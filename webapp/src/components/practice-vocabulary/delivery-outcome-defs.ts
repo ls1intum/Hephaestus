@@ -173,13 +173,6 @@ export function deliveryOutcome(feedback: DeliveryFacts): StatusDef {
 	return DELIVERY_STATE_DEFS[deliveryState];
 }
 
-export function isWithheld(feedback: DeliveryFacts): boolean {
-	return (
-		feedback.deliveryState === "SUPPRESSED" ||
-		(feedback.deliveryState === "PARTIALLY_DELIVERED" && feedback.suppressionReason !== undefined)
-	);
-}
-
 /** Still on its way out: sending, or retrying the comments that have not reached the provider yet. */
 export function isDeliveryInProgress(feedback: DeliveryFacts): boolean {
 	return (

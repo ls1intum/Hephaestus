@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+
 import type { PracticeGroup } from "@/api/types.gen";
 import { InlineLink } from "@/components/common/InlineLink";
 
@@ -22,6 +24,17 @@ export interface FeedbackTextProps {
 
 const NO_GROUPS: PracticeGroup[] = [];
 
+/** Punctuation that must stay on the line of the work link before it. */
+const LEADING_PUNCTUATION = /^[.,;:!?)]+/u;
+
+/** The punctuation a text segment opens with when a work link comes right before it. */
+function punctuationAfterWork(segments: FeedbackTextSegment[], index: number): string | undefined {
+	const [segment, next] = [segments[index], segments[index + 1]];
+	return segment?.type === "work" && next?.type === "text"
+		? LEADING_PUNCTUATION.exec(next.text)?.[0]
+		: undefined;
+}
+
 /**
  * Running text with its practice names as pills, its groups as their own icon and colour, and its
  * work references as links. A practice is the one grey pill every practice surface names it with,
@@ -40,15 +53,31 @@ export function FeedbackText({
 }: FeedbackTextProps) {
 	return (
 		<Component className={className}>
-			{segments.map((segment, index) => (
-				<Segment
-					key={index}
-					segment={segment}
-					onOpenPractice={onOpenPractice}
-					groups={groups}
-					onOpenGroup={onOpenGroup}
-				/>
-			))}
+			{segments.map((segment, index) => {
+				// A link with its icon is an atomic inline, so a line may break after it, even before a
+				// full stop. The punctuation that follows it moves into one unbreakable span with it.
+				const held = punctuationAfterWork(segments, index - 1);
+				if (held !== undefined && segment.type === "text") {
+					return <Fragment key={index}>{segment.text.slice(held.length)}</Fragment>;
+				}
+				const node = (
+					<Segment
+						segment={segment}
+						onOpenPractice={onOpenPractice}
+						groups={groups}
+						onOpenGroup={onOpenGroup}
+					/>
+				);
+				const mark = punctuationAfterWork(segments, index);
+				return mark === undefined ? (
+					<Fragment key={index}>{node}</Fragment>
+				) : (
+					<span key={index} className="whitespace-nowrap">
+						{node}
+						{mark}
+					</span>
+				);
+			})}
 		</Component>
 	);
 }

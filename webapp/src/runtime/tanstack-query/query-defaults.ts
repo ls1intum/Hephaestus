@@ -1,3 +1,4 @@
+import { problemStatusOf } from "@/lib/problem-detail";
 import { getUserViewSession } from "@/runtime/user-view/session";
 
 export const QUERY_STALE_TIME_MS = 30_000;
@@ -12,4 +13,9 @@ export const QUERY_RETRIES = 3;
  */
 export function sessionRetriesQueries(): boolean {
 	return getUserViewSession() === undefined;
+}
+
+/** A 404 is a record that does not exist here: asking again answers the same, only later. */
+export function retryUnlessNotFound(failureCount: number, error: unknown): boolean {
+	return sessionRetriesQueries() && problemStatusOf(error) !== 404 && failureCount < QUERY_RETRIES;
 }

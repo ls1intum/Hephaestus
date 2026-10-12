@@ -1,3 +1,4 @@
+import type { HistoryState } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { multiValue } from "@/lib/search-params";
@@ -58,6 +59,12 @@ export interface OpenInStackOptions {
 	 * it was first opened from, and Back does not walk through every record already handled.
 	 */
 	swap?: boolean;
+	/**
+	 * The surface shows one level at a time: a link from a level replaces it rather than opening over
+	 * it. Unlike `swap`, it is a step of its own in history, so Back returns to the record it replaced;
+	 * and it is not a push, so dismissing it closes to the page instead of going back to that record.
+	 */
+	single?: boolean;
 }
 
 /**
@@ -75,13 +82,13 @@ export interface OpenInStackOptions {
 export function openInStack(
 	stack: readonly string[],
 	key: string,
-	{ swap = false }: OpenInStackOptions = {},
+	{ swap = false, single = false }: OpenInStackOptions = {},
 ): { detail: string[]; pushed: boolean } {
 	const open = stack.indexOf(key);
 	if (open !== -1) {
 		return { detail: stack.slice(0, open + 1), pushed: false };
 	}
-	if (swap && stack.length > 0) {
+	if ((swap || single) && stack.length > 0) {
 		return { detail: [...stack.slice(0, -1), key], pushed: false };
 	}
 	if (stack.length >= DETAIL_STACK_MAX_DEPTH) {
@@ -112,4 +119,35 @@ export function detailSearch(entry: DetailStackEntry): { detail: string[] } {
 
 export function detailStackKey(entry: DetailStackEntry): string {
 	return `${entry.kind}:${entry.id}`;
+}
+
+/**
+ * How many levels at the top of the entry's stack this visit pushed, one history entry each, so
+ * that many can be dismissed by going back. An entry stamped before the count was kept counts its
+ * own push alone.
+ */
+export function pushedLevels(state: HistoryState | undefined): number {
+	if (state?.detailPush !== true) {
+		return 0;
+	}
+	return state.detailPushes ?? 1;
+}
+
+/**
+ * The state of a history entry the stack writes. A new entry carries only its own stamp, never a
+ * marker another writer left on the entry it came from: such a marker describes that one entry, and
+ * copied forward it would make a later writer mistake the reader's own level for its step. An entry
+ * rewritten in place keeps what it had.
+ *
+ * The stamp is whether the entry pushed a level and, if so, how many levels it and the entries
+ * right before it pushed in a row ({@link pushedLevels}): read off the entry it came from, not
+ * copied from it, so a run of pushes counts up and anything else starts it over.
+ */
+export function detailEntryState(
+	previous: HistoryState,
+	detailPush: boolean,
+	replace: boolean,
+): HistoryState {
+	const stamp = { detailPush, detailPushes: detailPush ? pushedLevels(previous) + 1 : undefined };
+	return replace ? { ...previous, ...stamp } : stamp;
 }

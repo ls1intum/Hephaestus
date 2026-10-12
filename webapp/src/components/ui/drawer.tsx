@@ -11,8 +11,7 @@ import { cn } from "cn";
  * ⚠️ Diverges from the shadcn registry — `shadcn add drawer` drops the following; re-apply them.
  *
  * 1. `DrawerContent` takes `size`: `default` is upstream's width, `detail` a panel that replaces a
- *    page, `detailWide` that panel for a surface that needs most of the viewport, `panel` a fixed
- *    tool column beside one. Each owns its width and `--peek`.
+ *    page, `panel` a fixed tool column beside one. Each owns its width and `--peek`.
  * 2. `DrawerContent` takes `dimWhenNested`, documented at its definition.
  * 3. `DrawerBody`, the scrollable middle, keyboard-focusable so a submitting form's disabled
  *    controls do not strand the overflow. `DrawerHeader` and `DrawerFooter` are sized for it: the
@@ -22,8 +21,10 @@ import { cn } from "cn";
  *    `motion-reduce:` block that zeroes the scale, the peek and the travel and keeps the fade.
  *    Upstream is 450ms both ways on one curve with no reduced-motion branch.
  * 5. `height` is transitioned only on the y axis, for the reason at the popup's class list.
- * 6. The overlay dims (`bg-black/25`) and never blurs; the viewport is `overflow-hidden` so the
- *    bleed pseudo-element stays off the page's scroll width.
+ * 6. The overlay dims (`bg-scrim`: 25% black in light mode, 50% in dark) and never blurs; the
+ *    viewport is `overflow-hidden` so the bleed pseudo-element stays off the page's scroll width.
+ * 7. The popup is `surface-raised bg-background`, not `bg-popover`: the utility repaints the page and
+ *    card colours inside the panel, so dark mode lifts the whole level, and a covered level recedes.
  */
 interface DrawerContextProps {
 	hasSnapPoints: boolean;
@@ -86,7 +87,7 @@ function DrawerOverlay({ className, ...props }: DrawerPrimitive.Backdrop.Props) 
 			// Dimmed but never blurred. A side panel earns its place over a page transition because
 			// the page behind stays legible; blurring it removes the only advantage.
 			className={cn(
-				"fixed inset-0 z-50 min-h-dvh bg-black/25 opacity-[max(var(--drawer-overlay-min-opacity,0),calc(1-var(--drawer-swipe-progress)))] transition-opacity duration-450 ease-drawer select-none data-ending-style:pointer-events-none data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-snap-points:[--drawer-overlay-min-opacity:0.5] data-starting-style:opacity-0 data-swiping:duration-0 supports-[-webkit-touch-callout:none]:absolute",
+				"fixed inset-0 z-50 min-h-dvh bg-scrim opacity-[max(var(--drawer-overlay-min-opacity,0),calc(1-var(--drawer-swipe-progress)))] transition-opacity duration-450 ease-drawer select-none data-ending-style:pointer-events-none data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-snap-points:[--drawer-overlay-min-opacity:0.5] data-starting-style:opacity-0 data-swiping:duration-0 supports-[-webkit-touch-callout:none]:absolute",
 				className,
 			)}
 			{...props}
@@ -110,29 +111,28 @@ function DrawerSwipeHandle({ className, ...props }: React.ComponentProps<"div">)
 	);
 }
 
+/** The `detail` preset's classes, documented at the variant. */
+const DETAIL_PANEL =
+	"will-change-auto [--peek:6rem] data-[swipe-axis=x]:[--drawer-content-width:100%] data-[swipe-axis=x]:sm:[--drawer-content-width:round(min(60rem,92vw),1px)] data-[swipe-axis=x]:xl:[--drawer-content-width:round(75vw,1px)]";
+
 const drawerContentVariants = cva("", {
 	variants: {
 		size: {
 			default:
 				"[--peek:1rem] data-[swipe-axis=x]:[--drawer-content-width:75%] data-[swipe-axis=x]:sm:[--drawer-content-width:24rem]",
 			/**
-			 * A panel that replaces a page, so it has to hold what that page held. Full width below
-			 * `sm`, where a partial cover is unreadable. `--peek` is far above the default: the column
-			 * a covered panel keeps on screen is the reason to stack rather than replace.
+			 * A panel that replaces a page, so it has to hold what that page held: every level of every
+			 * detail stack, one width for all of them, so a level over another always covers it to the
+			 * same depth and leaves the same `--peek` of it showing. Full width below `sm`, where a
+			 * partial cover is unreadable; 60rem from `sm`, 75vw from `xl`.
+			 *
+			 * Both widths are rounded to a whole pixel, and `will-change-auto` replaces the base
+			 * `will-change-transform`: at these widths the panel edge is rarely on a whole pixel, and a
+			 * panel kept on a GPU layer at rest rasterises its text soft, so demoting the layer after the
+			 * animation lets the text, and every hover state repainted inside it, snap back to the pixel
+			 * grid.
 			 */
-			detail:
-				"[--peek:6rem] data-[swipe-axis=x]:[--drawer-content-width:100%] data-[swipe-axis=x]:sm:[--drawer-content-width:min(44rem,92vw)] data-[swipe-axis=x]:xl:[--drawer-content-width:min(62rem,75vw)]",
-			/**
-			 * `detail` for a surface whose content needs most of the viewport, e.g. a two-column
-			 * standing with a run feed. Same peek; from `sm` the width is 60rem where `detail` is 44rem,
-			 * and from `xl` it holds 75vw instead of capping at 62rem. Both widths are rounded to a
-			 * whole pixel, and `will-change-auto` replaces the base `will-change-transform`: at these
-			 * widths the panel edge is rarely on a whole pixel, and a panel kept on a GPU layer at rest
-			 * rasterises its text soft, so demoting the layer after the animation lets the text snap
-			 * back to the pixel grid.
-			 */
-			detailWide:
-				"will-change-auto [--peek:6rem] data-[swipe-axis=x]:[--drawer-content-width:100%] data-[swipe-axis=x]:sm:[--drawer-content-width:round(min(60rem,92vw),1px)] data-[swipe-axis=x]:xl:[--drawer-content-width:round(75vw,1px)]",
+			detail: DETAIL_PANEL,
 			/** A tool beside the page rather than a page over it: one fixed column, the page keeps the rest. */
 			panel:
 				"[--peek:1rem] data-[swipe-axis=x]:[--drawer-content-width:100%] data-[swipe-axis=x]:sm:[--drawer-content-width:28rem]",
@@ -176,12 +176,12 @@ function DrawerContent({
 						// `height` is transitioned only on the y axis. Base UI releases a parent's pinned height on the
 						// exact frame its child's exit completes, so a side panel that animates height jumps at that
 						// frame; on the x axis it is `inset-y-0` and its height never legitimately changes.
-						"group/drawer-popup pointer-events-auto fixed z-50 m-(--drawer-inset,0px) flex max-h-(--drawer-content-max-height,none) min-h-0 w-(--drawer-content-width,auto) transform-[translate3d(var(--translate-x,0px),var(--translate-y,0px),0)_scale(var(--stack-scale))] flex-col bg-popover text-popover-foreground shadow-lg ease-(--drawer-ease) will-change-transform outline-none select-none",
-						"data-[swipe-axis=y]:h-(--drawer-content-height) data-[swipe-axis=y]:transition-[transform,height,opacity,filter] data-[swipe-axis=y]:[interpolate-size:allow-keywords]",
-						"data-[swipe-axis=x]:transition-[transform,opacity,filter]",
+						"group/drawer-popup pointer-events-auto fixed z-50 m-(--drawer-inset,0px) flex max-h-(--drawer-content-max-height,none) min-h-0 w-(--drawer-content-width,auto) transform-[translate3d(var(--translate-x,0px),var(--translate-y,0px),0)_scale(var(--stack-scale))] flex-col bg-background text-popover-foreground shadow-lg ease-(--drawer-ease) will-change-transform surface-raised outline-none select-none",
+						"data-[swipe-axis=y]:h-(--drawer-content-height) data-[swipe-axis=y]:transition-[transform,height,opacity,filter,background-color] data-[swipe-axis=y]:[interpolate-size:allow-keywords]",
+						"data-[swipe-axis=x]:transition-[transform,opacity,filter,background-color]",
 						"data-nested-drawer-open:overflow-hidden data-nested-drawer-open:brightness-95",
 						// Bleed — paints past the anchored edge so an overscrolled drawer shows no gap.
-						"after:pointer-events-none after:absolute after:bg-(--drawer-bleed-background,var(--color-popover)) data-[swipe-axis=x]:after:inset-y-0 data-[swipe-axis=x]:after:w-(--bleed) data-[swipe-axis=y]:after:inset-x-0 data-[swipe-axis=y]:after:h-(--bleed) data-[swipe-direction=down]:after:top-full data-[swipe-direction=left]:after:right-full data-[swipe-direction=right]:after:left-full data-[swipe-direction=up]:after:bottom-full",
+						"after:pointer-events-none after:absolute after:bg-(--drawer-bleed-background,var(--background)) data-[swipe-axis=x]:after:inset-y-0 data-[swipe-axis=x]:after:w-(--bleed) data-[swipe-axis=y]:after:inset-x-0 data-[swipe-axis=y]:after:h-(--bleed) data-[swipe-direction=down]:after:top-full data-[swipe-direction=left]:after:right-full data-[swipe-direction=right]:after:left-full data-[swipe-direction=up]:after:bottom-full",
 						"[--drawer-content-height:var(--drawer-height,auto)] data-[swipe-axis=y]:[--drawer-content-max-height:calc(100dvh-6rem)] data-[swipe-axis=y]:data-snap-points:[--drawer-content-height:100dvh]",
 						drawerContentVariants({ size }),
 						// Reduced motion: keep the panel, drop what triggers vestibular symptoms. The scale and

@@ -1,5 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 
+import type { BrandIcon } from "@/components/icons/brand";
+
 import type { FacetOption } from "@/components/common/FacetMultiSelect";
 
 /**
@@ -11,7 +13,8 @@ import type { FacetOption } from "@/components/common/FacetMultiSelect";
  */
 export interface StatusDef {
 	label: string;
-	icon: LucideIcon;
+	/** A provider's own mark where the value names a provider: GitHub, GitLab, Slack, Heph. */
+	icon: LucideIcon | BrandIcon;
 	badgeVariant: BadgeVariant;
 	description: string;
 }

@@ -11,7 +11,7 @@ export interface SectionLabelProps {
 }
 
 /**
- * The small muted label over a block: "What is holding up well", "Current feedback", "Why it
+ * The small muted label over a block: "Current feedback", "Why it
  * matters". A section with a title and a sentence under it is `layout/Section` at `size="lg"`.
  */
 export function SectionLabel({ id, as: Tag = "span", children, className }: SectionLabelProps) {

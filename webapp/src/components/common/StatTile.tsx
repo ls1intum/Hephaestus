@@ -49,7 +49,8 @@ export function StatTile({
 			</CardHeader>
 			<CardContent className="flex flex-1 flex-col gap-3">
 				<div className="space-y-1">
-					<p className="flex items-baseline gap-1.5">
+					{/* A `div`, not a `p`: a loading tile's value is a block skeleton. */}
+					<div className="flex items-baseline gap-1.5">
 						<span
 							className={cn(
 								"text-2xl leading-none font-semibold tabular-nums",
@@ -61,7 +62,7 @@ export function StatTile({
 						{qualifier !== undefined && (
 							<span className="text-sm text-muted-foreground">{qualifier}</span>
 						)}
-					</p>
+					</div>
 					{detail}
 				</div>
 				{children}

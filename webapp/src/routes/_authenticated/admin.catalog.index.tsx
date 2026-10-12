@@ -102,7 +102,7 @@ function AdminCuratedCatalogPage() {
 	const { detail, ...search } = Route.useSearch();
 	const queryClient = useQueryClient();
 	const detailStack = parseDetailStack(detail, CURATED_LEVEL_KINDS);
-	const stackControls = useDetailStack(detailStack);
+	const stackControls = useDetailStack();
 	const pathAt = levelPathAt(detailStack, {
 		pageLabel: "Practice catalog",
 		labelOf: (entry) => CURATED_LEVEL_LABELS[entry.kind],

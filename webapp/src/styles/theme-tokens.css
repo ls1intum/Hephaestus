@@ -12,6 +12,10 @@
 	--card-foreground: oklch(0.141 0.005 285.823);
 	--popover: oklch(1 0 0);
 	--popover-foreground: oklch(0.141 0.005 285.823);
+	/* A drawer level another level covers. Light mode recedes it with the drawer's brightness filter. */
+	--popover-covered: oklch(1 0 0);
+	/* What a modal drawer lays over the page behind it. */
+	--scrim: oklch(0 0 0 / 25%);
 	--primary: oklch(0.21 0.006 285.885);
 	--primary-foreground: oklch(0.985 0 0);
 	--secondary: oklch(0.967 0.001 286.375);
@@ -53,12 +57,19 @@
 }
 
 .dark {
+	/*
+	 * Elevation in dark mode is a lighter surface, not a shadow: a shadow or a dimming filter barely
+	 * changes a near-black surface. Page 0.141 < card 0.18 < overlay 0.21; a covered drawer level
+	 * recedes to 0.165, below the level in front of it.
+	 */
 	--background: oklch(0.141 0.005 285.823);
 	--foreground: oklch(0.985 0 0);
-	--card: oklch(0.141 0.005 285.823);
+	--card: oklch(0.18 0.006 285.9);
 	--card-foreground: oklch(0.985 0 0);
-	--popover: oklch(0.141 0.005 285.823);
+	--popover: oklch(0.21 0.006 285.885);
 	--popover-foreground: oklch(0.985 0 0);
+	--popover-covered: oklch(0.165 0.005 285.9);
+	--scrim: oklch(0 0 0 / 50%);
 	--primary: oklch(0.985 0 0);
 	--primary-foreground: oklch(0.21 0.006 285.885);
 	--secondary: oklch(0.274 0.006 286.033);
@@ -73,7 +84,7 @@
 	--success-foreground: oklch(0.21 0.006 285.885);
 	--warning: oklch(0.769 0.153 70.08);
 	--warning-foreground: oklch(0.21 0.006 285.885);
-	--border: oklch(0.274 0.006 286.033);
+	--border: oklch(0.32 0.006 286);
 	--input: oklch(0.274 0.006 286.033);
 	--ring: oklch(0.442 0.017 285.786);
 	--chart-1: oklch(0.488 0.243 264.376);
@@ -105,6 +116,7 @@
 	--color-card-foreground: var(--card-foreground);
 	--color-popover: var(--popover);
 	--color-popover-foreground: var(--popover-foreground);
+	--color-scrim: var(--scrim);
 	--color-primary: var(--primary);
 	--color-primary-foreground: var(--primary-foreground);
 	--color-secondary: var(--secondary);

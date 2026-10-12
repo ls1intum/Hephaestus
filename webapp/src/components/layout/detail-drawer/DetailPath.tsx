@@ -36,8 +36,8 @@ export interface DetailPathProps extends LevelPath {
  * The eyebrow over a level's title, read off the route's detail stack: the page and the levels
  * behind, by name, then what this level is. A crumb behind is an `InlineLink` that closes down to
  * it, and the path is the one place that says both where the reader is and how they got there.
- * The stack never goes deeper than three levels over the page, so a counter would be true and
- * useless; a named path answers "where am I" in one line.
+ * The stack never goes deeper than DETAIL_STACK_MAX_DEPTH (four) levels over the page, so a
+ * counter would be true and useless; a named path answers "where am I" in one line.
  *
  * The breadcrumb primitive's list, without its `nav`: covered levels stay in the accessibility
  * tree, and two landmarks with the same name would be one too many. Its link is not used either,

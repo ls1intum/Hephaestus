@@ -5,9 +5,18 @@ import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { DrawerClose, DrawerHeader } from "@/components/ui/drawer";
 
+import { DetailPath, type DetailPathProps } from "./DetailPath";
+
 export interface DetailDrawerHeaderProps {
 	/** True below the top level, where dismissing returns to the drawer behind rather than the page. */
 	nested?: boolean;
+	/**
+	 * Where the dismiss sits. `beside` (the default) gives it a column of its own, so the content
+	 * starts after it. `inPath` lays it over the start of the content's first row, which must be a
+	 * {@link LevelPathRow} to leave room for it, so the title and everything under it line up with
+	 * the body.
+	 */
+	dismiss?: "beside" | "inPath";
 	className?: string;
 	children: ReactNode;
 }
@@ -24,16 +33,38 @@ export interface DetailDrawerHeaderProps {
  */
 export function DetailDrawerHeader({
 	nested = false,
+	dismiss = "beside",
 	className,
 	children,
 }: DetailDrawerHeaderProps) {
+	const inPath = dismiss === "inPath";
 	return (
-		<DrawerHeader className={cn("flex-row items-start gap-3", className)}>
-			<DrawerClose render={<Button variant="ghost" size="icon-sm" className="-ml-2 shrink-0" />}>
+		<DrawerHeader className={cn("flex-row items-start gap-3", inPath && "relative", className)}>
+			<DrawerClose
+				render={
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className={inPath ? "absolute top-5 left-4" : "-ml-2 shrink-0"}
+					/>
+				}
+			>
 				{nested ? <ChevronLeft /> : <XIcon />}
 				<span className="sr-only">{nested ? "Back" : "Close"}</span>
 			</DrawerClose>
 			<div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-2">{children}</div>
 		</DrawerHeader>
+	);
+}
+
+/**
+ * The path's row of a header with `dismiss="inPath"`: as tall as the dismiss, and indented past it,
+ * so the dismiss sits over the row's start and never over the first crumb.
+ */
+export function LevelPathRow(props: DetailPathProps) {
+	return (
+		<div className="flex min-h-7 items-center pl-8">
+			<DetailPath {...props} />
+		</div>
 	);
 }

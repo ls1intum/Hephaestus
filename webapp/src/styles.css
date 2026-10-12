@@ -39,6 +39,22 @@ code {
 }
 
 /*
+ * A raised surface: a drawer level, or anything else that opens over the page. It repaints the page
+ * and card colours its content reads, so a box drawn on `bg-background` or `bg-card` inside it sits
+ * on the raised surface instead of punching a hole down to the page. A level another level covers
+ * recedes to `--popover-covered`. In light mode both equal the page's white.
+ */
+@utility surface-raised {
+	--background: var(--popover);
+	--card: var(--popover);
+
+	&[data-nested-drawer-open] {
+		--background: var(--popover-covered);
+		--card: var(--popover-covered);
+	}
+}
+
+/*
  * Provider-aware semantic colors.
  * Default values use @primer/primitives (GitHub), which handles light/dark via data-color-mode on
  * the root element. GitLab overrides are defined below via [data-provider="gitlab"] selectors.

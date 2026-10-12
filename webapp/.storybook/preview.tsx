@@ -136,6 +136,10 @@ const preview: Preview = {
 					name: "Mobile",
 					styles: { width: "375px", height: "667px" },
 				},
+				phone390: {
+					name: "Phone (390px)",
+					styles: { width: "390px", height: "844px" },
+				},
 				tablet: {
 					name: "Tablet",
 					styles: { width: "768px", height: "1024px" },

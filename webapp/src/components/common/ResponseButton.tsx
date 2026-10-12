@@ -54,14 +54,25 @@ export interface ResponseButtonProps extends Omit<ComponentProps<typeof Button>,
 	tone: ResponseTone;
 	/** Whether this is the response the reader chose; a pressed button wears its tone. */
 	pressed: boolean;
+	/**
+	 * A response that should not compete with the action beside it: no border or ground at rest and
+	 * muted until hovered, as `variant="quiet"` draws it. Pressed, it wears its tone all the same.
+	 */
+	quiet?: boolean;
 }
 
 /** One of the responses a reader can give: a card's "Helpful", an observation's "Addressed". */
-export function ResponseButton({ tone, pressed, className, ...props }: ResponseButtonProps) {
+export function ResponseButton({
+	tone,
+	pressed,
+	quiet = false,
+	className,
+	...props
+}: ResponseButtonProps) {
 	return (
 		<Button
 			type="button"
-			variant="outline"
+			variant={quiet ? "quiet" : "outline"}
 			aria-pressed={pressed}
 			className={cn(PRESSED_TINT[tone], className)}
 			{...props}

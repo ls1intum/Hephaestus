@@ -56,7 +56,7 @@ export function PublicPersonDrawer({
 		onClose,
 	});
 	return (
-		<DetailDrawerStack stack={stack} size="detail" onClose={onClose}>
+		<DetailDrawerStack stack={stack} onClose={onClose}>
 			{(_entry, level): ReactNode => {
 				const target = stack[level.depth]?.target;
 				if (target?.kind !== "person") {

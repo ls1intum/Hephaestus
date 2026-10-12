@@ -80,5 +80,8 @@ afterEach(() => {
 	// in the next one's DOM and answers its queries. Dismissing marks them all inactive, which is
 	// what the replay reads.
 	toast.dismiss();
+	// Session storage outlives a test too, such as the overview's remembered range: each test starts
+	// as a fresh browser tab.
+	sessionStorage.clear();
 });
 afterAll(() => server.close());

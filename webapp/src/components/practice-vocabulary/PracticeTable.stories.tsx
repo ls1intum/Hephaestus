@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ClipboardCheckIcon } from "lucide-react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 
 import type { PracticeStanding } from "@/api/types.gen";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -117,8 +117,8 @@ export const Default: Story = {
 };
 
 /**
- * The standing badge and the trend chip are buttons only so a keyboard reaches their sentences;
- * they answer nothing of their own, so a pointer's press on either is the row's. A keyboard's
+ * The standing badge and the trend chip are buttons only so their sentences are in reach; they
+ * answer nothing of their own, so a mouse press on either is the row's. A tap or a keyboard's
  * Enter on one is not: that reader came for the sentence, and the row's own link is theirs.
  */
 export const OpensFromTheStandingCell: Story = {
@@ -140,6 +140,16 @@ export const OpensFromTheStandingCell: Story = {
 		badge.focus();
 		await userEvent.keyboard("{Enter}");
 		await expect(onOpen).not.toHaveBeenCalled();
+		// A tap opens the sentence, not the row.
+		await userEvent.keyboard("{Escape}");
+		await waitFor(async () => {
+			await expect(badge).toHaveAttribute("aria-expanded", "false");
+		});
+		await userEvent.pointer({ keys: "[TouchA]", target: badge });
+		await expect(onOpen).not.toHaveBeenCalled();
+		await waitFor(async () => {
+			await expect(badge).toHaveAttribute("aria-expanded", "true");
+		});
 		// The row's own link is the keyboard path, and Enter on it still opens the row.
 		within(row)
 			.getByRole("button", { name: "Open practice Describe what changed and why" })

@@ -19,6 +19,7 @@ import {
 } from "@tanstack/react-router";
 import {
 	lazy,
+	type ReactNode,
 	Suspense,
 	useEffect,
 	useEffectEvent,
@@ -81,6 +82,7 @@ import { isMentorSetUp } from "@/lib/mentor-preference";
 import { stepUpChallengeOf } from "@/lib/problem-detail";
 import { toScmProviderType } from "@/lib/provider/provider-terms";
 import { useSearchState } from "@/lib/search-params";
+import { WorkProviderContext } from "@/lib/work-provider-context";
 import { type AuthContextType, useAuth } from "@/runtime/auth/AuthContext";
 import { safeReturnTo } from "@/runtime/auth/return-to";
 import { FeatureFlagDevTools } from "@/runtime/feature-flags/FeatureFlagDevTools";
@@ -139,41 +141,43 @@ function RootLayout() {
 			<SkipToContent />
 			{loginOpen !== true && <CookieConsentBanner />}
 			<ProviderColors />
-			<SidebarProvider>
-				<AppSidebarContainer />
-				<SidebarInset className="mr-[var(--right-sidebar-width,0)] min-w-0">
-					<HeaderContainer />
-					{userView && (
-						<UserViewBanner
-							name={userView.name}
-							workspace={userView.workspaceName}
-							hasAccount={userView.hasAccount}
-							onExit={exitUserView}
-						/>
-					)}
-					<main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col">
-						{surface === "standard" ? (
-							<StandardPageSurface className="flex-1">
-								<Outlet />
-							</StandardPageSurface>
-						) : (
-							<div
-								className={
-									surface === "fullscreen" ? "flex min-h-0 min-w-0 flex-1 flex-col" : "flex-1"
-								}
-							>
-								<Outlet />
-							</div>
+			<WorkProviderScope>
+				<SidebarProvider>
+					<AppSidebarContainer />
+					<SidebarInset className="mr-[var(--right-sidebar-width,0)] min-w-0">
+						<HeaderContainer />
+						{userView && (
+							<UserViewBanner
+								name={userView.name}
+								workspace={userView.workspaceName}
+								hasAccount={userView.hasAccount}
+								onExit={exitUserView}
+							/>
 						)}
-					</main>
-					{surface !== "fullscreen" && (
-						<Footer
-							buildInfo={environment.buildInfo}
-							isProduction={environment.deployment.isProduction}
-						/>
-					)}
-				</SidebarInset>
-			</SidebarProvider>
+						<main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col">
+							{surface === "standard" ? (
+								<StandardPageSurface className="flex-1">
+									<Outlet />
+								</StandardPageSurface>
+							) : (
+								<div
+									className={
+										surface === "fullscreen" ? "flex min-h-0 min-w-0 flex-1 flex-col" : "flex-1"
+									}
+								>
+									<Outlet />
+								</div>
+							)}
+						</main>
+						{surface !== "fullscreen" && (
+							<Footer
+								buildInfo={environment.buildInfo}
+								isProduction={environment.deployment.isProduction}
+							/>
+						)}
+					</SidebarInset>
+				</SidebarProvider>
+			</WorkProviderScope>
 			<Toaster />
 			<PublicLoginOverlay />
 			{userView && <UserViewConfirmAccess />}
@@ -471,6 +475,15 @@ function ProviderColors() {
 	});
 	useProviderColors(toScmProviderType(published ?? own));
 	return null;
+}
+
+/**
+ * The noun of the workspace's work, for every surface: only a provider the workspace names, never
+ * the fallback. Context reaches portals, so drawers read it too.
+ */
+function WorkProviderScope({ children }: { children: ReactNode }) {
+	const [workProvider] = scmKindOf(useActiveWorkspaceSlug().chromeWorkspace?.providerType);
+	return <WorkProviderContext value={workProvider}>{children}</WorkProviderContext>;
 }
 
 /** The workspace's own source-control provider, as the integration kind the sidebar lists it under. */

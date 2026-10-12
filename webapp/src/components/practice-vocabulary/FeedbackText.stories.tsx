@@ -93,3 +93,17 @@ export const GroupNotInTheWorkspace: Story = {
 		await expect(args.onOpenGroup).toHaveBeenCalledWith("retired-group");
 	},
 };
+
+/** The full stop after a work link stays on the link's line on a narrow screen. */
+export const StopAfterAWorkLink: Story = {
+	args: { segments: [text("Moved to Needs attention after "), work(pullRequest(21)), text(".")] },
+	globals: { viewport: { value: "phone390" } },
+	play: async ({ canvas }) => {
+		const link = canvas.getByRole("link", { name: "#21 (opens in a new tab)" });
+		const held = link.parentElement;
+		await expect(held).toHaveClass("whitespace-nowrap");
+		await expect(held?.lastChild?.textContent).toBe(".");
+		// The stop is not repeated in the text after the link.
+		await expect(held?.parentElement?.textContent.endsWith("tab).")).toBe(true);
+	},
+};

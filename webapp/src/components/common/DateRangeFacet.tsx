@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
+import { useNow } from "@/components/common/use-now";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -23,18 +24,21 @@ export interface DateRangeFacetProps {
 	onChange: (range: DateRange | undefined) => void;
 }
 
-function rangeLabel(range: DateRange): string | undefined {
+/** The applied range as the facet shows it, for a pill that names the same range. */
+export function dateRangeLabel(range: DateRange): string | undefined {
 	if (!range.from) {
 		return undefined;
 	}
 	if (!range.to) {
-		return `From ${format(range.from, "MMM d, yyyy")}`;
+		return `From ${format(range.from, "d MMM yyyy")}`;
 	}
-	return `${format(range.from, "MMM d")} – ${format(range.to, "MMM d, yyyy")}`;
+	// Day before month, as every other date in the app.
+	return `${format(range.from, "d MMM")} – ${format(range.to, "d MMM yyyy")}`;
 }
 
 export function DateRangeFacet({ title, value, onChange }: DateRangeFacetProps) {
-	const applied = value?.from ? rangeLabel(value) : undefined;
+	const today = new Date(useNow());
+	const applied = value?.from ? dateRangeLabel(value) : undefined;
 	return (
 		<Popover>
 			<PopoverTrigger
@@ -71,6 +75,10 @@ export function DateRangeFacet({ title, value, onChange }: DateRangeFacetProps) 
 					selected={value}
 					onSelect={onChange}
 					numberOfMonths={1}
+					// Every date this filters is something that already happened: a future day can only
+					// select nothing.
+					disabled={{ after: today }}
+					endMonth={today}
 				/>
 				{/* The way out every other facet in the toolbar has: without it a picked range can only be
 				    replaced by picking another, never removed. */}

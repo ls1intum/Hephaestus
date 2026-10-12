@@ -1,6 +1,6 @@
 import { Meter } from "@base-ui/react/meter";
-import { ArrowRightIcon, CheckIcon, ChevronRightIcon, ClockIcon, PackageIcon } from "lucide-react";
-import { type ComponentType, type Ref, useId } from "react";
+import { ArrowRightIcon, CheckIcon, ClockIcon, PackageIcon } from "lucide-react";
+import { type ComponentType, type ReactNode, useId } from "react";
 
 import { cn } from "cn";
 import type { InAppEvidence, ReviewedWorkRef } from "@/api/types.gen";
@@ -8,29 +8,26 @@ import { FOCUS_RING } from "@/components/common/focus";
 import { InlineLink } from "@/components/common/InlineLink";
 import { ResponseButton, toneOf } from "@/components/common/ResponseButton";
 import { ResponseCommentBand } from "@/components/common/ResponseCommentBand";
-import { SectionLabel } from "@/components/common/SectionLabel";
 import { statusValues } from "@/components/common/status-def";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
 import { useNow } from "@/components/common/use-now";
-import { reviewedWorkIcon } from "@/components/icons/reviewed-work-icon";
 import { pillClasses } from "@/components/practice-vocabulary/group-visuals";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { formatDay, formatDayTime, formatShortDay } from "@/lib/dates";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatDay, formatDayTime } from "@/lib/dates";
 import { hasText } from "@/lib/text";
 
 import { FEEDBACK_RESOLUTION_DEFS, type FeedbackResolution } from "./feedback-resolution-defs";
 import { FEEDBACK_STATE_DEFS, type FeedbackState, isOpenFeedback } from "./feedback-state-defs";
-import { type FeedbackTextSegment, linkWork } from "./feedback-text";
+import { count, type FeedbackTextSegment, linkWork } from "./feedback-text";
 import { FEEDBACK_USEFULNESS_DEFS, type FeedbackUsefulness } from "./feedback-usefulness-defs";
 import { FeedbackText } from "./FeedbackText";
+import { FeedbackWorkTimeline } from "./FeedbackWorkTimeline";
 import { GroupName } from "./GroupName";
-import { OUTCOME_DEFS } from "./outcome-defs";
-import { countedStripWork, type StripPiece, stripPieces } from "./practice-feedback-card-strip";
+import { cleanLabel, timelinePieces } from "./practice-feedback-timeline";
 import { PracticePill } from "./PracticePill";
-import { StatusIcon } from "./StatusTooltip";
 
 /** The band under a card's footer: the rating's comment, or the sentence a dispute carries. */
 export type FeedbackBand = "comment" | "dispute";
@@ -44,29 +41,25 @@ export type ResponseControl = "rating" | "answer" | "send" | "disagree";
  */
 export type ResolvingAnswer = Exclude<FeedbackResolution, "DISPUTED">;
 
-const RESOLVING_ANSWERS: ResolvingAnswer[] = ["ADDRESSED", "NOT_APPLICABLE"];
-
-const DisagreeIcon = FEEDBACK_RESOLUTION_DEFS.DISPUTED.icon;
-
 /**
- * One piece of reviewed work in the card's strip — the evidence behind the feedback — with what
- * the review saw on it.
+ * One piece of reviewed work on the card's timeline — the evidence behind the feedback — with
+ * what the review saw on it.
  */
 export interface ReviewedWorkOutcome {
 	/** The work by number — "!425" — linked to its page when the provider has one. */
 	ref: ReviewedWorkRef;
-	/** When the work was reviewed; the strip orders by it and shows it as the short day, "28 Aug". */
+	/** When the work was reviewed; the timeline orders by it and shows it as the short day, "28 Aug". */
 	date: Date;
 	outcome: InAppEvidence["outcome"];
 }
 
 /**
  * One piece of work that came back clean on the practice since the feedback was prepared. It has
- * no outcome of its own: being here is what the strip marks it with.
+ * no outcome of its own: being here is what the timeline marks it with.
  */
 export interface CleanWork {
 	ref: ReviewedWorkRef;
-	/** When the piece was reviewed; the strip orders and dates it by this. */
+	/** When the piece was reviewed; the timeline orders and dates it by this. */
 	date: Date;
 }
 
@@ -103,20 +96,22 @@ export interface PracticeFeedbackCardEntry {
 	 */
 	body: string;
 	/**
-	 * The evidence behind the feedback; the strip lists the newest that fit, oldest to newest, in
-	 * any order given. Each piece carries its own kind and provider, which decides the noun the
-	 * strip's label counts by.
+	 * The evidence behind the feedback; the timeline shows the newest, oldest to newest, in any
+	 * order given, and counts the older ones in one "N earlier" place.
 	 */
 	reviewedWork: ReviewedWorkOutcome[];
 	/**
 	 * The clean work since, oldest first and at most `cleanNeeded` long; each piece carries the day
-	 * it was reviewed, so the strip places it among the evidence by time rather than after it. The
+	 * it was reviewed, so the timeline places it among the evidence by time rather than after it. The
 	 * meter fills by it, and once resolved these are the pieces that resolved it.
 	 */
 	cleanWork: CleanWork[];
 	cleanNeeded: number;
 	nextStep: string;
-	/** The line under the next step: what ticks it, or what did. */
+	/**
+	 * How the feedback resolves, or how it did: on an open card the meter's tooltip and
+	 * description, on any other the sentence under "Your last reviewed work".
+	 */
 	condition: FeedbackTextSegment[];
 	state: FeedbackState;
 	/** When the feedback was created or, once `state` is resolved or closed, when that happened. */
@@ -169,13 +164,46 @@ export interface PracticeFeedbackCardProps extends FeedbackRatingProps {
 	onLearnMore?: () => void;
 	onOpenPractice?: (slug: string) => void;
 	onOpenGroup?: (slug: string) => void;
-	/**
-	 * The card as an element the page can land on: "Read the feedback" in Heph's card scrolls to it
-	 * and moves the focus here, so the reader's next Tab continues from the card rather than from
-	 * where the link stood.
-	 */
-	ref?: Ref<HTMLElement>;
 	className?: string;
+}
+
+const RESOLVING_ANSWERS: ResolvingAnswer[] = ["ADDRESSED", "NOT_APPLICABLE"];
+
+/**
+ * The two answers in the student's words, each with what it does, said in its tooltip and as its
+ * description. The registry's "Addressed" and "Not applicable" read as statuses, not as something
+ * to press. Both close the card as "Marked by
+ * you" and the clean work count goes on (`practice-review-glossary.mdx` § How feedback resolves);
+ * only "Not applicable" also holds back the same claim on the same work in a later review
+ * (`FeedbackResponseSuppressionFilter`), so only its line says so. A press on the chosen answer
+ * takes it back.
+ */
+const ANSWER_WORDS: Record<ResolvingAnswer, { label: string; effect: string }> = {
+	ADDRESSED: {
+		label: "I fixed this",
+		effect: "The card moves to Marked by you, and your next work confirms it.",
+	},
+	NOT_APPLICABLE: {
+		label: "Does not fit my work",
+		effect:
+			"The card moves to Marked by you, and a later review of the same work does not send you this point again.",
+	},
+};
+
+const DisagreeIcon = FEEDBACK_RESOLUTION_DEFS.DISPUTED.icon;
+
+const DISAGREE = {
+	label: "Disagree",
+	description: "Tell workspace admins what is wrong in this feedback.",
+} as const;
+
+/**
+ * The rule under the zone's title on an open card, with the card's own number: "Resolves when three
+ * pieces of reviewed work come back clean." The meter's tooltip keeps the full sentence.
+ */
+function resolveRule(cleanNeeded: number): string {
+	const pieces = count(cleanNeeded, "piece of reviewed work", "pieces of reviewed work");
+	return `Resolves when ${pieces} ${cleanNeeded === 1 ? "comes" : "come"} back clean.`;
 }
 
 /**
@@ -190,13 +218,39 @@ function formatTimestamp(date: Date, state: FeedbackState, today: Date): string 
 		: `${def.stamp ?? def.label} ${formatDay(date)}`;
 }
 
-const DISAGREE = "Disagree";
+/**
+ * The card is one target that opens the practice: "Learn more about this practice" stretches its
+ * press over the whole card (the stretched-link pattern), and every other control in it, the work's
+ * links and the scrolling timeline sit above that layer, so they still take their own press.
+ */
+const ABOVE_CARD_LINK =
+	"[&_:is(a,button,textarea,input,[tabindex]):not([data-card-link])]:relative [&_:is(a,button,textarea,input,[tabindex]):not([data-card-link])]:z-10";
 
 /**
- * One piece of practice feedback in three bands: what was seen, the next step with the two ways it
- * resolves — the meter the clean work fills and the reader's own answer — and the footer that rates
- * it. The glyph leading the next-step band says where the work stands and is never a control, so
- * nothing in that place looks like a checkbox the reader could tick.
+ * The state that invites the press, while the pointer is on the card or the keyboard focuses its
+ * link: the focus ring around the whole card, and (see `CardTint`) a light tint.
+ */
+const CARD_LINK_STATE =
+	"has-[[data-card-link]:focus-visible]:border-ring has-[[data-card-link]:focus-visible]:ring-3 has-[[data-card-link]:focus-visible]:ring-ring/50";
+
+/**
+ * The card's three section headings, "Why this was raised", "Next step" and "Your last reviewed
+ * work": one size, weight and colour, each one step (`gap-1`) above what it names, so they read as
+ * one set.
+ */
+const ZONE_HEADING = "text-sm font-semibold text-foreground";
+
+const workKey = (ref: { kind: string; id: string | number }) => `${ref.kind} ${ref.id}`;
+
+/**
+ * One piece of practice feedback in zones a reader takes in at a glance. The top says what it is
+ * about, its explanation under "Why this was raised"; the tinted band under it, what to do next;
+ * "Your last reviewed work", where the practice was seen on the left, and on the right how close
+ * the clean work is to resolving it and the reader's own way to close it; and the footer, when it
+ * was written and how the reader rates it. Thin rules separate
+ * them: above and below the band, and above the footer. Students in the first interview round found
+ * the earlier card dense and its parts hard to tell apart; these zones answer that. A withdrawn card
+ * keeps the head and the footer only, with the notice in between.
  */
 export function PracticeFeedbackCard({
 	card: {
@@ -227,43 +281,45 @@ export function PracticeFeedbackCard({
 	onLearnMore,
 	onOpenPractice,
 	onOpenGroup,
-	ref,
 	className,
 }: PracticeFeedbackCardProps) {
 	const headingId = useId();
 	const responseId = useId();
 	const shownTimestamp = formatTimestamp(timestamp, state, new Date(useNow()));
 	const resolved = state === "resolved";
-	// No work can tick a closed card, so it draws no count towards the threshold.
 	const closed = state === "closed";
-	// Only the reader's own answer is theirs to take back.
-	const answerable = isOpenFeedback(state) || state === "marked";
-	const BandIcon = FEEDBACK_STATE_DEFS[isOpenFeedback(state) ? "open" : state].icon;
+	const open = isOpenFeedback(state);
+	const answerable = open || state === "marked";
+	const BandIcon = FEEDBACK_STATE_DEFS[open ? "open" : state].icon;
 	const GroupIcon = group?.icon ?? PackageIcon;
 	const groupPill = hasText(group?.color) ? pillClasses(group.color) : undefined;
 	const cleanCount = cleanWork.length;
-	const cleanLabel = `${cleanCount} of ${cleanNeeded} clean`;
-	const shownWork = stripPieces(reviewedWork, cleanWork);
-	const evidenceRefs = reviewedWork.map((piece) => piece.ref);
-	const stripLabel = countedStripWork(shownWork.map((piece) => piece.ref));
-	// The work the body may name: everything the card can vouch for, whether the strip shows it or
-	// gave way to a newer piece.
-	const knownWork = [...evidenceRefs, ...cleanWork.map((clean) => clean.ref)];
-	const WorkIcon = reviewedWorkIcon(stripLabel.kind, stripLabel.provider);
-	const header = (
-		<div className="flex flex-wrap items-center justify-between gap-4">
+	const knownWork = [...reviewedWork.map((piece) => piece.ref), ...cleanWork.map((c) => c.ref)];
+	// The timeline shows the newest pieces only, oldest to newest, at most `TIMELINE_WORK_LIMIT`
+	// whatever the history; what falls out of it is counted in one "N earlier" place at its start,
+	// piece by piece, so evidence on work that also came back clean still counts.
+	const shown = timelinePieces(reviewedWork, cleanWork);
+	const earlier = reviewedWork.length + cleanWork.length - shown.length;
+	const cleanKeys = new Set(cleanWork.map((piece) => `${workKey(piece.ref)} clean`));
+	const missing = resolved || closed ? 0 : Math.max(cleanNeeded - cleanCount, 0);
+	// What the feedback is about: the practice, its group, and where the feedback stands.
+	const head = (
+		<div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
 			<div className="flex flex-wrap items-center gap-3 text-sm">
 				<PracticePill
 					name={practiceName}
 					onOpen={onOpenPractice && (() => onOpenPractice(practiceSlug))}
 				/>
-				<span className="text-muted-foreground">in</span>
-				<GroupName
-					name={group?.name ?? "Unassigned"}
-					icon={GroupIcon}
-					pill={groupPill}
-					onOpen={group && onOpenGroup && (() => onOpenGroup(group.slug))}
-				/>
+				{/* "in" moves with the group, so a wrap never leaves it at the end of the line. */}
+				<span className="inline-flex max-w-full min-w-0 items-center gap-3">
+					<span className="text-muted-foreground">in</span>
+					<GroupName
+						name={group?.name ?? "Unassigned"}
+						icon={GroupIcon}
+						pill={groupPill}
+						onOpen={group && onOpenGroup && (() => onOpenGroup(group.slug))}
+					/>
+				</span>
 			</div>
 			<StatusBadge
 				def={FEEDBACK_STATE_DEFS[state]}
@@ -277,30 +333,22 @@ export function PracticeFeedbackCard({
 		// next step, a meter that could read as progress, or buttons to answer it.
 		return (
 			<article
-				ref={ref}
 				aria-labelledby={headingId}
-				tabIndex={-1}
-				className={cn(
-					FOCUS_RING,
-					"flex flex-col overflow-hidden rounded-xl border bg-background",
-					className,
-				)}
+				className={cn("flex flex-col overflow-hidden rounded-xl border bg-background", className)}
 			>
-				<div className="flex flex-col gap-4 p-4">
-					{header}
-					<div className="flex flex-col gap-2.5">
-						<h3 id={headingId} className="max-w-3xl text-lg font-semibold">
-							This feedback was withdrawn
-						</h3>
-						<p className="max-w-3xl text-sm text-muted-foreground">
-							A workspace admin took it back because what it said was wrong. It says nothing about
-							how your work stands on this practice.
-						</p>
-					</div>
+				<div className="flex flex-col gap-3 p-4">
+					{head}
+					<h3 id={headingId} className="max-w-3xl text-lg leading-snug font-semibold">
+						This feedback was withdrawn
+					</h3>
+					<p className="max-w-3xl text-sm text-foreground">
+						A workspace admin took it back because what it said was wrong. It says nothing about how
+						your work stands on this practice.
+					</p>
 				</div>
-				<div className="flex flex-wrap items-center gap-3 border-t p-4">
-					<span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-						<ClockIcon className="size-4 shrink-0" aria-hidden />
+				<div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t px-4 py-2.5 text-xs">
+					<span className="inline-flex items-center gap-1.5 text-muted-foreground">
+						<ClockIcon className="size-3.5 shrink-0" aria-hidden />
 						<time dateTime={timestamp.toISOString()}>{shownTimestamp}</time>
 					</span>
 				</div>
@@ -310,27 +358,29 @@ export function PracticeFeedbackCard({
 
 	return (
 		<article
-			ref={ref}
 			aria-labelledby={headingId}
-			// Not in the tab order, but a target the page can put the focus on.
-			tabIndex={-1}
 			className={cn(
-				FOCUS_RING,
-				"flex flex-col overflow-hidden rounded-xl border bg-background",
-				// The two washes: `webapp/AGENTS.md` § Practice surfaces palette.
+				"group/card relative isolate flex flex-col overflow-hidden rounded-xl border bg-background",
+				onLearnMore && ["cursor-pointer", ABOVE_CARD_LINK, CARD_LINK_STATE],
 				state === "new" && "border-mentor/35 bg-linear-160 from-mentor/5 to-background to-55%",
 				resolved && "border-success/35 bg-linear-160 from-success/5 to-background to-55%",
 				className,
 			)}
 		>
-			<div className="flex flex-col gap-4 p-4">
-				{header}
-
-				<div className="flex flex-col gap-2.5">
-					<h3 id={headingId} className="max-w-3xl text-lg font-semibold">
-						{headline}
-					</h3>
-					<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "max-w-3xl text-sm text-muted-foreground")}>
+			{onLearnMore && <CardTint />}
+			{/* What it is about. */}
+			<div className="flex flex-col gap-3 p-4">
+				{head}
+				<h3 id={headingId} className="max-w-3xl text-lg leading-snug font-semibold">
+					{headline}
+				</h3>
+				{/*
+				 * The whole explanation under a heading that names it: it is short, and a clamp only hid the
+				 * reason behind a click.
+				 */}
+				<div className="flex flex-col gap-1">
+					<h4 className={ZONE_HEADING}>Why this was raised</h4>
+					<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "max-w-3xl text-sm text-foreground")}>
 						<UntrustedMarkdown
 							renderText={(value) => <FeedbackText segments={linkWork(value, knownWork)} />}
 						>
@@ -338,25 +388,36 @@ export function PracticeFeedbackCard({
 						</UntrustedMarkdown>
 					</div>
 				</div>
-
-				<div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-					<span className="inline-flex items-center gap-2 whitespace-nowrap text-muted-foreground">
-						<WorkIcon className="size-3.5 shrink-0" />
-						{stripLabel.text}
-					</span>
-					{shownWork.map((piece, index) => (
-						<StripPieceView key={piece.key} piece={piece} arrow={index > 0} />
-					))}
-				</div>
+				{onLearnMore && (
+					// Muted at rest; while the card is hovered or this link focused it is a link as the app draws
+					// one everywhere (`InlineLink`): in the accent and underlined, one pixel thick at the
+					// same offset. On a screen without hover it is in the accent from the start, as nothing
+					// would turn it.
+					<InlineLink
+						onClick={onLearnMore}
+						data-card-link=""
+						className={cn(
+							"group/card-link inline-flex items-center gap-1 self-end text-sm font-medium text-muted-foreground",
+							"after:absolute after:inset-0 after:content-['']",
+							"group-hover/card:text-mentor group-hover/card:underline focus-visible:text-mentor [@media(hover:none)]:text-mentor",
+						)}
+					>
+						Learn more about this practice
+						<ArrowRightIcon
+							aria-hidden
+							className="size-3.5 shrink-0 transition-transform group-hover/card:translate-x-0.5 group-focus-visible/card-link:translate-x-0.5"
+						/>
+					</InlineLink>
+				)}
 			</div>
 
+			{/* What to do. */}
 			<div
 				className={cn(
-					"grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 gap-y-3 border-t px-4 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]",
+					"grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 border-y px-4 py-3",
 					resolved ? "bg-success/10 dark:bg-success/15" : "bg-sidebar",
 				)}
 			>
-				{/* The line box is 20 px, so the glyph sits on the first line without an offset. */}
 				<span className="flex h-5 items-center" aria-hidden>
 					{resolved ? (
 						<span className="inline-flex size-4 items-center justify-center rounded-full bg-success">
@@ -367,148 +428,175 @@ export function PracticeFeedbackCard({
 					)}
 				</span>
 				<div className="flex min-w-0 flex-col gap-1">
-					<span className="text-sm font-semibold">Next step</span>
-					{/* The composer writes the step in Markdown, as it writes the body. */}
+					<h4 className={ZONE_HEADING}>Next step</h4>
 					<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "max-w-3xl text-sm text-foreground")}>
 						<UntrustedMarkdown>{nextStep}</UntrustedMarkdown>
 					</div>
-					<p className="text-xs text-muted-foreground">
-						<FeedbackText segments={condition} onOpenPractice={onOpenPractice} />
-					</p>
 				</div>
-				{/* A count toward a threshold is a meter, not task progress (APG meter pattern). */}
-				{!closed && (
-					<Meter.Root
-						value={cleanCount}
-						max={cleanNeeded}
-						aria-label="Clean work in a row"
-						getAriaValueText={() => cleanLabel}
-						className="col-start-2 flex flex-col items-start gap-1.5 sm:col-start-3 sm:items-end sm:pt-0.5"
-					>
-						<Meter.Track className="inline-flex gap-1">
-							{Array.from({ length: cleanNeeded }, (_, index) => (
-								<span
-									key={index}
-									className={cn(
-										"h-2 w-6 rounded-full",
-										index < cleanCount ? "bg-success" : "bg-border",
-									)}
-								/>
-							))}
-						</Meter.Track>
-						<Meter.Value className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
-							{() => cleanLabel}
-						</Meter.Value>
-					</Meter.Root>
-				)}
-				{/* The other way to close the card, under the clean work that ticks it by itself. */}
-				{onResolve && answerable && (
-					<div className="col-start-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-						<SectionLabel id={responseId} className="font-normal">
-							Your response
-						</SectionLabel>
+			</div>
+
+			{/*
+			 * Your last reviewed work: on the left, where the practice was seen, along the timeline; on the
+			 * right, one compact block for the status and the action: how close the clean work is to
+			 * resolving it, then the reader's own way to close it, left-aligned inside the block and the
+			 * block set to the right. A narrow card stacks the block under the timeline, full width. A
+			 * rule under the band parts the zone from the band.
+			 */}
+			<div className="@container/progress px-4 py-3">
+				<div className="grid gap-x-10 gap-y-4 @xl/progress:grid-cols-[minmax(0,1fr)_auto]">
+					<div className="flex min-w-0 flex-col gap-2.5">
+						<div className="flex flex-col gap-1">
+							<h4 className={ZONE_HEADING}>Your last reviewed work</h4>
+							{/* The rule in sight on an open card; once it no longer holds, the closing sentence. */}
+							<p data-progress-rule="" className="text-xs text-muted-foreground">
+								{open ? (
+									resolveRule(cleanNeeded)
+								) : (
+									<FeedbackText segments={condition} onOpenPractice={onOpenPractice} />
+								)}
+							</p>
+						</div>
+						<FeedbackWorkTimeline
+							pieces={shown}
+							cleanKeys={cleanKeys}
+							earlier={earlier}
+							missing={missing}
+						/>
+					</div>
+					{(!closed || (onResolve && answerable)) && (
+						// One compact block: the meter with its count on one line, then the reader's own way to
+						// close the card. Its left edges align; on a wide card it stands right of the timeline,
+						// as wide as its answers, and on a narrow one it takes the full width under it.
 						<div
-							role="group"
-							aria-labelledby={responseId}
-							className="flex flex-wrap items-center gap-2"
+							data-progress-status=""
+							className="flex w-full flex-col gap-3 @xl/progress:w-max @xl/progress:min-w-56 @xl/progress:self-start @xl/progress:justify-self-end"
 						>
-							{RESOLVING_ANSWERS.map((value) => {
-								const def = FEEDBACK_RESOLUTION_DEFS[value];
-								const pressed = resolution === value;
-								const savingHere = pressed && saving === "answer";
+							{!closed && (
+								<CleanMeter
+									cleanCount={cleanCount}
+									cleanNeeded={cleanNeeded}
+									label={cleanLabel({ cleanCount, cleanNeeded })}
+									description={open ? <FeedbackText segments={condition} /> : undefined}
+								/>
+							)}
+							{onResolve && answerable && (
+								<div className="flex flex-col gap-1.5">
+									<span id={responseId} className="text-xs text-muted-foreground">
+										Or mark it yourself
+									</span>
+									<div
+										role="group"
+										aria-labelledby={responseId}
+										className="flex flex-wrap items-center gap-2"
+									>
+										{RESOLVING_ANSWERS.map((value) => {
+											const def = FEEDBACK_RESOLUTION_DEFS[value];
+											const pressed = resolution === value;
+											return (
+												<Answer
+													key={value}
+													value={value}
+													tone={toneOf(def.badgeVariant)}
+													pressed={pressed}
+													saving={pressed && saving === "answer"}
+													disabled={isPending}
+													onClick={() => onResolve(value)}
+												/>
+											);
+										})}
+									</div>
+								</div>
+							)}
+						</div>
+					)}
+				</div>
+			</div>
+
+			{/* When it was written, and how the reader rates it. */}
+			<div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t px-4 py-2.5 text-xs">
+				<div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5">
+					<span className="inline-flex items-center gap-1.5 text-muted-foreground">
+						<ClockIcon className="size-3.5 shrink-0" aria-hidden />
+						<time dateTime={timestamp.toISOString()}>{shownTimestamp}</time>
+					</span>
+				</div>
+				{(onRate !== undefined || onDisagree !== undefined) && (
+					<div
+						role="group"
+						aria-label="Rate this feedback"
+						className="ml-auto flex items-center gap-0.5"
+					>
+						{onRate &&
+							statusValues(FEEDBACK_USEFULNESS_DEFS).map((value) => {
+								const def = FEEDBACK_USEFULNESS_DEFS[value];
+								const pressed = usefulness === value;
+								const savingHere = pressed && saving === "rating";
 								return (
-									<ResponseButton
+									<Reaction
 										key={value}
+										label={savingHere ? "Saving…" : def.label}
+										description={def.description}
 										tone={toneOf(def.badgeVariant)}
 										pressed={pressed}
 										disabled={isPending}
-										className="bg-background"
-										onClick={() => onResolve(value)}
+										onClick={() => onRate(value)}
 									>
-										{savingHere && <Spinner />}
-										{savingHere ? "Saving…" : def.label}
-									</ResponseButton>
+										{savingHere ? <Spinner /> : <def.icon aria-hidden />}
+									</Reaction>
 								);
 							})}
-						</div>
+						{onDisagree && (
+							<Reaction
+								label={saving === "disagree" ? "Saving…" : DISAGREE.label}
+								description={DISAGREE.description}
+								tone={toneOf(FEEDBACK_RESOLUTION_DEFS.DISPUTED.badgeVariant)}
+								pressed={resolution === "DISPUTED"}
+								disabled={isPending}
+								onClick={onDisagree}
+							>
+								{saving === "disagree" ? <Spinner /> : <DisagreeIcon aria-hidden />}
+							</Reaction>
+						)}
 					</div>
 				)}
 			</div>
 
-			<div className="flex flex-wrap items-center justify-between gap-4 border-t p-4">
-				<div className="flex flex-wrap items-center gap-3">
-					<span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-						<ClockIcon className="size-4 shrink-0" aria-hidden />
-						<time dateTime={timestamp.toISOString()}>{shownTimestamp}</time>
-					</span>
-					{onRate &&
-						statusValues(FEEDBACK_USEFULNESS_DEFS).map((value) => {
-							const { icon: Icon, label } = FEEDBACK_USEFULNESS_DEFS[value];
-							const pressed = usefulness === value;
-							const savingHere = pressed && saving === "rating";
-							return (
-								<ResponseButton
-									key={value}
-									tone={toneOf(FEEDBACK_USEFULNESS_DEFS[value].badgeVariant)}
-									pressed={pressed}
-									disabled={isPending}
-									onClick={() => onRate(value)}
-								>
-									{savingHere ? <Spinner /> : <Icon aria-hidden />}
-									{savingHere ? "Saving…" : label}
-								</ResponseButton>
-							);
-						})}
-					{onDisagree && (
-						<DisagreeButton
-							disputed={resolution === "DISPUTED"}
-							isPending={isPending}
-							saving={saving === "disagree"}
-							onClick={onDisagree}
-						/>
-					)}
-				</div>
-				{onLearnMore && (
-					<Button variant="outline" onClick={onLearnMore}>
-						Learn more about this practice
-						<ArrowRightIcon aria-hidden />
-					</Button>
+			{/* The bands take their own presses, above the card's link. */}
+			<div className="relative z-10 flex flex-col">
+				{openBand === "dispute" && (
+					<ResponseCommentBand
+						key="dispute"
+						name="Why you disagree"
+						label="What is wrong in this feedback?"
+						placeholder="One or two sentences on what is wrong"
+						required
+						audience="Workspace admins read your sentence, not the card, and can correct its observations or withdraw it. The card stays open until then."
+						isPending={isPending}
+						sending={saving === "send"}
+						onSend={onSendDispute}
+						onSkip={onSkipComment}
+					/>
+				)}
+				{openBand === "comment" && usefulness !== undefined && (
+					<ResponseCommentBand
+						key={usefulness}
+						{...FEEDBACK_USEFULNESS_DEFS[usefulness].note}
+						isPending={isPending}
+						sending={saving === "send"}
+						onSend={onSendComment}
+						onSkip={onSkipComment}
+					/>
 				)}
 			</div>
-
-			{openBand === "dispute" && (
-				<ResponseCommentBand
-					key="dispute"
-					name="Why you disagree"
-					label="What is wrong in this feedback?"
-					placeholder="One or two sentences on what is wrong"
-					required
-					audience="Workspace admins read your sentence, not the card, and can correct its observations or withdraw it. The card stays open until then."
-					isPending={isPending}
-					sending={saving === "send"}
-					onSend={onSendDispute}
-					onSkip={onSkipComment}
-				/>
-			)}
-			{openBand === "comment" && usefulness !== undefined && (
-				<ResponseCommentBand
-					key={usefulness}
-					{...FEEDBACK_USEFULNESS_DEFS[usefulness].note}
-					isPending={isPending}
-					sending={saving === "send"}
-					onSend={onSendComment}
-					onSkip={onSkipComment}
-				/>
-			)}
 		</article>
 	);
 }
 
-/** The card's three bands while the feedback loads. */
+/** The card's zones while the feedback loads. */
 export function PracticeFeedbackCardSkeleton() {
 	return (
 		<div aria-hidden className="flex flex-col overflow-hidden rounded-xl border bg-background">
-			<div className="flex flex-col gap-4 p-4">
+			<div className="flex flex-col gap-3 p-4">
 				<div className="flex flex-wrap items-center justify-between gap-4">
 					<div className="flex items-center gap-3">
 						<Skeleton className="h-5 w-48 rounded-full" />
@@ -516,76 +604,210 @@ export function PracticeFeedbackCardSkeleton() {
 					</div>
 					<Skeleton className="h-5 w-16 rounded-full" />
 				</div>
-				<div className="flex flex-col gap-2.5">
-					<Skeleton className="h-7 w-full max-w-md" />
+				<Skeleton className="h-7 w-full max-w-md" />
+				<div className="flex flex-col gap-1">
+					<Skeleton className="h-5 w-32" />
 					<Skeleton className="h-5 w-full max-w-3xl" />
 					<Skeleton className="h-5 w-3/5" />
 				</div>
-				<Skeleton className="h-5 w-72 max-w-full" />
+				<Skeleton className="h-5 w-52 self-end" />
 			</div>
-			<div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 gap-y-3 border-t bg-sidebar px-4 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-				<Skeleton className="mt-0.5 size-4 rounded-full" />
-				<div className="flex min-w-0 flex-col gap-1">
-					<Skeleton className="h-5 w-20" />
-					<Skeleton className="h-5 w-full max-w-xl" />
-					<Skeleton className="h-4 w-56 max-w-full" />
+			<div className="flex flex-col gap-1 border-y bg-sidebar px-4 py-3 pl-12">
+				<Skeleton className="h-5 w-20" />
+				<Skeleton className="h-5 w-full max-w-xl" />
+			</div>
+			<div className="grid gap-x-10 gap-y-4 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+				<div className="flex flex-col gap-2.5">
+					<Skeleton className="h-5 w-44" />
+					<Skeleton className="h-4 w-64 max-w-full" />
+					<Skeleton className="h-10 w-full" />
 				</div>
-				<div className="col-start-2 flex flex-col items-start gap-1.5 sm:col-start-3 sm:items-end">
-					<Skeleton className="h-2 w-20 rounded-full" />
-					<Skeleton className="h-4 w-20" />
+				<div className="flex flex-col gap-3 sm:w-56">
+					<Skeleton className="h-6 w-full" />
+					<Skeleton className="h-8 w-full" />
 				</div>
 			</div>
-			<div className="flex flex-wrap items-center justify-between gap-4 border-t p-4">
-				<div className="flex items-center gap-3">
-					<Skeleton className="h-5 w-28" />
-					<Skeleton className="h-8 w-24" />
-					<Skeleton className="h-8 w-28" />
-				</div>
-				<Skeleton className="h-9 w-60" />
+			<div className="flex flex-wrap items-center justify-between gap-4 border-t px-4 py-2.5">
+				<Skeleton className="h-5 w-48" />
+				<Skeleton className="h-8 w-28" />
 			</div>
 		</div>
 	);
 }
 
-function DisagreeButton({
-	disputed,
-	isPending,
-	saving,
-	onClick,
+/**
+ * The clean work in a row: a segment bar that takes the block's width, with the count beside it in
+ * the text's own size. On an open card its tooltip carries
+ * the sentence on how the feedback resolves, which stays the meter's description for a screen
+ * reader; the meter then takes focus, so a keyboard opens the tooltip too.
+ */
+function CleanMeter({
+	cleanCount,
+	cleanNeeded,
+	label,
+	description,
 }: {
-	disputed: boolean;
-	isPending: boolean;
-	saving: boolean;
-	onClick: () => void;
+	cleanCount: number;
+	cleanNeeded: number;
+	label: string;
+	description?: ReactNode;
 }) {
+	const descriptionId = useId();
+	const root: Meter.Root.Props = {
+		value: cleanCount,
+		max: cleanNeeded,
+		"aria-label": "Clean work in a row",
+		"aria-describedby": description === undefined ? undefined : descriptionId,
+		getAriaValueText: () => label,
+		className: cn(
+			"flex h-6 w-full items-center gap-3 rounded-sm",
+			description !== undefined && FOCUS_RING,
+		),
+	};
+	const parts = (
+		<>
+			<Meter.Track className="flex min-w-24 flex-1 gap-1">
+				{Array.from({ length: cleanNeeded }, (_, index) => (
+					<span
+						key={index}
+						className={cn(
+							"h-2 flex-1 rounded-full",
+							index < cleanCount ? "bg-success" : "bg-border",
+						)}
+					/>
+				))}
+			</Meter.Track>
+			<Meter.Value className="text-sm whitespace-nowrap text-foreground tabular-nums">
+				{() => label}
+			</Meter.Value>
+		</>
+	);
+	if (description === undefined) {
+		return <Meter.Root {...root}>{parts}</Meter.Root>;
+	}
 	return (
-		<ResponseButton
-			tone={toneOf(FEEDBACK_RESOLUTION_DEFS.DISPUTED.badgeVariant)}
-			pressed={disputed}
-			disabled={isPending}
-			onClick={onClick}
-		>
-			{saving ? <Spinner /> : <DisagreeIcon aria-hidden />}
-			{saving ? "Saving…" : DISAGREE}
-		</ResponseButton>
+		<>
+			<Tooltip>
+				<TooltipTrigger render={<Meter.Root {...root} tabIndex={0} />}>{parts}</TooltipTrigger>
+				<TooltipContent className="max-w-xs">{description}</TooltipContent>
+			</Tooltip>
+			<span id={descriptionId} className="sr-only">
+				{description}
+			</span>
+		</>
 	);
 }
 
 /**
- * One piece of the strip. The arrow that leads it travels with it, so a wrapped line never ends
- * on one.
+ * One answer as a button with its words on it. What it does stays out of sight until asked for: the
+ * tooltip says it on hover and focus, and a screen reader hears the same line as the button's
+ * description. The pressed answer adds that a second press takes it back.
  */
-function StripPieceView({ piece, arrow }: { piece: StripPiece; arrow: boolean }) {
+function Answer({
+	value,
+	tone,
+	pressed,
+	saving,
+	disabled,
+	onClick,
+}: {
+	value: ResolvingAnswer;
+	tone: ReturnType<typeof toneOf>;
+	pressed: boolean;
+	saving: boolean;
+	disabled: boolean;
+	onClick: () => void;
+}) {
+	const descriptionId = useId();
+	const { label, effect } = ANSWER_WORDS[value];
+	const description = pressed ? `${effect} Press it again to take it back.` : effect;
 	return (
-		<span className="inline-flex items-center gap-2 whitespace-nowrap">
-			{arrow && <ChevronRightIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden />}
-			<StatusIcon def={OUTCOME_DEFS[piece.outcome]} />
-			<InlineLink href={piece.ref.url} external className="font-medium">
-				{piece.ref.label}
-			</InlineLink>
-			<time dateTime={piece.date.toISOString()} className="text-muted-foreground tabular-nums">
-				{formatShortDay(piece.date)}
-			</time>
-		</span>
+		<>
+			<Tooltip>
+				<TooltipTrigger
+					render={
+						<ResponseButton
+							tone={tone}
+							pressed={pressed}
+							disabled={disabled}
+							aria-describedby={descriptionId}
+							className="bg-background"
+							onClick={onClick}
+						/>
+					}
+				>
+					{saving && <Spinner />}
+					{saving ? "Saving…" : label}
+				</TooltipTrigger>
+				<TooltipContent className="max-w-xs">{description}</TooltipContent>
+			</Tooltip>
+			<span id={descriptionId} className="sr-only">
+				{description}
+			</span>
+		</>
+	);
+}
+
+/** One rating as a compact icon button, named by its words and explained in its tooltip. */
+function Reaction({
+	label,
+	description,
+	tone,
+	pressed,
+	disabled,
+	onClick,
+	children,
+}: {
+	label: string;
+	description: string;
+	tone: ReturnType<typeof toneOf>;
+	pressed: boolean;
+	disabled: boolean;
+	onClick: () => void;
+	children: ReactNode;
+}) {
+	const descriptionId = useId();
+	return (
+		<>
+			<Tooltip>
+				<TooltipTrigger
+					render={
+						<ResponseButton
+							quiet
+							size="icon-sm"
+							tone={tone}
+							pressed={pressed}
+							disabled={disabled}
+							aria-label={label}
+							aria-describedby={descriptionId}
+							onClick={onClick}
+						/>
+					}
+				>
+					{children}
+				</TooltipTrigger>
+				<TooltipContent className="max-w-xs">
+					<span className="font-semibold">{label}</span> · {description}
+				</TooltipContent>
+			</Tooltip>
+			<span id={descriptionId} className="sr-only">
+				{description}
+			</span>
+		</>
+	);
+}
+
+/**
+ * The hover and focus tint: a layer under the card's content and over its ground, washes included,
+ * so the new and resolved gradients show through. The card isolates its stacking, so the layer sits
+ * above the card's own ground and never takes a press.
+ */
+function CardTint() {
+	return (
+		<span
+			aria-hidden
+			data-card-tint=""
+			className="pointer-events-none absolute inset-0 -z-10 bg-muted/0 transition-colors group-hover/card:bg-muted/25 group-has-[[data-card-link]:focus-visible]/card:bg-muted/25"
+		/>
 	);
 }

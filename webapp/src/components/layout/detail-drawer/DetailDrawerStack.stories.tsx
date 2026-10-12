@@ -6,6 +6,13 @@ import { DetailDrawerHeader } from "@/components/layout/detail-drawer/DetailDraw
 import { Button } from "@/components/ui/button";
 import { DrawerBody, DrawerDescription, DrawerFooter, DrawerTitle } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { withPageBehind } from "@/stories/decorators";
 import { expectSettledVisible } from "@/stories/overlay";
 import { Stateful } from "@/stories/stateful";
@@ -311,6 +318,40 @@ export const DetailSizeKeepsItsPeek: Story = {
 	},
 };
 
+/**
+ * The Practice profile is the reference every stack follows: each level is the same panel, so a
+ * level over another covers it to the same depth and leaves the same column showing, whatever kind
+ * either level is. A wide trace under a narrower sheet left twice the column showing, half of it
+ * scaled-down trace, and a sheet kept on a GPU layer at rest drew its text soft.
+ */
+export const EveryLevelCoversToTheSameDepth: Story = {
+	args: {
+		stack: [
+			{ kind: "trace", id: "review:42" },
+			{ kind: "feedback", id: "33333333" },
+			{ kind: "practice", id: "describe-what-and-why" },
+		],
+	},
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async () => {
+		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
+		const levels = popups();
+		await expect(levels).toHaveLength(3);
+		// Layout widths, which the stack's step-back transform leaves alone: the depth a level covers
+		// to is its width, so equal widths are equal depths.
+		const widths = levels.map((popup) => popup.offsetWidth);
+		await expect(new Set(widths).size).toBe(1);
+		for (const popup of levels) {
+			// The class, not the resolved value, for the reason `DetailSizeKeepsItsPeek` gives.
+			await expect(popup.className).toContain("[--peek:6rem]");
+			await expect(popup.className).toContain("will-change-auto");
+		}
+		for (const overlay of document.querySelectorAll('[data-slot="drawer-overlay"]')) {
+			await expect(getComputedStyle(overlay).backdropFilter).toBe("none");
+		}
+	},
+};
+
 export const DismissedLevelDoesNotComeBack: Story = {
 	args: {
 		stack: [
@@ -509,6 +550,75 @@ export const RegionsReachThePanelEdges: Story = {
 		// A form disables every control while it submits, and then nothing inside the scrolling
 		// region is focusable — so the region itself has to be.
 		await expect(popup.querySelector('[data-slot="drawer-body"]')).toHaveAttribute("tabindex", "0");
+	},
+};
+
+/**
+ * Closing the last level gives focus back to the control that opened it, even after a Select inside
+ * the level was used: its listbox is portalled beside the level's dialog, not into it, so its options
+ * must never stand in for the opener.
+ */
+export const FocusReturnsToTheOpener: Story = {
+	args: { stack: [] },
+	parameters: { chromatic: { disableSnapshot: true } },
+	render: (args) => (
+		<Stateful initial={args.stack}>
+			{(stack, setStack) => (
+				<>
+					<Button
+						className="m-4"
+						onClick={(event) => {
+							// As a level opened from the address, the drawer finds nothing focused to return to.
+							event.currentTarget.blur();
+							setStack([{ kind: "practice", id: "describe-what-and-why" }]);
+						}}
+					>
+						Open level
+					</Button>
+					<DetailDrawerStack
+						{...args}
+						stack={stack}
+						onClose={(depth) => setStack(stack.slice(0, depth))}
+					>
+						{(entry, level) => (
+							<>
+								<DetailDrawerHeader nested={level.nested}>
+									<DrawerTitle>{`${entry.kind} · ${entry.id}`}</DrawerTitle>
+								</DetailDrawerHeader>
+								<DrawerBody>
+									<Select
+										items={[
+											{ value: "all", label: "All" },
+											{ value: "met", label: "Met" },
+										]}
+										defaultValue="all"
+									>
+										<SelectTrigger aria-label="Outcome">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent aria-label="Outcome">
+											<SelectItem value="all">All</SelectItem>
+											<SelectItem value="met">Met</SelectItem>
+										</SelectContent>
+									</Select>
+								</DrawerBody>
+							</>
+						)}
+					</DetailDrawerStack>
+				</>
+			)}
+		</Stateful>
+	),
+	play: async () => {
+		const opener = screen.getByRole("button", { name: "Open level" });
+		await userEvent.click(opener);
+		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
+		await userEvent.click(screen.getByRole("combobox", { name: "Outcome" }));
+		await userEvent.click(await screen.findByRole("option", { name: "Met" }));
+		await waitFor(async () => expect(screen.queryByRole("listbox")).toBeNull());
+		await userEvent.keyboard("{Escape}");
+		await waitFor(async () => expect(popups()).toHaveLength(0));
+		await waitFor(async () => expect(opener).toHaveFocus());
 	},
 };
 

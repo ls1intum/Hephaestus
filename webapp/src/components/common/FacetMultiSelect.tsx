@@ -1,6 +1,8 @@
 import { ChevronsUpDownIcon, type LucideIcon, PlusCircleIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { cn } from "cn";
+import type { BrandIcon } from "@/components/icons/brand";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +29,7 @@ export interface FacetOption<TValue extends string | number = string> {
 	 * The same icon the value's badge carries elsewhere, so a filter reads as the thing it filters.
 	 * Options built from a status registry get this for free; see `statusFacetOptions`.
 	 */
-	icon?: LucideIcon;
+	icon?: LucideIcon | BrandIcon;
 	/** Tone for `icon`, matching its badge variant. */
 	iconClassName?: string;
 }
@@ -60,6 +62,8 @@ export interface FacetMultiSelectProps<TValue extends string | number> {
 	disabled?: boolean;
 	className?: string;
 	emptyLabel?: string;
+	/** Below the options, inside the popup: a control that changes which options there are. */
+	footer?: ReactNode;
 }
 
 export function toFacetOptions<TValue extends string>(
@@ -86,6 +90,7 @@ export function FacetMultiSelect<TValue extends string | number>({
 	disabled = false,
 	className,
 	emptyLabel = "No matches. Try a different search.",
+	footer,
 }: FacetMultiSelectProps<TValue>) {
 	const { contains } = useComboboxFilter({ sensitivity: "base" });
 	const selectedOptions = options.filter((option) => selected.includes(option.value));
@@ -206,6 +211,12 @@ export function FacetMultiSelect<TValue extends string | number>({
 						</ComboboxItem>
 					)}
 				</ComboboxList>
+				{footer !== undefined && (
+					<>
+						<ComboboxSeparator />
+						<div className="px-2 py-1">{footer}</div>
+					</>
+				)}
 				{selectedOptions.length > 0 && (
 					<>
 						<ComboboxSeparator />

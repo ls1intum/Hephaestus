@@ -682,6 +682,9 @@ importers:
       chromatic:
         specifier: 18.7.2
         version: 18.7.2
+      dom-accessibility-api:
+        specifier: 0.6.3
+        version: 0.6.3
       entities:
         specifier: 8.1.0
         version: 8.1.0

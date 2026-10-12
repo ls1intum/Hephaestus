@@ -106,6 +106,12 @@ export function queryErrorIsRetryable(error: unknown): boolean {
 
 const LOAD_TITLE = /^We could not load (?<what>.+)$/u;
 
+/**
+ * The server's generic not-found detail (`EntityNotFoundException`). The title already says "We
+ * could not find X" and the 404 line says what to do, so repeating it would say the same thrice.
+ */
+const GENERIC_NOT_FOUND = /^We could not find that\b.*\bIt may have been deleted\b/u;
+
 function describe(lead: string, next: string): string {
 	if (lead.length === 0 || lead === next) {
 		return next;
@@ -126,7 +132,8 @@ export function QueryErrorAlert({
 }: QueryErrorAlertProps) {
 	const status = problemStatusOf(error);
 	const { icon, cause, next, variant, retryable, retitle, ignoreDetail } = classifyError(status);
-	const detail = ignoreDetail === true ? "" : problemDetailOf(error, "").trim();
+	const raw = ignoreDetail === true ? "" : problemDetailOf(error, "").trim();
+	const detail = status === 404 && GENERIC_NOT_FOUND.test(raw) ? "" : raw;
 	const showRetry = onRetry != null && retryable;
 	const what = LOAD_TITLE.exec(title)?.groups?.what;
 	const shownTitle = what != null && retitle != null ? retitle(what) : title;

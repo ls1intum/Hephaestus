@@ -1,8 +1,15 @@
 import { ArrowRightIcon } from "lucide-react";
-import { type ComponentProps, Fragment, type MouseEvent, type ReactNode } from "react";
+import {
+	type ComponentProps,
+	Fragment,
+	type MouseEvent,
+	type ReactElement,
+	type ReactNode,
+} from "react";
 
 import { cn } from "cn";
 import type { PracticeStanding, PracticeTrend, TrendSupport } from "@/api/types.gen";
+import { ROW_CONTROL_FOCUS } from "@/components/common/focus";
 import { InlineLink } from "@/components/common/InlineLink";
 import { SortButton } from "@/components/common/SortButton";
 import {
@@ -48,9 +55,10 @@ interface PracticeTableBody<TRow> {
 	renderRow: (row: TRow) => ReactNode;
 	/**
 	 * What the table says when there are none, in the shape every practice surface says it in:
-	 * the icon over a title and one sentence on when something will show up here.
+	 * the icon over a title and one sentence on when something will show up here. `null` when the
+	 * table's own sections hold the rows instead, so no empty state claims there are none.
 	 */
-	empty: { icon: ReactNode; title: string; description: string };
+	empty: { icon: ReactNode; title: string; description: string } | null;
 	isLoading?: boolean;
 	/**
 	 * One skeleton row, drawn a few times while loading; without one the body stays empty until
@@ -63,6 +71,13 @@ export interface PracticeTableFrameProps<TRow> extends PracticeTableBody<TRow> {
 	head: ReactNode;
 	/** The empty state spans this many columns. */
 	columns: number;
+	/** Classes on the `<table>`, such as the narrow layout `PracticeTable` gives its rows. */
+	tableClassName?: string;
+	/**
+	 * Further `<tbody>` sections under the rows, in the same table, so their cells share its columns:
+	 * the folds of the Practice profile.
+	 */
+	sections?: ReactNode;
 }
 
 /**
@@ -80,6 +95,8 @@ export function PracticeTableFrame<TRow>({
 	empty,
 	isLoading = false,
 	loadingRow,
+	tableClassName,
+	sections,
 }: PracticeTableFrameProps<TRow>) {
 	let body: ReactNode;
 	if (isLoading) {
@@ -90,7 +107,7 @@ export function PracticeTableFrame<TRow>({
 					{loadingRow}
 				</TableRow>
 			));
-	} else if (rows.length === 0) {
+	} else if (rows.length === 0 && empty !== null) {
 		body = (
 			<TableRow variant="static">
 				{/* The cell is `whitespace-nowrap` by default, which the block's sentence must wrap
@@ -112,17 +129,18 @@ export function PracticeTableFrame<TRow>({
 	return (
 		// `shrink-0`: an `overflow-hidden` flex item has no automatic minimum size, so a level's column
 		// would squash the frame and clip its last rows.
-		<div className="shrink-0 overflow-hidden rounded-xl border bg-background">
+		<div className="@container shrink-0 overflow-hidden rounded-xl border bg-background">
 			<Table
 				aria-label={label}
 				aria-describedby={describedBy}
 				aria-busy={isLoading || undefined}
-				className="min-w-152"
+				className={cn("min-w-152", tableClassName)}
 			>
 				<TableHeader>
 					<TableRow>{head}</TableRow>
 				</TableHeader>
 				<TableBody>{body}</TableBody>
+				{sections}
 			</Table>
 		</div>
 	);
@@ -148,7 +166,28 @@ export interface PracticeTableProps<TRow> extends PracticeTableBody<TRow> {
 	 * row draws its own link at its end.
 	 */
 	renderRow: (row: TRow) => ReactNode;
+	/**
+	 * Sections under the rows in the same table, given the table's column count so a row of theirs
+	 * can span it: a fold's toggle row and its rows line up with the columns above by construction.
+	 */
+	sections?: (columns: number) => ReactNode;
 }
+
+/**
+ * Below the width the columns need (`min-w-152`), as in a sheet on a phone, a row is no longer a
+ * line of columns that scrolls sideways out of sight: it stacks, the subject's name first and whole,
+ * then the standing and the counts side by side, then the row's link. The head stays for a screen
+ * reader.
+ */
+export const STACKED = [
+	"@max-[38rem]:block @max-[38rem]:min-w-0",
+	"@max-[38rem]:[&_thead]:sr-only @max-[38rem]:[&_tbody]:block",
+	"@max-[38rem]:[&_tr]:flex @max-[38rem]:[&_tr]:flex-wrap @max-[38rem]:[&_tr]:items-start @max-[38rem]:[&_tr]:gap-x-4 @max-[38rem]:[&_tr]:gap-y-2 @max-[38rem]:[&_tr]:px-3 @max-[38rem]:[&_tr]:py-3",
+	"@max-[38rem]:[&_td]:block @max-[38rem]:[&_td]:min-w-0 @max-[38rem]:[&_td]:p-0 @max-[38rem]:[&_td]:whitespace-normal",
+	"@max-[38rem]:[&_td[data-subject]]:order-first @max-[38rem]:[&_td[data-subject]]:basis-full",
+	"@max-[38rem]:[&_td:last-child]:basis-full @max-[38rem]:[&_td:last-child]:text-left",
+	"@max-[38rem]:[&_td[colspan]]:basis-full",
+].join(" ");
 
 /** Practices or practice groups by standing: Standing, the subject, then the row's link. */
 export function PracticeTable<TRow>({
@@ -156,12 +195,16 @@ export function PracticeTable<TRow>({
 	onSortChange,
 	heads = NO_HEADS,
 	subjectHead,
+	sections,
 	...body
 }: PracticeTableProps<TRow>) {
+	const columns = heads.reduce((sum, head) => sum + (head.span ?? 1), FIXED_COLUMNS);
 	return (
 		<PracticeTableFrame
 			{...body}
-			columns={heads.reduce((sum, head) => sum + (head.span ?? 1), FIXED_COLUMNS)}
+			tableClassName={STACKED}
+			columns={columns}
+			sections={sections?.(columns)}
 			head={
 				<>
 					<TableHead aria-sort={sort === "asc" ? "ascending" : "descending"} className="w-60">
@@ -191,10 +234,11 @@ export function PracticeTable<TRow>({
 /**
  * A click that landed on a nested control — a practice link — is that control's, and everything
  * else opens the row. The row's own link carries `data-row-link`, and a button that exists only
- * to put a tooltip within a keyboard's reach — the standing badge, the trend chip — carries
- * `data-tooltip-only`: a pointer's press on it answers nothing of its own, so it is the row's. A
- * keyboard's Enter or Space on it arrives as a click with `detail` 0, and that reader came for the
- * sentence, not the row; the row's keyboard path is its own link.
+ * to put a sentence within reach — the standing badge, the trend chip — carries
+ * `data-tooltip-only`: a mouse press on it answers nothing of its own, so it is the row's, and the
+ * hover already showed the sentence. A tap opens the sentence and stops at the button
+ * (`TipPopover`). A keyboard's Enter or Space arrives as a click with `detail` 0, and that reader
+ * came for the sentence, not the row; the row's keyboard path is its own link.
  */
 function landedOnNestedControl(event: MouseEvent<HTMLElement>): boolean {
 	if (!(event.target instanceof Element)) {
@@ -207,11 +251,16 @@ function landedOnNestedControl(event: MouseEvent<HTMLElement>): boolean {
 	return !Object.hasOwn(control.dataset, "tooltipOnly") || event.detail === 0;
 }
 
+/** A press on the row's own link, which a real link answers itself. */
+function landedOnRowLink(event: MouseEvent<HTMLElement>): boolean {
+	return event.target instanceof Element && event.target.closest("[data-row-link]") !== null;
+}
+
 /**
  * The row's own link at its end and what it opens. One record, so a row never draws a link that
  * opens nothing, nor opens on a press with no link for a keyboard to reach.
  */
-export interface PracticeTableRowLink {
+export type PracticeTableRowLink = {
 	/** The words on the link: "Open group", "Open practice". */
 	text: string;
 	/**
@@ -219,8 +268,17 @@ export interface PracticeTableRowLink {
 	 * the words: every row's link reads the same, and the name is what tells them apart.
 	 */
 	name: string;
-	onOpen: () => void;
-}
+} & (
+	| { onOpen: () => void; render?: undefined }
+	| {
+			/**
+			 * A real link to open instead, such as a `DetailStackLink`, so the row also opens in a new
+			 * tab. A press elsewhere on the row is passed to it, so both paths open the same address.
+			 */
+			render: ReactElement;
+			onOpen?: undefined;
+	  }
+);
 
 export interface PracticeTableRowProps extends Omit<ComponentProps<typeof TableRow>, "onClick"> {
 	/**
@@ -233,15 +291,35 @@ export interface PracticeTableRowProps extends Omit<ComponentProps<typeof TableR
 	 * edge.
 	 */
 	open?: boolean;
+	/**
+	 * True for the row the reader came from on another page, with no level open: it keeps the same
+	 * bar, and `aria-current` says it to a screen reader.
+	 */
+	marked?: boolean;
+	/**
+	 * The row's own controls, such as Track, Trace and Request review, in a column of their own before
+	 * the link's: the table's head names it. A press anywhere in that cell is its own and never opens
+	 * the row, so a control that misses its button by a pixel does not open the sheet instead.
+	 */
+	action?: ReactNode;
 }
+
+/**
+ * The rule before a row's actions column, for the table that holds `PracticeTableRow`s with an
+ * `action`: drawn by the table, since a cell owns its own shape.
+ */
+export const ROW_ACTIONS_RULE =
+	"[&_td[data-row-actions]]:border-l @max-2xl:[&_td[data-row-actions]]:border-l-0";
 
 /**
  * The bar on the open row's leading edge, worn by the first cell of a `PracticeTableRow`, which
  * is `StandingCell` here: a `<td>` positions it reliably and a `<tr>` does not. It takes the
- * accent from the row's `data-state`.
+ * accent from the row's `data-state`, from a marked row's `aria-current`, or from the row's own link
+ * when that link is a real one to the level in front: the router marks it `aria-current`, so what a
+ * screen reader hears and what the eye sees are one fact.
  */
 export const OPEN_ROW_BAR =
-	"relative before:absolute before:inset-y-0 before:left-0 before:w-0.5 group-data-[state=open]/row:before:bg-mentor";
+	"relative before:absolute before:inset-y-0 before:left-0 before:w-0.5 group-data-[state=open]/row:before:bg-mentor group-aria-[current=true]/row:before:bg-mentor group-has-[[data-row-link][aria-current=page]]/row:before:bg-mentor";
 
 /**
  * A row whose "Open …" link at its end is the keyboard path and whose whole surface is the pointer
@@ -250,6 +328,8 @@ export const OPEN_ROW_BAR =
 export function PracticeTableRow({
 	link,
 	open = false,
+	marked = false,
+	action,
 	className,
 	children,
 	...props
@@ -257,18 +337,42 @@ export function PracticeTableRow({
 	return (
 		<TableRow
 			data-state={open ? "open" : undefined}
+			aria-current={marked || undefined}
+			// A badge's panel leaves a mouse press inside this row to the row (`TipPopover`).
+			data-row-press={link ? "" : undefined}
 			className={cn("group/row", link && "cursor-pointer", className)}
 			onClick={
 				link &&
 				((event) => {
-					if (!landedOnNestedControl(event)) {
+					// A press inside a dialog a row's control opened arrives here too, because React passes a
+					// portal's events to its React parents; it is not a press on the row.
+					if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) {
+						return;
+					}
+					// The actions column is the row's controls' own, gaps between them included.
+					if (event.target instanceof Element && event.target.closest("[data-row-actions]")) {
+						return;
+					}
+					if (landedOnNestedControl(event)) {
+						return;
+					}
+					if (link.render === undefined) {
 						link.onOpen();
+					} else if (!landedOnRowLink(event)) {
+						event.currentTarget.querySelector<HTMLElement>("[data-row-link]")?.click();
 					}
 				})
 			}
 			{...props}
 		>
 			{children}
+			{action !== undefined && (
+				// The table draws a rule on its leading edge (`ROW_ACTIONS_RULE`), which sets the controls
+				// apart from the facts the row opens on.
+				<TableCell data-row-actions className="cursor-default align-top">
+					<span className="flex items-center gap-2">{action}</span>
+				</TableCell>
+			)}
 			<RowLinkCell link={link} />
 		</TableRow>
 	);
@@ -296,8 +400,10 @@ export function StandingCell({ standing, direction, support, scope }: StandingCe
 export interface SubjectCellProps {
 	/** The pill or name of the practice or the group. */
 	badge: ReactNode;
-	/** What happened to it since the latest run; without one the row shows only the pill. */
-	sentence?: FeedbackTextSegment[];
+	/** What happened to it since the latest run, one bullet per sentence; none shows only the pill. */
+	sentences?: FeedbackTextSegment[][];
+	/** Opens a practice a sentence names. */
+	onOpenPractice?: (practiceSlug: string) => void;
 	/** What else goes under the badge: the group table's list of events. */
 	children?: ReactNode;
 	/** `OPEN_ROW_BAR` where the subject is the row's first cell. */
@@ -305,12 +411,26 @@ export interface SubjectCellProps {
 }
 
 /** The subject's pill with its sentence under it, wrapping rather than widening the column. */
-export function SubjectCell({ badge, sentence, children, className }: SubjectCellProps) {
+export function SubjectCell({
+	badge,
+	sentences,
+	onOpenPractice,
+	children,
+	className,
+}: SubjectCellProps) {
 	return (
-		<TableCell className={cn("whitespace-normal", className)}>
+		<TableCell data-subject className={cn("whitespace-normal", className)}>
 			<div className="flex min-w-0 flex-col items-start gap-2">
 				{badge}
-				{sentence && <FeedbackText as="p" segments={sentence} className="max-w-md text-sm" />}
+				{sentences !== undefined && sentences.length > 0 && (
+					<ul className="max-w-md list-disc space-y-1 pl-4 text-sm marker:text-muted-foreground">
+						{sentences.map((sentence, index) => (
+							<li key={index}>
+								<FeedbackText segments={sentence} onOpenPractice={onOpenPractice} />
+							</li>
+						))}
+					</ul>
+				)}
 				{children}
 			</div>
 		</TableCell>
@@ -319,7 +439,8 @@ export function SubjectCell({ badge, sentence, children, className }: SubjectCel
 
 /**
  * The row's own link at its end: an `InlineLink` drawn as a button carrying `data-row-link` and no
- * handler of its own, so the press bubbles to the row, which owns the opening. The link rule is
+ * handler of its own, so the press bubbles to the row, which owns the opening. A row given a real
+ * link draws that instead, carrying the same mark, and the link opens itself. The link rule is
  * `InlineLink`'s, and the row's own hover is added since the whole row is the pointer path. The
  * accessible name is built from the visible words, so it always starts with what is on screen and
  * a reader who speaks them reaches the link (WCAG 2.2 SC 2.5.3). An `aria-label` rather than
@@ -331,8 +452,13 @@ function RowLinkCell({ link }: { link: PracticeTableRowLink | undefined }) {
 		<TableCell className="text-right">
 			{link && (
 				<InlineLink
-					render={<button type="button" data-row-link aria-label={`${link.text} ${link.name}`} />}
-					className="inline-flex items-center gap-1 font-medium whitespace-nowrap group-hover/row:text-mentor group-hover/row:underline"
+					render={link.render ?? <button type="button" />}
+					data-row-link
+					aria-label={`${link.text} ${link.name}`}
+					className={cn(
+						"inline-flex items-center gap-1 font-medium whitespace-nowrap group-hover/row:text-mentor group-hover/row:underline",
+						ROW_CONTROL_FOCUS,
+					)}
 				>
 					{link.text}
 					<ArrowRightIcon
