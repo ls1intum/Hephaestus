@@ -1454,7 +1454,7 @@ export const retryAgentJobDelivery = <ThrowOnError extends boolean = false>(opti
 /**
  * Get what an agent job spent on the model, per attempt
  *
- * One entry per attempt that reached the model, read from the usage ledger, with its tokens, pricing state and cost. The total is absent while an attempt has no known price.
+ * One entry per attempt with recorded usage, read from the usage ledger, with its tokens, pricing state and cost. The total is absent while an attempt has no known price.
  */
 export const getAgentJobUsage = <ThrowOnError extends boolean = false>(options: Options<GetAgentJobUsageData, ThrowOnError>): RequestResult<GetAgentJobUsageResponses, GetAgentJobUsageErrors, ThrowOnError> => (options.client ?? client).get<GetAgentJobUsageResponses, GetAgentJobUsageErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

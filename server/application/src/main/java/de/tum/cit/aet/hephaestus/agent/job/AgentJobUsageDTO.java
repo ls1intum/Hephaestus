@@ -10,12 +10,12 @@ import org.jspecify.annotations.Nullable;
 /** What a job spent on the model, attempt by attempt, and in total. */
 @Schema(description = "The model usage and cost of a job, per attempt and in total")
 public record AgentJobUsageDTO(
-        @NonNull @Schema(description = "One entry per attempt that reached the model, first attempt first")
+        @NonNull @Schema(description = "One entry per attempt with recorded usage, first attempt first")
         List<AgentJobUsageAttemptDTO> attempts,
 
         @Schema(
                 description = "The cost of every attempt in US dollars; absent when an attempt has no known price or"
-                        + " none reached the model")
+                        + " no usage is recorded")
         @Nullable
         BigDecimal totalCostUsd,
 

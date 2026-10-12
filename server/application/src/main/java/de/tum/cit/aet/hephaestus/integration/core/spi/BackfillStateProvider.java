@@ -93,14 +93,17 @@ public interface BackfillStateProvider {
      * names no sync target, and the repository may be monitored by several scopes at once (mirrored
      * repositories are instance-global and shared across workspaces), so the caller has neither a
      * {@code syncTargetId} nor a way to enumerate them. Implementations resolve the affected targets by
-     * {@code nativeId} and apply the same re-key + consumer-refresh semantics per target.
+     * {@code nativeId} on {@code providerId} — a native id is unique only on its provider instance — and apply the
+     * same re-key + consumer-refresh semantics per target.
      * <p>
      * A no-op when {@code nativeId} is unknown (never re-key by name alone) or when no target tracks it.
      *
+     * @param providerId        the provider instance the event came from
      * @param nativeId          the provider's stable numeric repository id from the webhook payload
      * @param newNameWithOwner  the repository's new {@code owner/name} as the payload reports it
      */
-    default void reconcileSyncTargetsForRepository(@Nullable Long nativeId, @Nullable String newNameWithOwner) {
+    default void reconcileSyncTargetsForRepository(
+            long providerId, @Nullable Long nativeId, @Nullable String newNameWithOwner) {
         // Default no-op: see reconcileSyncTargetIdentity.
     }
 

@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.repository;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -37,10 +36,6 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     Optional<Repository> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
     Optional<Repository> findByNameWithOwnerAndProviderId(String nameWithOwner, Long providerId);
-
-    /** Whether a repository of this name and native id exists on a provider of another type. */
-    boolean existsByNameWithOwnerAndNativeIdAndProviderTypeNot(
-            String nameWithOwner, Long nativeId, IdentityProviderType providerType);
 
     /**
      * Finds a repository by ID with the organization eagerly fetched.

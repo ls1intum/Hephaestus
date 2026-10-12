@@ -64,6 +64,7 @@ class GitHubLifecycleListenerPurgeTest extends BaseUnitTest {
                 mock(),
                 connectionService,
                 workspaceLifecycleService,
+                mock(),
                 mock());
     }
 
@@ -78,7 +79,8 @@ class GitHubLifecycleListenerPurgeTest extends BaseUnitTest {
 
         assertThat(listener.purgeWorkspaceForInstallation(INSTALLATION_ID)).contains(workspace);
 
-        verify(connectionService).transition(eq(connection), any(ConnectionService.TransitionRequest.class));
+        verify(connectionService)
+                .disconnectForErasure(eq(connection), any(ConnectionService.TransitionRequest.class), any(), any());
     }
 
     @Test

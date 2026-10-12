@@ -174,7 +174,7 @@ public class InAppFeedbackEvidence {
 
     /**
      * When the developer's later work resolved each of these pieces of feedback, for an operator tracing one: only a
-     * card on their practice pages that reached them, read by {@link #workResolutions} over its visible evidence as the
+     * card prepared for their practice pages, read by {@link #workResolutions} over its visible evidence as the
      * card itself reads it. Feedback the work has not resolved, and feedback on any other channel, is absent.
      */
     public Map<UUID, Instant> resolvedByWorkAt(Long workspaceId, Collection<Feedback> feedback, Instant now) {

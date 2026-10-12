@@ -2,7 +2,12 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -36,6 +41,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +53,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
+
+    @Autowired
+    private ConnectionRepository sourceConnections;
+
+    @Autowired
+    private ConnectionService sourceConnectionService;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -220,6 +232,20 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
     }
 
     private long persistMonitoredPullRequest(String title) {
+        Connection source = sourceConnections.saveAndFlush(new Connection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "pat",
+                new ConnectionConfig.GitHubPatConfig("review-summary-org", null, Set.of())));
+        sourceConnectionService.transition(
+                source,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "review-read-test",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
         Repository repository = new Repository();
         repository.setNativeId(9311L);
         repository.setProvider(ensureGitHubProvider());

@@ -26,7 +26,10 @@ public record AgentJobDTO(
         @Schema(description = "Job metadata (routing/display info)") @Nullable
         Object metadata,
 
-        @Schema(description = "Job output (agent results)") @Nullable
+        @Schema(
+                description =
+                        "Raw output is not returned by administrative job reads; use the authorized observation and feedback endpoints")
+        @Nullable
         Object output,
 
         @NonNull
@@ -193,7 +196,7 @@ public record AgentJobDTO(
                 job.getStatus(),
                 ReviewRunTargetDTO.from(target),
                 job.getMetadata(),
-                job.getOutput(),
+                null,
                 ReviewRunOutcome.fromJobOutput(job.getOutput()),
                 ReviewRunOutcome.coveringJobId(job.getOutput()),
                 redactInstanceBaseUrl(snapshot),
@@ -239,7 +242,7 @@ public record AgentJobDTO(
                 row.getStatus(),
                 ReviewRunTargetDTO.from(target),
                 row.getMetadata(),
-                row.getOutput(),
+                null,
                 ReviewRunOutcome.fromJobOutput(row.getOutput()),
                 ReviewRunOutcome.coveringJobId(row.getOutput()),
                 redactInstanceBaseUrl(snapshot),

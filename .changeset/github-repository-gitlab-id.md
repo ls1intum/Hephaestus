@@ -2,4 +2,4 @@
 "hephaestus": patch
 ---
 
-A repository a token-based GitHub workspace adds no longer takes the id of a GitLab project of the same name, which hid it from the workspace's lists. The sync replaces such an id where one was already stored.
+Repositories added to a token-based GitHub workspace no longer take the identifier of a GitLab project with the same name. Sync corrects previously stored mismatches so the repositories appear in the workspace’s lists.

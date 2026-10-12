@@ -84,7 +84,7 @@ public class AgentJobController {
     @GetMapping("/{jobId}/usage")
     @Operation(
             summary = "Get what an agent job spent on the model, per attempt",
-            description = "One entry per attempt that reached the model, read from the usage ledger, with its tokens,"
+            description = "One entry per attempt with recorded usage, read from the usage ledger, with its tokens,"
                     + " pricing state and cost. The total is absent while an attempt has no known price.",
             operationId = "getAgentJobUsage")
     @ApiResponse(

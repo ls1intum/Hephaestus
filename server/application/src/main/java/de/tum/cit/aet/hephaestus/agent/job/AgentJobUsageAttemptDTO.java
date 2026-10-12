@@ -12,10 +12,12 @@ import org.jspecify.annotations.Nullable;
 /** What one attempt of a job spent, as the usage ledger recorded it. */
 @Schema(description = "The model usage and cost of one attempt of a job")
 public record AgentJobUsageAttemptDTO(
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "The attempt, 1 for the first run")
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                description = "The zero-based attempt number, 0 for the first run")
         int attempt,
 
-        @NonNull @Schema(description = "When the attempt finished")
+        @NonNull @Schema(description = "When the usage was recorded")
         Instant occurredAt,
 
         @Schema(description = "The model the attempt called") @Nullable

@@ -7,11 +7,17 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignal;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignalRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -52,6 +58,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.jspecify.annotations.Nullable;
@@ -68,6 +75,12 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String LINEAGE = "/workspaces/{slug}/practices/reviews/lineage";
     private static final ParameterizedTypeReference<List<String>> IDS = new ParameterizedTypeReference<>() {};
+
+    @Autowired
+    private ConnectionRepository sourceConnections;
+
+    @Autowired
+    private ConnectionService sourceConnectionService;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -213,6 +226,20 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     /** A pull request in a repository that {@code monitoredBy} monitors, merged at {@code mergedAt} if set. */
     private PullRequest pullRequest(Workspace monitoredBy, @Nullable Instant mergedAt) {
+        Connection source = sourceConnections.saveAndFlush(new Connection(
+                monitoredBy,
+                IntegrationKind.GITHUB,
+                "pat",
+                new ConnectionConfig.GitHubPatConfig("lineage-org", null, Set.of())));
+        sourceConnectionService.transition(
+                source,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "review-read-test",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
         long nativeId = NATIVE_IDS.incrementAndGet();
         String nameWithOwner = "lineage-org/repo-" + nativeId;
         Repository repository = new Repository();
@@ -414,7 +441,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    void shouldSayOnlyThatTheDeveloperAnsweredWhenTheAnswerIsNotADispute() {
+    void shouldExposeActionResponseMetadataButKeepRatingOnlyResponsesPrivate() {
         UUID traced = observe("Answered claim");
         Feedback addressed = compose(workspace, job, 0, FeedbackDeliveryState.DELIVERED, null);
         Feedback notApplicable = compose(workspace, job, 1, FeedbackDeliveryState.DELIVERED, null);
@@ -448,18 +475,16 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         byte[] content = getOk("?kind=OBSERVATION&id={id}", traced)
                 .jsonPath("$.feedback.length()")
                 .isEqualTo(3)
-                .jsonPath("$.feedback[0].response.respondedAt")
+                .jsonPath("$.feedback[?(@.id=='" + addressed.getId() + "')].response.respondedAt")
                 .exists()
-                .jsonPath("$.feedback[0].response.disputed")
+                .jsonPath("$.feedback[?(@.id=='" + addressed.getId() + "')].response.disputed")
                 .isEqualTo(false)
-                .jsonPath("$.feedback[1].response.respondedAt")
+                .jsonPath("$.feedback[?(@.id=='" + notApplicable.getId() + "')].response.respondedAt")
                 .exists()
-                .jsonPath("$.feedback[1].response.disputed")
+                .jsonPath("$.feedback[?(@.id=='" + notApplicable.getId() + "')].response.disputed")
                 .isEqualTo(false)
-                .jsonPath("$.feedback[2].response.respondedAt")
-                .exists()
-                .jsonPath("$.feedback[2].response.disputed")
-                .isEqualTo(false)
+                .jsonPath("$.feedback[?(@.id=='" + rated.getId() + "')].response")
+                .doesNotExist()
                 .returnResult()
                 .getResponseBodyContent();
         String body = content == null ? "" : new String(content, StandardCharsets.UTF_8);
@@ -469,6 +494,14 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .doesNotContain("Fixed in the next push")
                 .doesNotContain("A private note on why it does not fit")
                 .doesNotContain("A private comment on the rating");
+        reactionRepository.saveAndFlush(Reaction.builder()
+                .feedback(addressed)
+                .reactorUserId(alice.getId())
+                .createdAt(Instant.now().plusSeconds(1))
+                .build());
+        getOk("?kind=OBSERVATION&id={id}", traced)
+                .jsonPath("$.feedback[?(@.id=='" + addressed.getId() + "')].response")
+                .doesNotExist();
     }
 
     @Test

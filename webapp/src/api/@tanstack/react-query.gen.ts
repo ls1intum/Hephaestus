@@ -2764,7 +2764,7 @@ export const getAgentJobUsageQueryKey = (options: Options<GetAgentJobUsageData>)
 /**
  * Get what an agent job spent on the model, per attempt
  *
- * One entry per attempt that reached the model, read from the usage ledger, with its tokens, pricing state and cost. The total is absent while an attempt has no known price.
+ * One entry per attempt with recorded usage, read from the usage ledger, with its tokens, pricing state and cost. The total is absent while an attempt has no known price.
  */
 export const getAgentJobUsageOptions = (options: Options<GetAgentJobUsageData>) => queryOptions<GetAgentJobUsageResponse, DefaultError, GetAgentJobUsageResponse, ReturnType<typeof getAgentJobUsageQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

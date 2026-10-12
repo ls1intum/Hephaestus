@@ -8,6 +8,12 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection.Format;
 import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection.ProjectedRecord;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
@@ -82,6 +88,12 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
     private ScmJobFolderProjector projector;
 
     @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private ConnectionService connectionService;
+
+    @Autowired
     private RepositoryRepository repositoryRepository;
 
     @Autowired
@@ -139,6 +151,7 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
     void seedWorkspace() {
         author = persistUser("label-author");
         workspace = createWorkspace("labels", "Labels", "labels-org", AccountType.ORG, author);
+        connect(workspace, IntegrationKind.GITHUB, new ConnectionConfig.GitHubPatConfig("labels-org", null, Set.of()));
         position = 0;
     }
 
@@ -203,9 +216,27 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
         gitLabIssue.setProvider(onGitLab.getProvider());
         issueRepository.save(gitLabIssue);
 
+        Workspace gitLabWorkspace =
+                createWorkspace("labels-gl", "Labels GitLab", "labels-org", AccountType.ORG, author);
+        connect(
+                gitLabWorkspace,
+                IntegrationKind.GITLAB,
+                new ConnectionConfig.GitLabConfig(
+                        "https://gitlab.com",
+                        null,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of(),
+                        null));
+        RepositoryToMonitor gitLabMonitor = new RepositoryToMonitor();
+        gitLabMonitor.setNameWithOwner(onGitLab.getNameWithOwner());
+        gitLabMonitor.setNativeId(onGitLab.getNativeId());
+        gitLabMonitor.setWorkspace(gitLabWorkspace);
+        repositoryToMonitorRepository.saveAndFlush(gitLabMonitor);
         for (Repository repository : List.of(onGitHub, onGitLab)) {
             List<ObjectNode> rows = new ArrayList<>();
-            projector.forEachInventoryRecord(workspace.getId(), repository.getId(), "ISSUE", rows::add);
+            Workspace sourceWorkspace = repository.equals(onGitHub) ? workspace : gitLabWorkspace;
+            projector.forEachInventoryRecord(sourceWorkspace.getId(), repository.getId(), "ISSUE", rows::add);
             assertThat(rows).singleElement().satisfies(row -> {
                 assertThat(row.path("number").asInt()).isEqualTo(7);
                 assertThat(row.path("repository").asString()).isEqualTo("labels-org/twins");
@@ -350,6 +381,19 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
                 .forEach(record -> files.computeIfAbsent(record.path(), ignored -> new ArrayList<>())
                         .add(record.value().path("native_id").asLong()));
         return files;
+    }
+
+    private void connect(Workspace owner, IntegrationKind kind, ConnectionConfig config) {
+        Connection connection = connections.saveAndFlush(new Connection(owner, kind, kind.name(), config));
+        connectionService.transition(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "projector-test",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
     }
 
     private Repository repository(String nameWithOwner, Workspace monitoredBy) {

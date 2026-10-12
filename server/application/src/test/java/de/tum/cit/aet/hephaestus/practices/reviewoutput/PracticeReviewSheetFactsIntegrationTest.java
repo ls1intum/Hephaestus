@@ -15,8 +15,10 @@ import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.CheckState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -81,6 +83,9 @@ class PracticeReviewSheetFactsIntegrationTest extends AbstractWorkspaceIntegrati
     private static final String JOB = "/workspaces/{slug}/agents/jobs/{id}";
     private static final String REVISIONS = "/workspaces/{slug}/practices/{practiceSlug}/revisions";
     private static final AtomicLong NATIVE_IDS = new AtomicLong(990_000);
+
+    @Autowired
+    private ConnectionService sourceConnectionService;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -434,8 +439,22 @@ class PracticeReviewSheetFactsIntegrationTest extends AbstractWorkspaceIntegrati
     @DisplayName("Work facts")
     class WorkFacts {
 
+        private void connect(Workspace owner, IntegrationKind kind, ConnectionConfig config) {
+            Connection connection = connectionRepository.saveAndFlush(new Connection(owner, kind, kind.name(), config));
+            sourceConnectionService.transition(
+                    connection,
+                    new ConnectionService.TransitionRequest(
+                            IntegrationState.ACTIVE,
+                            "TEST_CONNECTED",
+                            "SYSTEM",
+                            "work-facts-test",
+                            UUID.randomUUID().toString(),
+                            "Source connected"));
+        }
+
         private PullRequest pullRequest(Workspace monitoredBy) {
             long nativeId = NATIVE_IDS.incrementAndGet();
+            connect(monitoredBy, IntegrationKind.GITHUB, new ConnectionConfig.GitHubPatConfig(null, null, Set.of()));
             return pullRequest(monitoredBy, ensureGitHubProvider(), "sheet-facts-org/repo-" + nativeId, null);
         }
 
@@ -533,22 +552,17 @@ class PracticeReviewSheetFactsIntegrationTest extends AbstractWorkspaceIntegrati
          */
         private PullRequest sameNameMergeRequestOfTheOtherWorkspace(boolean nativeIdKnown) {
             String nameWithOwner = "shared-org/shared-repo";
-            connectionRepository.save(new Connection(
-                    workspace,
-                    IntegrationKind.GITHUB,
-                    "pat",
-                    new ConnectionConfig.GitHubPatConfig(null, null, Set.of())));
-            connectionRepository.save(new Connection(
+            connect(workspace, IntegrationKind.GITHUB, new ConnectionConfig.GitHubPatConfig(null, null, Set.of()));
+            connect(
                     otherWorkspace,
                     IntegrationKind.GITLAB,
-                    "gitlab",
                     new ConnectionConfig.GitLabConfig(
                             "https://gitlab.com",
                             null,
                             null,
                             ConnectionConfig.GitLabConfig.SigningMode.WHSEC,
                             Set.of(),
-                            null)));
+                            null));
             PullRequest ours = pullRequest(workspace, ensureGitHubProvider(), nameWithOwner, null);
             if (nativeIdKnown) {
                 jdbcTemplate.update("""

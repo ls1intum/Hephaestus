@@ -1974,7 +1974,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * budget holds and since when the oldest of those became available to a worker, so a requeued review waits from
      * its requeue and one still backing off before a retry does not wait yet, and how many are held for budget. The reviews that finished
      * since {@code dayAgo}, and of those since {@code hourAgo}, are counted apart over the terminal jobs; a cancelled
-     * review is not counted, since it did no work.
+     * review is not counted in these completion figures.
      */
     @Query(value = """
         SELECT

@@ -5,13 +5,14 @@ import static de.tum.cit.aet.hephaestus.core.TransactionCallbacks.afterCommit;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.core.security.ScmOrigin;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.SourceProviderNamespaces;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnumerator;
@@ -184,7 +185,15 @@ public class WorkspaceRepositoryMonitorService {
             throw new RepositoryAlreadyMonitoredException(nameWithOwner);
         }
 
-        if (findRepository(nameWithOwner).isEmpty()) {
+        ConnectionConfig config = connectionRepository
+                .findActive(workspace.getId(), kind)
+                .map(connection -> connection.getConfig())
+                .orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
+        IdentityProvider provider =
+                sourceProvider(kind, config).orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
+        Optional<Repository> repository = repositoryRepository.findByNameWithOwnerAndProviderId(
+                nameWithOwner, Objects.requireNonNull(provider.getId()));
+        if (repository.isEmpty()) {
             log.debug(
                     "Skipped repository monitor addition: reason=repositoryNotFound, nameWithOwner={}",
                     LoggingUtils.sanitizeForLog(nameWithOwner));
@@ -198,12 +207,7 @@ public class WorkspaceRepositoryMonitorService {
 
         RepositoryToMonitor repositoryToMonitor = new RepositoryToMonitor();
         repositoryToMonitor.setNameWithOwner(nameWithOwner);
-        // A token-based workspace syncs from github.com, as GitHubDataSyncService does.
-        repositoryToMonitor.setNativeId(resolveNativeId(
-                nameWithOwner,
-                gitProviderRepository
-                        .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
-                        .orElse(null)));
+        repositoryToMonitor.setNativeId(repository.orElseThrow().getNativeId());
         repositoryToMonitor.setWorkspace(workspace);
         persistRepositoryMonitor(workspace, repositoryToMonitor, false);
     }
@@ -221,13 +225,7 @@ public class WorkspaceRepositoryMonitorService {
             ConnectionConfig config = connectionRepository
                     .lockActiveConfig(workspaceId, IntegrationKind.GITLAB)
                     .orElseThrow(() -> new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug()));
-            Optional<String> origin = config instanceof ConnectionConfig.GitLabConfig gitLab
-                    ? ScmOrigin.of(gitLab.serverUrl())
-                    : Optional.empty();
-            Long nativeId = gitProviderRepository.findAllByType(IdentityProviderType.GITLAB).stream()
-                    .filter(provider -> origin.isPresent()
-                            && ScmOrigin.of(provider.getServerUrl()).equals(origin))
-                    .findFirst()
+            Long nativeId = sourceProvider(IntegrationKind.GITLAB, config)
                     .flatMap(provider -> repositoryRepository.findByNameWithOwnerAndProviderId(
                             nameWithOwner, Objects.requireNonNull(provider.getId())))
                     .map(Repository::getNativeId)
@@ -274,33 +272,36 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     public void removeRepositoryFromMonitor(String slug, String nameWithOwner) throws EntityNotFoundException {
-        Workspace workspace = requireWorkspace(slug);
+        transactionTemplate.executeWithoutResult(status -> {
+            Workspace workspace = requireWorkspace(slug);
 
-        if (isGitHubAppWorkspace(workspace)) {
-            throw new RepositoryManagementNotAllowedException(slug);
-        }
+            if (isGitHubAppWorkspace(workspace)) {
+                throw new RepositoryManagementNotAllowedException(slug);
+            }
 
-        RepositoryToMonitor repositoryToMonitor = workspace.getRepositoriesToMonitor().stream()
-                .filter(r -> r.getNameWithOwner().equals(nameWithOwner))
-                .findFirst()
-                .orElse(null);
+            RepositoryToMonitor repositoryToMonitor = workspace.getRepositoriesToMonitor().stream()
+                    .filter(r -> r.getNameWithOwner().equals(nameWithOwner))
+                    .findFirst()
+                    .orElse(null);
 
-        if (repositoryToMonitor == null) {
-            log.debug(
-                    "Skipped repository monitor removal: reason=notMonitored, nameWithOwner={}, workspaceId={}",
+            if (repositoryToMonitor == null) {
+                log.debug(
+                        "Skipped repository monitor removal: reason=notMonitored, nameWithOwner={}, workspaceId={}",
+                        LoggingUtils.sanitizeForLog(nameWithOwner),
+                        workspace.getId());
+                throw new EntityNotFoundException("Repository", nameWithOwner);
+            }
+
+            log.info(
+                    "Removed repository from monitor: nameWithOwner={}, workspaceId={}",
                     LoggingUtils.sanitizeForLog(nameWithOwner),
                     workspace.getId());
-            throw new EntityNotFoundException("Repository", nameWithOwner);
-        }
 
-        log.info(
-                "Removed repository from monitor: nameWithOwner={}, workspaceId={}",
-                LoggingUtils.sanitizeForLog(nameWithOwner),
-                workspace.getId());
-
-        deleteRepositoryMonitor(workspace, repositoryToMonitor);
-
-        deleteRepositoryIfOrphaned(nameWithOwner);
+            List<Long> repositoryIds =
+                    repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(repositoryToMonitor.getId());
+            deleteRepositoryMonitor(workspace, repositoryToMonitor);
+            repositoryIds.forEach(this::deleteRepositoryIfOrphaned);
+        });
     }
 
     public void removeRepositoryFromMonitor(WorkspaceContext workspaceContext, String nameWithOwner)
@@ -308,13 +309,15 @@ public class WorkspaceRepositoryMonitorService {
         removeRepositoryFromMonitor(requireSlug(workspaceContext), nameWithOwner);
     }
 
-    /** Remove a repository monitor for a given installation id if it exists; no-op if missing. */
+    /** Provider events preserve the native identity; a reused path is not the removed repository. */
     @Transactional
-    public Optional<Workspace> removeRepositoryMonitorForInstallation(long installationId, String nameWithOwner) {
-        return removeRepositoryMonitorInTransaction(installationId, nameWithOwner);
+    public Optional<Workspace> removeRepositoryMonitorForInstallation(
+            long installationId, String nameWithOwner, @Nullable Long expectedNativeId) {
+        return removeRepositoryMonitorInTransaction(installationId, nameWithOwner, expectedNativeId);
     }
 
-    private Optional<Workspace> removeRepositoryMonitorInTransaction(long installationId, String nameWithOwner) {
+    private Optional<Workspace> removeRepositoryMonitorInTransaction(
+            long installationId, String nameWithOwner, @Nullable Long expectedNativeId) {
         if (StringUtils.isBlank(nameWithOwner)) {
             return Optional.empty();
         }
@@ -331,10 +334,24 @@ public class WorkspaceRepositoryMonitorService {
         }
 
         RepositoryToMonitor monitor = monitorOpt.get();
+        if (expectedNativeId != null) {
+            boolean matches = monitor.getNativeId() != null
+                    ? expectedNativeId.equals(monitor.getNativeId())
+                    : repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId()).stream()
+                            .map(repositoryRepository::findById)
+                            .flatMap(Optional::stream)
+                            .anyMatch(repository -> expectedNativeId.equals(repository.getNativeId()));
+            if (!matches) {
+                log.debug(
+                        "Skipped repository removal: reason=identityMismatch, workspaceId={}, monitorId={}",
+                        workspace.getId(),
+                        monitor.getId());
+                return workspaceOpt;
+            }
+        }
+        List<Long> repositoryIds = repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId());
         var result = removeRepositoryMonitorInternal(workspace, monitor);
-
-        // Orphan repos would cause permanent sync errors.
-        deleteRepositoryIfOrphaned(nameWithOwner);
+        repositoryIds.forEach(this::deleteRepositoryIfOrphaned);
 
         return result;
     }
@@ -355,12 +372,11 @@ public class WorkspaceRepositoryMonitorService {
         workspaceOpt.ifPresent(workspace -> {
             List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
             for (RepositoryToMonitor monitor : monitors) {
-                String nameWithOwner = monitor.getNameWithOwner();
+                List<Long> repositoryIds = deleteRepositories
+                        ? repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId())
+                        : List.of();
                 deleteRepositoryMonitor(workspace, monitor);
-
-                if (deleteRepositories && nameWithOwner != null) {
-                    deleteRepositoryIfOrphaned(nameWithOwner);
-                }
+                repositoryIds.forEach(this::deleteRepositoryIfOrphaned);
             }
         });
         return workspaceOpt;
@@ -489,15 +505,14 @@ public class WorkspaceRepositoryMonitorService {
                 .filter(monitor -> !StringUtils.isBlank(monitor.getNameWithOwner()))
                 .filter(monitor ->
                         !desiredRepositories.contains(monitor.getNameWithOwner().toLowerCase(Locale.ENGLISH)))
-                .forEach(monitor -> removeRepositoryMonitorInTransaction(installationId, monitor.getNameWithOwner()));
+                .forEach(monitor ->
+                        removeRepositoryMonitorInTransaction(installationId, monitor.getNameWithOwner(), null));
     }
 
-    /**
-     * Repositories are global entities (integration.scm is workspace-agnostic),
-     * so this lookup is intentionally not scoped to a workspace.
-     */
-    private Optional<Repository> findRepository(String nameWithOwner) {
-        return repositoryRepository.findByNameWithOwner(nameWithOwner);
+    private Optional<IdentityProvider> sourceProvider(IntegrationKind kind, ConnectionConfig config) {
+        return PersonSourceNamespace.from(kind.name(), SourceProviderNamespaces.configuredUrl(config))
+                .flatMap(namespace -> gitProviderRepository.findByTypeAndServerUrl(
+                        IdentityProviderType.from(kind), namespace.serverUrl()));
     }
 
     /**
@@ -525,48 +540,24 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     /**
-     * Deletes a repository only if no workspace is monitoring it (repositories are shared
-     * across workspaces). Cascades deletion to any projects owned by this repository to
-     * maintain referential integrity for the polymorphic project ownership model.
-     *
-     * <p><b>The cross-tenant guard of the whole SCM domain.</b> {@code repository} and everything
-     * hanging off it carry no {@code workspace_id} — they key on {@code (provider_id, native_id)}
-     * ({@code BaseGitServiceEntity}) and are genuinely SHARED between workspaces that monitor the
-     * same source repository. The {@code countByNameWithOwner} check below is therefore the only
-     * thing standing between a workspace-scoped erase and a global one: the caller removes
-     * <em>its own</em> {@code repository_to_monitor} row first, then asks this method to drop the
-     * shared row only if the count fell to zero. Callers MUST flush the monitor removal before
-     * calling (a pending orphanRemoval delete is invisible to this count query).
-     *
-     * <p>Public so {@link ScmWorkspaceContentEraser} can route the disconnect and workspace-purge
-     * erase triggers through this exact cascade instead of a second, unguarded deleter.
+     * Deletes an exact source repository only after its last matching monitor is removed. Callers capture its
+     * internal id before removal and flush that removal before this check. A same-named row on another provider
+     * is neither a deletion target nor proof that this source remains monitored.
      */
-    public void deleteRepositoryIfOrphaned(String nameWithOwner) {
-        if (StringUtils.isBlank(nameWithOwner)) {
-            return;
-        }
-
-        long monitorCount = repositoryToMonitorRepository.countByNameWithOwner(nameWithOwner);
+    public void deleteRepositoryIfOrphaned(Long repositoryId) {
+        long monitorCount = repositoryToMonitorRepository.countForRepository(repositoryId);
         if (monitorCount > 0) {
             log.debug(
-                    "Skipped repository deletion: reason=stillMonitored, repoName={}, monitorCount={}",
-                    LoggingUtils.sanitizeForLog(nameWithOwner),
+                    "Skipped repository deletion: reason=stillMonitored, repositoryId={}, monitorCount={}",
+                    repositoryId,
                     monitorCount);
             return;
         }
-
-        repositoryRepository.findByNameWithOwner(nameWithOwner).ifPresent(repository -> {
-            Long repoId = repository.getId();
-
-            gitRepositoryManager.deleteOrphanedRepository(repoId);
-
-            // Synchronous publish — listeners run in this transaction so any vendor-
-            // owned dependents (GitHub Projects V2 polymorphic ownership rows) are gone
-            // before the repository delete fires.
-            eventPublisher.publishEvent(new RepositoryAboutToBeDeletedEvent(repoId));
-
+        repositoryRepository.findById(repositoryId).ifPresent(repository -> {
+            gitRepositoryManager.deleteOrphanedRepository(repositoryId);
+            eventPublisher.publishEvent(new RepositoryAboutToBeDeletedEvent(repositoryId));
             repositoryRepository.delete(repository);
-            log.debug("Deleted orphaned repository: repoName={}", LoggingUtils.sanitizeForLog(nameWithOwner));
+            log.debug("Deleted orphaned repository: repositoryId={}", repositoryId);
         });
     }
 
@@ -625,7 +616,7 @@ public class WorkspaceRepositoryMonitorService {
     private void deleteRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor) {
         // Remove from collection first - orphanRemoval=true will handle deletion
         workspace.getRepositoriesToMonitor().remove(monitor);
-        workspaceRepository.save(workspace);
+        workspaceRepository.saveAndFlush(workspace);
         if (shouldUseNats(workspace)) {
             // Like announceRepositoryMonitor, the refresh waits for the commit that removes the monitor.
             Long workspaceId = workspace.getId();

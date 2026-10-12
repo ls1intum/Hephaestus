@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.MonitoredRepositoryScope;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -78,12 +79,60 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
     List<RepositoryToMonitor> findAllWithWorkspaceByNameWithOwner(@Param("nameWithOwner") String nameWithOwner);
 
     /**
-     * Finds every monitor tracking the repository with the given provider-stable id — across all
-     * workspaces, because a repository can be monitored by several tenants at once. Used to re-key
-     * {@code nameWithOwner} after an upstream rename/transfer, where the name is exactly the value
-     * that has gone stale and so cannot be the lookup key.
+     * Finds every monitor tracking the repository with the given provider-stable id on {@code providerId} — across
+     * all workspaces whose SCM connection is registered under that provider, because a repository can be monitored by
+     * several tenants at once. A native id is unique only on its provider, so a monitor of another provider instance
+     * with the same id is not one of them. Used to re-key {@code nameWithOwner} after an upstream rename/transfer,
+     * where the name is exactly the value that has gone stale and so cannot be the lookup key.
      */
-    List<RepositoryToMonitor> findByNativeId(Long nativeId);
+    @Query(
+            value = "SELECT rtm.* FROM repository_to_monitor rtm WHERE rtm.native_id = :nativeId AND "
+                    + MonitoredRepositoryScope.NATIVE_RTM_SOURCE_PROVIDER,
+            nativeQuery = true)
+    List<RepositoryToMonitor> findByNativeIdOnSourceProvider(
+            @Param("nativeId") Long nativeId, @Param("providerId") Long providerId);
+
+    /** A stored id is foreign only with a verified own-provider replacement and no own-provider owner of the old id. */
+    @Query(
+            value = """
+        SELECT EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r ON r.native_id = :resolvedNativeId
+                       WHERE rtm.id = :monitorId AND\s""" + MonitoredRepositoryScope.NATIVE_RTM_SOURCE_OF_R + """
+        ) AND EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r
+                       ON r.name_with_owner = rtm.name_with_owner AND r.native_id = rtm.native_id
+                       WHERE rtm.id = :monitorId AND NOT\s"""
+                    + MonitoredRepositoryScope.NATIVE_RTM_SOURCE_OF_R + """
+        ) AND NOT EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r ON r.native_id = rtm.native_id
+                       WHERE rtm.id = :monitorId AND\s"""
+                    + MonitoredRepositoryScope.NATIVE_RTM_SOURCE_OF_R + """
+        )
+        """,
+            nativeQuery = true)
+    boolean monitorHoldsAnotherInstancesId(
+            @Param("monitorId") Long monitorId, @Param("resolvedNativeId") Long resolvedNativeId);
+
+    /** Exact mirrored repository ids covered by one workspace, before its monitors are removed. */
+    @Query(
+            value = "SELECT DISTINCT r.id FROM repository_to_monitor rtm JOIN repository r"
+                    + " ON r.name_with_owner = rtm.name_with_owner WHERE rtm.workspace_id = :workspaceId AND "
+                    + MonitoredRepositoryScope.NATIVE_RTM_R,
+            nativeQuery = true)
+    List<Long> findSourceRepositoryIds(@Param("workspaceId") Long workspaceId);
+
+    /** Exact mirrored repository ids covered by the monitor being removed. */
+    @Query(
+            value = "SELECT r.id FROM repository_to_monitor rtm JOIN repository r"
+                    + " ON r.name_with_owner = rtm.name_with_owner WHERE rtm.id = :monitorId AND "
+                    + MonitoredRepositoryScope.NATIVE_RTM_R,
+            nativeQuery = true)
+    List<Long> findSourceRepositoryIdsOfMonitor(@Param("monitorId") Long monitorId);
+
+    /** Remaining monitors of this exact source repository; a foreign same-named repository does not count. */
+    @Query(
+            value = "SELECT COUNT(*) FROM repository_to_monitor rtm JOIN repository r"
+                    + " ON r.name_with_owner = rtm.name_with_owner WHERE r.id = :repositoryId AND "
+                    + MonitoredRepositoryScope.NATIVE_RTM_R,
+            nativeQuery = true)
+    long countForRepository(@Param("repositoryId") Long repositoryId);
 
     /** One workspace's monitors of the repository with the given provider-stable id. */
     List<RepositoryToMonitor> findByWorkspaceIdAndNativeId(Long workspaceId, Long nativeId);

@@ -448,7 +448,7 @@ export type AgentJob = {
      */
     model?: string;
     /**
-     * Job output (agent results)
+     * Raw output is not returned by administrative job reads; use the authorized observation and feedback endpoints
      */
     output?: unknown;
     /**
@@ -486,11 +486,11 @@ export type AgentJob = {
  */
 export type AgentJobUsage = {
     /**
-     * One entry per attempt that reached the model, first attempt first
+     * One entry per attempt with recorded usage, first attempt first
      */
     attempts: Array<AgentJobUsageAttempt>;
     /**
-     * The cost of every attempt in US dollars; absent when an attempt has no known price or none reached the model
+     * The cost of every attempt in US dollars; absent when an attempt has no known price or no usage is recorded
      */
     totalCostUsd?: number;
     /**
@@ -504,7 +504,7 @@ export type AgentJobUsage = {
  */
 export type AgentJobUsageAttempt = {
     /**
-     * The attempt, 1 for the first run
+     * The zero-based attempt number, 0 for the first run
      */
     attempt: number;
     cacheReadTokens: number;
@@ -523,7 +523,7 @@ export type AgentJobUsageAttempt = {
      */
     model?: string;
     /**
-     * When the attempt finished
+     * When the usage was recorded
      */
     occurredAt: Date;
     outputTokens: number;

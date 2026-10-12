@@ -79,8 +79,9 @@ public class GitHubInstallationRepositoriesMessageHandler
 
         // Notify consuming module via SPI for removed repositories
         if (!removed.isEmpty()) {
-            List<String> removedNames =
-                    removed.stream().map(GitHubRepositoryRefDTO::fullName).toList();
+            List<ProvisioningListener.RepositoryRemoval> removedNames = removed.stream()
+                    .map(ref -> new ProvisioningListener.RepositoryRemoval(ref.id(), ref.fullName()))
+                    .toList();
             provisioningListener.onRepositoriesRemoved(installationId, removedNames);
             log.info(
                     "Removed repositories from installation: installationId={}, repoCount={}",

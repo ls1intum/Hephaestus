@@ -106,13 +106,13 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
 
         switch (action) {
             case DELETED -> handleRepositoryDeleted(event, fullName, safeFullName);
-            case ARCHIVED -> handleRepositoryArchived(fullName, safeFullName, true);
-            case UNARCHIVED -> handleRepositoryArchived(fullName, safeFullName, false);
+            case ARCHIVED -> handleRepositoryArchived(repositoryRef.id(), fullName, safeFullName, true);
+            case UNARCHIVED -> handleRepositoryArchived(repositoryRef.id(), fullName, safeFullName, false);
             // A transfer carries the same payload shape as a rename (only the changed component
             // differs: changes.owner vs changes.repository.name) and needs the identical healing.
             case RENAMED, TRANSFERRED -> handleRepositoryMoved(event, safeFullName);
-            case PRIVATIZED -> handleVisibilityChanged(fullName, safeFullName, true);
-            case PUBLICIZED -> handleVisibilityChanged(fullName, safeFullName, false);
+            case PRIVATIZED -> handleVisibilityChanged(repositoryRef.id(), fullName, safeFullName, true);
+            case PUBLICIZED -> handleVisibilityChanged(repositoryRef.id(), fullName, safeFullName, false);
             default ->
                 log.debug(
                         "Skipped repository event: reason=unhandledAction, action={}, repoName={}",
@@ -130,7 +130,8 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
 
         if (installation == null || installation.id() == null) {
             log.warn("Cannot clean up deleted repository - missing installation ID: repoName={}", safeFullName);
-            deleteRepositoryByName(fullName, safeFullName);
+            deleteRepository(
+                    event.repository() == null ? null : event.repository().id(), fullName, safeFullName);
             return;
         }
 
@@ -138,7 +139,10 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
 
         log.info("Processing repository deletion: repoName={}, installationId={}", safeFullName, installationId);
 
-        provisioningListener.onRepositoriesRemoved(installationId, List.of(fullName));
+        provisioningListener.onRepositoriesRemoved(
+                installationId,
+                List.of(new ProvisioningListener.RepositoryRemoval(
+                        event.repository() == null ? null : event.repository().id(), fullName)));
 
         log.info("Completed repository deletion cleanup: repoName={}, installationId={}", safeFullName, installationId);
     }
@@ -150,8 +154,8 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
      * the repository itself. This maintains referential integrity for the
      * polymorphic project ownership model.
      */
-    private void deleteRepositoryByName(String fullName, String safeFullName) {
-        repositoryRepository.findByNameWithOwner(fullName).ifPresent(repository -> {
+    private void deleteRepository(@Nullable Long nativeId, String fullName, String safeFullName) {
+        findGitHubRepository(nativeId, fullName).ifPresent(repository -> {
             Long repoId = repository.getId();
 
             int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForRepository(repoId);
@@ -168,9 +172,9 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
         });
     }
 
-    private void handleRepositoryArchived(String fullName, String safeFullName, boolean archived) {
-        repositoryRepository
-                .findByNameWithOwner(fullName)
+    private void handleRepositoryArchived(
+            @Nullable Long nativeId, String fullName, String safeFullName, boolean archived) {
+        findGitHubRepository(nativeId, fullName)
                 .ifPresentOrElse(
                         repository -> {
                             repository.setArchived(archived);
@@ -184,6 +188,16 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
                                 "Repository not found locally for archive update: repoName={}, archived={}",
                                 safeFullName,
                                 archived));
+    }
+
+    private Optional<Repository> findGitHubRepository(@Nullable Long nativeId, String nameWithOwner) {
+        return gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                .flatMap(provider -> nativeId == null
+                        ? repositoryRepository.findByNameWithOwnerAndProviderId(
+                                nameWithOwner, Objects.requireNonNull(provider.getId()))
+                        : repositoryRepository.findByNativeIdAndProviderId(
+                                nativeId, Objects.requireNonNull(provider.getId())));
     }
 
     /**
@@ -223,7 +237,20 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
             return;
         }
 
-        resolveMovedRepository(nativeId, previousNameWithOwner)
+        // Both rows are this provider's: a native id or a name is unique only on its provider instance.
+        Long providerId = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                .map(IdentityProvider::getId)
+                .orElse(null);
+        if (providerId == null) {
+            log.debug(
+                    "No provider registered for repository {}; nothing of it is mirrored: newRepoName={}",
+                    event.action(),
+                    safeNewFullName);
+            return;
+        }
+
+        resolveMovedRepository(providerId, nativeId, previousNameWithOwner)
                 .ifPresentOrElse(
                         repository -> {
                             repository.setName(newName);
@@ -246,37 +273,27 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
 
         // Always attempt the monitor re-key, even when no domain row is mirrored yet: the monitor is
         // what the NATS filter is built from, so leaving it stale is the actual data-loss path.
-        syncTargetProvider.reconcileSyncTargetsForRepository(nativeId, newFullName);
+        syncTargetProvider.reconcileSyncTargetsForRepository(providerId, nativeId, newFullName);
     }
 
     /**
-     * Locates the mirrored row for a repository whose name has just moved. Prefers the stable
+     * Locates this provider's mirrored row for a repository whose name has just moved. Prefers the stable
      * {@code (nativeId, providerId)} key — the only identity a transfer preserves — and falls back to
-     * the previous {@code owner/name} for a row whose {@code native_id} was never captured.
+     * the previous {@code owner/name} on the same provider only when the event itself has no native id.
      */
     private Optional<Repository> resolveMovedRepository(
-            @Nullable Long nativeId, @Nullable String previousNameWithOwner) {
+            Long providerId, @Nullable Long nativeId, @Nullable String previousNameWithOwner) {
         if (nativeId != null) {
-            Long providerId = gitProviderRepository
-                    .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
-                    .map(IdentityProvider::getId)
-                    .orElse(null);
-            if (providerId != null) {
-                Optional<Repository> byNativeId =
-                        repositoryRepository.findByNativeIdAndProviderId(nativeId, providerId);
-                if (byNativeId.isPresent()) {
-                    return byNativeId;
-                }
-            }
+            return repositoryRepository.findByNativeIdAndProviderId(nativeId, providerId);
         }
         return previousNameWithOwner == null
                 ? Optional.empty()
-                : repositoryRepository.findByNameWithOwner(previousNameWithOwner);
+                : repositoryRepository.findByNameWithOwnerAndProviderId(previousNameWithOwner, providerId);
     }
 
-    private void handleVisibilityChanged(String fullName, String safeFullName, boolean isPrivate) {
-        repositoryRepository
-                .findByNameWithOwner(fullName)
+    private void handleVisibilityChanged(
+            @Nullable Long nativeId, String fullName, String safeFullName, boolean isPrivate) {
+        findGitHubRepository(nativeId, fullName)
                 .ifPresentOrElse(
                         repository -> {
                             repository.setVisibility(

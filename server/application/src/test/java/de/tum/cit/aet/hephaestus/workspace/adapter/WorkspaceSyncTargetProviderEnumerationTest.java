@@ -21,7 +21,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -77,8 +76,7 @@ class WorkspaceSyncTargetProviderEnumerationTest extends BaseUnitTest {
                 connectionService,
                 new NatsConnectionProperties(true, "nats://localhost:4222", null, null),
                 natsConsumerService,
-                mock(PracticeReviewRepositoryTargetRepository.class),
-                mock(RepositoryRepository.class));
+                mock(PracticeReviewRepositoryTargetRepository.class));
         lenient()
                 .when(workspaceScopeFilter.isRepositoryAllowed(any(RepositoryToMonitor.class)))
                 .thenReturn(true);

@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -87,7 +88,10 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
                 .toList();
         workspace.getRepositoriesToMonitor().addAll(monitors);
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace));
-        when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(monitors);
+        when(repositoryToMonitorRepository.findSourceRepositoryIds(WORKSPACE_ID))
+                .thenReturn(LongStream.range(101L, 101L + namesWithOwner.length)
+                        .boxed()
+                        .toList());
         return workspace;
     }
 
@@ -97,8 +101,8 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
 
         eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
 
-        verify(repositoryMonitorService).deleteRepositoryIfOrphaned("acme/alpha");
-        verify(repositoryMonitorService).deleteRepositoryIfOrphaned("acme/beta");
+        verify(repositoryMonitorService).deleteRepositoryIfOrphaned(101L);
+        verify(repositoryMonitorService).deleteRepositoryIfOrphaned(102L);
     }
 
     @Test
@@ -108,10 +112,10 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
         eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
 
         assertThat(workspace.getRepositoriesToMonitor()).isEmpty();
-        // saveAndFlush, not save: a pending orphanRemoval DELETE is invisible to countByNameWithOwner.
+        // saveAndFlush, not save: a pending orphanRemoval DELETE is invisible to countForRepository.
         InOrder order = inOrder(workspaceRepository, repositoryMonitorService);
         order.verify(workspaceRepository).saveAndFlush(workspace);
-        order.verify(repositoryMonitorService).deleteRepositoryIfOrphaned("acme/alpha");
+        order.verify(repositoryMonitorService).deleteRepositoryIfOrphaned(101L);
     }
 
     @Test
@@ -123,7 +127,7 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
         ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
         InOrder order = inOrder(eventPublisher, repositoryMonitorService);
         order.verify(eventPublisher).publishEvent(captor.capture());
-        order.verify(repositoryMonitorService).deleteRepositoryIfOrphaned("acme/alpha");
+        order.verify(repositoryMonitorService).deleteRepositoryIfOrphaned(101L);
         assertThat(captor.getValue()).isEqualTo(new ScmMirrorErasedEvent(WORKSPACE_ID));
     }
 
@@ -131,7 +135,6 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
     void erase_isIdempotent_secondRunFindsNoMonitorsAndDeletesNothing() {
         Workspace workspace = newWorkspace();
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace));
-        when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of());
 
         eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
         eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);

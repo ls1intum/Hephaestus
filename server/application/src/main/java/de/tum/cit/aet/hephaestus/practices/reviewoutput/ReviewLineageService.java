@@ -376,8 +376,8 @@ class ReviewLineageService {
      * dispute's explanation is written to the admins, while the rating, any other resolution and the note beside it
      * stay private to the developer and never leave SQL ({@link ReactionRepository#findAdminVisibleResponses}).
      *
-     * <p>{@code respondedAt} is set for an answer that is only a rating too, so admins see that and when the developer
-     * rated, not how. This is intended for now and kept as an open product decision.
+     * <p>Only the newest snapshot containing an explicit action can expose response metadata. Rating-only or
+     * retracted responses stay private; an older action is never reopened.
      */
     private Map<UUID, ReviewLineageResponseDTO> responses(Long workspaceId, Collection<FeedbackRow> feedback) {
         if (feedback.isEmpty()) {

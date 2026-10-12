@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -143,7 +145,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         workspaceRepository.saveAndFlush(workspace);
 
         workspaceRepositoryMonitorService.removeRepositoryMonitorForInstallation(
-                INSTALLATION_ID, "HephaestusTest/retained");
+                INSTALLATION_ID, "HephaestusTest/retained", null);
 
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
                 .extracting(RepositoryToMonitor::getNameWithOwner)
@@ -155,13 +157,11 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         Workspace workspace = persistGitHubTokenWorkspace();
         persistRepository(IdentityProviderType.GITLAB, GITLAB_SERVER_URL, 701L);
 
-        workspaceRepositoryMonitorService.addRepositoryToMonitor(workspace.getWorkspaceSlug(), SHARED_NAME);
-
-        // The GitLab project's id would hide the GitHub repository from every scoped query.
+        assertThatThrownBy(() -> workspaceRepositoryMonitorService.addRepositoryToMonitor(
+                        workspace.getWorkspaceSlug(), SHARED_NAME))
+                .isInstanceOf(EntityNotFoundException.class);
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
-                .singleElement()
-                .extracting(RepositoryToMonitor::getNativeId)
-                .isNull();
+                .isEmpty();
     }
 
     @Test

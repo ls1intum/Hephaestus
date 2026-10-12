@@ -89,13 +89,9 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     }
 
     /**
-     * What an admin may learn of the response that stands on each of these pieces of feedback: that the recipient
-     * answered and when, whether the answer disputes the feedback, and the dispute's explanation, which is written to
-     * the admins. The rating, any other resolution and the note beside it stay in SQL, so no admin projection can
-     * pass them on. The same responses as {@link #findCurrentResponses}; the caller passes at least one id.
-     *
-     * <p>An answer that is only a rating still counts as answered here: admins see that and when, not how. Whether
-     * that should stay is an open product decision.
+     * The newest response snapshot is visible to admins only when it contains an explicit action.
+     * Rating-only and empty snapshots stay private and never reopen an older response. Only a dispute's
+     * explanation is addressed to admins; rating values, other actions and their notes stay in SQL.
      */
     @Query(value = """
         SELECT latest.feedback_id AS "feedbackId", latest.created_at AS "respondedAt",
@@ -105,7 +101,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
         """ + LATEST_RESPONSE + """
         ) latest
         WHERE latest.feedback_id IN (:feedbackIds)
-          AND (latest.usefulness IS NOT NULL OR latest.action IS NOT NULL)
+          AND latest.action IS NOT NULL
         """, nativeQuery = true)
     List<AdminVisibleResponseRow> findAdminVisibleResponses(
             @Param("workspaceId") Long workspaceId, @Param("feedbackIds") Collection<UUID> feedbackIds);
