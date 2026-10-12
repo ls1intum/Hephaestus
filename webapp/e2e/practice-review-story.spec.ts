@@ -11,7 +11,7 @@ import { expect, loginAsDevAdmin, test } from "./fixtures";
  */
 
 const REVIEW = "5e5e0000-0000-4000-8000-000000000001";
-const OBSERVATION = "5e5e0000-0000-4000-8000-000000000011";
+const NOT_MET = "5e5e0000-0000-4000-8000-000000000011";
 const MET = "5e5e0000-0000-4000-8000-000000000012";
 const COMMENT = "5e5e0000-0000-4000-8000-000000000021";
 const WITHHELD = "5e5e0000-0000-4000-8000-000000000022";
@@ -41,7 +41,7 @@ const job = {
 	target: { type: "scm.pull_request", title: work.title, reviewedWork: work },
 };
 
-const observation = (id: string, summary: string, outcome: string, feedbackCount: number) => ({
+const result = (id: string, summary: string, outcome: string, feedbackCount: number) => ({
 	id,
 	agentJobId: REVIEW,
 	summary,
@@ -52,6 +52,7 @@ const observation = (id: string, summary: string, outcome: string, feedbackCount
 	observedAt: "2026-09-01T13:39:00Z",
 	focus: false,
 	invalidated: false,
+	problemCount: outcome === "NOT_MET" ? 1 : 0,
 	feedbackCount,
 	ownFeedbackCount: feedbackCount,
 });
@@ -78,16 +79,11 @@ const lineage = {
 			joinedReview: false,
 		},
 	],
-	observations: [
-		observation(
-			OBSERVATION,
-			"A cache miss and a permission failure come back as one 404",
-			"NOT_MET",
-			2,
-		),
-		observation(MET, "The controller delegates first", "MET", 0),
+	results: [
+		result(NOT_MET, "A cache miss and a permission failure come back as one 404", "NOT_MET", 2),
+		result(MET, "The controller delegates first", "MET", 0),
 	],
-	moreObservations: 0,
+	moreResults: 0,
 	feedback: [
 		{
 			id: COMMENT,
@@ -98,7 +94,7 @@ const lineage = {
 			createdAt: "2026-09-01T13:41:00Z",
 			deliveredAt: "2026-09-01T13:41:30Z",
 			placementCount: 1,
-			observationIds: [OBSERVATION],
+			practiceResultIds: [NOT_MET],
 			focus: false,
 		},
 		{
@@ -110,16 +106,16 @@ const lineage = {
 			suppressionReason: "ARTIFACT_MERGED",
 			createdAt: "2026-09-01T14:58:00Z",
 			placementCount: 0,
-			observationIds: [OBSERVATION],
+			practiceResultIds: [NOT_MET],
 			focus: false,
 		},
 	],
 	moreFeedback: 0,
 };
 
-/** The observation's own read, for its level. */
-const observationDetail = {
-	id: OBSERVATION,
+/** The result's own read, for its level. */
+const resultDetail = {
+	id: NOT_MET,
 	agentJobId: REVIEW,
 	summary: "A cache miss and a permission failure come back as one 404",
 	practiceSlug: "errors-carry-context",
@@ -131,6 +127,7 @@ const observationDetail = {
 	observedAt: "2026-09-01T13:39:00Z",
 	reviewedWork: work,
 	evidenceRationale: "Both cases end in the same NotFoundException.",
+	observations: [],
 	disputes: [],
 	invalidations: [],
 	feedback: [],
@@ -152,8 +149,8 @@ function at(path: string) {
 async function serveReview(page: Page) {
 	await page.route(at(`/agents/jobs/${REVIEW}`), json(job));
 	await page.route(at("/practices/reviews/lineage"), json(lineage));
-	await page.route(at("/practices/reviews/observations"), json(emptyPage));
-	await page.route(at(`/practices/reviews/observations/${OBSERVATION}`), json(observationDetail));
+	await page.route(at("/practices/reviews/results"), json(emptyPage));
+	await page.route(at(`/practices/reviews/results/${NOT_MET}`), json(resultDetail));
 	await page.route(at("/practices/reviews/feedback"), json(emptyPage));
 	await page.route(at("/practices/reviews"), json(emptyPage));
 	await page.route(
@@ -205,12 +202,12 @@ test("a step opens its record's sheet over the trace, and Escape closes it first
 	await expect(story.locator('[data-here="true"]')).toHaveAttribute("data-lineage-node", "review");
 
 	await story
-		.getByRole("button", { name: new RegExp(observationDetail.summary, "u") })
+		.getByRole("button", { name: new RegExp(resultDetail.summary, "u") })
 		.first()
 		.click();
-	const level = page.getByRole("dialog", { name: observationDetail.summary });
+	const level = page.getByRole("dialog", { name: resultDetail.summary });
 	await expect(level).toBeVisible();
-	await expect(page).toHaveURL(new RegExp(`detail=.*observation(?:%3A|:)${OBSERVATION}`, "u"));
+	await expect(page).toHaveURL(new RegExp(`detail=.*result(?:%3A|:)${NOT_MET}`, "u"));
 	// The sheet over the trace is the same as from its row: no story, no way on to another record.
 	await expect(level.getByRole("group", { name: "How this came about" })).toHaveCount(0);
 

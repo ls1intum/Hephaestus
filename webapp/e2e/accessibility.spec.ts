@@ -52,7 +52,7 @@ const SIGNED_IN: Surface[] = [
 	{ name: "Review settings", path: "/w/e2e/admin/practices/review" },
 	{ name: "Practice reviews", path: "/w/e2e/admin/practices/reviews" },
 	{ name: "Review runs", path: "/w/e2e/admin/practices/reviews/runs" },
-	{ name: "Review observations", path: "/w/e2e/admin/practices/reviews/observations" },
+	{ name: "Review results", path: "/w/e2e/admin/practices/reviews/results" },
 	{ name: "Review feedback", path: "/w/e2e/admin/practices/reviews/feedback" },
 	{
 		name: "Work no review started on",
