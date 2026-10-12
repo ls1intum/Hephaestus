@@ -49,8 +49,13 @@ export function StatTile({
 			</CardHeader>
 			<CardContent className="flex flex-1 flex-col gap-3">
 				<div className="space-y-1">
-					{/* A `div`, not a `p`: a loading tile's value is a block skeleton. */}
-					<div className="flex items-baseline gap-1.5">
+					{/*
+					 * A `div`, not a `p`: a loading tile's value is a block skeleton. Baseline alignment
+					 * makes the line's own height follow the font's ascent and descent (24 to 26px across
+					 * system fonts), so the line holds the tallest of them and a loading tile's 26px line
+					 * matches it with any font; it grows only when the qualifier wraps.
+					 */}
+					<div className="flex min-h-6.5 items-baseline gap-1.5">
 						<span
 							className={cn(
 								"text-2xl leading-none font-semibold tabular-nums",

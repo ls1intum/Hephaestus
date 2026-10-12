@@ -670,7 +670,22 @@ export const OnlyInApprovalQueue: Story = {
 	},
 };
 
-const top = (element: HTMLElement) => element.getBoundingClientRect().top;
+/**
+ * Whether `first` reads before `second` in a wrapping row: on a line above it, or on the same line
+ * and to its left. How the footer wraps at 320px depends on the font's widths: with the system font
+ * on macOS the steps take a line of their own, with Arial's widths they share one with "Reject
+ * feedback", and either reads the steps first.
+ */
+function readsBefore(first: HTMLElement, second: HTMLElement): boolean {
+	const a = first.getBoundingClientRect();
+	const b = second.getBoundingClientRect();
+	const SLACK_PX = 1;
+	if (a.bottom <= b.top + SLACK_PX) {
+		return true;
+	}
+	const sameLine = a.top < b.bottom && b.top < a.bottom;
+	return sameLine && a.right <= b.left + SLACK_PX;
+}
 
 export const InApprovalQueueReflow: Story = {
 	args: InApprovalQueue.args,
@@ -681,14 +696,14 @@ export const InApprovalQueueReflow: Story = {
 			within(panel).getByRole("button", { name: "Approve and open next" }),
 		).toBeVisible();
 		await expectNoPanelOverflow(panel);
-		// The stacked footer shows the steps first, as the tab order reaches them first.
+		// The wrapped footer shows the steps first, as the tab order reaches them first.
 		const steps = within(panel).getByRole("navigation", { name: "Feedback awaiting approval" });
-		await expect(top(steps)).toBeLessThan(
-			top(within(panel).getByRole("button", { name: "Approve and open next" })),
-		);
-		await expect(top(steps)).toBeLessThan(
-			top(within(panel).getByRole("button", { name: "Reject feedback" })),
-		);
+		for (const name of ["Approve and open next", "Reject feedback"]) {
+			await expect(
+				readsBefore(steps, within(panel).getByRole("button", { name })),
+				`The steps read after "${name}"`,
+			).toBe(true);
+		}
 	},
 };
 
