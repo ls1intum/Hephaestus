@@ -77,6 +77,16 @@ export interface ProgramExecution {
 	calls: { review: number } & Record<ModelSlot, number>;
 }
 
+/** A request the host still owes a reply. */
+interface OpenRequest {
+	kind: "model" | "read" | "review";
+	call: AbortController;
+	/** The slot of a model request. */
+	slot?: ModelSlot;
+	/** The host already failed it and counted it when it stopped the program. */
+	refused?: true;
+}
+
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const cut = (text: string) => text.slice(0, MAX_ERROR_CHARS).toWellFormed();
 
@@ -205,7 +215,14 @@ export async function runCustomProgram(
 	]);
 	let aborted: AbortReason | undefined;
 	/** Requests the host still owes a reply, by id, each with its own cancellation. */
-	const open = new Map<number, { kind: "model" | "read" | "review"; call: AbortController }>();
+	const open = new Map<number, OpenRequest>();
+	/** Count one model call whose failure the program receives. */
+	const countUnrated = (slot: ModelSlot, reason: Reason) => {
+		const slotReport = report.find((r) => r.slot === slot);
+		if (slotReport !== undefined) {
+			slotReport.notRated[reason] = (slotReport.notRated[reason] ?? 0) + 1;
+		}
+	};
 	const reply = (message: Exclude<HostMessage, { kind: "job" | "abort" | "meta-accepted" }>) => {
 		// A reply to a request already answered, or after the program stopped, is dropped.
 		if (!open.delete(message.id) || !child.connected) {
@@ -234,10 +251,16 @@ export async function runCustomProgram(
 		if (child.connected) {
 			child.send({ kind: "abort", reason } satisfies HostMessage);
 		}
-		// Every request in flight fails now; whatever its call answers later is not sent.
-		for (const [id, { kind, call }] of open) {
-			call.abort(new UnratedError(reason, `the host stopped this program: ${reason}`));
-			refuseRequest(kind, id, reason);
+		// Every request in flight fails now; whatever its call answers later is not sent or counted.
+		// The count is taken here, before the program can read the failure and return.
+		for (const [id, request] of open) {
+			request.refused = true;
+			request.call.abort(new UnratedError(reason, `the host stopped this program: ${reason}`));
+			if (request.slot !== undefined) {
+				// A slot report has no cancelled count: as in the direct model calls, it is the deadline.
+				countUnrated(request.slot, reason === "cancelled" ? "deadline" : reason);
+			}
+			refuseRequest(request.kind, id, reason);
 		}
 		open.clear();
 		killLater = setTimeout(stopAtLimit, RETURN_MS);
@@ -278,12 +301,16 @@ export async function runCustomProgram(
 
 	const answerModel = async (
 		message: Extract<ChildMessage, { kind: "model" }>,
+		request: OpenRequest,
 		call: AbortSignal,
 	) => {
 		const { id, slot, label } = message;
-		const slotReport = report.find((r) => r.slot === slot);
 		const model = services.models[slot];
-		if (accepted[slot] === undefined || model === undefined || slotReport === undefined) {
+		if (
+			accepted[slot] === undefined ||
+			model === undefined ||
+			!report.some((r) => r.slot === slot)
+		) {
 			reply({
 				kind: "model-failed",
 				id,
@@ -306,7 +333,10 @@ export async function runCustomProgram(
 			reply({ kind: "model", id, answer: outcome.value, tokensLeft: services.budget.left });
 			return;
 		}
-		slotReport.notRated[outcome.reason] = (slotReport.notRated[outcome.reason] ?? 0) + 1;
+		if (request.refused === true) {
+			return;
+		}
+		countUnrated(slot, outcome.reason);
 		services.log(
 			`  [${slug}] ${slot} call${label === "" ? "" : ` in ${label}`} not rated: ${outcome.reason}`,
 		);
@@ -402,11 +432,12 @@ export async function runCustomProgram(
 	/** Answer one request; a request the host cannot answer, such as options without a JSON form, stops the program. */
 	const answerRequest = async (
 		message: Extract<ChildMessage, { kind: "model" | "read" | "review" }>,
+		request: OpenRequest,
 		callSignal: AbortSignal,
 	) => {
 		try {
 			if (message.kind === "model") {
-				await answerModel(message, callSignal);
+				await answerModel(message, request, callSignal);
 			} else if (message.kind === "read") {
 				await answerRead(message);
 			} else {
@@ -503,9 +534,14 @@ export async function runCustomProgram(
 					return;
 				}
 				const call = new AbortController();
-				open.set(message.id, { kind: message.kind, call });
+				const request: OpenRequest = {
+					kind: message.kind,
+					call,
+					...(message.kind === "model" && { slot: message.slot }),
+				};
+				open.set(message.id, request);
 				const callSignal = AbortSignal.any([signal, call.signal]);
-				void answerRequest(message, callSignal);
+				void answerRequest(message, request, callSignal);
 			}
 		}
 	});
