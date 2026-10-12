@@ -36,7 +36,9 @@ export function ActivityRepositoryTable({
 		<Table bordered aria-label="Repositories">
 			<TableHeader>
 				<TableRow variant="static">
-					<TableHead className="pl-3 text-muted-foreground">Repository</TableHead>
+					<TableHead className="sticky left-0 z-20 bg-card pl-3 text-muted-foreground">
+						Repository
+					</TableHead>
 					<TableHead numeric className="w-px text-right text-muted-foreground">
 						Contributions
 					</TableHead>
@@ -54,7 +56,11 @@ export function ActivityRepositoryTable({
 			<TableBody>
 				{rows.map(({ repository, counts }) => (
 					<TableRow key={repository.id} variant="static">
-						<TableCell className="pl-3 font-medium">{repository.key}</TableCell>
+						<TableCell className="sticky left-0 z-20 bg-card pl-3 font-medium">
+							<span className="block w-36 wrap-anywhere whitespace-normal sm:w-56">
+								{repository.key}
+							</span>
+						</TableCell>
 						<TableCell numeric className="text-right font-semibold">
 							{counts.contributions === 0 ? <NoneMark /> : counts.contributions}
 						</TableCell>
