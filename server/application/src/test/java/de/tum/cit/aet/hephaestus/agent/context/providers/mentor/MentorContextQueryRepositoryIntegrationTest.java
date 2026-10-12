@@ -4,9 +4,15 @@ import static de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures.admitt
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnPersistence;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -47,6 +53,12 @@ import org.springframework.beans.factory.annotation.Autowired;
  * Postgres container to pin the {@code DISTINCT ON} and jsonb-to-text projection contracts.
  */
 class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private ConnectionService connectionService;
 
     @Autowired
     private MentorContextQueryRepository queryRepository;
@@ -104,6 +116,19 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         user.setUpdatedAt(Instant.now());
         user.setProvider(gitProvider);
         user = userRepository.save(user);
+    }
+
+    private void connectSource(IntegrationKind kind, ConnectionConfig config) {
+        Connection connection = connections.saveAndFlush(new Connection(workspace, kind, kind.name(), config));
+        connectionService.transition(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "mentor-context-test",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
     }
 
     private ChatThread seedThreadWithUserMessage(String firstPrompt) {
@@ -172,6 +197,19 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
                     .orElseGet(() -> gitProviderRepository.save(
                             new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
             gitHub = side(gitHubProvider, "https://github.com", person(gitHubProvider, "https://github.com", "reader"));
+            connectSource(
+                    IntegrationKind.GITLAB,
+                    new ConnectionConfig.GitLabConfig(
+                            user.getProvider().getServerUrl(),
+                            null,
+                            null,
+                            ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                            Set.of(),
+                            null));
+            connectSource(
+                    IntegrationKind.GITHUB,
+                    new ConnectionConfig.GitHubAppConfig(
+                            880_000L, workspace.getAccountLogin(), gitHubProvider.getServerUrl(), Set.of()));
         }
 
         @Test

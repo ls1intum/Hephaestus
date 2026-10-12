@@ -35,8 +35,14 @@ import de.tum.cit.aet.hephaestus.core.privacy.PersonDataRequest;
 import de.tum.cit.aet.hephaestus.core.privacy.PersonDataService;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -111,6 +117,12 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     private static final String FROM = "2026-01-01T00:00:00Z";
     private static final String TO = "2026-02-01T00:00:00Z";
     private static final Instant DAY = Instant.parse("2026-01-10T12:00:00Z");
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private ConnectionService connectionService;
 
     @Autowired
     private IdentityLinkRepository publicIdentities;
@@ -1886,6 +1898,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         @BeforeEach
         void seedTeams() {
+            connectGitHub();
             Organization organization = new Organization();
             organization.setNativeId(nativeIds.incrementAndGet());
             organization.setLogin(workspace.getAccountLogin());
@@ -2338,6 +2351,11 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     @Nested
     class OpenWork {
 
+        @BeforeEach
+        void connectSource() {
+            connectGitHub();
+        }
+
         @Test
         void shouldListOpenReviewRequestsByOthersInMonitoredRepositoriesWhenAMemberIsAsked() {
             PullRequest requested = pullRequest(zoe, monitored, requesting(ada));
@@ -2644,7 +2662,38 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         private Function<PullRequest, PullRequest> onGitLab() {
             return work -> {
-                work.setProvider(ensureGitLabProvider());
+                var provider = ensureGitLabProvider();
+                Repository repository = Objects.requireNonNull(work.getRepository());
+                repository.setProvider(provider);
+                repository.setHtmlUrl(provider.getServerUrl() + "/" + repository.getNameWithOwner());
+                repositoryRepository.save(repository);
+                work.setProvider(provider);
+                work.setHtmlUrl(repository.getHtmlUrl() + "/-/merge_requests/" + work.getNumber());
+                if (connections
+                        .findByWorkspaceIdAndKindAndInstanceKey(
+                                workspace.getId(), IntegrationKind.GITLAB, "activity-gitlab")
+                        .isEmpty()) {
+                    Connection connection = connections.saveAndFlush(new Connection(
+                            workspace,
+                            IntegrationKind.GITLAB,
+                            "activity-gitlab",
+                            new ConnectionConfig.GitLabConfig(
+                                    provider.getServerUrl(),
+                                    null,
+                                    null,
+                                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                                    Set.of(),
+                                    null)));
+                    connectionService.transition(
+                            connection,
+                            new ConnectionService.TransitionRequest(
+                                    IntegrationState.ACTIVE,
+                                    "TEST_CONNECTED",
+                                    "SYSTEM",
+                                    "activity-gitlab",
+                                    UUID.randomUUID().toString(),
+                                    "Source connected"));
+                }
                 return work;
             };
         }
@@ -2985,6 +3034,23 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         user = userRepository.save(user);
         ensureWorkspaceMembership(workspace, user, WorkspaceRole.MEMBER);
         return user;
+    }
+
+    private void connectGitHub() {
+        Connection connection = connections.saveAndFlush(new Connection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "activity-open-work",
+                new ConnectionConfig.GitHubAppConfig(9301L, workspace.getAccountLogin(), null, Set.of())));
+        connectionService.transition(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "activity-open-work",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
     }
 
     private Repository repository(String nameWithOwner, boolean monitor) {
