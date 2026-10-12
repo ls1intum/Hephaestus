@@ -10,11 +10,21 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RangeControls } from "@/components/common/RangeControls";
 import { Section } from "@/components/layout/Section";
 
-import { PracticeCountsTable } from "./PracticeCountsTable";
+import type {
+	DeliveryBreakdownReads,
+	ReviewAttentionReads,
+} from "@/hooks/use-practice-review-overview";
+import { DeliveryBreakdownCard } from "./DeliveryBreakdownCard";
+import { deliveryFailures, finishedInRange } from "./overview-counts";
+import { type PracticeCountsFilter, PracticeCountsTable } from "./PracticeCountsTable";
 import type { OutcomeScope } from "./review-outcomes";
 import type { PracticeReviewOverviewState, PreviousReviewPeriodState } from "./review-states";
-import { ReviewAttention, type ReviewAttentionProps } from "./ReviewAttention";
+import { ReviewAttention } from "./ReviewAttention";
 import { ReviewPipeline } from "./ReviewPipeline";
+import { ReviewQueueCard } from "./ReviewQueueCard";
+import type { ReviewQueueState } from "./ReviewQueueNow";
+import { ReviewTabIntro } from "./ReviewTabIntro";
+import type { ReviewTimingState } from "./ReviewTimeCard";
 
 export interface PracticeReviewOverviewPageProps {
 	workspaceSlug: string;
@@ -25,17 +35,28 @@ export interface PracticeReviewOverviewPageProps {
 	overview: PracticeReviewOverviewState;
 	/** The period before the range, which the stages' totals are set against. */
 	previous: PreviousReviewPeriodState;
-	attention: Omit<ReviewAttentionProps, "workspaceSlug" | "rangeInSentence">;
+	/** The decisions an admin owes, whenever the feedback was composed. */
+	attention: ReviewAttentionReads;
+	/** The range's feedback by channel and by reason, beside the Feedback tile. */
+	delivery: DeliveryBreakdownReads;
+	/** How long the range's reviews took, read apart from the overview. */
+	timing: ReviewTimingState;
+	/** The queue as it stands now, whatever the range, above the review time. */
+	queue: ReviewQueueState;
 	/** The workspace's practices, for how many recorded nothing; absent while they load. */
 	practices: Practice[] | undefined;
 	/** Leads the page: whatever stops reviews from running. */
 	banner?: ReactNode;
+	/** The Practices table's filters, as the route keeps them in the URL. */
+	practicesFilter?: PracticeCountsFilter;
 }
 
 /**
- * The home of Practice reviews, in the order an admin's questions come: can reviews run, what do I
- * owe them, what did they do, and which practices did it. The range heads the page because it
- * governs everything below it except the approvals, which are owed whenever they were composed.
+ * The home of Practice reviews, in the order an admin's questions come: can reviews run, must I act,
+ * what is in the queue and how long reviews take, what the reviews did, what reached the developers,
+ * and which practices did it. Each area is a few cards, each card one question. The range heads the
+ * page because it governs everything below it except what the queue holds now, which is read as it
+ * stands and says so, and the approvals, which are owed whenever they were composed.
  */
 export function PracticeReviewOverviewPage({
 	workspaceSlug,
@@ -45,14 +66,20 @@ export function PracticeReviewOverviewPage({
 	overview,
 	previous,
 	attention,
+	delivery,
+	timing,
+	queue,
 	practices,
 	banner,
+	practicesFilter,
 }: PracticeReviewOverviewPageProps) {
 	const rangeDef = REVIEW_RANGE_DEFS[range];
+	const finished = finishedInRange(overview, scope);
 	return (
 		<div className="space-y-10">
 			<div className="space-y-4">
-				<div className="flex justify-end">
+				<div className="flex flex-wrap items-center justify-between gap-2">
+					<ReviewTabIntro tab="overview" />
 					<RangeControls
 						options={REVIEW_RANGE_OPTIONS}
 						range={range}
@@ -62,11 +89,22 @@ export function PracticeReviewOverviewPage({
 				</div>
 				{banner}
 			</div>
-			<ReviewAttention
-				workspaceSlug={workspaceSlug}
-				rangeInSentence={rangeDef.inSentence}
-				{...attention}
-			/>
+			<ReviewAttention {...attention} />
+			<Section
+				title="Queue"
+				size="lg"
+				description={`What waits and runs now. What finished and how long reviews took ${rangeDef.during}.`}
+			>
+				<ReviewQueueCard
+					workspaceSlug={workspaceSlug}
+					queue={queue}
+					timing={timing}
+					finished={finished}
+					scope={scope}
+					label={rangeDef.label}
+					during={rangeDef.during}
+				/>
+			</Section>
 			<Section title="What the reviews did" size="lg" description={rangeDef.label}>
 				{overview.status === "error" ? (
 					<QueryErrorAlert
@@ -79,21 +117,45 @@ export function PracticeReviewOverviewPage({
 						workspaceSlug={workspaceSlug}
 						state={overview}
 						previous={previous}
+						previousName={rangeDef.previous}
 						scope={scope}
+						stages={["reviews", "observations"]}
 					/>
 				)}
 			</Section>
+			{/* The Delivery cards count from the overview too: its failure is said once, above. */}
+			{overview.status !== "error" && (
+				<Section title="Delivery" size="lg" description={rangeDef.label}>
+					<ReviewPipeline
+						aria-label="Delivery"
+						workspaceSlug={workspaceSlug}
+						state={overview}
+						previous={previous}
+						previousName={rangeDef.previous}
+						scope={scope}
+						stages={["feedback"]}
+						lastTile={
+							<DeliveryBreakdownCard
+								workspaceSlug={workspaceSlug}
+								scope={scope}
+								range={rangeDef}
+								overview={overview}
+								delivered={delivery.delivered}
+								withheld={delivery.withheld}
+								failedDeliveries={deliveryFailures(scope, overview)}
+								unprocessedResults={delivery.unprocessedResults}
+							/>
+						}
+					/>
+				</Section>
+			)}
 			{overview.status !== "error" && (
 				<Section
 					title="Practices"
 					size="lg"
-					description={`How the reviews judged each practice in ${rangeDef.inSentence}, busiest first.`}
+					description={`How the reviews judged each practice ${rangeDef.during}, the ones that need a look first.`}
 				>
-					<PracticeCountsTable
-						workspaceSlug={workspaceSlug}
-						state={overview}
-						practices={practices}
-					/>
+					<PracticeCountsTable state={overview} practices={practices} filter={practicesFilter} />
 				</Section>
 			)}
 		</div>

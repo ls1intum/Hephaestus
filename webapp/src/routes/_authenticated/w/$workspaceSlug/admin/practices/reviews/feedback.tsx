@@ -2,12 +2,10 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
 import {
-	listGroupsOptions,
+	countPracticeReviewFeedbackByLocationOptions,
 	listPracticeReviewFeedbackInfiniteOptions,
-	listPracticesOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { FeedbackListPage } from "@/components/admin/practice-reviews/FeedbackListPage";
-import { practiceFacetOptions } from "@/components/admin/practice-reviews/ObservationFilters";
 import { practiceReviewsHead } from "@/components/admin/practice-reviews/review-levels";
 import {
 	type FeedbackSearch,
@@ -15,7 +13,9 @@ import {
 	feedbackSearchSchema,
 	REVIEW_PAGE_SIZE,
 } from "@/components/admin/practice-reviews/review-search";
-import { useReviewPeople } from "@/hooks/use-review-people";
+import { panelState } from "@/components/common/panel-state";
+import { useReviewScopeSources } from "@/hooks/use-review-scope-sources";
+import { useScopeRecordFilter } from "@/hooks/use-scope-record-filter";
 import { useSearchState } from "@/lib/search-params";
 import { pagedListState } from "@/runtime/tanstack-query/infinite-list";
 import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
@@ -43,22 +43,33 @@ function FeedbackListRoute() {
 		}),
 		...pagedModelParams,
 	});
-	// The groups only describe each practice option; there is no group facet here.
-	const groupsQuery = useQuery({ ...listGroupsOptions({ path: { workspaceSlug } }) });
-	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
-	const people = useReviewPeople(workspaceSlug);
+	const { groups, practices, people } = useReviewScopeSources(workspaceSlug);
+	// Everything addressed to the recipient filtered to, whatever else is filtered: the summary is
+	// about the person, and its counts open the list narrowed to them alone.
+	const recipientCountsQuery = useQuery({
+		...countPracticeReviewFeedbackByLocationOptions({
+			path: { workspaceSlug },
+			query: { recipientUserId: search.recipientUserId },
+		}),
+		enabled: search.recipientUserId !== undefined,
+	});
+
+	const record = useScopeRecordFilter(workspaceSlug, search);
 
 	return (
 		<FeedbackListPage
+			record={record}
+			workspaceSlug={workspaceSlug}
 			search={search}
 			onSearchChange={updateSearch}
 			feedback={pagedListState(feedbackQueryResult, (feedback) => feedback.id)}
-			practices={{
-				options: practiceFacetOptions(practicesQuery.data, groupsQuery.data),
-				isLoading: practicesQuery.isLoading,
-				isError: practicesQuery.isError,
-			}}
+			groups={groups}
+			practices={practices}
 			people={people}
+			recipientCounts={panelState(recipientCountsQuery, (counts) => ({
+				status: "ready" as const,
+				counts,
+			}))}
 		/>
 	);
 }

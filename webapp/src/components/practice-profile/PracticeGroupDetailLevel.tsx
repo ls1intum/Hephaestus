@@ -1,5 +1,5 @@
 import { ClipboardCheckIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 
 import type { PracticeGroup, PracticeGroupStanding, PracticeStanding } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -7,18 +7,11 @@ import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { LevelHeader } from "@/components/layout/detail-drawer/LevelHeader";
 import { Section } from "@/components/layout/Section";
 import { count, type FeedbackTextSegment } from "@/components/practice-vocabulary/feedback-text";
-import { FeedbackText } from "@/components/practice-vocabulary/FeedbackText";
 import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
-import {
-	HephFeedbackCard,
-	type HephFeedbackCardProps,
-	HephFeedbackCardSkeleton,
-} from "@/components/practice-vocabulary/HephFeedbackCard";
 import {
 	DEFAULT_PRACTICE_GROUP_SORT,
 	sortByStanding,
 } from "@/components/practice-vocabulary/practice-group-list-order";
-import { formatGroupStandingBasis } from "@/components/practice-vocabulary/practice-trend-presentation";
 import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
 import {
 	PracticeTable,
@@ -29,18 +22,24 @@ import {
 import { countPracticeStandings } from "@/components/practice-vocabulary/standing-counts";
 import { StandingBadge, TrendNote } from "@/components/practice-vocabulary/StandingBadge";
 import { StandingSummaryBox } from "@/components/practice-vocabulary/StandingSummaryBox";
-import { WhereYouStand } from "@/components/practice-vocabulary/WhereYouStand";
 import { DrawerBody } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell } from "@/components/ui/table";
-import { hasText } from "@/lib/text";
+import { capitalise, hasText } from "@/lib/text";
 
-import { NoSuchGroup } from "./practice-profile-blocks";
+import {
+	type FoldReason,
+	FoldedPractices,
+	FoldedStandingCell,
+	NeverAppliedBadge,
+} from "./FoldedPractices";
+import { groupNeverApplied, splitFoldedPractices } from "./practice-folds";
+import type { PracticePattern } from "./practice-pattern";
+import { GroupWithoutPractices, NoSuchGroup } from "./practice-profile-blocks";
+import { PracticePatternLine } from "./PracticePatternLine";
 
-export interface PracticeGroupDetailLevelProps extends Partial<
-	Pick<HephFeedbackCardProps, "holdingUp" | "holdingUpNote" | "reviewedWork">
-> {
+export interface PracticeGroupDetailLevelProps {
 	nested?: boolean;
 	/** Where the level sits, from the drawer. */
 	path: LevelPath;
@@ -48,13 +47,11 @@ export interface PracticeGroupDetailLevelProps extends Partial<
 	standing?: PracticeGroupStanding;
 	/** The group's practices, as the standings carry them; left out while they load. */
 	practices?: PracticeStanding[];
-	/** The group's "Next step", composed from its newest open feedback; left out without one. */
-	nextStep?: FeedbackTextSegment[];
 	/**
 	 * One sentence per practice under its pill, keyed by slug; a practice without one shows only
 	 * the pill.
 	 */
-	practiceSentences?: Record<string, FeedbackTextSegment[] | undefined>;
+	practiceSentences?: Record<string, FeedbackTextSegment[][] | undefined>;
 	/** Opens the practice's own level over this one. */
 	onOpenPractice?: (practiceSlug: string) => void;
 	/** The practice whose level is open over this one; its row stays marked. */
@@ -62,9 +59,20 @@ export interface PracticeGroupDetailLevelProps extends Partial<
 	isLoading: boolean;
 	error?: unknown;
 	onRetry?: () => void;
+	/** Each practice's pattern from its open card, keyed by slug, as a label beside its name. */
+	patterns?: Record<string, PracticePattern | undefined>;
 }
 
-const practiceCountLabel = (n: number) => `${count(n, "practice", "practices")} in this group`;
+const NO_PRACTICES_YET = {
+	icon: <ClipboardCheckIcon />,
+	title: "No practices yet",
+	description: "Practices appear here once a workspace admin adds them to this group.",
+};
+
+const NO_PATTERNS: Record<string, PracticePattern | undefined> = {};
+
+const practiceCountLabel = (n: number) =>
+	capitalise(`${count(n, "practice", "practices")} in this group`);
 
 /**
  * A practice row's shape while the practices load: the badge and chip, the pill and its sentence,
@@ -90,14 +98,12 @@ const loadingRow = (
 	</>
 );
 
-const NO_HELD: NonNullable<PracticeGroupDetailLevelProps["holdingUp"]> = [];
-const NO_WORK: NonNullable<PracticeGroupDetailLevelProps["reviewedWork"]> = [];
 const NO_SENTENCES: NonNullable<PracticeGroupDetailLevelProps["practiceSentences"]> = {};
 
 /**
  * One practice group as the profile's first detail level, in one column: the catalog's words on
- * the group, Heph's word on what holds and the next step, where the reader stands in it, and the
- * practices it reviews. What the reviews found stays one level deeper, on the practice.
+ * the group, then the practices it reviews. Where the reader stands in it is the header's. What the
+ * reviews found stays one level deeper, on the practice.
  */
 export function PracticeGroupDetailLevel({
 	nested,
@@ -105,21 +111,92 @@ export function PracticeGroupDetailLevel({
 	group,
 	standing,
 	practices,
-	holdingUp = NO_HELD,
-	holdingUpNote,
-	reviewedWork = NO_WORK,
-	nextStep,
 	practiceSentences = NO_SENTENCES,
 	onOpenPractice,
 	openPracticeSlug,
 	isLoading,
 	error,
 	onRetry,
+	patterns = NO_PATTERNS,
 }: PracticeGroupDetailLevelProps) {
 	const practiceCount = practices?.length ?? 0;
+	// A group with no practices has no standing to name and nothing to count.
+	const showsStanding = group !== undefined && (isLoading || practiceCount > 0);
 	const counts = countPracticeStandings(practices ?? []);
 	// The table's sort is this level's alone: it is not a place a reader returns to by URL.
 	const [sort, setSort] = useState(DEFAULT_PRACTICE_GROUP_SORT);
+	// Practices that never applied, and the ones no review has observed yet, leave the table for one
+	// folded line each under it.
+	const { shown: applied, neverApplied, notObserved } = splitFoldedPractices(practices ?? []);
+	// Every practice of the group sits in a fold: the group has practices, so "No practices yet"
+	// would be wrong. The folds stand open instead and their own sentences say why.
+	const onlyFolded = applied.length === 0 && neverApplied.length + notObserved.length > 0;
+	const byStanding = (rows: readonly PracticeStanding[]) =>
+		sortByStanding(
+			rows,
+			sort,
+			(practice) => practice.standing,
+			(left, right) => left.name.localeCompare(right.name),
+		);
+	// A folded practice shows as any practice without data: its standing alone, no pattern and no
+	// sentence of what moved.
+	const renderPracticeRow = (practice: PracticeStanding, folded?: FoldReason) => {
+		const pattern = folded ? undefined : patterns[practice.slug];
+		const sentences = folded ? undefined : practiceSentences[practice.slug];
+		return (
+			<PracticeTableRow
+				open={practice.slug === openPracticeSlug}
+				link={
+					onOpenPractice && {
+						text: "Open practice",
+						name: practice.name,
+						onOpen: () => onOpenPractice(practice.slug),
+					}
+				}
+			>
+				{folded ? (
+					<FoldedStandingCell scope="practice" reason={folded} />
+				) : (
+					<StandingCell
+						standing={practice.standing}
+						direction={practice.direction}
+						support={practice.trendSupport}
+						scope="practice"
+					/>
+				)}
+				<SubjectCell
+					badge={
+						pattern ? (
+							// The pattern on the first line of the row, beside the name and level with
+							// the standing, so the two columns open on the same fact.
+							<span className="flex flex-wrap items-center gap-2">
+								<PracticePill name={practice.name} />
+								<PracticePatternLine pattern={pattern} />
+							</span>
+						) : (
+							<PracticePill name={practice.name} />
+						)
+					}
+					sentences={sentences}
+				/>
+			</PracticeTableRow>
+		);
+	};
+	// A fold: a toggle row and the folded rows, as sections of the table itself, so they share its
+	// columns.
+	const fold = (folded: readonly PracticeStanding[], reason: FoldReason, columns: number) => (
+		<FoldedPractices
+			count={folded.length}
+			noun="practice"
+			reason={reason}
+			columns={columns}
+			defaultOpen={onlyFolded}
+		>
+			{byStanding(folded).map((practice) => (
+				<Fragment key={practice.slug}>{renderPracticeRow(practice, reason)}</Fragment>
+			))}
+		</FoldedPractices>
+	);
 	// One table for both states: while loading it draws its rows' shape, so the level does not
 	// jump when they land.
 	const practicesTable = (
@@ -128,55 +205,28 @@ export function PracticeGroupDetailLevel({
 			sort={sort}
 			onSortChange={setSort}
 			subjectHead="Practice"
-			rows={sortByStanding(
-				practices ?? [],
-				sort,
-				(practice) => practice.standing,
-				(left, right) => left.name.localeCompare(right.name),
-			)}
+			rows={byStanding(applied)}
 			rowKey={(practice) => practice.slug}
-			renderRow={(practice) => (
-				<PracticeTableRow
-					open={practice.slug === openPracticeSlug}
-					link={
-						onOpenPractice && {
-							text: "Open practice",
-							name: practice.name,
-							onOpen: () => onOpenPractice(practice.slug),
-						}
-					}
-				>
-					<StandingCell
-						standing={practice.standing}
-						direction={practice.direction}
-						support={practice.trendSupport}
-						scope="practice"
-					/>
-					<SubjectCell
-						badge={<PracticePill name={practice.name} />}
-						sentence={practiceSentences[practice.slug]}
-					/>
-				</PracticeTableRow>
-			)}
-			empty={{
-				icon: <ClipboardCheckIcon />,
-				title: "No practices yet",
-				description: "Practices appear here once a workspace admin adds them to this group.",
-			}}
+			renderRow={(practice) => renderPracticeRow(practice)}
+			empty={onlyFolded ? null : NO_PRACTICES_YET}
 			isLoading={isLoading}
 			loadingRow={loadingRow}
+			sections={(columns) =>
+				isLoading ? undefined : (
+					<>
+						{fold(neverApplied, "never-applied", columns)}
+						{fold(notObserved, "not-observed", columns)}
+					</>
+				)
+			}
 		/>
 	);
 
 	let body: ReactNode;
 	if (isLoading) {
-		body = (
-			// Heph's card and the practices table, as they will be laid out.
-			<>
-				<HephFeedbackCardSkeleton />
-				{practicesTable}
-			</>
-		);
+		body =
+			// The practices table, as it will be laid out.
+			practicesTable;
 	} else if (error != null) {
 		body = (
 			<QueryErrorAlert
@@ -189,42 +239,15 @@ export function PracticeGroupDetailLevel({
 				onRetry={onRetry}
 			/>
 		);
+	} else if (group && practiceCount === 0) {
+		// The page lists no such group; a link to one lands here rather than on an empty table.
+		body = <GroupWithoutPractices />;
 	} else if (group) {
 		body = (
 			<>
 				{hasText(group.description) && (
 					<p className="max-w-2xl text-base text-pretty">{group.description}</p>
 				)}
-				<HephFeedbackCard
-					holdingUp={holdingUp}
-					holdingUpNote={holdingUpNote}
-					reviewedWork={reviewedWork}
-					onOpenPractice={onOpenPractice}
-					blocks={
-						nextStep
-							? [
-									{
-										label: "Next step",
-										content: (
-											<FeedbackText
-												as="p"
-												segments={nextStep}
-												onOpenPractice={onOpenPractice}
-												className="max-w-2xl text-sm"
-											/>
-										),
-									},
-								]
-							: []
-					}
-				/>
-				<WhereYouStand
-					standing={standing?.standing ?? "NOT_OBSERVED"}
-					basis={formatGroupStandingBasis(counts)}
-					direction={standing?.direction}
-					support={standing?.trendSupport}
-					scope="group"
-				/>
 				<Section
 					size="lg"
 					title="Practices in this group"
@@ -255,7 +278,11 @@ export function PracticeGroupDetailLevel({
 					/>
 				}
 				chips={
-					group && (
+					showsStanding &&
+					// A group whose every practice never applied reads as its folded row does.
+					(groupNeverApplied(practices ?? []) ? (
+						<NeverAppliedBadge scope="group" />
+					) : (
 						<>
 							<StandingBadge
 								standing={standing?.standing ?? "NOT_OBSERVED"}
@@ -268,10 +295,10 @@ export function PracticeGroupDetailLevel({
 								scope="group"
 							/>
 						</>
-					)
+					))
 				}
 				aside={
-					group && (isLoading || practiceCount > 0) ? (
+					showsStanding ? (
 						<StandingSummaryBox
 							label={practiceCountLabel(practiceCount)}
 							counts={counts}

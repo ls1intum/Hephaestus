@@ -1,15 +1,17 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, within } from "storybook/test";
+import { expect, fn, screen, waitFor, within } from "storybook/test";
 
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 
-import { clearedFeedbackFilters, FeedbackFilters } from "./FeedbackFilters";
-import { practiceGroups, reviewArtifact, workspaceMembers, workspacePractices } from "./fixtures";
+import { clearedFeedbackFacets, FeedbackFilters } from "./FeedbackFilters";
+import { practiceGroups, workspaceMembers, workspacePractices } from "./fixtures";
 import { practiceFacetOptions } from "./ObservationFilters";
+import { clearedScope } from "./review-scope";
 import type { FeedbackSearch } from "./review-search";
 import type { ReviewPeople } from "./ReviewPersonFacet";
+import { STORY_GROUPS } from "./story-scope-sources";
 
 const PEOPLE: ReviewPeople = {
 	options: workspaceMembers.map((member) => ({
@@ -38,9 +40,11 @@ const meta = {
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	args: {
-		search: { deliveryState: undefined, withheldFamily: undefined, channel: undefined },
+		search: { deliveryState: undefined, withheldFamily: undefined, location: undefined },
 		onPatch: fn(),
 		onReset: fn(),
+		onClearScope: fn(),
+		groups: STORY_GROUPS,
 		practices: PRACTICES,
 		people: PEOPLE,
 		total: 11,
@@ -58,8 +62,12 @@ const meta = {
 						args.onPatch(next);
 					}}
 					onReset={() => {
-						patch(clearedFeedbackFilters());
+						patch(clearedFeedbackFacets());
 						args.onReset();
+					}}
+					onClearScope={() => {
+						patch(clearedScope());
+						args.onClearScope();
 					}}
 				/>
 			)}
@@ -81,7 +89,7 @@ export const Unfiltered: Story = {
 /** Reset appears as soon as anything is set, and the count changes its wording with it. */
 export const FilteredCountReadsDifferently: Story = {
 	args: {
-		search: { deliveryState: ["DELIVERED"], withheldFamily: undefined, channel: undefined },
+		search: { deliveryState: ["DELIVERED"], withheldFamily: undefined, location: undefined },
 		total: 3,
 	},
 	play: async ({ canvas }) => {
@@ -93,7 +101,7 @@ export const FilteredCountReadsDifferently: Story = {
 /** One row of feedback is still a sentence that agrees with itself. */
 export const ExactlyOneMatch: Story = {
 	args: {
-		search: { deliveryState: ["DELIVERED"], withheldFamily: undefined, channel: undefined },
+		search: { deliveryState: ["DELIVERED"], withheldFamily: undefined, location: undefined },
 		total: 1,
 	},
 	play: async ({ canvas }) => {
@@ -111,43 +119,6 @@ export const ReportsAChosenOutcome: Story = {
 };
 
 /**
- * Arriving from a review or from a piece of work, the scope is a filter the reader did not set and
- * has to be able to see and drop. The work is named rather than printed as an id.
- */
-export const ScopedToOnePieceOfWork: Story = {
-	args: {
-		search: {
-			deliveryState: undefined,
-			withheldFamily: undefined,
-			channel: undefined,
-			artifactKind: "scm.pull_request",
-			artifactId: 42,
-		},
-		scopedWork: reviewArtifact.reviewedWork,
-		total: 4,
-	},
-	play: async ({ canvas }) => {
-		canvas.getByText(/Reviewed work/u);
-		canvas.getByText(/ls1intum\/Hephaestus · #1423/u);
-	},
-};
-
-export const ScopedToOneReview: Story = {
-	args: {
-		search: {
-			deliveryState: undefined,
-			withheldFamily: undefined,
-			channel: undefined,
-			agentJobId: "11111111-1111-1111-1111-111111111111",
-		},
-		total: 4,
-	},
-	play: async ({ canvas }) => {
-		canvas.getByText(/Review/u);
-	},
-};
-
-/**
  * The person the list is filtered to may not be on the fetched member page; the facet names them from
  * the row that is on screen rather than showing a bare id.
  */
@@ -156,14 +127,14 @@ export const FilteredToSomebodyOffThePage: Story = {
 		search: {
 			deliveryState: undefined,
 			withheldFamily: undefined,
-			channel: undefined,
+			location: undefined,
 			recipientUserId: 404,
 		},
 		recipientName: "Barbara Liskov",
 		total: 2,
 	},
 	play: async ({ canvas }) => {
-		await canvas.findByRole("combobox", { name: "Recipient: Barbara Liskov" });
+		await canvas.findByRole("combobox", { name: "Developer: Barbara Liskov" });
 	},
 };
 
@@ -173,7 +144,7 @@ export const Mobile: Story = {
 		search: {
 			deliveryState: ["DELIVERED", "SUPPRESSED"],
 			withheldFamily: undefined,
-			channel: undefined,
+			location: undefined,
 		},
 		total: 7,
 	},
@@ -204,7 +175,7 @@ export const APracticeOnAPhone: Story = {
 		search: {
 			deliveryState: undefined,
 			withheldFamily: undefined,
-			channel: undefined,
+			location: undefined,
 			practiceSlug: ["thin-controllers"],
 		},
 		total: 3,
@@ -228,13 +199,17 @@ export const WhileThePracticesLoad: Story = {
 };
 
 /**
- * Sorting does not narrow anything, which is why it sits with the count rather than among the facets
- * and why Reset leaves it alone — as on the observations list. Picking the default again clears it
- * from the search rather than writing the server's own default into the URL.
+ * Sorting does not narrow anything, which is why Reset leaves it alone — as on the observations
+ * list. It sits in the row with the facets. Picking the default again clears it from the search
+ * rather than writing the server's own default into the URL.
  */
 export const SortIsNotAFilter: Story = {
 	args: {
-		search: { deliveryState: ["AWAITING_APPROVAL"], withheldFamily: undefined, channel: undefined },
+		search: {
+			deliveryState: ["AWAITING_APPROVAL"],
+			withheldFamily: undefined,
+			location: undefined,
+		},
 		total: 3,
 	},
 	play: async ({ args, canvas, userEvent }) => {
@@ -243,6 +218,8 @@ export const SortIsNotAFilter: Story = {
 		await userEvent.click(sort);
 		await userEvent.click(await screen.findByRole("option", { name: "Oldest first" }));
 		await expect(args.onPatch).toHaveBeenCalledWith({ order: "OLDEST" });
+		// The leaving popup still blocks the pointer under a loaded test pool, so Reset waits for it.
+		await waitFor(async () => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
 
 		await userEvent.click(canvas.getByRole("button", { name: "Reset" }));
 		await expect(sort).toHaveTextContent("Oldest first");
@@ -250,5 +227,36 @@ export const SortIsNotAFilter: Story = {
 		await userEvent.click(sort);
 		await userEvent.click(await screen.findByRole("option", { name: "Newest first" }));
 		await expect(args.onPatch).toHaveBeenLastCalledWith({ order: undefined });
+		await waitFor(async () => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
+	},
+};
+
+/**
+ * A group is part of the shared scope: it finds the feedback written from observations of any
+ * practice in it, and it narrows the practices on offer.
+ */
+export const ReportsAChosenGroup: Story = {
+	play: async ({ args, canvas, userEvent }) => {
+		const group = STORY_GROUPS.options[0];
+		await userEvent.click(canvas.getByRole("combobox", { name: "Group" }));
+		const listbox = await screen.findByRole("listbox", { name: "Group options" });
+		await userEvent.click(
+			await within(listbox).findByRole("option", { name: new RegExp(group?.label ?? "", "u") }),
+		);
+		await expect(args.onPatch).toHaveBeenCalledWith({ groupSlug: [group?.value] });
+	},
+};
+
+/** Every facet sits in one row: Outcome, Channel, Why withheld and the sort, with no toggle. */
+export const EveryFacetInOneRow: Story = {
+	play: async ({ args, canvas, userEvent }) => {
+		canvas.getByRole("combobox", { name: "Outcome" });
+		canvas.getByRole("combobox", { name: "Channel" });
+		canvas.getByRole("combobox", { name: /Sort/u });
+		await expect(canvas.queryByRole("button", { name: /More filters/u })).toBeNull();
+		await userEvent.click(canvas.getByRole("combobox", { name: "Why withheld" }));
+		const listbox = await screen.findByRole("listbox", { name: "Why withheld options" });
+		await userEvent.click(await within(listbox).findByRole("option", { name: /Housekeeping/u }));
+		await expect(args.onPatch).toHaveBeenCalledWith({ withheldFamily: ["HOUSEKEEPING"] });
 	},
 };

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent, waitFor, within } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 
 import { HEPH_LABEL } from "@/components/brand/HephIcon";
 import { ALL_FEEDBACK_CARDS } from "@/stories/practice-feedback-cards-story-mock-data";
@@ -11,19 +11,17 @@ import {
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 
-import { composeOverview, EMPTY_OVERVIEW } from "./compose-overview";
+import { withProvider } from "@/stories/decorators";
 import { DEFAULT_FEEDBACK_TAB } from "./practice-profile-search";
 import { PracticeProfilePage } from "./PracticeProfilePage";
 
-const composed = composeOverview(OVERVIEW_FIXTURE);
-const empty = composeOverview(EMPTY_OVERVIEW);
-
 const meta = {
+	decorators: [withProvider("GITHUB")],
 	component: PracticeProfilePage,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		overview: composed,
+		latestRun: OVERVIEW_FIXTURE.latestRun,
 		practices: practiceStandings,
 		groups,
 		feedbackCards: ALL_FEEDBACK_CARDS,
@@ -34,8 +32,8 @@ const meta = {
 		state: { status: "ready" },
 	},
 	argTypes: {
-		// One composed record: nothing in it is a control a reader could set by hand.
-		overview: { control: false },
+		// One run reference from the server: nothing in it is a control a reader could set by hand.
+		latestRun: { control: false },
 	},
 } satisfies Meta<typeof PracticeProfilePage>;
 
@@ -47,33 +45,33 @@ export const Default: Story = {
 		await expect(canvas.getByRole("heading", { level: 1, name: "Practice profile" })).toBeVisible();
 		// The table of every practice is a level over the page, not a section of it.
 		await expect(canvas.queryByRole("table", { name: "All practice groups" })).toBeNull();
-		// The cards sit under their own sub-heading and a tab row that opens on the newest ones.
+		// The cards sit under their own sub-heading and a tab row that opens on the open ones.
 		await expect(canvas.getByRole("heading", { level: 2, name: "Your feedback" })).toBeVisible();
 		const tabs = within(canvas.getByRole("tablist", { name: "Feedback" })).getAllByRole("tab");
 		await expect(tabs.map((tab) => tab.textContent)).toStrictEqual([
-			"Newest 2",
 			"Open 6",
 			"Resolved and closed 3",
 			"All 9",
 		]);
-		await expect(canvas.getByRole("tab", { name: /^Newest/u })).toHaveAttribute(
+		await expect(canvas.getByRole("tab", { name: /^Open/u })).toHaveAttribute(
 			"aria-selected",
 			"true",
 		);
-		await expect(canvas.getAllByRole("article")).toHaveLength(2);
+		await expect(canvas.getAllByRole("article")).toHaveLength(6);
 		await expect(canvas.getByText("Newest first")).toBeVisible();
 		// A real link: the level it opens is an address, so it opens in a new tab and reloads.
 		await expect(canvas.getByRole("link", { name: "See all practice groups" })).toHaveAttribute(
 			"href",
 			expect.stringContaining("practice-groups:all"),
 		);
-		// The paragraph names two things and counts the rest, which unfolds in place.
-		await expect(canvas.getByRole("button", { name: /^Show the/u })).toBeVisible();
+		// No summary card stands between the header and the feedback: the cards come first.
+		await expect(canvas.queryByRole("img", { name: HEPH_LABEL })).toBeNull();
+		await expect(canvas.queryByText("What changed")).toBeNull();
 		// A card's practice pill and its "Learn more" both open the practice's level, where its
 		// introduction leads.
 		const [card] = canvas.getAllByRole("article");
 		if (!card) {
-			throw new Error("The Newest tab shows a card");
+			throw new Error("The Open tab shows a card");
 		}
 		await userEvent.click(
 			within(card).getByRole("button", { name: "Scope the change to one concern" }),
@@ -90,10 +88,7 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Each tab filters the cards in place: resolved ones in their resolved state, "Newest" the two
- * newest open cards.
- */
+/** Each tab filters the cards in place: open ones, resolved ones in their resolved state, or all. */
 export const FeedbackTabs: Story = {
 	render: (args) => (
 		<Stateful initial={args.feedbackTab}>
@@ -131,49 +126,8 @@ export const FeedbackTabs: Story = {
 
 		await userEvent.click(canvas.getByRole("tab", { name: /^Open/u }));
 		await expect(articles()).toHaveLength(6);
-
-		await userEvent.click(canvas.getByRole("tab", { name: /^Newest/u }));
-		await expect(articles()).toHaveLength(2);
 		await expect(articles()[0]).toHaveTextContent("Pull requests bundle a fix with a refactor");
 		await expect(within(first()).getByText("New")).toBeVisible();
-	},
-};
-
-/**
- * "Read the feedback ↓" in Heph's card lands the reader on the card it is about. The card the
- * fall back names sits behind the "Newest" tab, so the page moves to a tab that lists it and puts
- * the focus on the card, and the reader's next Tab continues from there rather than from the top.
- */
-export const ReadTheFeedbackFromTheCard: Story = {
-	render: (args) => (
-		<Stateful initial={args.feedbackTab}>
-			{(tab, setTab) => (
-				<PracticeProfilePage
-					{...args}
-					feedbackTab={tab}
-					onFeedbackTabChange={(next) => {
-						args.onFeedbackTabChange?.(next);
-						setTab(next);
-					}}
-				/>
-			)}
-		</Stateful>
-	),
-	play: async ({ canvas }) => {
-		await userEvent.click(
-			canvas.getByRole("button", {
-				name: "Read the feedback for Say which acceptance criteria are done",
-			}),
-		);
-		const card = canvas
-			.getByText("Pull requests closed their issue without saying what was met")
-			.closest("article");
-		if (!card) {
-			throw new Error("Every piece of feedback is an article");
-		}
-		await waitFor(async () => {
-			await expect(card).toHaveFocus();
-		});
 	},
 };
 
@@ -183,7 +137,7 @@ export const ReadTheFeedbackFromTheCard: Story = {
  */
 export const ColdStart: Story = {
 	args: {
-		overview: empty,
+		latestRun: undefined,
 		practices: [],
 		feedbackCards: [],
 	},
@@ -203,7 +157,7 @@ export const ColdStart: Story = {
 /** "Resolved and closed" says what would move a card here, rather than repeating the other tabs. */
 export const NothingResolvedYet: Story = {
 	args: {
-		overview: empty,
+		latestRun: undefined,
 		practices: [],
 		feedbackCards: [],
 		feedbackTab: "resolved",
@@ -212,30 +166,30 @@ export const NothingResolvedYet: Story = {
 		await expect(canvas.getByText("No resolved or closed feedback yet")).toBeVisible();
 		await expect(
 			canvas.getByText(
-				"A card moves here once the work resolves it, you mark it as addressed, or its practice’s review rules change.",
+				"A card moves here once your work resolves it, you mark it yourself, or your workspace changes its practice.",
 			),
 		).toBeVisible();
 	},
 };
 
-/** The card list is a skeleton of the two newest cards, and the tabs carry no counts yet. */
+/** The card list is a skeleton of two cards, and the tabs carry no counts yet. */
 export const Loading: Story = {
 	args: {
-		overview: empty,
+		latestRun: undefined,
 		practices: [],
 		groups: [],
 		feedbackCards: [],
 		state: { status: "loading" },
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("tab", { name: "Newest" })).toBeVisible();
+		await expect(canvas.getByRole("tab", { name: "Open" })).toBeVisible();
 		await expect(canvas.queryByRole("article")).toBeNull();
 	},
 };
 
 export const LoadFailed: Story = {
 	args: {
-		overview: empty,
+		latestRun: undefined,
 		practices: [],
 		groups: [],
 		feedbackCards: [],

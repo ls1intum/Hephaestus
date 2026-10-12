@@ -1,228 +1,236 @@
 import { Link } from "@tanstack/react-router";
-import { PencilIcon, ScanSearchIcon, SlidersHorizontalIcon } from "lucide-react";
 
-import { cn } from "cn";
-import type { Practice, PracticeReviewCounts, ReviewObservation } from "@/api/types.gen";
-import { STALE } from "@/components/activity/activity-tones";
-import {
-	practiceFormLevel,
-	practiceSetupLevel,
-} from "@/components/admin/practices/practice-search";
+import type { Practice, PracticeDefinitionOptions, PracticeRevision } from "@/api/types.gen";
+import { PRACTICE_DEFINITION_FIELDS } from "@/components/admin/practices/practice-definition-fields";
+import { practiceFormLevel } from "@/components/admin/practices/practice-search";
+import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import { WorkspacePracticeDefinition } from "@/components/admin/practices/WorkspacePracticeDefinition";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { detailStackKey } from "@/components/layout/detail-drawer/detail-stack";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
-import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
-import { buttonVariants } from "@/components/ui/button";
-import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
-import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
+import { AutonomySourceNote } from "@/components/practice-vocabulary/AutonomySourceNote";
+import { DrawerBody } from "@/components/ui/drawer";
+import { autonomySourceOf } from "@/lib/practice-autonomy";
 import { hasText } from "@/lib/text";
 
-import { OutcomeMix } from "./OutcomeMix";
 import {
-	feedbackSlots,
-	markedIncorrectSlot,
-	OUTCOME_LEGEND_LABELS,
-	observationSlots,
-	type OutcomeScope,
-	slotsTotal,
-} from "./review-outcomes";
-import type { ReviewSectionState } from "./review-states";
+	type SheetEvent,
+	SheetHistory,
+	SheetSection,
+	SheetStatusLine,
+	SheetTechnical,
+} from "./RecordSheet";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
-import { ObservationsSection } from "./ReviewOutputSections";
 
 export interface PracticeLevelProps {
 	workspaceSlug: string;
 	nested?: boolean;
 	path: LevelPath;
-	practiceSlug: string;
-	/** The practice as the workspace defines it, for its name, why it matters and its autonomy. */
-	practice: Practice | undefined;
-	/** "Last 30 days": the range every count on the level covers. */
-	rangeLabel: string;
-	/** The range as the lists' day filters. */
-	scope: OutcomeScope;
-	/** The practice's counts in the range; absent when it recorded nothing there. */
-	counts: PanelState<{ counts?: PracticeReviewCounts; stale: boolean }>;
-	/** Its most recent observations in the range. */
-	observations: ReviewSectionState<ReviewObservation>;
+	/**
+	 * The practice as Practice setup defines it, with the options its definition is read against;
+	 * `practice` is `undefined` for one the workspace no longer has.
+	 */
+	practice: PanelState<{
+		practice: Practice | undefined;
+		definitionOptions: PracticeDefinitionOptions;
+		/** The group's display name, for the autonomy it inherits. Absent when unassigned. */
+		groupName?: string;
+	}>;
+	/** Every stored version of its definition, newest first, with what changed in each. */
+	revisions?: PanelState<{ revisions: PracticeRevision[] }>;
 }
 
 /**
- * One practice as the reviews saw it: how much autonomy it runs with, how its observations turned
- * out, what became of the feedback citing it, and what it observed most recently. The footer edits
- * its definition, which is where a practice that reviews wrongly is fixed.
+ * One practice's sheet: its full definition and nothing else, as Practice setup's panel shows it —
+ * one component for both. The status line says its autonomy, where that comes from and when it last
+ * changed; the history says when it was created, each version of its definition with what changed
+ * in it, and whether its automated review was withdrawn. It counts nothing: the row it was opened from has the counts. Changing it is Practice
+ * setup's form, which the header links to.
  */
 export function PracticeLevel({
 	workspaceSlug,
 	nested,
 	path,
-	practiceSlug,
-	practice,
-	rangeLabel,
-	scope,
-	counts,
-	observations,
+	practice: state,
+	revisions,
 }: PracticeLevelProps) {
-	const practiceScope = { ...scope, practiceSlug };
-	const name =
-		practice?.name ?? (counts.status === "ready" ? counts.counts?.practiceName : undefined);
+	const practice = state.status === "ready" ? state.practice : undefined;
+	const groupName = state.status === "ready" ? state.groupName : undefined;
+	const header = (
+		<ReviewLevelHeader
+			nested={nested}
+			path={path}
+			kind="practice"
+			loading={state.status === "loading"}
+			chips={
+				practice && (
+					<SheetStatusLine
+						status={<StatusBadge def={AUTONOMY_DEFS[practice.autonomy.effective]} />}
+						flag={
+							<AutonomySourceNote
+								source={autonomySourceOf(practice.autonomy, groupName ?? null)}
+								className="text-muted-foreground"
+							/>
+						}
+						at={{ label: "changed", date: practice.updatedAt }}
+					/>
+				)
+			}
+			title={practice?.name}
+			description={
+				practice && (
+					<InlineLink
+						render={
+							<Link
+								to="/w/$workspaceSlug/admin/practices"
+								params={{ workspaceSlug }}
+								search={{ detail: [detailStackKey(practiceFormLevel(practice.slug))] }}
+							/>
+						}
+					>
+						Edit in Practice setup
+					</InlineLink>
+				)
+			}
+		/>
+	);
+	if (state.status !== "ready") {
+		return (
+			<>
+				{header}
+				<DrawerBody className="pt-2">
+					{state.status === "error" ? (
+						<QueryErrorAlert
+							error={state.error}
+							title="We could not load this practice"
+							onRetry={state.onRetry}
+						/>
+					) : (
+						<PracticeDefinitionSkeleton />
+					)}
+				</DrawerBody>
+			</>
+		);
+	}
+	if (practice === undefined) {
+		return (
+			<>
+				{header}
+				<DrawerBody className="pt-2">
+					<p className="text-sm text-muted-foreground">
+						This workspace no longer has this practice.
+					</p>
+				</DrawerBody>
+			</>
+		);
+	}
 	return (
 		<>
-			<ReviewLevelHeader
-				nested={nested}
-				path={path}
-				kind="practice"
-				loading={name === undefined && counts.status === "loading"}
-				title={name ?? "This practice"}
-				chips={practice && <AutonomyBadge autonomy={practice.autonomy.effective} />}
-				description={<p>{rangeLabel}</p>}
-			/>
+			{header}
 			<DrawerBody className="flex flex-col gap-8 pt-2">
-				{hasText(practice?.whyItMatters) && (
-					<p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-						{practice.whyItMatters}
-					</p>
-				)}
-				{practice && (
-					<p className="text-sm text-muted-foreground">
-						<InlineLink
-							className="font-medium"
-							render={
-								<Link to="/w/$workspaceSlug/admin/practices/review" params={{ workspaceSlug }} />
-							}
-						>
-							Change its autonomy in Review settings
-						</InlineLink>
-					</p>
-				)}
-				<Counts workspaceSlug={workspaceSlug} counts={counts} scope={practiceScope} />
-				<ObservationsSection
-					workspaceSlug={workspaceSlug}
-					state={observations}
-					list={{
-						list: "observations",
-						search: { from: scope.from, to: scope.to, practiceSlug: [practiceSlug] },
-					}}
-					practices={practice && [practice]}
+				<SheetSection part="what">
+					<WorkspacePracticeDefinition
+						practice={practice}
+						definitionOptions={state.definitionOptions}
+						groupName={groupName}
+						showStanding={false}
+					/>
+				</SheetSection>
+				<SheetSection part="state">
+					<SheetHistory
+						events={[
+							...practiceHistory(practice),
+							...(revisions?.status === "ready" ? revisions.revisions.map(revisionEvent) : []),
+						]}
+					/>
+					{revisions?.status === "error" && (
+						<QueryErrorAlert
+							error={revisions.error}
+							title="We could not load the versions of this practice"
+							onRetry={revisions.onRetry}
+						/>
+					)}
+				</SheetSection>
+				<SheetTechnical
+					facts={[
+						{ label: "Slug", value: <code>{practice.slug}</code>, copy: practice.slug },
+						{ label: "Practice ID", value: String(practice.id), copy: String(practice.id) },
+						{
+							label: "Group",
+							value: hasText(practice.groupSlug) ? <code>{practice.groupSlug}</code> : "Unassigned",
+						},
+						{
+							label: "Current version",
+							value:
+								revisions?.status === "ready" && revisions.revisions.length > 0
+									? String(revisions.revisions[0]?.revisionNumber)
+									: "—",
+						},
+						{
+							label: "Precompute script",
+							value: hasText(practice.precomputeScript) ? "Present" : "None",
+						},
+					]}
 				/>
 			</DrawerBody>
-			<DrawerFooter>
-				<Link
-					to="/w/$workspaceSlug/admin/practices"
-					params={{ workspaceSlug }}
-					search={detailSearch(practiceSetupLevel(practiceSlug))}
-					className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
-				>
-					<SlidersHorizontalIcon />
-					Open in Practice setup
-				</Link>
-				<Link
-					to="/w/$workspaceSlug/admin/practices"
-					params={{ workspaceSlug }}
-					search={detailSearch(practiceFormLevel(practiceSlug))}
-					className={cn(buttonVariants(), "w-full sm:w-auto")}
-				>
-					<PencilIcon />
-					Edit practice
-				</Link>
-			</DrawerFooter>
 		</>
 	);
 }
 
-function Counts({
-	workspaceSlug,
-	counts,
-	scope,
-}: {
-	workspaceSlug: string;
-	counts: PracticeLevelProps["counts"];
-	scope: OutcomeScope;
-}) {
-	if (counts.status === "error") {
-		return (
-			<QueryErrorAlert
-				error={counts.error}
-				title="We could not load the counts for this practice"
-				onRetry={counts.onRetry}
-			/>
-		);
+function practiceHistory(practice: Practice): SheetEvent[] {
+	const events: SheetEvent[] = [
+		{
+			key: "created",
+			at: practice.createdAt,
+			title: "Created",
+			detail:
+				practice.catalogOrigin === undefined
+					? "Written in this workspace."
+					: `Adopted from the catalog (${practice.catalogOrigin.slug}).`,
+		},
+	];
+	if (practice.updatedAt.getTime() !== practice.createdAt.getTime()) {
+		events.push({ key: "changed", at: practice.updatedAt, title: "Last changed" });
 	}
-	// Another range's "not checked", standing in while this one loads, says nothing about this one.
-	if (counts.status === "loading" || (counts.stale && counts.counts === undefined)) {
-		return (
-			<div className="grid gap-6 sm:grid-cols-2" aria-hidden>
-				{Array.from({ length: 2 }, (_, index) => (
-					<div key={index} className="space-y-2">
-						<Skeleton className="h-7 w-32" />
-						<Skeleton className="h-4 w-48" />
-					</div>
-				))}
-			</div>
-		);
+	if (practice.automatedReviewWithdrawal !== undefined) {
+		events.push({
+			key: "withdrawn",
+			at: undefined,
+			title: "Automated review withdrawn",
+			detail: practice.automatedReviewWithdrawal.description,
+		});
 	}
-	if (counts.counts === undefined) {
-		return (
-			<Empty variant="outlined">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<ScanSearchIcon />
-					</EmptyMedia>
-					<EmptyTitle>Not checked in this range</EmptyTitle>
-					<EmptyDescription>
-						No review recorded an observation about this practice. It may not apply to the work that
-						was reviewed, or it may be turned off.
-					</EmptyDescription>
-				</EmptyHeader>
-			</Empty>
-		);
+	return events;
+}
+
+/** One version of the definition: what changed in it, and whether what a review checks changed. */
+function revisionEvent(revision: PracticeRevision): SheetEvent {
+	const changed = revision.changed.map((field) => PRACTICE_DEFINITION_FIELDS[field].label);
+	let detail: string | undefined;
+	if (revision.revisionNumber === 1) {
+		detail = "The first version of the definition.";
+	} else if (changed.length === 0) {
+		detail = "Recorded again without a change to the definition.";
+	} else {
+		detail = `Changed: ${changed.join(", ")}.`;
 	}
-	const { observations, observationsInvalidated, feedback } = counts.counts;
-	const outcomes = observationSlots(observations, scope);
-	const total = slotsTotal(outcomes);
-	const incorrect = markedIncorrectSlot(observationsInvalidated, scope);
-	const feedbackFamilies = feedbackSlots(feedback, scope);
-	return (
-		<div
-			aria-busy={counts.stale || undefined}
-			className={cn("grid gap-6 sm:grid-cols-2", counts.stale && STALE)}
-		>
-			<div className="space-y-2">
-				<OutcomeMix
-					workspaceSlug={workspaceSlug}
-					total={total}
-					slots={outcomes}
-					flags={{
-						label: OUTCOME_LEGEND_LABELS.checkedObservations,
-						// "1 of 33 marked incorrect": the share an admin found wrong, out of all of them.
-						slots: [{ ...incorrect, label: `of ${total} ${incorrect.label}` }],
-					}}
-					noun={(count) => (count === 1 ? "observation" : "observations")}
-					label={OUTCOME_LEGEND_LABELS.observations}
-				/>
-				{observationsInvalidated > 0 && (
-					<p className="text-xs text-muted-foreground">{MARKED_INCORRECT_DEF.note}</p>
+	return {
+		key: `revision-${revision.id}`,
+		at: revision.createdAt,
+		title: `Version ${revision.revisionNumber}`,
+		detail: (
+			<>
+				<span className="block">{detail}</span>
+				{revision.reviewRulesChanged && (
+					<span className="block">
+						What a review checks changed, so earlier observations no longer reflect it.
+					</span>
 				)}
-			</div>
-			<OutcomeMix
-				workspaceSlug={workspaceSlug}
-				total={slotsTotal(feedbackFamilies)}
-				slots={feedbackFamilies}
-				noun={(count) =>
-					count === 1 ? "piece of feedback cited it" : "pieces of feedback cited it"
-				}
-				label={OUTCOME_LEGEND_LABELS.feedback}
-			/>
-		</div>
-	);
+			</>
+		),
+	};
 }

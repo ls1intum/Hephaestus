@@ -19,8 +19,6 @@ export type ReviewCountState =
 /** The period of the same length before the range, which a total is set against. */
 interface PreviousReviewPeriod {
 	overview: PracticeReviewOverview;
-	/** "the previous 30 days": the period after "than" or "as". */
-	name: string;
 }
 
 /**
@@ -32,8 +30,13 @@ export type PracticeReviewOverviewState = PanelState<{
 	stale: boolean;
 }>;
 
-/** The period before, which the totals are set against; failed, they go without a comparison. */
-export type PreviousReviewPeriodState = PanelState<{ period: PreviousReviewPeriod }>;
+/**
+ * The period before, which the totals are set against; failed, they go without a comparison, and
+ * `none` where the range has no period before it, all time.
+ */
+export type PreviousReviewPeriodState =
+	| PanelState<{ period: PreviousReviewPeriod }>
+	| { status: "none" };
 
 /** The overview as a region under the page draws it: the page reports a failure once, for all of them. */
 export type OverviewRegionState = Exclude<PracticeReviewOverviewState, { status: "error" }>;

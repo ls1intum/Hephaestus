@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -280,6 +280,17 @@ const openReviewsChip = async () =>
 const group = `practice-group:${packagingGroup.slug}`;
 const practiceEntry = `practice:${practice.slug}`;
 
+/** A group nothing is reviewed in: no practice was added to it, or every one is switched off. */
+const emptyGroup = { ...packagingGroup, id: 99, slug: "empty-group", name: "Nothing in here" };
+
+function useEmptyGroup() {
+	server.use(
+		http.get("*/workspaces/:workspaceSlug/practice-groups", () =>
+			HttpResponse.json([...groups, emptyGroup]),
+		),
+	);
+}
+
 /** Through the page to the first practice's level, one level per history entry. */
 async function openPractice(router: Awaited<ReturnType<typeof renderProfile>>) {
 	fireEvent.click(
@@ -306,6 +317,14 @@ async function openPractice(router: Awaited<ReturnType<typeof renderProfile>>) {
 			practiceEntry,
 		]),
 	);
+}
+
+/** The practice level opens on its feedback; the observations are the tab beside it. */
+async function showObservations() {
+	fireEvent.click(
+		await screen.findByRole("tab", { name: /^Observations/u, selected: false }, ROUTE_RENDER_WAIT),
+	);
+	await screen.findByRole("tab", { name: /^Observations/u, selected: true });
 }
 
 /**
@@ -370,6 +389,37 @@ describe("practice profile route", () => {
 		await waitFor(() => expect(detail()).toStrictEqual(["practice-groups:all", group]));
 	});
 
+	it("lists no group without a practice", async () => {
+		useEmptyGroup();
+		// The drawer over the page hides the page's own heading, so the level is waited for itself.
+		renderRouteAtWithRouter(
+			`${PAGE}?detail=${encodeURIComponent(JSON.stringify(["practice-groups:all"]))}`,
+		);
+
+		const table = await screen.findByRole(
+			"table",
+			{ name: "All practice groups" },
+			ROUTE_RENDER_WAIT,
+		);
+		await within(table).findByRole(
+			"button",
+			{ name: `Open group ${packagingGroup.name}` },
+			ROUTE_RENDER_WAIT,
+		);
+		expect(within(table).queryByText(emptyGroup.name)).toBeNull();
+	});
+
+	it("opens a link to a group without a practice on a level that says so", async () => {
+		useEmptyGroup();
+		renderRouteAtWithRouter(
+			`${PAGE}?detail=${encodeURIComponent(JSON.stringify([`practice-group:${emptyGroup.slug}`]))}`,
+		);
+
+		await screen.findByText("This group has no practices", undefined, ROUTE_RENDER_WAIT);
+		screen.getByRole("heading", { name: emptyGroup.name });
+		expect(screen.queryByText("We could not find this practice group")).toBeNull();
+	});
+
 	it("opens every review of the reader's work from the chip, then one review over it", async () => {
 		const router = await renderProfile();
 		const detail = () => stackInSearch(router.state.location.search.detail);
@@ -392,7 +442,7 @@ describe("practice profile route", () => {
 			ROUTE_RENDER_WAIT,
 		);
 		// The row under the level and the head over it.
-		await waitFor(() => expect(screen.getAllByText("2nd review")).toHaveLength(2));
+		await waitFor(() => expect(screen.getAllByText("Review 2")).toHaveLength(2));
 		await waitFor(() => expect(tracedReviewIds).toContain(openProfileReviewRun.reviewId));
 
 		// One level per history entry, so Back closes exactly one and then the drawer.
@@ -649,6 +699,7 @@ describe("practice profile route", () => {
 	it("opens and closes an observation without writing the URL, so leaving the level takes one step", async () => {
 		const router = await renderProfile();
 		await openPractice(router);
+		await showObservations();
 		const entries = router.history.length;
 		const searchStr = () => router.state.location.searchStr;
 		const before = searchStr();
@@ -683,11 +734,11 @@ describe("practice profile route", () => {
 		// The page under the open drawer is hidden from the accessibility tree, so the level's own
 		// heading is what says the route has rendered.
 		const { router } = renderRouteAtWithRouter(
-			`${PAGE}?detail=${encodeURIComponent(JSON.stringify([group, practiceEntry]))}&practiceTab=feedback`,
+			`${PAGE}?detail=${encodeURIComponent(JSON.stringify([group, practiceEntry]))}&practiceTab=observations`,
 		);
 		await screen.findByRole("heading", { name: practice.name }, ROUTE_RENDER_WAIT);
 		const search = () => router.state.location.search;
-		expect(search().practiceTab).toBe("feedback");
+		expect(search().practiceTab).toBe("observations");
 
 		fireEvent.click(screen.getByRole("button", { name: "Back" }));
 
@@ -695,18 +746,18 @@ describe("practice profile route", () => {
 		expect(router.state.location.searchStr).not.toContain("practiceTab");
 	});
 
-	it("opens a practice tab it does not know on the observations, and drops it from the URL", async () => {
+	it("opens a practice tab it does not know on the feedback, and drops it from the URL", async () => {
 		const { router } = renderRouteAtWithRouter(
 			`${PAGE}?detail=${encodeURIComponent(JSON.stringify([group, practiceEntry]))}&practiceTab=about`,
 		);
 		await screen.findByRole("heading", { name: practice.name }, ROUTE_RENDER_WAIT);
 
-		const observations = await screen.findByRole("tab", { name: /^Observations/u }, SETTLE_WAIT);
-		expect(observations.getAttribute("aria-selected")).toBe("true");
+		const feedback = await screen.findByRole("tab", { name: /^Feedback/u }, SETTLE_WAIT);
+		expect(feedback.getAttribute("aria-selected")).toBe("true");
 		await waitFor(() => expect(router.state.location.searchStr).not.toContain("practiceTab"));
 	});
 
-	it("opens a link to the guide on the observations when the practice has no guide", async () => {
+	it("opens a link to the guide on the feedback when the practice has no guide", async () => {
 		const { visual } = bundledGuidance;
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/guidance", ({ params }) =>
@@ -719,8 +770,8 @@ describe("practice profile route", () => {
 		// The picture is in, so the guidance has settled without a guide.
 		await screen.findByRole("img", { name: visual.alt }, ROUTE_RENDER_WAIT);
 
-		const observations = await screen.findByRole("tab", { name: /^Observations/u }, SETTLE_WAIT);
-		expect(observations.getAttribute("aria-selected")).toBe("true");
+		const feedback = await screen.findByRole("tab", { name: /^Feedback/u }, SETTLE_WAIT);
+		expect(feedback.getAttribute("aria-selected")).toBe("true");
 		expect(screen.queryByRole("tab", { name: "Guide" })).toBeNull();
 	});
 
@@ -731,9 +782,29 @@ describe("practice profile route", () => {
 		await waitFor(() => expect(router.state.location.search.feedback).toBe("resolved"));
 		// The tab is selected once the page has read it back from the URL; a press on a tab that is
 		// still selected in the DOM is not a change.
-		fireEvent.click(await screen.findByRole("tab", { name: /^Newest/u, selected: false }));
+		fireEvent.click(await screen.findByRole("tab", { name: /^Open/u, selected: false }));
 
 		await waitFor(() => expect(router.state.location.searchStr).toBe(""));
+	});
+
+	it("opens an older link to the Newest tab, which is gone, on Open", async () => {
+		const router = await renderProfile(`${PAGE}?feedback=newest`);
+
+		const open = await screen.findByRole("tab", { name: /^Open/u }, ROUTE_RENDER_WAIT);
+		expect(open.getAttribute("aria-selected")).toBe("true");
+		expect(screen.queryByRole("tab", { name: /^Newest/u })).toBeNull();
+		await waitFor(() => expect(router.state.location.search.feedback).not.toBe("newest"));
+	});
+
+	it("links to itself without the default view, as the sidebar does", async () => {
+		const router = await renderProfile();
+		await screen.findByRole("link", { name: "See all practice groups" }, ROUTE_RENDER_WAIT);
+
+		const location = router.buildLocation({
+			to: "/w/$workspaceSlug/practice-profile",
+			params: { workspaceSlug: "acme" },
+		});
+		expect(location.searchStr).toBe("");
 	});
 
 	it("keeps the URL silent on the default sort direction, and the level a press from dismissed", async () => {
@@ -853,8 +924,9 @@ describe("practice profile in a user view", () => {
 		const router = await renderProfile();
 		await screen.findByText(feedback.headline, undefined, ROUTE_RENDER_WAIT);
 		const ratings = screen.queryAllByRole("button", { name: "Helpful" }).length;
-		const answers = screen.queryAllByRole("button", { name: "Addressed" }).length;
+		const answers = screen.queryAllByRole("button", { name: "I fixed this" }).length;
 		await openPractice(router);
+		await showObservations();
 		await screen.findByText("Why it was noted", undefined, ROUTE_RENDER_WAIT);
 		return {
 			ratings,
@@ -887,5 +959,105 @@ describe("practice profile in a user view", () => {
 			answers: 0,
 			observationResponse: 0,
 		});
+	});
+});
+
+/** A piece of evidence on one pull request, for a card that rests on several. */
+const pullRequestEvidence = (number: number) => ({
+	observedAt: "2026-09-08T10:00:00Z",
+	outcome: "NOT_MET" as const,
+	reviewedWork: {
+		kind: "scm.pull_request",
+		id: String(9000 + number),
+		label: `#${number}`,
+		title: `Pull request ${number}`,
+		provider: "GITHUB" as const,
+	},
+});
+
+/** A practice of the open group that every review so far found not to apply. */
+const neverApplied = practiceStandings.find(
+	(each) => each.groupSlug === packagingGroup.slug && each.slug !== practice.slug,
+);
+if (!neverApplied) {
+	throw new Error("The fixtures carry a second practice in the packaging group");
+}
+const withNeverApplied = practiceStandings.map((each) =>
+	each.slug === neverApplied.slug
+		? { ...each, standing: "NO_OPPORTUNITY" as const, notApplicableOnly: true }
+		: each,
+);
+
+/** Every practice of the packaging group never applied. */
+const packagingNeverApplied = practiceStandings.map((each) =>
+	each.groupSlug === packagingGroup.slug
+		? { ...each, standing: "NO_OPPORTUNITY" as const, notApplicableOnly: true }
+		: each,
+);
+/** The server reads such a group as NO_OPPORTUNITY. */
+const packagingGroupNothingToReport = Object.values(groupStandings).map((each) =>
+	each.groupSlug === packagingGroup.slug ? { ...each, standing: "NO_OPPORTUNITY" as const } : each,
+);
+
+describe("practice profile pattern label and folds", () => {
+	const patterned: Wire<InAppFeedback> = {
+		...feedback,
+		evidence: [pullRequestEvidence(21), pullRequestEvidence(22)],
+	};
+	const groupPage = `${PAGE}?detail=${encodeURIComponent(JSON.stringify([group]))}`;
+
+	it("folds a practice that never applied under its group's table", async () => {
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/standings", () =>
+				HttpResponse.json(withNeverApplied),
+			),
+		);
+		const openNeverApplied = { name: `Open practice ${neverApplied.name}` };
+		const fold = { name: "Does not apply to your work yet" };
+
+		renderRouteAtWithRouter(groupPage);
+		const folded = await screen.findByRole("button", fold, ROUTE_RENDER_WAIT);
+		expect(folded.getAttribute("aria-expanded")).toBe("false");
+		expect(screen.queryByRole("button", openNeverApplied)).toBeNull();
+		cleanup();
+
+		// Its own level says it does not apply, in place of "Nothing to report yet".
+		renderRouteAtWithRouter(
+			`${PAGE}?detail=${encodeURIComponent(JSON.stringify([group, `practice:${neverApplied.slug}`]))}`,
+		);
+		await expect(
+			screen.findAllByText("Does not apply to your work yet", {}, ROUTE_RENDER_WAIT),
+		).resolves.not.toHaveLength(0);
+	});
+
+	it("names a group whose every practice never applied as its folded row does", async () => {
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/standings", () =>
+				HttpResponse.json(packagingNeverApplied),
+			),
+			http.get("*/workspaces/:workspaceSlug/practice-groups/standings", () =>
+				HttpResponse.json(packagingGroupNothingToReport),
+			),
+		);
+		renderRouteAtWithRouter(groupPage);
+		await expect(
+			screen.findAllByRole(
+				"button",
+				{ name: "Does not apply to your work yet" },
+				ROUTE_RENDER_WAIT,
+			),
+		).resolves.not.toHaveLength(0);
+		expect(screen.queryByText("Nothing to report yet")).toBeNull();
+	});
+
+	it("shows the pattern as a plain label in the group's table", async () => {
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/feedback/in-app", () =>
+				HttpResponse.json([patterned]),
+			),
+		);
+		renderRouteAtWithRouter(groupPage);
+		const label = await screen.findByText(/^Has open feedback/u, {}, ROUTE_RENDER_WAIT);
+		expect(label.closest("button")).toBeNull();
 	});
 });

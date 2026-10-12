@@ -137,6 +137,25 @@ export const WithAside: Story = {
 	},
 };
 
+const LONG_TITLE =
+	"2 issues to tighten in this change, plus one thing worth keeping. The lookup returns the same 404 for a cache miss and for a permission failure, so an operator cannot tell a stale link from a missing grant without reading the query, and the next person debugging a support ticket goes to the logs to work out where it failed.";
+
+/** A long name wraps to three lines at most instead of cutting off on the first; the whole name is its tooltip. */
+export const LongTitleWraps: Story = {
+	args: { title: LONG_TITLE },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const heading = panel.getByRole("heading", { level: 2, name: LONG_TITLE });
+		await expectSettledVisible(heading);
+		await expect(heading).toHaveAttribute("title", LONG_TITLE);
+		await expect(getComputedStyle(heading).webkitLineClamp).toBe("3");
+		const lineHeight = Number.parseFloat(getComputedStyle(heading).lineHeight);
+		// More than one line, and no more than three.
+		await expect(heading.clientHeight).toBeGreaterThan(lineHeight * 1.5);
+		await expect(heading.clientHeight).toBeLessThanOrEqual(Math.ceil(lineHeight * 3) + 1);
+	},
+};
+
 export const Loading: Story = {
 	args: { loading: true, mark: undefined },
 	play: async () => {

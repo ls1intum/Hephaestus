@@ -1,0 +1,79 @@
+import { describe, expect, it } from "vitest";
+
+import type { ProfileReviewRun, ReviewedWorkRef } from "@/api/types.gen";
+
+import { groupReviewRunsByDay, reviewOrdinalLabel, runPositionsOnWork } from "./review-run-groups";
+
+const NOW = new Date(2026, 8, 22, 21, 30);
+
+const pullRequest = (id: string): ReviewedWorkRef => ({
+	id,
+	kind: "scm.pull_request",
+	label: `#${id}`,
+});
+
+const run = (
+	reviewId: string,
+	reviewedAt: Date,
+	reviewedWork = pullRequest("902"),
+): ProfileReviewRun => ({
+	reviewId,
+	reviewedAt,
+	reviewedWork,
+	status: "COMPLETED",
+	practices: { notMet: 0, met: 0, notApplicable: 0, undetermined: 0 },
+	feedbackDelivered: 0,
+	slippedPractices: [],
+	mayRequest: false,
+});
+
+describe("groupReviewRunsByDay", () => {
+	it("keeps the wire's order and never repeats a heading", () => {
+		const days = groupReviewRunsByDay(
+			[
+				run("a", new Date(2026, 8, 22, 18, 0)),
+				run("b", new Date(2026, 8, 22, 9, 0)),
+				run("c", new Date(2026, 8, 21, 9, 0)),
+				run("d", new Date(2025, 11, 31, 9, 0)),
+			],
+			(entry) => entry.reviewedAt,
+			NOW,
+		);
+		expect(days.map((day) => [day.label, day.runs.map((entry) => entry.reviewId)])).toStrictEqual([
+			["Tuesday, 22 September", ["a", "b"]],
+			["Monday, 21 September", ["c"]],
+			["Wednesday, 31 December 2025", ["d"]],
+		]);
+	});
+});
+
+describe("runPositionsOnWork", () => {
+	it("counts each work's reviews from the oldest", () => {
+		const positions = runPositionsOnWork([
+			run("newer", NOW),
+			run("other", NOW, pullRequest("871")),
+			run("older", NOW),
+		]);
+		expect(Object.fromEntries(positions)).toStrictEqual({ newer: 2, other: 1, older: 1 });
+	});
+});
+
+describe("reviewOrdinalLabel", () => {
+	it.each([
+		[1, undefined],
+		[2, "Review 2"],
+		[3, "Review 3"],
+		[4, "Review 4"],
+		[11, "Review 11"],
+		[12, "Review 12"],
+		[112, "Review 112"],
+	])("labels position %i as %s", (position, label) => {
+		expect(reviewOrdinalLabel(position)).toBe(label);
+	});
+
+	it("counts the work's reviews when it knows them", () => {
+		expect(reviewOrdinalLabel(2, 3)).toBe("Review 2 of 3");
+		// A count that cannot hold the position is not shown.
+		expect(reviewOrdinalLabel(4, 3)).toBe("Review 4");
+	});
+});

@@ -1,53 +1,31 @@
-import type { ReviewFeedback } from "@/api/types.gen";
 import { hasText } from "@/lib/text";
 
 import { feedbackExcerptMarkdown } from "./feedback-display";
 
 /**
- * The opening words of a piece of feedback, as a line of prose a row can be told apart by.
+ * The first line of prose of a whole piece of feedback, as the title of its sheet. No ellipsis: the
+ * sheet shows the rest right under it, so the title is the opening line as written, not a cut.
+ * `undefined` for the two states with no prose to show: no body at all, and a body that is nothing
+ * but a code quote.
+ */
+export function feedbackOpeningLine(body: string | undefined): string | undefined {
+	if (!hasText(body)) {
+		return undefined;
+	}
+	return flattenMarkdown(feedbackExcerptMarkdown(body, false))[0];
+}
+
+/**
+ * A Markdown note as its lines of prose, in order.
  *
- * `bodyPreview` is a fixed-character cut of the Markdown note the developer receives, so it usually
- * ends somewhere inside the first fenced code quote. Printed verbatim a row title reads as markup, a
- * language tag and half a statement. This flattens it to the sentence a person would read out: code
+ * Printed verbatim, a note's opening reads as markup, a language tag and half a statement. This
+ * flattens it to the sentences a person would read out: code
  * fences go entirely — a fragment of somebody's Java is never the useful summary of a note about
  * their Java — as do rules and list bullets, while inline markers are unwrapped so the words survive.
- *
- * The trailing ellipsis marks both cuts the text has been through, the server's and this function's.
- * Without it a preview that stops mid-clause reads as feedback that was itself truncated.
- *
- * Returns `undefined` for the two states with no prose to show: no body at all — conversation
- * feedback is recorded before anything is composed — and a preview that is nothing but a code quote.
- * They read differently to an operator, so the caller tells them apart on `bodyPreview` rather than
- * printing one sentence for both.
  */
-export function feedbackPreviewText(
-	feedback: Pick<ReviewFeedback, "bodyPreview" | "bodyTruncated">,
-): string | undefined {
-	const source = feedback.bodyPreview;
-	if (!hasText(source)) {
-		return undefined;
-	}
-
-	const { text, dropped } = flattenMarkdown(
-		feedbackExcerptMarkdown(source, feedback.bodyTruncated),
-	);
-	if (!text) {
-		return undefined;
-	}
-	// A full stop immediately before the ellipsis reads as a typo rather than as a continuation.
-	return feedback.bodyTruncated || dropped ? `${text.replace(/\.$/u, "")}…` : text;
-}
-
-interface Flattened {
-	text: string;
-	/** Whether anything was left out, as opposed to merely being unwrapped. */
-	dropped: boolean;
-}
-
-function flattenMarkdown(source: string): Flattened {
+function flattenMarkdown(source: string): string[] {
 	const lines = source.split("\n");
 	const kept: string[] = [];
-	let dropped = false;
 	let insideFence = false;
 	/** The "You wrote:" line dropped with its block, held in case the block was all there was. */
 	let leadIn: string | undefined;
@@ -62,7 +40,6 @@ function flattenMarkdown(source: string): Flattened {
 				leadIn = kept.pop();
 			}
 			insideFence = !insideFence;
-			dropped = true;
 			continue;
 		}
 		if (insideFence) {
@@ -74,7 +51,6 @@ function flattenMarkdown(source: string): Flattened {
 		}
 		// A horizontal rule separates two observations; in one line of prose it is a false sentence break.
 		if (/^(?<rule>[-*_])\k<rule>{2,}$/u.test(trimmed.replaceAll(/\s/gu, ""))) {
-			dropped = true;
 			continue;
 		}
 		kept.push(
@@ -89,7 +65,7 @@ function flattenMarkdown(source: string): Flattened {
 		kept.push(leadIn);
 	}
 
-	return { text: kept.join(" ").replaceAll(/\s+/gu, " ").trim(), dropped };
+	return kept.map((line) => line.replaceAll(/\s+/gu, " ").trim()).filter(hasText);
 }
 
 /**

@@ -3,10 +3,11 @@ import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { PracticeGroup } from "@/api/types.gen";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
-import { withPageBehind } from "@/stories/decorators";
+import { text, work } from "@/components/practice-vocabulary/feedback-text";
+import { withPageBehind, withProvider } from "@/stories/decorators";
+import { expectFoldOnTableColumns } from "@/stories/fold-columns";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
 import { detailPractices, focusedChanges } from "@/stories/practice-detail-story-mock-data";
-import { ALL_FEEDBACK_CARDS } from "@/stories/practice-feedback-cards-story-mock-data";
 import {
 	OVERVIEW_FIXTURE,
 	packagingGroup,
@@ -16,14 +17,12 @@ import { expectNoPanelOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 import { precedes } from "@/test/dom";
 
-import { composeGroupOverview, composeNextStep } from "./compose-overview";
+import { SAMPLE_PATTERN_NONE_CLEAN } from "@/stories/practice-profile-samples";
+import { composeGroupOverview } from "./compose-overview";
 import { PracticeGroupDetailLevel } from "./PracticeGroupDetailLevel";
 
-/** What the route composes for the group's level: its slice of the overview and its next step. */
-const groupOverview = (groupSlug: string) => ({
-	...composeGroupOverview(OVERVIEW_FIXTURE, groupSlug),
-	nextStep: composeNextStep(ALL_FEEDBACK_CARDS, groupSlug),
-});
+/** What the route composes for the group's level: a sentence per practice in it. */
+const groupOverview = (groupSlug: string) => composeGroupOverview(OVERVIEW_FIXTURE, groupSlug);
 
 /**
  * The level has no page of its own, so every story mounts a real drawer over a real page.
@@ -31,7 +30,7 @@ const groupOverview = (groupSlug: string) => ({
 const meta = {
 	component: PracticeGroupDetailLevel,
 	parameters: { layout: "fullscreen" },
-	decorators: [withPageBehind],
+	decorators: [withPageBehind, withProvider("GITHUB")],
 	args: {
 		path: { behind: [{ label: "Practice profile", depth: 0 }], onClose: fn() },
 		group: packagingGroup,
@@ -51,11 +50,7 @@ const meta = {
 	render: (args) => (
 		<Stateful initial={[{ kind: "practice-group", id: packagingGroup.slug }]}>
 			{(stack, setStack) => (
-				<DetailDrawerStack
-					stack={stack}
-					size="detailWide"
-					onClose={(depth) => setStack(stack.slice(0, depth))}
-				>
+				<DetailDrawerStack stack={stack} onClose={(depth) => setStack(stack.slice(0, depth))}>
 					{(_entry, level) => (
 						<PracticeGroupDetailLevel
 							{...args}
@@ -76,7 +71,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A group the overview does not mention: nothing held, no next step, only the reviewed work. */
+/** A group the overview does not mention: no practice carries a sentence. */
 const otherGroup: PracticeGroup = {
 	...packagingGroup,
 	slug: "testing-discipline",
@@ -86,37 +81,34 @@ const otherGroup: PracticeGroup = {
 	description: "Prove a change works before a reviewer has to take your word for it.",
 };
 
+/** The table's own rows: its first body, without the header or a fold under it. */
 const practiceRows = () =>
-	within(screen.getByRole("table", { name: "Practices in this group" }))
-		.getAllByRole("row")
-		.slice(1);
+	within(
+		screen.getByRole("table", { name: "Practices in this group" }).querySelector("tbody") ??
+			document.body,
+	).getAllByRole("row");
 
 /**
- * The group the overview knows, in one column: the catalog's words on the group lead, then Heph's
- * card with held rows and a next step, where the reader stands, and the practices with a sentence
- * under each.
+ * The group the overview knows, in one column: the catalog's words on the group lead, then the
+ * practices with a sentence under each practice the overview mentions. No summary card and no
+ * "Where you stand" section stand between them.
  */
 export const Default: Story = {
 	play: async ({ args }) => {
-		await expectSettledVisible(await screen.findByText("What is holding up well"));
+		const table = await screen.findByRole("table", { name: "Practices in this group" });
+		await expectSettledVisible(table);
 		const lead = screen.getByText(/one concern per change/u);
 		await expect(lead).toBeVisible();
-		await expect(precedes(lead, screen.getByText("What is holding up well"))).toBe(true);
-		await expect(
-			precedes(
-				screen.getByRole("region", { name: "Where you stand" }),
-				screen.getByRole("table", { name: "Practices in this group" }),
-			),
-		).toBe(true);
+		await expect(precedes(lead, table)).toBe(true);
 		const header = screen.getByRole("heading", { name: packagingGroup.name });
 		await expect(header).toBeVisible();
 		await expect(screen.getByText("Group")).toBeVisible();
 		// The practice count and its ring sit beside the title, over the line that closes the
-		// header; Heph's card starts under it, so the two do not touch.
-		const summary = screen.getByText("five practices in this group");
+		// header, and the tabs start under it.
+		const summary = screen.getByText("Five practices in this group");
 		await expect(summary).toBeVisible();
-		// The standing names the work it is read from beside its badge.
-		await expect(screen.getAllByText("from 4 pieces of work")[0]).toBeVisible();
+		// The standing names the work it is read from in its sentence only, not beside its badge.
+		await expect(screen.queryByText(/^from \d+ pieces? of work$/u)).toBeNull();
 		const [line] = within(screen.getByRole("dialog")).getAllByRole("separator");
 		if (!line) {
 			throw new Error("Expected the line under the header.");
@@ -124,17 +116,12 @@ export const Default: Story = {
 		await expect(summary.getBoundingClientRect().bottom).toBeLessThanOrEqual(
 			line.getBoundingClientRect().top,
 		);
-		await expect(
-			screen.getByRole("img", { name: "Heph, AI mentor" }).getBoundingClientRect().top,
-		).toBeGreaterThan(line.getBoundingClientRect().bottom);
-		await expect(screen.getByText("Next step")).toBeVisible();
-		const nextStep = screen.getByText(/That is the open next step on/u);
-		await expect(nextStep).toBeVisible();
-		// The practice the next step names opens the practice.
-		await userEvent.click(
-			within(nextStep).getByRole("button", { name: "Scope the change to one concern" }),
-		);
-		await expect(args.onOpenPractice).toHaveBeenLastCalledWith("scope-one-reviewable-change");
+		// No summary card: no Heph mark, no held rows, no next step, no reviewed work.
+		await expect(screen.queryByRole("img", { name: "Heph, AI mentor" })).toBeNull();
+		await expect(screen.queryByText("What is holding up well")).toBeNull();
+		await expect(screen.queryByText("Next step")).toBeNull();
+		// One column: no tabs over the practices.
+		await expect(screen.queryByRole("tab")).toBeNull();
 		// A practice the overview mentions carries its sentence under its pill, its clean work
 		// linked.
 		await expect(screen.getByText(/^Feedback resolved by the work after/u)).toBeVisible();
@@ -147,36 +134,26 @@ export const Default: Story = {
 };
 
 /**
- * Where the reader stands in the group, in the registry's words and on the practices counted —
- * the same counts the ring draws — over the practices themselves.
+ * Where the reader stands in the group is the header's badge, trend and ring; the level adds no
+ * "Where you stand" section over the practices.
  */
 export const Standing: Story = {
 	play: async () => {
-		const stand = await screen.findByRole("region", { name: "Where you stand" });
-		await expectSettledVisible(stand);
-		await expect(
-			within(stand).getByText(
-				"Recent reviews here mostly found problems. Read from four pieces of work. Of five practices, two need attention, one shows mixed feedback and two are going well.",
-			),
-		).toBeVisible();
-		await expect(within(stand).getByText("Needs attention")).toBeVisible();
-		await expect(within(stand).getByText("More difficulties recently")).toBeVisible();
-		await expect(
-			within(stand).getByText(
-				"Recent reviewed work carried more problems than the stretch before it. Across eight pieces of reviewed work in this group. Two of three practices here had enough evidence to compare. Evidence spans 12 days.",
-			),
-		).toBeVisible();
-		// The badge and the chip are printed beside their sentences, so neither is a tooltip's trigger.
-		await expect(within(stand).queryByRole("button")).toBeNull();
-		await expect(screen.getByRole("table", { name: "Practices in this group" })).toBeVisible();
+		await expectSettledVisible(
+			await screen.findByRole("table", { name: "Practices in this group" }),
+		);
+		await expect(screen.queryByRole("region", { name: "Where you stand" })).toBeNull();
+		await expect(screen.getByText(/one concern per change/u)).toBeVisible();
 	},
 };
 
-/** A group nothing is written about yet opens on Heph's card, with no line saying so. */
+/** A group nothing is written about yet opens on its practices, with no line saying so. */
 export const NoDescription: Story = {
 	args: { group: { ...packagingGroup, description: undefined } },
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("What is holding up well"));
+		await expectSettledVisible(
+			await screen.findByRole("table", { name: "Practices in this group" }),
+		);
 		await expect(screen.queryByText(/one concern per change/u)).not.toBeInTheDocument();
 	},
 };
@@ -207,10 +184,7 @@ export const Sorting: Story = {
 	},
 };
 
-/**
- * A group the overview does not mention: nothing held there, no open card to take a next step
- * from, so Heph's card keeps only its footer — a block with nothing to say is left out.
- */
+/** A group the overview does not mention: its practices are listed without a sentence. */
 export const OtherGroup: Story = {
 	args: {
 		group: otherGroup,
@@ -222,15 +196,14 @@ export const OtherGroup: Story = {
 		await expect(
 			screen.getByText("Prove a change works before a reviewer has to take your word for it."),
 		).toBeVisible();
-		await expect(screen.queryByText("What is holding up well")).toBeNull();
-		await expect(screen.queryByText("Next step")).toBeNull();
-		await expect(screen.getByText("pull requests")).toBeVisible();
+		await expect(screen.queryByText(/^Feedback resolved by the work after/u)).toBeNull();
 	},
 };
 
 /**
- * A group with nothing reviewed yet: the table says so, the card keeps only its footer, and
- * where the reader stands claims no basis and no direction over no verdict.
+ * A group with no practices, or with every one switched off: the profile lists no such group, so
+ * only a link lands here. The level names the group and says it has no practices — no card, no
+ * tabs, no standing over nothing.
  */
 export const NoPractices: Story = {
 	args: {
@@ -246,17 +219,12 @@ export const NoPractices: Story = {
 		...groupOverview(otherGroup.slug),
 	},
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("No practices yet"));
-		await expect(screen.queryByText("What is holding up well")).toBeNull();
-		await expect(screen.queryByText("Next step")).toBeNull();
-		await expect(screen.getByText("pull requests")).toBeVisible();
-		const stand = screen.getByRole("region", { name: "Where you stand" });
-		await expect(
-			within(stand).getByText("No practice in this group has been observed in your work yet."),
-		).toBeVisible();
-		await expect(within(stand).queryByText(/^Of /u)).toBeNull();
-		// The header's chip is the only one: no direction is claimed over no verdict.
-		await expect(screen.getAllByText("Not enough to compare yet")).toHaveLength(1);
+		await expectSettledVisible(await screen.findByText("This group has no practices"));
+		await expect(screen.getByRole("heading", { name: otherGroup.name })).toBeVisible();
+		await expect(screen.queryByRole("tab")).toBeNull();
+		await expect(screen.queryByRole("table")).toBeNull();
+		await expect(screen.queryByText(/^Not observed/u)).toBeNull();
+		await expect(screen.queryByText("We could not find this practice group")).toBeNull();
 	},
 };
 
@@ -278,15 +246,14 @@ export const OpenPracticeRow: Story = {
 	},
 };
 
-/** Heph's card and the table each draw their own shape, so nothing jumps when the level lands. */
+/** The table draws its own shape, so nothing jumps when the level lands. */
 export const Loading: Story = {
 	args: { isLoading: true },
 	play: async () => {
 		const table = await screen.findByRole("table", { name: "Practices in this group" });
 		await expectSettledVisible(table);
 		await expect(table).toHaveAttribute("aria-busy", "true");
-		await expect(screen.getByRole("img", { name: "Heph, AI mentor" })).toBeVisible();
-		await expect(screen.queryByText("What is holding up well")).toBeNull();
+		await expect(screen.queryByRole("img", { name: "Heph, AI mentor" })).toBeNull();
 		await expect(screen.queryByRole("tab")).toBeNull();
 	},
 };
@@ -316,7 +283,7 @@ export const MobileReflow: Story = {
 	play: async () => {
 		const panel = await settledDrawerPanel();
 		await expectNoPanelOverflow(panel);
-		const summary = screen.getByText("five practices in this group");
+		const summary = screen.getByText("Five practices in this group");
 		const title = screen.getByRole("heading", { name: packagingGroup.name });
 		await expect(summary.getBoundingClientRect().top).toBeGreaterThanOrEqual(
 			title.getBoundingClientRect().bottom,
@@ -331,7 +298,7 @@ export const MobileSummarySpansHeader: Story = {
 		await settledDrawerPanel();
 		// At 320px the legend alone fills the column, so a box that hugs it only shows from here up.
 		// The summary's text block sits in the box, and the heading's row in the title column.
-		const box = screen.getByText("five practices in this group").parentElement?.parentElement;
+		const box = screen.getByText("Five practices in this group").parentElement?.parentElement;
 		const titleColumn = screen.getByRole("heading", { name: packagingGroup.name }).parentElement
 			?.parentElement;
 		if (!box || !titleColumn) {
@@ -341,4 +308,182 @@ export const MobileSummarySpansHeader: Story = {
 			Math.abs(box.getBoundingClientRect().width - titleColumn.getBoundingClientRect().width),
 		).toBeLessThanOrEqual(1);
 	},
+};
+
+// --- The pattern label and the folds ------------------------------------------------------------
+
+const [patterned] = detailPractices;
+const neverAppliedPractices = detailPractices.map((practice, index) =>
+	index === detailPractices.length - 1
+		? { ...practice, standing: "NO_OPPORTUNITY" as const, notApplicableOnly: true }
+		: practice,
+);
+const pullRequest = (number: number) =>
+	work({
+		kind: "scm.pull_request",
+		id: String(9000 + number),
+		label: `#${number}`,
+		title: `Pull request ${number}`,
+		provider: "GITHUB",
+	});
+/** A row's sentence that names the work already, as a fall back does. */
+const patternedSentences = patterned && {
+	...groupOverview(packagingGroup.slug).practiceSentences,
+	[patterned.slug]: [
+		[text("Back to 0 of 3 clean after "), pullRequest(12), text(" and "), pullRequest(14)],
+	],
+};
+const patternArgs = {
+	practices: neverAppliedPractices,
+	practiceSentences: patternedSentences,
+	patterns: patterned ? { [patterned.slug]: SAMPLE_PATTERN_NONE_CLEAN } : {},
+};
+
+/**
+ * The pattern: "Has open feedback", a plain label beside the practice's name, on the line of its standing. The sentence under it names the work, so the label
+ * does not count it again. It is no control; the row's own link opens the practice. The practice
+ * that never applied folds under the table.
+ */
+export const Pattern: Story = {
+	args: patternArgs,
+	play: async () => {
+		const label = await screen.findByText("Has open feedback");
+		await expectSettledVisible(label);
+		await expect(label.closest("button")).toBeNull();
+		await expect(screen.queryByRole("button", { name: /Has open feedback/u })).toBeNull();
+		await expectSettledVisible(
+			screen.getByRole("button", { name: "Does not apply to your work yet" }),
+		);
+	},
+};
+
+/** Without a sentence naming the work, the label reads the same. */
+export const PatternWithoutSentence: Story = {
+	args: { ...patternArgs, practiceSentences: {} },
+	play: async () => {
+		await expectSettledVisible(await screen.findByText("Has open feedback"));
+	},
+};
+
+export const PatternDark: Story = {
+	args: Pattern.args,
+	globals: { theme: "dark" },
+};
+
+export const PatternPhone: Story = {
+	args: Pattern.args,
+	globals: { viewport: { value: "mobile" } },
+};
+
+/** The group's practices with one never applied and one no review has observed yet. */
+const foldedPractices = detailPractices.map((practice, index) => {
+	if (index === detailPractices.length - 1) {
+		return { ...practice, standing: "NO_OPPORTUNITY" as const, notApplicableOnly: true };
+	}
+	if (index === detailPractices.length - 2) {
+		return {
+			...practice,
+			standing: "NOT_OBSERVED" as const,
+			direction: undefined,
+			trendSupport: undefined,
+		};
+	}
+	return practice;
+});
+const notObservedName = detailPractices.at(-2)?.name ?? "";
+
+/**
+ * A practice no review has observed yet leaves the table for
+ * its own folded line, beside the fold of practices that never applied. It still opens from there.
+ */
+export const NotObservedPractices: Story = {
+	args: { practices: foldedPractices },
+	play: async ({ args }) => {
+		const trigger = await screen.findByRole("button", {
+			name: "Practices not observed yet",
+		});
+		await expectSettledVisible(trigger);
+		await expect(practiceRows()).toHaveLength(3);
+		await expect(
+			screen.getByRole("button", { name: "Does not apply to your work yet" }),
+		).toBeVisible();
+		await userEvent.click(trigger);
+		// Opened, the fold's rows join the same table, each with its standing badge alone.
+		await expect(screen.getAllByRole("table")).toHaveLength(1);
+		const folded = screen.getByRole("rowgroup", { name: "Practices not observed yet" });
+		await expect(within(folded).getByText("Not observed yet")).toBeVisible();
+		await expect(within(folded).queryByText(/compare/u)).toBeNull();
+		await expectFoldOnTableColumns(practiceRows()[0] ?? null, folded);
+		await userEvent.click(
+			within(folded).getByRole("button", { name: `Open practice ${notObservedName}` }),
+		);
+		await expect(args.onOpenPractice).toHaveBeenCalledWith(detailPractices.at(-2)?.slug);
+	},
+};
+
+/**
+ * Every practice of the group is not observed yet. The group has practices, so the table does not
+ * claim it has none: the fold stands open and its own sentence says why.
+ */
+export const OnlyNotObservedPractices: Story = {
+	args: {
+		practices: detailPractices.map((practice) => ({
+			...practice,
+			standing: "NOT_OBSERVED" as const,
+			direction: undefined,
+			trendSupport: undefined,
+		})),
+	},
+	play: async () => {
+		const trigger = await screen.findByRole("button", { name: "Practices not observed yet" });
+		await expectSettledVisible(trigger);
+		await expect(trigger).toHaveAttribute("aria-expanded", "true");
+		await expect(screen.queryByText("No practices yet")).toBeNull();
+		const folded = screen.getByRole("rowgroup", { name: "Practices not observed yet" });
+		await expect(within(folded).getAllByText("Not observed yet")).toHaveLength(
+			detailPractices.length,
+		);
+	},
+};
+
+export const NotObservedPracticesOpen: Story = {
+	args: { practices: foldedPractices },
+	play: async () => {
+		const trigger = await screen.findByRole("button", {
+			name: "Practices not observed yet",
+		});
+		await expectSettledVisible(trigger);
+		await userEvent.click(trigger);
+		await expectFoldOnTableColumns(
+			practiceRows()[0] ?? null,
+			screen.getByRole("rowgroup", { name: "Practices not observed yet" }),
+		);
+	},
+};
+
+/** Both folds open at once at 1440 px: every folded row sits on the columns of the rows above. */
+export const FoldsOpen: Story = {
+	args: { practices: foldedPractices },
+	globals: { viewport: { value: "desktop" } },
+	play: async () => {
+		for (const name of ["Practices not observed yet", "Does not apply to your work yet"]) {
+			const trigger = await screen.findByRole("button", { name });
+			await expectSettledVisible(trigger);
+			await userEvent.click(trigger);
+			await expectFoldOnTableColumns(
+				practiceRows()[0] ?? null,
+				screen.getByRole("rowgroup", { name }),
+			);
+		}
+	},
+};
+
+export const NotObservedPracticesDark: Story = {
+	...NotObservedPracticesOpen,
+	globals: { theme: "dark" },
+};
+
+export const NotObservedPracticesPhone: Story = {
+	...NotObservedPracticesOpen,
+	globals: { viewport: { value: "phone390" } },
 };

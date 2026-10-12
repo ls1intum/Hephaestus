@@ -125,5 +125,6 @@ export function toFeedbackCard(
 				? (closure?.state ?? (feedback.readAt ? "open" : "new"))
 				: "withdrawn",
 		timestamp: withdrawnAt ?? closure?.at ?? feedback.preparedAt,
+		preparedAt: feedback.preparedAt,
 	};
 }

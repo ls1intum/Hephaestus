@@ -189,7 +189,7 @@ function PublicActivityRoute() {
 		void setSearch((previous) => ({ ...previous, ...view }), { replace: true });
 	};
 	const detailStack = parseActivityStack(search.detail, PUBLIC_ACTIVITY_LEVEL_KINDS);
-	const stackControls = useDetailStack(detailStack);
+	const stackControls = useDetailStack();
 
 	return (
 		<>

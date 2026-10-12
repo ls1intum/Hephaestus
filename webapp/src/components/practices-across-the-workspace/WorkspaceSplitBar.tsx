@@ -6,11 +6,12 @@ import type { ComponentType } from "react";
 
 import { cn } from "cn";
 import type { WorkspaceSplit } from "@/api/types.gen";
-import { statusValues } from "@/components/common/status-def";
+import { type BadgeVariant, statusValues } from "@/components/common/status-def";
 import {
 	isSettledStanding,
 	PRACTICE_GROUP_STANDING_DEFS,
 	type PracticeGroupStandingValue,
+	type StandingScope,
 } from "@/components/practice-vocabulary/practice-group-standing-defs";
 import {
 	NEUTRAL_GREY,
@@ -19,7 +20,14 @@ import {
 } from "@/components/practice-vocabulary/standing-counts";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { NOBODY_YET, splitDescription, splitTotalText } from "./across-workspace-copy";
+import { type InfoLine, InfoLines, InfoTip } from "@/components/common/InfoTip";
+import {
+	barsHint,
+	NOBODY_YET,
+	NONE_YET_PLAIN,
+	splitDescription,
+	splitTotalText,
+} from "./across-workspace-copy";
 
 export interface WorkspaceSplitBarProps {
 	split: WorkspaceSplit;
@@ -47,6 +55,13 @@ function standingPart(standing: PracticeGroupStandingValue): PartDef {
 		colorClass: standingColorClass(standing),
 	};
 }
+
+/** The colour each verdict wears, in words, so the legend's (i) does not rest on colour alone. */
+const COLOUR_WORD: Partial<Record<BadgeVariant, string>> = {
+	destructive: "Red, ",
+	warning: "Orange, ",
+	success: "Green, ",
+};
 
 const NONE_YET_PART: PartDef = { key: "none", ...NONE_YET_SEGMENT };
 
@@ -140,16 +155,34 @@ export function EmptyTrack() {
 	return <div aria-hidden className={cn("mt-5 w-full", EMPTY_TRACK)} />;
 }
 
-/** The bar's lines while it loads: the marker's row, the bar, the counts, then the total. */
+/** Unequal parts, so the loading bar reads as a split rather than one block. */
+const SKELETON_PARTS = [5, 4, 6, 3] as const;
+
+/**
+ * The bar's lines while it loads, at the loaded bar's heights: the marker's row, the parts with a
+ * count under each, then the total.
+ */
 export function WorkspaceSplitBarSkeleton() {
 	return (
 		<div aria-hidden className="flex w-full min-w-0 flex-col gap-1">
-			<div className="flex flex-col gap-0.5">
-				<span className="h-5" />
-				<Skeleton className="h-2 w-full rounded-sm" />
-				<Skeleton className="h-4 w-full" />
+			<div className="flex w-full min-w-0 gap-0.5">
+				{SKELETON_PARTS.map((grow) => (
+					<div
+						key={grow}
+						className="flex min-w-10 grow-(--count) basis-0 flex-col items-center gap-0.5"
+						style={{ "--count": grow }}
+					>
+						<span className="h-5" />
+						<Skeleton className="h-2 w-full rounded-sm" />
+						<span className="flex h-4 items-center">
+							<Skeleton className="h-3 w-7" />
+						</span>
+					</div>
+				))}
 			</div>
-			<Skeleton className="ml-auto h-4 w-24" />
+			<span className="flex h-4 items-center justify-end">
+				<Skeleton className="h-3 w-24" />
+			</span>
 		</div>
 	);
 }
@@ -168,14 +201,45 @@ export function LevelSplit({
 }
 
 /**
- * Once above each table of bars. An empty track says what it is under itself, so the legend
+ * A verdict's colour and words, as the legend's (i) reads them out: "Red, Needs attention: …", after
+ * a sample of the colour, then grey and how the bars count.
+ */
+const verdictLines = (scope: StandingScope): readonly InfoLine[] => [
+	...statusValues(PRACTICE_GROUP_STANDING_DEFS)
+		.filter(isSettledStanding)
+		.map((standing) => {
+			const def = PRACTICE_GROUP_STANDING_DEFS[standing];
+			return {
+				term: `${COLOUR_WORD[def.badgeVariant] ?? ""}${def.label}:`,
+				text: def.description,
+				swatchClass: standingColorClass(standing),
+			};
+		}),
+	{ ...NONE_YET_PLAIN, swatchClass: NONE_YET_SEGMENT.colorClass },
+	{ term: "How the bars count:", text: barsHint(scope) },
+];
+
+/**
+ * Once above each table of bars, with an (i) at its end that says what each colour means, grey
+ * included, and how the bars count. An empty track says what it is under itself, so the legend
  * leaves it out.
  */
-export function SplitLegend() {
+export function SplitLegend({ scope }: { scope: StandingScope }) {
+	return (
+		<div className="flex items-start gap-2">
+			<SplitLegendItems />
+			<InfoTip label="About the bars" className="my-0 -mt-1">
+				<InfoLines lines={verdictLines(scope)} />
+			</InfoTip>
+		</div>
+	);
+}
+
+function SplitLegendItems() {
 	return (
 		<ul
 			aria-label="What the bars show"
-			className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground"
+			className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground"
 		>
 			{SPLIT_PARTS.map((part) => {
 				const Icon = part.icon;

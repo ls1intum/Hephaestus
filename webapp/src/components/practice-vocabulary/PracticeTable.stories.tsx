@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ClipboardCheckIcon } from "lucide-react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 
 import type { PracticeStanding } from "@/api/types.gen";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -95,7 +95,7 @@ type Story = StoryObj<typeof meta>;
 
 /** What needs attention first; a press on Standing turns the order around. */
 export const Default: Story = {
-	play: async ({ args, canvas }) => {
+	play: async ({ canvas }) => {
 		const links = () => canvas.getAllByRole("button", { name: /^Open practice /u });
 		// Each name starts with the link's visible words, so a reader who speaks them reaches it
 		// (WCAG 2.2 SC 2.5.3); the practice after them tells the rows apart.
@@ -111,14 +111,39 @@ export const Default: Story = {
 			"Open practice Write commit subjects a reviewer can follow",
 		]);
 		await userEvent.click(canvas.getByRole("button", { name: "Standing" }));
-		await expect(args.onSortChange).toHaveBeenCalledWith("desc");
 		await expect(names()[0]).toBe("Open practice Mark the change ready and link its issue");
 	},
 };
 
+export const MobileSort: Story = {
+	decorators: [
+		(Story) => (
+			<div className="w-80 max-w-full">
+				<Story />
+			</div>
+		),
+	],
+	play: async ({ canvas }) => {
+		const button = canvas.getByRole("button", { name: "Standing" });
+		const bounds = button.getBoundingClientRect();
+		const table = canvas.getByRole("table");
+		const frame = table.getBoundingClientRect();
+		await expect(bounds.width).toBeGreaterThan(20);
+		await expect(bounds.left).toBeGreaterThanOrEqual(frame.left);
+		await expect(bounds.right).toBeLessThanOrEqual(frame.right);
+		button.focus();
+		await expect(button).toHaveFocus();
+		await userEvent.keyboard("{Enter}");
+		await expect(button.closest("th")).toHaveAttribute("aria-sort", "descending");
+		await expect(
+			canvas.getAllByRole("button", { name: /^Open practice /u })[0],
+		).toHaveAccessibleName("Open practice Mark the change ready and link its issue");
+	},
+};
+
 /**
- * The standing badge and the trend chip are buttons only so a keyboard reaches their sentences;
- * they answer nothing of their own, so a pointer's press on either is the row's. A keyboard's
+ * The standing badge and the trend chip are buttons only so their sentences are in reach; they
+ * answer nothing of their own, so a mouse press on either is the row's. A tap or a keyboard's
  * Enter on one is not: that reader came for the sentence, and the row's own link is theirs.
  */
 export const OpensFromTheStandingCell: Story = {
@@ -140,6 +165,16 @@ export const OpensFromTheStandingCell: Story = {
 		badge.focus();
 		await userEvent.keyboard("{Enter}");
 		await expect(onOpen).not.toHaveBeenCalled();
+		// A tap opens the sentence, not the row.
+		await userEvent.keyboard("{Escape}");
+		await waitFor(async () => {
+			await expect(badge).toHaveAttribute("aria-expanded", "false");
+		});
+		await userEvent.pointer({ keys: "[TouchA]", target: badge });
+		await expect(onOpen).not.toHaveBeenCalled();
+		await waitFor(async () => {
+			await expect(badge).toHaveAttribute("aria-expanded", "true");
+		});
 		// The row's own link is the keyboard path, and Enter on it still opens the row.
 		within(row)
 			.getByRole("button", { name: "Open practice Describe what changed and why" })

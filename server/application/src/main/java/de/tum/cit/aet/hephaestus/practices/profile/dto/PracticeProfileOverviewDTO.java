@@ -22,8 +22,9 @@ public record PracticeProfileOverviewDTO(
         @Nullable @Schema(description = "The newest review run on the developer's work; absent before any ran")
         ReviewRunRefDTO latestRun,
 
-        @NonNull
         @Schema(
+                deprecated = true,
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED,
                 description =
                         "Practices standing as a strength whose newest pieces of work are all clean, longest run first")
         List<HeldPracticeDTO> holdingUp,
@@ -32,5 +33,8 @@ public record PracticeProfileOverviewDTO(
         @Schema(description = "Everything that changed in the window, newest first; one change per practice and type")
         List<ProfileChangeDTO> changes,
 
-        @NonNull @Schema(description = "The pieces of work whose runs fall in the window, deduplicated, newest first")
+        @Schema(
+                deprecated = true,
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+                description = "The pieces of work whose runs fall in the window, deduplicated, newest first")
         List<ReviewedWorkRefDTO> reviewedWork) {}

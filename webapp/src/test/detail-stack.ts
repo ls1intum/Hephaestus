@@ -11,3 +11,35 @@ export function levelsOpenedBy(link: HTMLElement): string[] {
 	);
 	return stackInSearch(search.detail);
 }
+
+/**
+ * The review page a link opens, and the record it focuses: `review:<id>` alone, or
+ * `review:<id> focus:observation:<id>`. Read from the path and the router's own search parser.
+ */
+export function reviewPageOpenedBy(link: HTMLElement): string | undefined {
+	const url = new URL(String(link.getAttribute("href")), window.location.origin);
+	const reviewId = /\/admin\/practices\/reviews\/review\/(?<id>[^/]+)$/u.exec(url.pathname)?.groups
+		?.id;
+	if (reviewId === undefined) {
+		return undefined;
+	}
+	const search: Record<string, unknown> = parseSearch(url.search);
+	return typeof search.focus === "string"
+		? `review:${reviewId} focus:${search.focus}`
+		: `review:${reviewId}`;
+}
+
+/**
+ * The Practice reviews list a link opens — `runs`, `observations`, `feedback` — and the filters it
+ * sets, read with the router's own search parser.
+ */
+export function listOpenedBy(link: HTMLElement): {
+	list: string | undefined;
+	search: Record<string, unknown>;
+} {
+	const url = new URL(String(link.getAttribute("href")), window.location.origin);
+	const list = /\/admin\/practices\/reviews\/(?<list>runs|observations|feedback)$/u.exec(
+		url.pathname,
+	)?.groups?.list;
+	return { list, search: parseSearch(url.search) };
+}

@@ -9,7 +9,9 @@ import {
 	type PracticeGroupStandingValue,
 	type StandingScope,
 } from "@/components/practice-vocabulary/practice-group-standing-defs";
-import { NONE_YET_SEGMENT } from "@/components/practice-vocabulary/standing-counts";
+import { NEUTRAL_GREY, NONE_YET_SEGMENT } from "@/components/practice-vocabulary/standing-counts";
+
+import type { InfoGroup, InfoLine } from "@/components/common/InfoTip";
 
 export type AcrossWorkspaceWindow = PracticesAcrossWorkspaceTiles["window"];
 
@@ -60,9 +62,45 @@ export const OPEN_IN_YOUR_PROFILE = "Open in your Practice profile";
 /** Delay before the page explains a slow read. */
 export const SLOW_LOAD_AFTER_MS = 4000;
 
-/** Shown while the counts take longer than {@link SLOW_LOAD_AFTER_MS}. */
-export const SLOW_LOAD_NOTE =
-	"Counting where everyone in the workspace stands takes a moment in a large course. The page fills in when the counts are ready.";
+/**
+ * Delay before the loading line shows and is announced: a read that is in by then only flashes
+ * the skeletons, and the live region is already in the page when its message arrives.
+ */
+export const LOADING_LINE_AFTER_MS = 200;
+
+/** The loading line above the skeletons, and the page's one announcement while it counts. */
+export const LOADING_STATUS = "Counting where everyone stands…";
+
+/** The page's one visible line under its title; {@link PAGE_INTRO} says the rest behind an (i). */
+export const PAGE_INTRO_SHORT = "Where the developers in this workspace stand. Not a grade.";
+
+/** Behind the (i) beside {@link PAGE_INTRO_SHORT}. */
+export const PAGE_INTRO: readonly InfoLine[] = [
+	{
+		term: "What it shows:",
+		text: "where the developers in this workspace stand in each practice group.",
+	},
+	{
+		term: "Not a grade:",
+		text: "each standing comes from AI review of their work and can be wrong.",
+	},
+	{ term: "Your next step:", text: "it is in your Practice profile." },
+];
+
+/**
+ * The loading line once the counts take longer than {@link SLOW_LOAD_AFTER_MS}; {@link SLOW_LOAD_NOTE}
+ * says the rest behind an (i). Short enough to stay on one line at 390px.
+ */
+export const SLOW_LOAD_SHORT = "Counting takes longer than usual…";
+
+/** Behind the (i) of the loading line. */
+export const SLOW_LOAD_NOTE: readonly InfoLine[] = [
+	{
+		term: "A large course:",
+		text: "counting where everyone in the workspace stands takes a moment.",
+	},
+	{ term: "Then:", text: "the page fills in when the counts are ready." },
+];
 
 /** Keep completed queries fresh across window changes and brief focus changes. */
 export const ACROSS_WORKSPACE_STALE_MS = 5 * 60 * 1000;
@@ -74,35 +112,58 @@ export const GROUPS_LOAD_ERROR = "We could not load the practice groups";
 const developers = (n: number) => count(n, "developer", "developers", true);
 
 /**
- * The lines under the tiles, built only from the response so they hold for every reply: how many
- * developers the band sorts, and that open feedback, which reads no window, has a band of its own.
- * One paragraph for each.
+ * The tiles' (i), in four groups that do not overlap: what the tile draws, how to read it, when the
+ * band is missing, and what the open feedback counts. The same for every window and every
+ * workspace, so it never carries a count or a window of its own. Interviews asked what grey and
+ * lower mean (`Und wenn es grau ist, ist es okay einfach?`, `was bedeutet das, niedriger?`).
  */
-export function tilesHint({
-	window,
-	developersWithAStandingInWindow,
-}: Pick<PracticesAcrossWorkspaceTiles, "window" | "developersWithAStandingInWindow">): readonly [
-	string,
-	string,
-] {
-	const open = "Open feedback counts what is open now, for every developer that this page counts.";
-	if (developersWithAStandingInWindow === 0) {
-		return [
-			`No developer in this workspace has a standing ${windowPhrase(window)}, so these figures have no typical range.`,
-			open,
-		];
-	}
-	const band = [
-		"The band is the typical range.",
-		`Hephaestus sorts the ${developers(developersWithAStandingInWindow)} in this workspace who ${developersWithAStandingInWindow === 1 ? "has" : "have"} a standing ${windowPhrase(window)} by their value.`,
-		"The band covers the middle half: a quarter of them are below it, and a quarter are above it.",
-		"Your marker shows your value.",
-		"When only a few developers are counted, the band can show the value of one person.",
-	].join(" ");
-	return [band, open];
-}
+export const FIGURES_PLAIN: readonly InfoGroup[] = [
+	{
+		heading: "What you see",
+		lines: [
+			{
+				term: "Grey band:",
+				text: "the typical range here, the middle half of the developers with a standing.",
+				swatchClass: NEUTRAL_GREY,
+			},
+			{ term: "Blue marker:", text: "your own value.", swatchClass: "text-mentor" },
+		],
+	},
+	{
+		heading: "How to read it",
+		lines: [
+			{
+				term: "Left of the band:",
+				text: "lower than for most developers.",
+				second: { term: "Right:", text: "higher." },
+			},
+			{
+				term: "Better or worse:",
+				text: "depends on the figure. Fewer practices needing attention is better; fewer going well is not.",
+			},
+		],
+	},
+	{
+		heading: "When the band is missing",
+		lines: [{ term: "No band:", text: "no developer has a standing yet." }],
+	},
+	{
+		heading: "What counts",
+		lines: [
+			{ term: "Open feedback:", text: "what is open now, for every developer counted here." },
+		],
+	},
+];
 
-/** The line over a table of bars, in the words of `docs/user/practice-profile.mdx` § The bars. */
+/**
+ * The plain reading of a bar's colours, first in the legend's (i). Grey is no standing, never "okay".
+ */
+export const NONE_YET_PLAIN: InfoLine = {
+	term: "Grey, None yet:",
+	text: "no standing yet. No review has judged this in their work, or there was nothing to judge. Grey does not mean okay.",
+};
+
+/** The lines in the legend's (i) after the colours, in the words of `docs/user/practice-profile.mdx` § The bars. */
 export function barsHint(scope: StandingScope): string {
 	return [
 		`Each bar counts developers by their current standing in the ${scope}, as their Practice profile shows it.`,

@@ -1,8 +1,16 @@
-import { useRouter } from "@tanstack/react-router";
+import { type HistoryState, useRouter } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 
 import { useSearchState } from "@/lib/search-params";
 
-import { type DetailStackEntry, encodeDetailStack } from "./detail-stack";
+import {
+	type DetailStackEntry,
+	detailEntryState,
+	detailStackKey,
+	openInStack,
+	pushedLevels,
+	stackInSearch,
+} from "./detail-stack";
 
 /** Values for the level params the hook was given, and no others: a misspelt key does not compile. */
 type LevelSearch<TParam extends string> = Partial<Record<TParam, unknown>>;
@@ -31,44 +39,80 @@ export interface DetailStackOptions<TParam extends string = never> {
 	 * that no longer shows them, or hand them to the next level opened.
 	 */
 	levelParams?: readonly TParam[];
+	/**
+	 * Whether closing a level that was not pushed on this entry rewrites the entry instead of adding
+	 * one. A page that another page navigates into as a step of its own passes this, so closing a
+	 * level that step opened belongs to the step and Back afterwards leaves for where it came from
+	 * instead of opening the level again. Without it, such a close is a new entry.
+	 */
+	replaceOnClose?: (state: HistoryState) => boolean;
 }
 
 /**
- * Dismissing the top level goes *back*, not forward to a shorter URL, so Escape and the browser's
- * Back button agree — otherwise Escape then Back re-opens what was just dismissed. Only for a level
- * this visit pushed, which is why the history entry is stamped rather than counted: a deep-linked
- * stack has nothing behind it, and going back would leave the app.
+ * Dismissing levels goes *back*, not forward to a shorter URL, so Escape and the browser's Back
+ * button agree — otherwise Escape then Back re-opens what was just dismissed. Only for levels this
+ * visit pushed, which is why the history entry is stamped with how many of its top levels were
+ * pushed one entry each ({@link pushedLevels}): a deep-linked stack has nothing behind it, and going
+ * back would leave the app. Closing several levels at once — a crumb, a press outside, the close of
+ * a level under another — goes back that many entries, so Back afterwards does not open them again.
+ * Where fewer of them were pushed, it goes back over those and closes the rest on the entry it lands
+ * on, so no close is ever written ahead of a level Back would open again.
  */
-export function useDetailStack<TParam extends string = never>(
-	stack: DetailStackEntry[],
-	{ levelParams = [] }: DetailStackOptions<TParam> = {},
-): DetailStackControls<TParam> {
+export function useDetailStack<TParam extends string = never>({
+	levelParams = [],
+	replaceOnClose,
+}: DetailStackOptions<TParam> = {}): DetailStackControls<TParam> {
 	const setSearch = useSearchState();
 	const router = useRouter();
+	// The listener of a close still waiting for its back step, dropped if the page goes first.
+	const pendingClose = useRef<(() => void) | undefined>(undefined);
+	useEffect(
+		() => () => {
+			pendingClose.current?.();
+			pendingClose.current = undefined;
+		},
+		[],
+	);
+	// The stack in the address now, in wire form: a control can run long after its render, such as a
+	// close after a request, and the reader may have moved the stack in the meantime.
+	const liveStack = () =>
+		stackInSearch((router.state.location.search as { detail?: unknown }).detail);
 
 	const goToStack = async (
-		next: DetailStackEntry[],
+		next: string[],
 		detailPush: boolean,
 		levelSearch: LevelSearch<TParam> = {},
+		replace = false,
 	) =>
 		setSearch(
 			(previous) => ({
 				...previous,
 				...Object.fromEntries(levelParams.map((param) => [param, undefined])),
 				...levelSearch,
-				detail: encodeDetailStack(next),
+				detail: next.length > 0 ? next : undefined,
 			}),
-			{ state: (previous) => ({ ...previous, detailPush }) },
+			{ state: (previous) => detailEntryState(previous, detailPush, replace), replace },
 		);
 
 	const push = async (entries: DetailStackEntry[], levelSearch?: LevelSearch<TParam>) => {
-		// In turn, since each entry is written against the location the one before it produced.
+		// In turn, one history entry each. The rules are DetailStackLink's: a level already in front
+		// keeps its entry, and one already open lower down or past the full depth is not a push.
+		let current = liveStack();
 		for (const [index, entry] of entries.entries()) {
-			await goToStack(
-				[...stack, ...entries.slice(0, index), entry],
-				true,
-				index === entries.length - 1 ? levelSearch : undefined,
-			);
+			const key = detailStackKey(entry);
+			const last = index === entries.length - 1;
+			if (current.at(-1) === key) {
+				if (last && levelSearch !== undefined) {
+					await setSearch((previous) => ({ ...previous, ...levelSearch }), {
+						state: true,
+						replace: true,
+					});
+				}
+				continue;
+			}
+			const { detail, pushed } = openInStack(current, key);
+			current = detail;
+			await goToStack(detail, pushed, last ? levelSearch : undefined);
 		}
 	};
 
@@ -78,12 +122,45 @@ export function useDetailStack<TParam extends string = never>(
 		},
 		push,
 		close: (depth) => {
-			// Only the top level: the entries below it are not known to be ours.
-			if (router.state.location.state.detailPush === true && depth === stack.length - 1) {
-				router.history.back();
+			const current = liveStack();
+			const closing = current.length - depth;
+			if (closing <= 0) {
 				return;
 			}
-			void goToStack(stack.slice(0, depth), false);
+			// Only levels this visit pushed: the entries below them are not known to be ours.
+			const pushed = pushedLevels(router.state.location.state);
+			if (pushed >= closing) {
+				router.history.go(-closing);
+				return;
+			}
+			// The rest is closed on the entry the reader is on, which `replaceOnClose` judges.
+			const closeRest = () => {
+				void goToStack(
+					current.slice(0, depth),
+					false,
+					undefined,
+					replaceOnClose?.(router.state.location.state) === true,
+				);
+			};
+			if (pushed === 0) {
+				closeRest();
+				return;
+			}
+			// Back over the pushed levels first: a close written over them would leave them ahead of
+			// it, and Back would open them again. The rest is written only where that step lands: a
+			// blocker that keeps the reader on the level (unsaved changes) also resolves a navigation,
+			// on the entry the close started from.
+			const target = router.state.location.state.__TSR_index - pushed;
+			pendingClose.current?.();
+			const unsubscribe = router.subscribe("onResolved", () => {
+				unsubscribe();
+				pendingClose.current = undefined;
+				if (router.state.location.state.__TSR_index === target) {
+					closeRest();
+				}
+			});
+			pendingClose.current = unsubscribe;
+			router.history.go(-pushed);
 		},
 		setView: (view) => {
 			void setSearch((previous) => ({ ...previous, ...view }), { state: true, replace: true });

@@ -1,4 +1,6 @@
-import type { FacetOption } from "@/components/common/FacetMultiSelect";
+import type { ReactElement } from "react";
+
+import { FacetMultiSelect, type FacetOption } from "@/components/common/FacetMultiSelect";
 import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 
 export interface AppliedFacetPill {
@@ -50,4 +52,34 @@ export function AppliedFacetPills({ pills }: { pills: AppliedFacetPill[] }) {
 			))}
 		</div>
 	);
+}
+
+/** One facet of a list's filter bar: its control in the toolbar and its pills on a phone. */
+export interface ListFacet {
+	control: ReactElement;
+	pills: AppliedFacetPill[];
+}
+
+/**
+ * A facet declared once: the toolbar's multi-select and the pills that name its values below `sm`
+ * come from the same title, options, values and change, so the two cannot drift apart.
+ */
+export function listFacet<TValue extends string>(
+	title: string,
+	options: FacetOption<TValue>[],
+	selected: readonly TValue[] | undefined,
+	onChange: (values: TValue[]) => void,
+): ListFacet {
+	return {
+		control: (
+			<FacetMultiSelect
+				key={title}
+				title={title}
+				options={options}
+				selected={selected ?? []}
+				onChange={onChange}
+			/>
+		),
+		pills: facetPills(title, options, selected, onChange),
+	};
 }

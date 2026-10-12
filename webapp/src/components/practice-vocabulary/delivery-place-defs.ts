@@ -56,15 +56,3 @@ export const OPERATOR_WITHHELD_TEXT: Partial<
 			"The text was written for the developer’s own practice pages and is withheld from operators.",
 	},
 };
-
-/**
- * The places worth offering as a filter — now all of them.
- *
- * <p>`IN_APP` was held out while the channel was declared and unwritten, because a filter for it
- * could only ever return an empty page and an operator would read that as "none today" rather than
- * "never any". A producer exists, so rows badged *On their practice pages* now appear in the list, and a
- * badge whose words match no option leaves a reader unable to filter for the row in front of them.
- * Filtering to it shows the same thing every other row shows minus the composed text, which the
- * query service withholds for the two private channels.
- */
-export const FILTERABLE_PLACES: readonly DeliveryPlace[] = ["IN_CONTEXT", "IN_CHAT", "IN_APP"];

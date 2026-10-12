@@ -37,7 +37,7 @@
 	--ifm-card-background-color: oklch(0.141 0.005 285.823);
 	--ifm-font-color-base: oklch(0.985 0 0);
 	--ifm-navbar-background-color: oklch(0.141 0.005 285.823);
-	--ifm-toc-border-color: oklch(0.274 0.006 286.033);
+	--ifm-toc-border-color: oklch(0.32 0.006 286);
 	--docusaurus-highlighted-code-line-bg: oklch(0.546 0.245 262.881 / 0.18);
 }
 
@@ -66,7 +66,7 @@
 
 [data-theme="dark"] {
 	--ifm-color-emphasis-100: oklch(0.21 0.006 285.885);
-	--ifm-color-emphasis-200: oklch(0.274 0.006 286.033);
+	--ifm-color-emphasis-200: oklch(0.32 0.006 286);
 	--ifm-color-emphasis-300: oklch(0.37 0.013 285.805);
 	--ifm-color-emphasis-400: oklch(0.442 0.017 285.786);
 	--ifm-color-emphasis-500: oklch(0.552 0.016 285.938);

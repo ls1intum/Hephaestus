@@ -99,6 +99,7 @@
 		"@vitest/browser-playwright": "catalog:",
 		"@vitest/coverage-v8": "catalog:",
 		"chromatic": "18.7.2",
+		"dom-accessibility-api": "0.6.3",
 		"entities": "8.1.0",
 		"jsdom": "30.0.1",
 		"msw": "2.15.0",

@@ -14,11 +14,6 @@ import {
 import type { OverviewRegionState, PreviousReviewPeriodState } from "./review-states";
 import { ReviewPipeline } from "./ReviewPipeline";
 
-const FROM_DAY = reviewOverviewScope.from;
-if (FROM_DAY === undefined) {
-	throw new Error("The overview's scope starts on a day");
-}
-
 /** The thirty days before: fewer reviews, as many observations, more feedback. */
 const PREVIOUS: PracticeReviewOverview = {
 	...quietPracticeReviewOverview,
@@ -33,9 +28,27 @@ const READY: OverviewRegionState = {
 	stale: false,
 };
 
+/** A course day's feedback: 120 pieces, 20 of them replaced, so 100 prepared; 30 withheld. */
+const COURSE_DAY: PracticeReviewOverview = {
+	...practiceReviewOverview,
+	feedback: {
+		...feedbackCounts([]),
+		delivered: 60,
+		prepared: 5,
+		failed: 2,
+		suppressed: 30,
+		discarded: 3,
+		superseded: 20,
+	},
+};
+
+function readyOf(overview: PracticeReviewOverview): OverviewRegionState {
+	return { status: "ready", overview, stale: false };
+}
+
 const PREVIOUS_READY: PreviousReviewPeriodState = {
 	status: "ready",
-	period: { overview: PREVIOUS, name: "the previous 30 days" },
+	period: { overview: PREVIOUS },
 };
 
 /**
@@ -51,12 +64,15 @@ const meta = {
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	args: {
-		workspaceSlug: "demo",
 		state: READY,
 		previous: PREVIOUS_READY,
+		previousName: "the previous 30 days",
 		scope: reviewOverviewScope,
 	},
-	argTypes: { state: { control: false }, previous: { control: false } },
+	argTypes: {
+		state: { control: false },
+		previous: { control: false },
+	},
 } satisfies Meta<typeof ReviewPipeline>;
 
 export default meta;
@@ -70,18 +86,25 @@ export const Default: Story = {
 		canvas.getByText("8 more than the previous 30 days");
 		canvas.getByText("Same as the previous 30 days");
 		canvas.getByText("6 fewer than the previous 30 days");
-		// Each stage's title opens its list over the range the tiles count.
-		const reviews = new URL(
-			within(stages).getByRole<HTMLAnchorElement>("link", { name: "Reviews" }).href,
+		// No tile links to its list: the tab above opens the same one, so a second way there is noise.
+		await expect(within(stages).queryByRole("link")).not.toBeInTheDocument();
+		within(stages).getByText("Reviews");
+		// Reviews still going have no outcome yet: they come last in the row, quiet, with the share
+		// that failed or timed out after them. How many run and wait right now is the queue's to say,
+		// so the tile does not split them.
+		await expect(
+			within(canvas.getByRole("list", { name: "Reviews not finished yet" })).getByRole("listitem"),
+		).toHaveTextContent("3 not finished yet");
+		canvas.getByText("failed or timed out", { exact: false });
+		await expect(canvas.queryByText(/\brunning\b/u)).not.toBeInTheDocument();
+		// Every tile has the same rows: title, figure, comparison, chart, then the row of figures, so
+		// the charts of the tiles side by side stand at the same height and are as tall.
+		const charts = [...stages.querySelectorAll("[data-slot=chart]")].map((chart) =>
+			chart.getBoundingClientRect(),
 		);
-		await expect(reviews.pathname).toBe("/w/demo/admin/practices/reviews/runs");
-		await expect(reviews.searchParams.get("from")).toBe(FROM_DAY);
-		// Reviews still going have no outcome yet: they are a live line, not legend entries.
-		const running = new URL(
-			canvas.getByRole<HTMLAnchorElement>("link", { name: "1 running" }).href,
-		);
-		await expect(running.searchParams.getAll("status")).toStrictEqual(["RUNNING"]);
-		canvas.getByRole("link", { name: "2 queued" });
+		await expect(charts).toHaveLength(3);
+		await expect(new Set(charts.map((chart) => Math.round(chart.top))).size).toBe(1);
+		await expect(new Set(charts.map((chart) => Math.round(chart.height))).size).toBe(1);
 		await expect(
 			within(canvas.getByRole("list", { name: "Reviews by outcome" }))
 				.getAllByRole("listitem")
@@ -95,14 +118,32 @@ export const Default: Story = {
 			"3 awaiting approval",
 			"1 prepared",
 			"14 delivered",
-			"5 withheld",
+			"4 withheld",
 			"1 failed to deliver",
+			"1 replaced by newer",
 		]);
 		// The marked-incorrect count overlaps the observations' outcomes, so it is listed apart.
-		within(canvas.getByRole("list", { name: "Observations checked by an admin" })).getByRole(
-			"link",
-			{ name: "3 marked incorrect" },
-		);
+		await expect(
+			within(canvas.getByRole("list", { name: "Observations checked by an admin" })).getByRole(
+				"listitem",
+			),
+		).toHaveTextContent("3 marked incorrect");
+	},
+};
+
+/**
+ * Replaced feedback is no loss: it leaves the withheld count and stands apart in a neutral word.
+ * Why feedback was withheld is the Feedback list's to say, so the tile gives the count alone.
+ */
+export const WithheldCountOnly: Story = {
+	args: { state: readyOf(COURSE_DAY) },
+	play: async ({ canvas }) => {
+		const legend = within(canvas.getByRole("list", { name: "Feedback by delivery" }))
+			.getAllByRole("listitem")
+			.map((item) => item.textContent);
+		await expect(legend).toContain("33 withheld");
+		await expect(legend).toContain("20 replaced by newer");
+		await expect(canvas.queryByText(/lost to timing/u)).not.toBeInTheDocument();
 	},
 };
 
@@ -159,19 +200,19 @@ export const Stale: Story = {
 	},
 };
 
-/** A quiet range: each tile is a nought with no chart and no legend, and its list is still a link. */
+/** A quiet range: each tile is a nought with no chart and no legend. */
 export const NothingReviewed: Story = {
 	args: {
 		state: { status: "ready", overview: quietPracticeReviewOverview, stale: false },
 		previous: {
 			status: "ready",
-			period: { overview: quietPracticeReviewOverview, name: "the previous 30 days" },
+			period: { overview: quietPracticeReviewOverview },
 		},
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getAllByText("Same as the previous 30 days")).toHaveLength(3);
 		await expect(canvas.queryByRole("list", { name: /\bby\b/u })).not.toBeInTheDocument();
-		canvas.getByRole("link", { name: "Feedback" });
+		canvas.getByText("Feedback");
 	},
 };
 

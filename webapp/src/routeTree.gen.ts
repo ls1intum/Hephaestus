@@ -80,6 +80,7 @@ import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsObservationsRo
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/runs'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/work'
 import { Route as AuthenticatedWWorkspaceSlugUserUsernamePracticeGroupsGroupSlugRouteImport } from './routes/_authenticated/w/$workspaceSlug/user/$username/practice-groups.$groupSlug'
+import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/review.$reviewId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -491,6 +492,15 @@ const AuthenticatedWWorkspaceSlugUserUsernamePracticeGroupsGroupSlugRoute =
       getParentRoute: () => AuthenticatedWWorkspaceSlugRouteRoute,
     } as any,
   )
+const AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRoute =
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRouteImport.update(
+    {
+      id: '/review/$reviewId',
+      path: '/review/$reviewId',
+      getParentRoute: () =>
+        AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute,
+    } as any,
+  )
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -563,6 +573,7 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceSlug/admin/practices/reviews/work': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute
   '/w/$workspaceSlug/user/$username/practice-groups/$groupSlug': typeof AuthenticatedWWorkspaceSlugUserUsernamePracticeGroupsGroupSlugRoute
   '/w/$workspaceSlug/admin/practices/reviews/': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
+  '/w/$workspaceSlug/admin/practices/reviews/review/$reviewId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -628,6 +639,7 @@ export interface FileRoutesByTo {
   '/w/$workspaceSlug/admin/practices/reviews/work': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute
   '/w/$workspaceSlug/user/$username/practice-groups/$groupSlug': typeof AuthenticatedWWorkspaceSlugUserUsernamePracticeGroupsGroupSlugRoute
   '/w/$workspaceSlug/admin/practices/reviews': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
+  '/w/$workspaceSlug/admin/practices/reviews/review/$reviewId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -702,6 +714,7 @@ export interface FileRoutesById {
   '/_authenticated/w/$workspaceSlug/admin/practices/reviews/work': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute
   '/_authenticated/w/$workspaceSlug/user/$username/practice-groups/$groupSlug': typeof AuthenticatedWWorkspaceSlugUserUsernamePracticeGroupsGroupSlugRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/reviews/': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
+  '/_authenticated/w/$workspaceSlug/admin/practices/reviews/review/$reviewId': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -776,6 +789,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/practices/reviews/work'
     | '/w/$workspaceSlug/user/$username/practice-groups/$groupSlug'
     | '/w/$workspaceSlug/admin/practices/reviews/'
+    | '/w/$workspaceSlug/admin/practices/reviews/review/$reviewId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -841,6 +855,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/practices/reviews/work'
     | '/w/$workspaceSlug/user/$username/practice-groups/$groupSlug'
     | '/w/$workspaceSlug/admin/practices/reviews'
+    | '/w/$workspaceSlug/admin/practices/reviews/review/$reviewId'
   id:
     | '__root__'
     | '/'
@@ -914,6 +929,7 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/work'
     | '/_authenticated/w/$workspaceSlug/user/$username/practice-groups/$groupSlug'
     | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/'
+    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/review/$reviewId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1432,6 +1448,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugUserUsernamePracticeGroupsGroupSlugRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceSlugRouteRoute
     }
+    '/_authenticated/w/$workspaceSlug/admin/practices/reviews/review/$reviewId': {
+      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews/review/$reviewId'
+      path: '/review/$reviewId'
+      fullPath: '/w/$workspaceSlug/admin/practices/reviews/review/$reviewId'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute
+    }
   }
 }
 
@@ -1515,6 +1538,7 @@ interface AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteChildren {
   AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRoute
   AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute
   AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
+  AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRoute
 }
 
 const AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteChildren: AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteChildren =
@@ -1529,6 +1553,8 @@ const AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteChildren: Authenticat
       AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute,
     AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute:
       AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute,
+    AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRoute:
+      AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRoute,
   }
 
 const AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteWithChildren =

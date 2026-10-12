@@ -46,7 +46,7 @@ function AdminSurveysPage() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const now = useNow();
 	const detailStack = parseDetailStack(detail, SURVEY_LEVEL_KINDS);
-	const stackControls = useDetailStack(detailStack);
+	const stackControls = useDetailStack();
 	const lifecycle = useSurveyLifecycle();
 	const surveysQuery = useQuery({
 		...adminListProductSurveysOptions({ query: { page, size: PAGE_SIZE } }),

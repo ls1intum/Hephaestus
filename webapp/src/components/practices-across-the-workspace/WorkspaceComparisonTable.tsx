@@ -7,7 +7,7 @@ import {
 	OPEN_ROW_BAR,
 	PracticeTableFrame,
 	PracticeTableRow,
-	type PracticeTableRowLink,
+	STACKED,
 	SubjectCell,
 } from "@/components/practice-vocabulary/PracticeTable";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +15,9 @@ import { TableCell, TableHead } from "@/components/ui/table";
 
 import { NOBODY_YET } from "./across-workspace-copy";
 import { EmptyTrack, WorkspaceSplitBar, WorkspaceSplitBarSkeleton } from "./WorkspaceSplitBar";
+
+/** The hidden words of the marked row, read after its name. */
+export const CAME_FROM_YOUR_PROFILE = ", where you came from in your Practice profile";
 
 /** One practice group or one practice. */
 export interface ComparisonRow {
@@ -38,9 +41,14 @@ export interface WorkspaceComparisonTableProps {
 	subjectHead: string;
 	state: ComparisonTableState;
 	/** The link at the row's end, which a press anywhere on the row also follows. */
-	rowLink: (row: ComparisonRow) => Omit<PracticeTableRowLink, "name">;
+	rowLink: (row: ComparisonRow) => { text: string; onOpen: () => void };
 	/** The row whose level is open over the page. */
 	openKey?: string;
+	/**
+	 * The row the reader came from in their Practice profile. It wears the same bar as an open
+	 * row, but says so in words too: `aria-current` and a hidden sentence, since no level is open.
+	 */
+	markedKey?: string;
 	empty: { title: string; description: string };
 }
 
@@ -55,6 +63,7 @@ export function WorkspaceComparisonTable({
 	state,
 	rowLink,
 	openKey,
+	markedKey,
 	empty,
 }: WorkspaceComparisonTableProps) {
 	const rows = state.status === "ready" ? state.rows : [];
@@ -72,6 +81,8 @@ export function WorkspaceComparisonTable({
 				aria-label={label}
 				aria-describedby={nobodyYet ? reasonId : undefined}
 				columns={3}
+				// On a phone a row stacks as PracticeTable's do, so the bar never scrolls out of sight.
+				tableClassName={STACKED}
 				head={
 					<>
 						<TableHead className="w-96">{subjectHead}</TableHead>
@@ -84,9 +95,25 @@ export function WorkspaceComparisonTable({
 				rows={rows}
 				rowKey={(row) => row.key}
 				renderRow={(row) => (
-					<PracticeTableRow open={row.key === openKey} link={{ ...rowLink(row), name: row.name }}>
-						<SubjectCell badge={row.subject} className={OPEN_ROW_BAR} />
-						<TableCell className="align-top whitespace-normal">
+					<PracticeTableRow
+						open={row.key === openKey}
+						marked={row.key === markedKey}
+						link={{ ...rowLink(row), name: row.name }}
+					>
+						<SubjectCell
+							badge={
+								row.key === markedKey ? (
+									<>
+										{row.subject}
+										<span className="sr-only">{CAME_FROM_YOUR_PROFILE}</span>
+									</>
+								) : (
+									row.subject
+								)
+							}
+							className={OPEN_ROW_BAR}
+						/>
+						<TableCell className="align-top whitespace-normal @max-[38rem]:basis-full">
 							{nobodyYet ? (
 								<EmptyTrack />
 							) : (
@@ -100,12 +127,17 @@ export function WorkspaceComparisonTable({
 				loadingRow={
 					<>
 						<TableCell>
-							<Skeleton className="h-5 w-48 rounded-full" />
+							<span className="flex items-center gap-2">
+								<Skeleton className="size-4 shrink-0 rounded-full" />
+								<Skeleton className="h-4 w-48" />
+							</span>
 						</TableCell>
-						<TableCell className="align-top">
+						<TableCell className="align-top whitespace-normal @max-[38rem]:basis-full">
 							<WorkspaceSplitBarSkeleton />
 						</TableCell>
-						<TableCell />
+						<TableCell>
+							<Skeleton className="ml-auto h-4 w-24" />
+						</TableCell>
 					</>
 				}
 			/>

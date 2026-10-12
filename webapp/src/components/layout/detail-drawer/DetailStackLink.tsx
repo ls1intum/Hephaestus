@@ -2,6 +2,7 @@ import { Link, type LinkComponentProps, useSearch } from "@tanstack/react-router
 
 import {
 	type DetailStackEntry,
+	detailEntryState,
 	detailStackKey,
 	type OpenInStackOptions,
 	openInStack,
@@ -29,12 +30,13 @@ export interface DetailStackLinkProps
 export function DetailStackLink({
 	entry,
 	swap = false,
+	single = false,
 	levelSearch,
 	...props
 }: DetailStackLinkProps) {
 	const current = useSearch({ strict: false, select: (search) => stackInSearch(search.detail) });
 	const key = detailStackKey(entry);
-	const { detail, pushed } = openInStack(current, key, { swap });
+	const { detail, pushed } = openInStack(current, key, { swap, single });
 	// A link to the level already in front changes nothing, so it must not rewrite that entry's mark;
 	// nor does a swap, which stands in for the level it replaces (`OpenInStackOptions.swap`).
 	const keepsEntry = current.at(-1) === key || swap;
@@ -43,7 +45,7 @@ export function DetailStackLink({
 			to="."
 			search={(previous: Record<string, unknown>) => ({ ...previous, ...levelSearch, detail })}
 			// See `useDetailStack`: marks a level this visit pushed, so its dismiss can go back.
-			state={(previous) => (keepsEntry ? previous : { ...previous, detailPush: pushed })}
+			state={(previous) => (keepsEntry ? previous : detailEntryState(previous, pushed, false))}
 			replace={keepsEntry}
 			// Omitted from the props above too: opening a panel must never move the page underneath it,
 			// and a caller that could pass this could reintroduce that.

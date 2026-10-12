@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent } from "storybook/test";
+import { expect, userEvent, waitFor } from "storybook/test";
 
+import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
+import { withProvider } from "@/stories/decorators";
 import { settledPopup } from "@/stories/overlay";
 
 import { statusValues } from "@/components/common/status-def";
@@ -16,6 +18,7 @@ const meta = {
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
 	args: { standing: "STRENGTH", scope: "group" },
+	decorators: [withProvider("GITHUB")],
 } satisfies Meta<typeof StandingBadge>;
 
 export default meta;
@@ -53,33 +56,105 @@ const fourPieces = {
 	opportunities: 8,
 	opportunitiesUntilComparable: 0,
 	previousOpportunities: 4,
-	reviewedWork: 4,
-	ropeHalfWidth: 0.15,
 	standingWork: 4,
+	reviewedWork: 11,
+	reviewedWorkKind: ARTIFACT_KIND.pullRequest,
+	ropeHalfWidth: 0.15,
 };
 
-/** A settled standing names how many pieces of work it is read from, beside the badge. */
+/**
+ * A settled standing names the work it is read from in its sentence, never beside the badge: the
+ * newest reviewed pull requests it reads, and all the pull requests reviewed for the practice.
+ */
 export const WithItsWork: Story = {
-	args: { support: fourPieces },
+	args: { scope: "practice", support: fourPieces },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("from 4 pieces of work")).toBeVisible();
+		// No count beside the badge: it lives in the sentence, which a screen reader hears too.
+		const SR_ONLY = { ignore: "script, style, .sr-only" };
+		await expect(canvas.queryByText(/pieces? of work|pull requests/u, SR_ONLY)).toBeNull();
+		await expect(canvas.getByRole("button", { name: "Going well" })).toHaveAccessibleDescription(
+			/11 pull requests were reviewed for this practice/u,
+		);
 		await userEvent.hover(canvas.getByRole("button", { name: "Going well" }));
 		const tooltip = await settledPopup();
 		await expect(tooltip).toHaveTextContent(
-			"Recent reviews here were almost entirely positive. Read from four pieces of work.",
+			"Recent reviews here were almost entirely positive. Read from your last 4 reviewed pull requests. In the last 90 days, 11 pull requests were reviewed for this practice.",
+		);
+	},
+};
+
+/** A group counts its practices' work once each, in the same two sentences. */
+export const GroupWork: Story = {
+	args: { support: { ...fourPieces, standingWork: 6, reviewedWork: 15 } },
+	play: async ({ canvas }) => {
+		await userEvent.hover(canvas.getByRole("button", { name: "Going well" }));
+		const tooltip = await settledPopup();
+		await expect(tooltip).toHaveTextContent(
+			"Read from the last reviewed pull requests of each practice here, 6 in all. In the last 90 days, 15 pull requests were reviewed for this group.",
 		);
 	},
 };
 
 /** Fewer than three pieces of work: the sentence behind the badge calls the standing an early read. */
 export const EarlyRead: Story = {
-	args: { support: { ...fourPieces, currentOpportunities: 1 } },
+	args: { scope: "practice", support: { ...fourPieces, standingWork: 1, reviewedWork: 1 } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("from 1 piece of work")).toBeVisible();
+		await expect(
+			canvas.queryByText(/pieces? of work|pull request/u, { ignore: "script, style, .sr-only" }),
+		).toBeNull();
 		await userEvent.hover(canvas.getByRole("button", { name: "Going well" }));
 		const tooltip = await settledPopup();
-		await expect(tooltip).toHaveTextContent("An early read from one piece of work.");
+		await expect(tooltip).toHaveTextContent(
+			"An early read from the only pull request reviewed for this practice in the last 90 days.",
+		);
 		await expect(tooltip).not.toHaveTextContent("almost entirely positive");
+	},
+};
+
+/** On GitLab the same sentence counts merge requests. */
+export const OnGitLab: Story = {
+	args: { scope: "practice", support: fourPieces },
+	decorators: [withProvider("GITLAB")],
+	play: async ({ canvas }) => {
+		await userEvent.tab();
+		await expect(canvas.getByRole("button", { name: "Going well" })).toHaveFocus();
+		const tooltip = await settledPopup();
+		await expect(tooltip).toHaveTextContent("Read from your last 4 reviewed merge requests.");
+	},
+};
+
+/**
+ * A tap opens the sentence and a second tap closes it: the sentence is a popover, as every (i)
+ * button's is, since a tooltip never opens on touch.
+ */
+export const TapToRead: Story = {
+	args: { scope: "practice", support: fourPieces },
+	play: async ({ canvas }) => {
+		const badge = canvas.getByRole("button", { name: "Going well" });
+		await userEvent.pointer({ keys: "[TouchA]", target: badge });
+		const popup = await settledPopup();
+		await expect(popup).toHaveTextContent("11 pull requests were reviewed for this practice.");
+		await expect(badge).toHaveAttribute("aria-expanded", "true");
+		await userEvent.pointer({ keys: "[TouchA]", target: badge });
+		await waitFor(async () => {
+			await expect(document.querySelector("[data-slot='popover-content']")).toBeNull();
+		});
+	},
+};
+
+/** Focus from the keyboard opens the sentence, and Escape closes it with the focus left on the badge. */
+export const EscapeCloses: Story = {
+	args: { scope: "practice", support: fourPieces },
+	play: async ({ canvas }) => {
+		await userEvent.tab();
+		const badge = canvas.getByRole("button", { name: "Going well" });
+		await expect(badge).toHaveFocus();
+		await expect(await settledPopup()).toHaveTextContent("Read from your last 4 reviewed");
+		await userEvent.keyboard("{Escape}");
+		await waitFor(async () => {
+			await expect(document.querySelector("[data-slot='popover-content']")).toBeNull();
+		});
+		await expect(badge).toHaveFocus();
 	},
 };
 

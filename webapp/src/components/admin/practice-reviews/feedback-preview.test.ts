@@ -1,99 +1,78 @@
 import { describe, expect, it } from "vitest";
 
 import { feedbackDisplayMarkdown } from "./feedback-display";
-import { feedbackPreviewText } from "./feedback-preview";
+import { feedbackOpeningLine } from "./feedback-preview";
 
-const preview = (bodyPreview: string | undefined, bodyTruncated = false) =>
-	feedbackPreviewText({ bodyPreview, bodyTruncated });
-
-describe("feedbackPreviewText", () => {
+describe("feedbackOpeningLine", () => {
 	it("returns a plain sentence unchanged", () => {
-		expect(preview("You kept the controller focused.")).toBe("You kept the controller focused.");
+		expect(feedbackOpeningLine("You kept the controller focused.")).toBe(
+			"You kept the controller focused.",
+		);
 	});
 
-	it("reports no text when the feedback carries no body", () => {
-		expect(preview(undefined)).toBeUndefined();
-	});
-
-	it("marks a body the server cut short", () => {
-		expect(preview("The lookup collapses two failures", true)).toBe(
-			"The lookup collapses two failures…",
+	it("keeps the whole first line with no ellipsis, since the sheet shows the rest", () => {
+		expect(feedbackOpeningLine("2 issues to tighten.\n\n- The lookup collapses two failures")).toBe(
+			"2 issues to tighten.",
 		);
 	});
 
 	it("unwraps headings, emphasis and inline code", () => {
-		expect(preview("## What worked\n\nThe **controller** stays `focused` on HTTP.")).toBe(
-			"What worked The controller stays focused on HTTP.",
+		expect(feedbackOpeningLine("## What worked\n\nThe controller stays.")).toBe("What worked");
+		expect(feedbackOpeningLine("The **controller** stays `focused` on HTTP.")).toBe(
+			"The controller stays focused on HTTP.",
 		);
 	});
 
 	it("keeps a link's words and drops its target", () => {
 		expect(
-			preview("See [the naming guideline](https://example.com/guide) for the longer version."),
+			feedbackOpeningLine(
+				"See [the naming guideline](https://example.com/guide) for the longer version.",
+			),
 		).toBe("See the naming guideline for the longer version.");
 	});
 
 	it("leaves out a fenced code block, and the line that introduced it", () => {
-		expect(preview("You wrote:\n\n```java\nreturn null;\n```\n\nPrefer an Optional.")).toBe(
-			"Prefer an Optional…",
-		);
+		expect(
+			feedbackOpeningLine("You wrote:\n\n```java\nreturn null;\n```\n\nPrefer an Optional."),
+		).toBe("Prefer an Optional.");
 	});
 
 	it("keeps a lead-in that introduces prose rather than a block", () => {
-		expect(preview("Two options:\n\nRename it, or keep both for a release.")).toBe(
-			"Two options: Rename it, or keep both for a release.",
+		expect(feedbackOpeningLine("Two options:\n\nRename it, or keep both for a release.")).toBe(
+			"Two options:",
 		);
 	});
 
-	// The colon stays: it is what says the omitted thing was going to follow, which is the case here.
-	it("keeps the lead-in when the fence it introduced was all the preview had left", () => {
-		expect(preview("The lookup reads:\n\n```java\nreturn repository.findVisi", true)).toBe(
-			"The lookup reads:…",
+	// The colon stays: it is what says the omitted thing was going to follow.
+	it("keeps the lead-in when the fence it introduced was all the body had", () => {
+		expect(feedbackOpeningLine("The lookup reads:\n\n```java\nreturn repository.findVisi")).toBe(
+			"The lookup reads:",
 		);
+		expect(feedbackOpeningLine("Quoted:\n\n```md\n<sub>a footer</sub>\n```\n")).toBe("Quoted:");
 	});
 
-	it("drops the rule between two observations", () => {
-		expect(preview("First point.\n\n---\n\nSecond point.")).toBe("First point. Second point…");
-	});
-
-	it("flattens a bulleted list into the line", () => {
-		expect(preview("Two options:\n\n- rename the field\n- keep both for a release")).toBe(
-			"Two options: rename the field keep both for a release",
-		);
-	});
-
-	it("reports no text when the preview held nothing but a code fence", () => {
-		expect(preview("```java\nreturn null;\n```")).toBeUndefined();
-	});
-
-	it("leaves out the comment Hephaestus finds its copy by, even in a preview cut short", () => {
-		expect(preview(`${MARKER}\nThe lookup collapses two failures`, true)).toBe(
-			"The lookup collapses two failures…",
+	it("drops a rule and a list bullet", () => {
+		expect(feedbackOpeningLine("---\n\nSecond point.")).toBe("Second point.");
+		expect(feedbackOpeningLine("- rename the field\n- keep both for a release")).toBe(
+			"rename the field",
 		);
 	});
 
 	it.each(["\r\n", "\r"])("removes the transport marker with %j line endings", (ending) => {
 		const body = `${MARKER}${ending}Keep it focused.${ending}`;
 		expect(feedbackDisplayMarkdown(body)).toBe("Keep it focused.\n");
-		expect(preview(body)).toBe("Keep it focused.");
+		expect(feedbackOpeningLine(body)).toBe("Keep it focused.");
 	});
 
-	it("shows only the authored words of a short posted body", () => {
-		expect(preview(`${MARKER}\nKeep it focused.\n\n---\n${DISCLOSURE}\n${SETTINGS}\n`)).toBe(
-			"Keep it focused.",
-		);
-	});
-
-	it("leaves out a footer the cut ended inside", () => {
+	it("skips a code quote and hidden markers to the first line of prose", () => {
 		expect(
-			preview(`${MARKER}\nKeep it focused.\n\n---\n<sub>Practice review &middot; Mod`, true),
-		).toBe("Keep it focused…");
+			feedbackOpeningLine(`${MARKER}\n\`\`\`java\nreturn null;\n\`\`\`\n**Return** an empty list.`),
+		).toBe("Return an empty list.");
 	});
 
-	it("keeps a footer quoted in code to the existing quote handling", () => {
-		const body = `Quoted:\n\n\`\`\`md\n${DISCLOSURE}\n\`\`\`\n`;
-		expect(feedbackDisplayMarkdown(body)).toBe(body);
-		expect(preview(body)).toBe("Quoted:…");
+	it("reports no text when the feedback carries no body", () => {
+		expect(feedbackOpeningLine(undefined)).toBeUndefined();
+		expect(feedbackOpeningLine("```java\nreturn null;\n```")).toBeUndefined();
 	});
 });
 

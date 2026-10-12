@@ -10,9 +10,11 @@ import type { PracticeGroup } from "@/api/types.gen";
 import { combinePanelStates, queryLoadState } from "@/components/common/panel-state";
 import { parseDetailStack } from "@/components/layout/detail-drawer/detail-stack";
 import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
+import { isFocusSwitchStep } from "@/components/practice-focus/practice-focus";
+import { ProfileFocusFooter } from "@/components/practice-focus/profile-focus-footer";
+import { usePracticeFocusSwitch } from "@/components/practice-focus/use-practice-focus-switch";
 import {
 	composeGroupOverview,
-	composeNextStep,
 	composeOverview,
 } from "@/components/practice-profile/compose-overview";
 import {
@@ -48,9 +50,11 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/practice-
 	validateSearch: practiceProfileSearchSchema,
 	search: {
 		middlewares: [
-			retainSearchParams(PRACTICE_PROFILE_SEARCH_PARAMS),
-			// The shortest address that means the same is the one a reader shares.
+			// The shortest address that means the same is the one a reader shares. Outermost, so it
+			// also strips the defaults the retain below copies into a link that names no search,
+			// such as the sidebar's.
 			stripSearchParams(PRACTICE_PROFILE_SEARCH_DEFAULTS),
+			retainSearchParams(PRACTICE_PROFILE_SEARCH_PARAMS),
 		],
 	},
 });
@@ -64,12 +68,16 @@ function PracticeProfile() {
 	const search = Route.useSearch();
 
 	const detailStack = parseDetailStack(search.detail, PRACTICE_PROFILE_LEVEL_KINDS);
-	const stackControls = useDetailStack(detailStack, { levelParams: PRACTICE_PROFILE_LEVEL_PARAMS });
+	const stackControls = useDetailStack({
+		levelParams: PRACTICE_PROFILE_LEVEL_PARAMS,
+		replaceOnClose: isFocusSwitchStep,
+	});
 
 	const setView = (view: Partial<PracticeProfileSearch>) => stackControls.setView(view);
 
 	const featureState = useWorkspaceFeatures(workspaceSlug);
-	const { groups, groupStandings, practiceStandings, practicesByGroup, ...standings } =
+	const focusSwitch = usePracticeFocusSwitch(workspaceSlug);
+	const { groups, emptyGroups, groupStandings, practiceStandings, practicesByGroup, ...standings } =
 		usePracticeStandings(workspaceSlug);
 	const { overview, ...overviewQuery } = usePracticeProfileOverview(workspaceSlug);
 	// The cards: read here, which is also what delivers the unread ones — so the read waits for a
@@ -131,7 +139,7 @@ function PracticeProfile() {
 	return (
 		<>
 			<PracticeProfilePage
-				overview={composed}
+				latestRun={composed.latestRun}
 				practices={practiceStandings}
 				groups={groups}
 				feedbackCards={feedback.cards}
@@ -155,13 +163,11 @@ function PracticeProfile() {
 				}}
 				onClose={stackControls.close}
 				groups={groups}
+				emptyGroups={emptyGroups}
 				groupStandings={groupStandings}
 				state={page}
 				feedbackCards={feedback.cards}
-				groupOverview={(groupSlug) => ({
-					...composeGroupOverview(overview, groupSlug),
-					nextStep: composeNextStep(feedback.cards, groupSlug),
-				})}
+				groupOverview={(groupSlug) => composeGroupOverview(overview, groupSlug)}
 				ratingProps={readOnly ? undefined : feedback.ratingProps}
 				onOpenPractice={(practiceSlug) => stackControls.open(practiceLevel(practiceSlug))}
 				practiceTab={search.practiceTab}
@@ -208,6 +214,27 @@ function PracticeProfile() {
 					},
 				}}
 				onSelectionChange={setView}
+				// The way to the same group or practice across the workspace. Not in a user view,
+				// where that page would count the viewer instead of the developer.
+				levelFooter={
+					readOnly
+						? undefined
+						: (entry) => (
+								<ProfileFocusFooter
+									entry={entry}
+									stack={detailStack}
+									groupOf={(slug) =>
+										practiceStandings.find((each) => each.slug === slug)?.groupSlug
+									}
+									nameOf={(focus) =>
+										focus.practiceSlug === undefined
+											? groups.find((each) => each.slug === focus.groupSlug)?.name
+											: practiceStandings.find((each) => each.slug === focus.practiceSlug)?.name
+									}
+									onSwitch={focusSwitch.toWorkspace}
+								/>
+							)
+				}
 			/>
 		</>
 	);

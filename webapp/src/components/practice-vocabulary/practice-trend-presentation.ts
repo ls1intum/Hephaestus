@@ -1,16 +1,15 @@
 import type { TrendSupport } from "@/api/types.gen";
-import { andList, capitalise } from "@/lib/text";
+import { artifactKindNoun, type WorkProvider } from "@/lib/artifact-kinds";
+import { capitalise } from "@/lib/text";
 
 import { count as counted, spell } from "./feedback-text";
 import {
 	isSettledStanding,
-	PRACTICE_GROUP_STANDING_DEFS,
 	type PracticeGroupStandingValue,
 	standingDefs,
 	type StandingScope,
 } from "./practice-group-standing-defs";
 import type { TrendDirection } from "./practice-trend-defs";
-import { type StandingCounts, summarizeStandingCounts } from "./standing-counts";
 
 /** "four pieces of reviewed work", under the number rule of `feedback-text`. */
 function reviewedWork(count: number, digits?: boolean): string {
@@ -31,63 +30,84 @@ export function shownTrendDirection(
 /** Below this many decided pieces of work, a settled standing is an early read (product vocabulary). */
 export const EARLY_READ_BELOW = 3;
 
-/** The server's count of decided pieces a standing is read from; none when no live review counted. */
+/**
+ * How far back the profile reads a standing, in days: the server's look-back
+ * (`PracticeStandingService.LOOKBACK_DAYS`), which bounds the reviewed work a standing counts.
+ */
+export const STANDING_LOOKBACK_DAYS = 90;
+
+/**
+ * The server's count of the reviewed work a standing is read from: each practice's newest decided
+ * pieces, once each; none when no live review counted any.
+ */
 export function standingWork(support: TrendSupport | undefined): number | undefined {
-	const current = support?.currentOpportunities;
-	return current !== undefined && current > 0 ? current : undefined;
+	const work = support?.standingWork;
+	return work !== undefined && work > 0 ? work : undefined;
 }
 
-/** "from 3 pieces of work". */
-export function formatStandingWork(work: number): string {
-	return `from ${counted(work, "piece", "pieces", true)} of work`;
+/** "the only", "the two", "all four": every piece of work reviewed, as one count. */
+function allWork(work: number): string {
+	if (work === 1) {
+		return "the only";
+	}
+	return work < EARLY_READ_BELOW ? `the ${spell(work)}` : `all ${spell(work)}`;
 }
 
-/** The registry's sentence with its count, or the early-read sentence below {@link EARLY_READ_BELOW}. */
+/** Work of several kinds, or of a kind the wire does not name, as one noun. */
+const ANY_WORK = { one: "piece of work", many: "pieces of work" };
+
+/**
+ * The registry's sentence, then what the standing rests on: the newest reviewed work it is read
+ * from, and how much work was reviewed for the practice or the group in the look-back. Below
+ * {@link EARLY_READ_BELOW} pieces it is an early read and says so instead of the registry's words.
+ * A standing no live review counted keeps the registry's sentence alone.
+ *
+ * The work is named by its kind where every piece shares one ("pull requests", "merge requests" on
+ * GitLab), else as "pieces of work". Both counts come from the server, from the same live reviews
+ * the standing reads, so the sentence can never count more work than the observations show.
+ */
 export function explainStanding(
 	standing: PracticeGroupStandingValue,
 	scope: StandingScope,
 	support: TrendSupport | undefined,
+	provider?: WorkProvider,
 ): string {
 	const { description } = standingDefs(scope)[standing];
 	const work = isSettledStanding(standing) ? standingWork(support) : undefined;
-	if (work === undefined) {
+	if (work === undefined || support === undefined) {
 		return description;
 	}
-	const pieces = `${counted(work, "piece", "pieces")} of work`;
+	const reviewed = Math.max(support.reviewedWork, work);
+	const kind = support.reviewedWorkKind;
+	const noun = (n: number) => {
+		if (kind !== undefined) {
+			return artifactKindNoun(kind, n, provider);
+		}
+		return n === 1 ? ANY_WORK.one : ANY_WORK.many;
+	};
+	const subject = scope === "group" ? "this group" : "this practice";
+	const window = `in the last ${STANDING_LOOKBACK_DAYS} days`;
+
+	if (reviewed === work) {
+		const all = allWork(work);
+		const read = `${all} ${noun(work)} reviewed for ${subject} ${window}.`;
+		return work < EARLY_READ_BELOW
+			? `An early read from ${read}`
+			: `${description} Read from ${read}`;
+	}
+
+	// Two counts in one sentence pair: both digits as soon as either reaches ten.
+	const digits = reviewed >= 10;
+	const latest =
+		scope === "group"
+			? `the last reviewed ${noun(2)} of each practice here, ${spell(work, digits)} in all`
+			: `your last ${spell(work, digits)} reviewed ${noun(work)}`;
+	const total = `In the last ${STANDING_LOOKBACK_DAYS} days, ${spell(reviewed, digits)} ${noun(reviewed)} ${
+		reviewed === 1 ? "was" : "were"
+	} reviewed for ${subject}.`;
 	return work < EARLY_READ_BELOW
-		? `An early read from ${pieces}.`
-		: `${description} Read from ${pieces}.`;
-}
-
-/**
- * How a settled practice standing weighs its work. Nothing for one piece, which has nothing to
- * weigh against.
- */
-export function formatStandingBasis(support: TrendSupport): string | undefined {
-	const current = support.currentOpportunities;
-	if (current === 0) {
-		return "Read from a review that you asked for or a review of your past work. Neither moves a trend.";
-	}
-	return current === 1 ? undefined : "Your latest work counts most, and older work counts less.";
-}
-
-/**
- * What a group's standing rests on: its practices counted by standing, in the registry's order —
- * "Of five practices, two need attention, one shows mixed feedback and two are going well." — the
- * same counts the ring beside the title draws. Nothing to name for a group with no practices.
- */
-export function formatGroupStandingBasis(counts: StandingCounts): string | undefined {
-	const present = summarizeStandingCounts(counts);
-	const total = present.reduce((sum, { count }) => sum + count, 0);
-	if (total === 0) {
-		return undefined;
-	}
-	const digits = total >= 10;
-	const parts = present.map(({ standing, count }) => {
-		const { one, many } = PRACTICE_GROUP_STANDING_DEFS[standing].predicate;
-		return counted(count, one, many, digits);
-	});
-	return `Of ${counted(total, "practice", "practices", digits)}, ${andList.format(parts)}.`;
+		? `An early read from ${latest}. ${total}`
+		: `${description} Read from ${latest}. ${total}`;
 }
 
 export function formatTrendProvenance(

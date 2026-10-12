@@ -1165,7 +1165,9 @@ const overviewWindowSchemaResponseTransformer = (data: any) => {
 
 const practiceProfileOverviewSchemaResponseTransformer = (data: any) => {
     data.changes = data.changes.map((item: any) => profileChangeSchemaResponseTransformer(item));
-    data.holdingUp = data.holdingUp.map((item: any) => heldPracticeSchemaResponseTransformer(item));
+    if (data.holdingUp) {
+        data.holdingUp = data.holdingUp.map((item: any) => heldPracticeSchemaResponseTransformer(item));
+    }
     if (data.latestRun) {
         data.latestRun = reviewRunRefSchemaResponseTransformer(data.latestRun);
     }

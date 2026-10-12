@@ -1,4 +1,4 @@
-import { type ReactNode, useLayoutEffect, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 
@@ -23,11 +23,12 @@ export interface DetailDrawerStackProps<TKind extends string = string> {
 	guardedKinds?: readonly TKind[];
 	/** Called with the depth to close down to — `close(0)` dismisses the whole stack. */
 	onClose: (depth: number) => void;
-	/**
-	 * Panel width preset for every level; "detailWide" for surfaces that need most of the viewport.
-	 */
-	size?: "detail" | "detailWide";
 	children: (entry: DetailStackEntry<TKind>, level: DetailDrawerLevel) => ReactNode;
+	/**
+	 * What a level shows under its body, after whatever `children` draws for it: one place for a
+	 * footer every level of a surface shares, so no level has to carry it.
+	 */
+	footer?: (entry: DetailStackEntry<TKind>) => ReactNode;
 }
 
 /**
@@ -41,6 +42,11 @@ export interface DetailDrawerStackProps<TKind extends string = string> {
  * read off the press's position, because the front level's viewport covers the whole screen and
  * is what every outside press lands on.
  *
+ * Every level of every stack is the same panel, the `detail` preset: one width, so a level over
+ * another covers it to the same depth and leaves the same column of it showing, whichever surface
+ * and kind it is. A width a level picked for itself would move that edge, and the Practice profile,
+ * Practices across the workspace and Practice reviews would each step back differently.
+ *
  * A dismissal shuts the drawer first and navigates when the exit animation ends, so the URL lags it:
  * dropping the level first would render it with an entry the caller no longer has data for. Clearing
  * the close before the stack catches up re-opens the level that just left.
@@ -49,7 +55,7 @@ export function DetailDrawerStack<TKind extends string>({
 	stack,
 	guardedKinds,
 	onClose,
-	size = "detail",
+	footer,
 	children,
 }: DetailDrawerStackProps<TKind>) {
 	const [closing, setClosing] = useState<{ depth: number; key: string } | null>(null);
@@ -66,6 +72,8 @@ export function DetailDrawerStack<TKind extends string>({
 		setClosing(key === undefined ? null : { depth, key });
 	};
 
+	useFocusReturn(stack.length > 0);
+
 	// Mounting is the arrival `useArrived` needs; a component left mounted on `null` has already
 	// spent its first render.
 	if (stack.length === 0) {
@@ -79,7 +87,7 @@ export function DetailDrawerStack<TKind extends string>({
 			closingDepth={closingDepth}
 			setClosingDepth={setClosingDepth}
 			onClose={onClose}
-			size={size}
+			footer={footer}
 		>
 			{children}
 		</DetailDrawerLevelView>
@@ -100,7 +108,7 @@ function DetailDrawerLevelView<TKind extends string>({
 	closingDepth,
 	setClosingDepth,
 	onClose,
-	size = "detail",
+	footer,
 	children,
 }: DetailDrawerLevelViewProps<TKind>) {
 	const entry = stack[depth];
@@ -142,8 +150,9 @@ function DetailDrawerLevelView<TKind extends string>({
 				onClose(depth);
 			}}
 		>
-			<DrawerContent size={size} dimWhenNested={false} data-detail-depth={depth}>
+			<DrawerContent size="detail" dimWhenNested={false} data-detail-depth={depth}>
 				{children(entry, { depth, nested: depth > 0 })}
+				{footer?.(entry)}
 				{child && (
 					<DetailDrawerLevelView
 						depth={depth + 1}
@@ -152,7 +161,7 @@ function DetailDrawerLevelView<TKind extends string>({
 						closingDepth={closingDepth}
 						setClosingDepth={setClosingDepth}
 						onClose={onClose}
-						size={size}
+						footer={footer}
 					>
 						{children}
 					</DetailDrawerLevelView>
@@ -200,4 +209,51 @@ function useArrived(): boolean {
 	// oxlint-disable-next-line react/set-state-in-effect -- The extra render is the point: the closed frame has to be committed before the level opens, which is the only way Base UI runs its enter transition.
 	useLayoutEffect(() => setArrived(true), []);
 	return arrived;
+}
+
+/**
+ * Gives focus back to what opened the stack once the last level has gone: the row, link or button
+ * the reader left from, so a keyboard reader continues where they were. URL-controlled navigation
+ * can blur that control before the popup mounts; this covers that case only when the framework
+ * has not already returned focus to a connected target.
+ *
+ * The opener is the last element focused before the first level opened. Focus while a level is
+ * open is never the opener, even outside every level: a Select, menu or popover inside a level is
+ * portalled beside its dialog, not into it. An opener the page has since removed, or a reader who
+ * already moved focus elsewhere, is left alone.
+ */
+function useFocusReturn(open: boolean) {
+	const opener = useRef<HTMLElement | null>(null);
+	const isOpen = useRef(open);
+	useLayoutEffect(() => {
+		isOpen.current = open;
+	}, [open]);
+	useEffect(() => {
+		const remember = ({ target }: FocusEvent) => {
+			// The dialog check covers focus a level takes before the effect above has run.
+			if (
+				!isOpen.current &&
+				target instanceof HTMLElement &&
+				target.closest('[role="dialog"]') === null
+			) {
+				opener.current = target;
+			}
+		};
+		document.addEventListener("focusin", remember);
+		return () => document.removeEventListener("focusin", remember);
+	}, []);
+	const wasOpen = useRef(open);
+	useEffect(() => {
+		const closed = wasOpen.current && !open;
+		wasOpen.current = open;
+		if (!closed) {
+			return;
+		}
+		const target = opener.current;
+		const active = document.activeElement;
+		const unclaimed = active === null || active === document.body || !active.isConnected;
+		if (target?.isConnected === true && unclaimed) {
+			target.focus({ preventScroll: true });
+		}
+	}, [open]);
 }

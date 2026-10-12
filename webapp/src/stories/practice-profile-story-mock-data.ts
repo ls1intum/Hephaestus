@@ -1,8 +1,8 @@
 /**
  * The developer's practice profile as the wire carries it, for the stories and the tests: the
  * reviewed work every practice-profile fixture names, the workspace's groups, the developer's
- * standing in each and on each practice, and one overview — the events behind the Heph card, the
- * group and practice sentences and the latest-run chip — on the same groups and practices as the
+ * standing in each and on each practice, and one overview — the events behind the group and practice
+ * sentences and the latest-run chip — on the same groups and practices as the
  * feedback card fixtures. The pages read the server.
  */
 import type {
@@ -428,7 +428,6 @@ const REVIEWING_CHANGES: ProfileChange[] = [
 export const SHARED_TRANSITION_OVERVIEW: PracticeProfileOverview = {
 	latestRun: { reviewId: "run-2026-09-09", at: LATEST_RUN_AT, reviewedWork: pullRequest(22) },
 	window: { since: inStoryYear("09-02T09:00"), until: LATEST_RUN_AT },
-	holdingUp: [],
 	changes: [
 		change(
 			"TREND_TURNED",
@@ -487,50 +486,11 @@ export const SHARED_TRANSITION_OVERVIEW: PracticeProfileOverview = {
 			evidence: [pullRequest(21)],
 		}),
 	],
-	reviewedWork: [pullRequest(21), pullRequest(22)],
 };
 
 /** The overview the stories show: one run, eleven changes, one of them a group moving. */
 export const OVERVIEW_FIXTURE: PracticeProfileOverview = {
 	latestRun: { reviewId: "run-2026-09-09", at: LATEST_RUN_AT, reviewedWork: pullRequest(22) },
 	window: { since: inStoryYear("09-02T09:00"), until: LATEST_RUN_AT },
-	holdingUp: [
-		{
-			practiceSlug: "ready-and-traceable-handoff",
-			practiceName: "Mark the change ready and link its issue",
-			groupSlug: PACKAGING.groupSlug,
-			holdsAs: "every pull request names its issue",
-			cleanWork: 9,
-			workKind: ARTIFACT_KIND.pullRequest,
-			since: inStoryYear("07-14T10:00"),
-		},
-		{
-			practiceSlug: "engaging-with-inline-review-comments",
-			practiceName: "Respond to each review comment",
-			groupSlug: "acting-on-review-feedback",
-			holdsAs: "every reviewer comment gets a visible answer",
-			cleanWork: 4,
-			workKind: ARTIFACT_KIND.pullRequest,
-			since: inStoryYear("08-20T10:00"),
-		},
-		{
-			practiceSlug: "commit-subjects-explain-each-change",
-			practiceName: "Write commit subjects a reviewer can follow",
-			groupSlug: PACKAGING.groupSlug,
-			holdsAs: "subjects name the change, not the file",
-			cleanWork: 6,
-			workKind: ARTIFACT_KIND.pullRequest,
-			since: inStoryYear("08-05T10:00"),
-		},
-	],
 	changes: [...PACKAGING_CHANGES, ...COMMUNICATION_CHANGES, ...REVIEWING_CHANGES],
-	reviewedWork: [
-		...[19, 20, 21, 22].map(pullRequest),
-		conversation("#releases"),
-		conversation("#incidents"),
-		conversation("#backend-review"),
-		issue(13),
-		issue(14),
-		{ id: "doc-7", kind: ARTIFACT_KIND.document, label: "Queue retry policy" },
-	],
 };

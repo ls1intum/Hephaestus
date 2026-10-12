@@ -23,12 +23,17 @@ function SheetPortal({ ...props }: SheetPrimitive.Portal.Props) {
 	return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />;
 }
 
+/**
+ * ⚠️ Diverges from the shadcn registry, which blurs the page behind a sheet: the backdrop is the
+ * detail drawer's own, `bg-scrim` and never blurred (`ui/drawer.tsx`, point 6). A sheet is a side
+ * panel like a detail level, and the page beside it stays as readable as it does beside one.
+ */
 function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
 	return (
 		<SheetPrimitive.Backdrop
 			data-slot="sheet-overlay"
 			className={cn(
-				"fixed inset-0 z-50 bg-black/10 duration-100 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+				"fixed inset-0 z-50 bg-scrim duration-100 data-ending-style:opacity-0 data-starting-style:opacity-0 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
 				className,
 			)}
 			{...props}

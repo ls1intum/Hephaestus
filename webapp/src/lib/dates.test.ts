@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
 	asDate,
+	durationBetween,
+	durationText,
 	formatCalendarDate,
 	formatDayRange,
 	formatDayTime,
@@ -125,5 +127,41 @@ describe("formatCalendarDate", () => {
 		expect(wireDate.getDate()).toBe(8);
 
 		expect(formatCalendarDate(wireDate)).toBe("9 September 2026");
+	});
+});
+
+describe("durationText", () => {
+	it("says seconds under a minute and whole minutes under an hour", () => {
+		expect(durationText(0)).toBe("0 s");
+		expect(durationText(41)).toBe("41 s");
+		expect(durationText(89)).toBe("1 min");
+		expect(durationText(3540)).toBe("59 min");
+	});
+
+	it("adds the next smaller unit from an hour", () => {
+		expect(durationText(3600)).toBe("1 h");
+		expect(durationText(9000)).toBe("2 h 30 min");
+		expect(durationText(183_600)).toBe("2 d 3 h");
+	});
+
+	it("rounds before it picks the units, so it never says 60 of a smaller one", () => {
+		expect(durationText(3570)).toBe("1 h");
+		expect(durationText(7170)).toBe("2 h");
+		expect(durationText(171_000)).toBe("2 d");
+		expect(durationText(86_370)).toBe("1 d");
+	});
+
+	it("never says a negative duration", () => {
+		expect(durationText(-5)).toBe("0 s");
+	});
+});
+
+describe("durationBetween", () => {
+	it("says the time between two moments whichever comes first", () => {
+		const from = new Date("2026-07-28T10:00:00Z");
+		const to = new Date("2026-07-28T11:17:00Z");
+		expect(durationBetween(from, to)).toBe("1 h 17 min");
+		expect(durationBetween(to, from)).toBe("1 h 17 min");
+		expect(durationBetween(from, from)).toBe("0 s");
 	});
 });

@@ -26,18 +26,18 @@ export const Empty: Story = {
 export const StartOnly: Story = {
 	args: { value: { from: new Date(2026, 6, 1) } },
 	play: async ({ canvas }) => {
-		await expect(await canvas.findByText("From Jul 1, 2026")).toBeVisible();
+		await expect(await canvas.findByText("From 1 Jul 2026")).toBeVisible();
 		// The applied range is in the accessible name too, so the control reads the same to a screen
-		// reader as it looks: "Observed: From Jul 1, 2026".
-		canvas.getByRole("button", { name: "Observed: From Jul 1, 2026" });
+		// reader as it looks: "Observed: From 1 Jul 2026".
+		canvas.getByRole("button", { name: "Observed: From 1 Jul 2026" });
 	},
 };
 
 export const FullRange: Story = {
 	args: { title: "Composed", value: { from: new Date(2026, 6, 1), to: new Date(2026, 6, 24) } },
 	play: async ({ canvas }) => {
-		await expect(await canvas.findByText("Jul 1 – Jul 24, 2026")).toBeVisible();
-		canvas.getByRole("button", { name: "Composed: Jul 1 – Jul 24, 2026" });
+		await expect(await canvas.findByText("1 Jul – 24 Jul 2026")).toBeVisible();
+		canvas.getByRole("button", { name: "Composed: 1 Jul – 24 Jul 2026" });
 	},
 };
 
@@ -70,5 +70,21 @@ export const NothingToClear: Story = {
 		await userEvent.click(await canvas.findByRole("button", { name: "Observed" }));
 		await screen.findByRole("grid");
 		await expect(screen.queryByRole("button", { name: "Clear selection" })).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * Every date this control filters already happened, so the calendar ends today: the next month is
+ * out of reach and no later day can be picked.
+ */
+export const EndsToday: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas }) => {
+		await userEvent.click(await canvas.findByRole("button", { name: "Observed" }));
+		await screen.findByRole("grid");
+		await expect(screen.getByRole("button", { name: /next month/iu })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
 	},
 };

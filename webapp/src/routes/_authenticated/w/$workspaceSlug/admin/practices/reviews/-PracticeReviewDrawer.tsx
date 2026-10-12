@@ -6,105 +6,129 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
 	getAgentJobOptions,
 	getAgentJobQueryKey,
 	getArtifactTraceOptions,
-	getArtifactTraceQueryKey,
+	getPracticeDefinitionOptionsOptions,
+	getPracticeReviewWorkFactsOptions,
 	listGroupsOptions,
-	listPracticeReviewFeedbackOptions,
-	listPracticeReviewFeedbackQueryKey,
 	listPracticeReviewObservationsOptions,
-	listPracticeReviewObservationsQueryKey,
+	listPracticeReviewsOptions,
+	listPracticeRevisionsOptions,
 	listPracticesOptions,
+	listTracedArtifactsOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type { AgentJob, ArtifactTrace, Practice, TracedSignal } from "@/api/types.gen";
+import { getPracticeReviewWorkFacts } from "@/api/sdk.gen";
+import type {
+	AgentJob,
+	ArtifactTrace,
+	GetPracticeReviewWorkFactsResponse,
+	ReviewLineage,
+	ReviewWorkFacts,
+	TracedSignal,
+} from "@/api/types.gen";
 import { FeedbackLevel } from "@/components/admin/practice-reviews/FeedbackLevel";
+import { REVIEWABLE_ON_DEMAND } from "@/components/admin/practice-reviews/job-utils";
 import { ObservationLevel } from "@/components/admin/practice-reviews/ObservationLevel";
-import { PracticeLevel } from "@/components/admin/practice-reviews/PracticeLevel";
+import {
+	PracticeLevel,
+	type PracticeLevelProps,
+} from "@/components/admin/practice-reviews/PracticeLevel";
+import { REQUEST_BLOCKED } from "@/components/admin/practice-reviews/RequestReviewAction";
+import {
+	levelRecord,
+	type RecordRef,
+	workOfRecord,
+} from "@/components/admin/practice-reviews/review-layers";
 import {
 	feedbackLevel,
 	PRACTICE_REVIEW_LEVEL_LABELS,
 	type PracticeReviewLevel,
-	parseWorkLevel,
-	practiceLevel,
 } from "@/components/admin/practice-reviews/review-levels";
-import { rangeScope } from "@/components/admin/practice-reviews/review-outcomes";
-import {
-	REVIEW_RANGE_DEFS,
-	type ReviewRange,
-	reviewRangeStart,
-} from "@/components/admin/practice-reviews/review-range";
-import {
-	ACTIVE_REVIEW_POLL_MS,
-	REVIEW_PREVIEW_SIZE,
-} from "@/components/admin/practice-reviews/review-search";
-import { toSectionState } from "@/components/admin/practice-reviews/review-states";
-import { ReviewedWorkLevel } from "@/components/admin/practice-reviews/ReviewedWorkLevel";
-import { ReviewLevelHeader } from "@/components/admin/practice-reviews/ReviewLevelHeader";
-import { ReviewRunLevel } from "@/components/admin/practice-reviews/ReviewRunLevel";
-import { MissingRecordEmpty } from "@/components/common/MissingRecordEmpty";
+import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
+import type { TraceNode } from "@/components/admin/practice-reviews/review-trace";
+import { ReviewLevel } from "@/components/admin/practice-reviews/ReviewLevel";
+import { useTraceDisplay } from "@/components/admin/practice-reviews/trace-display";
+import { ALL_STEPS, type TraceFilter } from "@/components/admin/practice-reviews/trace-filter";
+import { type TraceChainState, TraceLevel } from "@/components/admin/practice-reviews/TraceLevel";
+import { WorkLevel } from "@/components/admin/practice-reviews/WorkLevel";
 import { panelState } from "@/components/common/panel-state";
-import { useNow } from "@/components/common/use-now";
-import {
-	type DetailStackEntry,
-	detailStackKey,
-	stackInSearch,
-} from "@/components/layout/detail-drawer/detail-stack";
+import { detailStackKey, stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { levelPathAt } from "@/components/layout/detail-drawer/level-path";
 import { TraceRefusalAlert } from "@/components/practice-trace/TraceRefusalAlert";
-import { DrawerBody } from "@/components/ui/drawer";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import {
 	useApprovalQueue,
 	useFeedbackController,
 	useNextInApprovalQueue,
 } from "@/hooks/use-feedback-controller";
 import { useObservationController } from "@/hooks/use-observation-controller";
-import { usePracticeReviewOverview } from "@/hooks/use-practice-review-overview";
 import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
+import { type ReviewLineageTarget, useReviewLineage } from "@/hooks/use-review-lineage";
 import { useReviewRunController } from "@/hooks/use-review-run-controller";
-import { problemStatusOf } from "@/lib/problem-detail";
 import { useSearchState } from "@/lib/search-params";
-import { QUERY_RETRIES, sessionRetriesQueries } from "@/runtime/tanstack-query/query-defaults";
 
 export interface PracticeReviewDrawerProps {
 	workspaceSlug: string;
+	/** The open levels: a record's sheet, a trace, or a trace with one record's sheet over it. */
 	stack: PracticeReviewLevel[];
-	/** Opens a level over the one in front, for an opener that cannot be a link. */
-	onOpen: (entry: DetailStackEntry) => void;
 	onClose: (depth: number) => void;
-	/** The range a practice level counts. */
-	range: ReviewRange;
+	/** Opens a record's sheet over the trace, the one level a trace has above it. */
+	onOpenOverTrace: (record: RecordRef) => void;
 	/** The feedback level in front is the approval queue, opened as one from Needs you. */
 	approvalQueue: boolean;
 }
 
+const labelOf = (entry: PracticeReviewLevel) => PRACTICE_REVIEW_LEVEL_LABELS[entry.kind];
+
+/** The kinds of work whose provider facts the server keeps: pull or merge requests and issues. */
+const PROVIDER_FACT_KINDS = new Set(["scm.pull_request", "scm.issue"]);
+
+/** The facts a 200 carries; a 204, work in no monitored repository, reads as an empty body. */
+function providerFacts(
+	data: GetPracticeReviewWorkFactsResponse | undefined,
+): ReviewWorkFacts | undefined {
+	const body: unknown = data;
+	return carriesFacts(body) ? body : undefined;
+}
+
+/** The words HTTP gives the statuses this endpoint answers, for a response over HTTP/2 that has none. */
+const STATUS_TEXT: Readonly<Record<number, string>> = { 200: "OK", 204: "No Content" };
+
+/** "204 No Content from GET /workspaces/acme/practices/reviews/work/scm.pull_request/42". */
+function serverAnswer(response: Response): string {
+	const text = response.statusText === "" ? STATUS_TEXT[response.status] : response.statusText;
+	const status = text === undefined ? String(response.status) : `${response.status} ${text}`;
+	const path = URL.canParse(response.url) ? new URL(response.url).pathname : undefined;
+	return path === undefined ? status : `${status} from GET ${path}`;
+}
+
 /**
- * The records Practice reviews opens, as levels over its tabs. Each level reads its own record, so
- * this host fetches only what every level shares: the workspace's practices, for the hover card on
- * a practice's name and a practice level's title.
+ * The client hands an empty body over as `{}` or `null`, whatever the generated type says; neither
+ * carries a `state`.
+ */
+function carriesFacts(body: unknown): body is ReviewWorkFacts {
+	return typeof body === "object" && body !== null && Object.hasOwn(body, "state");
+}
+
+/**
+ * What Practice reviews opens over its tabs (`review-layers.ts`): one record's sheet from a row, a
+ * record's trace from a row's Trace, and from a step of the trace that step's record's sheet over
+ * it. Each level reads its own record. Every level is the stack's one width, as on the Practice
+ * profile, so a sheet over the trace leaves the same column of it in view as any level over another.
  */
 export function PracticeReviewDrawer({
 	workspaceSlug,
 	stack,
-	onOpen,
 	onClose,
-	range,
+	onOpenOverTrace,
 	approvalQueue,
 }: PracticeReviewDrawerProps) {
-	const practicesQuery = useQuery({
-		...listPracticesOptions({ path: { workspaceSlug } }),
-		enabled: stack.length > 0,
-	});
-	const practices = practicesQuery.data;
-	const labelOf = (entry: PracticeReviewLevel) =>
-		(entry.kind === "practice"
-			? practices?.find((practice) => practice.slug === entry.id)?.name
-			: undefined) ?? PRACTICE_REVIEW_LEVEL_LABELS[entry.kind];
 	const pathAt = levelPathAt(stack, { pageLabel: "Practice reviews", labelOf, onClose });
 	const setSearch = useSearchState();
 	const router = useRouter();
@@ -126,42 +150,42 @@ export function PracticeReviewDrawer({
 	};
 
 	return (
-		<DetailDrawerStack stack={stack} size="detailWide" onClose={onClose}>
+		<DetailDrawerStack
+			stack={stack}
+
+			onClose={onClose}
+		>
 			{(entry, level) => {
-				const shared = {
-					workspaceSlug,
-					nested: level.nested,
-					path: pathAt(level.depth),
-					practices,
-				};
-				switch (entry.kind) {
+				const record = levelRecord(entry);
+				if (record === undefined) {
+					return null;
+				}
+				const shared = { workspaceSlug, nested: level.nested, path: pathAt(level.depth) };
+				if (entry.kind === "trace") {
+					return <TraceLevelRead {...shared} record={record} onOpen={onOpenOverTrace} />;
+				}
+				switch (record.kind) {
 					case "review": {
-						return <ReviewLevelRead {...shared} jobId={entry.id} />;
+						return <ReviewLevelRead {...shared} reviewId={record.id} />;
 					}
 					case "observation": {
-						return <ObservationLevelRead {...shared} observationId={entry.id} />;
+						return <ObservationLevelRead {...shared} observationId={record.id} />;
 					}
 					case "feedback": {
 						return (
 							<FeedbackLevelRead
 								{...shared}
-								feedbackId={entry.id}
-								inQueue={approvalQueue}
-								onMoveOn={(next) => moveOn(entry.id, next)}
+								feedbackId={record.id}
+								inQueue={approvalQueue && level.depth === 0}
+								onMoveOn={(next) => moveOn(record.id, next)}
 							/>
 						);
 					}
 					case "work": {
-						return (
-							<WorkLevelRead
-								{...shared}
-								id={entry.id}
-								onOpenPractice={(practiceSlug) => onOpen(practiceLevel(practiceSlug))}
-							/>
-						);
+						return <WorkLevelRead {...shared} record={record} />;
 					}
 					case "practice": {
-						return <PracticeLevelRead {...shared} practiceSlug={entry.id} range={range} />;
+						return <PracticeLevelRead {...shared} practiceSlug={record.id} />;
 					}
 				}
 			}}
@@ -184,12 +208,278 @@ interface LevelReadProps {
 	workspaceSlug: string;
 	nested: boolean;
 	path: LevelPath;
-	practices: Practice[] | undefined;
 }
 
-function ReviewLevelRead({ jobId, ...props }: LevelReadProps & { jobId: string }) {
-	const run = useReviewRunController(props.workspaceSlug, jobId);
-	return <ReviewRunLevel {...props} {...run} />;
+// ------------------------------------------------------------------------------------------------
+// The trace
+// ------------------------------------------------------------------------------------------------
+
+/** The record a trace marks "You started here": the one it was opened for. A practice's is its newest observation. */
+function hereOf(record: RecordRef, newestObservation: string | undefined): TraceNode | undefined {
+	switch (record.kind) {
+		case "review": {
+			return { kind: "review" };
+		}
+		case "work": {
+			return { kind: "work" };
+		}
+		case "observation":
+		case "feedback": {
+			return { kind: record.kind, id: record.id };
+		}
+		case "practice": {
+			return newestObservation === undefined
+				? undefined
+				: { kind: "observation", id: newestObservation };
+		}
+	}
+}
+
+function lineageTarget(
+	record: RecordRef,
+	newestObservation: string | undefined,
+): ReviewLineageTarget | undefined {
+	switch (record.kind) {
+		case "review": {
+			return { kind: "REVIEW", id: record.id, whole: true };
+		}
+		case "observation": {
+			return { kind: "OBSERVATION", id: record.id, whole: true };
+		}
+		case "feedback": {
+			return { kind: "FEEDBACK", id: record.id, whole: true };
+		}
+		case "work": {
+			const work = workOfRecord(record);
+			return work === undefined ? undefined : { kind: "WORK", ...work, whole: true };
+		}
+		case "practice": {
+			return newestObservation === undefined
+				? undefined
+				: { kind: "OBSERVATION", id: newestObservation, whole: true };
+		}
+	}
+}
+
+/** What the trace's head calls what it stands on. */
+function traceTitle(
+	record: RecordRef,
+	lineage: ReviewLineage | undefined,
+	practiceName: string | undefined,
+): string {
+	const work = lineage?.work?.label ?? "the work";
+	switch (record.kind) {
+		case "review": {
+			return `Review of ${work}`;
+		}
+		case "observation": {
+			return (
+				lineage?.observations.find((observation) => observation.id === record.id)?.summary ??
+				PRACTICE_REVIEW_LEVEL_LABELS.observation
+			);
+		}
+		case "feedback": {
+			return `Feedback on ${work}`;
+		}
+		case "work": {
+			return lineage?.work?.title ?? lineage?.work?.label ?? PRACTICE_REVIEW_LEVEL_LABELS.work;
+		}
+		case "practice": {
+			return practiceName ?? PRACTICE_REVIEW_LEVEL_LABELS.practice;
+		}
+	}
+}
+
+/**
+ * A piece of work as recorded work, read before its chain: a chain is asked for only where one of
+ * its moments started a review, so the trace of work no review started on never asks for a chain it
+ * does not have. Any other record asks for its chain at once.
+ */
+function useRecordedWork(workspaceSlug: string, record: RecordRef) {
+	const work = workOfRecord(record);
+	const tracedOptions = listTracedArtifactsOptions({
+		path: { workspaceSlug },
+		query: { artifactKind: work?.artifactKind, artifactId: work?.artifactId, size: 1 },
+	});
+	const traced = useQuery({
+		...tracedOptions,
+		queryFn: work === undefined ? skipToken : tracedOptions.queryFn,
+	});
+	const recorded = traced.data?.content?.[0];
+	const withoutReview = traced.isSuccess && (recorded?.reviewedSignalCount ?? 0) === 0;
+	const askChain = work === undefined || !(traced.isPending || withoutReview);
+	return { work, traced, recorded, askChain };
+}
+
+/**
+ * One record's trace. A practice's trace is the story of its newest observation, narrowed to the
+ * practice; work none of whose moments started a review has no chain, and shows its latest moment.
+ * The filter is the reader's while the trace is open; what it shows on top of its steps is the
+ * reader's in this browser, for every trace. It marks the record it was opened for, and the mark
+ * stays there while other records open over it.
+ */
+function TraceLevelRead({
+	workspaceSlug,
+	nested,
+	path,
+	record,
+	onOpen,
+}: LevelReadProps & {
+	record: RecordRef;
+	onOpen: (record: RecordRef) => void;
+}) {
+	const practiceFilter: TraceFilter =
+		record.kind === "practice" ? { kind: "practice", practiceSlug: record.id } : ALL_STEPS;
+	const [display, setDisplay] = useTraceDisplay();
+	const [filter, setFilter] = useState<TraceFilter>(practiceFilter);
+
+	const newestOptions = listPracticeReviewObservationsOptions({
+		path: { workspaceSlug },
+		query: { practiceSlug: [record.id], size: 1 },
+	});
+	const newestQuery = useQuery({
+		...newestOptions,
+		queryFn: record.kind === "practice" ? newestOptions.queryFn : skipToken,
+	});
+	const newest = newestQuery.data?.content?.[0];
+	const practicesOptions = listPracticesOptions({ path: { workspaceSlug } });
+	const practices = useQuery({
+		...practicesOptions,
+		queryFn: record.kind === "practice" ? practicesOptions.queryFn : skipToken,
+	}).data;
+
+	const { work, traced, recorded, askChain } = useRecordedWork(workspaceSlug, record);
+	const lineage = useReviewLineage(
+		workspaceSlug,
+		askChain ? lineageTarget(record, newest?.id) : undefined,
+	);
+	const practicesEnabled = useActiveWorkspaceSlug().workspaces.find(
+		(workspace) => workspace.workspaceSlug === workspaceSlug,
+	)?.practicesEnabled;
+
+	let chain: TraceChainState = { status: "none" };
+	if (lineage !== undefined) {
+		chain = lineage;
+	} else if (record.kind === "practice" && newestQuery.isPending) {
+		chain = { status: "loading" };
+	} else if (work !== undefined) {
+		if (traced.isPending) {
+			chain = { status: "loading" };
+		} else if (recorded !== undefined) {
+			chain = { status: "unreviewed", work: recorded };
+		}
+	}
+
+	const ready = chain.status === "ready" ? chain.lineage : undefined;
+	// The review the trace tells, read as its sheet reads it: one source for its times, model,
+	// outcome and first read, and the cache the sheet over the trace shares.
+	const reviewId = ready?.review?.id;
+	const jobOptions = getAgentJobOptions({ path: { workspaceSlug, jobId: reviewId ?? "" } });
+	const job = useQuery({
+		...jobOptions,
+		queryFn: reviewId === undefined ? skipToken : jobOptions.queryFn,
+	}).data;
+	// The review's row, as its sheet reads it, for how the review came to run.
+	const rowOptions = listPracticeReviewsOptions({
+		path: { workspaceSlug },
+		query: { agentJobId: reviewId, size: 1 },
+	});
+	const row = useQuery({
+		...rowOptions,
+		queryFn: reviewId === undefined ? skipToken : rowOptions.queryFn,
+	}).data?.content?.[0];
+	const practiceName =
+		practices?.find((practice) => practice.slug === record.id)?.name ?? newest?.practiceName;
+	return (
+		<TraceLevel
+			nested={nested}
+			path={path}
+			title={traceTitle(record, ready, practiceName)}
+			description={
+				record.kind === "practice"
+					? "The trace of its newest observation, narrowed to the practice."
+					: undefined
+			}
+			chain={chain}
+			here={hereOf(record, newest?.id)}
+			onOpen={onOpen}
+			display={display}
+			onDisplayChange={setDisplay}
+			filter={filter}
+			onFilterChange={setFilter}
+			workRecord={record.kind === "work" ? record : undefined}
+			practicesEnabled={practicesEnabled}
+			job={job}
+			origin={row?.origin}
+			position={reviewPosition(row)}
+		/>
+	);
+}
+
+// ------------------------------------------------------------------------------------------------
+// The record sheets
+// ------------------------------------------------------------------------------------------------
+
+function ReviewLevelRead({
+	workspaceSlug,
+	reviewId,
+	...props
+}: LevelReadProps & { reviewId: string }) {
+	const run = useReviewRunController(workspaceSlug, reviewId);
+	const groups = useQuery(listGroupsOptions({ path: { workspaceSlug } })).data;
+	const summary = useQuery(
+		listPracticeReviewsOptions({
+			path: { workspaceSlug },
+			query: { agentJobId: reviewId, size: 1 },
+		}),
+	).data?.content?.[0];
+	// The sheet shows the work, so a refusal is said on it.
+	const request = useRequestPracticeReview(workspaceSlug, { showsInline: () => true });
+	const job = run.job.status === "ready" ? run.job.job : undefined;
+	const work = job?.target.reviewedWork;
+	const artifactId = Number(work?.id);
+	const requestable =
+		work !== undefined && REVIEWABLE_ON_DEMAND.has(work.kind) && Number.isSafeInteger(artifactId);
+	// The trace is this review's answers, so another review of the work is asked for by the list.
+	const activeOptions = listPracticeReviewsOptions({
+		path: { workspaceSlug },
+		query: { artifactKind: work?.kind, artifactId, status: ["QUEUED", "RUNNING"], size: 1 },
+	});
+	const activeQuery = useQuery({
+		...activeOptions,
+		queryFn: requestable ? activeOptions.queryFn : skipToken,
+	});
+	const otherActive = (activeQuery.data?.content?.length ?? 0) > 0;
+	return (
+		<ReviewLevel
+			{...props}
+			job={run.job}
+			summary={summary}
+			trace={run.trace}
+			groups={groups}
+			deliveryChecks={run.deliveryChecks}
+			usage={run.usage}
+			onCancel={run.onCancel}
+			cancelPending={run.cancelPending}
+			onRetryResultProcessing={run.onRetryResultProcessing}
+			retryResultProcessingPending={run.retryResultProcessingPending}
+			onRequestReview={
+				requestable ? () => request.ask({ artifactKind: work.kind, artifactId }) : undefined
+			}
+			requestingReview={request.asking !== undefined}
+			// Another ask while a review of this work waits or runs would only be coalesced into it.
+			requestBlocked={otherActive ? REQUEST_BLOCKED.active : undefined}
+			requestRefusal={
+				request.refusal && (
+					<TraceRefusalAlert
+						refusal={request.refusal.outcome}
+						workspaceSlug={workspaceSlug}
+						canAdminister
+					/>
+				)
+			}
+		/>
+	);
 }
 
 function ObservationLevelRead({
@@ -247,157 +537,152 @@ function FeedbackLevelRead({
 	return <FeedbackLevel {...props} {...controller} queue={queue} />;
 }
 
-/**
- * Three independent reads of the same work, kept independent all the way to the level: each part
- * shows its own result, so one endpoint failing costs the reader that part and not the level. The
- * trace is asked for without a review, which is every review of the work at once.
- */
 function WorkLevelRead({
-	id,
-	onOpenPractice,
+	workspaceSlug,
+	record,
 	...props
-}: LevelReadProps & { id: string; onOpenPractice: (practiceSlug: string) => void }) {
-	const work = parseWorkLevel(id);
-	const path = { workspaceSlug: props.workspaceSlug };
-	const query = { ...work, size: REVIEW_PREVIEW_SIZE };
-	const feedbackOptions = listPracticeReviewFeedbackOptions({ path, query });
-	const observationOptions = listPracticeReviewObservationsOptions({ path, query });
+}: LevelReadProps & { record: RecordRef }) {
+	const work = workOfRecord(record);
+	const options = listTracedArtifactsOptions({
+		path: { workspaceSlug },
+		query: { artifactKind: work?.artifactKind, artifactId: work?.artifactId, size: 1 },
+	});
+	const query = useQuery({ ...options, queryFn: work === undefined ? skipToken : options.queryFn });
+	// Every moment on the work, which only its trace lists, and what the provider reported about it;
+	// neither is on the work list's row.
 	const traceOptions = getArtifactTraceOptions({
-		path: { ...path, artifactKind: work?.artifactKind ?? "", artifactId: work?.artifactId ?? 0 },
+		path: {
+			workspaceSlug,
+			artifactKind: work?.artifactKind ?? "",
+			artifactId: work?.artifactId ?? 0,
+		},
 	});
-	const feedback = useQuery({
-		...feedbackOptions,
-		queryFn: work === undefined ? skipToken : feedbackOptions.queryFn,
-	});
-	const observations = useQuery({
-		...observationOptions,
-		queryFn: work === undefined ? skipToken : observationOptions.queryFn,
-	});
-	const trace = useQuery({
+	const traceQuery = useQuery({
 		...traceOptions,
 		queryFn: work === undefined ? skipToken : traceOptions.queryFn,
-		// A 404 is work nothing was ever recorded about: asking again answers the same.
-		retry: (failureCount, error) =>
-			sessionRetriesQueries() && problemStatusOf(error) !== 404 && failureCount < QUERY_RETRIES,
+		retry: false,
 		// Current practices or latest occasions waiting for admission keep the trace discoverable.
 		refetchInterval: (result) => (reviewing(result.state.data) ? ACTIVE_REVIEW_POLL_MS : false),
 	});
-	// An observation can settle before composition and result processing finish. Follow the runs
-	// that own current answers and the latest admitted occasions, even when older observations mask them.
+	// Practice answers can settle before composition and result processing finish. Follow the runs
+	// that own current answers and the latest admitted occasions, even when older answers mask them.
 	const reviewIds = [
 		...new Set(
 			[
-				...(trace.data?.practices ?? []),
-				...latestSignals(trace.data?.signals.filter((entry) => entry.reviewId !== undefined) ?? []),
+				...(traceQuery.data?.practices ?? []),
+				...latestSignals(
+					traceQuery.data?.signals.filter((entry) => entry.reviewId !== undefined) ?? [],
+				),
 			].flatMap((entry) => (entry.reviewId === undefined ? [] : [entry.reviewId])),
 		),
 	].sort();
-	const reviewProgress = useQueries({
+	const processing = useQueries({
 		queries: reviewIds.map((jobId) =>
 			queryOptions({
-				...getAgentJobOptions({ path: { ...path, jobId } }),
+				...getAgentJobOptions({ path: { workspaceSlug, jobId } }),
 				refetchOnMount: "always",
 				refetchInterval: (result) =>
 					processingReview(result.state.data) ? ACTIVE_REVIEW_POLL_MS : false,
 			}),
 		),
-		combine: (results) => ({
-			active: results.some((result) => processingReview(result.data)),
-			settled: results
-				.flatMap((result) =>
-					result.isSuccess && result.isFetchedAfterMount && !processingReview(result.data)
-						? [
-								`${result.data.id}:${result.data.status}:${result.data.deliveryStatus ?? ""}:${result.data.retryCount}:${result.data.completedAt?.getTime() ?? ""}`,
-							]
-						: [],
-				)
-				.sort()
-				.join(","),
-		}),
+		combine: (results) => results.some((result) => processingReview(result.data)),
 	});
-	const { settled: settledRuns, active } = reviewProgress;
-	const processing = active || reviewing(trace.data);
+	// The work's counts change when its reviews settle, so the row is read again once they have.
 	const queryClient = useQueryClient();
-	const { workspaceSlug } = props;
-	const artifactKind = work?.artifactKind;
-	const artifactId = work?.artifactId;
-	const reviewIdsKey = reviewIds.join(",");
-	const assessmentVersion = trace.data?.practices
+	const running = reviewing(traceQuery.data) || processing;
+	const wasRunning = useRef(running);
+	useEffect(() => {
+		const before = wasRunning.current;
+		wasRunning.current = running;
+		if (before && !running) {
+			void queryClient.invalidateQueries({ queryKey: options.queryKey });
+		}
+	});
+	// A retry can reuse a settled run's ID, so a changed answer reads its run again. Compared as text,
+	// not as the trace's Dates, so a refreshed but unchanged trace reads nothing.
+	const assessmentVersion = traceQuery.data?.practices
 		.map(
 			(entry) =>
 				`${entry.practiceSlug}:${entry.reviewId ?? ""}:${entry.outcome}:${entry.decidedAt?.getTime() ?? ""}`,
 		)
 		.sort()
 		.join("|");
-	// A retry can reuse a settled run's ID. Compare assessment values, not the DTO's Date objects,
-	// so a refreshed but unchanged trace does not refresh its jobs in a cycle.
+	const assessed = useRef(assessmentVersion);
 	useEffect(() => {
-		if (assessmentVersion === undefined || assessmentVersion === "" || reviewIdsKey === "") {
+		const before = assessed.current;
+		assessed.current = assessmentVersion;
+		if (before === undefined || before === assessmentVersion) {
 			return;
 		}
-		for (const jobId of reviewIdsKey.split(",")) {
+		for (const jobId of reviewIds) {
 			void queryClient.invalidateQueries({
 				queryKey: getAgentJobQueryKey({ path: { workspaceSlug, jobId } }),
 			});
 		}
-	}, [assessmentVersion, reviewIdsKey, queryClient, workspaceSlug]);
-	useEffect(() => {
-		if (!settledRuns || artifactKind === undefined || artifactId === undefined) {
-			return;
-		}
-		const scope = {
-			path: { workspaceSlug },
-			query: { artifactKind, artifactId, size: REVIEW_PREVIEW_SIZE },
-		};
-		void queryClient.invalidateQueries({ queryKey: listPracticeReviewFeedbackQueryKey(scope) });
-		void queryClient.invalidateQueries({ queryKey: listPracticeReviewObservationsQueryKey(scope) });
-		void queryClient.invalidateQueries({
-			queryKey: getArtifactTraceQueryKey({
-				path: { workspaceSlug, artifactKind, artifactId },
-			}),
-		});
-	}, [settledRuns, queryClient, workspaceSlug, artifactKind, artifactId]);
-	const groups = useQuery({
-		...listGroupsOptions({ path }),
-		enabled: work !== undefined,
 	});
-	// The level shows the one piece of work it asks about, so a refusal is said on it.
-	const review = useRequestPracticeReview(props.workspaceSlug, { showsInline: () => true });
-	if (work === undefined) {
-		return (
-			<>
-				<ReviewLevelHeader
-					nested={props.nested}
-					path={props.path}
-					kind="work"
-					title="Unknown work"
-				/>
-				<DrawerBody className="pt-2">
-					<MissingRecordEmpty title="This link does not name a piece of reviewed work" />
-				</DrawerBody>
-			</>
-		);
-	}
+	const factsOptions = getPracticeReviewWorkFactsOptions({
+		path: {
+			workspaceSlug,
+			artifactKind: work?.artifactKind ?? "",
+			artifactId: work?.artifactId ?? 0,
+		},
+	});
+	// What the server answered is cached beside the body, so a sheet that has no facts says which
+	// answer left it without them, also when it opens again from the cache. Only this sheet reads
+	// the key, so the cached data is in this shape everywhere.
+	const factsQuery = useQuery({
+		queryKey: factsOptions.queryKey,
+		queryFn:
+			work === undefined || !PROVIDER_FACT_KINDS.has(work.artifactKind)
+				? skipToken
+				: async ({ signal }) => {
+						const { data, response } = await getPracticeReviewWorkFacts({
+							...factsOptions.queryKey[0],
+							signal,
+							throwOnError: true,
+						});
+						return { facts: providerFacts(data), answer: serverAnswer(response) };
+					},
+		// Work outside the monitored repositories answers 204 with nothing: asking again answers the same.
+		retry: false,
+	});
+	const request = useRequestPracticeReview(workspaceSlug, { showsInline: () => true });
 	return (
-		<ReviewedWorkLevel
+		<WorkLevel
 			{...props}
-			{...work}
-			feedback={toSectionState(feedback, processing)}
-			observations={toSectionState(observations, processing)}
-			trace={
-				problemStatusOf(trace.error) === 404
-					? { status: "none" }
-					: panelState(trace, (data) => ({ status: "ready" as const, trace: data }))
+			workspaceSlug={workspaceSlug}
+			work={
+				work === undefined
+					? { status: "ready", work: undefined }
+					: panelState(query, (page) => ({ status: "ready" as const, work: page.content?.[0] }))
 			}
-			groups={groups.data ?? []}
-			onOpenPractice={onOpenPractice}
-			onReviewNow={() => review.ask(work)}
-			requesting={review.asking !== undefined}
+			moments={panelState(traceQuery, (trace) => ({
+				status: "ready" as const,
+				moments: trace.signals,
+			}))}
+			facts={
+				work === undefined || !PROVIDER_FACT_KINDS.has(work.artifactKind)
+					? { status: "ready", facts: undefined }
+					: panelState(factsQuery, ({ facts, answer }) => ({
+							status: "ready" as const,
+							facts,
+							unmonitored: facts === undefined,
+							answer,
+						}))
+			}
+			onRequestReview={
+				work !== undefined && REVIEWABLE_ON_DEMAND.has(work.artifactKind)
+					? () => request.ask(work)
+					: undefined
+			}
+			requesting={request.asking !== undefined}
+			// Another ask while a review of this work runs would only be coalesced into it.
+			requestBlocked={reviewRunning(traceQuery.data) ? REQUEST_BLOCKED.active : undefined}
 			refusal={
-				review.refusal && (
+				request.refusal && (
 					<TraceRefusalAlert
-						refusal={review.refusal.outcome}
-						workspaceSlug={props.workspaceSlug}
+						refusal={request.refusal.outcome}
+						workspaceSlug={workspaceSlug}
 						canAdminister
 					/>
 				)
@@ -407,54 +692,72 @@ function WorkLevelRead({
 }
 
 function PracticeLevelRead({
+	workspaceSlug,
 	practiceSlug,
-	range,
-	practices,
 	...props
-}: LevelReadProps & { practiceSlug: string; range: ReviewRange }) {
-	const nowMs = useNow();
-	const from = reviewRangeStart(nowMs, range);
-	const overview = usePracticeReviewOverview(props.workspaceSlug, from);
-	// The most recent, in the list's own order: what the practice is doing now.
-	const observations = useQuery({
-		...listPracticeReviewObservationsOptions({
-			path: { workspaceSlug: props.workspaceSlug },
-			query: { practiceSlug: [practiceSlug], from, size: REVIEW_PREVIEW_SIZE },
-		}),
-	});
+}: LevelReadProps & { practiceSlug: string }) {
+	const practicesQuery = useQuery(listPracticesOptions({ path: { workspaceSlug } }));
+	const optionsQuery = useQuery(getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }));
+	const groupsQuery = useQuery(listGroupsOptions({ path: { workspaceSlug } }));
+	const revisionsQuery = useQuery(
+		listPracticeRevisionsOptions({ path: { workspaceSlug, practiceSlug } }),
+	);
+	const practice = practicesQuery.data?.find((candidate) => candidate.slug === practiceSlug);
+	let state: PracticeLevelProps["practice"];
+	if (practicesQuery.isError || optionsQuery.isError) {
+		state = {
+			status: "error",
+			error: practicesQuery.error ?? optionsQuery.error,
+			onRetry: () => {
+				void practicesQuery.refetch();
+				void optionsQuery.refetch();
+			},
+		};
+	} else if (practicesQuery.data === undefined || optionsQuery.data === undefined) {
+		state = { status: "loading" };
+	} else {
+		state = {
+			status: "ready",
+			practice,
+			definitionOptions: optionsQuery.data,
+			groupName: groupsQuery.data?.find((group) => group.slug === practice?.groupSlug)?.name,
+		};
+	}
 	return (
 		<PracticeLevel
 			{...props}
-			practiceSlug={practiceSlug}
-			practice={practices?.find((practice) => practice.slug === practiceSlug)}
-			rangeLabel={REVIEW_RANGE_DEFS[range].label}
-			scope={rangeScope(from, nowMs)}
-			counts={
-				overview.status === "ready"
-					? {
-							status: "ready",
-							stale: overview.stale,
-							counts: overview.overview.practices.find(
-								(counts) => counts.practiceSlug === practiceSlug,
-							),
-						}
-					: overview
-			}
-			observations={toSectionState(observations)}
+			workspaceSlug={workspaceSlug}
+			practice={state}
+			revisions={panelState(revisionsQuery, (revisions) => ({
+				status: "ready" as const,
+				revisions,
+			}))}
 		/>
+	);
+}
+
+/** A review of the work is queued or running. */
+function reviewRunning(trace: ArtifactTrace | undefined): boolean {
+	return (
+		trace?.practices.some((entry) => entry.outcome === "PENDING" || entry.outcome === "RUNNING") ===
+		true
 	);
 }
 
 /** Follow current assessments and latest occasions still waiting for a review to be admitted. */
 function reviewing(trace: ArtifactTrace | undefined): boolean {
 	return (
-		trace?.practices.some((entry) => entry.outcome === "PENDING" || entry.outcome === "RUNNING") ===
-			true ||
+		reviewRunning(trace) ||
 		latestSignals(trace?.signals ?? []).some(
 			(entry) =>
 				entry.state === "RECORDED" || entry.state === "PENDING" || entry.state === "DEFERRED",
 		)
 	);
+}
+
+/** A run still works, or its results still wait to be processed. */
+function processingReview(job: AgentJob | undefined): boolean {
+	return job?.status === "QUEUED" || job?.status === "RUNNING" || job?.deliveryStatus === "PENDING";
 }
 
 /** Keep every tie: provider timestamps can have less precision than separate review occasions. */
@@ -473,6 +776,12 @@ function latestSignals(signals: TracedSignal[]): TracedSignal[] {
 	return [...latest.values()].flat();
 }
 
-function processingReview(job: AgentJob | undefined): boolean {
-	return job?.status === "QUEUED" || job?.status === "RUNNING" || job?.deliveryStatus === "PENDING";
+/** Where a review stands among the reviews of its work, where its row says both. */
+function reviewPosition(
+	row: { positionOnWork?: number; reviewsOnWork?: number } | undefined,
+): { index: number; total: number } | undefined {
+	if (row?.positionOnWork === undefined || row.reviewsOnWork === undefined) {
+		return undefined;
+	}
+	return { index: row.positionOnWork, total: row.reviewsOnWork };
 }

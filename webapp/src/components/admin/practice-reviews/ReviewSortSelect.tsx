@@ -56,7 +56,9 @@ export function ReviewSortSelect<T extends string>({
 					<ArrowDownWideNarrowIcon aria-hidden className="text-muted-foreground" />
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent aria-labelledby={sortLabelId}>
+				{/* Below the trigger and aligned to its end: drawn over it, the list was pushed sideways by
+				    the trigger's icon and ran past the page's edge where the select ends a toolbar. */}
+				<SelectContent aria-labelledby={sortLabelId} alignItemWithTrigger={false} align="end">
 					{items.map((item) => (
 						<SelectItem key={item.value} value={item.value}>
 							{item.label}

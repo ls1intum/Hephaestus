@@ -1,48 +1,49 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { listTracedArtifactsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
-import { practiceReviewsHead } from "@/components/admin/practice-reviews/review-levels";
 import {
-	REVIEW_PAGE_SIZE,
-	type WorkSearch,
-	workQuery,
-	workSearchSchema,
-} from "@/components/admin/practice-reviews/review-search";
-import { WorkListPage } from "@/components/admin/practice-reviews/WorkListPage";
-import { workRowKey } from "@/components/admin/practice-reviews/WorkRow";
-import { useSearchState } from "@/lib/search-params";
-import { pagedListState } from "@/runtime/tanstack-query/infinite-list";
-import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
+	parsePracticeReviewLevels,
+	parseWorkLevel,
+} from "@/components/admin/practice-reviews/review-levels";
+import { carriedScope } from "@/components/admin/practice-reviews/review-scope";
+import { workSearchSchema } from "@/components/admin/practice-reviews/review-search";
+import { NO_REVIEW_STARTED } from "@/components/practice-vocabulary/review-status-defs";
 
+/**
+ * The Work tab is gone. What it alone showed was the work no review started on, with why: that is
+ * now the Reviews tab's Status "No review started". An address of the tab goes there, keeping the scope and
+ * the selection, and a record it opened stays open. The work kind it filtered by has no facet
+ * there, so it is dropped. An address that opens one piece of work, as the browser extension's
+ * "review details" link does, lands on that work's own reviews instead, under its sheet.
+ */
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/work",
 )({
 	validateSearch: workSearchSchema,
-	head: practiceReviewsHead("Work"),
-	component: WorkRoute,
+	beforeLoad: ({ search, params }) => {
+		const opened = parsePracticeReviewLevels(search.detail).find((level) => level.kind === "work");
+		const work = opened === undefined ? undefined : parseWorkLevel(opened.id);
+		if (work !== undefined) {
+			throw redirect({
+				to: "/w/$workspaceSlug/admin/practices/reviews/runs",
+				params: { workspaceSlug: params.workspaceSlug },
+				search: {
+					...carriedScope("runs", search),
+					artifactKind: work.artifactKind,
+					artifactId: work.artifactId,
+					detail: search.detail,
+				},
+				replace: true,
+			});
+		}
+		throw redirect({
+			to: "/w/$workspaceSlug/admin/practices/reviews/runs",
+			params: { workspaceSlug: params.workspaceSlug },
+			search: {
+				...carriedScope("runs", search),
+				status: [NO_REVIEW_STARTED],
+				detail: search.detail,
+			},
+			replace: true,
+		});
+	},
 });
-
-function WorkRoute() {
-	const { workspaceSlug } = Route.useParams();
-	const search = Route.useSearch();
-	const setSearch = useSearchState();
-	const updateSearch = (patch: Partial<WorkSearch>) => {
-		void setSearch((previous) => ({ ...previous, ...patch }), { replace: true });
-	};
-	const workQueryResult = useInfiniteQuery({
-		...listTracedArtifactsInfiniteOptions({
-			path: { workspaceSlug },
-			query: workQuery(search, REVIEW_PAGE_SIZE),
-		}),
-		...pagedModelParams,
-	});
-
-	return (
-		<WorkListPage
-			search={search}
-			onSearchChange={updateSearch}
-			work={pagedListState(workQueryResult, workRowKey)}
-		/>
-	);
-}

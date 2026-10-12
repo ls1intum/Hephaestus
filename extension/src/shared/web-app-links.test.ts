@@ -13,10 +13,10 @@ describe("web app links", () => {
 		});
 	});
 
-	it("adds this work's reviewed output for a workspace admin, keeping work and workspace", () => {
+	it("adds this work's own reviews for a workspace admin, with its sheet open", () => {
 		expect(workLinks(APP, "intro", { kind: "scm.issue", id: "12" }, true)).toStrictEqual({
 			trace: `${APP}/w/intro/feedback/scm.issue/12`,
-			reviewDetails: `${APP}/w/intro/admin/practices/reviews/work?detail=work%3Aissue%3A12`,
+			reviewDetails: `${APP}/w/intro/admin/practices/reviews/runs?artifactKind=scm.issue&artifactId=12&detail=work%3Aissue%3A12`,
 		});
 	});
 });

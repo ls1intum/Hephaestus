@@ -1,5 +1,5 @@
 import { type LucideIcon, MessageSquareTextIcon, ScanSearchIcon, WorkflowIcon } from "lucide-react";
-import { Fragment } from "react";
+import type { ReactNode } from "react";
 
 import { cn } from "cn";
 import type { PracticeReviewBucket, PracticeReviewOverview } from "@/api/types.gen";
@@ -7,19 +7,23 @@ import { deltaPhrase } from "@/components/activity/activity-buckets";
 import { STALE } from "@/components/activity/activity-tones";
 import { BucketBars } from "@/components/activity/BucketBars";
 import { InlineLink } from "@/components/common/InlineLink";
+import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { OutcomeMix, type OutcomeMixProps } from "./OutcomeMix";
+import { OVERVIEW_TYPE } from "./overview-type-scale";
+import { percentText, shareOf } from "./review-attention";
 import {
-	FINISHED_REVIEW_STATUSES,
-	feedbackSlots,
+	ENDED_REVIEW_STATUSES,
+	finishedCount,
 	markedIncorrectSlot,
 	OUTCOME_LEGEND_LABELS,
 	observationSlots,
 	type OutcomeScope,
+	scopeSearch,
+	overviewFeedbackSlots,
 	type OutcomeSlot,
-	type ReviewListTarget,
 	reviewSlots,
 	slotsTotal,
 } from "./review-outcomes";
@@ -27,13 +31,24 @@ import type { OverviewRegionState, PreviousReviewPeriodState } from "./review-st
 import { ReviewListLink } from "./ReviewListLink";
 
 export interface ReviewPipelineProps {
-	workspaceSlug: string;
 	state: OverviewRegionState;
 	/** The period before the range, which each total is set against; failed, there is no comparison. */
 	previous: PreviousReviewPeriodState;
+	/** That period by name, from the range on screen: "the previous 30 days". */
+	previousName: string;
 	/** The range as the lists' day filters, so every count opens the rows it counts. */
 	scope: OutcomeScope;
+	/** The stages to draw, in their order; all three when absent. */
+	stages?: readonly StageKey[];
+	/** The list's accessible name, so two rows of tiles on a page are told apart. */
+	"aria-label"?: string;
+	/** A last tile with its own read, such as the failed deliveries, drawn after the stages. */
+	lastTile?: ReactNode;
+	/** Given, the counts of the stages that link open their lists filtered to the rows counted. */
+	workspaceSlug?: string;
 }
+
+export type StageKey = "reviews" | "observations" | "feedback";
 
 /**
  * Volume is information, not a state, and a practice surface has no tone for that: its accent is
@@ -44,7 +59,7 @@ export interface ReviewPipelineProps {
 const VOLUME_FILL = "var(--color-muted-foreground)";
 
 interface StageDef {
-	key: "reviews" | "observations" | "feedback";
+	key: StageKey;
 	title: string;
 	icon: LucideIcon;
 	noun: (count: number) => string;
@@ -52,11 +67,10 @@ interface StageDef {
 	total: (overview: PracticeReviewOverview) => number;
 	slots: (overview: PracticeReviewOverview, scope?: OutcomeScope) => OutcomeSlot[];
 	flags?: (overview: PracticeReviewOverview, scope: OutcomeScope) => OutcomeMixProps["flags"];
-	list: (scope: OutcomeScope) => ReviewListTarget;
 }
 
 const isFinished = (slot: OutcomeSlot) =>
-	(FINISHED_REVIEW_STATUSES as readonly string[]).includes(slot.key);
+	(ENDED_REVIEW_STATUSES as readonly string[]).includes(slot.key);
 
 const STAGES: readonly StageDef[] = [
 	{
@@ -68,7 +82,12 @@ const STAGES: readonly StageDef[] = [
 		// Every review requested in the range, whether it has finished or not.
 		total: (overview) => slotsTotal(reviewSlots(overview.reviews)),
 		slots: (overview, scope) => reviewSlots(overview.reviews, scope).filter(isFinished),
-		list: ({ from, to }) => ({ list: "runs", search: { from, to } }),
+		// Reviews not finished yet have no outcome to count: they come last in the row, quiet, and
+		// the page re-reads while any are there. How many run and wait right now is the queue's.
+		flags: (overview, scope) => ({
+			label: OUTCOME_LEGEND_LABELS.openReviews,
+			slots: [openReviewsSlot(overview, scope)],
+		}),
 	},
 	{
 		key: "observations",
@@ -77,12 +96,16 @@ const STAGES: readonly StageDef[] = [
 		noun: (count) => (count === 1 ? "observation" : "observations"),
 		perBucket: (bucket) => bucket.observations,
 		total: (overview) => slotsTotal(observationSlots(overview.observations)),
-		slots: (overview, scope) => observationSlots(overview.observations, scope),
+		// The outcome's own word, one form for all four: "35 met", "27 not met", "10 not applicable".
+		slots: (overview, scope) =>
+			observationSlots(overview.observations, scope).map((slot) => ({
+				...slot,
+				label: slot.def.label.toLowerCase(),
+			})),
 		flags: (overview, scope) => ({
 			label: OUTCOME_LEGEND_LABELS.checkedObservations,
 			slots: [markedIncorrectSlot(overview.observationsInvalidated, scope)],
 		}),
-		list: ({ from, to }) => ({ list: "observations", search: { from, to } }),
 	},
 	{
 		key: "feedback",
@@ -90,46 +113,68 @@ const STAGES: readonly StageDef[] = [
 		icon: MessageSquareTextIcon,
 		noun: (count) => (count === 1 ? "piece of feedback" : "pieces of feedback"),
 		perBucket: (bucket) => bucket.feedback,
-		total: (overview) => slotsTotal(feedbackSlots(overview.feedback)),
-		slots: (overview, scope) => feedbackSlots(overview.feedback, scope),
-		list: ({ from, to }) => ({ list: "feedback", search: { from, to } }),
+		total: (overview) => slotsTotal(overviewFeedbackSlots(overview.feedback)),
+		slots: (overview, scope) => overviewFeedbackSlots(overview.feedback, scope),
 	},
 ];
+
+/** The row's columns by how many tiles it holds, so no tile stands alone on a wide screen. */
+const GRID_COLUMNS: Partial<Record<number, string>> = {
+	1: "",
+	2: "@xl:grid-cols-2",
+	3: "@3xl:grid-cols-3",
+};
 
 /**
  * The stages work flows through — reviews ran, recorded observations, composed feedback — a tile
  * each, in the recipe of Activity's tiles: the total, how it compares with the period before, its
  * volume over the range, then what it split into. Each stage is counted by its own date, so the
- * tiles stand side by side rather than claiming one caused the next.
+ * tiles stand side by side rather than claiming one caused the next. The tile's title has no link,
+ * since the tab above opens the same list; given a workspace, each count opens the list filtered to
+ * exactly the rows it counts, over the range.
  */
-export function ReviewPipeline({ workspaceSlug, state, previous, scope }: ReviewPipelineProps) {
+export function ReviewPipeline({
+	state,
+	previous,
+	previousName,
+	scope,
+	stages,
+	"aria-label": label = "Stages",
+	lastTile,
+	workspaceSlug,
+}: ReviewPipelineProps) {
 	const busy = state.status === "loading" || state.stale;
+	const shown = stages === undefined ? STAGES : STAGES.filter(({ key }) => stages.includes(key));
+	const tiles = shown.length + (lastTile === undefined ? 0 : 1);
 	return (
 		<div className="@container">
 			<ul
 				aria-busy={busy || undefined}
-				aria-label="Stages"
+				aria-label={label}
 				className={cn(
-					"grid grid-cols-1 gap-3 @3xl:grid-cols-3",
+					"grid grid-cols-1 gap-3",
+					GRID_COLUMNS[tiles] ?? "@xl:grid-cols-2 @5xl:grid-cols-4",
 					state.status === "ready" && state.stale && STALE,
 				)}
 			>
-				{STAGES.map((stage) => (
+				{shown.map((stage) => (
 					<li key={stage.key} className="flex">
 						{state.status === "ready" ? (
 							<StageTile
-								workspaceSlug={workspaceSlug}
 								stage={stage}
 								overview={state.overview}
 								previous={previous}
+								previousName={previousName}
 								stale={state.stale}
 								scope={scope}
+								workspaceSlug={workspaceSlug}
 							/>
 						) : (
 							<StageSkeleton />
 						)}
 					</li>
 				))}
+				{lastTile !== undefined && <li className="flex">{lastTile}</li>}
 			</ul>
 			{busy && <span className="sr-only">Loading what the reviews did</span>}
 		</div>
@@ -137,113 +182,146 @@ export function ReviewPipeline({ workspaceSlug, state, previous, scope }: Review
 }
 
 function StageTile({
-	workspaceSlug,
 	stage,
 	overview,
 	previous,
+	previousName,
 	stale,
 	scope,
+	workspaceSlug,
 }: {
-	workspaceSlug: string;
 	stage: StageDef;
 	overview: PracticeReviewOverview;
 	previous: PreviousReviewPeriodState;
+	previousName: string;
 	/** The overview is the previous range's, which nothing may be set against. */
 	stale: boolean;
 	scope: OutcomeScope;
+	workspaceSlug?: string;
 }) {
 	const Icon = stage.icon;
 	const total = stage.total(overview);
 	// Set against the period before once both are in; until then its line is held, so the tile does
 	// not move when the comparison lands.
 	let delta: string | null | undefined = null;
-	if (previous.status === "error") {
+	if (previous.status === "error" || previous.status === "none") {
 		delta = undefined;
 	} else if (previous.status === "ready" && !stale) {
-		delta = deltaPhrase(total, stage.total(previous.period.overview), previous.period.name);
+		delta = deltaPhrase(total, stage.total(previous.period.overview), previousName);
 	}
 	return (
 		<Card size="sm" className="w-full">
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2 text-sm font-medium">
 					<Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-					<InlineLink
-						render={
-							<ReviewListLink workspaceSlug={workspaceSlug} destination={stage.list(scope)} />
-						}
-					>
-						{stage.title}
-					</InlineLink>
+					{/* No link: the tab above opens the same list. */}
+					{stage.title}
 				</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<OutcomeMix
-					workspaceSlug={workspaceSlug}
 					total={total}
 					slots={stage.slots(overview, scope)}
 					flags={stage.flags?.(overview, scope)}
 					noun={stage.noun}
 					label={OUTCOME_LEGEND_LABELS[stage.key]}
 					delta={delta}
+					workspaceSlug={workspaceSlug}
+					trailing={
+						stage.key === "reviews" ? (
+							<FailedOrTimedOut overview={overview} scope={scope} workspaceSlug={workspaceSlug} />
+						) : undefined
+					}
 				>
-					{stage.key === "reviews" && (
-						<StillRunning workspaceSlug={workspaceSlug} overview={overview} scope={scope} />
-					)}
-					{total > 0 && (
-						<BucketBars
-							rows={overview.buckets.map((bucket) => ({
-								start: bucket.start.getTime(),
-								count: stage.perBucket(bucket),
-							}))}
-							bucket={overview.bucket}
-							span={{ from: overview.from, to: overview.to }}
-							name={stage.title}
-							fill={VOLUME_FILL}
-						/>
-					)}
+					{/* Drawn at zero too, so the tiles beside each other keep their rows in line. */}
+					<BucketBars
+						rows={overview.buckets.map((bucket) => ({
+							start: bucket.start.getTime(),
+							count: stage.perBucket(bucket),
+						}))}
+						bucket={overview.bucket}
+						span={{ from: overview.from, to: overview.to }}
+						name={stage.title}
+						fill={VOLUME_FILL}
+					/>
 				</OutcomeMix>
 			</CardContent>
 		</Card>
 	);
 }
 
+/** Reviews of the range not finished yet, queued or running, opening the Reviews table at them. */
+function openReviewsSlot(overview: PracticeReviewOverview, scope: OutcomeScope): OutcomeSlot {
+	return {
+		key: "open",
+		def: REVIEW_STATUS_DEFS.RUNNING,
+		label: "not finished yet",
+		count: overview.reviews.queued + overview.reviews.running,
+		target: {
+			list: "runs",
+			search: { ...scopeSearch(scope, "runs"), status: ["QUEUED", "RUNNING"] },
+		},
+	};
+}
+
 /**
- * Reviews not finished yet — "1 running, 2 queued" — as a live line rather than a legend entry: they
- * have no outcome to count yet, and the page re-reads while any are there.
+ * The share of the range's finished reviews that failed or timed out, as the last item of the
+ * Reviews tile's row: "8 % failed or timed out". The counts are in the row already; the share is
+ * what the row adds. Plain at any share, by the overview's colour rule
+ * (`review-attention-thresholds.ts`); none when nothing failed. Given a workspace, it opens the
+ * Reviews table filtered to them over the range.
  */
-function StillRunning({
-	workspaceSlug,
-	overview,
+function FailedOrTimedOut({
+	overview: { reviews },
 	scope,
+	workspaceSlug,
 }: {
-	workspaceSlug: string;
 	overview: PracticeReviewOverview;
 	scope: OutcomeScope;
+	workspaceSlug?: string;
 }) {
-	const slots = reviewSlots(overview.reviews, scope);
-	// What is happening now reads before what is waiting.
-	const live = (["RUNNING", "QUEUED"] as const).flatMap((status) =>
-		slots.filter((slot) => slot.key === status && slot.count > 0),
-	);
-	if (live.length === 0) {
+	const failed = reviews.failed + reviews.timedOut;
+	const finished = finishedCount(reviews);
+	if (failed === 0) {
 		return null;
 	}
+	const share = shareOf(failed, finished);
+	const text = (
+		<>
+			<span className={OVERVIEW_TYPE.value}>{percentText(share)}</span> failed or timed out
+		</>
+	);
 	return (
-		<p className="text-sm text-muted-foreground">
-			{live.map((slot, index) => (
-				<Fragment key={slot.key}>
-					{index > 0 && ", "}
-					<InlineLink
-						tone="count"
-						render={<ReviewListLink workspaceSlug={workspaceSlug} destination={slot.target} />}
-					>
-						<span className="tabular-nums">{slot.count}</span> {slot.label}
-					</InlineLink>
-				</Fragment>
-			))}
-		</p>
+		<span
+			data-tone="secondary"
+			title={`${failed} of ${finished} finished reviews`}
+			className={cn("inline-flex items-center gap-1.5", OVERVIEW_TYPE.label)}
+		>
+			<FailedIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+			{workspaceSlug === undefined ? (
+				<span>{text}</span>
+			) : (
+				<InlineLink
+					tone="count"
+					aria-label={`${percentText(share)} failed or timed out, ${failed} of ${finished} finished reviews`}
+					render={
+						<ReviewListLink
+							workspaceSlug={workspaceSlug}
+							destination={{
+								list: "runs",
+								search: { ...scopeSearch(scope, "runs"), status: ["FAILED", "TIMED_OUT"] },
+							}}
+						/>
+					}
+				>
+					{text}
+				</InlineLink>
+			)}
+		</span>
 	);
 }
+
+const FailedIcon = REVIEW_STATUS_DEFS.FAILED.icon;
 
 /** A tile's shape while the overview loads: the title, the number, the bars, the legend. */
 function StageSkeleton() {

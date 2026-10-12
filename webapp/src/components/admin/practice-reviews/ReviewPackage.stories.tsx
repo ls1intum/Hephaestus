@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 import { expectNoPageOverflow } from "@/stories/reflow";
-import { reviewFeedbackDetail } from "./fixtures";
+import { PRIVATE_FEEDBACK_TEXT, reviewFeedbackDetail } from "./fixtures";
 import { ReviewPackage } from "./ReviewPackage";
 
 const longPath =
@@ -57,5 +57,36 @@ export const ExactSummaryAndInlinePackage: Story = {
 			),
 		).toBeVisible();
 		await expectNoPageOverflow();
+	},
+};
+
+/**
+ * A card on the developer's own practice pages is theirs alone: handed placements anyway, the
+ * package says the text is withheld and shows none of it, not even the file it is about.
+ */
+export const PrivatePlaceNeverShown: Story = {
+	args: {
+		feedback: {
+			...feedback,
+			channel: "IN_APP",
+			location: "PRACTICE_PAGES",
+			proposedPlacements: [
+				{ type: "SUMMARY" as const, body: PRIVATE_FEEDBACK_TEXT },
+				{
+					type: "INLINE" as const,
+					body: PRIVATE_FEEDBACK_TEXT,
+					path: longPath,
+					startLine: 148,
+				},
+			],
+		},
+	},
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByText(/written for the developer’s own practice pages and is withheld/u),
+		).toBeVisible();
+		await expect(canvas.queryByText(PRIVATE_FEEDBACK_TEXT)).toBeNull();
+		await expect(canvas.queryByText(longPath)).toBeNull();
 	},
 };

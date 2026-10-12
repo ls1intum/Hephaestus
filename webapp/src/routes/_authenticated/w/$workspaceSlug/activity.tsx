@@ -53,7 +53,7 @@ function Activity() {
 	const providerType = toScmProviderType(workspace?.providerType);
 
 	const detailStack = parseActivityStack(search.detail, SELF_ACTIVITY_LEVEL_KINDS);
-	const stackControls = useDetailStack(detailStack);
+	const stackControls = useDetailStack();
 	const openCategory = detailStack.at(-1)?.target;
 
 	const period = periodFromSearch(search);

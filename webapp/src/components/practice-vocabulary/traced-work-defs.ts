@@ -19,7 +19,7 @@ export const TRACED_WORK_DEFS: StatusDefs<TracedWorkState> = {
 		icon: CircleDashedIcon,
 		badgeVariant: "outline",
 		description:
-			"Moments were recorded on this work, but none of them started a practice review. Open it to read why each one stopped.",
+			"Moments were recorded on this work, but none of them started a practice review. The row says why the latest one did not.",
 	},
 };
 

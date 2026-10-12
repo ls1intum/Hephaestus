@@ -1,8 +1,10 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import type { BrandIcon } from "@/components/icons/brand";
+
 export interface Fact {
-	icon: LucideIcon;
+	icon: LucideIcon | BrandIcon;
 	term: string;
 	detail: ReactNode;
 }

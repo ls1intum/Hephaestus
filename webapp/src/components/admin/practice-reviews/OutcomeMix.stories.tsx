@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 
+import { InlineLink } from "@/components/common/InlineLink";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
@@ -12,6 +13,7 @@ import {
 	observationSlots,
 	slotsTotal,
 } from "./review-outcomes";
+import { ReviewListLink } from "./ReviewListLink";
 
 const observationNoun = (total: number): string => (total === 1 ? "observation" : "observations");
 const feedbackNoun = (total: number): string =>
@@ -22,8 +24,8 @@ const FEEDBACK = feedbackSlots(practiceReviewOverview.feedback, reviewOverviewSc
 
 /**
  * A total, how it changed, then what it splits into — as counts in words, never as a bar: each
- * count wears the words, icon and tone of the registry that owns its value, and opens the list of
- * exactly the rows it counts. A count that opens a list carries a faint underline at rest.
+ * count wears the words, icon and tone of the registry that owns its value. The counts are text: the
+ * card has one link, to the list it counts, passed as `link`.
  *
  * A flag such as "marked incorrect" overlaps the parts — a met observation marked incorrect is
  * still a met observation — so it is listed apart, under its own name, and never added.
@@ -41,7 +43,6 @@ const meta = {
 	],
 	tags: ["autodocs"],
 	args: {
-		workspaceSlug: "demo",
 		total: slotsTotal(OBSERVATIONS),
 		slots: OBSERVATIONS,
 		flags: {
@@ -75,24 +76,14 @@ export const Observations: Story = {
 			"10 not applicable",
 			"6 undetermined",
 		]);
-		const positive = new URL(
-			legend.getByRole<HTMLAnchorElement>("link", { name: "35 met observations" }).href,
-		);
-		await expect(positive.pathname).toBe("/w/demo/admin/practices/reviews/observations");
-		await expect(positive.searchParams.getAll("outcome")).toStrictEqual(["MET"]);
-		await expect(positive.searchParams.get("from")).toBe(reviewOverviewScope.from);
+		// The counts are text: the card it sits in has one link, to the list it counts.
+		await expect(canvas.queryByRole("link")).not.toBeInTheDocument();
 		const flags = within(canvas.getByRole("list", { name: "Observations checked by an admin" }));
-		const incorrect = new URL(
-			flags.getByRole<HTMLAnchorElement>("link", { name: "3 marked incorrect" }).href,
-		);
-		await expect(incorrect.searchParams.get("invalidated")).toBe("true");
+		flags.getByText("3", { exact: false });
 	},
 };
 
-/**
- * Feedback by delivery family. Each family opens the list filtered to every state it stands for,
- * and a family with none in it is left out.
- */
+/** Feedback by delivery family, as text. A family with none in it is left out. */
 export const Feedback: Story = {
 	args: {
 		total: slotsTotal(FEEDBACK),
@@ -112,19 +103,11 @@ export const Feedback: Story = {
 			"5 withheld",
 			"1 failed to deliver",
 		]);
-		const withheld = new URL(
-			legend.getByRole<HTMLAnchorElement>("link", { name: "5 withheld" }).href,
-		);
-		await expect(withheld.pathname).toBe("/w/demo/admin/practices/reviews/feedback");
-		await expect(withheld.searchParams.getAll("deliveryState")).toStrictEqual([
-			"SUPPRESSED",
-			"DISCARDED",
-			"SUPERSEDED",
-		]);
+		await expect(legend.queryByRole("link")).not.toBeInTheDocument();
 	},
 };
 
-/** A practice's feedback opens the feedback citing that practice. */
+/** A practice's feedback card has one link, to the feedback citing that practice. */
 export const OnePractice: Story = {
 	args: {
 		...Feedback.args,
@@ -132,17 +115,28 @@ export const OnePractice: Story = {
 			...reviewOverviewScope,
 			practiceSlug: "thin-controllers",
 		}),
+		link: (
+			<InlineLink
+				render={
+					<ReviewListLink
+						workspaceSlug="demo"
+						destination={{ list: "feedback", search: { practiceSlug: ["thin-controllers"] } }}
+					/>
+				}
+			>
+				See the feedback that cited it
+			</InlineLink>
+		),
 	},
 	play: async ({ canvas }) => {
-		const legend = within(canvas.getByRole("list", { name: "Feedback by delivery" }));
-		const delivered = new URL(
-			legend.getByRole<HTMLAnchorElement>("link", { name: "14 delivered" }).href,
-		);
-		await expect(delivered.searchParams.getAll("practiceSlug")).toStrictEqual(["thin-controllers"]);
-		await expect(delivered.searchParams.getAll("deliveryState")).toStrictEqual([
-			"DELIVERED",
-			"PARTIALLY_DELIVERED",
-		]);
+		const [link, ...others] = canvas.getAllByRole<HTMLAnchorElement>("link");
+		await expect(others).toHaveLength(0);
+		if (link === undefined) {
+			throw new Error("The card has no link");
+		}
+		const target = new URL(link.href);
+		await expect(target.pathname).toBe("/w/demo/admin/practices/reviews/feedback");
+		await expect(target.searchParams.getAll("practiceSlug")).toStrictEqual(["thin-controllers"]);
 	},
 };
 

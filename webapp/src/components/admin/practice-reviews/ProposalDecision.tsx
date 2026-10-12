@@ -10,13 +10,9 @@ import { useId, useState } from "react";
 import type { GetPracticeReviewFeedbackResponse } from "@/api/types.gen";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
-import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
-import {
-	deliveredPlacementType,
-	placementLabel,
-} from "@/components/practice-vocabulary/placement-defs";
+import { OPERATOR_WITHHELD_TEXT } from "@/components/practice-vocabulary/delivery-place-defs";
+import { deliveredPlacementType } from "@/components/practice-vocabulary/placement-defs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import {
@@ -30,54 +26,25 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { hasText } from "@/lib/text";
 
+import { FeedbackBody } from "./FeedbackBody";
 import {
 	PROPOSAL_REJECTION_REASONS,
 	type ProposalRejectionReason,
 } from "./proposal-rejection-vocabulary";
 import { feedbackLevel } from "./review-levels";
-import { ReviewFact } from "./ReviewFactGrid";
 import { ReviewPackage } from "./ReviewPackage";
-
-/** The facts only a proposal has: where it will appear and the revision it was written against. */
-export function ProposalFacts({ feedback }: { feedback: GetPracticeReviewFeedbackResponse }) {
-	const provider = feedback.reviewedWork?.provider;
-	const placements = [
-		...new Set(
-			feedback.proposedPlacements.map((placement) =>
-				placementLabel(feedback.channel, deliveredPlacementType(placement.type, provider)),
-			),
-		),
-	];
-	return (
-		<>
-			<ReviewFact label="Will appear as">
-				<div className="flex flex-wrap gap-1.5">
-					{placements.length > 0 ? (
-						placements.map((placement) => (
-							<Badge key={placement} variant="outline">
-								{placement}
-							</Badge>
-						))
-					) : (
-						<span className="text-muted-foreground">
-							{DELIVERY_PLACE_DEFS[feedback.channel].label}
-						</span>
-					)}
-				</div>
-			</ReviewFact>
-			{hasText(feedback.reviewedRevision) && (
-				<ReviewFact label="Reviewed revision">
-					<code className="text-xs break-all">{feedback.reviewedRevision}</code>
-				</ReviewFact>
-			)}
-		</>
-	);
-}
 
 /** Exactly what approval sends, expanded, because approving it unread is the failure to design out. */
 export function ProposalPackage({ feedback }: { feedback: GetPracticeReviewFeedbackResponse }) {
+	// A private place's text is never shown here, nor counted: the place's own words stand in.
+	if (OPERATOR_WITHHELD_TEXT[feedback.channel] !== undefined) {
+		return (
+			<Section level={3} title="What will be sent">
+				<FeedbackBody feedback={{ ...feedback, body: undefined }} />
+			</Section>
+		);
+	}
 	const { proposedPlacements } = feedback;
 	const summary = proposedPlacements.find((placement) => placement.type === "SUMMARY");
 	const inline = proposedPlacements.filter((placement) => placement.type === "INLINE");
@@ -135,8 +102,8 @@ export interface ProposalDecisionProps {
 }
 
 /**
- * The level's footer: where this proposal is in the queue and a step either way, then reject, with
- * a reason, or approve for delivery.
+ * The level's first row: where this proposal is in the queue and a step either way, then reject,
+ * with a reason, or approve for delivery.
  */
 export function ProposalDecision({
 	canApprove,
@@ -169,15 +136,10 @@ export function ProposalDecision({
 function QueueSteps({ queue }: { queue: ApprovalQueue }) {
 	const step = buttonVariants({ variant: "ghost", size: "icon" });
 	return (
-		// Below `sm` the footer stacks in reverse, which would put the steps last on screen while
-		// they are first in the tab order; ordered last, the reversal shows them first, as they read.
-		<nav
-			aria-label="Feedback awaiting approval"
-			className="flex items-center gap-1 max-sm:order-last sm:mr-auto"
-		>
+		<nav aria-label="Feedback awaiting approval" className="mr-auto flex items-center gap-1">
 			{queue.previous === undefined ? (
 				<Button variant="ghost" size="icon" disabled aria-label="Previous">
-					<ChevronLeftIcon />
+					<ChevronLeftIcon aria-hidden />
 				</Button>
 			) : (
 				<DetailStackLink
@@ -194,7 +156,7 @@ function QueueSteps({ queue }: { queue: ApprovalQueue }) {
 			</span>
 			{queue.next === undefined ? (
 				<Button variant="ghost" size="icon" disabled aria-label="Next">
-					<ChevronRightIcon />
+					<ChevronRightIcon aria-hidden />
 				</Button>
 			) : (
 				<DetailStackLink entry={feedbackLevel(queue.next)} swap className={step} aria-label="Next">
@@ -223,7 +185,11 @@ function RejectFeedbackPopover({
 				<CircleXIcon />
 				Reject feedback
 			</PopoverTrigger>
-			<PopoverContent align="end" side="top" className="w-[min(24rem,calc(100vw-2rem))] gap-4 p-4">
+			<PopoverContent
+				align="end"
+				side="bottom"
+				className="w-[min(24rem,calc(100vw-2rem))] gap-4 p-4"
+			>
 				<PopoverHeader>
 					<PopoverTitle>Reject this feedback</PopoverTitle>
 					<PopoverDescription>

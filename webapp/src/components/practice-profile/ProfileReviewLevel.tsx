@@ -21,8 +21,11 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { useNow } from "@/components/common/use-now";
 import { reviewedWorkIcon } from "@/components/icons/reviewed-work-icon";
-import { DetailDrawerHeader } from "@/components/layout/detail-drawer/DetailDrawerHeader";
-import { DetailPath, type LevelPath } from "@/components/layout/detail-drawer/DetailPath";
+import {
+	DetailDrawerHeader,
+	LevelPathRow,
+} from "@/components/layout/detail-drawer/DetailDrawerHeader";
+import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import {
 	earlierReviewOf,
@@ -42,13 +45,13 @@ import { artifactKindLabel, reviewedWorkName, sameReviewedWork } from "@/lib/art
 import { formatDayTime } from "@/lib/dates";
 import { hasText } from "@/lib/text";
 
+import { RequestedReviewTag, ReviewOrdinalTag } from "@/components/practice-trace/review-run-tags";
 import {
 	REVIEW_SELECTION_CLEARED,
 	REVIEW_TABS,
 	reviewLevel,
 	type ReviewTab,
 } from "./practice-profile-search";
-import { RequestedReviewTag, ReviewOrdinalTag } from "./review-run-tags";
 
 /**
  * One review and what it observed about the reader, with this work's review activity: every
@@ -121,7 +124,7 @@ function LoadingBody() {
 	return (
 		<div className="flex flex-col gap-4">
 			<PracticeTabsSkeleton tabs={REVIEW_TABS.length} />
-			<ReviewRunPracticeTableSkeleton rows={SKELETON_ROWS} />
+			<ReviewRunPracticeTableSkeleton rows={SKELETON_ROWS} inReview />
 		</div>
 	);
 }
@@ -243,7 +246,7 @@ export function ProfileReviewLevel({
 
 	return (
 		<>
-			<DetailDrawerHeader nested={nested}>
+			<DetailDrawerHeader nested={nested} dismiss="inPath">
 				<ReviewHead
 					path={path}
 					run={run}
@@ -309,7 +312,7 @@ function ReviewHead({
 
 	return (
 		<div className="flex min-w-0 flex-1 flex-col gap-2">
-			<DetailPath {...path} current="Review" />
+			<LevelPathRow {...path} current="Review" />
 			<p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
 				<WorkIcon className="size-3.5 shrink-0" />
 				<span className="truncate">

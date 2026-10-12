@@ -42,11 +42,7 @@ const meta = {
 	render: (args) => (
 		<Stateful initial={[personLevel(ada.login)]}>
 			{(stack, setStack) => (
-				<DetailDrawerStack
-					stack={stack}
-					size="detail"
-					onClose={(depth) => setStack(stack.slice(0, depth))}
-				>
+				<DetailDrawerStack stack={stack} onClose={(depth) => setStack(stack.slice(0, depth))}>
 					{(_entry, level) => (
 						<PersonActivityLevel
 							{...args}

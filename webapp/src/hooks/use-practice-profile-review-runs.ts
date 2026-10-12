@@ -17,7 +17,7 @@ import {
 	type ReviewTimeframe,
 } from "@/components/practice-profile/practice-profile-search";
 import type { ProfileReviewDetailState } from "@/components/practice-profile/ProfileReviewLevel";
-import { runPositionsOnWork } from "@/components/practice-profile/review-run-groups";
+import { runPositionsOnWork } from "@/components/practice-trace/review-run-groups";
 import {
 	EMPTY_REVIEW_RUN_FEED,
 	type ReviewRunFeedState,

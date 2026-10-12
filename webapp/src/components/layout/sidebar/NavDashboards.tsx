@@ -37,7 +37,11 @@ export function NavDashboards({
 		matchRoute({ to: "/w/$workspaceSlug/workspace-activity", fuzzy: true }),
 	);
 	const onTeams = Boolean(matchRoute({ to: "/w/$workspaceSlug/teams", fuzzy: true }));
-	const [practicesOpen, setPracticesOpen] = useSectionOpen(onAcrossTheWorkspace);
+	// Anywhere in the section, the profile with its slide-in layers included, keeps the pages under it
+	// in sight; the chevron still folds them away by itself.
+	const [practicesOpen, setPracticesOpen] = useSectionOpen(
+		onPracticeProfile || onAcrossTheWorkspace,
+	);
 	// On a phone the sidebar is a sheet with full labels, never icon-only.
 	const { isMobile, state } = useSidebar();
 	const iconOnly = !isMobile && state === "collapsed";
@@ -49,8 +53,8 @@ export function NavDashboards({
 		<SidebarGroup>
 			<SidebarGroupLabel>Dashboards</SidebarGroupLabel>
 			<SidebarMenu>
-				{/* The profile is the parent's own link, so one press reaches it from anywhere, and the
-				    chevron beside it, not the label, discloses the workspace view. */}
+				{/* The profile is the parent's own link, so one press reaches it from anywhere and unfolds
+				    the pages under it; the chevron beside it folds and unfolds them on its own. */}
 				{practicesEnabled && (
 					<Collapsible
 						open={practicesOpen}
@@ -62,6 +66,8 @@ export function NavDashboards({
 							// One active item in every mode: the view's own entry when it is in sight, else its parent.
 							isActive={onPracticeProfile || (onAcrossTheWorkspace && !practicesOpen && !iconOnly)}
 							render={<Link to="/w/$workspaceSlug/practice-profile" params={{ workspaceSlug }} />}
+							// Unfolds even when the reader is already on the profile and had folded it.
+							onClick={() => setPracticesOpen(true)}
 						>
 							<Compass />
 							<span>Practice profile</span>

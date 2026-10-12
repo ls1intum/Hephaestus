@@ -4,8 +4,11 @@ import type { ProfileReviewRun, ReviewedWorkRef } from "@/api/types.gen";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SelectFilter } from "@/components/common/SelectFilter";
-import { DetailDrawerHeader } from "@/components/layout/detail-drawer/DetailDrawerHeader";
-import { DetailPath, type LevelPath } from "@/components/layout/detail-drawer/DetailPath";
+import {
+	DetailDrawerHeader,
+	LevelPathRow,
+} from "@/components/layout/detail-drawer/DetailDrawerHeader";
+import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { TraceKindFilter } from "@/components/practice-trace/TraceKindFilter";
 import type { ReviewRunFeedState } from "@/components/profile/review-runs";
 import { EarlierReviews } from "@/components/profile/ReviewRunFeed";
@@ -110,9 +113,9 @@ export function ProfileReviewsLevel({
 
 	return (
 		<>
-			<DetailDrawerHeader nested={nested}>
+			<DetailDrawerHeader nested={nested} dismiss="inPath">
 				<div className="flex min-w-0 flex-1 flex-col gap-2">
-					<DetailPath {...path} current="Reviews" />
+					<LevelPathRow {...path} current="Reviews" />
 					<DrawerTitle className="text-2xl font-semibold tracking-tight break-words">
 						{REVIEWS_OF_YOUR_WORK}
 					</DrawerTitle>

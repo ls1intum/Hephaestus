@@ -108,3 +108,37 @@ export function formatDayTime(date: Date, today: Date): string {
 export function browserTimeZone(): string {
 	return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
+
+const MINUTE = 60;
+const HOUR = 60 * MINUTE;
+
+/**
+ * A duration as a reader says it, in one format for every trace, sheet and card: "0 s", "42 s",
+ * "6 min", "1 h 20 min", "2 d 3 h". Under an hour one unit is enough; above it, the next smaller
+ * unit keeps the figure from rounding away most of an hour. The figure is rounded to the units it
+ * is said in before the units are chosen, so it never says "60 min" or "1 h 60 min".
+ */
+export function durationText(seconds: number): string {
+	const whole = Math.max(0, Math.round(seconds));
+	if (whole < MINUTE) {
+		return `${whole} s`;
+	}
+	const minutes = Math.round(whole / MINUTE);
+	if (minutes < 60) {
+		return `${minutes} min`;
+	}
+	if (minutes < 24 * 60) {
+		const hours = Math.floor(minutes / 60);
+		const rest = minutes % 60;
+		return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+	}
+	const totalHours = Math.round(whole / HOUR);
+	const days = Math.floor(totalHours / 24);
+	const hours = totalHours % 24;
+	return hours === 0 ? `${days} d` : `${days} d ${hours} h`;
+}
+
+/** The time between two moments in {@link durationText}'s words, whichever comes first. */
+export function durationBetween(from: Date, to: Date): string {
+	return durationText(Math.abs(to.getTime() - from.getTime()) / 1000);
+}

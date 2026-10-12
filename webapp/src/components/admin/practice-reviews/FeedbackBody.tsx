@@ -1,9 +1,5 @@
-import { StatusBadge } from "@/components/common/StatusBadge";
 import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
-import {
-	type DeliveryFacts,
-	deliveryOutcome,
-} from "@/components/practice-vocabulary/delivery-outcome-defs";
+import type { DeliveryFacts } from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { OPERATOR_WITHHELD_TEXT } from "@/components/practice-vocabulary/delivery-place-defs";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,7 +16,6 @@ export interface FeedbackBodyProps {
 
 export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 	const { body } = feedback;
-	const unsent = feedback.deliveryState !== "DELIVERED";
 	const withheld = OPERATOR_WITHHELD_TEXT[feedback.channel];
 
 	// A private place's text is never shown here, even when a caller passes one.
@@ -28,7 +23,6 @@ export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 		return (
 			<Card flush className={className}>
 				<CardContent className="space-y-2 py-4">
-					{unsent && <StatusBadge def={deliveryOutcome(feedback)} />}
 					<p className="text-muted-foreground">{withheld.detail}</p>
 				</CardContent>
 			</Card>
@@ -57,7 +51,6 @@ export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 							Source
 						</TabsTrigger>
 					</TabsList>
-					{unsent && <StatusBadge def={deliveryOutcome(feedback)} />}
 				</CardHeader>
 				<CardContent className="pb-4">
 					<TabsContent value="rendered" className={UNTRUSTED_MARKDOWN_PROSE}>

@@ -15,6 +15,8 @@ import { hasText } from "@/lib/text";
 
 import { AllPracticeGroupsLevel } from "./AllPracticeGroupsLevel";
 import type { AllPracticeGroupsTableProps } from "./AllPracticeGroupsTable";
+import { isNeverApplied } from "./practice-folds";
+import { practicePatternOf } from "./practice-pattern";
 import {
 	ALL_PRACTICE_GROUPS,
 	openLevelId,
@@ -31,10 +33,7 @@ import {
 import { ProfileReviewLevel, type ProfileReviewLevelProps } from "./ProfileReviewLevel";
 import { ProfileReviewsLevel, type ProfileReviewsLevelProps } from "./ProfileReviewsLevel";
 
-export type GroupLevelOverview = Pick<
-	PracticeGroupDetailLevelProps,
-	"holdingUp" | "holdingUpNote" | "reviewedWork" | "nextStep" | "practiceSentences"
->;
+export type GroupLevelOverview = Pick<PracticeGroupDetailLevelProps, "practiceSentences">;
 
 export interface PracticeGroupDetailDrawerProps {
 	/** What the open group and practice levels show. */
@@ -56,8 +55,13 @@ export interface PracticeGroupDetailDrawerProps {
 	onClose: (depth: number) => void;
 	/** Pushes the practice level over the group. */
 	onOpenPractice: (practiceSlug: string) => void;
-	/** The groups the levels name and the developer's standing in each. */
+	/** The groups the levels list and name, and the developer's standing in each. */
 	groups: PracticeGroup[];
+	/**
+	 * The groups with no practice in them. Not in the table: they sit in the fold of groups not
+	 * observed yet. A link to one opens its level, which says the group has no practices.
+	 */
+	emptyGroups?: PracticeGroup[];
 	groupStandings: Record<string, PracticeGroupStanding | undefined>;
 	/**
 	 * The page's load state: a level shows nothing without the page's standings, so it waits and
@@ -67,8 +71,8 @@ export interface PracticeGroupDetailDrawerProps {
 	/** The developer's practice feedback, for the practice level's Feedback tab. */
 	feedbackCards?: PracticeFeedbackCardEntry[];
 	/**
-	 * What Heph says on a group's level — its held rows, next step, reviewed work and practice
-	 * sentences; without it the group shows without the card.
+	 * The sentence under each practice on a group's level; without it the rows show the practice
+	 * alone.
 	 */
 	groupOverview?: (groupSlug: string) => GroupLevelOverview;
 	/**
@@ -89,10 +93,14 @@ export interface PracticeGroupDetailDrawerProps {
 	 * Back leave the level in one step however many were opened.
 	 */
 	onSelectionChange: (selection: PracticeGroupDetailSelection) => void;
+	/** What a level shows under its body, such as the way to the same group across the workspace. */
+	levelFooter?: (entry: DetailStackEntry<PracticeProfileDetailLevelKind>) => ReactNode;
 }
 
 /** The page under the stack, as the first crumb of every level's path. */
 const PAGE_LABEL = "Practice profile";
+
+const NO_GROUPS: PracticeGroup[] = [];
 
 /**
  * The detail drawer over the practice profile, addressed by the route's `detail` stack: the
@@ -105,6 +113,7 @@ export function PracticeGroupDetailDrawer({
 	onClose,
 	onOpenPractice,
 	groups,
+	emptyGroups = NO_GROUPS,
 	groupStandings,
 	state,
 	feedbackCards,
@@ -114,19 +123,31 @@ export function PracticeGroupDetailDrawer({
 	skeletonRows,
 	reviewRuns,
 	onSelectionChange,
+	levelFooter,
 }: PracticeGroupDetailDrawerProps) {
 	const groupIndex = detailStack.findIndex((entry) => entry.kind === "practice-group");
 	const openGroupSlug = openLevelId(detailStack, "practice-group");
 	const openPracticeSlug = openLevelId(detailStack, "practice");
-	const openGroup = groups.find((candidate) => candidate.slug === openGroupSlug);
+	const findGroup = (slug: string | undefined) =>
+		groups.find((candidate) => candidate.slug === slug) ??
+		emptyGroups.find((candidate) => candidate.slug === slug);
+	const openGroup = findGroup(openGroupSlug);
 	const openStanding = hasText(openGroupSlug) ? groupStandings[openGroupSlug] : undefined;
 	const load = loadProps(state);
+	// Each practice of the group to the pattern of its open card.
+	const patternsOf = (practices: readonly { slug: string }[]) =>
+		Object.fromEntries(
+			practices.map((practice) => [
+				practice.slug,
+				practicePatternOf(feedbackCards ?? [], practice.slug),
+			]),
+		);
 	// A level behind is named by what it shows. The practice level is the deepest, so it is never
 	// behind another.
 	const labelOf = (entry: DetailStackEntry<PracticeProfileDetailLevelKind>): string => {
 		switch (entry.kind) {
 			case "practice-group": {
-				return groups.find((candidate) => candidate.slug === entry.id)?.name ?? "Group";
+				return findGroup(entry.id)?.name ?? "Group";
 			}
 			case "practice": {
 				return "Practice";
@@ -147,7 +168,7 @@ export function PracticeGroupDetailDrawer({
 	const { list, open } = reviewRuns;
 
 	return (
-		<DetailDrawerStack stack={detailStack} size="detailWide" onClose={onClose}>
+		<DetailDrawerStack stack={detailStack} onClose={onClose} footer={levelFooter}>
 			{(entry, level): ReactNode => {
 				switch (entry.kind) {
 					case "practice-groups": {
@@ -160,6 +181,7 @@ export function PracticeGroupDetailDrawer({
 								standings={groupStandings}
 								openGroupSlug={openGroupSlug}
 								state={state}
+								emptyGroups={emptyGroups}
 							/>
 						);
 					}
@@ -174,6 +196,7 @@ export function PracticeGroupDetailDrawer({
 								{...(hasText(openGroupSlug) ? groupOverview?.(openGroupSlug) : undefined)}
 								openPracticeSlug={openPracticeSlug}
 								onOpenPractice={onOpenPractice}
+								patterns={patternsOf(detail.practices)}
 								{...load}
 							/>
 						);
@@ -198,6 +221,7 @@ export function PracticeGroupDetailDrawer({
 									onRespond: detail.respond,
 									pendingResponses: detail.pendingResponses,
 								}}
+								neverApplied={detail.practice !== undefined && isNeverApplied(detail.practice)}
 								{...load}
 							/>
 						);

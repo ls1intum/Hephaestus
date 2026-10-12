@@ -54,7 +54,10 @@ const SIGNED_IN: Surface[] = [
 	{ name: "Review runs", path: "/w/e2e/admin/practices/reviews/runs" },
 	{ name: "Review observations", path: "/w/e2e/admin/practices/reviews/observations" },
 	{ name: "Review feedback", path: "/w/e2e/admin/practices/reviews/feedback" },
-	{ name: "Reviewed work", path: "/w/e2e/admin/practices/reviews/work" },
+	{
+		name: "Work no review started on",
+		path: `/w/e2e/admin/practices/reviews/runs?status=${encodeURIComponent('["NOT_STARTED"]')}`,
+	},
 	{ name: "AI models", path: "/w/e2e/admin/models" },
 	{ name: "AI usage", path: "/w/e2e/admin/usage" },
 	{ name: "Integrations", path: "/w/e2e/admin/integrations" },

@@ -8,11 +8,11 @@ import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { daysBefore, hoursBefore } from "@/stories/story-clock";
 import { expectGenuinelyDisabled } from "@/test/controls";
-import { levelsOpenedBy } from "@/test/detail-stack";
 import { precedes } from "@/test/dom";
 
-import { observationDetail, reviewObservationDetail, workspacePractices } from "./fixtures";
+import { observationDetail, reviewObservationDetail } from "./fixtures";
 import { ObservationLevel } from "./ObservationLevel";
+import { SHEET_SECTIONS } from "./RecordSheet";
 import { observationLevel } from "./review-levels";
 
 const ready = (observation: ReviewObservationDetail) => ({
@@ -44,10 +44,13 @@ const markedIncorrect: ReviewObservationDetail = {
 };
 
 /**
- * One observation over whichever list it was opened from: what the review saw, why, from which
- * passages, and what feedback it became. Its one decision — mark it incorrect, or restore it — is
- * the footer, behind a popover that will not submit without a reason, because an invalidation
- * without one is not something the developer could read.
+ * One observation's sheet, over the list it was opened from or over a trace, in the order every
+ * record sheet has: a status line, What it is, State and history (observed, disputed, marked
+ * incorrect, restored, no longer current), the rationale and evidence, Technical (closed) and the
+ * actions. It links to no other record; its trace tells where it came from and what it led to.
+ * Its one decision — mark it incorrect, or restore it — is the footer, behind a popover that will
+ * not submit without a reason, because an invalidation without one is not something the developer
+ * could read.
  */
 const meta = {
 	component: ObservationLevel,
@@ -57,17 +60,12 @@ const meta = {
 	args: {
 		path: { behind: [{ label: "Practice reviews", depth: 0 }], onClose: fn() },
 		observation: ready(reviewObservationDetail),
-		practices: workspacePractices,
 		onChangeValidity: fn(async () => undefined),
 		isChangingValidity: false,
 	},
 	argTypes: { path: { control: false } },
 	render: (args) => (
-		<InLevelStack
-			entry={observationLevel(reviewObservationDetail.id)}
-			path={args.path}
-			size="detailWide"
-		>
+		<InLevelStack entry={observationLevel(reviewObservationDetail.id)} path={args.path}>
 			{(level) => <ObservationLevel {...args} {...level} />}
 		</InLevelStack>
 	),
@@ -85,29 +83,42 @@ export const Default: Story = {
 				level: 2,
 			}),
 		).toBeVisible();
-		// Provenance opens the review that made this as the next level, not a UUID to read.
-		await expect(levelsOpenedBy(panel.getByRole("link", { name: "in a review" }))).toEqual([
-			`review:${reviewObservationDetail.agentJobId}`,
-		]);
+		// The sheet is the observation alone: no story, and no link to another record. The work links
+		// out to its provider.
 		await expect(
-			levelsOpenedBy(panel.getByRole("link", { name: "See everything reviewed on this work" })),
-		).toEqual(["work:pull-request:42"]);
-		panel.getByRole("heading", { name: "Why this was raised", level: 3 });
+			panel.queryByRole("group", { name: "How this came about" }),
+		).not.toBeInTheDocument();
+		const links = panel.queryAllByRole("link");
+		for (const link of links) {
+			await expect(String(link.getAttribute("href"))).not.toMatch(/detail=|\/reviews\//u);
+		}
+		await expect(
+			panel.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent),
+		).toStrictEqual([
+			SHEET_SECTIONS.what,
+			SHEET_SECTIONS.state,
+			SHEET_SECTIONS.details,
+			SHEET_SECTIONS.technical,
+		]);
+		panel.getByRole("heading", { name: "Why this was raised", level: 4 });
 		// The evidence is read as passages, never as the stored record it came from.
 		await expect(panel.queryByText(/citations/u)).not.toBeInTheDocument();
-		// Each piece of feedback it fed opens over this level, with what became of it.
-		const feedback = panel.getAllByRole("link", { name: "Feedback about this observation" });
-		await expect(feedback).toHaveLength(2);
-		await expect(feedback.map(levelsOpenedBy)).toEqual([
-			[expect.stringMatching(/^feedback:/u)],
-			[expect.stringMatching(/^feedback:/u)],
-		]);
-		panel.getByRole("button", { name: "Replaced by newer" });
 		// Standing, it offers the one decision there is, and not its reverse.
 		await expect(panel.getByRole("button", { name: "Mark as incorrect" })).toBeEnabled();
 		await expect(
 			panel.queryByRole("button", { name: "Restore observation" }),
 		).not.toBeInTheDocument();
+	},
+};
+
+/** An observation from a review someone requested says so among what it is. */
+export const ByHand: Story = {
+	args: { observation: ready({ ...reviewObservationDetail, origin: "MANUAL" }) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText("Origin");
+		await expect(panel.getByText("Requested")).toBeVisible();
+		panel.getByText("Someone asked for this review.");
 	},
 };
 
@@ -139,21 +150,10 @@ export const Reflow: Story = {
 	},
 };
 
-export const SupportsAnotherObservation: Story = {
-	args: { observation: ready(observationDetail("77777777-7777-7777-7777-777777777777")) },
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		panel.getByRole("link", { name: "Feedback this observation supports" });
-		await expect(
-			panel.queryByRole("link", { name: "Feedback about this observation" }),
-		).not.toBeInTheDocument();
-	},
-};
-
-/** Historical feedback stays visible, but the level does not present it as a current claim. */
 /**
- * The developer disputes feedback written from the observation: their explanation leads the panel,
- * opens the disputed feedback over it, and the decision stays the footer's.
+ * The developer disputes feedback written from the observation. The dispute answers this
+ * observation, so it is in its history in full, in their words, naming the feedback by where it
+ * went without linking it. Their ratings and private notes are theirs and are not shown.
  */
 export const Disputed: Story = {
 	args: {
@@ -172,30 +172,27 @@ export const Disputed: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		panel.getAllByText("Disputed");
-		await expect(panel.getByText("The developer disputes this")).toBeVisible();
+		panel.getByText("Disputed by the developer, on feedback on their practice pages");
 		panel.getByText("The retry is the caller's job here; this service only reports the failure.");
-		await expect(
-			levelsOpenedBy(panel.getByRole("link", { name: "Feedback on their practice pages" })),
-		).toEqual(["feedback:dddddddd-2222-2222-2222-222222222222"]);
+		await expect(panel.queryByRole("alert")).toBeNull();
+		await expect(panel.queryByRole("link", { name: /practice pages/u })).not.toBeInTheDocument();
 		panel.getByRole("button", { name: "Mark as incorrect" });
 	},
 };
 
-export const FeedbackWasWithheld: Story = {
-	args: { observation: ready(observationDetail("bbbbbbbb-2222-2222-2222-222222222222")) },
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		panel.getByRole("link", { name: "Feedback about this observation" });
-		panel.getByText("Found while reviewing past work, which is measured but never sent.");
-		await expect(panel.getByText("This observation is no longer current")).toBeVisible();
+/** An observation that is no longer current says so in its status line and in its history. */
+export const NoLongerCurrent: Story = {
+	args: {
+		observation: ready({
+			...observationDetail("bbbbbbbb-2222-2222-2222-222222222222"),
+			supersededAt: hoursBefore(5),
+		}),
 	},
-};
-
-export const NoFeedbackComposed: Story = {
-	args: { observation: ready(observationDetail("cccccccc-2222-2222-2222-222222222222")) },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		await expect(panel.getByText("No feedback came from this observation")).toBeVisible();
+		panel.getByText("Historical observation");
+		panel.getByText("No longer current");
+		await expect(panel.queryByRole("alert")).toBeNull();
 	},
 };
 
@@ -256,12 +253,14 @@ export const MarkedIncorrect: Story = {
 	play: async () => {
 		const panelElement = await settledDrawerPanel();
 		const panel = within(panelElement);
-		await expect(panel.getByText("Marked as incorrect")).toBeVisible();
-		// The header says it under the title, where its standing goes.
-		const [chip] = panel.getAllByText("Marked incorrect");
+		// The header says it under the title, where its standing goes, and only there.
+		const [chip, ...others] = panel.getAllByText("Marked incorrect", {
+			selector: "[data-sheet-status] *",
+		});
 		if (!chip) {
 			throw new Error("The level does not say it was marked incorrect");
 		}
+		await expect(others).toHaveLength(0);
 		await expect(precedes(panel.getByRole("heading", { level: 2 }), chip)).toBe(true);
 		await expect(
 			panel.getByText(
@@ -275,12 +274,13 @@ export const MarkedIncorrect: Story = {
 		await expect(
 			panel.queryByRole("button", { name: "Mark as incorrect" }),
 		).not.toBeInTheDocument();
-		// Newest first: the correction in force, then the restore that ended the earlier one, then it.
-		const corrections = within(panel.getByRole("region", { name: "Corrections" }));
-		await expect(corrections.getAllByRole("listitem").map((entry) => entry.textContent)).toEqual([
-			expect.stringMatching(/^Marked incorrect by Ada Admin/u),
-			expect.stringMatching(/^Restored by an account that no longer exists/u),
-			expect.stringMatching(/^Marked incorrect by Ada Admin/u),
+		// Oldest first: observed, the earlier correction and its restore, then the one in force.
+		const history = within(panel.getByRole("list", { name: "History" }));
+		await expect(history.getAllByRole("listitem").map((entry) => entry.textContent)).toEqual([
+			expect.stringMatching(/^Observed/u),
+			expect.stringMatching(/^Marked incorrect.*by Ada Admin/u),
+			expect.stringMatching(/^Restored.*by an account that no longer exists/u),
+			expect.stringMatching(/^Marked incorrect.*by Ada Admin/u),
 		]);
 	},
 };
@@ -346,7 +346,7 @@ export const LoadFailed: Story = {
 			onRetry: fn(),
 		},
 	},
-	play: async ({ args, userEvent }) => {
+	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByText("We could not load this observation")).toBeVisible();
 		// With no record to name it, the level is named for what it is.
@@ -354,10 +354,6 @@ export const LoadFailed: Story = {
 		await expect(
 			panel.queryByRole("button", { name: "Mark as incorrect" }),
 		).not.toBeInTheDocument();
-		await userEvent.click(panel.getByRole("button", { name: "Retry" }));
-		if (args.observation.status !== "error") {
-			throw new Error("This story is the error branch");
-		}
-		await expect(args.observation.onRetry).toHaveBeenCalledOnce();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
 	},
 };

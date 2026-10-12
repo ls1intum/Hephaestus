@@ -3929,16 +3929,20 @@ export type PracticeProfileOverview = {
     changes: Array<ProfileChange>;
     /**
      * Practices standing as a strength whose newest pieces of work are all clean, longest run first
+     *
+     * @deprecated
      */
-    holdingUp: Array<HeldPractice>;
+    holdingUp?: Array<HeldPractice>;
     /**
      * The newest review run on the developer's work; absent before any ran
      */
     latestRun?: ReviewRunRef;
     /**
      * The pieces of work whose runs fall in the window, deduplicated, newest first
+     *
+     * @deprecated
      */
-    reviewedWork: Array<ReviewedWorkRef>;
+    reviewedWork?: Array<ReviewedWorkRef>;
     /**
      * The span every change below was measured over
      */

@@ -5,8 +5,8 @@ import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { rendersContent } from "@/lib/react-node";
 
-import { DetailDrawerHeader } from "./DetailDrawerHeader";
-import { DetailPath, type LevelPath } from "./DetailPath";
+import { DetailDrawerHeader, LevelPathRow } from "./DetailDrawerHeader";
+import type { LevelPath } from "./DetailPath";
 
 export interface LevelHeaderProps {
 	/** True below the top level, where dismissing returns to the drawer behind. */
@@ -55,16 +55,21 @@ export function LevelHeader({
 	loading = false,
 }: LevelHeaderProps) {
 	return (
-		<DetailDrawerHeader nested={nested}>
+		// The dismiss sits at the start of the path's row, so the title and its standing line up with
+		// the body under them rather than 32px in from it.
+		<DetailDrawerHeader nested={nested} dismiss="inPath">
 			<div className={cn("flex min-w-0 flex-1 flex-col gap-2", aside && "basis-56")}>
-				<DetailPath {...path} current={current} />
+				<LevelPathRow {...path} current={current} />
 				<div className="flex min-w-0 items-center gap-3">
 					{mark}
 					{/* A drawer is named by its title, so the heading stays while the record loads; out of
 					    the row, so the skeleton standing in for it sits where the name will. */}
+					{/* A long name wraps to three lines at most and ends in an ellipsis there; the whole
+					    name is its tooltip. */}
 					<DrawerTitle
+						title={!loading && typeof title === "string" ? title : undefined}
 						className={cn(
-							"min-w-0 text-2xl font-semibold tracking-tight break-words",
+							"line-clamp-3 min-w-0 text-2xl font-semibold tracking-tight break-words",
 							loading && "sr-only",
 						)}
 					>

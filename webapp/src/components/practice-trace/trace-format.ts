@@ -1,6 +1,10 @@
 import type { PracticeTraceEntry, ReviewRequestOutcome, TracedSignal } from "@/api/types.gen";
 import type { ReviewSectionId } from "@/components/admin/practices/review/review-sections";
 import { statusValues } from "@/components/common/status-def";
+import {
+	OBSERVATION_ORIGIN_DEFS,
+	REVIEW_OCCASION_LABELS,
+} from "@/components/practice-vocabulary/observation-origin-defs";
 import { TRACE_OUTCOME_DEFS } from "@/components/practice-vocabulary/trace-outcome-defs";
 
 export type { TraceOutcome } from "@/components/practice-vocabulary/trace-outcome-defs";
@@ -84,16 +88,16 @@ export const REFUSAL_FIXES: Partial<Record<SignalStateReason, RefusalFix>> = {
 export const DISCOVERED_VIA_LABELS: Record<DiscoveredVia, string> = {
 	EVENT: "Live event",
 	SYNC: "Noticed during a sync",
-	MANUAL: "Requested by hand",
-	BACKFILL: "Backfill of past work",
-	SWEEP: "Found by a recurring check",
+	MANUAL: REVIEW_OCCASION_LABELS.MANUAL,
+	BACKFILL: REVIEW_OCCASION_LABELS.BACKFILL,
+	SWEEP: REVIEW_OCCASION_LABELS.SWEEP,
 };
 
 export const DISCOVERED_VIA_DESCRIPTIONS: Record<DiscoveredVia, string> = {
 	EVENT: "Reported by the provider as it happened, so the time is exact.",
 	SYNC: "Spotted by a scheduled sync, so the time is only as precise as the sync.",
-	MANUAL: "Someone asked for this review explicitly.",
-	BACKFILL: "Recorded while catching up on work that predates the connection.",
+	MANUAL: OBSERVATION_ORIGIN_DEFS.MANUAL.description,
+	BACKFILL: OBSERVATION_ORIGIN_DEFS.BACKFILL.description,
 	SWEEP:
 		"Found by the recurring check over recent work, not announced by the provider, so the time is only as precise as the check.",
 };

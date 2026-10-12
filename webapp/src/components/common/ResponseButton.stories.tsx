@@ -90,3 +90,33 @@ export const ResponsesDark: Story = {
 	...Responses,
 	globals: { theme: "dark" },
 };
+
+/**
+ * Quiet responses, as the practice feedback card draws its ratings: no border and no ground at
+ * rest, so they sit below the card's action, and the same tint as an outlined response once pressed.
+ */
+export const Quiet: Story = {
+	render: () => (
+		<div className="flex flex-col gap-2 p-4">
+			{[false, true].map((pressed) => (
+				<div key={String(pressed)} className="flex flex-wrap gap-2">
+					{TONES.map((tone) => (
+						<ResponseButton key={tone} tone={tone} pressed={pressed} quiet>
+							{TONE_LABELS[tone]}
+						</ResponseButton>
+					))}
+				</div>
+			))}
+		</div>
+	),
+	play: async ({ canvas }) => {
+		for (const tone of TONES) {
+			const [rest, pressed] = restAndPressed(
+				canvas.getAllByRole("button", { name: TONE_LABELS[tone] }),
+			);
+			// At rest it paints no ground of its own; pressed, it wears its tone.
+			await expect(groundOf(rest)).toBe("rgba(0, 0, 0, 0)");
+			await expect(groundOf(pressed)).not.toBe(groundOf(rest));
+		}
+	},
+};

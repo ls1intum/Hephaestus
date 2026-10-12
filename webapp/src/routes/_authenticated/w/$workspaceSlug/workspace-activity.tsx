@@ -92,7 +92,7 @@ function WorkspaceActivity() {
 	const facets = useActivityFacets({ ...scope, enabled: peopleEnabled });
 	const ready = people.status === "ready" ? people.people : undefined;
 
-	const stackControls = useDetailStack(detailStack);
+	const stackControls = useDetailStack();
 	const targets = detailStack.map(({ target }) => target);
 	const login = targets.find((target) => target.kind === "person")?.login;
 	const category = targets.find((target) => target.kind === "activity")?.category;

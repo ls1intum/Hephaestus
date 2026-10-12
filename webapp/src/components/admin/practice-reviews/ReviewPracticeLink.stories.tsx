@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, screen } from "storybook/test";
 
-import { levelsOpenedBy } from "@/test/detail-stack";
+import { listOpenedBy } from "@/test/detail-stack";
 
 import { workspacePractices } from "./fixtures";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
@@ -37,8 +37,11 @@ export const WithoutThePracticeRecord: Story = {
 	args: { practice: undefined },
 	play: async ({ canvas, userEvent }) => {
 		const link = canvas.getByRole("link", { name: /Thin controllers/u });
-		// The link stands on its own: without the record it still opens the practice's level.
-		await expect(levelsOpenedBy(link)).toEqual(["practice:thin-controllers"]);
+		// The link stands on its own: without the record it still opens the practice's observations.
+		await expect(listOpenedBy(link)).toEqual({
+			list: "observations",
+			search: { practiceSlug: "thin-controllers" },
+		});
 		await userEvent.hover(link);
 		await expect(screen.queryByText(thinControllers.whyItMatters ?? "")).not.toBeInTheDocument();
 	},

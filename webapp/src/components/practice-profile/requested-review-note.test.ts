@@ -18,7 +18,7 @@ function run(origin: ObservationDetail["origin"], ...outcomes: ObservationDetail
 describe("requestedReviewNote", () => {
 	it("says that a requested review does not move the standing when the newest one found no problem", () => {
 		expect(requestedReviewNote(developing, [run("MANUAL", "MET"), run("LIVE", "NOT_MET")])).toBe(
-			"A review that you requested is evidence only and does not change your standing.",
+			"A requested review is evidence only and does not change your standing.",
 		);
 	});
 

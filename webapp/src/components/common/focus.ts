@@ -19,3 +19,11 @@ export const FOCUS_RING_INSET = `${FOCUS_RING} focus-visible:ring-inset`;
  * inset on top of this, as `StatusIcon` does for its 14 px icon.
  */
 export const HIT_AREA_24 = "relative before:absolute before:-inset-1 before:content-['']";
+
+/**
+ * The ring a table row's own controls wear — its "Open …" link, Track and Trace — so the three
+ * focus alike, and visibly on the light surface, where the half-transparent `--ring` of
+ * `FOCUS_RING` is too faint beside a row's hover.
+ */
+export const ROW_CONTROL_FOCUS =
+	"outline-none focus-visible:ring-2 focus-visible:ring-mentor focus-visible:ring-offset-2 focus-visible:ring-offset-background";

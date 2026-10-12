@@ -1,26 +1,40 @@
-import { cn } from "cn";
-import type { ReviewFeedbackCounts, ReviewObservation } from "@/api/types.gen";
+import type { ReviewObservation } from "@/api/types.gen";
 import type { StatusDef } from "@/components/common/status-def";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
-import { hasText } from "@/lib/text";
+import { StatusLabel } from "@/components/practice-vocabulary/StatusTooltip";
 
-import { feedbackSlots, type OutcomeSlot } from "./review-outcomes";
-
-export function ObservationResultBadge({
+/**
+ * The result and, for a shortfall, its severity, as words beside their icons. A verdict is not an
+ * exception, so neither is a badge: the badges on a level are kept for what went wrong.
+ */
+export function ObservationResult({
 	observation,
 }: {
 	observation: Pick<ReviewObservation, "outcome" | "severity">;
 }) {
 	const severity = observationSeverity(observation);
 	return (
-		<span className="flex flex-wrap items-center gap-1.5">
-			<StatusBadge def={OUTCOME_DEFS[observation.outcome]} />
-			{severity && <StatusBadge def={severity} />}
+		<span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+			<StatusLabel def={OUTCOME_DEFS[observation.outcome]} />
+			{severity && <StatusLabel def={severity} />}
 		</span>
 	);
+}
+
+/** The states a badge is kept for: what failed, was withheld, was disputed or needs a look. */
+export function isExceptionStatus(def: StatusDef): boolean {
+	return def.badgeVariant === "destructive" || def.badgeVariant === "warning";
+}
+
+/**
+ * A record's status on a level: a badge when it is an exception, otherwise its icon and words as
+ * plain text, so the badges that remain are the ones to look at.
+ */
+export function ReviewStatusMark({ def }: { def: StatusDef }) {
+	return isExceptionStatus(def) ? <StatusBadge def={def} /> : <StatusLabel def={def} />;
 }
 
 /**
@@ -36,70 +50,13 @@ export function observationSeverity(
 }
 
 /**
- * LIVE renders nothing: badging the ordinary case buries the exceptions. The words are the
+ * LIVE renders nothing: naming the ordinary case buries the others. The others are plain words, not
+ * a badge: an origin is a fact about the record, not something that went wrong. The words are the
  * registry's, so the operator's console and the developer's own surface name an origin alike.
  */
-export function ObservationOriginBadge({ origin }: { origin: ReviewObservation["origin"] }) {
+export function ObservationOriginNote({ origin }: { origin: ReviewObservation["origin"] }) {
 	if (origin === "LIVE") {
 		return null;
 	}
-	return <StatusBadge def={OBSERVATION_ORIGIN_DEFS[origin]} />;
-}
-
-/**
- * Every slot is drawn, zeroes included, and the template is fixed at each width, so the strip's
- * width does not depend on the numbers in it: a tally that dropped its zeroes would put the same
- * count at a different x on every row, reflow under the reader as a poll refreshes, and make an
- * absent count indistinguishable from one this screen does not render at all.
- *
- * Each number keeps its word beside it, so a screen reader gets "0 not met observations" rather than a
- * bare nought.
- */
-export function ReviewCountStrip({ slots, label }: { slots: OutcomeSlot[]; label: string }) {
-	return (
-		<ul aria-label={label} className="grid grid-cols-2 gap-x-4 gap-y-0.5 sm:grid-cols-4">
-			{slots.map((slot) => (
-				<li key={slot.key} className="flex min-w-0 items-baseline gap-1">
-					<span
-						className={cn(
-							"tabular-nums",
-							slot.count > 0 ? "font-medium text-foreground" : "text-muted-foreground/60",
-						)}
-					>
-						{slot.count}
-					</span>
-					{
-						// A real space, so the pair reads "0 not met observations" to a screen reader and in a
-						// test. Flex drops whitespace-only children, so the visible gap is still the one
-						// `gap-1` sets and this adds nothing to the layout.
-						" "
-					}
-					<span className="min-w-0 break-words">{slot.label}</span>
-				</li>
-			))}
-		</ul>
-	);
-}
-
-export function FeedbackCountsSummary({
-	counts,
-	prefix,
-}: {
-	counts: ReviewFeedbackCounts;
-	/** Names what the numbers count. Only worth passing where the surrounding heading does not
-	 * already say it — under one that does, it is noise. */
-	prefix?: string;
-}) {
-	const parts = feedbackSlots(counts)
-		.filter((slot) => slot.count > 0)
-		.map((slot) => `${slot.count} ${slot.label}`);
-	if (parts.length === 0) {
-		return <span>No feedback composed</span>;
-	}
-	return (
-		<span>
-			{hasText(prefix) && `${prefix} `}
-			{parts.join(" · ")}
-		</span>
-	);
+	return <span>{OBSERVATION_ORIGIN_DEFS[origin].label}</span>;
 }

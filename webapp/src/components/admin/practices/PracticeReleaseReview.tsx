@@ -13,6 +13,7 @@ import {
 	PracticeGuideVersion,
 	PracticeVisualVersion,
 } from "@/components/admin/practice-editor/practice-guidance-version";
+import { PRACTICE_DEFINITION_FIELDS } from "@/components/admin/practices/practice-definition-fields";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,24 +30,6 @@ import {
 
 type Field = PracticeReleaseField["field"];
 type Choice = "CURRENT" | "OFFERED";
-
-const FIELDS = {
-	NAME: { label: "Name", key: "name" },
-	SIGNALS: { label: "When to review", key: "signals" },
-	EVIDENCE_REQUIREMENTS: { label: "Evidence to read", key: "evidenceRequirements" },
-	REVIEW_WHEN: { label: "Review conditions", key: "reviewWhen" },
-	SUBJECT: { label: "Person judged", key: "subject" },
-	PRECONDITION: { label: "Only review when", key: "precondition" },
-	CRITERIA: { label: "Review criteria", key: "criteria" },
-	PRECOMPUTE_SCRIPT: { label: "Static analysis", key: "precomputeScript" },
-	AUTOMATED_REVIEW_POLICY: { label: "Automated review settings", key: "automatedReviewPolicy" },
-	WHY_IT_MATTERS: { label: "Why it matters", key: "whyItMatters" },
-	WHAT_GOOD_LOOKS_LIKE: { label: "What good looks like", key: "whatGoodLooksLike" },
-	GROUP_SLUG: { label: "Group", key: "groupSlug" },
-	DELIVERY_BEHAVIOR: { label: "Feedback delivery", key: "deliveryBehavior" },
-	VISUAL: { label: "Visual", key: "visual" },
-	GUIDE: { label: "Guide", key: "guide" },
-} satisfies Record<Field, { label: string; key: keyof PracticeDefinition }>;
 
 const BASE_SOURCE = {
 	EXACT_ADOPTION: "The exact version previously accepted",
@@ -78,7 +61,7 @@ function fieldText(definition: PracticeDefinition, field: Field): string {
 		const sentences = deliveryBehaviorSentences(definition.deliveryBehavior);
 		return sentences.length > 0 ? sentences.join("\n") : DEFAULT_DELIVERY_BEHAVIOR_TEXT;
 	}
-	const value = definition[FIELDS[field].key];
+	const value = definition[PRACTICE_DEFINITION_FIELDS[field].key];
 	if (value === undefined) {
 		return "Not set";
 	}
@@ -160,7 +143,7 @@ export function PracticeReleaseReview({
 					{proposal.fields.map(({ field, offeredChanged, conflict }) => (
 						<TableRow key={field} variant="static">
 							<TableHead scope="row" className="align-top font-medium">
-								{FIELDS[field].label}
+								{PRACTICE_DEFINITION_FIELDS[field].label}
 								{conflict && (
 									<Badge variant="warning" className="ml-2">
 										Conflict
@@ -182,7 +165,7 @@ export function PracticeReleaseReview({
 							<TableCell className="align-top">
 								{offeredChanged ? (
 									<RadioGroup
-										aria-label={`Use a version for ${FIELDS[field].label}`}
+										aria-label={`Use a version for ${PRACTICE_DEFINITION_FIELDS[field].label}`}
 										value={choices.get(field) ?? ""}
 										disabled={pending !== null}
 										onValueChange={(choice) => {

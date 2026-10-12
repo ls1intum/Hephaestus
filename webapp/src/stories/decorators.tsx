@@ -3,16 +3,22 @@ import { ListChecks } from "lucide-react";
 
 import { StandardPageSurface } from "@/components/layout/StandardPageSurface";
 import type { ProviderType } from "@/lib/provider/provider-terms";
+import { WorkProviderContext } from "@/lib/work-provider-context";
 import { useProviderColors } from "@/runtime/theme/provider-colors";
 
 /**
  * Paints a story in a provider's colours from the document root, as the app does, so that the
- * `--color-provider-*` tokens reach the story's drawers and tooltips too.
+ * `--color-provider-*` tokens reach the story's drawers and tooltips too, and so that a sentence
+ * names the work the way the provider does ("merge requests" on GitLab).
  */
 export function withProvider(provider: ProviderType): Decorator {
 	return function ProviderDecorator(Story) {
 		useProviderColors(provider);
-		return <Story />;
+		return (
+			<WorkProviderContext value={provider}>
+				<Story />
+			</WorkProviderContext>
+		);
 	};
 }
 

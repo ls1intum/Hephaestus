@@ -64,7 +64,7 @@ export const FEEDBACK_STATE_DEFS: Record<FeedbackState, FeedbackStateDef> = {
 		icon: CircleSlashIcon,
 		badgeVariant: "outline",
 		description:
-			"The practice’s review rules changed after this was written, so it closed unresolved.",
+			"The practice’s review settings changed after this was written, so it closed unresolved.",
 	},
 	withdrawn: {
 		label: "Withdrawn",

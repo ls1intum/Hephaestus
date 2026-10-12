@@ -1,11 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 
 import type { ReviewObservation } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/stories/reflow";
+import { daysBefore, hoursBefore } from "@/stories/story-clock";
 import { levelsOpenedBy } from "@/test/detail-stack";
 
-import { feedbackCounts, reviewObservations, workspacePractices } from "./fixtures";
+import { feedbackCounts, reviewObservations } from "./fixtures";
 import { ObservationResults } from "./ObservationResults";
 
 const [firstObservation] = reviewObservations;
@@ -25,15 +26,23 @@ const longContent = {
 	},
 } satisfies ReviewObservation;
 
+/** The fixture's observations spread over a week, about three a day. */
+const overAWeek: ReviewObservation[] = reviewObservations.map((observation, index) => ({
+	...observation,
+	observedAt: index < 3 ? hoursBefore(index + 1) : daysBefore(Math.floor(index / 3)),
+}));
+
 /** Storybook resets a spy that appears in `args` between runs, so one instance is enough. */
 const clearFilters = fn();
+const retry = fn();
 
-/** The practice several of the fixture's observations name, and the one the hover card is read on. */
-const THIN_CONTROLLERS = workspacePractices.find((p) => p.slug === "thin-controllers");
-if (!THIN_CONTROLLERS) {
-	throw new Error("The practice fixtures no longer cover thin-controllers");
-}
+const TABLE = { name: "Observations" } as const;
 
+/**
+ * The Observations stream, drawn as the Reviews table: one body per day under its heading, the time
+ * and the verdict as an icon, the observation with its practice, the work, the developer and what
+ * came of it. The whole row opens the observation's sheet; Track and Trace end it.
+ */
 const meta = {
 	component: ObservationResults,
 	parameters: {
@@ -43,10 +52,6 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		state: { status: "ready", observations: reviewObservations },
-		// A row names its practice but carries none of its prose, so the screen hands the list down and
-		// each row reads its own record out of it. Handed over as a prop, not fetched: see
-		// `ReviewPracticeLink`.
-		practices: workspacePractices,
 	},
 } satisfies Meta<typeof ObservationResults>;
 
@@ -56,22 +61,38 @@ type Story = StoryObj<typeof meta>;
 /** The mixed observation list from the review fixtures. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		// The result is each row's leading icon, named by its label rather than repeated as a badge.
-		await expect(canvas.getAllByRole("button", { name: "Not met" })).toHaveLength(7);
-		await expect(canvas.queryByText("Not met")).not.toBeInTheDocument();
-		canvas.getByRole("button", { name: "Not applicable" });
-		await expect(canvas.queryByRole("button", { name: "Undetermined" })).not.toBeInTheDocument();
-		// Severity qualifies a not met observation, so it is the badge the row keeps.
-		canvas.getByText("Critical");
-		canvas.getByText("Informational");
-		await expect(canvas.getAllByText("Minor")).toHaveLength(3);
-		await expect(canvas.getAllByText("Backfilled")).toHaveLength(2);
-		await expect(canvas.getAllByText("Requested")).toHaveLength(2);
-		await expect(canvas.queryAllByText("No result")).toHaveLength(0);
-		// A row opens its observation over the list, so the list stays where the reader left it.
+		const table = canvas.getByRole("table", TABLE);
 		await expect(
-			levelsOpenedBy(canvas.getByRole("link", { name: firstObservation.summary })),
-		).toEqual([`observation:${firstObservation.id}`]);
+			within(table)
+				.getAllByRole("columnheader")
+				.map((head) => head.textContent),
+		).toEqual(["Observed", "Observation", "Work", "Developer", "Actions", "Open"]);
+		// The verdict is each row's leading icon, named for a screen reader, and no button.
+		await expect(canvas.getAllByText("Not met").length).toBeGreaterThan(0);
+		await expect(canvas.queryByRole("button", { name: "Not met" })).not.toBeInTheDocument();
+		canvas.getByText("Not applicable");
+		// Severity is named only where it costs something: critical or major.
+		canvas.getByText("Critical");
+		await expect(canvas.queryByText("Minor")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("Informational")).not.toBeInTheDocument();
+		await expect(canvas.getAllByText("Backfilled")).toHaveLength(2);
+		// A row opens its observation over the list, so the list stays where the reader left it.
+		const open = canvas
+			.getAllByRole("link", { name: /^Open observation /u })
+			.find((link) => link.getAttribute("aria-label")?.includes(firstObservation.summary) === true);
+		await expect(open === undefined ? [] : levelsOpenedBy(open)).toEqual([
+			`observation:${firstObservation.id}`,
+		]);
+	},
+};
+
+/** A week of observations: one heading per day, newest first, and each row carries only its time. */
+export const ManyDays: Story = {
+	args: { state: { status: "ready", observations: overAWeek } },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		const days = within(canvas.getByRole("table", TABLE)).getAllByRole("rowheader");
+		await expect(days.length).toBeGreaterThan(2);
 	},
 };
 
@@ -84,7 +105,6 @@ export const Undetermined: Story = {
 				{
 					...firstObservation,
 					outcome: "UNDETERMINED",
-
 					severity: undefined,
 					summary: "The captured discussion leaves the chosen approach ambiguous",
 				},
@@ -92,82 +112,71 @@ export const Undetermined: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByRole("button", { name: "Undetermined" });
-		await expect(canvas.queryByRole("button", { name: /outcome/u })).not.toBeInTheDocument();
+		canvas.getByText("Undetermined");
+		// The row's own controls are its Track and Trace, nothing else.
+		await expect(canvas.getAllByRole("button").map((button) => button.title)).toEqual([
+			"",
+			"Track",
+		]);
 		await expect(canvas.queryByText("Critical")).not.toBeInTheDocument();
 	},
 };
 
 /**
- * Feedback a conversation linked without a record that it was shown still counts as composed feedback,
- * so the row names it rather than claiming none was composed.
+ * A row shows the observation, not what became of it: feedback counts are the trace's to tell, so
+ * none appear here even when the observation led to feedback.
  */
-export const UnconfirmedConversationFeedback: Story = {
+export const NoFeedbackCounts: Story = {
 	args: {
 		state: {
 			status: "ready",
-			observations: [
-				{
-					...firstObservation,
-					feedback: feedbackCounts(["UNCONFIRMED"]),
-				},
-			],
+			observations: [{ ...firstObservation, feedback: feedbackCounts(["UNCONFIRMED"]) }],
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Feedback: 1 unconfirmed")).toBeVisible();
-		await expect(canvas.queryByText("No feedback composed")).toBeNull();
+		await expect(canvas.queryByText("1 unconfirmed")).toBeNull();
+		await expect(canvas.queryByText("No feedback")).toBeNull();
 	},
 };
 
 /**
- * The practice on a row does two things: it opens the practice's level over the list, and it says
- * what the practice is without leaving the list. Both are checked, because the card is the half that
- * goes quiet on its own — a row that stops being handed its practice record still renders a
- * perfectly good link.
+ * A row opens one thing, its observation's sheet. The practice and the work are plain text; Track
+ * and Trace end the row.
  */
-export const PracticeOpensItsLevel: Story = {
+export const OneLinkPerRow: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvas, userEvent }) => {
-		// Several observations name this practice, and every one of them opens the same level.
-		const links = await canvas.findAllByRole("link", { name: /Thin controllers/u });
-		for (const link of links) {
-			await expect(levelsOpenedBy(link)).toEqual(["practice:thin-controllers"]);
+	play: async ({ canvas }) => {
+		const rows = within(canvas.getByRole("table", TABLE))
+			.getAllByRole("row")
+			.filter((row) => within(row).queryAllByRole("cell").length > 0);
+		await expect(rows).toHaveLength(reviewObservations.length);
+		for (const row of rows) {
+			await expect(
+				within(row)
+					.getAllByRole("link")
+					.map((link) => link.title),
+			).toEqual(["Trace", ""]);
+			await expect(
+				within(row)
+					.getAllByRole("button")
+					.map((button) => button.title),
+			).toEqual(["Track"]);
 		}
-		// The card is a portal, so it is looked for on the whole screen rather than in the canvas.
-		const [firstLink] = links;
-		if (!firstLink) {
-			throw new Error("No row named the practice");
-		}
-		await userEvent.hover(firstLink);
-		await screen.findByText(THIN_CONTROLLERS.whyItMatters ?? "");
-		await screen.findByText(THIN_CONTROLLERS.whatGoodLooksLike ?? "");
+		await expect(
+			canvas.queryByRole("link", { name: /^Thin controllers/u }),
+		).not.toBeInTheDocument();
+		await expect(canvas.getAllByText("Thin controllers").length).toBeGreaterThan(0);
 	},
 };
 
-export const WithoutPracticeRecords: Story = {
-	args: { practices: undefined },
-	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvas, userEvent }) => {
-		const [link] = await canvas.findAllByRole("link", { name: /Thin controllers/u });
-		if (!link) {
-			throw new Error("No row named the practice");
-		}
-		await expect(levelsOpenedBy(link)).toEqual(["practice:thin-controllers"]);
-		await userEvent.hover(link);
-		await expect(screen.queryByText(THIN_CONTROLLERS.whyItMatters ?? "")).not.toBeInTheDocument();
-	},
-};
-
-export const Mobile: Story = {
+/** On a phone the table scrolls sideways in its frame; the page does not. */
+export const Narrow: Story = {
 	parameters: {
-		chromatic: { disableSnapshot: true },
+		chromatic: { viewports: [320] },
 		viewport: { defaultViewport: "reflow" },
 	},
 	play: async ({ canvas }) => {
-		canvas.getByRole("link", {
-			name: "The queue is called the outbox everywhere except in the config",
-		});
+		canvas.getByRole("table", TABLE);
 		await expectNoPageOverflow();
 	},
 };
@@ -183,14 +192,23 @@ export const LongContent: Story = {
 	},
 };
 
+/** The head stands and the rows wait in their shape, so nothing jumps when they arrive. */
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("table", TABLE)).toHaveAttribute("aria-busy", "true");
+	},
 };
 
 export const Empty: Story = {
 	args: { state: { status: "empty", filtered: false } },
 	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await expect(
+			within(canvas.getByRole("table", TABLE)).getByText("No observations yet"),
+		).toBeVisible();
+	},
 };
 
 export const FilteredToNothing: Story = {
@@ -199,5 +217,47 @@ export const FilteredToNothing: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Clear all filters" }));
 		await expect(clearFilters).toHaveBeenCalled();
+	},
+};
+
+export const LoadFailed: Story = {
+	args: {
+		state: {
+			status: "error",
+			error: { status: 500, detail: "The observation index is unavailable." },
+			onRetry: retry,
+		},
+	},
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas, userEvent }) => {
+		await canvas.findByText("We could not load observations");
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		await expect(retry).toHaveBeenCalled();
+	},
+};
+
+/** The verdict icons, the day headings and the exception badges keep their contrast on dark. */
+export const Dark: Story = {
+	globals: { theme: "dark" },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		canvas.getByRole("table", TABLE);
+	},
+};
+
+/**
+ * Tracking one observation: its row is tinted and its Track pressed, read from the address, as on
+ * the list every table narrows to it.
+ */
+export const Tracked: Story = {
+	parameters: {
+		router: {
+			initialUrl: `/?observationId=${firstObservation.id}&agentJobId=${firstObservation.agentJobId}&selected=true`,
+		},
+	},
+	play: async ({ canvas }) => {
+		const [tracked] = canvas.getAllByRole("button", { name: /^Track observation /u });
+		await expect(tracked).toHaveAttribute("aria-pressed", "true");
+		await expect(tracked?.closest("tr")).toHaveAttribute("data-variant", "highlighted");
 	},
 };

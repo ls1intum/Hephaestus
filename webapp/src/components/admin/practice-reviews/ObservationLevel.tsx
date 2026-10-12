@@ -1,25 +1,15 @@
-import { CircleSlashIcon, MessageSquareTextIcon, Undo2Icon } from "lucide-react";
+import { CircleSlashIcon, Undo2Icon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { cn } from "cn";
-import type {
-	GetPracticeReviewObservationResponse,
-	ObservationInvalidation,
-	Practice,
-} from "@/api/types.gen";
-import { InlineLink } from "@/components/common/InlineLink";
+import type { GetPracticeReviewObservationResponse } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { RelativeTime } from "@/components/common/RelativeTime";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
-import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
-import {
-	ClaimCurrentnessAlert,
-	ClaimCurrentnessBadge,
-} from "@/components/practice-vocabulary/ClaimCurrentness";
-import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { NON_CURRENT } from "@/components/practice-vocabulary/claim-currentness";
 import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
 import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/observation-dispute-defs";
 import {
@@ -27,37 +17,35 @@ import {
 	PROVIDER_COPY_IN_FORCE,
 	PROVIDER_COPY_RESTORED,
 } from "@/components/practice-vocabulary/observation-invalidation-defs";
-import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
+import { Badge } from "@/components/ui/badge";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
-import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/components/ui/empty";
 import { hasText } from "@/lib/text";
 
-import { CorrectionEntry, CorrectionReasonPopover } from "./CorrectionReason";
-import { DisputeAlert } from "./DisputeAlert";
+import { CorrectionReasonPopover } from "./CorrectionReason";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
 import { ObservationEvidence } from "./ObservationEvidence";
-import { feedbackLevel, workLevel } from "./review-levels";
+import {
+	ERASED_ACCOUNT,
+	type SheetEvent,
+	SheetHistory,
+	SheetSection,
+	SheetStatusLine,
+	SheetTechnical,
+} from "./RecordSheet";
 import { ReviewArtifactLink } from "./ReviewArtifact";
-import { ObservationResultBadge } from "./ReviewBadges";
+import { ObservationResult } from "./ReviewBadges";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
 import { ReviewPerson } from "./ReviewPerson";
-import { ReviewPracticeLink } from "./ReviewPracticeLink";
-import { ReviewProvenanceLine } from "./ReviewProvenanceLine";
-import { ReviewRow, ReviewRowLink, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
+import { ReviewPracticeName } from "./ReviewPracticeLink";
+
+type ObservationRecord = GetPracticeReviewObservationResponse;
 
 export interface ObservationLevelProps {
 	nested?: boolean;
 	path: LevelPath;
-	observation: PanelState<{ observation: GetPracticeReviewObservationResponse }>;
-	practices: Practice[] | undefined;
+	observation: PanelState<{ observation: ObservationRecord }>;
 	/**
 	 * Invalidates (`false`) or restores (`true`) the observation, with the admin's reason. Settles when the
 	 * server has answered; the form keeps the reason until it succeeded.
@@ -66,21 +54,50 @@ export interface ObservationLevelProps {
 	isChangingValidity: boolean;
 }
 
+/** The correction in force, if any: the newest one, until it is restored. */
+function correctionInForce(observation: ObservationRecord) {
+	const latest = observation.invalidations.at(0);
+	return latest !== undefined && latest.restoredAt === undefined ? latest : undefined;
+}
+
 /**
- * One observation: what the review saw, why, from which passages, and what feedback it became. Its
- * one decision — mark it incorrect, or restore it — is the footer.
+ * The one flag the status line has room for, most consequential first: marked incorrect, then
+ * disputed, then no longer current.
+ */
+function observationFlag(observation: ObservationRecord): ReactNode {
+	if (correctionInForce(observation) !== undefined) {
+		return <StatusBadge def={MARKED_INCORRECT_DEF} />;
+	}
+	if (observation.disputes.length > 0) {
+		return <StatusBadge def={DEVELOPER_RESPONSE_DEFS.DISPUTED} />;
+	}
+	if (observation.claimCurrentness !== "CURRENT") {
+		const config = NON_CURRENT[observation.claimCurrentness];
+		return <Badge variant={config.badgeVariant}>{config.badge}</Badge>;
+	}
+	return undefined;
+}
+
+/**
+ * One observation's sheet, and only the observation, in the order every sheet has: the status
+ * line (its outcome and severity, the one flag that changes how it reads, when it was observed),
+ * what it is, its history — observed, disputed in the developer's own words, marked incorrect and
+ * restored, no longer current — why it was raised with every passage of evidence, and the technical
+ * facts. Its one decision, mark it incorrect or restore it, is the footer.
+ *
+ * The dispute is shown in full, because it answers this observation. The developer's ratings and
+ * private notes are not: they stay theirs. The feedback written from it and when it was read are
+ * its trace.
  */
 export function ObservationLevel({
 	nested,
 	path,
 	observation: state,
-	practices,
 	onChangeValidity,
 	isChangingValidity,
 }: ObservationLevelProps) {
 	const observation = state.status === "ready" ? state.observation : undefined;
-	const latest = observation?.invalidations.at(0);
-	const inForce = latest !== undefined && latest.restoredAt === undefined ? latest : undefined;
+	const inForce = observation && correctionInForce(observation);
 	const header = (
 		<ReviewLevelHeader
 			nested={nested}
@@ -89,26 +106,15 @@ export function ObservationLevel({
 			loading={state.status === "loading"}
 			chips={
 				observation && (
-					<>
-						<ObservationResultBadge observation={observation} />
-						<ClaimCurrentnessBadge currentness={observation.claimCurrentness} />
-						{inForce && <StatusBadge def={MARKED_INCORRECT_DEF} />}
-						{observation.disputes.length > 0 && (
-							<StatusBadge def={DEVELOPER_RESPONSE_DEFS.DISPUTED} />
-						)}
-					</>
-				)
-			}
-			title={observation?.summary}
-			description={
-				observation && (
-					<ReviewProvenanceLine
-						agentJobId={observation.agentJobId}
-						verb="Observed"
-						at={observation.observedAt}
+					<SheetStatusLine
+						status={<ObservationResult observation={observation} />}
+						flag={observationFlag(observation)}
+						at={{ label: "observed", date: observation.observedAt }}
 					/>
 				)
 			}
+			title={observation?.summary}
+			description={observation && <ReviewArtifactLink reviewedWork={observation.reviewedWork} />}
 		/>
 	);
 
@@ -132,126 +138,76 @@ export function ObservationLevel({
 	}
 
 	const { observation: record } = state;
-	const work = workLevel(record.reviewedWork.kind, record.reviewedWork.id);
 
 	return (
 		<>
 			{header}
 			<DrawerBody className="flex flex-col gap-8 pt-2">
-				<ClaimCurrentnessAlert currentness={record.claimCurrentness} />
-				{inForce && <InvalidationAlert invalidation={inForce} />}
-				{record.disputes.map((dispute) => (
-					<DisputeAlert key={dispute.feedbackId} dispute={dispute} linkFeedback />
-				))}
+				<SheetSection part="what">
+					<ReviewFactGrid>
+						<ReviewFact label="Practice">
+							<ReviewPracticeName practiceName={record.practiceName} group={record.group} />
+						</ReviewFact>
+						<ReviewFact label="Developer">
+							<ReviewPerson person={record.subject} />
+						</ReviewFact>
+						{hasText(record.reviewedWork.title) && (
+							<ReviewFact label="Reviewed work">
+								<span className="break-words">{record.reviewedWork.title}</span>
+							</ReviewFact>
+						)}
+						<ReviewFact label="Origin">
+							<span className="space-y-0.5">
+								<span className="block">{OBSERVATION_ORIGIN_DEFS[record.origin].label}</span>
+								<span className="block text-muted-foreground">
+									{OBSERVATION_ORIGIN_DEFS[record.origin].description}
+								</span>
+							</span>
+						</ReviewFact>
+					</ReviewFactGrid>
+				</SheetSection>
 
-				<ReviewFactGrid>
-					<ReviewFact label="Practice">
-						<ReviewPracticeLink
-							practiceSlug={record.practiceSlug}
-							practiceName={record.practiceName}
-							group={record.group}
-							practice={practices?.find((practice) => practice.slug === record.practiceSlug)}
-						/>
-					</ReviewFact>
-					<ReviewFact label="Developer">
-						<ReviewPerson person={record.subject} />
-					</ReviewFact>
-					<ReviewFact label="Reviewed work">
-						<div className="space-y-1">
-							<ReviewArtifactLink reviewedWork={record.reviewedWork} />
-							{hasText(record.reviewedWork.title) && (
-								<p className="break-words text-muted-foreground">{record.reviewedWork.title}</p>
-							)}
-							{work && (
-								<InlineLink className="font-medium" render={<DetailStackLink entry={work} />}>
-									See everything reviewed on this work
-								</InlineLink>
-							)}
-						</div>
-					</ReviewFact>
-				</ReviewFactGrid>
+				<SheetSection part="state">
+					<SheetHistory events={observationHistory(record)} now={observationNow(record)} />
+				</SheetSection>
 
-				{hasText(record.evidenceRationale) && (
-					<Section level={3} title="Why this was raised">
-						{/* Rendered as the developer's own row renders it, so both read the same text. */}
-						<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
-							<UntrustedMarkdown>{record.evidenceRationale}</UntrustedMarkdown>
-						</div>
-					</Section>
-				)}
+				<SheetSection part="details">
+					<div className="space-y-6">
+						{hasText(record.evidenceRationale) && (
+							<Section level={4} size="sm" title="Why this was raised">
+								{/* The reviewer writes its rationale in Markdown, as the developer's own row shows it. */}
+								<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
+									<UntrustedMarkdown>{record.evidenceRationale}</UntrustedMarkdown>
+								</div>
+							</Section>
+						)}
+						<Section level={4} size="sm" title="Evidence">
+							<ObservationEvidence evidence={record.evidence} />
+						</Section>
+					</div>
+				</SheetSection>
 
-				<Section level={3} title="Evidence">
-					<ObservationEvidence evidence={record.evidence} />
-				</Section>
-
-				<Section level={3} title="Feedback from this observation">
-					{record.feedback.length === 0 ? (
-						<Empty variant="outlined">
-							<EmptyHeader>
-								<EmptyMedia variant="icon">
-									<MessageSquareTextIcon />
-								</EmptyMedia>
-								<EmptyTitle>No feedback came from this observation</EmptyTitle>
-								<EmptyDescription>
-									It was recorded, and no feedback was composed from it.
-								</EmptyDescription>
-							</EmptyHeader>
-						</Empty>
-					) : (
-						<ReviewRowList label="Feedback from this observation">
-							{record.feedback.map((feedback) => (
-								<ReviewRow
-									key={feedback.feedbackId}
-									status={deliveryOutcome(feedback)}
-									title={
-										<ReviewRowLink entry={feedbackLevel(feedback.feedbackId)}>
-											{/* Named by what it is to *this* observation. Titling it with the delivery
-											    place would say nothing about the thing the link opens, and repeat
-											    the fact the meta line beside it already carries. */}
-											{feedback.role === "PRIMARY"
-												? "Feedback about this observation"
-												: "Feedback this observation supports"}
-										</ReviewRowLink>
-									}
-									meta={
-										<>
-											<ReviewRowMeta items={[DELIVERY_PLACE_DEFS[feedback.channel].label]} />
-											{feedback.suppressionReason && (
-												<p>{withholdingReasonSentence(feedback.suppressionReason)}</p>
-											)}
-										</>
-									}
-								/>
-							))}
-						</ReviewRowList>
-					)}
-				</Section>
-
-				{record.invalidations.length > 0 && (
-					<Section level={3} title="Corrections">
-						<ol className="space-y-3 text-sm">
-							{record.invalidations.flatMap((invalidation) => [
-								invalidation.restoredAt !== undefined && (
-									<CorrectionEntry
-										key={`${invalidation.id}-restored`}
-										action="Restored"
-										actor={invalidation.restoredBy}
-										at={invalidation.restoredAt}
-										reason={invalidation.restorationReason}
-										note={PROVIDER_COPY_RESTORED[invalidation.providerCopy]}
-									/>
-								),
-								<CorrectionEntry
-									key={invalidation.id}
-									action="Marked incorrect"
-									actor={invalidation.invalidatedBy}
-									at={invalidation.invalidatedAt}
-									reason={invalidation.reason}
-								/>,
-							])}
-						</ol>
-					</Section>
-				)}
+				<SheetTechnical
+					facts={[
+						{ label: "Observation ID", value: <code>{record.id}</code>, copy: record.id },
+						{
+							label: "Review ID",
+							value: <code>{record.agentJobId}</code>,
+							copy: record.agentJobId,
+						},
+						{
+							label: "Practice revision",
+							value:
+								record.practiceRevisionId === undefined ? "—" : String(record.practiceRevisionId),
+						},
+						{
+							label: "Recurrence key",
+							value: hasText(record.recurrenceKey) ? <code>{record.recurrenceKey}</code> : "—",
+							copy: record.recurrenceKey,
+						},
+						{ label: "Currentness", value: <code>{record.claimCurrentness}</code> },
+					]}
+				/>
 			</DrawerBody>
 			<DrawerFooter>
 				<ValidityPopover
@@ -264,25 +220,82 @@ export function ObservationLevel({
 	);
 }
 
-function InvalidationAlert({ invalidation }: { invalidation: ObservationInvalidation }) {
-	return (
-		<Alert variant="destructive">
-			<CircleSlashIcon />
-			<AlertTitle>Marked as incorrect</AlertTitle>
-			<AlertDescription>
-				<p>
-					{invalidation.invalidatedBy ?? "A workspace admin"} marked this observation as incorrect{" "}
-					<RelativeTime value={invalidation.invalidatedAt} />. Reason: “{invalidation.reason}”
-				</p>
-				<p>
-					It no longer counts toward the developer’s standing, their practice page or Heph. Feedback
-					about it that had not reached anyone was stopped. The developer sees it labelled with this
-					reason in their review history.
-				</p>
-				<p>{PROVIDER_COPY_IN_FORCE[invalidation.providerCopy]}</p>
-			</AlertDescription>
-		</Alert>
-	);
+/**
+ * Observed, each dispute in the developer's own words, each correction and restore with who and
+ * why, and when a later review superseded it: one list, oldest first.
+ */
+export function observationHistory(observation: ObservationRecord): SheetEvent[] {
+	const DisputedIcon = DEVELOPER_RESPONSE_DEFS.DISPUTED.icon;
+	const events: SheetEvent[] = [{ key: "observed", at: observation.observedAt, title: "Observed" }];
+	for (const dispute of observation.disputes) {
+		events.push({
+			key: `disputed-${dispute.feedbackId}`,
+			at: dispute.disputedAt,
+			icon: <DisputedIcon aria-hidden className="size-3.5 text-warning" />,
+			title: `Disputed by the developer, on feedback ${DELIVERY_PLACE_DEFS[dispute.channel].label.toLowerCase()}`,
+			detail: (
+				<blockquote className="mt-1 border-l-2 pl-3 break-words whitespace-pre-wrap text-foreground">
+					{dispute.explanation}
+				</blockquote>
+			),
+		});
+	}
+	for (const correction of observation.invalidations) {
+		events.push({
+			key: correction.id,
+			at: correction.invalidatedAt,
+			title: "Marked incorrect",
+			by: correction.invalidatedBy ?? ERASED_ACCOUNT,
+			detail: `Reason: “${correction.reason}”`,
+		});
+		if (correction.restoredAt !== undefined) {
+			const note = PROVIDER_COPY_RESTORED[correction.providerCopy];
+			events.push({
+				key: `${correction.id}-restored`,
+				at: correction.restoredAt,
+				title: "Restored",
+				by: correction.restoredBy ?? ERASED_ACCOUNT,
+				detail: (
+					<>
+						{hasText(correction.restorationReason) && (
+							<span className="block">Reason: “{correction.restorationReason}”</span>
+						)}
+						{note !== undefined && <span className="block">{note}</span>}
+					</>
+				),
+			});
+		}
+	}
+	if (observation.supersededAt !== undefined) {
+		events.push({
+			key: "superseded",
+			at: observation.supersededAt,
+			title: "No longer current",
+			detail: "A later change to the reviewed work superseded it.",
+		});
+	}
+	return events;
+}
+
+/** What the current state means, in one or two sentences, in place of an alert. */
+function observationNow(observation: ObservationRecord): ReactNode {
+	const inForce = correctionInForce(observation);
+	if (inForce !== undefined) {
+		return (
+			<>
+				It no longer counts toward the developer’s standing, their practice pages or Heph, and
+				feedback about it that had not reached anyone was stopped.{" "}
+				{PROVIDER_COPY_IN_FORCE[inForce.providerCopy]}
+			</>
+		);
+	}
+	if (observation.disputes.length > 0) {
+		return "While the dispute stands, a later review of the same work does not raise the same point again. Mark the observation incorrect if it was wrong.";
+	}
+	if (observation.claimCurrentness !== "CURRENT") {
+		return NON_CURRENT[observation.claimCurrentness].description;
+	}
+	return undefined;
 }
 
 function ValidityPopover({

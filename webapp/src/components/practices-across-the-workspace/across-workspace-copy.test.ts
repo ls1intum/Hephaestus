@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { WorkspaceSplit } from "@/api/types.gen";
 
-import { barsHint, splitDescription, tilesHint } from "./across-workspace-copy";
+import { barsHint, FIGURES_PLAIN, splitDescription } from "./across-workspace-copy";
 
 const split = (
 	needsAttention: number,
@@ -50,32 +50,30 @@ describe("splitDescription", () => {
 	});
 });
 
-describe("tilesHint", () => {
-	const tiles = { window: "DAYS_30", developersWithAStandingInWindow: 41 } as const;
-
-	it.each([
-		["DAYS_30", "the 41 developers in this workspace who have a standing in the last 30 days by"],
-		["DAYS_90", "the 41 developers in this workspace who have a standing in the last 90 days by"],
-		["ALL_TIME", "the 41 developers in this workspace who have a standing so far by"],
-	] as const)("names the %s window in the toggle's words", (window, phrase) => {
-		expect(tilesHint({ ...tiles, window })[0]).toContain(phrase);
+describe("FIGURES_PLAIN", () => {
+	it("holds no count and no window, so it reads the same for every filter", () => {
+		// The words only: a swatch's class name may carry digits.
+		const words = FIGURES_PLAIN.flatMap((group) => [
+			group.heading,
+			...group.lines.flatMap((line) => [line.term, line.text, JSON.stringify(line.second)]),
+		]);
+		expect(words.join(" ")).not.toMatch(/\d|days|so far/u);
 	});
 
-	it("agrees count, noun and verb in the singular", () => {
-		const [band] = tilesHint({ ...tiles, developersWithAStandingInWindow: 1 });
-		expect(band).toContain("the 1 developer in this workspace who has a standing");
+	it("answers four questions that do not overlap, each line led by its key term", () => {
+		expect(
+			FIGURES_PLAIN.map((group) => [group.heading, group.lines.map((line) => line.term)]),
+		).toStrictEqual([
+			["What you see", ["Grey band:", "Blue marker:"]],
+			["How to read it", ["Left of the band:", "Better or worse:"]],
+			["When the band is missing", ["No band:"]],
+			["What counts", ["Open feedback:"]],
+		]);
 	});
 
-	it("says plainly that a band over few developers can show one person's value", () => {
-		expect(tilesHint(tiles)[0]).toMatch(
-			/When only a few developers are counted, the band can show the value of one person\.$/u,
-		);
-	});
-
-	it("says why there is no band when nobody is counted", () => {
-		expect(tilesHint({ ...tiles, developersWithAStandingInWindow: 0 })[0]).toBe(
-			"No developer in this workspace has a standing in the last 30 days, so these figures have no typical range.",
-		);
+	it("draws the band's and the marker's colours beside their lines", () => {
+		const [whatYouSee] = FIGURES_PLAIN;
+		expect(whatYouSee?.lines.every((line) => line.swatchClass !== undefined)).toBe(true);
 	});
 });
 

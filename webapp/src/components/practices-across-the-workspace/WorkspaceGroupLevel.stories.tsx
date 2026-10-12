@@ -13,6 +13,7 @@ import { expectNoPanelOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 
 import { ACROSS_THE_WORKSPACE } from "./across-workspace-copy";
+import { CAME_FROM_YOUR_PROFILE } from "./WorkspaceComparisonTable";
 import { WorkspaceGroupLevel } from "./WorkspaceGroupLevel";
 
 /**
@@ -26,18 +27,13 @@ const meta = {
 	args: {
 		path: { behind: [{ label: ACROSS_THE_WORKSPACE, depth: 0 }], onClose: fn() },
 		state: { status: "ready", group: PACKAGING_GROUP },
-		onGoToProfile: fn(),
 		onGoToPractice: fn(),
 	},
 	argTypes: { path: { control: false } },
 	render: (args) => (
 		<Stateful initial={[{ kind: "practice-group", id: PACKAGING_GROUP.groupSlug }]}>
 			{(stack, setStack) => (
-				<DetailDrawerStack
-					stack={stack}
-					size="detailWide"
-					onClose={(depth) => setStack(stack.slice(0, depth))}
-				>
+				<DetailDrawerStack stack={stack} onClose={(depth) => setStack(stack.slice(0, depth))}>
 					{(_entry, level) => (
 						<WorkspaceGroupLevel
 							{...args}
@@ -62,8 +58,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * The head carries the crumb, the group and its split with the You marker, and the way to the group
- * in the reader's profile. The reader's own standing and trend are there, not here.
+ * The head carries the crumb, the group and its split with the You marker. The way to the group in
+ * the reader's profile is the level's footer, which the route adds. The reader's own standing and
+ * trend are there, not here.
  */
 export const Default: Story = {
 	play: async ({ args }) => {
@@ -76,12 +73,6 @@ export const Default: Story = {
 				name: "28 developers with a current standing in this workspace: 7 Needs attention, 6 Mixed feedback, 8 Going well, 7 none yet. The You marker is on Needs attention.",
 			})[0],
 		).toBeVisible();
-		await userEvent.click(
-			level.getByRole("button", {
-				name: "Open in your Practice profile Packaging work for review",
-			}),
-		);
-		await expect(args.onGoToProfile).toHaveBeenCalledOnce();
 		const table = within(
 			level.getByRole("table", { name: "Practices of Packaging work for review" }),
 		);
@@ -100,8 +91,13 @@ export const Default: Story = {
 				name: "28 developers with a current standing in this workspace: 1 Needs attention, 0 Mixed feedback, 2 Going well, 25 none yet. The You marker is on none yet.",
 			}),
 		).toBeVisible();
+		// The bars' explanation waits behind the legend's (i), worded for a practice.
+		await expect(level.queryByText(/^Each bar counts developers/u)).toBeNull();
+		await userEvent.click(level.getByRole("button", { name: "About the bars" }));
+		const bars = within(await screen.findByRole("dialog", { name: "About the bars" }));
+		await expect(bars.getByText(/current standing in the practice,/u)).toBeVisible();
 		await expect(
-			level.getByText(/So a small count can let others tell where you stand\.$/u),
+			bars.getByText(/So a small count can let others tell where you stand\.$/u),
 		).toBeVisible();
 	},
 };
@@ -128,7 +124,7 @@ export const NobodyYet: Story = {
 		await expect(level.getAllByText("No developer has a standing yet.")).toHaveLength(2);
 		await expect(
 			level.getByRole("button", {
-				name: "Open in your Practice profile Packaging work for review",
+				name: "Open in your Practice profile Scope the change to one concern",
 			}),
 		).toBeVisible();
 	},
@@ -166,7 +162,16 @@ export const Loading: Story = {
 	play: async () => {
 		await settledDrawerPanel();
 		await expect(screen.getByRole("table")).toHaveAttribute("aria-busy", "true");
+		await expect(screen.getByRole("table").closest("[data-slot=drawer-body]")).toHaveAttribute(
+			"aria-busy",
+			"true",
+		);
 	},
+};
+
+export const LoadingDark: Story = {
+	args: Loading.args,
+	globals: { theme: "dark" },
 };
 
 /** The overview failed: the level says so and retries, rather than closing over a stale address. */
@@ -215,5 +220,24 @@ export const Reflow: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
 		await expectNoPanelOverflow(await settledDrawerPanel());
+	},
+};
+
+/**
+ * The practice the reader came from in their Practice profile
+ * keeps the bar on its leading edge, and says so to a screen reader: `aria-current` on its row and
+ * a hidden sentence after its name. No level is open, so the row is not marked open.
+ */
+export const MarkedPractice: Story = {
+	args: { focusPracticeSlug: PACKAGING_GROUP.practices[0]?.practiceSlug },
+	play: async () => {
+		const panel = await settledDrawerPanel();
+		const marked = within(panel)
+			.getAllByRole("row")
+			.filter((row) => row.getAttribute("aria-current") === "true");
+		await expect(marked).toHaveLength(1);
+		const [row] = marked;
+		await expect(row).toHaveTextContent(CAME_FROM_YOUR_PROFILE);
+		await expect(row).not.toHaveAttribute("data-state", "open");
 	},
 };

@@ -7,7 +7,7 @@ import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawe
 import type { PracticeGuidanceState } from "@/components/practice-guidance/PracticeIntro";
 import type { ReviewRunFeedState } from "@/components/profile/review-runs";
 import { DrawerBody, DrawerTitle } from "@/components/ui/drawer";
-import { withPageBehind } from "@/stories/decorators";
+import { withPageBehind, withProvider } from "@/stories/decorators";
 import { useFeedbackRatings } from "@/stories/feedback-ratings";
 import { expectSettledVisible } from "@/stories/overlay";
 import {
@@ -72,7 +72,7 @@ function RatedLevel(props: PracticeDetailLevelProps) {
 const meta = {
 	component: PracticeDetailLevel,
 	parameters: { layout: "fullscreen" },
-	decorators: [withPageBehind],
+	decorators: [withPageBehind, withProvider("GITHUB")],
 	args: {
 		path: {
 			behind: [
@@ -114,7 +114,6 @@ const meta = {
 			{(state, patch) => (
 				<DetailDrawerStack
 					stack={state.stack}
-					size="detailWide"
 					onClose={(depth) => patch({ stack: state.stack.slice(0, depth) })}
 				>
 					{(entry, level) =>
@@ -164,30 +163,46 @@ if (!olderObservation) {
 
 /**
  * Opens on the practice's introduction — why it matters, then the picture captioned with what good
- * looks like — over the tabs. The observations come first, under
- * where the reader stands, with the newest open to why it was noted, the evidence, the next step
- * and its response controls; every earlier row is a line the reader can open. Nothing was loaded
- * to open it.
+ * looks like — over the tabs. The feedback written about the practice leads the rail and is the
+ * tab selected, with the observations and the guide beside it.
  */
 export const Default: Story = {
 	play: async () => {
-		await expectSettledVisible(await screen.findByRole("heading", { name: "Observations" }));
+		await expectSettledVisible(await screen.findByRole("heading", { level: 2, name: "Feedback" }));
+		const [first, second, third] = screen.getAllByRole("tab");
+		await expect(first).toHaveAccessibleName("Feedback 1");
+		await expect(second).toHaveAccessibleName("Observations 3");
+		await expect(third).toHaveAccessibleName("Guide");
 		const intro = screen.getByRole("region", { name: "Introduction" });
 		await expect(precedes(intro, screen.getByRole("tablist", { name: "Practice" }))).toBe(true);
 		await expect(
 			within(intro).getByRole("figure", { name: focusedChanges.whatGoodLooksLike }),
 		).toBeVisible();
+		await expect(screen.getByRole("tab", { name: "Feedback 1" })).toHaveAttribute(
+			"aria-selected",
+			"true",
+		);
+		await expect(screen.getByRole("tab", { name: "Observations 3" })).toHaveAttribute(
+			"aria-selected",
+			"false",
+		);
+		await expect(screen.queryByRole("heading", { name: "Observations" })).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * On the observations, the newest is open to why it was noted, the evidence, the next step and
+ * its response controls; every earlier row is a line the reader can open. Nothing was loaded to
+ * open it.
+ */
+export const ObservationsTab: Story = {
+	args: { tab: "observations" },
+	play: async () => {
+		await expectSettledVisible(await screen.findByRole("heading", { name: "Observations" }));
 		await expect(screen.getByRole("tab", { name: "Guide" })).toHaveAttribute(
 			"aria-selected",
 			"false",
 		);
-		// Where the reader stands leads the observations it rests on.
-		await expect(
-			precedes(
-				screen.getByRole("region", { name: "Where you stand" }),
-				screen.getByRole("heading", { name: "Observations" }),
-			),
-		).toBe(true);
 		// Below the top, dismissing returns to the group behind, so the control says Back.
 		await expect(screen.getByRole("button", { name: "Back" })).toBeVisible();
 		// The feed holds every run there is, so the tab can say how many observations it opens on.
@@ -238,14 +253,12 @@ export const Default: Story = {
  * only, where the reader sees both.
  */
 export const RequestedReviewClean: Story = {
-	args: { feed: { ...readyFeed, runs: [requestedCleanRun, ...detailRuns] } },
+	args: { tab: "observations", feed: { ...readyFeed, runs: [requestedCleanRun, ...detailRuns] } },
 	play: async () => {
 		await expectSettledVisible(await screen.findByRole("heading", { name: "Observations" }));
 		await expect(screen.getAllByText("Needs attention")).not.toHaveLength(0);
 		await expect(
-			screen.getByText(
-				/A review that you requested is evidence only and does not change your standing\./u,
-			),
+			screen.getByText(/A requested review is evidence only and does not change your standing\./u),
 		).toBeVisible();
 		await expect(screen.getByText("Requested")).toBeVisible();
 	},
@@ -336,7 +349,8 @@ export const FeedbackOnTheWorkOnly: Story = {
 	},
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("No feedback yet"));
-		await userEvent.click(screen.getByRole("button", { name: "Show observations" }));
+		await expect(screen.queryByRole("button", { name: "Show observations" })).toBeNull();
+		await userEvent.click(screen.getByRole("tab", { name: "Observations 3" }));
 		await expect(screen.getByRole("tab", { name: "Observations 3" })).toHaveAttribute(
 			"aria-selected",
 			"true",
@@ -383,13 +397,13 @@ export const GuideTab: Story = {
 
 /**
  * A practice with a picture and no guide has no Guide tab, so a link that asks for the guide lands
- * on the observations instead of an empty tab.
+ * on the feedback instead of an empty tab.
  */
 export const WithoutGuide: Story = {
 	args: { tab: "guide", guidance: { status: "ready", visual: bundledGuidance.visual } },
 	play: async () => {
-		await expectSettledVisible(await screen.findByRole("heading", { name: "Observations" }));
-		await expect(screen.getByRole("tab", { name: "Observations 3" })).toHaveAttribute(
+		await expectSettledVisible(await screen.findByRole("heading", { level: 2, name: "Feedback" }));
+		await expect(screen.getByRole("tab", { name: "Feedback 1" })).toHaveAttribute(
 			"aria-selected",
 			"true",
 		);
@@ -398,23 +412,15 @@ export const WithoutGuide: Story = {
 	},
 };
 
-/**
- * Where the reader stands, in the registry's words and what each rests on, boxed under its label at
- * the top of the observations.
- */
-export const Standing: Story = {
+/** No "Where you stand" section: the header's badge and trend carry the standing. */
+export const WithoutWhereYouStand: Story = {
+	args: { tab: "observations" },
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("Where you stand"));
-		const standingLine = screen.getByText(
-			"Recent reviews here mostly found problems. Read from six pieces of work. Your latest work counts most, and older work counts less.",
-		);
-		const trendLine = screen.getByText(
-			"Recent reviewed work carried more strengths than the stretch before it. Compared your latest six pieces of reviewed work with the five before them. Evidence spans 12 days.",
-		);
-		await expect(standingLine).toBeVisible();
-		await expect(trendLine).toBeVisible();
-		// The two lines share one box under the label.
-		await expect(standingLine.parentElement).toBe(trendLine.parentElement);
+		await expectSettledVisible(await screen.findByRole("heading", { name: "Observations" }));
+		await expect(screen.queryByText("Where you stand")).not.toBeInTheDocument();
+		await expect(
+			screen.queryByText(/counts most, and older work counts less/u),
+		).not.toBeInTheDocument();
 	},
 };
 
@@ -423,7 +429,7 @@ export const Standing: Story = {
  * alone would be short, and would grow as the reader pressed.
  */
 export const MoreToLoad: Story = {
-	args: { feed: { ...readyFeed, hasMore: true } },
+	args: { tab: "observations", feed: { ...readyFeed, hasMore: true } },
 	play: async () => {
 		await expectSettledVisible(await screen.findByRole("button", { name: "View earlier reviews" }));
 		await expect(screen.getByRole("tab", { name: "Observations" })).toBeVisible();
@@ -434,8 +440,8 @@ export const MoreToLoad: Story = {
 };
 
 /**
- * A practice no review has settled: the badge and the trend both say so in words about this one
- * practice, and where the reader stands claims no basis and no direction.
+ * A practice no review has settled: the badge and the trend in the header say so, and nothing
+ * claims a basis or a direction.
  */
 export const NotObserved: Story = {
 	args: {
@@ -448,11 +454,8 @@ export const NotObserved: Story = {
 		feed: { ...readyFeed, runs: [] },
 	},
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("Where you stand"));
-		await expect(screen.getAllByText("Not observed yet")).toHaveLength(2);
-		await expect(
-			screen.getByText("No review has observed this practice in your work yet."),
-		).toBeVisible();
+		await expectSettledVisible(await screen.findByRole("region", { name: "Introduction" }));
+		await expect(screen.getAllByText("Not observed yet")).toHaveLength(1);
 		await expect(screen.queryByText(/No practice in this group/u)).not.toBeInTheDocument();
 		await expect(screen.queryByText(/Read from|counts most/u)).not.toBeInTheDocument();
 		await expect(screen.queryByText(/pieces? of work$/u)).not.toBeInTheDocument();
@@ -461,9 +464,21 @@ export const NotObserved: Story = {
 	},
 };
 
-/** The rail and the feed each draw their own shape, so nothing jumps when the level lands. */
+/**
+ * The rail and the tab it opens on each draw their own shape, so nothing jumps when the level
+ * lands: a feedback card by default.
+ */
 export const Loading: Story = {
 	args: { isLoading: true, practice: undefined },
+	play: async () => {
+		await screen.findByText("Loading feedback…");
+		await expect(screen.queryByRole("tab")).toBeNull();
+	},
+};
+
+/** Asked for the observations, the level loads in the feed's shape instead. */
+export const LoadingObservations: Story = {
+	args: { isLoading: true, practice: undefined, tab: "observations" },
 	play: async () => {
 		await screen.findByText("Loading reviews…");
 		await expect(screen.queryByRole("tab")).toBeNull();
@@ -484,6 +499,7 @@ export const Missing: Story = {
 };
 
 export const MobileReflow: Story = {
+	args: { tab: "observations" },
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("PracticeCatalogLoader.java"));
@@ -495,4 +511,38 @@ export const MobileReflow: Story = {
 		}
 		await expectNoPanelOverflow(frontmost);
 	},
+};
+
+// --- The pattern label and the folds ------------------------------------------------------------
+
+/** The pattern stays in the group's table, never in this header. */
+export const PatternNotInHeader: Story = {
+	args: { practice: describedPractice },
+	play: async () => {
+		await expectSettledVisible(
+			await screen.findByRole("heading", { name: describedPractice.name }),
+		);
+		await expect(screen.queryByText(/^Has open feedback/u)).not.toBeInTheDocument();
+	},
+};
+
+/** A practice that never applied says so instead of a gap. */
+export const NeverApplied: Story = {
+	args: {
+		practice: { ...focusedChanges, standing: "NO_OPPORTUNITY", notApplicableOnly: true },
+		neverApplied: true,
+	},
+	play: async () => {
+		await expect(await screen.findAllByText("Does not apply to your work yet")).not.toHaveLength(0);
+	},
+};
+
+export const NeverAppliedDark: Story = {
+	args: { practice: describedPractice, neverApplied: true },
+	globals: { theme: "dark" },
+};
+
+export const NeverAppliedPhone: Story = {
+	args: { practice: describedPractice, neverApplied: true },
+	globals: { viewport: { value: "mobile" } },
 };

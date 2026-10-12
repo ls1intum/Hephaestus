@@ -110,7 +110,7 @@ export const READY_ADMIN: ReadyContext = {
 	canInspectReviewDetails: true,
 	links: {
 		...READY.links,
-		reviewDetails: `${WEB_APP}/w/intro-course/admin/practices/reviews/work?detail=work%3Apull-request%3A4009`,
+		reviewDetails: `${WEB_APP}/w/intro-course/admin/practices/reviews/runs?artifactKind=scm.pull_request&artifactId=4009&detail=work%3Apull-request%3A4009`,
 	},
 };
 

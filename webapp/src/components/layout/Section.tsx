@@ -24,14 +24,16 @@ export interface SectionProps
 	title: ReactNode;
 	description?: ReactNode;
 	actions?: ReactElement | undefined;
-	/** `h3` when the section sits inside another one, so the outline stays truthful. */
-	level?: 2 | 3;
+	/** `h3` when the section sits inside another one, `h4` one step further, so the outline stays truthful. */
+	level?: 2 | 3 | 4;
 	/**
 	 * Base for `${id}-title` and `${id}-description`, for a nested control that has to be named or
 	 * described by them — a `role="radiogroup"` is not named by an enclosing heading.
 	 */
 	id?: string;
 }
+
+const HEADINGS = { 2: "h2", 3: "h3", 4: "h4" } as const;
 
 /**
  * Configured rather than composed: the three holes always take the same kinds of thing, and a
@@ -50,7 +52,7 @@ export function Section({
 }: SectionProps) {
 	const generatedId = useId();
 	const base = id ?? generatedId;
-	const Heading = level === 2 ? "h2" : "h3";
+	const Heading = HEADINGS[level];
 
 	return (
 		<section

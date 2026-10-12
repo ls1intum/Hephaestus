@@ -36,7 +36,7 @@ const loaded = {
 	activity: { status: "ready", trace: namedTrace },
 } satisfies ProfileReviewDetailState;
 
-const practiceTable = () => screen.getByRole("table", { name: "Every practice on this work" });
+const practiceTable = () => screen.getByRole("table", { name: "Every practice in this review" });
 
 /** Always stacked on the reviews list, so every story mounts it as a drawer's second level. */
 const meta = {
@@ -66,7 +66,6 @@ const meta = {
 	render: (args) => (
 		<DetailDrawerStack
 			stack={[REVIEWS_LEVEL, reviewLevel(openProfileReviewRun.reviewId)]}
-			size="detailWide"
 			onClose={fn()}
 		>
 			{(entry, level) =>
@@ -101,7 +100,7 @@ export const Default: Story = {
 		await userEvent.click(screen.getByRole("button", { name: "Request review" }));
 		await expect(args.onReviewNow).toHaveBeenCalledWith(openProfileReviewRun.reviewedWork);
 		await expect(screen.getByText("Requested")).toBeVisible();
-		await expect(screen.getByText("2nd review")).toBeVisible();
+		await expect(screen.getByText("Review 2")).toBeVisible();
 		await expect(screen.getByRole("tab", { name: "Every practice 4" })).toBeVisible();
 		await expect(screen.getByRole("tab", { name: "What we noticed 5" })).toBeVisible();
 
@@ -386,7 +385,7 @@ export const ActivityLoading: Story = {
 	args: { state: { ...loaded, activity: { status: "loading" } } },
 	play: async () => {
 		await settledDrawerPanel();
-		await expect(screen.getByText("2nd review")).toBeVisible();
+		await expect(screen.getByText("Review 2")).toBeVisible();
 		await expect(practiceTable()).toHaveAttribute("aria-busy", "true");
 	},
 };

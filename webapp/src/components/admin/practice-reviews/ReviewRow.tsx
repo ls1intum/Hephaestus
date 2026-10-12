@@ -5,15 +5,15 @@ import { InlineLink } from "@/components/common/InlineLink";
 import type { StatusDef } from "@/components/common/status-def";
 import type { DetailStackEntry } from "@/components/layout/detail-drawer/detail-stack";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
-import { StatusIcon } from "@/components/practice-vocabulary/StatusTooltip";
+import { StatusGlyph } from "@/components/practice-vocabulary/StatusTooltip";
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { hasText } from "@/lib/text";
 
 export interface ReviewRowProps {
 	/**
-	 * What the row's record is, drawn as the leading icon in its tone: a button named by its label,
-	 * whose tooltip says the words. It is not repeated as a badge: the trailing column carries only
-	 * what qualifies it.
+	 * What the row's record is, drawn as the leading icon in its tone and named by its label for a
+	 * screen reader. It is no button: the row's one control is its title. It is not repeated as a
+	 * badge: the trailing column carries only what qualifies it.
 	 */
 	status: StatusDef;
 	/** The row's one link, stretched over the whole row; {@link ReviewRowLink} draws it. */
@@ -21,6 +21,11 @@ export interface ReviewRowProps {
 	meta?: ReactElement | undefined;
 	/** People and qualifying badges, in the trailing column. */
 	chips?: ReviewRowChip[];
+	/**
+	 * The row's Track and Trace (`RecordRowActions`), last in the row and apart from its link. A row
+	 * whose record is tracked is tinted, read off the pressed Track toggle.
+	 */
+	actions?: ReactElement;
 }
 
 export interface ReviewRowChip {
@@ -35,12 +40,18 @@ export interface ReviewRowChip {
 
 /**
  * One record in a divided list, drawn the way Activity draws a piece of open work: the status icon,
- * the title that opens the record over the page, the facts that place it, and at the end who it is
- * about and what qualifies it.
+ * the title that opens the record's sheet over the page, the facts that place it, at the end who it
+ * is about and what qualifies it, and last its Track and Trace. The title is the row's one link: the
+ * facts are plain text.
  */
-export function ReviewRow({ status, title, meta, chips }: ReviewRowProps) {
+export function ReviewRow({ status, title, meta, chips, actions }: ReviewRowProps) {
 	return (
 		<Item render={<li />} variant="row" size="sm" className="relative items-start">
+			{/* The tracked record's row is tinted, read off its pressed Track toggle. */}
+			<span
+				aria-hidden
+				className="pointer-events-none absolute inset-0 hidden bg-primary/5 group-has-[[data-track][aria-pressed=true]]/item:block"
+			/>
 			{/* The open row keeps a bar on its leading edge, as an open practice row does. It is drawn
 			    from the title link's `aria-current`, so what a screen reader hears and what the eye sees
 			    are one fact. */}
@@ -49,9 +60,7 @@ export function ReviewRow({ status, title, meta, chips }: ReviewRowProps) {
 				className="absolute inset-y-0 left-0 hidden w-0.5 bg-mentor group-has-[[data-slot=item-title]_[aria-current]]/item:block"
 			/>
 			<ItemMedia className="mt-0.5">
-				{/* A button, so a keyboard reaches the words as well as a pointer: the row shows them
-				    nowhere else. `z-10` lifts it over the title's stretched link. */}
-				<StatusIcon def={status} className="z-10 size-4 justify-center" />
+				<StatusGlyph def={status} className="size-4 justify-center" />
 			</ItemMedia>
 			<ItemContent className="min-w-0 basis-48 gap-1">
 				<ItemTitle className="line-clamp-none block w-full min-w-0 break-words [&_a]:after:absolute [&_a]:after:inset-0">
@@ -79,6 +88,7 @@ export function ReviewRow({ status, title, meta, chips }: ReviewRowProps) {
 						))}
 					</ItemActions>
 				)}
+			{actions !== undefined && <div className="shrink-0 self-start">{actions}</div>}
 		</Item>
 	);
 }
@@ -97,7 +107,7 @@ export interface ReviewRowLinkProps {
  */
 export function ReviewRowLink({ entry, className, children }: ReviewRowLinkProps) {
 	return (
-		<InlineLink render={<DetailStackLink entry={entry} />} className={className}>
+		<InlineLink render={<DetailStackLink entry={entry} single />} className={className}>
 			{children}
 		</InlineLink>
 	);

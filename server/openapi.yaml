@@ -17513,6 +17513,7 @@ components:
             $ref: "#/components/schemas/ProfileChange"
         holdingUp:
           type: array
+          deprecated: true
           description: "Practices standing as a strength whose newest pieces of work\
             \ are all clean, longest run first"
           items:
@@ -17523,6 +17524,7 @@ components:
             any ran
         reviewedWork:
           type: array
+          deprecated: true
           description: "The pieces of work whose runs fall in the window, deduplicated,\
             \ newest first"
           items:
@@ -17532,8 +17534,6 @@ components:
           description: The span every change below was measured over
       required:
       - changes
-      - holdingUp
-      - reviewedWork
       - window
     PracticeReleaseField:
       type: object

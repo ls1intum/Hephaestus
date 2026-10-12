@@ -1,22 +1,32 @@
 import { addDays } from "date-fns";
 import type {
 	AgentJob,
+	AgentJobUsage,
+	ArtifactTrace,
 	AutonomyAssignment,
+	DeliveryPolicyTrace,
 	EvidenceCitation,
 	Practice,
 	PracticeReviewBucket,
 	PracticeReviewCounts,
 	PracticeReviewOverview,
+	PracticeReviewQueue,
+	PracticeReviewQueueItem,
+	PracticeReviewTiming,
+	PracticeRevision,
 	ReviewedWorkRef,
 	ReviewFeedback,
 	ReviewFeedbackCounts,
 	ReviewFeedbackDetail,
+	ReviewFeedbackLocationCounts,
+	ReviewFeedbackReasonCount,
 	ReviewObservation,
 	ReviewObservationCounts,
 	ReviewObservationDetail,
 	ReviewRunSummary,
 	ReviewRunTarget,
 	ReviewSubject,
+	ReviewWorkFacts,
 	WorkspaceMembership,
 } from "@/api/types.gen";
 import { EMPTY_REVIEW_SETTINGS } from "@/components/admin/practice-editor/review-settings";
@@ -25,10 +35,15 @@ import {
 	REVIEW_RANGE_DEFS,
 	reviewRangeStart,
 } from "@/components/admin/practice-reviews/review-range";
+import {
+	artifactTrace,
+	deniedDeliveryPolicyEvaluation,
+} from "@/components/practice-trace/fixtures";
+import { OPERATOR_WITHHELD_TEXT } from "@/components/practice-vocabulary/delivery-place-defs";
 import { ARTIFACT_KIND, type KnownArtifactKind } from "@/lib/artifact-kinds";
 import { toDayParam } from "@/lib/date-range-search";
 import { hasText } from "@/lib/text";
-import { minutesAfter, STORY_NOW } from "@/stories/story-clock";
+import { minutesAfter, minutesBefore, STORY_NOW } from "@/stories/story-clock";
 
 import type { OutcomeScope } from "./review-outcomes";
 import type { OverviewRegionState } from "./review-states";
@@ -346,6 +361,8 @@ interface FeedbackSpec {
 	 * preview and truncation flag are derived from it. */
 	body?: string;
 	channel: ReviewFeedback["channel"];
+	/** Where a conversation raised it; absent, delivered conversation feedback reads as the app's. */
+	conversation?: "HEPH" | "SLACK";
 	outcome: ReviewFeedback["deliveryState"];
 	withheldFor?: ReviewFeedback["suppressionReason"];
 	recipient: ReviewSubject;
@@ -409,6 +426,24 @@ const cited = (sourceKind: string, path: string, quote: string, line = 1): Evide
 	quote,
 	quoteRedacted: false,
 });
+
+/**
+ * A summary comment exactly as Hephaestus posts it on a pull request
+ * (`PracticeFeedbackCommentFormatter`): the hidden marker, the composer's text, a rule, and the
+ * `<sub>` footer with its two links. The stored body is this text, so every page that shows it
+ * must render the HTML the way GitHub does.
+ */
+export const POSTED_SUMMARY_COMMENT = [
+	"<!-- hephaestus:practice-review:774b9e9b-2c40-4d6b-9e76-7094dda3a7a2 -->",
+	"The description needs its purpose and coverage. Use the description to name the need behind this change and identify which of the linked item's Done-when points it covers or defers.",
+	"",
+	"The title names the app-problem and user-story task, but the authored description only references issue #3 and gives no reason.",
+	"",
+	"---",
+	"<sub>Practice review &middot; gpt-6-luna. This feedback is AI-generated and can be inaccurate. Answer or dispute it in [Hephaestus](https://hephaestus.example/w/aet/feedback/scm.pull_request/42).</sub>",
+	"<sub>[Why you see this and how to stop it](https://hephaestus.example/settings#practice-feedback)</sub>",
+	"",
+].join("\n");
 
 /** Match DeliveryComposer formatting, with the preview cut inside the first code fence. */
 const LONG_BODY = [
@@ -727,6 +762,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				id: "22222222-4444-4444-4444-444444444444",
 				body: "You described the rollback in terms of what a customer would see rather than which tables move. That is the version somebody paged at 2am can act on.",
 				channel: "IN_CHAT",
+				conversation: "SLACK",
 				outcome: "DELIVERED",
 				recipient: grace,
 				composedAt: "2026-07-26T16:06:00Z",
@@ -769,6 +805,18 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				outcome: "FAILED",
 				recipient: barbara,
 				composedAt: "2026-07-25T11:32:00Z",
+				from: ["11111111-5555-5555-5555-555555555555"],
+			},
+			{
+				// A card on the developer's own practice pages. The server never sends its text to an
+				// operator; it is written here so a story can prove no surface shows it.
+				id: "44444444-5555-5555-5555-555555555555",
+				body: "Private to Barbara: the runbook's first step is the one a tired reader most needs.",
+				channel: "IN_APP",
+				outcome: "DELIVERED",
+				recipient: barbara,
+				composedAt: "2026-07-25T11:33:00Z",
+				deliveredAt: "2026-07-25T11:33:00Z",
 				from: ["11111111-5555-5555-5555-555555555555"],
 			},
 		],
@@ -908,7 +956,16 @@ export const REVIEW_FIXTURE: RunSpec[] = [
  * something the preview beside it contradicts. */
 const BODY_PREVIEW_LENGTH = 320;
 
-function preview(body: string | undefined) {
+/**
+ * The text the server lets an operator read: none for a private place (`OPERATOR_WITHHELD_TEXT`),
+ * whose text the fixture still writes so a story can prove it never reaches the screen.
+ */
+function operatorBody(spec: FeedbackSpec): string | undefined {
+	return OPERATOR_WITHHELD_TEXT[spec.channel] === undefined ? spec.body : undefined;
+}
+
+function preview(spec: FeedbackSpec) {
+	const body = operatorBody(spec);
 	return {
 		bodyPreview: body?.slice(0, BODY_PREVIEW_LENGTH),
 		bodyTruncated: (body?.length ?? 0) > BODY_PREVIEW_LENGTH,
@@ -920,6 +977,11 @@ const allObservationSpecs = allRuns.flatMap((run) =>
 	run.observations.map((observation) => ({ run, observation })),
 );
 const allFeedbackSpecs = allRuns.flatMap((run) => run.feedback.map((item) => ({ run, item })));
+
+/** The ids of the feedback written from one observation, as the feedback list filters by it. */
+export function feedbackIdsFrom(observationId: string): ReadonlySet<string> {
+	return new Set(feedbackFor(observationId).map(({ item }) => item.id));
+}
 
 /** The feedback drawing on one observation, newest first, as the detail surfaces list it. */
 function feedbackFor(observationId: string) {
@@ -963,6 +1025,34 @@ export function feedbackCounts(
 	return counts;
 }
 
+/** What the counts by reason return for these rows: the rows with a reason, by it. */
+export function reasonCounts(rows: readonly ReviewFeedback[]): ReviewFeedbackReasonCount[] {
+	const counts = new Map<NonNullable<ReviewFeedback["suppressionReason"]>, number>();
+	for (const row of rows) {
+		if (row.suppressionReason !== undefined) {
+			counts.set(row.suppressionReason, (counts.get(row.suppressionReason) ?? 0) + 1);
+		}
+	}
+	return [...counts].map(([reason, count]) => ({ reason, count }));
+}
+
+/** What the counts endpoint returns for these rows: by location, in the order the server sorts them. */
+export function locationCounts(rows: readonly ReviewFeedback[]): ReviewFeedbackLocationCounts[] {
+	const order: ReviewFeedback["location"][] = [
+		"GITHUB",
+		"GITLAB",
+		"OTHER_WORK",
+		"HEPH",
+		"SLACK",
+		"NEXT_CONVERSATION",
+		"PRACTICE_PAGES",
+	];
+	return order.flatMap((at) => {
+		const states = rows.filter((row) => row.location === at).map((row) => row.deliveryState);
+		return states.length === 0 ? [] : [{ location: at, feedback: feedbackCounts(states) }];
+	});
+}
+
 function disposition(observationId: string): ReviewFeedbackCounts {
 	return feedbackCounts(feedbackFor(observationId).map(({ item }) => item.outcome));
 }
@@ -990,26 +1080,7 @@ function toObservation(run: RunSpec, spec: ObservationSpec): ReviewObservation {
 	};
 }
 
-function toFeedback(run: RunSpec, spec: FeedbackSpec): ReviewFeedback {
-	return {
-		id: spec.id,
-		agentJobId: run.id,
-		reviewedWork: run.work.reviewedWork,
-		...preview(spec.body),
-		channel: spec.channel,
-		createdAt: new Date(spec.composedAt),
-		deliveredAt: hasText(spec.deliveredAt) ? new Date(spec.deliveredAt) : undefined,
-		deliveryState: spec.outcome,
-		observationCount: spec.from.length,
-		recipient: spec.recipient,
-		replacesId: spec.replaces,
-		subject: run.developer,
-		suppressionReason: spec.withheldFor,
-		location: locationOf(run, spec),
-	};
-}
-
-/** The location the server derives: the channel, split by the work's provider. */
+/** The location the server derives: the channel, split by the work's provider or the conversation's. */
 function locationOf(run: RunSpec, spec: FeedbackSpec): ReviewFeedback["location"] {
 	switch (spec.channel) {
 		case "IN_APP": {
@@ -1021,10 +1092,29 @@ function locationOf(run: RunSpec, spec: FeedbackSpec): ReviewFeedback["location"
 		}
 		case "IN_CHAT": {
 			return spec.outcome === "DELIVERED" || spec.outcome === "UNCONFIRMED"
-				? "HEPH"
+				? (spec.conversation ?? "HEPH")
 				: "NEXT_CONVERSATION";
 		}
 	}
+}
+
+function toFeedback(run: RunSpec, spec: FeedbackSpec): ReviewFeedback {
+	return {
+		id: spec.id,
+		agentJobId: run.id,
+		reviewedWork: run.work.reviewedWork,
+		...preview(spec),
+		channel: spec.channel,
+		location: locationOf(run, spec),
+		createdAt: new Date(spec.composedAt),
+		deliveredAt: hasText(spec.deliveredAt) ? new Date(spec.deliveredAt) : undefined,
+		deliveryState: spec.outcome,
+		observationCount: spec.from.length,
+		recipient: spec.recipient,
+		replacesId: spec.replaces,
+		subject: run.developer,
+		suppressionReason: spec.withheldFor,
+	};
 }
 
 /** Newest first, as the list endpoint returns them. */
@@ -1053,8 +1143,20 @@ export const reviewRuns: ReviewRunSummary[] = allRuns
 			undetermined: run.observations.filter((o) => o.outcome === "UNDETERMINED").length,
 		},
 		feedback: feedbackCounts(run.feedback.map((f) => f.outcome)),
+		origin: run.origin ?? "LIVE",
 		developers: [run.developer],
 		...practiceVerdicts(run),
+		positionOnWork: allRuns.filter(
+			(other) =>
+				other.work.reviewedWork.kind === run.work.reviewedWork.kind &&
+				other.work.reviewedWork.id === run.work.reviewedWork.id &&
+				other.startedAt <= run.startedAt,
+		).length,
+		reviewsOnWork: allRuns.filter(
+			(other) =>
+				other.work.reviewedWork.kind === run.work.reviewedWork.kind &&
+				other.work.reviewedWork.id === run.work.reviewedWork.id,
+		).length,
 		finishedAfterMerge: false,
 		finishedAfterMergeStartedByMerge: false,
 	}))
@@ -1130,8 +1232,18 @@ export function reviewJob(runId: string): AgentJob {
 		createdAt: started,
 		availableAt: started,
 		startedAt: started,
-		executionStartedAt: run.status === "FAILED" ? undefined : new Date(started.getTime() + 30_000),
+		// Forty seconds preparing, the rest of the five minutes with the model, a minute until the
+		// first comment was posted, and three hours until the developer read the feedback.
+		executionStartedAt: new Date(started.getTime() + 40_000),
 		completedAt: finished,
+		firstFeedbackPostedAt:
+			run.status === "COMPLETED" && finished !== undefined
+				? new Date(finished.getTime() + 60_000)
+				: undefined,
+		firstFeedbackReadAt:
+			run.status === "COMPLETED" && finished !== undefined
+				? new Date(finished.getTime() + 3 * 3_600_000)
+				: undefined,
 		deliveryStatus: run.status === "COMPLETED" ? "DELIVERED" : undefined,
 		llmModel: "openai/gpt-oss-120b",
 		llmTotalInputTokens: 24_000,
@@ -1195,6 +1307,68 @@ function feedbackPlacements(item: FeedbackSpec): ReviewFeedbackDetail["placement
 	return [{ id: `${item.id}-summary`, placementType: "SUMMARY", postedCommentRef: "2481933" }];
 }
 
+/**
+ * The deliveries a piece of feedback on the work went out in: one sent, one being retried after a
+ * provider error, one that gave up. Feedback that waits, was withheld or goes elsewhere has none.
+ */
+function feedbackDispatches(run: RunSpec, item: FeedbackSpec): ReviewFeedbackDetail["dispatches"] {
+	if (item.channel !== "IN_CONTEXT") {
+		return [];
+	}
+	const createdAt = new Date(item.composedAt);
+	const base = {
+		id: `${item.id.slice(0, 8)}-0000-4000-8000-00000000d15c`,
+		destination: "AUTOMATIC_REVIEW_PACKAGE" as const,
+		createdAt,
+	};
+	switch (item.outcome) {
+		case "DELIVERED":
+		case "SUPERSEDED": {
+			return [
+				{
+					...base,
+					state: "SENT",
+					attemptCount: 1,
+					updatedAt: hasText(item.deliveredAt) ? new Date(item.deliveredAt) : createdAt,
+					deliveredExternalRef: "2481933",
+					deliveredExternalUrl: `${run.work.reviewedWork.url ?? "https://github.com/acme/app/pull/1423"}#issuecomment-2481933`,
+				},
+			];
+		}
+		case "PREPARED":
+		case "PARTIALLY_DELIVERED":
+		case "UNCONFIRMED": {
+			return [
+				{
+					...base,
+					state: item.outcome === "UNCONFIRMED" ? "UNCERTAIN" : "PENDING",
+					attemptCount: 2,
+					updatedAt: new Date(createdAt.getTime() + 2 * 60_000),
+					nextAttemptAt: new Date(createdAt.getTime() + 10 * 60_000),
+					lastError: "GitHub answered 502 Bad Gateway while the summary comment was posted.",
+				},
+			];
+		}
+		case "FAILED":
+		case "PARTIALLY_FAILED": {
+			return [
+				{
+					...base,
+					state: "FAILED",
+					attemptCount: 5,
+					updatedAt: new Date(createdAt.getTime() + 40 * 60_000),
+					lastError: "GitHub answered 403: Resource not accessible by integration.",
+				},
+			];
+		}
+		case "AWAITING_APPROVAL":
+		case "DISCARDED":
+		case "SUPPRESSED": {
+			return [];
+		}
+	}
+}
+
 export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 	const found = allFeedbackSpecs.find(({ item }) => item.id === feedbackId);
 	if (!found) {
@@ -1205,8 +1379,9 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 		id: item.id,
 		agentJobId: run.id,
 		reviewedWork: run.work.reviewedWork,
-		body: item.body,
+		body: operatorBody(item),
 		channel: item.channel,
+		location: locationOf(run, item),
 		createdAt: new Date(item.composedAt),
 		deliveredAt: hasText(item.deliveredAt) ? new Date(item.deliveredAt) : undefined,
 		deliveryState: item.outcome,
@@ -1227,6 +1402,7 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 			};
 		}),
 		placements: feedbackPlacements(item),
+		dispatches: feedbackDispatches(run, item),
 		proposedPlacements:
 			item.outcome === "AWAITING_APPROVAL" && item.channel === "IN_CONTEXT"
 				? [
@@ -1253,8 +1429,6 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 		suppressionReason: item.withheldFor,
 		deliveryPolicy: [],
 		withdrawals: [],
-		dispatches: [],
-		location: locationOf(run, item),
 	};
 }
 
@@ -1292,7 +1466,7 @@ function cycled<T>(specs: readonly T[], index: number): T {
  */
 export function manyObservations(count: number): ReviewObservation[] {
 	const base = reviewObservations;
-	return Array.from({ length: count }, (_, index) => {
+	const rows = Array.from({ length: count }, (_, index) => {
 		const source = cycled(base, index);
 		const cycle = Math.floor(index / base.length);
 		if (cycle === 0) {
@@ -1304,6 +1478,8 @@ export function manyObservations(count: number): ReviewObservation[] {
 			observedAt: new Date(source.observedAt.getTime() - cycle * 86_400_000),
 		};
 	});
+	// Newest first, as the server sends them, so each day's rows stay together under one heading.
+	return rows.sort((a, b) => b.observedAt.getTime() - a.observedAt.getTime());
 }
 
 /**
@@ -1328,7 +1504,7 @@ export function manyMembers(count: number): WorkspaceMembership[] {
 
 export function manyFeedback(count: number): ReviewFeedback[] {
 	const base = reviewFeedback;
-	return Array.from({ length: count }, (_, index) => {
+	const rows = Array.from({ length: count }, (_, index) => {
 		const source = cycled(base, index);
 		const cycle = Math.floor(index / base.length);
 		if (cycle === 0) {
@@ -1340,6 +1516,8 @@ export function manyFeedback(count: number): ReviewFeedback[] {
 			createdAt: new Date(source.createdAt.getTime() - cycle * 86_400_000),
 		};
 	});
+	// Newest first, as the server sends them, so each day's rows stay together under one heading.
+	return rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 const pullRequestTarget: AgentJob["target"] = {
@@ -1385,6 +1563,80 @@ export const mockJobCompleted: AgentJob = {
 	llmTotalCalls: 7,
 	retryCount: 0,
 	exitCode: 0,
+	traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
+};
+
+/** A review the server stopped before it started, because its budget was used up. */
+export const mockJobCancelledOnBudget: AgentJob = {
+	id: "job-cancelled-budget-1",
+	jobType: "PULL_REQUEST_REVIEW",
+	reviewOutcome: "REVIEWED",
+	target: pullRequestTarget,
+	status: "CANCELLED",
+	model: "gpt-5.4-mini",
+	configSnapshot: { name: "Default reviewer" },
+	createdAt: new Date("2026-05-20T07:00:00Z"),
+	availableAt: new Date("2026-05-20T07:00:00Z"),
+	completedAt: new Date("2026-05-20T07:00:04Z"),
+	cancellationReason: "BUDGET_EXHAUSTED",
+	retryCount: 0,
+	traceId: "0af7651916cd43dd8448eb211c80319c",
+};
+
+/** What a review spent on the model: a first attempt that failed and the retry that finished. */
+export const mockJobUsageTwoAttempts: AgentJobUsage = {
+	attempts: [
+		{
+			attempt: 0,
+			occurredAt: new Date("2026-05-20T10:02:00Z"),
+			model: "openai/gpt-oss-120b",
+			pricingState: "PRICED",
+			fundingSource: "INSTANCE",
+			costUsd: 0.0125,
+			totalCalls: 3,
+			inputTokens: 11_000,
+			outputTokens: 300,
+			reasoningTokens: 40,
+			cacheReadTokens: 0,
+			cacheWriteTokens: 0,
+		},
+		{
+			attempt: 1,
+			occurredAt: new Date("2026-05-20T10:05:00Z"),
+			model: "openai/gpt-oss-120b",
+			pricingState: "PRICED",
+			fundingSource: "INSTANCE",
+			costUsd: 0.03,
+			totalCalls: 4,
+			inputTokens: 13_000,
+			outputTokens: 614,
+			reasoningTokens: 80,
+			cacheReadTokens: 2000,
+			cacheWriteTokens: 0,
+		},
+	],
+	totalCostUsd: 0.0425,
+	unpricedAttempts: 0,
+};
+
+/** One attempt on a model the workspace set up without a price. */
+export const mockJobUsageUnpriced: AgentJobUsage = {
+	attempts: [
+		{
+			attempt: 0,
+			occurredAt: new Date("2026-05-20T10:05:00Z"),
+			model: "acme/house-model",
+			pricingState: "UNPRICED",
+			fundingSource: "WORKSPACE",
+			totalCalls: 7,
+			inputTokens: 24_000,
+			outputTokens: 914,
+			reasoningTokens: 120,
+			cacheReadTokens: 0,
+			cacheWriteTokens: 0,
+		},
+	],
+	unpricedAttempts: 1,
 };
 
 export const mockJobRunning: AgentJob = {
@@ -1397,6 +1649,9 @@ export const mockJobRunning: AgentJob = {
 	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T11:58:00Z"),
 	availableAt: new Date("2026-05-20T11:58:00Z"),
+	// Running means it left the queue: a running review without a start would contradict itself.
+	startedAt: new Date("2026-05-20T11:58:20Z"),
+	executionStartedAt: new Date("2026-05-20T11:59:00Z"),
 	retryCount: 0,
 };
 
@@ -1634,6 +1889,22 @@ export const practiceReviewOverview: PracticeReviewOverview = {
 	practices: practiceCounts,
 };
 
+/**
+ * The overview's 14 delivered pieces by channel, as the counts by location return them for the
+ * delivered states: on GitHub, on the developers' practice pages, and with Heph in Slack.
+ */
+export const deliveredByChannelCounts: ReviewFeedbackLocationCounts[] = [
+	{ location: "GITHUB", feedback: { ...ZERO_FEEDBACK, delivered: 7, partiallyDelivered: 1 } },
+	{ location: "SLACK", feedback: { ...ZERO_FEEDBACK, delivered: 2 } },
+	{ location: "PRACTICE_PAGES", feedback: { ...ZERO_FEEDBACK, delivered: 4 } },
+];
+
+/** The overview's 3 withheld pieces by reason: 2 as the work was merged, 1 over the limit. */
+export const withheldByReasonCounts: ReviewFeedbackReasonCount[] = [
+	{ reason: "VOLUME_CAPPED", count: 1 },
+	{ reason: "ARTIFACT_MERGED", count: 2 },
+];
+
 /** Thirty days in which nothing was reviewed: every bucket present, and every one of them zero. */
 export const quietPracticeReviewOverview: PracticeReviewOverview = {
 	...practiceReviewOverview,
@@ -1663,6 +1934,101 @@ export const reviewOverviewScope: OutcomeScope = {
 };
 
 // ---------------------------------------------------------------------------------------------
+// Where the time of the overview's reviews went
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The thirty days' reviews as the local data had them: a typical review took 9 min 20 s from the
+ * request to its comment, almost all of it with the model, and the slowest 1 in 10 took 19 min or
+ * longer. Nine reviews started before the merge and
+ * finished after it.
+ */
+export const practiceReviewTiming: PracticeReviewTiming = {
+	from: OVERVIEW_FROM,
+	to: new Date(STORY_NOW),
+	asked: { count: 40, medianSeconds: 120, p90Seconds: 600 },
+	queue: { count: 258, medianSeconds: 26, p90Seconds: 60 },
+	preparation: { count: 51, medianSeconds: 20, p90Seconds: 40 },
+	model: { count: 51, medianSeconds: 700, p90Seconds: 1080 },
+	posted: { count: 14, medianSeconds: 12, p90Seconds: 30 },
+	// Until asked 2 min, Queue 26 s, Run 12 min, To developer 12 s: they add up to the median.
+	total: { count: 14, medianSeconds: 878, p90Seconds: 1500 },
+	totalShares: {
+		asked: 120 / 878,
+		queue: 26 / 878,
+		preparation: 20 / 878,
+		model: 700 / 878,
+		runUnsplit: 0,
+		posted: 12 / 878,
+	},
+	finished: { count: 51, medianSeconds: 866, p90Seconds: 1490 },
+	finishedShares: {
+		asked: 120 / 866,
+		queue: 26 / 866,
+		preparation: 20 / 866,
+		model: 700 / 866,
+		runUnsplit: 0,
+	},
+	read: { count: 11, medianSeconds: 67_020, p90Seconds: 90_000 },
+	waitingLong: 0,
+	finishedAfterMerge: 9,
+	finishedAfterMergeStartedByMerge: 0,
+	feedbackWithheldAsMerged: 0,
+};
+
+// ---------------------------------------------------------------------------------------------
+// The queue right now
+// ---------------------------------------------------------------------------------------------
+
+const queueItem = (
+	id: string,
+	state: "running" | "waiting" | "held",
+	work: ReviewWork,
+	developer: ReviewSubject,
+	minutes: number,
+): PracticeReviewQueueItem => ({
+	id,
+	status: state === "running" ? "RUNNING" : "QUEUED",
+	heldForBudget: state === "held",
+	target: work,
+	developer,
+	since: minutesBefore(minutes),
+});
+
+/** The busy queue's head, by name, for a story to rearrange. */
+export const reviewQueueHead = {
+	runningLong: queueItem("queue-run-1", "running", reviewArtifact, ada, 3),
+	runningShort: queueItem("queue-run-2", "running", gitlabMergeRequest, grace, 1),
+	waitingLong: queueItem("queue-wait-1", "waiting", webhookRetryPullRequest, alan, 4),
+	waitingShort: queueItem("queue-wait-2", "waiting", leagueColumnsPullRequest, katherine, 2),
+	waitingNew: queueItem("queue-wait-3", "waiting", invoiceBackfillMergeRequest, barbara, 1),
+};
+
+/** Nothing waits or runs; twelve reviews finished in the last hour. */
+export const idleReviewQueue: PracticeReviewQueue = {
+	asOf: new Date(STORY_NOW),
+	running: 0,
+	activeWorkers: 0,
+	waiting: 0,
+	heldForBudget: 0,
+	head: [],
+	finishedLastHour: 12,
+	finishedLastDay: 96,
+	finishedPerHourLastDay: 4,
+};
+
+/** Two running on two workers, five waiting, the oldest for four minutes: busy, not stuck. */
+export const busyReviewQueue: PracticeReviewQueue = {
+	...idleReviewQueue,
+	running: 2,
+	activeWorkers: 2,
+	waiting: 5,
+	oldestWaitingSince: minutesBefore(4),
+	head: Object.values(reviewQueueHead),
+};
+
+// ---------------------------------------------------------------------------------------------
+// What the overview says needs an admin// ---------------------------------------------------------------------------------------------
 // What the overview says needs an admin
 // ---------------------------------------------------------------------------------------------
 
@@ -1679,3 +2045,110 @@ export const awaitingApprovalFeedback: ReviewFeedback[] = reviewFeedback
 		deliveredAt: undefined,
 		suppressionReason: undefined,
 	}));
+
+/**
+ * The trace of the work a review fixture looked at, told so it agrees with that review: the moment
+ * that started it happened two minutes before it was asked for, the other moments before that, and
+ * the practices it answered name it. A trace taken from another review would put the moment that
+ * started this one after it finished.
+ */
+export function reviewTraceOf(job: AgentJob): ArtifactTrace {
+	const asked = job.createdAt.getTime();
+	const starting = artifactTrace.signals.find((signal) => signal.reviewId === LINEAGE_TRACE_REVIEW);
+	return {
+		...artifactTrace,
+		signals: artifactTrace.signals.map((signal, index) =>
+			signal === starting
+				? { ...signal, reviewId: job.id, occurredAt: new Date(asked - 2 * 60_000) }
+				: {
+						...signal,
+						reviewId: signal.reviewId === undefined ? undefined : `earlier-${index}`,
+						occurredAt: new Date(asked - (index + 1) * 3_600_000),
+					},
+		),
+		practices: artifactTrace.practices.map((entry) =>
+			entry.reviewId === LINEAGE_TRACE_REVIEW ? { ...entry, reviewId: job.id } : entry,
+		),
+	};
+}
+
+/** The review whose answers the shared work trace fixture lists. */
+const LINEAGE_TRACE_REVIEW = "11111111-1111-1111-1111-111111111111";
+
+/** A check the review ran for itself, which its sheet lists and a piece of feedback does not. */
+export function reviewDeliveryChecksOf(job: AgentJob): DeliveryPolicyTrace[] {
+	return [
+		{
+			...deniedDeliveryPolicyEvaluation,
+			reviewId: job.id,
+			evaluatedAt: new Date((job.completedAt ?? job.createdAt).getTime() + 30_000),
+		},
+	];
+}
+
+// ---------------------------------------------------------------------------------------------
+// What the provider reported about a piece of work, and a practice's versions
+// ---------------------------------------------------------------------------------------------
+
+/** A merged pull request whose head failed its checks. */
+export const mergedPullRequestFacts: ReviewWorkFacts = {
+	artifactKind: "scm.pull_request",
+	artifactId: 1423,
+	author: { id: 7, login: "jdoe", name: "Jane Doe" },
+	state: "MERGED",
+	draft: false,
+	sourceBranch: "feature/retry-service",
+	targetBranch: "main",
+	headRevision: "27f4e88c9f5a1b2c3d4e5f60718293a4b5c6d7e8",
+	createdAt: new Date("2026-08-05T09:12:00Z"),
+	updatedAt: new Date("2026-08-07T10:05:00Z"),
+	mergedAt: new Date("2026-08-07T10:02:00Z"),
+	closedAt: new Date("2026-08-07T10:02:00Z"),
+	additions: 120,
+	deletions: 30,
+	changedFiles: 7,
+	commits: 3,
+	checkState: "FAILURE",
+	checkObservedAt: new Date("2026-08-07T09:58:00Z"),
+	lastSyncAt: new Date("2026-08-07T10:06:00Z"),
+};
+
+/** An issue still open, with no branches, size or checks. */
+export const openIssueFacts: ReviewWorkFacts = {
+	artifactKind: "scm.issue",
+	artifactId: 1430,
+	author: { id: 8, login: "asmith", name: "Alex Smith" },
+	state: "OPEN",
+	createdAt: new Date("2026-08-03T14:00:00Z"),
+	updatedAt: new Date("2026-08-06T08:30:00Z"),
+	lastSyncAt: new Date("2026-08-06T08:31:00Z"),
+};
+
+/** Three versions of a practice: the first, a wording change, and a change to what it checks. */
+export const practiceRevisions: PracticeRevision[] = [
+	{
+		id: 303,
+		revisionNumber: 3,
+		createdAt: new Date("2026-08-02T09:00:00Z"),
+		changed: ["CRITERIA", "EVIDENCE_REQUIREMENTS"],
+		reviewRulesChanged: true,
+	},
+	{
+		id: 302,
+		revisionNumber: 2,
+		createdAt: new Date("2026-07-20T09:00:00Z"),
+		changed: ["WHY_IT_MATTERS"],
+		reviewRulesChanged: false,
+	},
+	{
+		id: 301,
+		revisionNumber: 1,
+		createdAt: new Date("2026-07-01T09:00:00Z"),
+		changed: [],
+		reviewRulesChanged: false,
+	},
+];
+
+/** The card on a developer's own practice pages, whose text the fixture writes and no surface may show. */
+export const PRIVATE_FEEDBACK_TEXT =
+	"Private to Barbara: the runbook's first step is the one a tired reader most needs.";

@@ -14,9 +14,9 @@ import {
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { daysBefore } from "@/stories/story-clock";
 
+import { runPositionsOnWork } from "@/components/practice-trace/review-run-groups";
 import { REVIEWS_LEVEL } from "./practice-profile-search";
 import { ProfileReviewsLevel } from "./ProfileReviewsLevel";
-import { runPositionsOnWork } from "./review-run-groups";
 
 const feedOf = (
 	runs: ProfileReviewRun[],
@@ -54,7 +54,7 @@ const meta = {
 	},
 	argTypes: { path: { control: false } },
 	render: (args) => (
-		<DetailDrawerStack stack={[REVIEWS_LEVEL]} size="detailWide" onClose={fn()}>
+		<DetailDrawerStack stack={[REVIEWS_LEVEL]} onClose={fn()}>
 			{(_entry, level) => <ProfileReviewsLevel {...args} nested={level.nested} />}
 		</DetailDrawerStack>
 	),
@@ -77,7 +77,7 @@ export const Default: Story = {
 		await expect(screen.getAllByText("Latest")).toHaveLength(1);
 		await expect(screen.getAllByText("Requested")).toHaveLength(1);
 		await expect(screen.getByLabelText("Timeframe")).toHaveTextContent("All time");
-		await expect(screen.getByText("2nd review")).toBeVisible();
+		await expect(screen.getByText("Review 2")).toBeVisible();
 		await expect(
 			screen.getByText("one practice met, one undetermined · three practices reached"),
 		).toBeVisible();

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	detailEntryState,
 	detailStackSchema,
 	encodeDetailStack,
 	openInStack,
 	parseDetailStack,
+	pushedLevels,
 } from "./detail-stack";
 
 const KINDS = ["group", "practice"] as const;
@@ -72,6 +74,13 @@ describe("openInStack", () => {
 		});
 	});
 
+	it("replaces the level in front on a one-level surface, and that is not a push", () => {
+		expect(openInStack(["feedback:a"], "observation:o", { single: true })).toStrictEqual({
+			detail: ["observation:o"],
+			pushed: false,
+		});
+	});
+
 	it("opens the first level of an empty stack even when asked to swap", () => {
 		expect(openInStack([], "feedback:a", { swap: true })).toStrictEqual({
 			detail: ["feedback:a"],
@@ -95,5 +104,44 @@ describe("encodeDetailStack", () => {
 
 	it("omits the param entirely when nothing is open, so a closed stack leaves no URL trace", () => {
 		expect(encodeDetailStack([])).toBeUndefined();
+	});
+});
+
+describe("pushedLevels", () => {
+	it("counts no level on an entry this visit did not push", () => {
+		expect(pushedLevels(undefined)).toBe(0);
+		expect(pushedLevels({ detailPush: false, detailPushes: 2 })).toBe(0);
+	});
+
+	it("counts the pushes in a row, or the entry's own push when it was stamped without a count", () => {
+		expect(pushedLevels({ detailPush: true })).toBe(1);
+		expect(pushedLevels({ detailPush: true, detailPushes: 2 })).toBe(2);
+	});
+});
+
+describe("detailEntryState", () => {
+	it("counts a push on from the entry it came from, without copying that entry's marks", () => {
+		const first = detailEntryState({ focusSwitch: true, detailPush: false }, true, false);
+		expect(first).toStrictEqual({ detailPush: true, detailPushes: 1 });
+		const second = detailEntryState({ ...first, focusSwitch: true }, true, false);
+		expect(second).toStrictEqual({ detailPush: true, detailPushes: 2 });
+		expect(pushedLevels(second)).toBe(2);
+	});
+
+	it("starts the count over on a new entry that pushed nothing", () => {
+		expect(detailEntryState({ detailPush: true, detailPushes: 3 }, false, false)).toStrictEqual({
+			detailPush: false,
+			detailPushes: undefined,
+		});
+	});
+
+	it("keeps the marks of an entry rewritten in place, and its count only while it is a push", () => {
+		const rewritten = detailEntryState(
+			{ focusSwitch: true, detailPush: true, detailPushes: 2 },
+			false,
+			true,
+		);
+		expect(rewritten).toMatchObject({ focusSwitch: true, detailPush: false });
+		expect(pushedLevels(rewritten)).toBe(0);
 	});
 });

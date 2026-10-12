@@ -89,6 +89,27 @@ export const NotFound: Story = {
 };
 
 /**
+ * 404 with the server's generic detail: the title already says it was not found, so the alert
+ * says what to do once instead of three times.
+ */
+export const NotFoundGenericDetail: Story = {
+	args: {
+		error: {
+			status: 404,
+			detail:
+				"We could not find that review. It may have been deleted. Reload the page to see what is current.",
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("We could not find the job history");
+		await expect(
+			canvas.getByText("It may have been deleted or moved. Go back to continue."),
+		).toBeVisible();
+		await expect(canvas.queryByText(/Reload the page/u)).not.toBeInTheDocument();
+	},
+};
+
+/**
  * 409 — usually not an error at all. Something else got there first, which is a warning, not a
  * failure, and re-asking would get the same answer.
  */
