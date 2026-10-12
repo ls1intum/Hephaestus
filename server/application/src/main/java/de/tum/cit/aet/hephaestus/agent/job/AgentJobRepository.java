@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.handler.LinkedRepairFollowupRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -1426,6 +1427,53 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             @Param("retryCount") int retryCount,
             @Param("stamp") ProvenanceStamp stamp);
 
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE AgentJob j SET j.metadata = :metadata WHERE j.id = :id AND j.workspace.id = :workspaceId "
+            + "AND j.status = 'RUNNING' AND j.retryCount = :retryCount "
+            + "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) "
+            + "AND j.executionStartedAt IS NULL AND " + NOT_ADMITTED)
+    int recordLinkedRepairSuccessor(
+            @Param("id") UUID id,
+            @Param("workspaceId") long workspaceId,
+            @Param("workerId") @Nullable String workerId,
+            @Param("retryCount") int retryCount,
+            @Param("metadata") JsonNode metadata);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+            value = "UPDATE agent_job SET metadata = jsonb_set(metadata, '{"
+                    + LinkedRepairFollowupRequest.SUCCESSOR_REVISION + "}', to_jsonb(CAST(:nextRevision AS text))) "
+                    + "WHERE id = :id AND workspace_id = :workspaceId AND status = 'COMPLETED' "
+                    + "AND metadata ->> '" + LinkedRepairFollowupRequest.SUCCESSOR_REVISION + "' = :previousRevision "
+                    + "AND metadata ->> '" + LinkedRepairFollowupRequest.ROOT_JOB + "' = CAST(:rootJobId AS text) "
+                    + "AND COALESCE(metadata ->> '" + ObservationAdmissionService.DIGEST_METADATA_KEY + "', '') = ''",
+            nativeQuery = true)
+    int advanceLinkedRepairSuccessor(
+            @Param("id") UUID id,
+            @Param("workspaceId") long workspaceId,
+            @Param("rootJobId") UUID rootJobId,
+            @Param("previousRevision") String previousRevision,
+            @Param("nextRevision") String nextRevision);
+
+    @Query(
+            value =
+                    "SELECT j.* FROM agent_job j WHERE j.workspace_id = :workspaceId "
+                            + "AND j.job_type = 'PULL_REQUEST_REVIEW' AND j.purpose = 'PRACTICE_REVIEW' "
+                            + "AND j.status = 'COMPLETED' AND (" + ReviewRunTargetMapper.WORK_ID_SQL
+                            + ") = CAST(:artifactId AS text) "
+                            + "AND COALESCE(j.metadata ->> '" + ObservationAdmissionService.DIGEST_METADATA_KEY
+                            + "', '') = '' "
+                            + "AND j.metadata ->> 'signal' = 'scm.pull_request.linked_issue_updated' "
+                            + "AND j.metadata ->> '" + LinkedRepairFollowupRequest.SUCCESSOR_REVISION + "' = :revision "
+                            + "AND j.created_at >= :since AND j.created_at <= :until ORDER BY j.created_at DESC, j.id DESC LIMIT 1",
+            nativeQuery = true)
+    Optional<AgentJob> findLinkedRepairPredecessor(
+            @Param("workspaceId") long workspaceId,
+            @Param("artifactId") long artifactId,
+            @Param("revision") String revision,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
+
     /** Written as a unit so the evidence snapshot and the readiness decisions over it cannot diverge. */
     record ProvenanceStamp(
             @Nullable String promptDigest,
@@ -1433,15 +1481,28 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             @Nullable JsonNode evidenceSnapshot,
             @Nullable JsonNode reviewReadiness) {}
 
+    String EVIDENCE_REFUSAL_TRANSITION =
+            "UPDATE AgentJob j SET j.status = 'COMPLETED', j.completedAt = :now, j.output = :output, "
+                    + "j.deliveryStatus = 'DELIVERED', j.errorMessage = NULL WHERE j.id = :id AND j.status = 'RUNNING' "
+                    + "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) "
+                    + "AND j.retryCount = :retryCount";
+
     // DELIVERED settles result processing here: no model output exists to process, and no recipient delivery is
     // claimed.
     @WorkspaceAgnostic("ID-based evidence-refusal transition; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("UPDATE AgentJob j SET j.status = 'COMPLETED', j.completedAt = :now, j.output = :output, "
-            + "j.deliveryStatus = 'DELIVERED', j.errorMessage = NULL WHERE j.id = :id AND j.status = 'RUNNING' "
-            + "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) "
-            + "AND j.retryCount = :retryCount")
+    @Query(EVIDENCE_REFUSAL_TRANSITION)
     int transitionToEvidenceRefused(
+            @Param("id") UUID id,
+            @Param("workerId") @Nullable String workerId,
+            @Param("retryCount") int retryCount,
+            @Param("now") Instant now,
+            @Param("output") JsonNode output);
+
+    @WorkspaceAgnostic("ID-based measurement refusal; admitted writers retain their original owner")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(EVIDENCE_REFUSAL_TRANSITION + " AND " + NOT_ADMITTED)
+    int transitionToStaleLinkedRepairRefused(
             @Param("id") UUID id,
             @Param("workerId") @Nullable String workerId,
             @Param("retryCount") int retryCount,

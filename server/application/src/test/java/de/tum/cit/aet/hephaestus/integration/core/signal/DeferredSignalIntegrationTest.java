@@ -17,6 +17,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -63,6 +65,31 @@ class DeferredSignalIntegrationTest extends BaseIntegrationTest {
         assertThat(insert(key, START.plusSeconds(70))).isZero();
         assertThat(due(START.plusSeconds(89))).doesNotContain(workspace.getId());
         assertThat(due(START.plusSeconds(90))).contains(workspace.getId());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldNotTakeOverASyncBudgetWaitForAnUnrelatedOccasion(boolean pullRequest) {
+        SignalKey key = new SignalKey(
+                workspace.getId(),
+                42L,
+                pullRequest ? ScmSignals.PULL_REQUEST_SYNCHRONIZED : ScmSignals.ISSUE_UPDATED,
+                new SignalRevision("digest~unrelated-wait"));
+        transactions.executeWithoutResult(status -> {
+            signals.insertIfAbsent(key, UUID.randomUUID(), START, "SYNC", START);
+            signals.markRefused(key, "PENDING", "BUDGET_EXHAUSTED", START.plusSeconds(10));
+        });
+
+        assertThat(insert(key, START.plusSeconds(20))).isZero();
+        assertThat(signals.findForArtifact(workspace.getId(), key.artifactKind().value(), key.artifactId()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.getDiscoveredVia()).isEqualTo(DiscoveredVia.SYNC);
+                    assertThat(row.getState()).isEqualTo(SignalState.PENDING);
+                    assertThat(row.getStateReason()).isEqualTo(SignalStateReason.BUDGET_EXHAUSTED);
+                    assertThat(row.getOccurredAt()).isEqualTo(START);
+                    assertThat(row.getStateChangedAt()).isEqualTo(START.plusSeconds(10));
+                });
     }
 
     @Test

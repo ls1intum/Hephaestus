@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPrepare
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobEventListener;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
+import de.tum.cit.aet.hephaestus.agent.job.LinkedRepairFollowups;
 import de.tum.cit.aet.hephaestus.agent.job.PullRequestSignalResubmitter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -2798,7 +2799,13 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
         private PullRequestSignalResubmitter resubmitter() {
             return new PullRequestSignalResubmitter(
-                    jobs, pullRequestRepository, gate, signalRecorder, reviewRepository, manifests);
+                    jobs,
+                    pullRequestRepository,
+                    gate,
+                    signalRecorder,
+                    reviewRepository,
+                    manifests,
+                    mock(LinkedRepairFollowups.class));
         }
 
         private ArtifactSignal mergeSignal() {
@@ -2887,7 +2894,13 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                             any(), eq(savedWorkspace.getId()), eq(ScmSignals.PULL_REQUEST_OPENED), any(), eq(false)))
                     .thenReturn(decision);
             transactionTemplate.executeWithoutResult(status -> new PullRequestSignalResubmitter(
-                            jobs, pullRequestRepository, gate, signalRecorder, reviewRepository, manifests)
+                            jobs,
+                            pullRequestRepository,
+                            gate,
+                            signalRecorder,
+                            reviewRepository,
+                            manifests,
+                            mock(LinkedRepairFollowups.class))
                     .resubmit(held));
 
             var request = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);

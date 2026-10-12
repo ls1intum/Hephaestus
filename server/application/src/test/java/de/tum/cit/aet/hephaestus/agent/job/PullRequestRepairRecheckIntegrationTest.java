@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -35,10 +36,13 @@ import de.tum.cit.aet.hephaestus.agent.handler.AnsweredPractices;
 import de.tum.cit.aet.hephaestus.agent.handler.CitationVerification;
 import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
+import de.tum.cit.aet.hephaestus.agent.handler.LinkedRepairFollowupRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewHandler;
 import de.tum.cit.aet.hephaestus.agent.handler.ReplaceableReviewCoverage;
+import de.tum.cit.aet.hephaestus.agent.handler.ReviewOutputService;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppSupportReader;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.AnsweredPractice;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
@@ -52,6 +56,8 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
@@ -127,6 +133,7 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkChanges;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
+import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -141,6 +148,7 @@ import java.nio.file.Files;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -158,6 +166,7 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -176,7 +185,13 @@ import tools.jackson.databind.node.ObjectNode;
  * A merge request whose author answered a problem — by editing the description or pushing — is reviewed again
  * for that problem's practice once the burst settles, through the real ledger, gate and admission.
  */
-@MockitoSpyBean(types = {PullRequestReviewHandler.class, InAppSupportReader.class, JobEvidenceFiles.class})
+@MockitoSpyBean(
+        types = {
+            PullRequestReviewHandler.class,
+            InAppSupportReader.class,
+            JobEvidenceFiles.class,
+            LlmBudgetService.class
+        })
 class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewIntegrationTest {
 
     @Autowired
@@ -307,6 +322,24 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
     @Autowired
     private GitLabMergeRequestProcessor gitlabMergeRequests;
 
+    @Autowired
+    private LinkedRepairFollowups followups;
+
+    @Autowired
+    private ReviewCompositionContinuation continuations;
+
+    @Autowired
+    private ReviewCompositionBasisRepository compositionBases;
+
+    @Autowired
+    private LlmBudgetService submissionBudgets;
+
+    @Autowired
+    private IdentityLinkRepository followupIdentities;
+
+    @Autowired
+    private AccountIdentityQuery accountIdentities;
+
     private Workspace workspace;
     private User developer;
     private Repository repository;
@@ -342,7 +375,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                 manifests,
                 repositoryPreparer);
         resubmitter = new PullRequestSignalResubmitter(
-                agentJobService, pullRequestRepository, gate, recorder, reviewRepository, manifests);
+                agentJobService, pullRequestRepository, gate, recorder, reviewRepository, manifests, followups);
         coalescer = new PullRequestPushCoalescer(
                 signals,
                 pullRequestRepository,
@@ -720,7 +753,422 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                 .isZero();
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldContinueAnAdmittedEventOnDiscoveredMaterialWithoutTurningSyncIntoAnEvent(boolean pending)
+            throws Exception {
+        var fixture = staleLinkedEvent();
+        AgentJob old = fixture.job();
+        SignalKey current = fixture.current();
+        String currentBody = "- [x] Confirm current repair";
+        assertThat(rowOf(current).getDiscoveredVia()).isEqualTo(DiscoveredVia.SYNC);
+        try (LinkedAttempt capture = captureLinkedAttempt(old, fixture.practice(), "- [x] Confirm current repair")) {
+            assertThat(followups.refuseStale(capture.job(), "test-worker"))
+                    .isEqualTo(LinkedRepairFollowups.Decision.REFUSED);
+        }
+        AgentJob refused = agentJobRepository.findById(old.getId()).orElseThrow();
+        assertThat(refused.getExecutionStartedAt()).isNull();
+        assertThat(refused.getStatus()).isEqualTo(AgentJobStatus.COMPLETED);
+        assertThat(ReviewRunOutcome.fromJobOutput(refused.getOutput()))
+                .isEqualTo(ReviewRunOutcome.INSUFFICIENT_EVIDENCE);
+        assertThat(rowOf(current).getState()).isEqualTo(SignalState.DEFERRED);
+        assertThat(rowOf(current).getJobId()).isNull();
+        assertThat(rowOf(current).getDiscoveredVia()).isEqualTo(DiscoveredVia.SYNC);
+        if (pending) {
+            doReturn(true).when(submissionBudgets).blockSubmission(any(), any(), any());
+            drainAfterCooldown(fixture.pr());
+            assertThat(rowOf(current).getState()).isEqualTo(SignalState.PENDING);
+            assertThat(rowOf(current).getStateReason()).isEqualTo(SignalStateReason.BUDGET_EXHAUSTED);
+            doReturn(false).when(submissionBudgets).blockSubmission(any(), any(), any());
+            currentBody = "- [x] Confirm later repair";
+            jdbcTemplate.update(
+                    "UPDATE issue SET body = ? WHERE id = ?",
+                    currentBody,
+                    pullRequestRepository
+                            .findClosingIssueIdsById(fixture.pr().getId())
+                            .getFirst());
+            SignalKey next = closingKey(fixture.pr());
+            transactions.executeWithoutResult(status -> recorder.record(next, Instant.now(), DiscoveredVia.SYNC));
+            drainAfterCooldown(fixture.pr());
+            assertThat(rowOf(current).getStateReason()).isEqualTo(SignalStateReason.COALESCED);
+            assertThat(rowOf(next).getState()).isEqualTo(SignalState.DEFERRED);
+            assertThat(rowOf(next).getDiscoveredVia()).isEqualTo(DiscoveredVia.SYNC);
+            current = next;
+        }
+        // A new submission owner reads only the committed predecessor and ledger after the old attempt ended.
+        resubmitter = new PullRequestSignalResubmitter(
+                agentJobService, pullRequestRepository, gate, recorder, reviewRepository, manifests, followups);
+        coalescer = new PullRequestPushCoalescer(
+                signals,
+                pullRequestRepository,
+                recorder,
+                resubmitter,
+                workspaceResolver,
+                reviewProperties,
+                agentJobRepository,
+                transactions,
+                coverage,
+                telemetry,
+                jsonMapper);
+        drainAfterCooldown(fixture.pr());
+        AgentJob fresh = jobOf(rowOf(current));
+        assertThat(fresh.getId()).isNotEqualTo(old.getId());
+        JsonNode facts = Objects.requireNonNull(fresh.getMetadata());
+        assertThat(facts.path("linked_issue_revision").asString())
+                .isEqualTo(current.revision().value());
+        assertThat(facts.path(LinkedRepairFollowupRequest.PREDECESSOR_JOB).asString())
+                .isEqualTo(old.getId().toString());
+        assertThat(facts.path(LinkedRepairFollowupRequest.ROOT_JOB).asString())
+                .isEqualTo(old.getId().toString());
+        assertThat(recheckedOf(fresh)).isEqualTo("[\"followup-linked-criteria\"]");
+        assertThat(rowOf(current).getDiscoveredVia()).isEqualTo(DiscoveredVia.SYNC);
+        assertThat(observationRepository.findByAgentJobId(old.getId(), workspace.getId()))
+                .isEmpty();
+        assertThat(observationRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
+                .allSatisfy(
+                        observation -> assertThat(observation.getSupersededAt()).isNull());
+        try (LinkedAttempt capture = captureLinkedAttempt(fresh, fixture.practice(), currentBody)) {
+            assertThat(followups.refuseStale(capture.job(), "test-worker"))
+                    .isEqualTo(LinkedRepairFollowups.Decision.PROCEED);
+            admissionService.admit(capture.identity(), capture.observations());
+        }
+        assertThat(observationRepository.findByAgentJobId(fresh.getId(), workspace.getId()))
+                .hasSize(1)
+                .allSatisfy(observation -> assertThat(observation.getOutcome()).isEqualTo(Outcome.MET));
+        assertThat(observationRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
+                .allSatisfy(
+                        observation -> assertThat(observation.getSupersededAt()).isNotNull());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+    void shouldUseANewLiveEventInsteadOfAnExpiredFollowupWhenItActuallyArrives(boolean budgetHeld, boolean liveArrival)
+            throws Exception {
+        var fixture = staleLinkedEvent();
+        try (LinkedAttempt capture =
+                captureLinkedAttempt(fixture.job(), fixture.practice(), "- [x] Confirm current repair")) {
+            assertThat(followups.refuseStale(capture.job(), "test-worker"))
+                    .isEqualTo(LinkedRepairFollowups.Decision.REFUSED);
+        }
+        if (budgetHeld) {
+            doReturn(true).when(submissionBudgets).blockSubmission(any(), any(), any());
+            drainAfterCooldown(fixture.pr());
+            assertThat(rowOf(fixture.current()).getState()).isEqualTo(SignalState.PENDING);
+            assertThat(rowOf(fixture.current()).getStateReason()).isEqualTo(SignalStateReason.BUDGET_EXHAUSTED);
+            doReturn(false).when(submissionBudgets).blockSubmission(any(), any(), any());
+        }
+        expireEvent(fixture.job());
+        if (liveArrival) {
+            deliverCurrentLinkedIssueEvent(fixture.pr());
+            ArtifactSignal event = rowOf(fixture.current());
+            assertThat(event.getDiscoveredVia()).isEqualTo(DiscoveredVia.EVENT);
+            assertThat(event.getState()).isEqualTo(SignalState.DEFERRED);
+            assertThat(event.getStateReason()).isNull();
+            assertThat(event.getActorUserId()).isEqualTo(developer.getId());
+            assertThat(event.getJobId()).isNull();
+            assertThat(event.getLastAttemptedAt()).isNull();
+            deliverCurrentLinkedIssueEvent(fixture.pr());
+            ArtifactSignal duplicate = rowOf(fixture.current());
+            assertThat(duplicate.getOccurredAt()).isEqualTo(event.getOccurredAt());
+            assertThat(duplicate.getStateChangedAt()).isEqualTo(event.getStateChangedAt());
+        }
+        drainAfterCooldown(fixture.pr());
+        ArtifactSignal settled = rowOf(fixture.current());
+        if (liveArrival) {
+            assertThat(settled.getDiscoveredVia()).isEqualTo(DiscoveredVia.EVENT);
+            assertThat(settled.getState()).isEqualTo(SignalState.TRIGGERED);
+            AgentJob fresh = jobOf(settled);
+            assertThat(fresh.getId()).isNotEqualTo(fixture.job().getId());
+            JsonNode facts = Objects.requireNonNull(fresh.getMetadata());
+            assertThat(facts.has(LinkedRepairFollowupRequest.ROOT_JOB)).isFalse();
+            assertThat(facts.has(LinkedRepairFollowupRequest.PREDECESSOR_JOB)).isFalse();
+            assertThat(recheckedOf(fresh)).isEqualTo("[\"followup-linked-criteria\"]");
+            deliverCurrentLinkedIssueEvent(fixture.pr());
+            ArtifactSignal owned = rowOf(fixture.current());
+            assertThat(owned.getState()).isEqualTo(SignalState.TRIGGERED);
+            assertThat(owned.getJobId()).isEqualTo(fresh.getId());
+            assertThat(owned.getOccurredAt()).isEqualTo(settled.getOccurredAt());
+        } else {
+            assertThat(settled.getDiscoveredVia()).isEqualTo(DiscoveredVia.SYNC);
+            assertThat(settled.getState()).isEqualTo(SignalState.LAPSED);
+            assertThat(settled.getStateReason()).isEqualTo(SignalStateReason.PENDING_DEADLINE_EXCEEDED);
+            assertThat(settled.getJobId()).isNull();
+        }
+    }
+
+    private void deliverCurrentLinkedIssueEvent(PullRequest pr) {
+        var issueListener = new IssueAgentJobEventListener(
+                agentJobService,
+                issueRepository,
+                pullRequestRepository,
+                gate,
+                workspaceResolver,
+                recorder,
+                issueEvidenceRevision,
+                transactionManager,
+                repositoryPreparer);
+        transactions.executeWithoutResult(status -> {
+            Issue current = issueRepository
+                    .findById(pullRequestRepository
+                            .findClosingIssueIdsById(pr.getId())
+                            .getFirst())
+                    .orElseThrow();
+            EventContext context = new EventContext(
+                    UUID.randomUUID(),
+                    Instant.now(),
+                    workspace.getId(),
+                    null,
+                    DataSource.WEBHOOK,
+                    "update",
+                    UUID.randomUUID().toString(),
+                    null,
+                    developer.getId());
+            issueListener.onIssueUpdated(
+                    new ScmDomainEvent.IssueUpdated(ScmEventPayload.IssueData.from(current), Set.of("body"), context));
+        });
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldKeepTheOriginalEventExpiryAcrossFollowupDeferralAndRestart(boolean expireBeforeDeferral)
+            throws Exception {
+        var fixture = staleLinkedEvent();
+        if (expireBeforeDeferral) {
+            expireEvent(fixture.job());
+            assertThat(fixture.job().getCreatedAt()).isAfter(Instant.now().minusSeconds(3600));
+        }
+        try (LinkedAttempt capture =
+                captureLinkedAttempt(fixture.job(), fixture.practice(), "- [x] Confirm current repair")) {
+            assertThat(followups.refuseStale(capture.job(), "test-worker"))
+                    .isEqualTo(LinkedRepairFollowups.Decision.REFUSED);
+        }
+        if (expireBeforeDeferral) {
+            assertThat(rowOf(fixture.current()).getState()).isEqualTo(SignalState.RECORDED);
+        } else {
+            expireEvent(fixture.job());
+            drainAfterCooldown(fixture.pr());
+            assertThat(rowOf(fixture.current()).getState()).isEqualTo(SignalState.LAPSED);
+            assertThat(rowOf(fixture.current()).getStateReason())
+                    .isEqualTo(SignalStateReason.PENDING_DEADLINE_EXCEEDED);
+        }
+        assertThat(rowOf(fixture.current()).getJobId()).isNull();
+        assertThat(rowOf(fixture.current()).getDiscoveredVia()).isEqualTo(DiscoveredVia.SYNC);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldNotReopenATerminalCurrentRevisionForAnOlderEvent(boolean lapsed) throws Exception {
+        var fixture = staleLinkedEvent();
+        SignalStateReason reason =
+                lapsed ? SignalStateReason.PENDING_DEADLINE_EXCEEDED : SignalStateReason.GATE_SKIPPED;
+        transactions.executeWithoutResult(status -> recorder.markRefused(fixture.current(), reason));
+        ArtifactSignal before = rowOf(fixture.current());
+        try (LinkedAttempt capture =
+                captureLinkedAttempt(fixture.job(), fixture.practice(), "- [x] Confirm current repair")) {
+            assertThat(followups.refuseStale(capture.job(), "test-worker"))
+                    .isEqualTo(LinkedRepairFollowups.Decision.REFUSED);
+        }
+        deliverCurrentLinkedIssueEvent(fixture.pr());
+        ArtifactSignal after = rowOf(fixture.current());
+        assertThat(after.getState()).isEqualTo(before.getState());
+        assertThat(after.getStateReason()).isEqualTo(reason);
+        assertThat(after.getStateChangedAt()).isEqualTo(before.getStateChangedAt());
+        assertThat(after.getDiscoveredVia()).isEqualTo(DiscoveredVia.SYNC);
+        assertThat(after.getJobId()).isNull();
+        assertThat(observationRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
+                .allSatisfy(
+                        observation -> assertThat(observation.getSupersededAt()).isNull());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldRecheckCurrentConsentAndTheOriginalAuthorBeforeStartingAFollowup(boolean changeAuthor) throws Exception {
+        var fixture = staleLinkedEvent();
+        try (LinkedAttempt capture =
+                captureLinkedAttempt(fixture.job(), fixture.practice(), "- [x] Confirm current repair")) {
+            assertThat(followups.refuseStale(capture.job(), "test-worker"))
+                    .isEqualTo(LinkedRepairFollowups.Decision.REFUSED);
+        }
+        if (changeAuthor) {
+            User other = persistUser("other-followup-author");
+            ensureWorkspaceMembership(workspace, other, WorkspaceMembership.WorkspaceRole.MEMBER);
+            jdbcTemplate.update(
+                    "UPDATE issue SET author_id = ? WHERE id = ?",
+                    other.getId(),
+                    fixture.pr().getId());
+        } else {
+            TestUserFactory.ensureAccountForUser(accountRepository, followupIdentities, developer);
+            long accountId = accountIdentities
+                    .resolveActiveAccountId(
+                            Objects.requireNonNull(developer.getProvider().getId()),
+                            developer.getNativeId().toString(),
+                            null)
+                    .orElseThrow();
+            jdbcTemplate.update(
+                    "INSERT INTO account_ai_choice(account_id, ai_choice, updated_at) VALUES (?, 'NO_AI', now()) "
+                            + "ON CONFLICT (account_id) DO UPDATE SET ai_choice = EXCLUDED.ai_choice, updated_at = EXCLUDED.updated_at",
+                    accountId);
+        }
+        drainAfterCooldown(fixture.pr());
+        assertThat(rowOf(fixture.current()).getState()).isEqualTo(SignalState.SUPPRESSED);
+        assertThat(rowOf(fixture.current()).getStateReason())
+                .isEqualTo(changeAuthor ? SignalStateReason.OUT_OF_REVIEW_SCOPE : SignalStateReason.MEMBER_AI_DECLINED);
+        assertThat(rowOf(fixture.current()).getJobId()).isNull();
+        assertThat(observationRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
+                .allSatisfy(
+                        observation -> assertThat(observation.getSupersededAt()).isNull());
+    }
+
+    @Test
+    void shouldPreserveAnAdmittedCompositionContinuationAfterLinkedMaterialChanges() throws Exception {
+        var fixture = staleLinkedEvent();
+        long issueId = pullRequestRepository
+                .findClosingIssueIdsById(fixture.pr().getId())
+                .getFirst();
+        jdbcTemplate.update("UPDATE issue SET body = ? WHERE id = ?", "- [x] Confirm first repair", issueId);
+        AgentJob admitted;
+        try (LinkedAttempt capture =
+                captureLinkedAttempt(fixture.job(), fixture.practice(), "- [x] Confirm first repair", true)) {
+            assertThat(evidenceFiles.completeReceipt(capture.identity())).isPresent();
+            admissionService.admit(capture.identity(), capture.observations());
+            admitted = agentJobRepository.findById(fixture.job().getId()).orElseThrow();
+            assertThat(ObservationAdmissionService.isAdmitted(admitted)).isTrue();
+            assertThat(compositionBases.findByWorkspaceIdAndJobId(workspace.getId(), admitted.getId()))
+                    .isPresent();
+            AgentJob original = admitted;
+            transactions.executeWithoutResult(status -> {
+                continuations.holdRecoveryCustody();
+                assertThat(continuations.requeue(
+                                original,
+                                "test-worker",
+                                new AgentJobRepository.CompositionRequeue(
+                                        0,
+                                        3,
+                                        Instant.now(),
+                                        Instant.now(),
+                                        "followup-continuation-token",
+                                        "f".repeat(64))))
+                        .isEqualTo(1);
+            });
+            admitted = agentJobRepository.findById(original.getId()).orElseThrow();
+            assertThat(admitted.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+            assertThat(admitted.getRetryCount()).isEqualTo(1);
+            assertThat(admitted.getExecutionStartedAt()).isNull();
+            admitted.setStatus(AgentJobStatus.RUNNING);
+            admitted.setWorkerId("test-worker");
+            admitted = agentJobRepository.saveAndFlush(admitted);
+        }
+        jdbcTemplate.update("UPDATE issue SET body = ? WHERE id = ?", "- [x] Confirm current repair", issueId);
+        assertThat(ObservationAdmissionService.isContinuation(admitted)).isTrue();
+        JsonNode beforeMetadata = Objects.requireNonNull(admitted.getMetadata()).deepCopy();
+        JsonNode beforeSnapshot =
+                Objects.requireNonNull(admitted.getEvidenceSnapshot()).deepCopy();
+        assertThat(followups.refuseStale(admitted, "test-worker")).isEqualTo(LinkedRepairFollowups.Decision.PROCEED);
+        AgentJob preserved = agentJobRepository.findById(admitted.getId()).orElseThrow();
+        assertThat(preserved.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        assertThat(preserved.getMetadata()).isEqualTo(beforeMetadata);
+        assertThat(preserved.getEvidenceSnapshot()).isEqualTo(beforeSnapshot);
+        assertThat(rowOf(fixture.current()).getState()).isEqualTo(SignalState.RECORDED);
+        assertThat(rowOf(fixture.current()).getJobId()).isNull();
+        var replacement = MAPPER.createObjectNode()
+                .put(
+                        LinkedRepairFollowupRequest.SUCCESSOR_REVISION,
+                        fixture.current().revision().value());
+        UUID id = admitted.getId();
+        transactions.executeWithoutResult(status -> {
+            assertThat(agentJobRepository.recordLinkedRepairSuccessor(
+                            id, workspace.getId(), "test-worker", 1, replacement))
+                    .isZero();
+            assertThat(agentJobRepository.transitionToStaleLinkedRepairRefused(
+                            id, "test-worker", 1, Instant.now(), replacement))
+                    .isZero();
+        });
+        assertThat(observationRepository.findByAgentJobId(id, workspace.getId()))
+                .hasSize(1);
+    }
+
+    private record StaleLinkedEvent(
+            PullRequest pr, Practice practice, AgentJob baseline, AgentJob job, SignalKey current) {}
+
+    private StaleLinkedEvent staleLinkedEvent() throws Exception {
+        Connection connection = new Connection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "followup-scm",
+                new ConnectionConfig.GitHubAppConfig(1732L, "org", null, Set.of()));
+        connection.setState(IntegrationState.ACTIVE);
+        connections.saveAndFlush(connection);
+        monitors.saveAndFlush(WorkspaceTestFixtures.repositoryMonitor(workspace, REPO));
+        Practice linked = practice("followup-linked-criteria", ScmSignals.PULL_REQUEST_MERGED);
+        linked.setEvidenceRequirements(
+                List.of(new PracticeEvidenceRequirement(LinkedWorkItemContentSource.KIND, EvidenceStance.REQUIRED)));
+        linked.setReviewWhen(Map.of());
+        linked.setSubject(ActorRole.AUTHOR);
+        linked.setPrecondition(null);
+        linked.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(linked, 2)));
+        linked = practiceRepository.saveAndFlush(linked);
+        PullRequest pr = pullRequest(false, HEAD, "Closes #18");
+        Issue issue = new Issue();
+        issue.setNativeId(7201L);
+        issue.setProvider(repository.getProvider());
+        issue.setRepository(repository);
+        issue.setNumber(18);
+        issue.setState(Issue.State.CLOSED);
+        issue.setTitle("Acceptance criteria");
+        issue.setBody("- [ ] Confirm repair");
+        issue.setCreatedAt(NOW.minus(Duration.ofDays(2)));
+        issue.setClosedAt(NOW);
+        issue = issueRepository.saveAndFlush(issue);
+        long issueId = issue.getId();
+        transactions.executeWithoutResult(status -> {
+            PullRequest managed = pullRequestRepository.findById(pr.getId()).orElseThrow();
+            managed.setState(Issue.State.MERGED);
+            managed.setMerged(true);
+            managed.setMergedAt(NOW);
+            managed.replaceClosingIssues(Set.of(issueRepository.getReferenceById(issueId)));
+            pullRequestRepository.saveAndFlush(managed);
+        });
+        AgentJob baseline = admittedLinkedReview(pr, linked);
+        jdbcTemplate.update("UPDATE issue SET body = ? WHERE id = ?", "- [x] Confirm first repair", issueId);
+        SignalKey event = closingKey(pr);
+        transactions.executeWithoutResult(status -> recorder.defer(event, Instant.now()));
+        drainAfterCooldown(pr);
+        AgentJob old = jobOf(rowOf(event));
+        jdbcTemplate.update("UPDATE issue SET body = ? WHERE id = ?", "- [x] Confirm current repair", issueId);
+        SignalKey current = closingKey(pr);
+        transactions.executeWithoutResult(status -> recorder.record(current, Instant.now(), DiscoveredVia.SYNC));
+        return new StaleLinkedEvent(pr, linked, baseline, old, current);
+    }
+
+    private SignalKey closingKey(PullRequest pr) {
+        PullRequest current =
+                pullRequestRepository.findByIdWithAllForGate(pr.getId()).orElseThrow();
+        return LinkedWorkItemContentSource.currentClosingMaterialKey(
+                        workspace.getId(), current, pullRequestRepository.findClosingIssuesById(pr.getId()))
+                .orElseThrow();
+    }
+
+    private void drainAfterCooldown(PullRequest pr) {
+        Instant settled = Instant.now().plus(Duration.ofMinutes(reviewProperties.cooldownMinutes() + 61));
+        transactions.executeWithoutResult(status -> coalescer.drain(workspace.getId(), pr.getId(), settled));
+    }
+
+    private void expireEvent(AgentJob event) {
+        jdbcTemplate.update(
+                "UPDATE artifact_signal SET occurred_at = ? WHERE workspace_id = ? AND job_id = ? AND discovered_via = 'EVENT'",
+                Timestamp.from(Instant.now()
+                        .minus(ledgerProperties.pendingLapseAfter())
+                        .minusSeconds(1)),
+                workspace.getId(),
+                event.getId());
+    }
+
     private LinkedAttempt captureLinkedAttempt(AgentJob job, Practice linked, String expectedBody) throws Exception {
+        return captureLinkedAttempt(job, linked, expectedBody, false);
+    }
+
+    private LinkedAttempt captureLinkedAttempt(AgentJob job, Practice linked, String expectedBody, boolean publicWriter)
+            throws Exception {
         job.setStatus(AgentJobStatus.RUNNING);
         job.setWorkerId("test-worker");
         job = agentJobRepository.saveAndFlush(job);
@@ -747,10 +1195,10 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                     .put("revisionId", linked.getCurrentRevision().getId());
             job.setEvidenceSnapshot(snapshot);
             job = agentJobRepository.saveAndFlush(job);
+            var files = new LinkedHashMap<>(raw.files());
+            if (publicWriter) FeedbackCompositionInputs.stage(files, ReviewOutputService.originOf(job.getMetadata()));
             inputs = evidenceFiles.prepare(
-                    job,
-                    new PreparedEvidence(raw.files(), raw.filesOnDisk(), raw.cleanups(), null, raw.directories()),
-                    null);
+                    job, new PreparedEvidence(files, raw.filesOnDisk(), raw.cleanups(), null, raw.directories()), null);
             String path = SandboxLayout.CONTEXT_PREFIX + "linked_work_items/18.md";
             List<String> lines = Files.readAllLines(inputs.filesOnDisk().get(path));
             int line = IntStream.range(0, lines.size())
@@ -1382,7 +1830,8 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                     null,
                     mock(ArtifactSourceCatalogRegistry.class),
                     Optional.empty(),
-                    Optional.empty());
+                    Optional.empty(),
+                    mock(LinkedRepairFollowups.class));
             assertThat(executor.processJob(repair.getId())).isTrue();
         } finally {
             meters.close();

@@ -1,11 +1,14 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.handler.LinkedRepairFollowupRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignal;
+import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
@@ -16,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewGate;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +48,7 @@ public class PullRequestSignalResubmitter {
     private final SignalRecorder signalRecorder;
     private final PullRequestReviewRepository reviewRepository;
     private final IntegrationManifestRegistry manifests;
+    private final LinkedRepairFollowups followups;
 
     public PullRequestSignalResubmitter(
             AgentJobService agentJobService,
@@ -51,13 +56,34 @@ public class PullRequestSignalResubmitter {
             ReviewGate reviewGate,
             SignalRecorder signalRecorder,
             PullRequestReviewRepository reviewRepository,
-            IntegrationManifestRegistry manifests) {
+            IntegrationManifestRegistry manifests,
+            LinkedRepairFollowups followups) {
         this.agentJobService = agentJobService;
         this.pullRequestRepository = pullRequestRepository;
         this.reviewGate = reviewGate;
         this.signalRecorder = signalRecorder;
         this.reviewRepository = reviewRepository;
         this.manifests = manifests;
+        this.followups = followups;
+    }
+
+    boolean advanceLinkedRepair(SignalKey current, PullRequest pr, List<ArtifactSignal> pending) {
+        boolean owned = false;
+        for (ArtifactSignal previous : pending) {
+            if (previous.getDiscoveredVia() != DiscoveredVia.SYNC) continue;
+            var admission = followups.admission(previous, pr);
+            if (admission.refusal() != null) {
+                signalRecorder.markRefused(previous.key(), admission.refusal());
+                owned = true;
+            } else if (admission.parent() != null) {
+                var advancement = followups.advance(previous, admission.parent(), current);
+                if (advancement != LinkedRepairFollowups.Advancement.WAITING) {
+                    signalRecorder.markRefused(previous.key(), SignalStateReason.COALESCED);
+                }
+                owned = true;
+            }
+        }
+        return owned;
     }
 
     /**
@@ -102,6 +128,14 @@ public class PullRequestSignalResubmitter {
             }
         }
 
+        var followup = signal.getDiscoveredVia() == DiscoveredVia.SYNC
+                        && ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED.equals(key.signalName())
+                ? followups.admission(signal, pr)
+                : new LinkedRepairFollowups.Admission(null, null);
+        if (followup.refusal() != null) {
+            signalRecorder.markRefused(key, followup.refusal());
+            return;
+        }
         GateDecision decision = reviewGate.evaluateQueued(
                 pr,
                 key.workspaceId(),
@@ -133,13 +167,21 @@ public class PullRequestSignalResubmitter {
                     request = request.withLinkedIssueRevision(key.revision().value());
                 }
                 if (reviewData != null) request = request.forSubmittedReview(reviewData);
+                JobSubmissionRequest selected =
+                        request.withOrigin(SignalOrigins.observationOriginOf(signal.getDiscoveredVia()));
+                if (followup.parent() != null) {
+                    selected = new LinkedRepairFollowupRequest(
+                            request.withOrigin(SignalOrigins.observationOriginOf(signal.getDiscoveredVia())),
+                            followup.parent().predecessorJobId(),
+                            followup.parent().rootJobId());
+                }
                 agentJobService.submit(
                         run.workspace().getId(),
                         AgentJobType.PULL_REQUEST_REVIEW,
                         // Carried from the ledger row rather than defaulted: a re-offered signal keeps the
                         // population it was discovered for, so a campaign's budget-deferred tail cannot land
                         // in the live series hours after the campaign paused.
-                        request.withOrigin(SignalOrigins.observationOriginOf(signal.getDiscoveredVia())),
+                        selected,
                         key,
                         run);
             }

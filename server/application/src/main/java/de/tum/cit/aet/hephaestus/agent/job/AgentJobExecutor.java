@@ -168,6 +168,7 @@ public class AgentJobExecutor {
 
     private final AgentProperties agentProperties;
     private final AgentJobRepository jobRepository;
+    private final LinkedRepairFollowups linkedRepairFollowups;
     private final ArtifactSourceCatalogRegistry sourceCatalogs;
     private final ReviewMemberAiPolicy memberAiPolicy;
     private final JobTypeHandlerRegistry handlerRegistry;
@@ -233,10 +234,12 @@ public class AgentJobExecutor {
             @Nullable LlmAdmissionService llmAdmissionService,
             ArtifactSourceCatalogRegistry sourceCatalogs,
             Optional<WorkerCapacityState> capacityState,
-            Optional<WorkerProperties> workerProperties) {
+            Optional<WorkerProperties> workerProperties,
+            LinkedRepairFollowups linkedRepairFollowups) {
         this.agentProperties = agentProperties;
         this.sourceCatalogs = sourceCatalogs;
         this.jobRepository = jobRepository;
+        this.linkedRepairFollowups = linkedRepairFollowups;
         this.memberAiPolicy = memberAiPolicy;
         this.handlerRegistry = handlerRegistry;
         this.practiceAgent = practiceAgent;
@@ -716,6 +719,17 @@ public class AgentJobExecutor {
             PreparedSandbox preparedSandbox = prepareSandboxSpec(jobId, job, claim.snapshot, preparationStage);
             stagedInputs = preparedSandbox.stagedInputs();
             SandboxSpec sandboxSpec = preparedSandbox.spec();
+            var linkedRepair = linkedRepairFollowups.refuseStale(job, workerId);
+            if (linkedRepair == LinkedRepairFollowups.Decision.REFUSED) {
+                metricOutcome = "INSUFFICIENT_EVIDENCE";
+                recordPracticeReviewRefusal(job, "linked_issue_capture_stale");
+                jobTelemetry.terminal(job, AgentJobStatus.COMPLETED, AgentJobTelemetry.age(job));
+                return;
+            }
+            if (linkedRepair == LinkedRepairFollowups.Decision.OWNERSHIP_LOST) {
+                metricOutcome = "OWNERSHIP_LOST";
+                return;
+            }
             // Past this boundary provider usage may exist even if execute() throws, so it is persisted
             // for recovery on another process. A lost fence means the job was cancelled or requeued
             // while preparation ran, so its sandbox must not start.

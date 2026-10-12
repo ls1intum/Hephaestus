@@ -17,7 +17,7 @@ public final class SignalOrigins {
     public static ObservationOrigin observationOriginOf(DiscoveredVia discoveredVia) {
         return switch (discoveredVia) {
             // SYNC groups with LIVE despite finding a signal after the fact: reconciliation never triggers a
-            // review on its own, only a later live redelivery or campaign does.
+            // review on its own. A live redelivery, campaign or continuation of an authorized event selects it.
             //
             // SWEEP groups with LIVE, not BACKFILL: its window is bounded to the recent past by rule rather
             // than chosen with hindsight, so filing it as BACKFILL would hide its observations from the

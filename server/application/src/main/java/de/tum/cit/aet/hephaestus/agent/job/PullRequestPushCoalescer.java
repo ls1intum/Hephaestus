@@ -352,6 +352,7 @@ public class PullRequestPushCoalescer implements PendingSignalResubmitter {
                 .findFirst()
                 .orElse(null);
         if (mergedRepair && settling.stream().noneMatch(signal -> signal.key().equals(current))) {
+            if (current != null && submitter.advanceLinkedRepair(current, pr, settling)) return;
             settling.forEach(signal -> recorder.markRefused(signal.key(), SignalStateReason.COALESCED));
             return;
         }

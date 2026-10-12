@@ -364,7 +364,13 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
                 .thenReturn(decision);
         resubmit(
                 new PullRequestSignalResubmitter(
-                        jobs, pullRequestRepository, reviewGate, signalRecorder, reviewRepository, manifests),
+                        jobs,
+                        pullRequestRepository,
+                        reviewGate,
+                        signalRecorder,
+                        reviewRepository,
+                        manifests,
+                        mock(LinkedRepairFollowups.class)),
                 held);
 
         var request = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
@@ -462,7 +468,13 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
      */
     private PullRequestSignalResubmitter pullRequestResubmitter() {
         return new PullRequestSignalResubmitter(
-                agentJobService, pullRequestRepository, gate, signalRecorder, reviewRepository, manifests);
+                agentJobService,
+                pullRequestRepository,
+                gate,
+                signalRecorder,
+                reviewRepository,
+                manifests,
+                mock(LinkedRepairFollowups.class));
     }
 
     private IssueSignalResubmitter issueResubmitter() {

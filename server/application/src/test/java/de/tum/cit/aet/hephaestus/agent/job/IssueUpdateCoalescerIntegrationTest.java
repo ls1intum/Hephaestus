@@ -460,7 +460,8 @@ class IssueUpdateCoalescerIntegrationTest extends BaseIntegrationTest {
                     mock(ReviewGate.class),
                     recorder,
                     mock(PullRequestReviewRepository.class),
-                    mock(IntegrationManifestRegistry.class));
+                    mock(IntegrationManifestRegistry.class),
+                    mock(LinkedRepairFollowups.class));
         }
 
         @Bean
