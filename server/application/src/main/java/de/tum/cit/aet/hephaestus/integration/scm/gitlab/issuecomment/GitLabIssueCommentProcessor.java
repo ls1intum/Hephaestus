@@ -157,11 +157,16 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
 
     @Transactional
     @Nullable
-    public IssueComment processFromSync(SyncNoteData data, Issue parent, Long providerId, Long scopeId) {
-        if (parent == null) {
+    public IssueComment processFromSync(SyncNoteData data, Issue suppliedParent, Long providerId, Long scopeId) {
+        if (suppliedParent == null) {
             log.warn("Skipped sync note: reason=nullParent, noteId={}", data.id());
             return null;
         }
+
+        // Sync returns a detached parent; event references must use this transaction's relationships.
+        Issue parent = issueRepository
+                .findById(Objects.requireNonNull(suppliedParent.getId()))
+                .orElseThrow(() -> new IllegalStateException("The comment's reviewed work no longer exists"));
 
         User author = findOrCreateUser(
                 GitLabUserLookup.of(

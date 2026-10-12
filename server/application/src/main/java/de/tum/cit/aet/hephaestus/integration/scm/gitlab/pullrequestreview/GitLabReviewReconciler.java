@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -44,11 +45,15 @@ public class GitLabReviewReconciler {
     private static final long FNV_PRIME = 0x100000001b3L;
 
     private final PullRequestReviewRepository reviewRepository;
+    private final PullRequestRepository pullRequestRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabReviewReconciler(
-            PullRequestReviewRepository reviewRepository, ApplicationEventPublisher eventPublisher) {
+            PullRequestReviewRepository reviewRepository,
+            PullRequestRepository pullRequestRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.reviewRepository = reviewRepository;
+        this.pullRequestRepository = pullRequestRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -98,7 +103,8 @@ public class GitLabReviewReconciler {
         return reviewRepository
                 .findByNativeIdAndProviderId(reviewNativeId, providerId)
                 .map(existing -> updateReview(existing, earliestNoteCreatedAt, ctx))
-                .orElseGet(() -> createReview(reviewNativeId, pr, author, provider, earliestNoteCreatedAt, ctx));
+                .orElseGet(() ->
+                        createReview(reviewNativeId, managedParent(pr), author, provider, earliestNoteCreatedAt, ctx));
     }
 
     public static final String APPROVED_SYSTEM_NOTE = "approved this merge request";
@@ -162,22 +168,26 @@ public class GitLabReviewReconciler {
             return null;
         }
         long nativeId = generateChangesRequestedNativeId(noteGlobalId, reviewer.getNativeId());
-        PullRequestReview review = Optional.ofNullable(changesRequestedReview(reviewer, noteGlobalId, provider))
-                .orElseGet(() -> {
-                    PullRequestReview created = new PullRequestReview();
-                    created.setNativeId(nativeId);
-                    created.setProvider(provider);
-                    created.setState(PullRequestReview.State.CHANGES_REQUESTED);
-                    created.setHtmlUrl(pr.getHtmlUrl() != null ? pr.getHtmlUrl() : "");
-                    created.setCreatedAt(requestedAt);
-                    created.setAuthor(reviewer);
-                    created.setPullRequest(pr);
-                    return created;
-                });
+        PullRequestReview existing = changesRequestedReview(reviewer, noteGlobalId, provider);
+        if (existing != null && requestedAt.equals(existing.getSubmittedAt())) {
+            return existing;
+        }
+        PullRequest parent = managedParent(pr);
+        PullRequestReview review = Optional.ofNullable(existing).orElseGet(() -> {
+            PullRequestReview created = new PullRequestReview();
+            created.setNativeId(nativeId);
+            created.setProvider(provider);
+            created.setState(PullRequestReview.State.CHANGES_REQUESTED);
+            created.setHtmlUrl(parent.getHtmlUrl() != null ? parent.getHtmlUrl() : "");
+            created.setCreatedAt(requestedAt);
+            created.setAuthor(reviewer);
+            created.setPullRequest(parent);
+            return created;
+        });
         review.setSubmittedAt(requestedAt);
         review.setUpdatedAt(Instant.now());
         PullRequestReview saved = reviewRepository.save(review);
-        pr.addReview(saved);
+        parent.addReview(saved);
         return saved;
     }
 
@@ -252,6 +262,13 @@ public class GitLabReviewReconciler {
                 author.getLogin(),
                 reviewNativeId);
         return saved;
+    }
+
+    /** Sync passes parents whose loading transaction has ended; lazy relationships belong to this write. */
+    private PullRequest managedParent(PullRequest parent) {
+        return pullRequestRepository
+                .findById(Objects.requireNonNull(parent.getId()))
+                .orElseThrow(() -> new IllegalStateException("The reviewed merge request no longer exists"));
     }
 
     /**
