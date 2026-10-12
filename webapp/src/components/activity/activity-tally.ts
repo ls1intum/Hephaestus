@@ -16,10 +16,7 @@ export type ActivityTally = Record<ActivityKind, number> &
 	Pick<ActivityCounts, "contributions" | "pullRequestsReviewed" | "comments">;
 
 export interface ActivityWeek {
-	/**
-	 * Local midnight of the Monday the server starts the week on, at 00:00 UTC. The server's instant
-	 * formats as Sunday west of UTC; this day reads as that Monday in every time zone.
-	 */
+	/** The actual UTC Monday instant used by the server to group activity. */
 	start: Date;
 	tally: ActivityTally;
 }
@@ -78,7 +75,7 @@ export function overviewOf(detail: ActivityPersonDetail): ActivityOverview {
 	return {
 		tally: tallyOf(detail.counts, detail.breakdown),
 		weeks: weekStarts(detail.from, detail.to).map((start) => ({
-			start: localWeekStart(start),
+			start,
 			tally: counted.get(start.getTime()) ?? EMPTY_TALLY,
 		})),
 		repositories: detail.repositories,
@@ -87,7 +84,7 @@ export function overviewOf(detail: ActivityPersonDetail): ActivityOverview {
 
 /**
  * The published contributions of every week of the span, oldest first, as a chart's rows: each
- * keyed by its local start like an overview's week. A week the server left out had none.
+ * keyed by its UTC start like an overview's week. A week the server left out had none.
  */
 export function contributionWeekRows(
 	weeks: readonly ActivitySparklineWeek[],
@@ -95,23 +92,21 @@ export function contributionWeekRows(
 ): { start: number; count: number }[] {
 	const counted = new Map(weeks.map((week) => [week.start.getTime(), week.contributions]));
 	return weekStarts(span.from, span.to).map((start) => ({
-		start: localWeekStart(start).getTime(),
+		start: start.getTime(),
 		count: counted.get(start.getTime()) ?? 0,
 	}));
 }
 
-/** The server's week start, 00:00 UTC on a Monday, as local midnight of that Monday (`ActivityWeek`). */
-export function localWeekStart(start: Date): Date {
-	return new Date(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
-}
-
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+export const UTC_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Every week the span touches, from the one that holds `from` to the one before `to`. The server
  * lists only weeks with activity, so a quiet week must still get its place on a chart.
  */
 export function weekStarts(from: Date, to: Date): Date[] {
+	if (from.getTime() >= to.getTime()) {
+		return [];
+	}
 	const daysSinceMonday = (from.getUTCDay() + 6) % 7;
 	let start = Date.UTC(
 		from.getUTCFullYear(),
@@ -121,7 +116,7 @@ export function weekStarts(from: Date, to: Date): Date[] {
 	const starts: Date[] = [];
 	while (start < to.getTime()) {
 		starts.push(new Date(start));
-		start += WEEK_MS;
+		start += UTC_WEEK_MS;
 	}
 	return starts;
 }

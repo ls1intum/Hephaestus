@@ -33,7 +33,7 @@ const ZERO = tallyOf(
 );
 
 const week = (day: number, counts: Partial<ActivityTally>) => ({
-	start: new Date(2026, 8, day),
+	start: new Date(Date.UTC(2026, 8, day)),
 	tally: { ...ZERO, ...counts },
 });
 
@@ -56,7 +56,7 @@ describe("weeksSummary", () => {
 				one: "pull request reviewed",
 				many: "pull requests reviewed",
 			}),
-		).toBe("6 pull requests reviewed. Busiest week 14–20 September 2026, 3");
+		).toMatch(/^6 pull requests reviewed\. Busiest week 14\s*–\s*20 September 2026 \(UTC\), 3$/u);
 	});
 
 	it("names no busiest week when nothing happened", () => {

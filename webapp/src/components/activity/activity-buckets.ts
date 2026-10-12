@@ -2,10 +2,15 @@ import { addDays, addMonths, format, isSameYear, max, min } from "date-fns";
 
 import type { TimeBucketSize } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
-import { formatDayRange } from "@/lib/dates";
+import { formatDayRange, formatUtcDayRange, formatUtcShortDay } from "@/lib/dates";
 
 import type { Noun } from "./activity-kind-defs";
-import type { ActivityOverview, ActivityTally, ActivityWeek } from "./activity-tally";
+import {
+	type ActivityOverview,
+	type ActivityTally,
+	type ActivityWeek,
+	UTC_WEEK_MS,
+} from "./activity-tally";
 
 export type BucketSize = TimeBucketSize;
 
@@ -110,6 +115,21 @@ export function bucketLabel(start: Date, size: BucketSize, span?: DateSpan): str
 	return whole && size === "MONTH" ? format(start, "MMMM yyyy") : formatDayRange(first, last);
 }
 
+/** UTC-grouped activity weeks, clipped to the actual range without changing bucket identity. */
+export function utcWeekLabel(start: Date, span?: DateSpan): string {
+	const end = new Date(start.getTime() + UTC_WEEK_MS - 1);
+	const first = span ? max([start, span.from]) : start;
+	const last = span ? min([end, new Date(span.to.getTime() - 1)]) : end;
+	return `${formatUtcDayRange(first, last)} (UTC)`;
+}
+
+export function utcWeekStartLabel(start: Date, nowMs: number): string {
+	const tick = formatUtcShortDay(start);
+	return start.getUTCFullYear() === new Date(nowMs).getUTCFullYear()
+		? tick
+		: `${tick} ${start.getUTCFullYear()}`;
+}
+
 /** The week with the highest count, the earliest on a tie; none when nothing happened. */
 export function busiestWeek(
 	weeks: readonly ActivityWeek[],
@@ -141,7 +161,7 @@ export function weeksSummary(
 	if (busiest === undefined) {
 		return headline;
 	}
-	return `${headline}. Busiest week ${bucketLabel(busiest.week.start, "WEEK", span)}, ${busiest.count}`;
+	return `${headline}. Busiest week ${utcWeekLabel(busiest.week.start, span)}, ${busiest.count}`;
 }
 
 /**

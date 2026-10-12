@@ -18,6 +18,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { formatUtcShortDay } from "@/lib/dates";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 import { capitalise, hasText } from "@/lib/text";
 
@@ -25,11 +26,11 @@ import {
 	type ActivityOverviewState,
 	averagePerBucket,
 	BUCKET_SIZE_DEFS,
-	bucketLabel,
 	busiestWeek,
 	type DateSpan,
 	readSpan,
-	startLabel,
+	utcWeekLabel,
+	utcWeekStartLabel,
 	weekRows,
 	weeksSummary,
 } from "./activity-buckets";
@@ -96,7 +97,7 @@ export function ActivityTrendChart({ state, category, providerType }: ActivityTr
 		(kind) => overview.tally[kind] !== 0 || overview.weeks.some((week) => week.tally[kind] !== 0),
 	);
 	const lastPlottedKind = plottedKinds.at(-1);
-	const label = (start: Date) => capitalise(bucketLabel(start, "WEEK", span));
+	const label = (start: Date) => capitalise(utcWeekLabel(start, span));
 	return (
 		<div aria-busy={state.stale || undefined} className={cn("space-y-5", state.stale && STALE)}>
 			<dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
@@ -117,6 +118,7 @@ export function ActivityTrendChart({ state, category, providerType }: ActivityTr
 				)}
 			</dl>
 			<figure aria-labelledby={summaryId} className="space-y-4">
+				<p className="text-xs text-muted-foreground">Weeks use UTC.</p>
 				<ul className="space-y-4">
 					{def.kinds.map((kind) => (
 						<KindRow
@@ -164,7 +166,10 @@ function Figure({ term, value, note }: { term: string; value: string; note?: str
 			<dd className="text-lg leading-tight font-semibold text-foreground">
 				{value}
 				{note !== undefined && (
-					<span className="ml-1.5 text-xs font-normal text-muted-foreground">{note}</span>
+					<span className="ml-1.5 text-xs font-normal text-muted-foreground">
+						<span className="sr-only"> in </span>
+						{note}
+					</span>
 				)}
 			</dd>
 		</div>
@@ -201,7 +206,6 @@ function KindRow({
 	const tone = ACTIVITY_TONES[markTone(def.tone)];
 	const rows = weekRows(overview.weeks, (tally) => tally[kind]);
 	const config = { count: { label: def.label, color: tone.fill } } satisfies ChartConfig;
-	const { tick } = BUCKET_SIZE_DEFS.WEEK;
 	const total = overview.tally[kind];
 	return (
 		<li className="space-y-1">
@@ -233,7 +237,9 @@ function KindRow({
 							tickFormatter={(start: number, index: number) =>
 								// The first tick carries the year when it is not this one, so a year of months
 								// never reads "Sep" … "Sep".
-								index === 0 ? startLabel(new Date(start), "WEEK", nowMs) : tick(new Date(start))
+								index === 0
+									? utcWeekStartLabel(new Date(start), nowMs)
+									: formatUtcShortDay(new Date(start))
 							}
 						/>
 						<ReferenceLine y={0} stroke="var(--color-border)" />
@@ -317,7 +323,7 @@ function BucketTable({
 							<TableRow key={week.start.getTime()} variant="static">
 								<TableCell className="sticky left-0 z-20 bg-card">
 									<span className="block w-28 wrap-anywhere whitespace-normal">
-										{capitalise(bucketLabel(week.start, "WEEK", span))}
+										{capitalise(utcWeekLabel(week.start, span))}
 									</span>
 								</TableCell>
 								{def.kinds.map((kind) => (

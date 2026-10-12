@@ -176,6 +176,7 @@ function TileChart({
 		<BucketBars
 			rows={weekRows(overview.weeks, def.headline.count)}
 			bucket="WEEK"
+			utcWeeks
 			span={span}
 			name={capitalise(def.headline.qualifier ?? def.label(providerType))}
 			fill={ACTIVITY_TONES[def.tone].fill}

@@ -65,13 +65,30 @@ export function formatDate(date: Date): string {
  * transformer parses one as UTC midnight, so its day is read in UTC; the local day is the one before
  * anywhere west of UTC.
  */
+const UTC_DATE_FIELDS = {
+	day: "numeric",
+	month: "long",
+	year: "numeric",
+	timeZone: "UTC",
+} as const;
+const UTC_DATE_FORMAT = new Intl.DateTimeFormat("en-GB", UTC_DATE_FIELDS);
+const UTC_SHORT_DAY_FORMAT = new Intl.DateTimeFormat("en-GB", {
+	day: "numeric",
+	month: "short",
+	timeZone: "UTC",
+});
+
 export function formatCalendarDate(date: Date): string {
-	return date.toLocaleDateString("en-GB", {
-		day: "numeric",
-		month: "long",
-		year: "numeric",
-		timeZone: "UTC",
-	});
+	return date.toLocaleDateString("en-GB", UTC_DATE_FIELDS);
+}
+
+/** Calendar days of an actual UTC interval, without projecting its instants into local midnight. */
+export function formatUtcDayRange(from: Date, to: Date): string {
+	return UTC_DATE_FORMAT.formatRange(from, to);
+}
+
+export function formatUtcShortDay(date: Date): string {
+	return UTC_SHORT_DAY_FORMAT.format(date);
 }
 
 export function formatWeekdayDay(date: Date, today: Date): string {

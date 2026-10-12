@@ -302,6 +302,7 @@ function PersonFigures({
 								<BucketBars
 									rows={contributionWeekRows(row.weeks, span)}
 									bucket="WEEK"
+									utcWeeks
 									span={span}
 									name="Contributions"
 									fill={ACTIVITY_TONES.accent.fill}
@@ -324,7 +325,7 @@ function PersonFigures({
 					<Table aria-labelledby="public-person-weeks-title">
 						<TableHeader>
 							<TableRow variant="static">
-								<TableHead>Week of</TableHead>
+								<TableHead>Week of (UTC)</TableHead>
 								<TableHead numeric className="text-right">
 									Contributions
 								</TableHead>

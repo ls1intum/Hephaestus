@@ -3,6 +3,7 @@ import { Bar, BarChart, LabelList, XAxis, YAxis } from "recharts";
 
 import { useNow } from "@/components/common/use-now";
 import { type ChartConfig, ChartContainer, ChartTooltip } from "@/components/ui/chart";
+import { formatUtcShortDay } from "@/lib/dates";
 import { capitalise } from "@/lib/text";
 
 import {
@@ -11,6 +12,8 @@ import {
 	type DateSpan,
 	startLabel,
 	trackRows,
+	utcWeekLabel,
+	utcWeekStartLabel,
 } from "./activity-buckets";
 import {
 	BAR_RADIUS,
@@ -26,6 +29,8 @@ export interface BucketBarsProps {
 	/** One count per bucket, oldest first, each keyed by its start in milliseconds. */
 	rows: readonly { start: number; count: number }[];
 	bucket: BucketSize;
+	/** Activity weeks are grouped in UTC; other callers keep their existing local bucket basis. */
+	utcWeeks?: boolean;
 	/** The span the counts were read for, which the tooltip clips a partial bucket to. */
 	span: DateSpan | undefined;
 	/** What a bar counts, in the tooltip: "Merged", "Reviews". */
@@ -40,15 +45,18 @@ export interface BucketBarsProps {
  * its last day, "Today" for a range that ends now. Only the peak carries its value; the tile's number and its sentence carry the rest, so
  * the chart is hidden from assistive technology.
  */
-export function BucketBars({ rows, bucket, span, name, fill }: BucketBarsProps) {
+export function BucketBars({ rows, bucket, span, name, fill, utcWeeks = false }: BucketBarsProps) {
 	const nowMs = useNow();
 	const tracked = trackRows(rows);
 	const first = rows.at(0);
+	const utc = utcWeeks && bucket === "WEEK";
+	const today = utc ? new Date(nowMs).setUTCHours(0, 0, 0, 0) : startOfDay(nowMs).getTime();
 	// A span that ends before today, a custom range, names its last day instead of "Today".
-	const lastDay =
-		span === undefined || span.to.getTime() > startOfDay(nowMs).getTime()
-			? "Today"
-			: startLabel(new Date(span.to.getTime() - 1), "DAY", nowMs);
+	let lastDay = "Today";
+	if (span !== undefined && span.to.getTime() <= today) {
+		const end = new Date(span.to.getTime() - 1);
+		lastDay = utc ? formatUtcShortDay(end) : startLabel(end, "DAY", nowMs);
+	}
 	const config = { count: { label: name, color: fill } } satisfies ChartConfig;
 	return (
 		<div aria-hidden className="space-y-1">
@@ -66,7 +74,9 @@ export function BucketBars({ rows, bucket, span, name, fill }: BucketBarsProps) 
 						content={
 							<BarTooltip
 								name={name}
-								bucketLabel={(start) => capitalise(bucketLabel(start, bucket, span))}
+								bucketLabel={(start) =>
+									capitalise(utc ? utcWeekLabel(start, span) : bucketLabel(start, bucket, span))
+								}
 							/>
 						}
 					/>
@@ -92,7 +102,12 @@ export function BucketBars({ rows, bucket, span, name, fill }: BucketBarsProps) 
 			</ChartContainer>
 			{first !== undefined && (
 				<div className="flex justify-between text-xs text-muted-foreground">
-					<span>{startLabel(new Date(first.start), bucket, nowMs)}</span>
+					<span>
+						{utc
+							? utcWeekStartLabel(new Date(first.start), nowMs)
+							: startLabel(new Date(first.start), bucket, nowMs)}
+					</span>
+					{utc && <span>UTC weeks</span>}
 					<span>{lastDay}</span>
 				</div>
 			)}
