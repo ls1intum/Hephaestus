@@ -1,10 +1,14 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ReviewSourceNotReadyException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Locale;
+import java.util.Set;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.TransactionException;
 
@@ -49,11 +53,23 @@ record PreparationFailure(Stage stage, Kind kind) {
         }
 
         static Kind of(Throwable failure) {
-            if (failure instanceof ReviewSourceNotReadyException) return SOURCE_NOT_READY;
-            if (failure instanceof JobPreparationException) return INPUT_PREPARATION;
-            if (failure instanceof IOException || failure instanceof UncheckedIOException) return IO;
-            if (failure instanceof DataAccessException || failure instanceof TransactionException) return DATABASE;
-            return UNKNOWN;
+            Kind fallback = failure instanceof JobPreparationException ? INPUT_PREPARATION : UNKNOWN;
+            Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+            Throwable current = failure;
+            while (visited.add(current)) {
+                if (current instanceof ReviewSourceNotReadyException) return SOURCE_NOT_READY;
+                if (current instanceof IOException || current instanceof UncheckedIOException) return IO;
+                if (current instanceof DataAccessException || current instanceof TransactionException) return DATABASE;
+                // These preparation owners retain the failure they wrap. A buried cause in any other
+                // exception says nothing reliable about preparation, and this diagnosis grants no retry.
+                if (!(current instanceof JobPreparationException || current instanceof EvidenceCollectionException)) {
+                    return fallback;
+                }
+                Throwable cause = current.getCause();
+                if (cause == null) return fallback;
+                current = cause;
+            }
+            return fallback;
         }
     }
 

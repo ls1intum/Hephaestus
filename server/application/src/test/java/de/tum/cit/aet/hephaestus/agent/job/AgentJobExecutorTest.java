@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
@@ -37,6 +38,7 @@ import de.tum.cit.aet.hephaestus.agent.gateway.WorkspaceBudgetExceededException;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.AnsweredPractice;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ReviewSourceNotReadyException;
@@ -996,9 +998,29 @@ class AgentJobExecutorTest extends BaseUnitTest {
             assertThat(released).isTrue();
         }
 
+        static Stream<Arguments> preparationFailures() {
+            String secret = "jdbc:postgresql://private/db password=secret token=eyJ.secret";
+            return Stream.of(
+                    Arguments.of(new IllegalStateException(secret), "the cause is not classified"),
+                    Arguments.of(
+                            new JobPreparationException(secret, new IOException(secret)),
+                            "a file or network operation failed"),
+                    Arguments.of(
+                            new JobPreparationException(
+                                    secret,
+                                    new EvidenceCollectionException(
+                                            secret, new DataIntegrityViolationException(secret))),
+                            "a database operation failed"),
+                    Arguments.of(
+                            new JobPreparationException(secret, new ReviewSourceNotReadyException(secret)),
+                            "the reviewed source was not ready"));
+        }
+
         @ParameterizedTest
-        @ValueSource(strings = {"Pinned review head is unavailable", "Review diff is empty or unavailable"})
-        void contextPreparationFailureBeforeSandboxDoesNotCreateUnpricedUsage(String failureMessage) {
+        @MethodSource("preparationFailures")
+        @ExtendWith(OutputCaptureExtension.class)
+        void contextPreparationFailureBeforeSandboxDoesNotCreateUnpricedUsage(
+                Exception failure, String kind, CapturedOutput output) {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
             when(memberAiPolicy.binding(eq(99L), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
@@ -1012,21 +1034,22 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.prepareInputs(any())).thenThrow(new IllegalStateException(failureMessage));
+            when(handler.prepareInputs(any())).thenThrow(failure);
 
             executor.processJob(jobId);
 
             verify(sandboxManager, never()).execute(any());
+            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt(), any(), any(), any());
+            assertThat(output).doesNotContain("password=secret", "token=eyJ.secret", "jdbc:postgresql://private");
             verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(usageRecorder, never()).record(any(), any());
-            // An untyped failure is not classified from its text, and its text never reaches the row.
+            // Diagnosis uses types only; no nested cause changes the retry decision or reaches the row.
             verify(jobRepository)
                     .transitionStatus(
                             eq(jobId),
                             eq(AgentJobStatus.FAILED),
                             any(),
-                            eq("The job failed before execution while preparing the review inputs: "
-                                    + "the cause is not classified."),
+                            eq("The job failed before execution while preparing the review inputs: " + kind + "."),
                             eq(Set.of(AgentJobStatus.RUNNING)));
         }
 
@@ -1617,6 +1640,14 @@ class AgentJobExecutorTest extends BaseUnitTest {
                             new SandboxCancelledException("cancelled"),
                             false,
                             "cancellation is a SandboxException subtype, but handled separately"),
+                    Arguments.of(
+                            new JobPreparationException("wrapped IO", new IOException("file")),
+                            false,
+                            "diagnostic IO does not grant retries"),
+                    Arguments.of(
+                            new JobPreparationException("wrapped source", new ReviewSourceNotReadyException("pending")),
+                            false,
+                            "only direct source-not-ready grants retries"),
                     Arguments.of(new RuntimeException("parse error"), false, "unclassified defaults to not-retryable"));
         }
 
