@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.MonitoredRepositoryScope;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -15,61 +15,67 @@ import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 /**
- * The reads a lineage makes: observations, feedback and the bindings between them, each scoped to one workspace and
+ * The reads a lineage makes: results, feedback and the bindings between them, each scoped to one workspace and
  * each capped by its caller. Read-only, so it extends the bare {@link Repository} and exposes no write.
  */
 interface ReviewLineageRepository extends Repository<Feedback, UUID> {
 
-    /** The columns an observation row carries; requires the alias {@code o}. */
-    String OBSERVATION_COLUMNS = """
+    /**
+     * The columns a result row carries; requires the alias {@code o}. A piece of feedback binds a result once, or once
+     * per problem of it, so the feedback is counted by its id.
+     */
+    String RESULT_COLUMNS = """
         SELECT o.id AS "id", o.agent_job_id AS "agentJobId", o.summary AS "summary",
                p.slug AS "practiceSlug", p.name AS "practiceName", o.outcome AS "outcome", o.severity AS "severity",
+               (SELECT COUNT(*) FROM practice_observation po WHERE po.practice_result_id = o.id) AS "problemCount",
                o.observed_at AS "observedAt", o.artifact_kind AS "artifactKind", o.artifact_id AS "artifactId",
-               (SELECT oi.invalidated_at FROM observation_invalidation oi WHERE
-        """ + ObservationRepository.OPEN_INVALIDATION + """
+               (SELECT oi.invalidated_at FROM practice_result_invalidation oi WHERE
+        """ + PracticeResultRepository.OPEN_INVALIDATION + """
                ) AS "markedIncorrectAt",
                linked.feedback_count AS "feedbackCount", linked.own_feedback_count AS "ownFeedbackCount"
-        FROM observation o
+        FROM practice_result o
         JOIN practice p ON p.id = o.practice_id
-        CROSS JOIN LATERAL (SELECT COUNT(*) AS feedback_count,
-                                   COUNT(*) FILTER (WHERE fb.agent_job_id = o.agent_job_id) AS own_feedback_count
-                            FROM feedback_observation fo
+        CROSS JOIN LATERAL (SELECT COUNT(DISTINCT fb.id) AS feedback_count,
+                                   COUNT(DISTINCT fb.id) FILTER (WHERE fb.agent_job_id = o.agent_job_id)
+                                       AS own_feedback_count
+                            FROM feedback_evidence fo
                             JOIN feedback fb ON fb.id = fo.feedback_id AND fb.workspace_id = o.workspace_id
-                            WHERE fo.observation_id = o.id) linked
+                            WHERE fo.practice_result_id = o.id AND fo.workspace_id = o.workspace_id) linked
         """;
 
-    @Query(value = OBSERVATION_COLUMNS + """
+    @Query(value = RESULT_COLUMNS + """
         WHERE o.workspace_id = :workspaceId AND o.id IN (:ids)
         """, nativeQuery = true)
-    List<ObservationRow> findObservations(@Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids);
+    List<ResultRow> findResults(@Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids);
 
     /**
-     * A review's observations, most worth reading first: the ones feedback came from, then problems by severity, then
-     * the rest; newest first within each.
+     * A review's results, most worth reading first: the ones feedback came from, then not met by severity, then the
+     * rest; newest first within each.
      */
-    @Query(value = OBSERVATION_COLUMNS + """
+    @Query(value = RESULT_COLUMNS + """
         WHERE o.workspace_id = :workspaceId AND o.agent_job_id = :agentJobId
-        ORDER BY EXISTS (SELECT 1 FROM feedback_observation bound WHERE bound.observation_id = o.id) DESC,
+        ORDER BY EXISTS (SELECT 1 FROM feedback_evidence bound
+                         WHERE bound.practice_result_id = o.id AND bound.workspace_id = o.workspace_id) DESC,
                  CASE o.outcome WHEN 'NOT_MET' THEN 0 WHEN 'MET' THEN 1 ELSE 2 END,
                  CASE o.severity WHEN 'CRITICAL' THEN 0 WHEN 'MAJOR' THEN 1 WHEN 'MINOR' THEN 2 WHEN 'INFO' THEN 3
                      ELSE 4 END,
                  o.observed_at DESC, o.id DESC
         LIMIT :limit
         """, nativeQuery = true)
-    List<ObservationRow> findObservationsOfReview(
+    List<ResultRow> findResultsOfReview(
             @Param("workspaceId") Long workspaceId, @Param("agentJobId") UUID agentJobId, @Param("limit") int limit);
 
     @Query(value = """
-        SELECT o.id FROM observation o WHERE o.workspace_id = :workspaceId AND o.agent_job_id = :agentJobId
+        SELECT o.id FROM practice_result o WHERE o.workspace_id = :workspaceId AND o.agent_job_id = :agentJobId
         """, nativeQuery = true)
-    List<UUID> findObservationIdsOfReview(@Param("workspaceId") Long workspaceId, @Param("agentJobId") UUID agentJobId);
+    List<UUID> findResultIdsOfReview(@Param("workspaceId") Long workspaceId, @Param("agentJobId") UUID agentJobId);
 
     @Query(value = """
-        SELECT COUNT(*) FROM observation o WHERE o.workspace_id = :workspaceId AND o.agent_job_id = :agentJobId
+        SELECT COUNT(*) FROM practice_result o WHERE o.workspace_id = :workspaceId AND o.agent_job_id = :agentJobId
         """, nativeQuery = true)
-    int countObservationsOfReview(@Param("workspaceId") Long workspaceId, @Param("agentJobId") UUID agentJobId);
+    int countResultsOfReview(@Param("workspaceId") Long workspaceId, @Param("agentJobId") UUID agentJobId);
 
-    interface ObservationRow {
+    interface ResultRow {
         UUID getId();
 
         UUID getAgentJobId();
@@ -85,13 +91,15 @@ interface ReviewLineageRepository extends Repository<Feedback, UUID> {
         @Nullable
         String getSeverity();
 
+        long getProblemCount();
+
         Instant getObservedAt();
 
         String getArtifactKind();
 
         Long getArtifactId();
 
-        /** Set while an admin has the observation marked incorrect; at most one invalidation is open. */
+        /** Set while an admin has the result marked incorrect; at most one invalidation is open. */
         @Nullable
         Instant getMarkedIncorrectAt();
 
@@ -130,15 +138,17 @@ interface ReviewLineageRepository extends Repository<Feedback, UUID> {
         """, nativeQuery = true)
     List<FeedbackRow> findFeedback(@Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids);
 
-    /** The feedback written from one observation, newest first. */
+    /** The feedback written from one result, newest first. */
     @Query(value = """
-        SELECT f.id FROM feedback_observation fo
-        JOIN feedback f ON f.id = fo.feedback_id AND f.workspace_id = :workspaceId
-        WHERE fo.observation_id = :observationId
+        SELECT f.id FROM feedback f
+        WHERE f.workspace_id = :workspaceId
+          AND EXISTS (SELECT 1 FROM feedback_evidence fo
+                      WHERE fo.feedback_id = f.id AND fo.workspace_id = f.workspace_id
+                        AND fo.practice_result_id = :practiceResultId)
         ORDER BY f.created_at DESC, f.id DESC
         """, nativeQuery = true)
-    List<UUID> findFeedbackIdsOfObservation(
-            @Param("workspaceId") Long workspaceId, @Param("observationId") UUID observationId);
+    List<UUID> findFeedbackIdsOfResult(
+            @Param("workspaceId") Long workspaceId, @Param("practiceResultId") UUID practiceResultId);
 
     /** The feedback one review composed, newest first. */
     @Query(value = """
@@ -194,13 +204,17 @@ interface ReviewLineageRepository extends Repository<Feedback, UUID> {
         long getPlacementCount();
     }
 
-    /** Which observations each piece of feedback was written from, in render order. */
+    /**
+     * Which results each piece of feedback was written from, in render order. A result bound once per problem is one
+     * row, at its first place.
+     */
     @Query(value = """
-        SELECT fo.feedback_id AS "feedbackId", fo.observation_id AS "observationId"
-        FROM feedback_observation fo
+        SELECT fo.feedback_id AS "feedbackId", fo.practice_result_id AS "practiceResultId"
+        FROM feedback_evidence fo
         JOIN feedback f ON f.id = fo.feedback_id AND f.workspace_id = :workspaceId
-        WHERE fo.feedback_id IN (:feedbackIds)
-        ORDER BY fo.ordinal, fo.observation_id
+        WHERE fo.feedback_id IN (:feedbackIds) AND fo.workspace_id = :workspaceId
+        GROUP BY fo.feedback_id, fo.practice_result_id
+        ORDER BY fo.feedback_id, MIN(fo.ordinal), fo.practice_result_id
         """, nativeQuery = true)
     List<BindingRow> findBindings(
             @Param("workspaceId") Long workspaceId, @Param("feedbackIds") Collection<UUID> feedbackIds);
@@ -208,13 +222,13 @@ interface ReviewLineageRepository extends Repository<Feedback, UUID> {
     interface BindingRow {
         UUID getFeedbackId();
 
-        UUID getObservationId();
+        UUID getPracticeResultId();
     }
 
-    /** The newest review that recorded an observation or composed feedback about one piece of work. */
+    /** The newest review that recorded a result or composed feedback about one piece of work. */
     @Query(value = """
         SELECT recorded.agent_job_id FROM (
-            SELECT o.agent_job_id, o.observed_at AS at FROM observation o
+            SELECT o.agent_job_id, o.observed_at AS at FROM practice_result o
             WHERE o.workspace_id = :workspaceId AND o.artifact_kind = :artifactKind AND o.artifact_id = :artifactId
             UNION ALL
             SELECT f.agent_job_id, f.created_at AS at FROM feedback f

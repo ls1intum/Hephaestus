@@ -83,10 +83,9 @@ class ReviewRunSummaryQueryService {
         return reviews.map(review -> {
             UUID id = review.getId();
             ReviewRunListFactsRow facts = listFacts.get(id);
-            RunPracticeOutcomes outcomes =
-                    RunPracticeOutcomes.ofCounted(standing.getOrDefault(id, List.of()).stream()
-                            .map(StandingRunResultRow::counted)
-                            .toList());
+            RunPracticeOutcomes outcomes = RunPracticeOutcomes.ofCounted(standing.getOrDefault(id, List.of()).stream()
+                    .map(StandingRunResultRow::counted)
+                    .toList());
             return new ReviewRunSummaryDTO(
                     id,
                     review.getStatus(),

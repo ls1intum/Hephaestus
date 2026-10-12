@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { AgentJob } from "@/api/types.gen";
 
 import { mockJobCompleted } from "./fixtures";
-import { isSlowGap, type NumberedObservation } from "./lineage-chain";
+import { isSlowGap, type NumberedResult } from "./lineage-chain";
 import {
 	LINEAGE_FB,
 	LINEAGE_REVIEW_ID,
@@ -12,7 +12,7 @@ import {
 	wholeReview,
 	wholeReviewStartedByMerge,
 } from "./lineage-fixtures";
-import { storyObservations, storyRail } from "./lineage-story";
+import { storyResults, storyRail } from "./lineage-story";
 import type { TraceNode } from "./review-trace";
 import { ReviewLineageGraph } from "./ReviewLineageGraph";
 import { DEFAULT_TRACE_DISPLAY } from "./trace-display";
@@ -66,8 +66,8 @@ function momentsAmongFeedback(): string[] {
 		.flatMap((item) => (item.kind === "moment" ? [item.moment.kind] : []));
 }
 
-function numberOf(list: readonly NumberedObservation[]): number | undefined {
-	return list.find((entry) => entry.observation.id === WHOLE_OBS.migration)?.number;
+function numberOf(list: readonly NumberedResult[]): number | undefined {
+	return list.find((entry) => entry.result.id === WHOLE_OBS.migration)?.number;
 }
 
 describe("the rail's order", () => {
@@ -81,10 +81,10 @@ describe("the rail's order", () => {
 	});
 });
 
-/** Each observation's number in the story of a chain, with its id. */
+/** Each result's number in the story of a chain, with its id. */
 function numbersOf(lineage: typeof wholeReview) {
-	return storyObservations(lineage, undefined).numbered.map(
-		({ observation, number }) => `${number}:${observation.id}`,
+	return storyResults(lineage, undefined).numbered.map(
+		({ result, number }) => `${number}:${result.id}`,
 	);
 }
 
@@ -110,14 +110,14 @@ describe("the rail's dots", () => {
 	});
 });
 
-describe("the observations' numbers", () => {
+describe("the results' numbers", () => {
 	it("stay the same in every trace of one review, whichever record it was opened from", () => {
 		const whole = numbersOf(wholeReview);
-		// A trace opened from another record marks other observations as its focus, and the server
+		// A trace opened from another record marks other results as its focus, and the server
 		// may list them in another order.
 		const fromAnother = {
 			...wholeReview,
-			observations: [...wholeReview.observations]
+			results: [...wholeReview.results]
 				.reverse()
 				.map((entry, index) => ({ ...entry, focus: index === 0 })),
 		};
@@ -130,13 +130,13 @@ const startsOrJoins = (moment: { startedReview?: boolean; joinedReview?: boolean
 	moment.startedReview === true || moment.joinedReview === true;
 
 describe("a filter", () => {
-	it("keeps each observation's number", () => {
-		const whole = storyObservations(wholeReview, undefined).numbered;
+	it("keeps each result's number", () => {
+		const whole = storyResults(wholeReview, undefined).numbered;
 		const narrowed = filteredLineage(wholeReview, {
 			kind: "practice",
 			practiceSlug: "workspace-scoped-queries",
 		});
-		const kept = storyObservations(narrowed, undefined, wholeReview).numbered;
+		const kept = storyResults(narrowed, undefined, wholeReview).numbered;
 		expect(kept.length).toBeLessThan(whole.length);
 		expect(numberOf(kept)).toBeDefined();
 		expect(numberOf(kept)).toBe(numberOf(whole));
@@ -158,10 +158,10 @@ describe("a filter", () => {
 		expect(lost).not.toContain(LINEAGE_FB.card);
 	});
 
-	it("does not say the review recorded no observation under Only feedback", () => {
+	it("does not say the review recorded no result under Only feedback", () => {
 		const { container } = renderTrace({ filter: { kind: "feedback" } });
 		const text = railText(container);
-		expect(text).not.toMatch(/recorded no observation/u);
+		expect(text).not.toMatch(/recorded no result/u);
 		expect(text).toMatch(/It recorded/u);
 		expect(text).toMatch(/Hidden by the filter/u);
 	});
@@ -174,9 +174,9 @@ describe("a filter", () => {
 	});
 });
 
-describe("an observation with no feedback of its own", () => {
+describe("a result with no feedback of its own", () => {
 	it("does not deny the review's other feedback", () => {
-		const { container } = renderTrace({ here: { kind: "observation", id: WHOLE_OBS.migration } });
+		const { container } = renderTrace({ here: { kind: "result", id: WHOLE_OBS.migration } });
 		const text = railText(container);
 		expect(text).not.toMatch(/No feedback from this review/u);
 		expect(text).toMatch(/other pieces of feedback/u);
@@ -237,7 +237,7 @@ describe("the review's sentence", () => {
 });
 
 function tableRows(container: HTMLElement) {
-	return container.querySelectorAll('[data-trace-table="observations"] [data-lineage-node]');
+	return container.querySelectorAll('[data-trace-table="results"] [data-lineage-node]');
 }
 
 function siblingsToggle() {
@@ -246,27 +246,25 @@ function siblingsToggle() {
 	});
 }
 
-/** The letter of a piece and the ids of the observations its row names under From. */
+/** The letter of a piece and the ids of the results its row names under From. */
 function feedbackRow(container: HTMLElement, id: string): { letter: string; sources: string[] } {
 	const row = container.querySelector<HTMLElement>(`[data-feedback-row="${id}"]`);
 	if (row === null) {
 		throw new Error(`No row for ${id}`);
 	}
 	const letter = row.querySelector("[data-step-control] > span")?.textContent ?? "";
-	const sources = [...row.querySelectorAll<HTMLElement>("[data-observation-id]")].map(
-		(chip) => chip.dataset.observationId ?? "",
+	const sources = [...row.querySelectorAll<HTMLElement>("[data-result-id]")].map(
+		(chip) => chip.dataset.resultId ?? "",
 	);
 	return { letter: letter.replace("Feedback ", ""), sources };
 }
 
-describe("the observations' table", () => {
+describe("the results' table", () => {
 	it("opens and folds on its own button, with Siblings left off", () => {
 		const { container } = renderTrace();
 		expect(tableRows(container)).toHaveLength(0);
-		fireEvent.click(
-			screen.getByRole("button", { name: /^Show all \d+ observations in the table$/u }),
-		);
-		expect(tableRows(container)).toHaveLength(wholeReview.observations.length);
+		fireEvent.click(screen.getByRole("button", { name: /^Show all \d+ results in the table$/u }));
+		expect(tableRows(container)).toHaveLength(wholeReview.results.length);
 		expect(siblingsToggle().getAttribute("aria-pressed")).toBe("false");
 		fireEvent.click(screen.getByRole("button", { name: "Fold the table" }));
 		expect(tableRows(container)).toHaveLength(0);
@@ -275,7 +273,7 @@ describe("the observations' table", () => {
 	it("opens with Expand all and folds with Collapse all", () => {
 		const { container } = renderTrace();
 		fireEvent.click(screen.getByRole("button", { name: "Expand all" }));
-		expect(tableRows(container)).toHaveLength(wholeReview.observations.length);
+		expect(tableRows(container)).toHaveLength(wholeReview.results.length);
 		fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
 		expect(tableRows(container)).toHaveLength(0);
 	});
@@ -283,24 +281,21 @@ describe("the observations' table", () => {
 	it("folds by hand even while Siblings is on", () => {
 		const { container } = renderTrace();
 		fireEvent.click(siblingsToggle());
-		expect(tableRows(container)).toHaveLength(wholeReview.observations.length);
+		expect(tableRows(container)).toHaveLength(wholeReview.results.length);
 		fireEvent.click(screen.getByRole("button", { name: "Fold the table" }));
 		expect(tableRows(container)).toHaveLength(0);
 	});
 
-	it("names the feedback each observation fed, as the feedback names its observations", () => {
+	it("names the feedback each result fed, as the feedback names its results", () => {
 		const { container } = renderTrace();
-		fireEvent.click(
-			screen.getByRole("button", { name: /^Show all \d+ observations in the table$/u }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: /^Show all \d+ results in the table$/u }));
 		const { letter, sources } = feedbackRow(container, LINEAGE_FB.card);
 		expect(letter).toMatch(/^[A-Z]$/u);
 		expect(sources.length).toBeGreaterThan(0);
 		const fed = sources.map(
 			(id) =>
-				container.querySelector(
-					`[data-trace-table="observations"] [data-lineage-node="observation:${id}"]`,
-				)?.textContent,
+				container.querySelector(`[data-trace-table="results"] [data-lineage-node="result:${id}"]`)
+					?.textContent,
 		);
 		for (const text of fed) {
 			expect(text).toContain(letter);

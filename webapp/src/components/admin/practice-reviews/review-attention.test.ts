@@ -64,15 +64,15 @@ describe("practiceMarker", () => {
 		expect(practiceMarker(observed(11, 4, 0, 5))).toBeUndefined();
 	});
 
-	it("marks nothing below 20 observations", () => {
+	it("marks nothing below 20 results", () => {
 		expect(practiceMarker(observed(0, 0, 19, 0))).toBeUndefined();
 	});
 });
 
-const row = (name: string, observations: ReturnType<typeof observed>, invalidated = 0) => ({
+const row = (name: string, results: ReturnType<typeof observed>, invalidated = 0) => ({
 	name,
-	observations,
-	observationsInvalidated: invalidated,
+	practiceResults: results,
+	practiceResultsInvalidated: invalidated,
 });
 
 describe("needsALookFirst", () => {

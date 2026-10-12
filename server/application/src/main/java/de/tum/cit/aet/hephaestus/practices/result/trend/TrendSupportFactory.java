@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.observation.ReviewedWorkKey;
+import de.tum.cit.aet.hephaestus.practices.result.ReviewedWorkKey;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;

@@ -34,10 +34,8 @@ public record ReviewFeedbackFilterParams(
 
         @RequestParam(required = false) @Nullable UUID agentJobId,
 
-        @Parameter(description = "Keep the feedback written from this observation")
-        @RequestParam(required = false)
-        @Nullable
-        UUID observationId,
+        @Parameter(description = "Keep the feedback written from this result") @RequestParam(required = false) @Nullable
+        UUID practiceResultId,
 
         @Parameter(description = "Kind of reviewed work, e.g. scm.pull_request")
         @RequestParam(required = false)
@@ -60,7 +58,7 @@ public record ReviewFeedbackFilterParams(
         List<String> practiceSlug,
 
         @Parameter(
-                description = "Practice groups whose feedback to list (repeatable): feedback bound to an observation"
+                description = "Practice groups whose feedback to list (repeatable): feedback bound to a result"
                         + " of a practice in any of them")
         @RequestParam(required = false)
         @Nullable
@@ -87,7 +85,7 @@ public record ReviewFeedbackFilterParams(
                 channel,
                 location,
                 agentJobId,
-                observationId,
+                practiceResultId,
                 kind,
                 artifactId,
                 recipientUserId,

@@ -221,7 +221,7 @@ export const SelectionApplies: Story = {
 	},
 };
 
-/** A developer and a practice from another tab narrow the reviews to those that observed them. */
+/** A developer and a practice from another tab narrow the reviews to those that recorded a result about them. */
 export const ScopeCarriedFromAnotherTab: Story = {
 	args: {
 		search: {

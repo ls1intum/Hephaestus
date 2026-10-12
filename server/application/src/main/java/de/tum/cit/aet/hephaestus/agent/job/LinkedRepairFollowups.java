@@ -4,7 +4,8 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.context.providers.LinkedWorkItemContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.LinkedRepairFollowupRequest;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.ReviewOutputService;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
@@ -68,7 +69,7 @@ public class LinkedRepairFollowups {
                         .equals(facts.path("signal").asString())) {
             return Decision.PROCEED;
         }
-        if (ObservationAdmissionService.isAdmitted(attempted)) return Decision.PROCEED;
+        if (ResultAdmissionService.isAdmitted(attempted)) return Decision.PROCEED;
         long artifactId = facts.path("pull_request_id").asLong(0);
         if (artifactId <= 0 || pullRequests.lockById(artifactId).isEmpty()) return Decision.PROCEED;
         AgentJob job = jobs.findByIdWithWorkspaceForUpdate(attempted.getId()).orElse(null);
@@ -77,7 +78,7 @@ public class LinkedRepairFollowups {
                 || job.getRetryCount() != attempted.getRetryCount()
                 || !Objects.equals(job.getWorkerId(), workerId)
                 || !job.getWorkspace().getId().equals(attempted.getWorkspace().getId())) return Decision.OWNERSHIP_LOST;
-        if (ObservationAdmissionService.isAdmitted(job)) return Decision.PROCEED;
+        if (ResultAdmissionService.isAdmitted(job)) return Decision.PROCEED;
         PullRequest pr = pullRequests.findByIdWithAllForGate(artifactId).orElse(null);
         if (pr == null || pr.getState() != Issue.State.MERGED || pr.getDeletedAt() != null) return Decision.PROCEED;
         for (long id : pullRequests.findClosingIssueIdsById(artifactId)) {
@@ -203,9 +204,11 @@ public class LinkedRepairFollowups {
         JsonNode facts = root.getMetadata();
         return root.getJobType() == AgentJobType.PULL_REQUEST_REVIEW
                 && root.getPracticeTriggerMode() == TriggerMode.AUTO
-                && !ObservationAdmissionService.isAdmitted(root)
+                && !ResultAdmissionService.isAdmitted(root)
                 && facts != null
-                && "LIVE".equals(facts.path("observation_origin").asString())
+                && "LIVE"
+                        .equals(facts.path(ReviewOutputService.ORIGIN_METADATA_KEY)
+                                .asString())
                 && ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED
                         .value()
                         .equals(facts.path("signal").asString())

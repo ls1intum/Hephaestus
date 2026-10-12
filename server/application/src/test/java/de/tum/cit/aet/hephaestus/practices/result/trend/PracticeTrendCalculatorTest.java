@@ -6,8 +6,8 @@ import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.noVe
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,7 +59,7 @@ class PracticeTrendCalculatorTest {
     void shouldCountEveryJudgedPieceOfWorkPastTheChartsCap() {
         // Sixteen judged pull requests and one with nothing to judge. The chart keeps twelve; the reader is told
         // about all sixteen, and that the standing reads the newest four of them.
-        List<Observation> observations = new ArrayList<>();
+        List<PracticeResult> observations = new ArrayList<>();
         for (int day = 1; day <= 16; day++) {
             observations.add(judged(day, "2026-05-%02dT09:00:00Z".formatted(day), Outcome.MET));
         }

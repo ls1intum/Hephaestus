@@ -31,12 +31,12 @@ export const PROBLEM_THRESHOLDS = {
 
 /**
  * Markers on the overview's practices (report F8): "Mostly not applicable" from 90 % of a practice's
- * observations not applicable, "Often undecided" from 30 % undetermined. Each only once the practice
- * has 20 observations in the range, so a handful of reviews never marks it. In the first course,
- * three practices were not applicable in every observation, and two undecided in a third to a half.
+ * results not applicable, "Often undecided" from 30 % undetermined. Each only once the practice
+ * has 20 results in the range, so a handful of reviews never marks it. In the first course,
+ * three practices were not applicable in every result, and two undecided in a third to a half.
  */
 export const PRACTICE_MARKER_THRESHOLDS = {
 	neverAppliesShare: 0.9,
 	oftenUndecidedShare: 0.3,
-	minimumObservations: 20,
+	minimumResults: 20,
 } as const;

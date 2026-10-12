@@ -7,7 +7,7 @@ const meta = {
 	component: DateRangeFacet,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
-	args: { title: "Observed", value: undefined, onChange: fn() },
+	args: { title: "Recorded", value: undefined, onChange: fn() },
 } satisfies Meta<typeof DateRangeFacet>;
 
 export default meta;
@@ -19,7 +19,7 @@ type Story = StoryObj<typeof meta>;
  */
 export const Empty: Story = {
 	play: async ({ canvas }) => {
-		await expect(await canvas.findByRole("button", { name: "Observed" })).toBeVisible();
+		await expect(await canvas.findByRole("button", { name: "Recorded" })).toBeVisible();
 	},
 };
 
@@ -28,8 +28,8 @@ export const StartOnly: Story = {
 	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("From 1 Jul 2026")).toBeVisible();
 		// The applied range is in the accessible name too, so the control reads the same to a screen
-		// reader as it looks: "Observed: From 1 Jul 2026".
-		canvas.getByRole("button", { name: "Observed: From 1 Jul 2026" });
+		// reader as it looks: "Recorded: From 1 Jul 2026".
+		canvas.getByRole("button", { name: "Recorded: From 1 Jul 2026" });
 	},
 };
 
@@ -43,7 +43,7 @@ export const FullRange: Story = {
 
 export const OpenedCalendar: Story = {
 	play: async ({ canvas }) => {
-		const trigger = await canvas.findByRole("button", { name: "Observed" });
+		const trigger = await canvas.findByRole("button", { name: "Recorded" });
 
 		await expect(trigger).toHaveAttribute("aria-expanded", "false");
 		await userEvent.click(trigger);
@@ -58,7 +58,7 @@ export const OpenedCalendar: Story = {
 export const ClearAPickedRange: Story = {
 	args: { value: { from: new Date(2026, 6, 1), to: new Date(2026, 6, 24) } },
 	play: async ({ args, canvas }) => {
-		await userEvent.click(await canvas.findByRole("button", { name: /^Observed:/u }));
+		await userEvent.click(await canvas.findByRole("button", { name: /^Recorded:/u }));
 		await userEvent.click(await screen.findByRole("button", { name: "Clear selection" }));
 		await expect(args.onChange).toHaveBeenCalledWith(undefined);
 	},
@@ -67,7 +67,7 @@ export const ClearAPickedRange: Story = {
 export const NothingToClear: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
-		await userEvent.click(await canvas.findByRole("button", { name: "Observed" }));
+		await userEvent.click(await canvas.findByRole("button", { name: "Recorded" }));
 		await screen.findByRole("grid");
 		await expect(screen.queryByRole("button", { name: "Clear selection" })).not.toBeInTheDocument();
 	},
@@ -80,7 +80,7 @@ export const NothingToClear: Story = {
 export const EndsToday: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
-		await userEvent.click(await canvas.findByRole("button", { name: "Observed" }));
+		await userEvent.click(await canvas.findByRole("button", { name: "Recorded" }));
 		await screen.findByRole("grid");
 		await expect(screen.getByRole("button", { name: /next month/iu })).toHaveAttribute(
 			"aria-disabled",

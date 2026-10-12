@@ -41,7 +41,7 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -78,7 +78,7 @@ class PracticeReviewSheetFactsIntegrationTest extends AbstractWorkspaceIntegrati
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String FEEDBACK = "/workspaces/{slug}/practices/reviews/feedback/{id}";
-    private static final String OBSERVATION = "/workspaces/{slug}/practices/reviews/observations/{id}";
+    private static final String RESULT = "/workspaces/{slug}/practices/reviews/results/{id}";
     private static final String WORK = "/workspaces/{slug}/practices/reviews/work/{kind}/{id}";
     private static final String JOB = "/workspaces/{slug}/agents/jobs/{id}";
     private static final String REVISIONS = "/workspaces/{slug}/practices/{practiceSlug}/revisions";
@@ -103,7 +103,7 @@ class PracticeReviewSheetFactsIntegrationTest extends AbstractWorkspaceIntegrati
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private LlmUsageEventRepository usageRepository;
@@ -700,14 +700,14 @@ class PracticeReviewSheetFactsIntegrationTest extends AbstractWorkspaceIntegrati
     }
 
     @Nested
-    @DisplayName("Observation origin")
-    class ObservationOrigin {
+    @DisplayName("Result origin")
+    class Origin {
 
         @Test
         @WithAdminUser
-        void shouldSayAnObservationCameFromARequestedReview() {
+        void shouldSayAResultCameFromARequestedReview() {
             UUID id = UUID.randomUUID();
-            observationRepository.insertIfAbsent(
+            practiceResultRepository.insertIfAbsent(
                     id,
                     "occurrence-" + id,
                     job.getId(),
@@ -722,13 +722,14 @@ class PracticeReviewSheetFactsIntegrationTest extends AbstractWorkspaceIntegrati
                     "MAJOR",
                     "{}",
                     "Reasoning",
-                    "recurrence-" + id,
+                    "test-scope",
+                    null,
+                    null,
+                    null,
                     Instant.now(),
                     "MANUAL");
 
-            getOk(OBSERVATION, workspace.getWorkspaceSlug(), id)
-                    .jsonPath("$.origin")
-                    .isEqualTo("MANUAL");
+            getOk(RESULT, workspace.getWorkspaceSlug(), id).jsonPath("$.origin").isEqualTo("MANUAL");
         }
     }
 }

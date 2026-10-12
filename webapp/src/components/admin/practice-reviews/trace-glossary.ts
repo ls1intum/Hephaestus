@@ -1,7 +1,7 @@
 import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
 
 /** The terms the story uses that a reader may not know, each with the words the product docs give it. */
-export type TraceTerm = "moment" | "observation" | "withheld" | "coalesced";
+export type TraceTerm = "moment" | "result" | "withheld" | "coalesced";
 
 export interface TraceTermDef {
 	label: string;
@@ -18,8 +18,8 @@ export const TRACE_TERMS: Record<TraceTerm, TraceTermDef> = {
 		description:
 			"Something that happened on the work, such as opened, new commits or merged. A review starts at a moment.",
 	},
-	observation: {
-		label: "Observation",
+	result: {
+		label: "Result",
 		description:
 			"One recorded result of reviewing one practice against one piece of reviewed work.",
 	},
@@ -35,12 +35,12 @@ export const TRACE_TERMS: Record<TraceTerm, TraceTermDef> = {
 };
 
 /** The words in a sentence the glossary explains, once each, in the order they come. */
-const TERM_PATTERN = /\b(?<term>observations?|withheld|coalesced|moments?)\b/giu;
+const TERM_PATTERN = /\b(?<term>results?|withheld|coalesced|moments?)\b/giu;
 
 function termOf(word: string): TraceTerm {
 	const lower = word.toLowerCase();
-	if (lower.startsWith("observation")) {
-		return "observation";
+	if (lower.startsWith("result")) {
+		return "result";
 	}
 	if (lower.startsWith("moment")) {
 		return "moment";

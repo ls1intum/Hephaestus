@@ -228,7 +228,7 @@ export const CurrentSection: Story = {
 export const TabCounts: Story = {
 	args: {
 		children: <ReviewsTab search={SCOPED} />,
-		counts: { runs: 1688, observations: 13_308, feedback: 1951 },
+		counts: { runs: 1688, results: 13_308, feedback: 1951 },
 	},
 	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/runs" } },
 	play: async ({ canvas }) => {
@@ -236,14 +236,14 @@ export const TabCounts: Story = {
 		await expect(sections.getAllByRole("link").map((link) => link.textContent)).toEqual([
 			"Overview",
 			"Reviews1,688",
-			"Observations13,308",
+			"Results13,308",
 			"Feedback1,951",
 		]);
 		await expect(sections.getByRole("link", { name: "Reviews, 1,688" })).toHaveAttribute(
 			"aria-current",
 			"page",
 		);
-		sections.getByRole("link", { name: "Observations, 13,308" });
+		sections.getByRole("link", { name: "Results, 13,308" });
 		sections.getByRole("link", { name: "Feedback, 1,951" });
 		await expect(sections.getByText("13,308")).toHaveClass("tabular-nums");
 	},
@@ -254,12 +254,12 @@ export const TabCounts: Story = {
  * count known to be nothing says 0, which an unknown one never does.
  */
 export const TabCountsLoading: Story = {
-	args: { counts: { observations: 0 } },
+	args: { counts: { results: 0 } },
 	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/runs" } },
 	play: async ({ canvas }) => {
 		const sections = within(canvas.getByRole("navigation", { name: "Practice review sections" }));
 		sections.getByRole("link", { name: "Reviews" });
-		sections.getByRole("link", { name: "Observations, 0" });
+		sections.getByRole("link", { name: "Results, 0" });
 		sections.getByRole("link", { name: "Feedback" });
 	},
 };
@@ -268,7 +268,7 @@ export const TabCountsLoading: Story = {
 export const TabCountsReflow: Story = {
 	args: {
 		children: <ReviewsTab search={SCOPED} />,
-		counts: { runs: 1688, observations: 13_308, feedback: 1951 },
+		counts: { runs: 1688, results: 13_308, feedback: 1951 },
 	},
 	parameters: {
 		viewport: { defaultViewport: "reflow" },

@@ -302,7 +302,7 @@ export const ScopeCarriedFromAnotherTab: Story = {
 		await expect(
 			within(scope).getByRole("combobox", { name: /^Developer(?::|$)/u }),
 		).toHaveTextContent(PEOPLE.options[0]?.label ?? "");
-		await expect(within(scope).getByRole("button", { name: /Observed/u })).toHaveTextContent(
+		await expect(within(scope).getByRole("button", { name: /Recorded/u })).toHaveTextContent(
 			"1 Sep – 10 Sep 2026",
 		);
 

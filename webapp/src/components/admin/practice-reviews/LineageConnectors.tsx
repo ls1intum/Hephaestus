@@ -5,7 +5,7 @@ import type { ReviewLineageFeedback } from "@/api/types.gen";
 import { type BadgeVariant, statusToneClass } from "@/components/common/status-def";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 
-import type { NumberedObservation } from "./lineage-chain";
+import type { NumberedResult } from "./lineage-chain";
 import type { Traced } from "./review-trace";
 
 /**
@@ -22,18 +22,18 @@ const LANE_INSET_PX = 16;
 const MOST_LANES = 10;
 
 /**
- * The observations that get a lane: each listed one some shown piece of feedback was written from,
+ * The results that get a lane: each listed one some shown piece of feedback was written from,
  * in their numbered order. Empty past `MOST_LANES`, so the story draws no connectors at all rather
  * than a thicket.
  */
 export function connectorLanes(
-	numbered: readonly NumberedObservation[],
+	numbered: readonly NumberedResult[],
 	feedback: readonly ReviewLineageFeedback[],
 ): string[] {
-	const used = new Set(feedback.flatMap((entry) => entry.observationIds));
+	const used = new Set(feedback.flatMap((entry) => entry.practiceResultIds));
 	const lanes = numbered
-		.filter((entry) => used.has(entry.observation.id))
-		.map((entry) => entry.observation.id);
+		.filter((entry) => used.has(entry.result.id))
+		.map((entry) => entry.result.id);
 	return lanes.length > MOST_LANES ? [] : lanes;
 }
 
@@ -44,12 +44,12 @@ export function laneGutter(lanes: readonly string[]): string | undefined {
 
 interface Connector {
 	key: string;
-	observationId: string;
+	practiceResultId: string;
 	feedbackId: string;
 	d: string;
 	/** The middle of the lane the line runs down, for a test to read. */
 	laneX: number;
-	/** Where the line starts, on the right edge of the observation's card, at its vertical centre. */
+	/** Where the line starts, on the right edge of the result's card, at its vertical centre. */
 	start: { x: number; y: number };
 	/** Where the line ends, on the right edge of the piece's card, at its vertical centre, marked with a dot. */
 	end: { x: number; y: number };
@@ -83,7 +83,7 @@ export function ConnectorSample({ className }: { className?: string }) {
 }
 
 /**
- * The colour of a connector: its observation's verdict at full strength on the path of the record
+ * The colour of a connector: its result's verdict at full strength on the path of the record
  * in front, softer where no record is in front, and grey off the path.
  */
 export function connectorTone(
@@ -140,19 +140,19 @@ function connectorPath(
 }
 
 interface Measured {
-	observationId: string;
+	practiceResultId: string;
 	start: { x: number; y: number };
 	ends: { feedbackId: string; x: number; y: number }[];
 }
 
-/** How far down the rail an observation's lines reach, from its card to its farthest piece. */
+/** How far down the rail a result's lines reach, from its card to its farthest piece. */
 function spanOf(entry: Measured): number {
 	const ys = [entry.start.y, ...entry.ends.map((end) => end.y)];
 	return Math.max(...ys) - Math.min(...ys);
 }
 
 /**
- * Which lane each observation's line runs in, from the edge outwards: the shortest run nearest the
+ * Which lane each result's line runs in, from the edge outwards: the shortest run nearest the
  * cards, so a line that spans another runs outside it and the two never cross where they turn. Two
  * of a length keep the rail's order, the later one nearer the cards.
  */
@@ -160,12 +160,12 @@ function laneOrder(measured: readonly Measured[]): Map<string, number> {
 	const order = measured
 		.map((entry, index) => ({ entry, index, span: spanOf(entry) }))
 		.sort((a, b) => a.span - b.span || b.index - a.index);
-	return new Map(order.map(({ entry }, lane) => [entry.observationId, lane]));
+	return new Map(order.map(({ entry }, lane) => [entry.practiceResultId, lane]));
 }
 
 /**
- * Thin lines from each observation to every piece of feedback written from it: right from the
- * middle of the observation's card into its lane, down the lane, and left into the middle of the
+ * Thin lines from each result to every piece of feedback written from it: right from the
+ * middle of the result's card into its lane, down the lane, and left into the middle of the
  * piece's card. The positions are measured from the cards themselves after layout, and again
  * whenever a card or the rail changes size or the rail's content changes: wrapping words, tags,
  * facts, folded parts opening. A line on the path of the record in front is drawn in its verdict's
@@ -179,7 +179,7 @@ export function LineageConnectors({
 }: {
 	container: React.RefObject<HTMLElement | null>;
 	lanes: readonly string[];
-	numbered: readonly NumberedObservation[];
+	numbered: readonly NumberedResult[];
 	traced: Traced | undefined;
 }) {
 	const [lines, setLines] = useState<Connector[]>([]);
@@ -224,16 +224,16 @@ export function LineageConnectors({
 				};
 			};
 			const measured: Measured[] = [];
-			for (const observationId of ids) {
-				const id = CSS.escape(observationId);
-				const source = box.querySelector(`[data-connector="source"][data-observation-id="${id}"]`);
+			for (const practiceResultId of ids) {
+				const id = CSS.escape(practiceResultId);
+				const source = box.querySelector(`[data-connector="source"][data-result-id="${id}"]`);
 				if (source === null) {
 					continue;
 				}
 				const start = centreOf(source);
 				const ends: Measured["ends"] = [];
 				for (const target of box.querySelectorAll<HTMLElement>(
-					`[data-connector^="use:"][data-observation-id="${id}"]`,
+					`[data-connector^="use:"][data-result-id="${id}"]`,
 				)) {
 					ends.push({
 						feedbackId: (target.dataset.connector ?? "").slice("use:".length),
@@ -241,16 +241,16 @@ export function LineageConnectors({
 					});
 				}
 				if (ends.length > 0) {
-					measured.push({ observationId, start, ends });
+					measured.push({ practiceResultId, start, ends });
 				}
 			}
 			const order = laneOrder(measured);
-			const next: Connector[] = measured.flatMap(({ observationId, start, ends }) => {
-				const lane = order.get(observationId) ?? 0;
+			const next: Connector[] = measured.flatMap(({ practiceResultId, start, ends }) => {
+				const lane = order.get(practiceResultId) ?? 0;
 				const laneX = edge + LANE_INSET_PX + lane * LANE_PX + LANE_PX / 2;
 				return ends.map(({ feedbackId, x, y }) => ({
-					key: `${observationId}:use:${feedbackId}`,
-					observationId,
+					key: `${practiceResultId}:use:${feedbackId}`,
+					practiceResultId,
 					feedbackId,
 					laneX,
 					start,
@@ -293,12 +293,10 @@ export function LineageConnectors({
 			observed.clear();
 		};
 	}, [container, laneKey]);
-	const outcomes = new Map(
-		numbered.map((entry) => [entry.observation.id, entry.observation.outcome]),
-	);
+	const outcomes = new Map(numbered.map((entry) => [entry.result.id, entry.result.outcome]));
 	const strong = (line: Connector) =>
 		traced !== undefined &&
-		traced.observations.has(line.observationId) &&
+		traced.results.has(line.practiceResultId) &&
 		traced.feedback.has(line.feedbackId);
 	return (
 		<svg
@@ -309,7 +307,7 @@ export function LineageConnectors({
 			{[...lines]
 				.sort((a, b) => Number(strong(a)) - Number(strong(b)))
 				.map((line) => {
-					const outcome = outcomes.get(line.observationId);
+					const outcome = outcomes.get(line.practiceResultId);
 					const faint = traced !== undefined && !strong(line);
 					const tone = connectorTone(
 						outcome === undefined ? undefined : OUTCOME_DEFS[outcome].badgeVariant,
@@ -323,7 +321,7 @@ export function LineageConnectors({
 							<path
 								d={line.d}
 								data-connector-line={line.key}
-								data-from-observation={line.observationId}
+								data-from-result={line.practiceResultId}
 								data-to-feedback={line.feedbackId}
 								data-lane-x={line.laneX}
 								data-strong={strong(line)}

@@ -4,7 +4,7 @@ import { Fragment, type ReactNode } from "react";
 import { cn } from "cn";
 import type { AgentJob, ReviewLineage } from "@/api/types.gen";
 import type { BadgeVariant } from "@/components/common/status-def";
-import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
+import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
 import { RESULT_PROCESSING_DEFS } from "@/components/practice-vocabulary/review-status-defs";
 import { REVIEW_TRIGGER_DEFS } from "@/components/practice-vocabulary/review-trigger-defs";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,7 @@ import { hiddenByFilter, type TraceFilter } from "./trace-filter";
 import { STAGE_HEADERS, STAGE_MARKS, type StageKey } from "./trace-stage-headers";
 import { TRACE_END_TONES, type TraceEnd } from "./trace-verdict";
 import { FeedbackTableStep } from "./TraceFeedbackTable";
-import { ObservationsStep } from "./TraceObservationTable";
+import { ResultsStep } from "./TraceResultTable";
 import { type RailStepProps, type StepProps, StoryNode, useStory } from "./TraceStoryNode";
 
 function WorkStep({ lineage, here }: { lineage: ReviewLineage; here: boolean }) {
@@ -46,12 +46,12 @@ function WorkStep({ lineage, here }: { lineage: ReviewLineage; here: boolean }) 
 
 type FeedbackItem = Extract<RailItem, { kind: "feedback" }>;
 
-/** Where the bottleneck line's stage falls on the rail: a review's own losses sit with its observations. */
+/** Where the bottleneck line's stage falls on the rail: a review's own losses sit with its results. */
 function bottleneckHeader(
 	stage: TraceBottleneck["stage"],
 	kind: TraceBottleneck["kind"],
 ): StageKey {
-	return stage === "review" && kind === "lost" ? "observations" : stage;
+	return stage === "review" && kind === "lost" ? "results" : stage;
 }
 
 /**
@@ -217,10 +217,10 @@ export function StageSteps({
 						/>
 					);
 				}
-				if (item.kind === "observations") {
+				if (item.kind === "results") {
 					return (
 						<Fragment key={item.key}>
-							<StageHeader stage="observations" first={false} />
+							<StageHeader stage="results" first={false} />
 							{step(item)}
 						</Fragment>
 					);
@@ -302,8 +302,8 @@ function RailStep(props: RailStepProps) {
 				/>
 			);
 		}
-		case "observations": {
-			return <ObservationsStep {...props} at={item.at} />;
+		case "results": {
+			return <ResultsStep {...props} at={item.at} />;
 		}
 		case "feedback": {
 			return <FeedbackTableStep {...props} items={[item.feedback]} />;
@@ -311,7 +311,7 @@ function RailStep(props: RailStepProps) {
 		case "siblings": {
 			return (
 				<SiblingsStep
-					observations={item.observations}
+					results={item.results}
 					feedback={item.feedback}
 					onShowSiblings={props.onShowSiblings}
 				/>
@@ -378,12 +378,12 @@ function BeforeSteps({
 
 /** The record's siblings, as one line; it lists them on the rail. */
 function SiblingsStep({
-	observations,
+	results,
 	feedback,
 	onShowSiblings,
 }: StorySiblings & { onShowSiblings: () => void }) {
 	const parts = [
-		observations > 0 ? countOf(observations, "other observation", "other observations") : undefined,
+		results > 0 ? countOf(results, "other result", "other results") : undefined,
 		feedback > 0 ? `${countOf(feedback, "other piece", "other pieces")} of feedback` : undefined,
 	].filter(hasText);
 	return (
@@ -532,7 +532,7 @@ function ReviewStep({
 						<StepTag def={RESULT_PROCESSING_DEFS[resultProcessing]} />
 					)}
 					{origin !== undefined && origin !== "LIVE" && (
-						<StepTag def={OBSERVATION_ORIGIN_DEFS[origin]} />
+						<StepTag def={RESULT_ORIGIN_DEFS[origin]} />
 					)}
 					{position !== undefined && position.total > 1 && (
 						<Badge variant="outline" size="xs" data-review-position>

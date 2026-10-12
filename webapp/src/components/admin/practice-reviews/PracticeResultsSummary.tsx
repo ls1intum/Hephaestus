@@ -10,13 +10,13 @@ import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
+import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { feedbackComposed } from "./practice-totals";
-import { familyCount, observationSlots, slotsTotal } from "./review-outcomes";
+import { familyCount, resultSlots, slotsTotal } from "./review-outcomes";
 
-export interface PracticeObservationsSummaryProps {
+export interface PracticeResultsSummaryProps {
 	workspaceSlug: string;
 	practiceSlug: string;
 	/** The practice's name as the workspace defines it; absent until the practices are read. */
@@ -28,17 +28,17 @@ export interface PracticeObservationsSummaryProps {
 }
 
 /**
- * The one practice the Observations list is filtered to, as plain counts above its rows: its
- * observations by verdict, how many an admin marked incorrect, and how much feedback citing it was
+ * The one practice the Results list is filtered to, as plain counts above its rows: its
+ * results by verdict, how many an admin marked incorrect, and how much feedback citing it was
  * delivered. Its definition is edited in Practice setup, which is the one link here.
  */
-export function PracticeObservationsSummary({
+export function PracticeResultsSummary({
 	workspaceSlug,
 	practiceSlug,
 	practiceName,
 	rangeLabel,
 	counts: state,
-}: PracticeObservationsSummaryProps) {
+}: PracticeResultsSummaryProps) {
 	const counts = state.status === "ready" ? state.counts : undefined;
 	const name = practiceName ?? counts?.practiceName ?? "This practice";
 	return (
@@ -82,7 +82,7 @@ export function PracticeObservationsSummary({
 	);
 }
 
-function Figures({ state }: { state: PracticeObservationsSummaryProps["counts"] }) {
+function Figures({ state }: { state: PracticeResultsSummaryProps["counts"] }) {
 	if (state.status === "error") {
 		return (
 			<QueryErrorAlert
@@ -105,12 +105,12 @@ function Figures({ state }: { state: PracticeObservationsSummaryProps["counts"] 
 	if (state.counts === undefined) {
 		return (
 			<p className="max-w-sm text-sm text-muted-foreground">
-				No review recorded an observation about this practice in these days.
+				No review recorded a result about this practice in these days.
 			</p>
 		);
 	}
-	const { observations, observationsInvalidated, feedback } = state.counts;
-	const verdicts = observationSlots(observations);
+	const { practiceResults, practiceResultsInvalidated, feedback } = state.counts;
+	const verdicts = resultSlots(practiceResults);
 	const total = slotsTotal(verdicts);
 	// Replaced feedback is left out, as in the Practices table.
 	const feedbackTotal = feedbackComposed(feedback);
@@ -122,13 +122,16 @@ function Figures({ state }: { state: PracticeObservationsSummaryProps["counts"] 
 				state.stale && STALE,
 			)}
 		>
-			<Figure label="Observations" value={String(total)}>
+			<Figure label="Results" value={String(total)}>
 				{verdicts
 					.filter((slot) => slot.count > 0)
 					.map((slot) => `${slot.count} ${slot.label}`)
 					.join(" · ")}
 			</Figure>
-			<Figure label={MARKED_INCORRECT_DEF.label} value={`${observationsInvalidated} of ${total}`} />
+			<Figure
+				label={MARKED_INCORRECT_DEF.label}
+				value={`${practiceResultsInvalidated} of ${total}`}
+			/>
 			<Figure
 				label="Feedback delivered"
 				value={

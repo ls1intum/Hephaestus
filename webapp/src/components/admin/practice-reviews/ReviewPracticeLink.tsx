@@ -15,7 +15,7 @@ export interface ReviewPracticeLinkProps {
 }
 
 /**
- * Opens the Observations list filtered to the practice rather than Practice setup: the reader is
+ * Opens the Results list filtered to the practice rather than Practice setup: the reader is
  * asking how the practice behaves, and Practice setup is one press from the counts above that list
  * when the answer is "change it".
  */
@@ -33,7 +33,7 @@ export function ReviewPracticeLink({
 		<InlineLink
 			render={
 				<Link
-					to="/w/$workspaceSlug/admin/practices/reviews/observations"
+					to="/w/$workspaceSlug/admin/practices/reviews/results"
 					params={{ workspaceSlug: workspaceSlug ?? "" }}
 					search={{ practiceSlug: [practiceSlug] }}
 				/>

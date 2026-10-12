@@ -30,7 +30,7 @@ public record AgentJobDTO(
 
         @Schema(
                 description =
-                        "Raw output is not returned by administrative job reads; use the authorized observation and feedback endpoints")
+                        "Raw output is not returned by administrative job reads; use the authorized result and feedback endpoints")
         @Nullable
         Object output,
 

@@ -12,7 +12,7 @@ public record FeedbackQueryFilter(
         @Nullable List<FeedbackChannel> channels,
         @Nullable List<FeedbackLocation> locations,
         @Nullable UUID agentJobId,
-        @Nullable UUID observationId,
+        @Nullable UUID practiceResultId,
         @Nullable ArtifactKind artifactKind,
         @Nullable Long artifactId,
         @Nullable Long recipientUserId,

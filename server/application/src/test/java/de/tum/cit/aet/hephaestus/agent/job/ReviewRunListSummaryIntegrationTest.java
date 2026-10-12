@@ -6,10 +6,10 @@ import static de.tum.cit.aet.hephaestus.practices.model.Outcome.NOT_MET;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.AbstractPracticeReviewIntegrationTest;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -43,7 +43,7 @@ class ReviewRunListSummaryIntegrationTest extends AbstractPracticeReviewIntegrat
     private ObjectMapper objectMapper;
 
     @Autowired
-    private ObservationInvalidationRepository invalidationRepository;
+    private PracticeResultInvalidationRepository invalidationRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -187,8 +187,8 @@ class ReviewRunListSummaryIntegrationTest extends AbstractPracticeReviewIntegrat
         User other = persistUser("run-list-other");
         UUID wrong =
                 observe(smallDiff, firstReview, 12L, other, NOT_MET, Severity.MINOR, NOW.minus(Duration.ofHours(3)));
-        invalidationRepository.save(new ObservationInvalidation(
-                observationRepository.findById(wrong).orElseThrow(), 1L, "About the wrong person", NOW));
+        invalidationRepository.save(new PracticeResultInvalidation(
+                practiceResultRepository.findById(wrong).orElseThrow(), 1L, "About the wrong person", NOW));
 
         list("").jsonPath("$.content[2].id")
                 .isEqualTo(firstReview.getId().toString())
@@ -198,9 +198,9 @@ class ReviewRunListSummaryIntegrationTest extends AbstractPracticeReviewIntegrat
                 .isEqualTo("run-list-developer")
                 .jsonPath("$.content[2].practices.notMet")
                 .isEqualTo(0)
-                .jsonPath("$.content[2].observations.notMet")
+                .jsonPath("$.content[2].practiceResults.notMet")
                 .isEqualTo(0)
-                .jsonPath("$.content[2].observations.met")
+                .jsonPath("$.content[2].practiceResults.met")
                 .isEqualTo(1);
         list("?subjectUserId=" + other.getId()).jsonPath("$.content.length()").isEqualTo(0);
     }

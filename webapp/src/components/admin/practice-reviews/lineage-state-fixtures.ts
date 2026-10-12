@@ -2,7 +2,7 @@ import type {
 	AgentJob,
 	ReviewLineage,
 	ReviewLineageFeedback,
-	ReviewLineageObservation,
+	ReviewLineageResult,
 } from "@/api/types.gen";
 import type { FeedbackLocation } from "@/components/practice-vocabulary/feedback-location-defs";
 import type { ReviewTrigger } from "@/components/practice-vocabulary/review-trigger-defs";
@@ -14,7 +14,7 @@ import {
 	EARLIER_REVIEW_ID,
 	LINEAGE_REVIEW_ID,
 	lineageFeedback,
-	lineageObservation,
+	lineageResult,
 	storyLineage,
 } from "./lineage-fixtures";
 
@@ -38,7 +38,7 @@ export type LineageStateGroup =
 	| "review"
 	| "trigger"
 	| "merge"
-	| "observations"
+	| "results"
 	| "location"
 	| "delivery"
 	| "withholding"
@@ -53,23 +53,23 @@ const OBS_A = id(1, 1);
 const OBS_B = id(1, 2);
 const OBS_C = id(1, 3);
 
-/** Three observations: one not met behind the feedback, one met, one not applicable. */
-const threeObservations = (overrides: Partial<ReviewLineageObservation> = {}) => [
-	lineageObservation(OBS_A, {
+/** Three results: one not met behind the feedback, one met, one not applicable. */
+const threeResults = (overrides: Partial<ReviewLineageResult> = {}) => [
+	lineageResult(OBS_A, {
 		summary: "A cache miss and a permission failure come back as the same 404",
 		severity: "MAJOR",
 		observedAt: at("13:39:00"),
 		feedbackCount: 1,
 		...overrides,
 	}),
-	lineageObservation(OBS_B, {
+	lineageResult(OBS_B, {
 		summary: "The controller delegates before it does anything else",
 		practiceSlug: "thin-controllers",
 		practiceName: "Thin controllers",
 		outcome: "MET",
 		observedAt: at("13:40:00"),
 	}),
-	lineageObservation(OBS_C, {
+	lineageResult(OBS_C, {
 		summary: "The work changes no public interface, so there is nothing to document",
 		practiceSlug: "public-interfaces-are-documented",
 		practiceName: "Public interfaces are documented",
@@ -80,7 +80,7 @@ const threeObservations = (overrides: Partial<ReviewLineageObservation> = {}) =>
 
 const FB_A = id(2, 1);
 
-/** One comment on the pull request from the not-met observation, delivered 30 s later. */
+/** One comment on the pull request from the not-met result, delivered 30 s later. */
 const oneComment = (overrides: Partial<ReviewLineageFeedback> = {}) =>
 	lineageFeedback(FB_A, [OBS_A], { createdAt: at("13:41:00"), ...overrides });
 
@@ -101,7 +101,7 @@ const chain = (overrides: Partial<ReviewLineage> = {}): ReviewLineage =>
 		workMoments: [
 			{ kind: "READY", occurredAt: at("13:34:50"), startedReview: true, joinedReview: false },
 		],
-		observations: threeObservations(),
+		results: threeResults(),
 		feedback: [oneComment()],
 		...overrides,
 	});
@@ -130,13 +130,13 @@ function jobOf(lineage: ReviewLineage, overrides: Partial<AgentJob> = {}): Agent
 
 const failedChain = chain({
 	review: { ...baseReview, status: "FAILED", phase: "FAILED", finishedAt: at("13:43:00") },
-	observations: [],
+	results: [],
 	feedback: [],
 });
 
 const slowQueueChain = chain({
 	review: { ...baseReview, startedAt: at("15:45:00"), finishedAt: at("15:52:00") },
-	observations: threeObservations().map((entry) => ({ ...entry, observedAt: at("15:50:00") })),
+	results: threeResults().map((entry) => ({ ...entry, observedAt: at("15:50:00") })),
 	feedback: [oneComment({ createdAt: at("15:51:00"), deliveredAt: at("15:51:20") })],
 });
 
@@ -148,7 +148,7 @@ const cancelledChain = chain({
 		startedAt: undefined,
 		finishedAt: at("13:35:04"),
 	},
-	observations: [],
+	results: [],
 	feedback: [],
 });
 
@@ -168,7 +168,7 @@ const reviewCases: LineageStateCase[] = [
 				startedAt: undefined,
 				finishedAt: undefined,
 			},
-			observations: [],
+			results: [],
 			feedback: [],
 		}),
 	},
@@ -184,26 +184,26 @@ const reviewCases: LineageStateCase[] = [
 				startedAt: undefined,
 				finishedAt: undefined,
 			},
-			observations: [],
+			results: [],
 			feedback: [],
 		}),
 	},
 	{
 		key: "running",
-		title: "Running, two observations so far",
+		title: "Running, two results so far",
 		lineage: chain({
 			review: { ...baseReview, status: "IN_PROGRESS", phase: "RUNNING", finishedAt: undefined },
-			observations: threeObservations().slice(0, 2),
+			results: threeResults().slice(0, 2),
 			feedback: [],
 		}),
 	},
 	{ key: "completed", title: "Completed", lineage: chain() },
 	{
 		key: "failed",
-		title: "Failed after recording one observation",
+		title: "Failed after recording one result",
 		lineage: chain({
 			review: { ...baseReview, status: "FAILED", phase: "FAILED" },
-			observations: threeObservations().slice(0, 1),
+			results: threeResults().slice(0, 1),
 			feedback: [],
 		}),
 	},
@@ -212,7 +212,7 @@ const reviewCases: LineageStateCase[] = [
 		title: "Timed out with nothing recorded",
 		lineage: chain({
 			review: { ...baseReview, status: "FAILED", phase: "TIMED_OUT", finishedAt: at("13:55:10") },
-			observations: [],
+			results: [],
 			feedback: [],
 		}),
 	},
@@ -221,7 +221,7 @@ const reviewCases: LineageStateCase[] = [
 		title: "Canceled",
 		lineage: chain({
 			review: { ...baseReview, status: "FAILED", phase: "CANCELLED", finishedAt: at("13:36:00") },
-			observations: [],
+			results: [],
 			feedback: [],
 		}),
 	},
@@ -229,14 +229,14 @@ const reviewCases: LineageStateCase[] = [
 		key: "insufficient-evidence",
 		title: "Completed, nothing assessed for lack of evidence",
 		reviewOutcome: "INSUFFICIENT_EVIDENCE",
-		lineage: chain({ observations: [], feedback: [] }),
+		lineage: chain({ results: [], feedback: [] }),
 	},
 	{
 		key: "coalesced",
 		title: "Answered by an earlier review on the same code",
 		reviewOutcome: "COALESCED",
 		lineage: chain({
-			observations: threeObservations().map((entry) => ({
+			results: threeResults().map((entry) => ({
 				...entry,
 				agentJobId: EARLIER_REVIEW_ID,
 				observedAt: at("11:02:00"),
@@ -259,7 +259,7 @@ const reviewCases: LineageStateCase[] = [
 		title: "Waited 19 minutes in the queue",
 		lineage: chain({
 			review: { ...baseReview, startedAt: at("13:54:00"), finishedAt: at("14:03:00") },
-			observations: threeObservations().map((entry) => ({ ...entry, observedAt: at("13:58:00") })),
+			results: threeResults().map((entry) => ({ ...entry, observedAt: at("13:58:00") })),
 			feedback: [oneComment({ createdAt: at("14:00:00"), deliveredAt: at("14:00:20") })],
 		}),
 	},
@@ -270,7 +270,7 @@ const reviewCases: LineageStateCase[] = [
 		job: jobOf(failedChain, {
 			retryCount: 1,
 			errorMessage:
-				"The model output did not match the review schema twice: observations[2].evidence[0].quote was not found in the diff.",
+				"The model output did not match the review schema twice: results[2].evidence[0].quote was not found in the diff.",
 		}),
 	},
 	{
@@ -358,7 +358,7 @@ const mergeCases: LineageStateCase[] = [
 		lineage: chain({
 			review: { ...baseReview, startedAt: at("13:50:00"), finishedAt: at("13:58:00") },
 			workMergedAt: at("13:42:00"),
-			observations: threeObservations().map((entry) => ({ ...entry, observedAt: at("13:54:00") })),
+			results: threeResults().map((entry) => ({ ...entry, observedAt: at("13:54:00") })),
 			feedback: [withheldAsMerged(at("13:56:00"))],
 		}),
 	},
@@ -399,32 +399,32 @@ const mergeCases: LineageStateCase[] = [
 ];
 
 // ------------------------------------------------------------------------------------------------
-// Observations: verdict by severity, corrections, an earlier review’s answers, none, many
+// Results: verdict by severity, corrections, an earlier review’s answers, none, many
 // ------------------------------------------------------------------------------------------------
 
-const verdictGrid: ReviewLineageObservation[] = [
+const verdictGrid: ReviewLineageResult[] = [
 	...(["CRITICAL", "MAJOR", "MINOR", "INFO"] as const).map((severity, index) =>
-		lineageObservation(id(3, index + 1), {
+		lineageResult(id(3, index + 1), {
 			summary: `Not met, ${severity.toLowerCase()}`,
 			severity,
 			observedAt: at(`13:3${6 + (index % 3)}:00`),
 		}),
 	),
-	lineageObservation(id(3, 5), {
+	lineageResult(id(3, 5), {
 		summary: "Met",
 		outcome: "MET",
 		practiceSlug: "thin-controllers",
 		practiceName: "Thin controllers",
 		observedAt: at("13:39:00"),
 	}),
-	lineageObservation(id(3, 6), {
+	lineageResult(id(3, 6), {
 		summary: "Not applicable",
 		outcome: "NOT_APPLICABLE",
 		practiceSlug: "public-interfaces-are-documented",
 		practiceName: "Public interfaces are documented",
 		observedAt: at("13:39:10"),
 	}),
-	lineageObservation(id(3, 7), {
+	lineageResult(id(3, 7), {
 		summary: "Undetermined: the diff does not say whether the migration runs first",
 		outcome: "UNDETERMINED",
 		practiceSlug: "workspace-scoped-queries",
@@ -433,9 +433,9 @@ const verdictGrid: ReviewLineageObservation[] = [
 	}),
 ];
 
-const manyObservations: ReviewLineageObservation[] = Array.from({ length: 24 }, (_, index) =>
-	lineageObservation(id(4, index + 1), {
-		summary: `Observation ${index + 1} of a large review`,
+const manyResults: ReviewLineageResult[] = Array.from({ length: 24 }, (_, index) =>
+	lineageResult(id(4, index + 1), {
+		summary: `Result ${index + 1} of a large review`,
 		outcome: (["NOT_MET", "MET", "MET", "NOT_APPLICABLE", "UNDETERMINED"] as const)[index % 5],
 		severity: index % 5 === 0 ? "MINOR" : undefined,
 		practiceSlug: `practice-${index % 8}`,
@@ -447,17 +447,17 @@ const manyObservations: ReviewLineageObservation[] = Array.from({ length: 24 }, 
 	}),
 );
 
-const observationCases: LineageStateCase[] = [
+const resultCases: LineageStateCase[] = [
 	{
 		key: "verdicts",
 		title: "Every verdict, and not met by severity",
-		lineage: chain({ observations: verdictGrid, feedback: [] }),
+		lineage: chain({ results: verdictGrid, feedback: [] }),
 	},
 	{
 		key: "marked-incorrect",
 		title: "Marked incorrect, so its card was withheld",
 		lineage: chain({
-			observations: threeObservations({
+			results: threeResults({
 				invalidated: true,
 				markedIncorrectAt: at("13:58:00"),
 			}),
@@ -478,9 +478,9 @@ const observationCases: LineageStateCase[] = [
 		key: "answered-earlier",
 		title: "Two practices answered by an earlier review",
 		lineage: chain({
-			observations: [
-				...threeObservations().slice(0, 1),
-				...threeObservations()
+			results: [
+				...threeResults().slice(0, 1),
+				...threeResults()
 					.slice(1)
 					.map((entry) => ({
 						...entry,
@@ -493,32 +493,32 @@ const observationCases: LineageStateCase[] = [
 	{
 		key: "not-met-silent",
 		title: "Not met, and no feedback written from it",
-		lineage: chain({ observations: threeObservations({ feedbackCount: 0 }), feedback: [] }),
+		lineage: chain({ results: threeResults({ feedbackCount: 0 }), feedback: [] }),
 	},
 	{
 		key: "later-review-wrote",
 		title: "Feedback a later review wrote counts for that review only",
 		lineage: chain({
-			observations: threeObservations({ feedbackCount: 1, ownFeedbackCount: 0 }),
+			results: threeResults({ feedbackCount: 1, ownFeedbackCount: 0 }),
 			feedback: [],
 		}),
 	},
 	{
 		key: "empty",
-		title: "Completed with no observation",
-		lineage: chain({ observations: [], feedback: [] }),
+		title: "Completed with no result",
+		lineage: chain({ results: [], feedback: [] }),
 	},
 	{
-		key: "observations-no-feedback",
-		title: "Observations, but no feedback",
-		lineage: chain({ observations: verdictGrid.slice(4), feedback: [] }),
+		key: "results-no-feedback",
+		title: "Results, but no feedback",
+		lineage: chain({ results: verdictGrid.slice(4), feedback: [] }),
 	},
 	{
-		key: "many-observations",
-		title: "24 observations",
+		key: "many-results",
+		title: "24 results",
 		lineage: chain({
-			observations: manyObservations,
-			feedback: manyObservations
+			results: manyResults,
+			feedback: manyResults
 				.filter((entry) => entry.feedbackCount > 0)
 				.map((entry, index) =>
 					lineageFeedback(id(5, index + 1), [entry.id], {
@@ -869,7 +869,7 @@ const responseCases: LineageStateCase[] = [
 const volumeCases: LineageStateCase[] = [
 	{
 		key: "many-feedback",
-		title: "Ten pieces of feedback from three observations",
+		title: "Ten pieces of feedback from three results",
 		lineage: chain({
 			feedback: Array.from({ length: 10 }, (_, index) =>
 				lineageFeedback(
@@ -890,7 +890,7 @@ export const LINEAGE_STATE_CASES: Record<LineageStateGroup, LineageStateCase[]> 
 	review: reviewCases,
 	trigger: triggerCases,
 	merge: mergeCases,
-	observations: observationCases,
+	results: resultCases,
 	location: locationCases,
 	delivery: deliveryCases,
 	withholding: withholdingCases,
@@ -903,7 +903,7 @@ export const LINEAGE_STATE_GROUP_TITLES: Record<LineageStateGroup, string> = {
 	review: "How the review ran",
 	trigger: "What started it",
 	merge: "The merge against the review",
-	observations: "Observations",
+	results: "Results",
 	location: "Where feedback went",
 	delivery: "What became of feedback",
 	withholding: "Why feedback was withheld",
@@ -924,4 +924,4 @@ export function lineageStateCase(key: string): LineageStateCase {
 }
 
 export const STATE_FEEDBACK_ID = FB_A;
-export const STATE_OBSERVATION_ID = OBS_A;
+export const STATE_RESULT_ID = OBS_A;

@@ -131,7 +131,7 @@ export const Default: Story = {
 		const practices = within(canvas.getByRole("region", { name: "Practices" }));
 		await expect(practices.getAllByRole("row")).toHaveLength(7);
 		// Queue is one card: the queue now, then the review time of the range under its name; the
-		// reviews stand beside the observations, the feedback beside where it went.
+		// reviews stand beside the results, the feedback beside where it went.
 		const queue = within(canvas.getByRole("region", { name: "Queue" }));
 		await expect(
 			canvas.getByRole("region", { name: "Queue" }).querySelectorAll("[data-slot=card]"),
@@ -146,7 +146,7 @@ export const Default: Story = {
 		const stages = canvas.getByRole("list", { name: "Stages" }).querySelectorAll(":scope > li");
 		await expect([...stages].map((card) => card.textContent)).toEqual([
 			expect.stringMatching(/^Reviews/u),
-			expect.stringMatching(/^Observations/u),
+			expect.stringMatching(/^Results/u),
 		]);
 		const delivery = canvas.getByRole("list", { name: "Delivery" }).querySelectorAll(":scope > li");
 		await expect(delivery).toHaveLength(2);
@@ -183,33 +183,30 @@ export const Default: Story = {
 		await expect(opens("4 withheld")[1]).toBe("SUPPRESSED,DISCARDED");
 		await expect(opens("1 failed to deliver")[1]).toBe("FAILED,PARTIALLY_FAILED");
 		await expect(opens("1 replaced by newer")[1]).toBe("SUPERSEDED");
-		// The Observations tile says each outcome in one short form, with marked incorrect as the
-		// quiet last item of the same row; each count opens the Observations table filtered to it.
-		const observationsLegend = canvas.getByRole("list", { name: "Observations by outcome" });
-		await expect(observationsLegend).toHaveTextContent(
-			"35 met27 not met10 not applicable6 undetermined",
+		// The Results tile says each outcome in one short form, with marked incorrect as the
+		// quiet last item of the same row; each count opens the Results table filtered to it.
+		const resultsLegend = canvas.getByRole("list", { name: "Results by outcome" });
+		await expect(resultsLegend).toHaveTextContent(
+			"35 met27 not met10 does not apply6 could not determine",
 		);
-		const checked = canvas.getByRole("list", { name: "Observations checked by an admin" });
-		await expect(checked.parentElement).toBe(observationsLegend.parentElement);
+		const checked = canvas.getByRole("list", { name: "Results checked by an admin" });
+		await expect(checked.parentElement).toBe(resultsLegend.parentElement);
 		await expect(checked.querySelector("svg")).toHaveClass("text-muted-foreground");
-		const observationLink = (name: string) =>
+		const resultLink = (name: string) =>
 			new URL(canvas.getByRole<HTMLAnchorElement>("link", { name }).href);
-		await expect(observationLink("27 not met").searchParams.getAll("outcome")).toStrictEqual([
+		await expect(resultLink("27 not met").searchParams.getAll("outcome")).toStrictEqual([
 			"NOT_MET",
 		]);
-		await expect(observationLink("3 marked incorrect").searchParams.get("invalidated")).toBe(
-			"true",
-		);
-		await expect(observationLink("3 marked incorrect").pathname).toBe(
-			"/w/demo/admin/practices/reviews/observations",
+		await expect(resultLink("3 marked incorrect").searchParams.get("invalidated")).toBe("true");
+		await expect(resultLink("3 marked incorrect").pathname).toBe(
+			"/w/demo/admin/practices/reviews/results",
 		);
 		// The Reviews tile alike: each outcome, and what is not finished yet, open the Reviews table.
-		await expect(observationLink("2 failed").searchParams.getAll("status")).toStrictEqual([
-			"FAILED",
+		await expect(resultLink("2 failed").searchParams.getAll("status")).toStrictEqual(["FAILED"]);
+		await expect(resultLink("3 not finished yet").searchParams.getAll("status")).toStrictEqual([
+			"QUEUED",
+			"RUNNING",
 		]);
-		await expect(observationLink("3 not finished yet").searchParams.getAll("status")).toStrictEqual(
-			["QUEUED", "RUNNING"],
-		);
 		canvas.getByRole("link", { name: "9 reviews finished after the merge" });
 		await expect(canvas.queryByText(/recorded nothing/u)).not.toBeInTheDocument();
 
@@ -318,8 +315,8 @@ const COURSE_DAY = {
 			feedback: feedbackCounts([]),
 			practiceSlug: "thin-controllers",
 			practiceName: "Wiki pages are kept up to date",
-			observations: { met: 0, notMet: 0, notApplicable: 29, undetermined: 1 },
-			observationsInvalidated: 0,
+			practiceResults: { met: 0, notMet: 0, notApplicable: 29, undetermined: 1 },
+			practiceResultsInvalidated: 0,
 		},
 		...practiceReviewOverview.practices.filter(
 			(practice) => practice.practiceSlug !== "thin-controllers",

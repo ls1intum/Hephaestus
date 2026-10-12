@@ -3,7 +3,7 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import {
 	getAgentJobOptions,
 	getPracticeReviewFeedbackOptions,
-	getPracticeReviewObservationOptions,
+	getPracticeReviewResultOptions,
 	listPracticesOptions,
 	listTracedArtifactsOptions,
 } from "@/api/@tanstack/react-query.gen";
@@ -49,7 +49,7 @@ export interface ReviewSelectionRead {
 type SelectionScope = Pick<
 	ReviewScope,
 	| "agentJobId"
-	| "observationId"
+	| "practiceResultId"
 	| "feedbackId"
 	| "selectedPractice"
 	| "artifactKind"
@@ -59,7 +59,7 @@ type SelectionScope = Pick<
 
 /**
  * The record the scope narrows to — the selection, or the same names set as a filter — read from its
- * own record: its name, the review its trace opens, and the work it names. A review and an observation name their work, so the work list can narrow to it
+ * own record: its name, the review its trace opens, and the work it names. A review and a result name their work, so the work list can narrow to it
  * without a filter of its own. Every tab and the layout read the same queries, so a switch between
  * tabs asks for nothing again.
  */
@@ -87,13 +87,13 @@ function useRecordRead(
 	const nowMs = useNow();
 	const path = { workspaceSlug };
 
-	const observationId = selection?.kind === "observation" ? selection.observationId : undefined;
-	const observationOptions = getPracticeReviewObservationOptions({
-		path: { ...path, observationId: observationId ?? "" },
+	const practiceResultId = selection?.kind === "result" ? selection.practiceResultId : undefined;
+	const resultOptions = getPracticeReviewResultOptions({
+		path: { ...path, practiceResultId: practiceResultId ?? "" },
 	});
-	const observationQuery = useQuery({
-		...observationOptions,
-		queryFn: observationId === undefined ? skipToken : observationOptions.queryFn,
+	const resultQuery = useQuery({
+		...resultOptions,
+		queryFn: practiceResultId === undefined ? skipToken : resultOptions.queryFn,
 	});
 
 	const jobId = selection?.kind === "review" ? selection.agentJobId : undefined;
@@ -172,18 +172,18 @@ function useRecordRead(
 				})),
 			};
 		}
-		case "observation": {
+		case "result": {
 			return {
 				selection,
 				picked,
-				name: panelState(observationQuery, (observation) => ({
+				name: panelState(resultQuery, (result) => ({
 					status: "ready" as const,
-					name: observation.summary,
+					name: result.summary,
 				})),
 				trace,
-				work: panelState(observationQuery, (observation) => ({
+				work: panelState(resultQuery, (result) => ({
 					status: "ready" as const,
-					work: workOf(observation.reviewedWork),
+					work: workOf(result.reviewedWork),
 				})),
 			};
 		}

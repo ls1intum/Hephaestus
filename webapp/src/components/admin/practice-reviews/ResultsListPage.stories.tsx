@@ -168,7 +168,7 @@ async function pickFacet(
 
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		await canvas.findByText("12 results.");
+		await canvas.findByText("13 results.");
 		// Every facet sits in the row, with no toggle to open first.
 		for (const name of [
 			"Group",
@@ -214,30 +214,30 @@ export const FilterToOnePerson: Story = {
 };
 
 /**
- * An observation selected elsewhere narrows this list to the review that recorded it, the
- * observation among its siblings. The selection is set where a chain starts — the Reviews and Work
+ * A result selected elsewhere narrows this list to the review that recorded it, the
+ * result among its siblings. The selection is set where a chain starts — the Reviews and Work
  * lists, or a level — so no row here offers a "Select".
  */
-export const NarrowedToTheSelectedObservation: Story = {
+export const NarrowedToTheSelectedResult: Story = {
 	args: {
 		search: {
 			outcome: undefined,
 			severity: undefined,
 			origin: undefined,
 			agentJobId: "11111111-1111-1111-1111-111111111111",
-			observationId: "66666666-6666-6666-6666-666666666666",
+			practiceResultId: "66666666-6666-6666-6666-666666666666",
 		},
 	},
 	parameters: {
 		router: {
 			initialUrl:
-				"/?agentJobId=11111111-1111-1111-1111-111111111111&observationId=66666666-6666-6666-6666-666666666666",
+				"/?agentJobId=11111111-1111-1111-1111-111111111111&practiceResultId=66666666-6666-6666-6666-666666666666",
 		},
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: /^Select/u })).not.toBeInTheDocument();
 		await expect(
-			within(canvas.getByRole("table", { name: "Observations" }))
+			within(canvas.getByRole("table", { name: "Results" }))
 				.getAllByRole("row")
 				.filter((row) => within(row).queryAllByRole("cell").length > 0),
 		).toHaveLength(4);
@@ -274,7 +274,7 @@ export const SortByActionability: Story = {
 		);
 		// Out of time order a day would head the rows again each time it came back, so the table keeps
 		// its headed bodies, one per rank of the order, and each row names its own day.
-		const table = canvas.getByRole("table", { name: "Observations" });
+		const table = canvas.getByRole("table", { name: "Results" });
 		await waitFor(async () =>
 			expect(
 				[...table.querySelectorAll("th[scope=rowgroup]")].map((heading) => heading.textContent),
@@ -288,7 +288,7 @@ export const SortByActionability: Story = {
 			"Not met · Critical",
 			"Not met · Major",
 			"Not met · Minor",
-			"Not met · Informational",
+			"Not met · Trivial",
 			"Met",
 		]);
 		await expect(new Set(headings).size).toBe(headings.length);

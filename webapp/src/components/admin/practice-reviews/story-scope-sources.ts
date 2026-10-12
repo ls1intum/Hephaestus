@@ -1,11 +1,7 @@
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 
 import { practiceGroups, workspaceMembers, workspacePractices } from "./fixtures";
-import {
-	groupFacetOptions,
-	type PracticeFacetOption,
-	practiceFacetOptions,
-} from "./ObservationFilters";
+import { groupFacetOptions, type PracticeFacetOption, practiceFacetOptions } from "./ResultFilters";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 
 /** The options of the shared scope's facets, loaded, for the stories of every review list. */

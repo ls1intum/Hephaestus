@@ -4,8 +4,8 @@ import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.judg
 import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.noVerdict;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -171,7 +171,7 @@ class GroupTrendAggregatorTest {
 
     @Test
     void shouldReadTheGroupsStandingWorkOffEveryPracticeNotOnlyTheComparedOnes() {
-        List<Observation> compared = new ArrayList<>();
+        List<PracticeResult> compared = new ArrayList<>();
         for (int day = 1; day <= 8; day++) {
             compared.add(judged(day, "2026-05-%02dT09:00:00Z".formatted(day), Outcome.MET));
         }

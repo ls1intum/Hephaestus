@@ -2,38 +2,38 @@ import { ChevronRightIcon } from "lucide-react";
 import { use } from "react";
 
 import { cn } from "cn";
-import type { ReviewLineage, ReviewLineageObservation } from "@/api/types.gen";
+import type { ReviewLineage, ReviewLineageResult } from "@/api/types.gen";
 import type { BadgeVariant } from "@/components/common/status-def";
-import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/observation-dispute-defs";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
+import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/result-dispute-defs";
+import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { Button } from "@/components/ui/button";
 import { hasText } from "@/lib/text";
 
-import { countOf, type NumberedObservation, verdictSummary } from "./lineage-chain";
+import { countOf, type NumberedResult, verdictSummary } from "./lineage-chain";
 import { answeredEarlier, reviewStepState } from "./lineage-story";
-import { LineageObservationChip } from "./LineageObservationChip";
+import { LineageResultChip } from "./LineageResultChip";
 import { LineageTimes, OffPathNote, Step, StepTime, ToneIcon } from "./LineageStep";
 import { sameTraceNode, type TraceNode } from "./review-trace";
 import { hiddenByFilter, type TraceFilter } from "./trace-filter";
 import { type RailStepProps, StoryNode, offPath, useStory } from "./TraceStoryNode";
 import { CellLabel, TRACE_ROW_CELLS, TRACE_ROW_MAIN, TraceTable, traceRowGrid } from "./TraceTable";
 
-/** Past this many, the table lists the first observations and folds the rest behind one line. */
-const OBSERVATIONS_OPEN = 12;
+/** Past this many, the table lists the first results and folds the rest behind one line. */
+const RESULTS_OPEN = 12;
 
 /**
- * The observations the review stage's table lists: every one where the table is open, otherwise
+ * The results the review stage's table lists: every one where the table is open, otherwise
  * only the path's own, with the record the reader started from among them. The rest stay dots
  * under the count, each of which opens itself.
  */
-export function observationRows(
-	numbered: NumberedObservation[],
-	path: NumberedObservation[] | undefined,
-	self: NumberedObservation | undefined,
+export function resultRows(
+	numbered: NumberedResult[],
+	path: NumberedResult[] | undefined,
+	self: NumberedResult | undefined,
 	listed: boolean,
-): NumberedObservation[] {
+): NumberedResult[] {
 	if (listed) {
 		return numbered;
 	}
@@ -44,11 +44,11 @@ export function observationRows(
 }
 
 /**
- * The review's observations: the count by verdict, then a table with one row per observation the
+ * The review's results: the count by verdict, then a table with one row per result the
  * reader sees in full, and a numbered dot for each of the rest. The table opens and folds on its own
  * button, whatever else the trace shows; "Expand all" opens it too.
  */
-export function ObservationsStep({
+export function ResultsStep({
 	lineage,
 	full,
 	filter,
@@ -68,11 +68,9 @@ export function ObservationsStep({
 	onOthersOpenChange,
 }: RailStepProps & { at: Date | undefined }) {
 	const { display } = useStory();
-	const total = lineage.observations.length + lineage.moreObservations;
-	const earlier = numbered.filter(({ observation }) =>
-		answeredEarlier(observation, lineage.review),
-	);
-	const marked = numbered.filter(({ observation }) => observation.invalidated).length;
+	const total = lineage.results.length + lineage.moreResults;
+	const earlier = numbered.filter(({ result }) => answeredEarlier(result, lineage.review));
+	const marked = numbered.filter(({ result }) => result.invalidated).length;
 	const empty = total === 0;
 	const nothing =
 		lineage.review === undefined
@@ -82,17 +80,15 @@ export function ObservationsStep({
 		earlier.length > 0 ? `${earlier.length} answered by an earlier review` : undefined,
 		marked > 0 ? `${marked} marked incorrect` : undefined,
 	].filter(hasText);
-	const inTable = new Set(rows.map(({ observation }) => observation.id));
-	const dotted = numbered.filter(({ observation }) => !inTable.has(observation.id));
+	const inTable = new Set(rows.map(({ result }) => result.id));
+	const dotted = numbered.filter(({ result }) => !inTable.has(result.id));
 	const shownRows =
-		listed && !othersOpen && rows.length > OBSERVATIONS_OPEN
-			? rows.slice(0, OBSERVATIONS_OPEN)
-			: rows;
+		listed && !othersOpen && rows.length > RESULTS_OPEN ? rows.slice(0, RESULTS_OPEN) : rows;
 	const hiddenRows = rows.length - shownRows.length;
 	const folded = path !== undefined || self !== undefined;
-	let toggleText = `Show all ${countOf(numbered.length, "observation", "observations")} in the table`;
+	let toggleText = `Show all ${countOf(numbered.length, "result", "results")} in the table`;
 	if (listed) {
-		toggleText = folded ? "Show only the observations on this path" : "Fold the table";
+		toggleText = folded ? "Show only the results on this path" : "Fold the table";
 	}
 	const toggle = numbered.length > 0 && (listed || dotted.length > 0) && (
 		<Button
@@ -115,32 +111,32 @@ export function ObservationsStep({
 	return (
 		<Step
 			dot={{
-				tone: empty ? "outline" : worstTone(lineage.observations),
+				tone: empty ? "outline" : worstTone(lineage.results),
 				hollow: empty,
-				here: here?.kind === "observation" || here?.kind === "observations",
+				here: here?.kind === "result" || here?.kind === "results",
 			}}
 			at={at}
 			gapFrom={at === undefined ? undefined : previous}
-			data-step="observations"
+			data-step="results"
 		>
 			<StoryNode
-				node={{ kind: "observations" }}
+				node={{ kind: "results" }}
 				className="px-1.5 py-1"
 				after={
 					<>
 						{shownRows.length > 0 && (
 							<TraceTable
-								kind="observations"
+								kind="results"
 								times={display.times}
-								label={listed ? "Observations of this review" : "Observations on this path"}
+								label={listed ? "Results of this review" : "Results on this path"}
 							>
 								{shownRows.map((entry) => (
-									<ObservationRow
-										key={entry.observation.id}
+									<ResultRow
+										key={entry.result.id}
 										entry={entry}
 										lineage={lineage}
 										letters={letters}
-										muted={offPath(traced, { kind: "observation", id: entry.observation.id })}
+										muted={offPath(traced, { kind: "result", id: entry.result.id })}
 									/>
 								))}
 							</TraceTable>
@@ -152,7 +148,7 @@ export function ObservationsStep({
 								className="mt-1 ml-1.5 text-muted-foreground"
 								onClick={() => onOthersOpenChange(true)}
 							>
-								{`Show ${countOf(hiddenRows, "more observation", "more observations")}`}
+								{`Show ${countOf(hiddenRows, "more result", "more results")}`}
 							</Button>
 						)}
 						{(dotted.length > 0 || toggle !== false) && (
@@ -161,8 +157,8 @@ export function ObservationsStep({
 									<ul
 										aria-label={
 											shownRows.length === 0
-												? "Observations by number"
-												: `${countOf(dotted.length, "other observation", "other observations")} of this review`
+												? "Results by number"
+												: `${countOf(dotted.length, "other result", "other results")} of this review`
 										}
 										className="flex flex-wrap items-center gap-0.5"
 									>
@@ -171,12 +167,12 @@ export function ObservationsStep({
 												{`${countOf(dotted.length, "other", "others")}:`}
 											</li>
 										)}
-										{dotted.map(({ observation, number }) => (
-											<li key={observation.id}>
-												<ObservationDot
-													observation={observation}
+										{dotted.map(({ result, number }) => (
+											<li key={result.id}>
+												<ResultDot
+													result={result}
 													number={number}
-													disputed={disputedFrom(observation.id, lineage)}
+													disputed={disputedFrom(result.id, lineage)}
 												/>
 											</li>
 										))}
@@ -188,23 +184,17 @@ export function ObservationsStep({
 					</>
 				}
 			>
-				<ObservationsHead
-					full={full}
-					filter={filter}
-					total={total}
-					nothing={nothing}
-					extras={extras}
-				/>
+				<ResultsHead full={full} filter={filter} total={total} nothing={nothing} extras={extras} />
 			</StoryNode>
 		</Step>
 	);
 }
 
 /**
- * What the observation step says: what the review recorded, from the whole chain, so a filter
+ * What the result step says: what the review recorded, from the whole chain, so a filter
  * never makes it say the review recorded less; how much of it the filter shows; or why there is none.
  */
-function ObservationsHead({
+function ResultsHead({
 	full,
 	filter,
 	total,
@@ -217,12 +207,12 @@ function ObservationsHead({
 	nothing: string | undefined;
 	extras: readonly string[];
 }) {
-	const wholeTotal = full.observations.length + full.moreObservations;
+	const wholeTotal = full.results.length + full.moreResults;
 	const filtered = filter.kind !== "all";
 	if (wholeTotal === 0) {
 		return (
 			<>
-				<span className="block font-medium">No observations</span>
+				<span className="block font-medium">No results</span>
 				{hasText(nothing) && <span className="block text-muted-foreground">{nothing}</span>}
 			</>
 		);
@@ -244,9 +234,9 @@ function ObservationsHead({
 	);
 }
 
-function worstTone(observations: readonly ReviewLineageObservation[]): BadgeVariant {
+function worstTone(results: readonly ReviewLineageResult[]): BadgeVariant {
 	for (const outcome of ["NOT_MET", "MET", "UNDETERMINED", "NOT_APPLICABLE"] as const) {
-		if (observations.some((entry) => entry.outcome === outcome)) {
+		if (results.some((entry) => entry.outcome === outcome)) {
 			return OUTCOME_DEFS[outcome].badgeVariant;
 		}
 	}
@@ -254,33 +244,33 @@ function worstTone(observations: readonly ReviewLineageObservation[]): BadgeVari
 }
 
 /**
- * Whether the developer disputes a piece of feedback written from the observation, as the
- * Observations list's "Developer response" filter reads it. Only that they dispute it: their rating
+ * Whether the developer disputes a piece of feedback written from the result, as the
+ * Results list's "Developer response" filter reads it. Only that they dispute it: their rating
  * and notes are never part of the chain.
  */
-function disputedFrom(observationId: string, lineage: ReviewLineage): boolean {
+function disputedFrom(practiceResultId: string, lineage: ReviewLineage): boolean {
 	return lineage.feedback.some(
 		(feedback) =>
-			feedback.observationIds.includes(observationId) && feedback.response?.disputed === true,
+			feedback.practiceResultIds.includes(practiceResultId) && feedback.response?.disputed === true,
 	);
 }
 
-/** One observation as its dot, which brings it into view and opens its sheet. */
-function ObservationDot({
-	observation,
+/** One result as its dot, which brings it into view and opens its sheet. */
+function ResultDot({
+	result,
 	number,
 	disputed,
 }: {
-	observation: ReviewLineageObservation;
+	result: ReviewLineageResult;
 	number: number;
 	/** Whether the developer disputes feedback written from it. */
 	disputed: boolean;
 }) {
 	const context = useStory();
-	const node: TraceNode = { kind: "observation", id: observation.id };
+	const node: TraceNode = { kind: "result", id: result.id };
 	const chip = (
-		<LineageObservationChip
-			observation={observation}
+		<LineageResultChip
+			result={result}
 			number={number}
 			withSummary
 			ringed={sameTraceNode(context.here, node)}
@@ -289,12 +279,12 @@ function ObservationDot({
 	const { open } = context;
 	// The outcome in words too, so a dot is never told by its colour alone.
 	const facts = [
-		OUTCOME_DEFS[observation.outcome].label,
-		observation.severity && SEVERITY_DEFS[observation.severity].label.toLowerCase(),
+		OUTCOME_DEFS[result.outcome].label,
+		result.severity && SEVERITY_DEFS[result.severity].label.toLowerCase(),
 		disputed ? "disputed" : undefined,
-		observation.invalidated ? "marked incorrect" : undefined,
+		result.invalidated ? "marked incorrect" : undefined,
 	].filter(hasText);
-	const title = `${number} · ${facts.join(", ")}: ${observation.summary}`;
+	const title = `${number} · ${facts.join(", ")}: ${result.summary}`;
 	if (open === undefined) {
 		return (
 			<span title={title} className="flex size-6 items-center justify-center rounded-full">
@@ -308,7 +298,7 @@ function ObservationDot({
 			type="button"
 			title={title}
 			onClick={() => {
-				open({ kind: "observation", id: observation.id });
+				open({ kind: "result", id: result.id });
 			}}
 			className="flex size-6 items-center justify-center rounded-full outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
 		>
@@ -317,54 +307,54 @@ function ObservationDot({
 	);
 }
 
-/** The letters of the pieces of feedback written from an observation, in the order they were written. */
+/** The letters of the pieces of feedback written from a result, in the order they were written. */
 function fedLetters(
-	observationId: string,
+	practiceResultId: string,
 	lineage: ReviewLineage,
 	letters: ReadonlyMap<string, string>,
 ): string[] {
 	return lineage.feedback
-		.filter((feedback) => feedback.observationIds.includes(observationId))
+		.filter((feedback) => feedback.practiceResultIds.includes(practiceResultId))
 		.map((feedback) => letters.get(feedback.id))
 		.filter(hasText)
 		.sort((a, b) => a.length - b.length || a.localeCompare(b));
 }
 
 /**
- * One observation as a row of the review stage's table: its number in its verdict's colour, its
+ * One result as a row of the review stage's table: its number in its verdict's colour, its
  * practice and summary, the outcome, the severity, the pieces of feedback written from it by letter,
  * and when it was observed. A correction, a dispute or an earlier review's answer stands under the
  * summary.
  */
-function ObservationRow({
+function ResultRow({
 	entry,
 	lineage,
 	letters,
 	muted,
 }: {
-	entry: NumberedObservation;
+	entry: NumberedResult;
 	lineage: ReviewLineage;
 	letters: ReadonlyMap<string, string>;
 	muted: boolean;
 }) {
 	const { display } = useStory();
-	const { observation, number } = entry;
-	const outcome = OUTCOME_DEFS[observation.outcome];
-	const severity = observation.severity && SEVERITY_DEFS[observation.severity];
-	const earlier = answeredEarlier(observation, lineage.review);
-	const disputed = disputedFrom(observation.id, lineage);
-	const fed = fedLetters(observation.id, lineage, letters);
-	const flagged = observation.invalidated || disputed || earlier;
+	const { result, number } = entry;
+	const outcome = OUTCOME_DEFS[result.outcome];
+	const severity = result.severity && SEVERITY_DEFS[result.severity];
+	const earlier = answeredEarlier(result, lineage.review);
+	const disputed = disputedFrom(result.id, lineage);
+	const fed = fedLetters(result.id, lineage, letters);
+	const flagged = result.invalidated || disputed || earlier;
 	return (
 		<li data-muted={muted} className={cn(muted && "text-muted-foreground")}>
 			<OffPathNote muted={muted} />
 			<StoryNode
 				row
-				node={{ kind: "observation", id: observation.id }}
-				className={cn(traceRowGrid("observations", display.times), "px-1.5 py-1.5")}
+				node={{ kind: "result", id: result.id }}
+				className={cn(traceRowGrid("results", display.times), "px-1.5 py-1.5")}
 			>
-				<LineageObservationChip
-					observation={observation}
+				<LineageResultChip
+					result={result}
 					number={number}
 					ringed={false}
 					connector="source"
@@ -372,25 +362,25 @@ function ObservationRow({
 				/>
 				<span className={TRACE_ROW_CELLS}>
 					<span className={TRACE_ROW_MAIN}>
-						<span className="block font-medium break-words">{observation.practiceName}</span>
+						<span className="block font-medium break-words">{result.practiceName}</span>
 						<span
 							className={cn(
 								"block break-words text-muted-foreground",
-								observation.invalidated && "line-through",
+								result.invalidated && "line-through",
 							)}
 						>
-							{observation.summary}
+							{result.summary}
 						</span>
 						{flagged && (
 							<span className="flex flex-wrap items-center gap-x-2 text-muted-foreground">
-								{observation.invalidated && (
+								{result.invalidated && (
 									<span className="inline-flex flex-wrap items-center gap-x-1 font-medium text-foreground">
 										<ToneIcon def={MARKED_INCORRECT_DEF} className="size-3" />
 										{MARKED_INCORRECT_DEF.label}
-										{observation.markedIncorrectAt && (
+										{result.markedIncorrectAt && (
 											<LabeledRailTime
 												label="at"
-												at={observation.markedIncorrectAt}
+												at={result.markedIncorrectAt}
 												className="font-normal text-muted-foreground"
 											/>
 										)}
@@ -433,8 +423,8 @@ function ObservationRow({
 					</span>
 					{display.times && (
 						<span className="text-muted-foreground @lg:text-right">
-							<CellLabel>Observed</CellLabel>
-							<StepTime at={observation.observedAt} />
+							<CellLabel>Recorded</CellLabel>
+							<StepTime at={result.observedAt} />
 						</span>
 					)}
 				</span>
@@ -443,7 +433,7 @@ function ObservationRow({
 	);
 }
 
-/** "Observed 3:37 pm": a time inside a step with what it is the time of, so two never read alike. */
+/** "Recorded 3:37 pm": a time inside a step with what it is the time of, so two never read alike. */
 function LabeledRailTime({
 	label,
 	at,

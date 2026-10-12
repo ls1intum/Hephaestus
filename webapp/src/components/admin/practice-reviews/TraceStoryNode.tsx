@@ -3,9 +3,9 @@ import { createContext, type ReactElement, type ReactNode, use } from "react";
 
 import { cn } from "cn";
 import type { AgentJob, ReviewLineage } from "@/api/types.gen";
-import type { ObservationOrigin } from "@/components/practice-vocabulary/observation-origin-defs";
+import type { ResultOrigin } from "@/components/practice-vocabulary/result-origin-defs";
 
-import type { NumberedById, NumberedObservation } from "./lineage-chain";
+import type { NumberedById, NumberedResult } from "./lineage-chain";
 import type { RailItem } from "./lineage-story";
 import { HereBadge, hereFrame } from "./LineageStep";
 import type { RecordRef } from "./review-layers";
@@ -30,7 +30,7 @@ export interface StoryContext {
 	/** How the review processed its results, from the review itself; undefined until it is read. */
 	resultProcessing: AgentJob["deliveryStatus"];
 	/** How the review came to run, from its row. */
-	origin: ObservationOrigin | undefined;
+	origin: ResultOrigin | undefined;
 	/** The review's own record, where the page read it and it is the trace's review. */
 	job: AgentJob | undefined;
 	/** Where the review stands among the reviews of its work. */
@@ -54,8 +54,8 @@ export function offPath(traced: Traced | undefined, node: TraceNode): boolean {
 	if (traced === undefined) {
 		return false;
 	}
-	if (node.kind === "observation") {
-		return !traced.observations.has(node.id);
+	if (node.kind === "result") {
+		return !traced.results.has(node.id);
 	}
 	if (node.kind === "feedback") {
 		return !traced.feedback.has(node.id);
@@ -171,15 +171,15 @@ export interface StepProps {
 	/** The whole chain, which says what the review did whatever the filter hides. */
 	full: ReviewLineage;
 	filter: TraceFilter;
-	numbered: NumberedObservation[];
-	self: NumberedObservation | undefined;
-	/** The observations on the record's path, where the siblings fold; undefined lists them all. */
-	path: NumberedObservation[] | undefined;
-	/** Whether every observation is a row of the review stage's table rather than a dot. */
+	numbered: NumberedResult[];
+	self: NumberedResult | undefined;
+	/** The results on the record's path, where the siblings fold; undefined lists them all. */
+	path: NumberedResult[] | undefined;
+	/** Whether every result is a row of the review stage's table rather than a dot. */
 	listed: boolean;
-	/** The observations the table lists, the rest being dots. */
-	rows: NumberedObservation[];
-	/** Opens or folds the observations' table by hand. */
+	/** The results the table lists, the rest being dots. */
+	rows: NumberedResult[];
+	/** Opens or folds the results' table by hand. */
 	onListedChange: (open: boolean) => void;
 	byId: NumberedById;
 	letters: ReadonlyMap<string, string>;

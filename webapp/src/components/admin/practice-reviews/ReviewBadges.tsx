@@ -1,4 +1,4 @@
-import type { Outcome, ReviewResult } from "@/api/types.gen";
+import type { ReviewResult } from "@/api/types.gen";
 import type { StatusDef } from "@/components/common/status-def";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { OUTCOME_DEFS, resultVerdict } from "@/components/practice-vocabulary/outcome-defs";
@@ -10,7 +10,10 @@ import { StatusLabel } from "@/components/practice-vocabulary/StatusTooltip";
  * The outcome in the words a result's head line uses — "Not met · 3 problems" where its problems are
  * known — with the registry's icon and colour, so the count travels with the outcome it qualifies.
  */
-export function resultOutcomeDef(outcome: Outcome, problems: number | undefined): StatusDef {
+export function resultOutcomeDef(
+	outcome: ReviewResult["outcome"],
+	problems: number | undefined,
+): StatusDef {
 	return { ...OUTCOME_DEFS[outcome], label: resultVerdict(outcome, problems) };
 }
 

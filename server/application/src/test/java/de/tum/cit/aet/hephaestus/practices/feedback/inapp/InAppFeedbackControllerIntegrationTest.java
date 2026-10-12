@@ -138,7 +138,7 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
                 FeedbackDeliveryState.PREPARED,
                 "You keep shipping untested changes",
                 "Across your last three pull requests the tests did not move with the code.");
-        bind(feedback, persistObservation(practice, job, developer, 101L));
+        bind(feedback, persistResult(practice, job, developer, 101L));
         practice.setAutonomy(PracticeAutonomy.OFF);
         practice = practiceRepository.saveAndFlush(practice);
 

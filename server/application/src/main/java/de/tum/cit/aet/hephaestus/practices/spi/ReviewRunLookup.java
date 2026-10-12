@@ -69,11 +69,11 @@ public interface ReviewRunLookup {
             @Nullable ReviewRunConclusion conclusion) {}
 
     /**
-     * Why a completed run recorded the observations it did. Status alone cannot tell a run that assessed the work
+     * Why a completed run recorded the results it did. Status alone cannot tell a run that assessed the work
      * and recorded nothing from one that assessed nothing at all.
      */
     enum ReviewRunConclusion {
-        /** The model ran against sufficient evidence; no observation means it recorded none. */
+        /** The model ran against sufficient evidence; no result means it recorded none. */
         REVIEWED,
         /** Required evidence could not be read, so no model ran and no practice was assessed. */
         INSUFFICIENT_EVIDENCE,

@@ -26,7 +26,7 @@ import {
 	DISCOVERED_VIA_LABELS,
 } from "@/components/practice-trace/trace-format";
 import { DataHandlingMark } from "@/components/practice-vocabulary/DataHandlingMark";
-import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
+import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
 import { REVIEW_CANCELLATION_DEFS } from "@/components/practice-vocabulary/review-cancellation-defs";
 import {
 	RESULT_PROCESSING_DEFS,
@@ -117,7 +117,7 @@ function reviewNow(job: AgentJob, partial: boolean): string | undefined {
 		return "A newer review of the same work replaced it while it waited. That review carries its practices and may still be waiting or running.";
 	}
 	return partial
-		? "It ended early, so its observations and feedback may be only part of what it would have found."
+		? "It ended early, so its results and feedback may be only part of what it would have found."
 		: undefined;
 }
 
@@ -134,7 +134,7 @@ function between(from: Date | undefined, to: Date | undefined): string | undefin
  * history from the ask to the first posted comment, every practice with its state and the review's
  * own delivery checks, and the technical facts. Its actions are the footer.
  *
- * It lists no other record and links to none: its observations, its feedback, when its feedback was
+ * It lists no other record and links to none: its results, its feedback, when its feedback was
  * first read and the other moments on the work are its trace or the work's sheet. The work links
  * out to its provider.
  */
@@ -196,7 +196,7 @@ export function ReviewLevel({
 	const partial =
 		endedEarly(job) &&
 		summary !== undefined &&
-		Object.values(summary.observations).some((count) => count > 0);
+		Object.values(summary.practiceResults).some((count) => count > 0);
 	return (
 		<>
 			{header}
@@ -230,7 +230,13 @@ export function ReviewLevel({
 						)}
 				</SheetSection>
 				<SheetSection part="details" title="Every practice">
-					<ReviewPractices job={job} trace={trace} summary={summary} groups={groups} />
+					<ReviewPractices
+						workspaceSlug={workspaceSlug}
+						job={job}
+						trace={trace}
+						summary={summary}
+						groups={groups}
+					/>
 				</SheetSection>
 				{deliveryChecks !== undefined && <ReviewDeliveryChecks state={deliveryChecks} />}
 				{practiceScript !== undefined && (
@@ -346,8 +352,8 @@ function ReviewWhat({
 			<ReviewFact label="Started by">{startedBy}</ReviewFact>
 			{summary?.origin !== undefined && (
 				<ReviewFact label="Origin">
-					<span title={OBSERVATION_ORIGIN_DEFS[summary.origin].description}>
-						{OBSERVATION_ORIGIN_DEFS[summary.origin].label}
+					<span title={RESULT_ORIGIN_DEFS[summary.origin].description}>
+						{RESULT_ORIGIN_DEFS[summary.origin].label}
 					</span>
 				</ReviewFact>
 			)}

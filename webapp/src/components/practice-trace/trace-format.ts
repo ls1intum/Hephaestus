@@ -2,9 +2,9 @@ import type { PracticeTraceEntry, ReviewRequestOutcome, TracedSignal } from "@/a
 import type { ReviewSectionId } from "@/components/admin/practices/review/review-sections";
 import { statusValues } from "@/components/common/status-def";
 import {
-	OBSERVATION_ORIGIN_DEFS,
+	RESULT_ORIGIN_DEFS,
 	REVIEW_OCCASION_LABELS,
-} from "@/components/practice-vocabulary/observation-origin-defs";
+} from "@/components/practice-vocabulary/result-origin-defs";
 import { TRACE_OUTCOME_DEFS } from "@/components/practice-vocabulary/trace-outcome-defs";
 
 export type { TraceOutcome } from "@/components/practice-vocabulary/trace-outcome-defs";
@@ -96,8 +96,8 @@ export const DISCOVERED_VIA_LABELS: Record<DiscoveredVia, string> = {
 export const DISCOVERED_VIA_DESCRIPTIONS: Record<DiscoveredVia, string> = {
 	EVENT: "Reported by the provider as it happened, so the time is exact.",
 	SYNC: "Spotted by a scheduled sync, so the time is only as precise as the sync.",
-	MANUAL: OBSERVATION_ORIGIN_DEFS.MANUAL.description,
-	BACKFILL: OBSERVATION_ORIGIN_DEFS.BACKFILL.description,
+	MANUAL: RESULT_ORIGIN_DEFS.MANUAL.description,
+	BACKFILL: RESULT_ORIGIN_DEFS.BACKFILL.description,
 	SWEEP:
 		"Found by the recurring check over recent work, not announced by the provider, so the time is only as precise as the check.",
 };

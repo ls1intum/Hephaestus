@@ -27,7 +27,7 @@ const TRACE_BUTTON = buttonVariants({ variant: "outline", size: "sm", className:
 const UNNAMED: Record<ReviewSelectionKind, string> = {
 	work: "a piece of work",
 	review: "a review",
-	observation: "an observation",
+	result: "a result",
 	feedback: "a piece of feedback",
 	practice: "a practice",
 };

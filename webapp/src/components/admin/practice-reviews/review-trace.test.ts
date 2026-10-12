@@ -14,8 +14,8 @@ describe("the record a review's page opens on", () => {
 	it("reads back what it writes", () => {
 		for (const focus of [
 			{ kind: "work" as const },
-			{ kind: "observations" as const },
-			{ kind: "observation" as const, id: LINEAGE_OBS.cache404 },
+			{ kind: "results" as const },
+			{ kind: "result" as const, id: LINEAGE_OBS.cache404 },
 			{ kind: "feedback" as const, id: LINEAGE_FB.card },
 		]) {
 			expect(parseTraceFocus(traceStepKey(focus))).toStrictEqual(focus);
@@ -24,15 +24,15 @@ describe("the record a review's page opens on", () => {
 
 	it("drops a value it cannot pin", () => {
 		expect(parseTraceFocus("review:1")).toBeUndefined();
-		expect(parseTraceFocus("observation:")).toBeUndefined();
+		expect(parseTraceFocus("result:")).toBeUndefined();
 		expect(parseTraceFocus(undefined)).toBeUndefined();
 	});
 });
 
 describe("the path a pinned node draws strong", () => {
-	it("runs from an observation to the feedback written from it", () => {
-		expect(tracedBy(wholeReview, { kind: "observation", id: LINEAGE_OBS.cache404 })).toStrictEqual({
-			observations: new Set([LINEAGE_OBS.cache404]),
+	it("runs from a result to the feedback written from it", () => {
+		expect(tracedBy(wholeReview, { kind: "result", id: LINEAGE_OBS.cache404 })).toStrictEqual({
+			results: new Set([LINEAGE_OBS.cache404]),
 			feedback: new Set([LINEAGE_FB.onGitHub, LINEAGE_FB.card, LINEAGE_FB.afterMerge]),
 		});
 	});
@@ -137,14 +137,14 @@ describe("what became of a piece of feedback", () => {
 			"Withheld: work closed",
 			"Withheld: over the volume limit",
 			"Withheld: developer opted out",
-			"Withheld: observation marked incorrect",
+			"Withheld: result marked incorrect",
 			"Withheld: near duplicate",
 		]);
 	});
 });
 
 describe("what the chain lost", () => {
-	it("counts a not-met observation with no feedback of its own review, and nothing met", () => {
+	it("counts a not-met result with no feedback of its own review, and nothing met", () => {
 		expect(silentNotMet(lineageStateCase("not-met-silent").lineage)).toHaveLength(1);
 		expect(silentNotMet(lineageStateCase("later-review-wrote").lineage)).toHaveLength(1);
 	});
@@ -157,20 +157,19 @@ describe("what the chain lost", () => {
 	});
 
 	it("keeps omitted chain records separate from the selected review's listed records", () => {
-		const lineage = { ...wholeReview, moreObservations: 9, moreFeedback: 7 };
+		const lineage = { ...wholeReview, moreResults: 9, moreFeedback: 7 };
 		const counts = stageCounts(lineage);
 		expect(counts.feedback).toBe(
 			wholeReview.feedback.filter((entry) => entry.agentJobId === wholeReview.review?.id).length,
 		);
-		expect(counts.observations).toBe(
-			wholeReview.observations.filter((entry) => entry.agentJobId === wholeReview.review?.id)
-				.length,
+		expect(counts.results).toBe(
+			wholeReview.results.filter((entry) => entry.agentJobId === wholeReview.review?.id).length,
 		);
 	});
 
 	it("counts an answer apart from work that resolved it", () => {
 		expect(stageCounts(lineageStateCase("responses").lineage)).toStrictEqual({
-			observations: 3,
+			results: 3,
 			feedback: 8,
 			reached: 7,
 			answered: 5,

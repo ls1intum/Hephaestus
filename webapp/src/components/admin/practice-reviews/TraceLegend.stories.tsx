@@ -59,7 +59,7 @@ export const Closed: Story = {
 };
 
 /**
- * Open: at its top, with the stages, the steps' dots, where a path ends, the observations and
+ * Open: at its top, with the stages, the steps' dots, where a path ends, the results and
  * feedback, the connections, the rail and the icons, each sample drawn by the part the trace draws
  * it with, then the terms and three things the trace cannot show.
  */
@@ -75,7 +75,7 @@ export const Open: Story = {
 			"Stages",
 			"Steps",
 			"Where a path ends",
-			"Observations and feedback",
+			"Results and feedback",
 			"Connections",
 			"Rail",
 			"Icons",

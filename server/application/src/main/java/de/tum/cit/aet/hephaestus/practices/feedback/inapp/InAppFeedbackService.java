@@ -195,7 +195,7 @@ public class InAppFeedbackService {
     }
 
     /** Whether the workspace still reviews the practice the evidence is about. */
-    private static boolean reviewed(List<Observation> evidence, PracticeAutonomy workspaceDefault) {
+    private static boolean reviewed(List<PracticeResult> evidence, PracticeAutonomy workspaceDefault) {
         return evidence.isEmpty()
                 || AutonomyResolver.effectiveAutonomyOf(evidence.getFirst().getPractice(), workspaceDefault)
                         .admitsReview();

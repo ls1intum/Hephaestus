@@ -12,7 +12,7 @@ import {
 	LINEAGE_REVIEW_ID,
 	lineageFeedbackFocus,
 	lineageMergedBeforeFinished,
-	lineageObservationFocus,
+	lineageResultFocus,
 	lineageStartedByMerge,
 	wholeReview,
 	wholeReviewManyFeedback,
@@ -28,7 +28,7 @@ const ready = (value: ReviewLineage) => ({ status: "ready" as const, lineage: va
 
 /**
  * The trace of a record, top to bottom in the order things happened: the work and the moment that
- * started the review, the review, its observations as numbered verdict dots, each piece of feedback
+ * started the review, the review, its results as numbered verdict dots, each piece of feedback
  * with where it went and how the developer answered, the merge where it fell, and where the path
  * ends. The record the trace was opened for is "You started here", with a ring and, with system
  * info, its facts; its siblings fold into one line. A press on a step opens its record's sheet over
@@ -45,8 +45,8 @@ const meta = {
 		),
 	],
 	args: {
-		lineage: ready(lineageObservationFocus),
-		here: { kind: "observation", id: LINEAGE_OBS.cache404 },
+		lineage: ready(lineageResultFocus),
+		here: { kind: "result", id: LINEAGE_OBS.cache404 },
 		onOpen: fn(),
 	},
 } satisfies Meta<typeof ReviewLineageGraph>;
@@ -76,32 +76,32 @@ function endOf(root: HTMLElement): HTMLElement | null {
 }
 
 /**
- * An observation's story as it opens: a sentence on top says what became of it; the rail reads
- * Trigger, Review, Feedback, Effect, and tells only the observation's path, from the review through
- * the observation ("You started here") to the feedback written from it and how it ended. The review's
+ * A result's story as it opens: a sentence on top says what became of it; the rail reads
+ * Trigger, Review, Feedback, Effect, and tells only the result's path, from the review through
+ * the result ("You started here") to the feedback written from it and how it ended. The review's
  * other records are one line.
  */
-export const ObservationStory: Story = {
+export const ResultStory: Story = {
 	play: async ({ canvas, canvasElement }) => {
 		await expect(verdictOf(canvasElement)).toHaveTextContent(
-			"This observation led to 1 piece of feedback; it was delivered and answered.",
+			"This result led to 1 piece of feedback; it was delivered and answered.",
 		);
 		await expect(hereOf(canvasElement)).toHaveAttribute(
 			"data-lineage-node",
-			`observation:${LINEAGE_OBS.cache404}`,
+			`result:${LINEAGE_OBS.cache404}`,
 		);
 		const stages = [...stepsOf(canvasElement).querySelectorAll("[data-stage-label]")];
 		await expect(stages.map((stage) => stage.textContent)).toStrictEqual([
 			"Trigger",
 			"Review",
-			"Observations",
+			"Results",
 			"Feedback",
 			"Effect",
 		]);
 		await expect(canvas.getByText("Why it ran: Work opened")).toBeVisible();
 		await expect(stepsOf(canvasElement).querySelectorAll('[data-step="feedback"]')).toHaveLength(1);
 		await expect(
-			canvas.getByRole("button", { name: "4 other observations, 2 other pieces of feedback" }),
+			canvas.getByRole("button", { name: "4 other results, 2 other pieces of feedback" }),
 		).toBeVisible();
 		await expect(endOf(canvasElement)).toHaveTextContent(
 			"the developer answered it; how stays private to them.",
@@ -113,12 +113,12 @@ export const ObservationStory: Story = {
 
 /**
  * The line of other records lists them on the rail at their own times, and the verdict and the end
- * still speak of the observation. The Siblings toggle stays the reader's choice for every trace.
+ * still speak of the result. The Siblings toggle stays the reader's choice for every trace.
  */
-export const ObservationStorySiblingsShown: Story = {
+export const ResultStorySiblingsShown: Story = {
 	play: async ({ canvas, canvasElement, userEvent }) => {
 		await userEvent.click(
-			canvas.getByRole("button", { name: "4 other observations, 2 other pieces of feedback" }),
+			canvas.getByRole("button", { name: "4 other results, 2 other pieces of feedback" }),
 		);
 		await expect(showToggle(canvasElement, "Siblings")).toHaveAttribute("aria-pressed", "false");
 		await expect(stepsOf(canvasElement).querySelectorAll('[data-step="feedback"]')).toHaveLength(3);
@@ -171,7 +171,7 @@ export const ConnectionsKeepTheSteps: Story = {
 
 /**
  * The facts the lists filter by are on the steps too. Each piece of feedback has a tag for where it
- * went: on the work, on the developer's practice pages, or in conversation. An observation whose
+ * went: on the work, on the developer's practice pages, or in conversation. A result whose
  * feedback the developer disputes says so. The review says when its results failed to process and
  * when it was not a live run; a processed, live review says nothing more.
  */
@@ -189,9 +189,9 @@ export const StepsCarryTheListFacts: Story = {
 			steps.querySelector(`[data-feedback-row="${id}"] [data-feedback-channel]`);
 		await expect(tagOf(LINEAGE_FB.onGitHub)).toHaveTextContent("On the work");
 		await expect(tagOf(LINEAGE_FB.card)).toHaveTextContent("On their practice pages");
-		// The developer disputes the comment written from the 404 observation, and only that is said.
+		// The developer disputes the comment written from the 404 result, and only that is said.
 		await expect(
-			steps.querySelector(`[data-lineage-node="observation:${LINEAGE_OBS.cache404}"]`),
+			steps.querySelector(`[data-lineage-node="result:${LINEAGE_OBS.cache404}"]`),
 		).toHaveTextContent("Disputed");
 		const review = steps.querySelector<HTMLElement>('[data-step="review"]');
 		await expect(review).toHaveTextContent("Result processing failed");
@@ -214,13 +214,13 @@ export const OrdinaryReviewSaysNothingMore: Story = {
 	},
 };
 
-/** A card's story: it rests on three observations, each repeated as its dot under the card. */
+/** A card's story: it rests on three results, each repeated as its dot under the card. */
 export const FeedbackStory: Story = {
 	args: { lineage: ready(lineageFeedbackFocus), here: { kind: "feedback", id: LINEAGE_FB.card } },
 	play: async ({ canvasElement }) => {
 		const here = hereOf(canvasElement);
 		await expect(here).toHaveAttribute("data-lineage-node", `feedback:${LINEAGE_FB.card}`);
-		await expect(here?.querySelectorAll("[data-observation-chip]")).toHaveLength(3);
+		await expect(here?.querySelectorAll("[data-result-chip]")).toHaveLength(3);
 		await expect(here).toHaveAttribute("data-here", "true");
 	},
 };
@@ -286,8 +286,8 @@ export const WorkStory: Story = {
 };
 
 /**
- * Every part shown: every observation as a row of the review's table, each piece of feedback with every fact and its
- * time, and connectors from each observation to the feedback written from it. "Expand all" unfolds
+ * Every part shown: every result as a row of the review's table, each piece of feedback with every fact and its
+ * time, and connectors from each result to the feedback written from it. "Expand all" unfolds
  * what came before the review: the earlier review's comment this review replaced.
  */
 export const AllShown: Story = {
@@ -301,7 +301,7 @@ export const AllShown: Story = {
 		await waitFor(async () => {
 			await expect(canvasElement.querySelectorAll("path[data-connector-line]")).toHaveLength(8);
 		});
-		await expect(canvas.getByRole("list", { name: "Observations of this review" })).toBeVisible();
+		await expect(canvas.getByRole("list", { name: "Results of this review" })).toBeVisible();
 		// Said once, in the facts "Expand all" opens under the piece, not again on its line.
 		await expect(canvas.getAllByText("Composed by")[0]).toBeVisible();
 		await expect(canvas.queryByText("Composed by an earlier review")).toBeNull();
@@ -334,23 +334,21 @@ export const DeliveredHelpful: Story = {
 };
 
 /**
- * The review's observations as a table of their own, opened and folded on its own button: the
+ * The review's results as a table of their own, opened and folded on its own button: the
  * Siblings toggle is no part of it. Each row names its practice, outcome, severity and the
  * feedback written from it by letter.
  */
-export const ObservationTable: Story = {
+export const ResultTable: Story = {
 	args: { lineage: ready(wholeReview), here: { kind: "review" } },
 	play: async ({ canvas, canvasElement, userEvent }) => {
-		const table = () => canvasElement.querySelector('[data-trace-table="observations"]');
+		const table = () => canvasElement.querySelector('[data-trace-table="results"]');
 		await expect(table()).toBeNull();
-		await userEvent.click(
-			canvas.getByRole("button", { name: "Show all 8 observations in the table" }),
-		);
+		await userEvent.click(canvas.getByRole("button", { name: "Show all 8 results in the table" }));
 		await expect(showToggle(canvasElement, "Siblings")).toHaveAttribute("aria-pressed", "false");
-		const rows = within(canvas.getByRole("list", { name: "Observations of this review" }));
+		const rows = within(canvas.getByRole("list", { name: "Results of this review" }));
 		await expect(rows.getAllByRole("listitem")).toHaveLength(8);
 		await expect(
-			table()?.querySelector(`[data-lineage-node="observation:${LINEAGE_OBS.cache404}"]`),
+			table()?.querySelector(`[data-lineage-node="result:${LINEAGE_OBS.cache404}"]`),
 		).toHaveTextContent(/Not met.*Major.*B, D, F/u);
 		await userEvent.click(canvas.getByRole("button", { name: "Fold the table" }));
 		await expect(table()).toBeNull();
@@ -360,7 +358,7 @@ export const ObservationTable: Story = {
 /**
  * The feedback as tables in the rail: pieces written one after another share one table, and a
  * moment on the work between them, such as the merge, starts a new one. Each row has its letter,
- * channel, state, the observations it was written from by number, and its time.
+ * channel, state, the results it was written from by number, and its time.
  */
 export const FeedbackTable: Story = {
 	args: { lineage: ready(wholeReview), here: { kind: "review" } },
@@ -375,7 +373,7 @@ export const FeedbackTable: Story = {
 		).toBe(true);
 		const card = canvasElement.querySelector(`[data-feedback-row="${LINEAGE_FB.card}"]`);
 		await expect(card).toHaveTextContent("On their practice pages");
-		await expect(card?.querySelectorAll("[data-observation-chip]")).toHaveLength(3);
+		await expect(card?.querySelectorAll("[data-result-chip]")).toHaveLength(3);
 	},
 };
 
@@ -423,14 +421,14 @@ function startedAt(root: HTMLElement): HTMLElement | null {
 export const StartedHere: Story = {
 	args: { defaultDisplay: { ...DEFAULT_TRACE_DISPLAY, system: true } },
 	play: async ({ canvasElement, userEvent }) => {
-		const start = `observation:${LINEAGE_OBS.cache404}`;
+		const start = `result:${LINEAGE_OBS.cache404}`;
 		await expect(startedAt(canvasElement)).toHaveAttribute("data-step-key", start);
 		await expect(hereOf(canvasElement)).toHaveAttribute("data-step-key", start);
 		await expect(
 			within(hereOf(canvasElement) ?? canvasElement).getByText("You started here"),
 		).toBeVisible();
 		await expect(startedAt(canvasElement)?.querySelector("[data-step-facts]")).toHaveTextContent(
-			/Observed/u,
+			/Recorded/u,
 		);
 		await userEvent.keyboard("{ArrowDown}");
 		await expect(startedAt(canvasElement)).toHaveAttribute("data-step-key", start);
@@ -454,7 +452,7 @@ export const OpenAStep: Story = {
 		await expect(args.onOpen).toHaveBeenCalledWith(expect.objectContaining({ kind: "feedback" }));
 		await expect(startedAt(canvasElement)).toHaveAttribute(
 			"data-step-key",
-			`observation:${LINEAGE_OBS.cache404}`,
+			`result:${LINEAGE_OBS.cache404}`,
 		);
 		// The work and its moments open the work's sheet; the review its own.
 		const review = stepsOf(canvasElement).querySelector<HTMLElement>('[data-step="review"]');
@@ -462,18 +460,18 @@ export const OpenAStep: Story = {
 		await expect(args.onOpen).toHaveBeenLastCalledWith({ kind: "review", id: LINEAGE_REVIEW_ID });
 		await expect(startedAt(canvasElement)).toHaveAttribute(
 			"data-step-key",
-			`observation:${LINEAGE_OBS.cache404}`,
+			`result:${LINEAGE_OBS.cache404}`,
 		);
 	},
 };
 
-/** Only feedback: the observations leave the rail, every piece of feedback stays. */
+/** Only feedback: the results leave the rail, every piece of feedback stays. */
 export const OnlyFeedback: Story = {
 	args: { lineage: ready(wholeReview), here: { kind: "review" }, filter: { kind: "feedback" } },
 	play: async ({ canvasElement }) => {
 		await expect(showToggle(canvasElement, "Siblings")).toBeDisabled();
 		await expect(
-			stepsOf(canvasElement).querySelectorAll('[data-lineage-node^="observation:"]'),
+			stepsOf(canvasElement).querySelectorAll('[data-lineage-node^="result:"]'),
 		).toHaveLength(0);
 		await expect(
 			stepsOf(canvasElement).querySelectorAll('[data-step="feedback"]').length,
@@ -494,7 +492,7 @@ export const OnlyLosses: Story = {
 	},
 };
 
-/** One practice: its observations and the feedback written from them. */
+/** One practice: its results and the feedback written from them. */
 export const OnlyOnePractice: Story = {
 	args: {
 		lineage: ready(wholeReview),
@@ -502,10 +500,8 @@ export const OnlyOnePractice: Story = {
 		filter: { kind: "practice", practiceSlug: "errors-carry-context" },
 	},
 	play: async ({ canvasElement }) => {
-		const observations = [
-			...stepsOf(canvasElement).querySelectorAll('[data-lineage-node^="observation:"]'),
-		];
-		await expect(observations.length).toBeGreaterThan(0);
+		const results = [...stepsOf(canvasElement).querySelectorAll('[data-lineage-node^="result:"]')];
+		await expect(results.length).toBeGreaterThan(0);
 	},
 };
 
@@ -516,14 +512,14 @@ export const OnlyOnePractice: Story = {
 /** The many-feedback review, with cards of every height: one summary wraps over several lines. */
 const mixedHeights: ReviewLineage = {
 	...wholeReviewManyFeedback,
-	observations: wholeReviewManyFeedback.observations.map((observation, index) =>
+	results: wholeReviewManyFeedback.results.map((result, index) =>
 		index === 1
 			? {
-					...observation,
+					...result,
 					summary:
 						"Three of the new tests are named after the method they call, not the behaviour they check. A failing run says which method broke, not what a reader expected. The names drift as the methods are renamed.",
 				}
-			: observation,
+			: result,
 	),
 };
 
@@ -553,7 +549,7 @@ function cardOf(root: HTMLElement, selector: string): DOMRect {
 }
 
 /**
- * Every line starts at the vertical centre of its observation's card and ends at the vertical
+ * Every line starts at the vertical centre of its result's card and ends at the vertical
  * centre of its piece's card, within a pixel, each on the card's right edge; the lanes sit a whole
  * number of lanes apart.
  */
@@ -566,13 +562,10 @@ async function expectConnectorsCentred(root: HTMLElement) {
 	}
 	const lanes = new Set<number>();
 	for (const path of paths) {
-		const observation = CSS.escape(path.dataset.fromObservation ?? "");
+		const result = CSS.escape(path.dataset.fromResult ?? "");
 		const feedback = CSS.escape(path.dataset.toFeedback ?? "");
-		const source = cardOf(root, `[data-connector="source"][data-observation-id="${observation}"]`);
-		const target = cardOf(
-			root,
-			`[data-connector="use:${feedback}"][data-observation-id="${observation}"]`,
-		);
+		const source = cardOf(root, `[data-connector="source"][data-result-id="${result}"]`);
+		const target = cardOf(root, `[data-connector="use:${feedback}"][data-result-id="${result}"]`);
 		const { start, end } = endsOf(path);
 		await expect(Math.abs(start.y - (source.top - drawing.top + source.height / 2))).toBeLessThan(
 			1,
@@ -598,7 +591,7 @@ async function expectCentredSoon(root: HTMLElement) {
 
 /**
  * Connections over cards of every height: a summary that wraps over several lines, tags, the facts
- * under every step, siblings listed. Each line leaves its observation's card at its vertical centre
+ * under every step, siblings listed. Each line leaves its result's card at its vertical centre
  * and meets each piece's card at its vertical centre, and still does after each "Show" toggle,
  * "Expand all", and a narrower sheet that wraps the words again.
  */
@@ -630,7 +623,7 @@ export const ConnectionsMeetEveryCardInTheMiddle: Story = {
 };
 
 /**
- * Twelve pieces from eight observations on a narrow sheet: one lane each, evenly spaced, the
+ * Twelve pieces from eight results on a narrow sheet: one lane each, evenly spaced, the
  * shortest run nearest the cards, and every end at a card's centre.
  */
 export const ConnectionsManyLines: Story = {
@@ -772,7 +765,7 @@ export const BottleneckNarrow: Story = {
 
 /**
  * "Expand all" opens a box only where a step has more to say than its line, and no two boxes say
- * the same: a moment, the count of observations and the end open none.
+ * the same: a moment, the count of results and the end open none.
  */
 export const ExpandAllSaysEachThingOnce: Story = {
 	args: { lineage: ready(wholeReview), here: { kind: "review" } },
@@ -785,7 +778,7 @@ export const ExpandAllSaysEachThingOnce: Story = {
 		for (const step of [
 			'[data-step="moment"]',
 			'[data-step="end"]',
-			'[data-step="observations"] > [data-step-content] > [data-step-key="observations"]',
+			'[data-step="results"] > [data-step-content] > [data-step-key="results"]',
 		]) {
 			const node = canvasElement.querySelector(step);
 			await expect(node?.querySelector(":scope > [data-step-facts]") ?? null).toBeNull();

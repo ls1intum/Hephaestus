@@ -62,8 +62,8 @@ export const Default: Story = {
 			"Practice",
 			"Number of results",
 			"Not met",
-			"Not applicable",
-			"Undetermined",
+			"Does not apply",
+			"Could not determine",
 			"Marked incorrect",
 			"Feedback delivered",
 			"Open",
@@ -112,7 +112,7 @@ export const Default: Story = {
 			within(busiest).queryByRole("button", { name: /^Track/u }),
 		).not.toBeInTheDocument();
 		await expect(within(busiest).queryByRole("link", { name: /^Trace/u })).not.toBeInTheDocument();
-		// 18 + 9 + 4 + 2 observations, each outcome out of them; 7 of the 12 pieces of feedback
+		// 18 + 9 + 4 + 2 results, each outcome out of them; 7 of the 12 pieces of feedback
 		// composed about it were delivered. No percentage, and no (i) speaks of one.
 		await expect(cellsOf(busiest).slice(0, 6)).toEqual([
 			"33",
@@ -122,9 +122,7 @@ export const Default: Story = {
 			"1 of 33",
 			"7 of 12",
 		]);
-		await userEvent.click(
-			canvas.getByRole("button", { name: "How Number of results is counted" }),
-		);
+		await userEvent.click(canvas.getByRole("button", { name: "How Number of results is counted" }));
 		await expect(
 			await screen.findByRole("dialog", { name: "How Number of results is counted" }),
 		).not.toHaveTextContent("percentage");
@@ -157,7 +155,7 @@ export const Default: Story = {
 			"Tests name the behaviour",
 			"Product language",
 		]);
-		// Below 20 observations no practice is marked, whatever its shares.
+		// Below 20 results no practice is marked, whatever its shares.
 		await expect(canvas.queryByText("Often undecided")).not.toBeInTheDocument();
 		// A practice that recorded nothing is not a row, and no line under the table counts it.
 		await expect(canvas.queryByText(/recorded nothing/u)).not.toBeInTheDocument();
@@ -176,22 +174,22 @@ const MARKED_PRACTICES = {
 			feedback: feedbackCounts([]),
 			practiceSlug: "wiki-docs",
 			practiceName: "Wiki pages are kept up to date",
-			observations: { met: 0, notMet: 0, notApplicable: 29, undetermined: 1 },
-			observationsInvalidated: 0,
+			practiceResults: { met: 0, notMet: 0, notApplicable: 29, undetermined: 1 },
+			practiceResultsInvalidated: 0,
 		},
 		{
 			feedback: feedbackCounts([]),
 			practiceSlug: "resolve-open-threads",
 			practiceName: "Open threads are resolved",
-			observations: { met: 8, notMet: 4, notApplicable: 1, undetermined: 9 },
-			observationsInvalidated: 0,
+			practiceResults: { met: 8, notMet: 4, notApplicable: 1, undetermined: 9 },
+			practiceResultsInvalidated: 0,
 		},
 	],
 };
 
 /**
  * "Mostly not applicable" from 90 % not applicable, "Often undecided" from 30 % undetermined, each from
- * 20 observations: the marked practices lead, the stronger marker first, and "Busiest first" puts
+ * 20 results: the marked practices lead, the stronger marker first, and "Busiest first" puts
  * the table back in the server's order.
  */
 export const NeedsALookFirst: Story = {
@@ -224,14 +222,14 @@ export const NeedsALookFirst: Story = {
 			within(wiki).getByText("Mostly not applicable").closest("[data-marker]"),
 		).toHaveAttribute(
 			"title",
-			"Not applicable in 29 of 30 observations. Consider turning it off for this workspace.",
+			"Does not apply in 29 of 30 results. Consider turning it off for this workspace.",
 		);
 		const threads = canvas.getByRole("row", { name: /Open threads/u });
 		await expect(
 			within(threads).getByText("Often undecided").closest("[data-marker]"),
 		).toHaveAttribute(
 			"title",
-			"Undetermined in 9 of 22 observations. The review may lack the evidence to decide.",
+			"Could not determine in 9 of 22 results. The review may lack the evidence to decide.",
 		);
 
 		const sort = canvas.getByRole("combobox", { name: "Sort" });
@@ -306,7 +304,7 @@ export const LongNamesAndMarkers: Story = {
 /**
  * "Thin controllers" is turned off today. Its counts are history, so the table hides it and says how
  * many it hides; "Show turned-off practices" brings it back. The state is read now, not from when its
- * observations were made.
+ * results were made.
  */
 export const TurnedOffPracticeHidden: Story = {
 	args: {
@@ -363,9 +361,7 @@ export const FilteredByGroup: Story = {
 		]);
 		// The totals stay those of every practice, and the line under the table says what is hidden.
 		await expect(
-			canvas.getByText(
-				"The totals include 3 practices that the filters hide, with 24 observations.",
-			),
+			canvas.getByText("The totals include 3 practices that the filters hide, with 24 results."),
 		).toBeVisible();
 	},
 };

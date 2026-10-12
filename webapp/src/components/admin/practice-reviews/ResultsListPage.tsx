@@ -29,7 +29,7 @@ export interface ResultsListPageProps {
 	/** The one record the scope is filtered to, by name, for its pill. */
 	record?: ScopeRecordFilter;
 	/**
-	 * Counts above the list for the one practice it is filtered to (`PracticeObservationsSummary`),
+	 * Counts above the list for the one practice it is filtered to (`PracticeResultsSummary`),
 	 * drawn by the route.
 	 */
 	summary?: ReactNode;
@@ -84,17 +84,12 @@ export function ResultsListPage({
 			/>
 			{summary}
 			{results.status === "error" && (
-				<ResultRows
-					state={{ status: "error", error: results.error, onRetry: results.onRetry }}
-				/>
+				<ResultRows state={{ status: "error", error: results.error, onRetry: results.onRetry }} />
 			)}
 			{results.status === "loading" && <ResultRows state={{ status: "loading" }} />}
 			{results.status === "ready" && (
 				<>
-					<ResultRows
-						state={resultsState(rows, hasFilter ? reset : undefined)}
-						byDay={byDay}
-					/>
+					<ResultRows state={resultsState(rows, hasFilter ? reset : undefined)} byDay={byDay} />
 					{rows.length > 0 && <ReviewListEnd {...results} noun="results" />}
 				</>
 			)}

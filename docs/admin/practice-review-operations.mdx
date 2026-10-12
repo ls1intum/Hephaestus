@@ -160,11 +160,12 @@ Metric names in the instrumented code are authoritative for dashboards and alert
 
 Each practice of a review runs one program: its practice script, or the built-in program when it has none.
 For each review, Hephaestus records how each program ran.
-Workspace admins see it in two places:
+Workspace admins see it on the review's sheet.
+Open the review under **Practice reviews → Reviews**.
 
-- **The trace line.** Open the work under **Practice reviews → Work**, then **Every practice**.
-  The column **What it saw** has one line for each practice of the review.
-- **The section Practice scripts of the review.** Open the review under **Practice reviews → Reviews**, or select **Details** in the trace line.
+- **The trace line.** Under **Every practice**, each practice that ran a program has one line.
+  An admin also sees the line under **What it saw** in a review on their own Practice profile.
+- **The section Practice scripts.** It follows **Every practice** on the same sheet.
 
 [Write a practice script](./practice-scripts.mdx) tells how to write and try a script.
 
@@ -174,8 +175,8 @@ The line starts with how the program ended.
 It names the program: **Practice script** or **Built-in review**.
 If some model calls of the program were not rated, the line adds their count.
 An example is `5 calls were not rated.`
-Then it has at most one link that fixes the cause, and **Details**.
-**Details** opens the review's section **Practice scripts**.
+Then it has at most one link that fixes the cause.
+On the Practice profile, the line also has **Details**, which opens the review's section **Practice scripts**.
 
 A program that returned a result has not yet passed admission.
 The server can still withhold that result, as [What admission checks](./practice-scripts.mdx#what-admission-checks) tells.
@@ -205,7 +206,7 @@ It opens [Calls that were not rated](#calls-that-were-not-rated), which tells wh
 
 #### The review's practice scripts
 
-The section **Practice scripts** is between the review's output and **How this review ran**.
+The section **Practice scripts** is on the review's sheet, after **Every practice** and the review's delivery checks.
 It has one row for each practice of the review:
 
 | Column | What it shows |
@@ -220,9 +221,10 @@ It has one row for each practice of the review:
 The section shows no cost.
 Its note says `Spend is on AI usage.`
 **AI usage** shows the cost of models for practice scripts, by practice.
-The card **How this review ran** shows the review's **Model** with an icon for its tier.
+**Technical** on the review's sheet shows the review's **Model** with an icon for its tier.
 Its **Review model calls** and token counts include the review sessions that programs open with `ctx.review()`, and the direct chat calls of the scripts.
 They do not include the decision, embedding and reranking calls.
+Its **Cost** includes them: it is what the review's attempts and its practice scripts' models cost together.
 
 #### Calls that were not rated
 

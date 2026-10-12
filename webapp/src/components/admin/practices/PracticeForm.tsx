@@ -167,7 +167,7 @@ export function PracticeForm(props: PracticeFormProps) {
 						</p>
 					</div>
 					<Link
-						to="/w/$workspaceSlug/admin/practices/reviews/observations"
+						to="/w/$workspaceSlug/admin/practices/reviews/results"
 						params={{ workspaceSlug }}
 						search={{ practiceSlug: [initialData.slug] }}
 						className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}

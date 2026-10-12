@@ -8,10 +8,10 @@ import { withPageBehind } from "@/stories/decorators";
 import { settledDrawerPanel } from "@/stories/overlay";
 
 import { FeedbackLevel } from "./FeedbackLevel";
-import { observationDetail, reviewFeedbackDetail, reviewJob } from "./fixtures";
+import { resultDetail, reviewFeedbackDetail, reviewJob } from "./fixtures";
 import { LINEAGE_OBS, LINEAGE_REVIEW_ID, wholeReview } from "./lineage-fixtures";
 import { lineageStateCase } from "./lineage-state-fixtures";
-import { ObservationLevel } from "./ObservationLevel";
+import { ResultLevel } from "./ResultLevel";
 import { levelRecord, type RecordRef, recordLevel, traceLevel } from "./review-layers";
 import type { PracticeReviewLevel } from "./review-levels";
 import { DEFAULT_TRACE_DISPLAY, FULL_TRACE_DISPLAY, type TraceDisplay } from "./trace-display";
@@ -68,10 +68,10 @@ function TraceStack(props: Omit<TraceLevelProps, "path" | "onOpen">) {
 					);
 				}
 				return (
-					<ObservationLevel
+					<ResultLevel
 						nested={level.nested}
 						path={path}
-						observation={{ status: "ready", observation: observationDetail(LINEAGE_OBS.cache404) }}
+						result={{ status: "ready", result: resultDetail(LINEAGE_OBS.cache404) }}
 						onChangeValidity={fn(async () => undefined)}
 						isChangingValidity={false}
 					/>
@@ -135,7 +135,7 @@ export const Default: Story = {
 
 /**
  * Every part on: the times, the system info with the facts under where the reader started, every
- * observation by practice, and connectors from each observation to the feedback written from it.
+ * result by practice, and connectors from each result to the feedback written from it.
  */
 export const AllOn: Story = {
 	args: { display: FULL_TRACE_DISPLAY },
@@ -206,7 +206,7 @@ export const OnlyLosses: Story = {
 };
 
 /**
- * An observation opened from the trace: its sheet over the trace, the same as from its row, with no
+ * A result opened from the trace: its sheet over the trace, the same as from its row, with no
  * story and no way on. Escape closes it back to the trace.
  */
 export const RecordOverTheTrace: Story = {

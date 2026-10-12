@@ -388,9 +388,7 @@ export function ReviewRunPracticeTable({
 									<TableCell colSpan={3} className="bg-muted/30 p-4 whitespace-normal">
 										<div className="flex min-w-0 flex-col gap-6">
 											{results.map((result) => (
-												<Fragment key={result.id}>
-													{renderResult(result.id)}
-												</Fragment>
+												<Fragment key={result.id}>{renderResult(result.id)}</Fragment>
 											))}
 										</div>
 									</TableCell>
@@ -590,16 +588,19 @@ function WhatItSaw({
  * section with the reasons behind any unrated call. The links name the practice for a screen
  * reader, which lists every row's links together.
  */
-function PracticeScriptTraceLine({
+export function PracticeScriptTraceLine({
 	workspaceSlug,
 	entry,
 	run,
 	reviewLink,
+	details: showDetails = true,
 }: {
 	workspaceSlug: string;
 	entry: PracticeTraceEntry;
 	run: PracticeScriptRun;
 	reviewLink: ((reviewId: string, label: ReactNode) => ReactNode) | undefined;
+	/** `false` where the line sits on the review's own sheet, beside its section Practice scripts. */
+	details?: boolean;
 }) {
 	const fix = practiceScriptFix(run);
 	const { reviewId, practiceName } = entry;
@@ -622,7 +623,8 @@ function PracticeScriptTraceLine({
 						fix={fix}
 					/>
 				)}
-				{hasText(reviewId) &&
+				{showDetails &&
+					hasText(reviewId) &&
 					(reviewLink?.(reviewId, details) ?? (
 						<InlineLink
 							render={

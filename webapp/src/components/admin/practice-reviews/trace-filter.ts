@@ -29,11 +29,11 @@ export function parseTraceFilter(value: string): TraceFilter {
 		: ALL_STEPS;
 }
 
-/** The practices a trace can be narrowed to: those its observations answered, by name. */
+/** The practices a trace can be narrowed to: those its results answered, by name. */
 export function tracePractices(lineage: ReviewLineage): { slug: string; name: string }[] {
 	const practices = new Map<string, string>();
-	for (const observation of lineage.observations) {
-		practices.set(observation.practiceSlug, observation.practiceName);
+	for (const result of lineage.results) {
+		practices.set(result.practiceSlug, result.practiceName);
 	}
 	return [...practices.entries()]
 		.map(([slug, name]) => ({ slug, name }))
@@ -50,11 +50,11 @@ export function hiddenByFilter(filter: TraceFilter): string {
  * every one, so the rail still reads from its start; what is left out is said by its counts being
  * gone, never as more records not listed.
  *
- * - Only feedback: every piece of feedback, and no observation.
+ * - Only feedback: every piece of feedback, and no result.
  * - Only losses: feedback whose path ends lost, as its end step says (withheld, rejected, replaced,
- *   failed, withdrawn), and the not-met observations that led to no feedback, with the observations
+ *   failed, withdrawn), and the not-met results that led to no feedback, with the results
  *   the lost feedback was written from. Feedback still on its way is not lost yet.
- * - One practice: its observations, and the feedback written from any of them.
+ * - One practice: its results, and the feedback written from any of them.
  */
 export function filteredLineage(lineage: ReviewLineage, filter: TraceFilter): ReviewLineage {
 	if (filter.kind === "all") {
@@ -65,36 +65,34 @@ export function filteredLineage(lineage: ReviewLineage, filter: TraceFilter): Re
 	);
 	const narrowed = {
 		...lineage,
-		moreObservations: 0,
+		moreResults: 0,
 		moreFeedback: 0,
 		workMoments: startingMoments,
 	};
 	switch (filter.kind) {
 		case "feedback": {
-			return { ...narrowed, observations: [] };
+			return { ...narrowed, results: [] };
 		}
 		case "losses": {
 			const lost = lineage.feedback.filter(feedbackLost);
-			const behind = new Set(lost.flatMap((feedback) => feedback.observationIds));
-			const silent = new Set(silentNotMet(lineage).map((observation) => observation.id));
+			const behind = new Set(lost.flatMap((feedback) => feedback.practiceResultIds));
+			const silent = new Set(silentNotMet(lineage).map((result) => result.id));
 			return {
 				...narrowed,
 				feedback: lost,
-				observations: lineage.observations.filter(
-					(observation) => behind.has(observation.id) || silent.has(observation.id),
-				),
+				results: lineage.results.filter((result) => behind.has(result.id) || silent.has(result.id)),
 			};
 		}
 		case "practice": {
-			const observations = lineage.observations.filter(
-				(observation) => observation.practiceSlug === filter.practiceSlug,
+			const results = lineage.results.filter(
+				(result) => result.practiceSlug === filter.practiceSlug,
 			);
-			const ids = new Set(observations.map((observation) => observation.id));
+			const ids = new Set(results.map((result) => result.id));
 			return {
 				...narrowed,
-				observations,
+				results,
 				feedback: lineage.feedback.filter((feedback) =>
-					feedback.observationIds.some((id) => ids.has(id)),
+					feedback.practiceResultIds.some((id) => ids.has(id)),
 				),
 			};
 		}

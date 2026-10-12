@@ -7,7 +7,7 @@ import type { ReviewScope, ReviewScopeSearch } from "./review-scope";
 
 /**
  * The one record the reader tracks with a row's crosshair, which every tab then narrows to: a piece
- * of work, a review, an observation or a piece of feedback with the review that recorded it, or a
+ * of work, a review, a result or a piece of feedback with the review that recorded it, or a
  * practice. It lives in the shared scope's URL names plus `selected=true`. The same names without `selected` are a plain filter,
  * as a "See all" link or an address from before the selection writes them: the lists narrow the
  * same way, and the toolbar shows a filter pill instead of the selection bar.
@@ -15,7 +15,7 @@ import type { ReviewScope, ReviewScopeSearch } from "./review-scope";
 export type ReviewSelection =
 	| { kind: "work"; artifactKind: KnownArtifactKind; artifactId: number }
 	| { kind: "review"; agentJobId: string }
-	| { kind: "observation"; observationId: string; agentJobId?: string }
+	| { kind: "result"; practiceResultId: string; agentJobId?: string }
 	| { kind: "feedback"; feedbackId: string; agentJobId?: string }
 	| { kind: "practice"; practiceSlug: string };
 
@@ -27,7 +27,7 @@ export type ReviewSelectionKind = ReviewSelection["kind"];
  */
 const selectionSearchSchema = z.object({
 	agentJobId: z.string().min(1).optional().catch(undefined),
-	observationId: z.string().min(1).optional().catch(undefined),
+	practiceResultId: z.string().min(1).optional().catch(undefined),
 	feedbackId: z.string().min(1).optional().catch(undefined),
 	selectedPractice: z.string().min(1).optional().catch(undefined),
 	artifactKind: z.enum(ARTIFACT_KIND_VALUES).optional().catch(undefined),
@@ -43,7 +43,7 @@ export function parseSelectionSearch(search: unknown): Partial<ReviewScopeSearch
 type RecordScope = Pick<
 	ReviewScope,
 	| "agentJobId"
-	| "observationId"
+	| "practiceResultId"
 	| "feedbackId"
 	| "selectedPractice"
 	| "artifactKind"
@@ -57,17 +57,17 @@ export function readSelection(scope: RecordScope): ReviewSelection | undefined {
 }
 
 /**
- * The one record the scope narrows to, picked or filtered. An observation names its review too, and
+ * The one record the scope narrows to, picked or filtered. A result names its review too, and
  * a review the work it read, so the most specific part is the record.
  */
 export function readScopedRecord(scope: RecordScope): ReviewSelection | undefined {
 	if (hasText(scope.feedbackId)) {
 		return { kind: "feedback", feedbackId: scope.feedbackId, agentJobId: scope.agentJobId };
 	}
-	if (hasText(scope.observationId)) {
+	if (hasText(scope.practiceResultId)) {
 		return {
-			kind: "observation",
-			observationId: scope.observationId,
+			kind: "result",
+			practiceResultId: scope.practiceResultId,
 			agentJobId: scope.agentJobId,
 		};
 	}
@@ -89,7 +89,7 @@ export function selectionSearch(
 ): Pick<
 	ReviewScopeSearch,
 	| "agentJobId"
-	| "observationId"
+	| "practiceResultId"
 	| "feedbackId"
 	| "selectedPractice"
 	| "artifactKind"
@@ -99,12 +99,10 @@ export function selectionSearch(
 	return {
 		selected: selection === undefined ? undefined : true,
 		agentJobId:
-			selection?.kind === "review" ||
-			selection?.kind === "observation" ||
-			selection?.kind === "feedback"
+			selection?.kind === "review" || selection?.kind === "result" || selection?.kind === "feedback"
 				? selection.agentJobId
 				: undefined,
-		observationId: selection?.kind === "observation" ? selection.observationId : undefined,
+		practiceResultId: selection?.kind === "result" ? selection.practiceResultId : undefined,
 		feedbackId: selection?.kind === "feedback" ? selection.feedbackId : undefined,
 		selectedPractice: selection?.kind === "practice" ? selection.practiceSlug : undefined,
 		artifactKind: selection?.kind === "work" ? selection.artifactKind : undefined,
@@ -130,8 +128,8 @@ export function isSameSelection(
 		case "review": {
 			return current.kind === "review" && current.agentJobId === candidate.agentJobId;
 		}
-		case "observation": {
-			return current.kind === "observation" && current.observationId === candidate.observationId;
+		case "result": {
+			return current.kind === "result" && current.practiceResultId === candidate.practiceResultId;
 		}
 		case "feedback": {
 			return current.kind === "feedback" && current.feedbackId === candidate.feedbackId;

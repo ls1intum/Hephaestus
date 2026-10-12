@@ -55,7 +55,7 @@ describe("splitFoldedPractices", () => {
 		expect(groupNeverApplied(mixed)).toBe(false);
 		// A group whose every practice never applied keeps its own fold.
 		expect(groupNotObservedYet([standing("a", "NO_OPPORTUNITY", true)])).toBe(false);
-		// A practice with nothing to report but some observations keeps the group in the table.
+		// A practice with nothing to report but some results keeps the group in the table.
 		expect(
 			groupNotObservedYet([standing("a", "NO_OPPORTUNITY"), standing("b", "NOT_OBSERVED")]),
 		).toBe(false);

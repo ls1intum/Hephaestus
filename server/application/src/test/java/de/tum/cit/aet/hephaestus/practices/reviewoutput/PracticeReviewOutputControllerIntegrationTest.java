@@ -1189,8 +1189,8 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         /** Only the feedback written from the observation, and none from another workspace's binding to it. */
         @Test
         @WithAdminUser
-        void shouldListTheFeedbackWrittenFromOneObservationWhenFilteredByIt() {
-            UUID observed = insertProblem(practiceA, job, alice, "Observed", "MAJOR");
+        void shouldListTheFeedbackWrittenFromOneResultWhenFilteredByIt() {
+            UUID observed = insertProblem(practiceA, job, alice, "Recorded", "MAJOR");
             UUID sibling = insertProblem(practiceB, job, alice, "Sibling", "MAJOR");
             Feedback fromIt = persistUnit(workspace, job, alice, 0, FeedbackDeliveryState.DELIVERED, null, "From it");
             bind(fromIt, observed);
@@ -1198,18 +1198,18 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             bind(
                     persistUnit(otherWorkspace, otherJob, bob, 0, FeedbackDeliveryState.DELIVERED, null, "Foreign"),
                     observed);
-            UUID foreignObservation =
-                    insertObservation(otherPractice, otherJob, bob, "Foreign", "NOT_MET", "MAJOR", 7L, Instant.now());
+            UUID foreignResult =
+                    insertResult(otherPractice, otherJob, bob, "Foreign", "NOT_MET", "MAJOR", 7L, Instant.now());
             bind(
                     persistUnit(workspace, job, alice, 2, FeedbackDeliveryState.DELIVERED, null, "Cross-bound"),
-                    foreignObservation);
+                    foreignResult);
 
-            getOk(FEEDBACK + "?observationId=" + observed, workspace.getWorkspaceSlug())
+            getOk(FEEDBACK + "?practiceResultId=" + observed, workspace.getWorkspaceSlug())
                     .jsonPath("$.page.totalElements")
                     .isEqualTo(1)
                     .jsonPath("$.content[0].id")
                     .isEqualTo(fromIt.getId().toString());
-            expectFeedbackTotal("?observationId=" + foreignObservation, 0);
+            expectFeedbackTotal("?practiceResultId=" + foreignResult, 0);
             expectFeedbackTotal("", 3);
         }
 

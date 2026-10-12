@@ -10,7 +10,7 @@ import {
 import { nonEmpty } from "@/lib/search-params";
 
 import { listFacet } from "./AppliedFacetPills";
-import type { PracticeFacetOption } from "./ObservationFilters";
+import type { PracticeFacetOption } from "./ResultFilters";
 import { clearedScope, hasAppliedScope, readScope, scopeSearch } from "./review-scope";
 import { listsWorkWithoutReview, type RunsSearch } from "./review-search";
 import { ReviewFilterBar } from "./ReviewFilterBar";
@@ -130,7 +130,7 @@ export function ReviewRunFilters({
 			scope={readScope(search)}
 			onChange={(patch) => onPatch(scopeSearch(tab, patch))}
 			onClearScope={onClearScope}
-			// A review matches a developer, practice or group when it recorded an observation of them.
+			// A review matches a developer, practice or group when it recorded a result of them.
 			// "Created", not "Started": a review can sit queued before a worker claims it. A provisional
 			// word: "Requested" names the review a person asked for. Work no review started counts the
 			// moments recorded on it, so the range filters when they were.

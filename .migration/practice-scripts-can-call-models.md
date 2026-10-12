@@ -69,10 +69,15 @@ Custom clients must use these new names:
 | `observationsInvalidated` on `PracticeReviewCounts` and `PracticeReviewOverview` | `practiceResultsInvalidated` |
 | `observationCount` on `PracticeTraceEntry` and `ReviewFeedback` | `practiceResultCount` |
 | `totalObservations` on `DeveloperPracticeSummary` | `totalResults` |
+| `kind=OBSERVATION` on `/workspaces/{workspaceSlug}/practices/reviews/lineage` | `kind=RESULT` |
+| `observations`, `moreObservations` on `ReviewLineage`, and the schema `ReviewLineageObservation` | `results`, `moreResults`, and `ReviewLineageResult` with `problemCount` |
+| `observationIds` on `ReviewLineageFeedback` | `practiceResultIds` |
+| Query parameter `observationId` on `/workspaces/{workspaceSlug}/practices/reviews/feedback` | `practiceResultId` |
 | `recurrenceKey` on a result | `recurrenceKey` is gone from the result. Each problem has its own. |
 
 `PracticeResultDetail` and `ReviewResultDetail` gain `observations`, `example` and `coverage`.
 `ReviewResultDetail` also gains `provenance`, and `ReviewResult` gains `problemCount`.
+`AgentJobUsage.totalCostUsd` now includes what the models of the job's practice scripts cost, and `practiceScriptCostUsd` gives that part.
 
 `PracticeResultList` gains `problems`, a list of `{ severity, summary }` in the review's order.
 It is empty when the result is not `NOT_MET`, or when the result detail does not show the evidence.

@@ -2,11 +2,7 @@ import { CircleSlashIcon, Undo2Icon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "cn";
-import type {
-	GetPracticeReviewResultResponse,
-	Observation,
-	OpenQuestion,
-} from "@/api/types.gen";
+import type { GetPracticeReviewResultResponse, Observation, OpenQuestion } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -204,7 +200,10 @@ export function ResultLevel({
 							<Section level={4} size="sm" title="Open questions">
 								<ul aria-label="Open questions" className="space-y-4 text-sm">
 									{openQuestions.map((question, index) => (
-										<OpenQuestionItem key={`${question.openQuestion}:${index}`} question={question} />
+										<OpenQuestionItem
+											key={`${question.openQuestion}:${index}`}
+											question={question}
+										/>
 									))}
 								</ul>
 							</Section>

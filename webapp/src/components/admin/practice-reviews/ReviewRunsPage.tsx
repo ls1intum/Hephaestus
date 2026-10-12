@@ -21,8 +21,8 @@ import {
 import { reviewedWorkName } from "@/lib/artifact-kinds";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
 
-import type { PracticeFacetOption } from "./ObservationFilters";
 import { REQUEST_BLOCKED, type RowReviewRequest } from "./RequestReviewAction";
+import type { PracticeFacetOption } from "./ResultFilters";
 import { clearedScope, hasAppliedScope, readScope } from "./review-scope";
 import { listsWorkWithoutReview, REVIEW_PAGE_SIZE, type RunsSearch } from "./review-search";
 import { ReviewListEnd } from "./ReviewListEnd";

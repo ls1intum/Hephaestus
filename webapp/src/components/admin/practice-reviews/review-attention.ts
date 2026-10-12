@@ -1,4 +1,4 @@
-import type { ReviewObservationCounts } from "@/api/types.gen";
+import type { ReviewResultCounts } from "@/api/types.gen";
 import type { BadgeVariant } from "@/components/common/status-def";
 import type { WithholdingReason } from "@/components/practice-vocabulary/withholding-defs";
 
@@ -70,14 +70,14 @@ export function withheldClass(reason: WithholdingReason): WithheldClass {
 }
 
 /**
- * What a practice's observations suggest an admin look at: a practice that mostly does not apply here
+ * What a practice's results suggest an admin look at: a practice that mostly does not apply here
  * costs reviews and tells nobody much, and one that often cannot decide may lack the evidence it needs.
  */
 export type PracticeMarker = "NEVER_APPLIES" | "OFTEN_UNDECIDED";
 
 export interface PracticeMarkerDef {
 	label: string;
-	/** The marker's reason with its numbers: "Not applicable in 179 of 179 observations. …" */
+	/** The marker's reason with its numbers: "Does not apply in 179 of 179 results. …" */
 	reason: (part: number, whole: number) => string;
 }
 
@@ -85,21 +85,21 @@ export const PRACTICE_MARKER_DEFS: Record<PracticeMarker, PracticeMarkerDef> = {
 	NEVER_APPLIES: {
 		label: "Mostly not applicable",
 		reason: (part, whole) =>
-			`Not applicable in ${part} of ${whole} observations. Consider turning it off for this workspace.`,
+			`Does not apply in ${part} of ${whole} results. Consider turning it off for this workspace.`,
 	},
 	OFTEN_UNDECIDED: {
 		label: "Often undecided",
 		reason: (part, whole) =>
-			`Undetermined in ${part} of ${whole} observations. The review may lack the evidence to decide.`,
+			`Could not determine in ${part} of ${whole} results. The review may lack the evidence to decide.`,
 	},
 };
 
-/** The one marker a practice's observations earn, the stronger first; none below the minimum. */
+/** The one marker a practice's results earn, the stronger first; none below the minimum. */
 export function practiceMarker(
-	counts: ReviewObservationCounts,
+	counts: ReviewResultCounts,
 ): { marker: PracticeMarker; part: number; whole: number } | undefined {
 	const whole = counts.met + counts.notMet + counts.notApplicable + counts.undetermined;
-	if (whole < PRACTICE_MARKER_THRESHOLDS.minimumObservations) {
+	if (whole < PRACTICE_MARKER_THRESHOLDS.minimumResults) {
 		return undefined;
 	}
 	if (shareOf(counts.notApplicable, whole) >= PRACTICE_MARKER_THRESHOLDS.neverAppliesShare) {
@@ -116,15 +116,15 @@ const UNMARKED_RANK = 2;
 
 /**
  * The practices in the order "Needs a look first": the ones with a marker ahead, the stronger marker
- * first; then the most observations an admin marked incorrect, then the most undetermined, since
+ * first; then the most results an admin marked incorrect, then the most that could not be determined, since
  * both say the review got the practice wrong or could not judge it. Ties keep the order they came
  * in, which is busiest first, so a range with nothing to look at reads as busiest first.
  */
 export function needsALookFirst<
-	T extends { observations: ReviewObservationCounts; observationsInvalidated: number },
+	T extends { practiceResults: ReviewResultCounts; practiceResultsInvalidated: number },
 >(rows: readonly T[]): T[] {
 	const rank = (row: T) => {
-		const found = practiceMarker(row.observations);
+		const found = practiceMarker(row.practiceResults);
 		return found === undefined ? UNMARKED_RANK : MARKER_RANK[found.marker];
 	};
 	return rows
@@ -132,8 +132,8 @@ export function needsALookFirst<
 		.sort(
 			(a, b) =>
 				a.rank - b.rank ||
-				b.row.observationsInvalidated - a.row.observationsInvalidated ||
-				b.row.observations.undetermined - a.row.observations.undetermined ||
+				b.row.practiceResultsInvalidated - a.row.practiceResultsInvalidated ||
+				b.row.practiceResults.undetermined - a.row.practiceResults.undetermined ||
 				a.index - b.index,
 		)
 		.map(({ row }) => row);

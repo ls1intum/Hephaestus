@@ -349,7 +349,7 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * deliberately, the ones it said nothing about, which no job-derived listing can show.
      *
      * <p>The {@link SignalledArtifactFilter}'s {@code from} and {@code to} keep the signals that occurred in the half-open window {@code [from, to)}, the
-     * convention of the review, observation and feedback listings. Thus, a row and its counts then describe that
+     * convention of the review, result and feedback listings. Thus, a row and its counts then describe that
      * window alone. A null bound drops out of the predicate.
      *
      * <p>{@code withoutReview} keeps only the artifacts none of whose signals in that window started a review: the

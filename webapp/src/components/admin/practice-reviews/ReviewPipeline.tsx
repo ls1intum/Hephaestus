@@ -48,7 +48,7 @@ export interface ReviewPipelineProps {
 	workspaceSlug?: string;
 }
 
-export type StageKey = "reviews" | "observations" | "feedback";
+export type StageKey = "reviews" | "results" | "feedback";
 
 /**
  * Volume is information, not a state, and a practice surface has no tone for that: its accent is

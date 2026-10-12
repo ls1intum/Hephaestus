@@ -106,9 +106,7 @@ export const Default: Story = {
 		await expect(panel.queryByText(/citations/u)).not.toBeInTheDocument();
 		// Standing, it offers the one decision there is, and not its reverse.
 		await expect(panel.getByRole("button", { name: "Mark as incorrect" })).toBeEnabled();
-		await expect(
-			panel.queryByRole("button", { name: "Restore result" }),
-		).not.toBeInTheDocument();
+		await expect(panel.queryByRole("button", { name: "Restore result" })).not.toBeInTheDocument();
 	},
 };
 

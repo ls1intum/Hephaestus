@@ -4,25 +4,25 @@ import { durationBetween } from "@/lib/dates";
 import { countOf } from "./lineage-chain";
 
 /**
- * One step of a trace: the work, a moment on it, the review, its observations together, one
- * observation, one piece of feedback, or the end of the path. The record a trace stands on draws its
+ * One step of a trace: the work, a moment on it, the review, its results together, one
+ * result, one piece of feedback, or the end of the path. The record a trace stands on draws its
  * path strong and the rest muted.
  */
 export type TraceNode =
 	| { kind: "work" }
 	| { kind: "review" }
-	| { kind: "observations" }
+	| { kind: "results" }
 	| { kind: "end" }
 	| { kind: "moment"; id: string }
-	| { kind: "observation"; id: string }
+	| { kind: "result"; id: string }
 	| { kind: "feedback"; id: string };
 
 /** A step the address can name as `?focus=`: any step but the review, which a trace of a review stands on. */
 export type TraceFocus = Exclude<TraceNode, { kind: "review" }>;
 
 /**
- * A step as the address writes it, `?focus=`: `work`, `observations`, `end`, `moment:<id>`,
- * `observation:<id>`, `feedback:<id>`, and `review`.
+ * A step as the address writes it, `?focus=`: `work`, `results`, `end`, `moment:<id>`,
+ * `result:<id>`, `feedback:<id>`, and `review`.
  */
 export function traceStepKey(node: TraceNode): string {
 	return "id" in node ? `${node.kind}:${node.id}` : node.kind;
@@ -35,7 +35,7 @@ export function momentNode(moment: ReviewLineageMoment): TraceNode {
 
 /** `?focus=` read back; undefined for a value the page cannot centre on. */
 export function parseTraceFocus(raw: string | undefined): TraceFocus | undefined {
-	if (raw === "work" || raw === "observations" || raw === "end") {
+	if (raw === "work" || raw === "results" || raw === "end") {
 		return { kind: raw };
 	}
 	const separator = raw?.indexOf(":") ?? -1;
@@ -47,7 +47,7 @@ export function parseTraceFocus(raw: string | undefined): TraceFocus | undefined
 	if (id.length === 0) {
 		return undefined;
 	}
-	if (kind === "observation" || kind === "feedback" || kind === "moment") {
+	if (kind === "result" || kind === "feedback" || kind === "moment") {
 		return { kind, id };
 	}
 	return undefined;
@@ -62,13 +62,13 @@ export function sameTraceNode(a: TraceNode | undefined, b: TraceNode | undefined
 
 /** What a pinned node draws strong. Undefined draws everything strong. */
 export interface Traced {
-	observations: ReadonlySet<string>;
+	results: ReadonlySet<string>;
 	feedback: ReadonlySet<string>;
 }
 
 /**
- * The path through `node`: an observation and the feedback written from it, a piece of feedback and
- * the observations it was written from, a review and what it recorded itself. The work is the whole
+ * The path through `node`: a result and the feedback written from it, a piece of feedback and
+ * the results it was written from, a review and what it recorded itself. The work is the whole
  * chain, so it dims nothing. The work and the review stay strong on every path, since every path
  * runs through them.
  */
@@ -81,23 +81,23 @@ export function tracedBy(lineage: ReviewLineage, node: TraceNode | undefined): T
 			return undefined;
 		}
 		case "review":
-		case "observations": {
+		case "results": {
 			const reviewId = lineage.review?.id;
 			return {
-				observations: new Set(
-					lineage.observations.filter((entry) => entry.agentJobId === reviewId).map((e) => e.id),
+				results: new Set(
+					lineage.results.filter((entry) => entry.agentJobId === reviewId).map((e) => e.id),
 				),
 				feedback: new Set(
 					lineage.feedback.filter((entry) => entry.agentJobId === reviewId).map((e) => e.id),
 				),
 			};
 		}
-		case "observation": {
+		case "result": {
 			return {
-				observations: new Set([node.id]),
+				results: new Set([node.id]),
 				feedback: new Set(
 					lineage.feedback
-						.filter((entry) => entry.observationIds.includes(node.id))
+						.filter((entry) => entry.practiceResultIds.includes(node.id))
 						.map((entry) => entry.id),
 				),
 			};
@@ -105,7 +105,7 @@ export function tracedBy(lineage: ReviewLineage, node: TraceNode | undefined): T
 		case "feedback": {
 			const feedback = lineage.feedback.find((entry) => entry.id === node.id);
 			return {
-				observations: new Set(feedback?.observationIds),
+				results: new Set(feedback?.practiceResultIds),
 				feedback: new Set([node.id]),
 			};
 		}

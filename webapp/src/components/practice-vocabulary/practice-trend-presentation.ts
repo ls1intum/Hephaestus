@@ -64,7 +64,7 @@ const ANY_WORK = { one: "piece of work", many: "pieces of work" };
  *
  * The work is named by its kind where every piece shares one ("pull requests", "merge requests" on
  * GitLab), else as "pieces of work". Both counts come from the server, from the same live reviews
- * the standing reads, so the sentence can never count more work than the observations show.
+ * the standing reads, so the sentence can never count more work than the results show.
  */
 export function explainStanding(
 	standing: PracticeGroupStandingValue,

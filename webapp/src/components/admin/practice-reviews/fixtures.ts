@@ -1343,23 +1343,20 @@ export const reviewRuns: ReviewRunSummary[] = allRuns
 
 /**
  * One verdict per practice, as the server tallies a run: any not met outweighs a met, and a
- * practice whose every observation did not apply did not apply. A finished run reached every
- * practice it observed.
+ * practice whose every result did not apply did not apply. A finished run reached every
+ * practice it recorded a result about.
  */
 function practiceVerdicts(
 	run: RunSpec,
 ): Pick<ReviewRunSummary, "practices" | "slippedPractices" | "practicesEvaluated"> {
-	const bySlug = new Map<string, ObservationSpec[]>();
-	for (const observation of run.observations) {
-		bySlug.set(observation.practiceSlug, [
-			...(bySlug.get(observation.practiceSlug) ?? []),
-			observation,
-		]);
+	const bySlug = new Map<string, ResultSpec[]>();
+	for (const result of run.results) {
+		bySlug.set(result.practiceSlug, [...(bySlug.get(result.practiceSlug) ?? []), result]);
 	}
 	const practices = { notMet: 0, met: 0, notApplicable: 0, undetermined: 0 };
 	const slippedPractices: ReviewRunSummary["slippedPractices"] = [];
-	for (const [practiceSlug, observed] of bySlug) {
-		const outcomes = observed.map((observation) => observation.outcome);
+	for (const [practiceSlug, recorded] of bySlug) {
+		const outcomes = recorded.map((result) => result.outcome);
 		if (outcomes.includes("NOT_MET")) {
 			practices.notMet += 1;
 			const practiceName =

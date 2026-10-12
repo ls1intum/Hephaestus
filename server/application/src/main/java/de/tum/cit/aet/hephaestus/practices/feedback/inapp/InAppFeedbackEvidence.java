@@ -186,7 +186,7 @@ public class InAppFeedbackEvidence {
         if (cards.isEmpty()) {
             return Map.of();
         }
-        Map<UUID, List<Observation>> evidence =
+        Map<UUID, List<PracticeResult>> evidence =
                 visibleEvidence(workspaceId, cards.stream().map(Feedback::getId).toList());
         Map<UUID, Instant> resolved = new LinkedHashMap<>();
         workResolutions(workspaceId, cards, evidence, practiceChangedAt(evidence), now)

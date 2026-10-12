@@ -848,20 +848,20 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                 .isEqualTo(old.getId().toString());
         assertThat(recheckedOf(fresh)).isEqualTo("[\"followup-linked-criteria\"]");
         assertThat(rowOf(current).getDiscoveredVia()).isEqualTo(DiscoveredVia.SYNC);
-        assertThat(observationRepository.findByAgentJobId(old.getId(), workspace.getId()))
+        assertThat(practiceResultRepository.findByAgentJobId(old.getId(), workspace.getId()))
                 .isEmpty();
-        assertThat(observationRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
+        assertThat(practiceResultRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
                 .allSatisfy(
                         observation -> assertThat(observation.getSupersededAt()).isNull());
         try (LinkedAttempt capture = captureLinkedAttempt(fresh, fixture.practice(), currentBody)) {
             assertThat(followups.refuseStale(capture.job(), "test-worker"))
                     .isEqualTo(LinkedRepairFollowups.Decision.PROCEED);
-            admissionService.admit(capture.identity(), capture.observations());
+            admissionService.admit(capture.identity(), capture.practiceResults());
         }
-        assertThat(observationRepository.findByAgentJobId(fresh.getId(), workspace.getId()))
+        assertThat(practiceResultRepository.findByAgentJobId(fresh.getId(), workspace.getId()))
                 .hasSize(1)
                 .allSatisfy(observation -> assertThat(observation.getOutcome()).isEqualTo(Outcome.MET));
-        assertThat(observationRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
+        assertThat(practiceResultRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
                 .allSatisfy(
                         observation -> assertThat(observation.getSupersededAt()).isNotNull());
     }
@@ -1001,7 +1001,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         assertThat(after.getStateChangedAt()).isEqualTo(before.getStateChangedAt());
         assertThat(after.getDiscoveredVia()).isEqualTo(DiscoveredVia.SYNC);
         assertThat(after.getJobId()).isNull();
-        assertThat(observationRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
+        assertThat(practiceResultRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
                 .allSatisfy(
                         observation -> assertThat(observation.getSupersededAt()).isNull());
     }
@@ -1040,7 +1040,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         assertThat(rowOf(fixture.current()).getStateReason())
                 .isEqualTo(changeAuthor ? SignalStateReason.OUT_OF_REVIEW_SCOPE : SignalStateReason.MEMBER_AI_DECLINED);
         assertThat(rowOf(fixture.current()).getJobId()).isNull();
-        assertThat(observationRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
+        assertThat(practiceResultRepository.findByAgentJobId(fixture.baseline().getId(), workspace.getId()))
                 .allSatisfy(
                         observation -> assertThat(observation.getSupersededAt()).isNull());
     }
@@ -1056,9 +1056,9 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         try (LinkedAttempt capture =
                 captureLinkedAttempt(fixture.job(), fixture.practice(), "- [x] Confirm first repair", true)) {
             assertThat(evidenceFiles.completeReceipt(capture.identity())).isPresent();
-            admissionService.admit(capture.identity(), capture.observations());
+            admissionService.admit(capture.identity(), capture.practiceResults());
             admitted = agentJobRepository.findById(fixture.job().getId()).orElseThrow();
-            assertThat(ObservationAdmissionService.isAdmitted(admitted)).isTrue();
+            assertThat(ResultAdmissionService.isAdmitted(admitted)).isTrue();
             assertThat(compositionBases.findByWorkspaceIdAndJobId(workspace.getId(), admitted.getId()))
                     .isPresent();
             AgentJob original = admitted;
@@ -1085,7 +1085,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
             admitted = agentJobRepository.saveAndFlush(admitted);
         }
         jdbcTemplate.update("UPDATE issue SET body = ? WHERE id = ?", "- [x] Confirm current repair", issueId);
-        assertThat(ObservationAdmissionService.isContinuation(admitted)).isTrue();
+        assertThat(ResultAdmissionService.isContinuation(admitted)).isTrue();
         JsonNode beforeMetadata = Objects.requireNonNull(admitted.getMetadata()).deepCopy();
         JsonNode beforeSnapshot =
                 Objects.requireNonNull(admitted.getEvidenceSnapshot()).deepCopy();
@@ -1109,7 +1109,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                             id, "test-worker", 1, Instant.now(), replacement))
                     .isZero();
         });
-        assertThat(observationRepository.findByAgentJobId(id, workspace.getId()))
+        assertThat(practiceResultRepository.findByAgentJobId(id, workspace.getId()))
                 .hasSize(1);
     }
 

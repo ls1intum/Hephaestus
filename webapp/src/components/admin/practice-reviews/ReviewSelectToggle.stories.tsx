@@ -48,13 +48,13 @@ export const Selected: Story = {
 };
 
 /**
- * An observation names its review too, but the review is not the selection: a row of that review
+ * A result names its review too, but the review is not the selection: a row of that review
  * stays unpressed.
  */
 export const AnotherKindSelected: Story = {
 	parameters: {
 		router: {
-			initialUrl: `/?agentJobId=${REVIEW_ID}&observationId=22222222-2222-2222-2222-222222222222&selected=true`,
+			initialUrl: `/?agentJobId=${REVIEW_ID}&practiceResultId=22222222-2222-2222-2222-222222222222&selected=true`,
 		},
 	},
 	play: async ({ canvas }) => {

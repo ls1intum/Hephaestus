@@ -21,7 +21,7 @@ const REVIEWS = "/w/acme/admin/practices/reviews";
  */
 const SCOPE = {
 	agentJobId: "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84",
-	observationId: "9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c",
+	practiceResultId: "9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c",
 	artifactKind: "scm.pull_request",
 	artifactId: "42",
 	from: "2026-09-01",
@@ -84,11 +84,11 @@ function countRead(path: string, total: number, counted: URL[]) {
 	});
 }
 
-/** The observations count read, failing with a 503 the first time it is asked and answering after. */
+/** The results count read, failing with a 503 the first time it is asked and answering after. */
 function failingOnceCount(total: number) {
 	let reads = 0;
 	const handler = http.get(
-		"*/workspaces/:workspaceSlug/practices/reviews/observations",
+		"*/workspaces/:workspaceSlug/practices/reviews/results",
 		({ request }) => {
 			if (new URL(request.url).searchParams.get("size") !== "1") {
 				return;
@@ -105,12 +105,12 @@ function failingOnceCount(total: number) {
 	return { handler, count: () => reads };
 }
 
-/** The observations count for developer 7, held until `release`; other reads fall through. */
+/** The results count for developer 7, held until `release`; other reads fall through. */
 function heldScopedCount() {
 	const held = deferred();
 	let asked = false;
 	const handler = http.get(
-		"*/workspaces/:workspaceSlug/practices/reviews/observations",
+		"*/workspaces/:workspaceSlug/practices/reviews/results",
 		async ({ request }) => {
 			const url = new URL(request.url);
 			if (url.searchParams.get("size") !== "1" || url.searchParams.get("subjectUserId") !== "7") {
@@ -152,7 +152,7 @@ describe("practice review routes", () => {
 
 	/**
 	 * The shared scope follows the reader to every tab: the person, practices and groups, the range,
-	 * and the selection. The person is the developer an observation is
+	 * and the selection. The person is the developer a result is
 	 * about, and on the feedback list the person the feedback is addressed to. A tab's own facets stay
 	 * on that tab.
 	 */
@@ -172,7 +172,7 @@ describe("practice review routes", () => {
 		for (const [tab, person] of [
 			["Overview", "subjectUserId"],
 			["Reviews", "subjectUserId"],
-			["Observations", "subjectUserId"],
+			["Results", "subjectUserId"],
 			["Feedback", "recipientUserId"],
 		] as const) {
 			expect(carriedSearch(sectionLink(navigation, tab))).toStrictEqual({
@@ -183,9 +183,9 @@ describe("practice review routes", () => {
 	});
 
 	it("carries nothing when nothing is scoped", async () => {
-		renderRouteAtWithRouter(`${REVIEWS}/observations?severity=${encodeURIComponent('["MAJOR"]')}`);
+		renderRouteAtWithRouter(`${REVIEWS}/results?severity=${encodeURIComponent('["MAJOR"]')}`);
 		const navigation = await sectionNavigation();
-		for (const tab of ["Overview", "Reviews", "Observations", "Feedback"]) {
+		for (const tab of ["Overview", "Reviews", "Results", "Feedback"]) {
 			expect(carriedSearch(sectionLink(navigation, tab))).toStrictEqual({});
 		}
 	});
@@ -203,7 +203,7 @@ describe("practice review routes", () => {
 	});
 
 	/**
-	 * A practice opens the Observations list filtered to it, over the days the overview counted, so
+	 * A practice opens the Results list filtered to it, over the days the overview counted, so
 	 * the counts above that list are the row's own.
 	 */
 	it("opens a practice's sheet from the overview, over the overview's range", async () => {
@@ -273,7 +273,7 @@ describe("practice review page titles", () => {
 		const counted: URL[] = [];
 		server.use(
 			countRead("/practices/reviews", 1688, counted),
-			countRead("/practices/reviews/observations", 13_308, counted),
+			countRead("/practices/reviews/results", 13_308, counted),
 			countRead("/practices/reviews/feedback", 1951, counted),
 		);
 		renderRouteAtWithRouter(
@@ -285,7 +285,7 @@ describe("practice review page titles", () => {
 			{ name: "Reviews, 1,688", hidden: true },
 			ROUTE_RENDER_WAIT,
 		);
-		await within(navigation).findByRole("link", { name: "Observations, 13,308", hidden: true });
+		await within(navigation).findByRole("link", { name: "Results, 13,308", hidden: true });
 		await within(navigation).findByRole("link", { name: "Feedback, 1,951", hidden: true });
 		within(navigation).getByRole("link", { name: "Overview", hidden: true });
 
@@ -301,7 +301,7 @@ describe("practice review page titles", () => {
 
 	/**
 	 * A count read that fails is asked again rather than leaving the tab without its count until the
-	 * page is reloaded; the observations table is the large one, whose read is the likeliest to fail.
+	 * page is reloaded; the results table is the large one, whose read is the likeliest to fail.
 	 */
 	it("asks again for a count that failed, and shows it once it is known", async () => {
 		const reads = failingOnceCount(13_308);
@@ -310,7 +310,7 @@ describe("practice review page titles", () => {
 		const navigation = await sectionNavigation();
 		await within(navigation).findByRole(
 			"link",
-			{ name: "Observations, 13,308", hidden: true },
+			{ name: "Results, 13,308", hidden: true },
 			{ timeout: 10_000 },
 		);
 		expect(reads.count()).toBe(2);
@@ -319,13 +319,13 @@ describe("practice review page titles", () => {
 	/** A scope change must not attribute the previous total to a new person while its read is held. */
 	it("hides the previous scope's count until the new one is known", async () => {
 		const scoped = heldScopedCount();
-		server.use(scoped.handler, countRead("/practices/reviews/observations", 13_308, []));
+		server.use(scoped.handler, countRead("/practices/reviews/results", 13_308, []));
 		try {
 			const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs`);
 			const navigation = await sectionNavigation();
 			await within(navigation).findByRole(
 				"link",
-				{ name: "Observations, 13,308", hidden: true },
+				{ name: "Results, 13,308", hidden: true },
 				ROUTE_RENDER_WAIT,
 			);
 			await router.navigate({
@@ -334,11 +334,11 @@ describe("practice review page titles", () => {
 			});
 			await waitFor(() => expect(scoped.asked()).toBe(true));
 			expect(
-				within(navigation).queryByRole("link", { name: "Observations, 13,308", hidden: true }),
+				within(navigation).queryByRole("link", { name: "Results, 13,308", hidden: true }),
 			).toBeNull();
-			within(navigation).getByRole("link", { name: "Observations", hidden: true });
+			within(navigation).getByRole("link", { name: "Results", hidden: true });
 			scoped.release();
-			await within(navigation).findByRole("link", { name: "Observations, 42", hidden: true });
+			await within(navigation).findByRole("link", { name: "Results, 42", hidden: true });
 		} finally {
 			scoped.release();
 		}

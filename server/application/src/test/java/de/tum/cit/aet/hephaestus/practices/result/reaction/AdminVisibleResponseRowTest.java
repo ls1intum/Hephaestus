@@ -1,8 +1,8 @@
-package de.tum.cit.aet.hephaestus.practices.observation.reaction;
+package de.tum.cit.aet.hephaestus.practices.result.reaction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.AdminVisibleResponseRow;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository.AdminVisibleResponseRow;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import org.junit.jupiter.api.Tag;

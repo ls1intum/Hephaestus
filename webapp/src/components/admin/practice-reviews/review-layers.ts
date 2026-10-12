@@ -13,7 +13,7 @@ import type { ReviewSelection } from "./review-selection";
  * In the address, a sheet is `?detail=<kind>:<id>` and a trace `?detail=trace:<kind>:<id>`, with the
  * sheet opened from it as a second `detail`.
  */
-export type RecordKind = "review" | "observation" | "feedback" | "work" | "practice";
+export type RecordKind = "review" | "result" | "feedback" | "work" | "practice";
 
 /** One record of Practice reviews. A piece of work is `pull-request:42`, as `workLevel` writes it. */
 export interface RecordRef {
@@ -21,13 +21,7 @@ export interface RecordRef {
 	id: string;
 }
 
-const RECORD_KINDS: readonly RecordKind[] = [
-	"review",
-	"observation",
-	"feedback",
-	"work",
-	"practice",
-];
+const RECORD_KINDS: readonly RecordKind[] = ["review", "result", "feedback", "work", "practice"];
 
 function isRecordKind(kind: string): kind is RecordKind {
 	return (RECORD_KINDS as readonly string[]).includes(kind);
@@ -82,8 +76,8 @@ export function recordSelection(
 		case "review": {
 			return { kind: "review", agentJobId: record.id };
 		}
-		case "observation": {
-			return { kind: "observation", observationId: record.id, agentJobId };
+		case "result": {
+			return { kind: "result", practiceResultId: record.id, agentJobId };
 		}
 		case "feedback": {
 			return { kind: "feedback", feedbackId: record.id, agentJobId };
@@ -104,8 +98,8 @@ export function selectionRecord(selection: ReviewSelection): RecordRef | undefin
 		case "review": {
 			return { kind: "review", id: selection.agentJobId };
 		}
-		case "observation": {
-			return { kind: "observation", id: selection.observationId };
+		case "result": {
+			return { kind: "result", id: selection.practiceResultId };
 		}
 		case "feedback": {
 			return { kind: "feedback", id: selection.feedbackId };

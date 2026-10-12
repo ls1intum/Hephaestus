@@ -2,18 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import { practiceReviewOverview } from "./fixtures";
 import { feedbackComposed, practiceTotals, practiceTotalsNotes } from "./practice-totals";
-import { observationSlots, overviewFeedbackSlots, slotsTotal } from "./review-outcomes";
+import { resultSlots, overviewFeedbackSlots, slotsTotal } from "./review-outcomes";
 
-/** The figures the Observations and Feedback tiles show for the overview. */
+/** The figures the Results and Feedback tiles show for the overview. */
 function tileFigures() {
-	const observations = observationSlots(practiceReviewOverview.observations);
-	const count = (key: string) => observations.find((slot) => slot.key === key)?.count;
+	const results = resultSlots(practiceReviewOverview.practiceResults);
+	const count = (key: string) => results.find((slot) => slot.key === key)?.count;
 	return {
-		observations: slotsTotal(observations),
+		results: slotsTotal(results),
 		notMet: count("notMet"),
 		notApplicable: count("NOT_APPLICABLE"),
 		undetermined: count("UNDETERMINED"),
-		markedIncorrect: practiceReviewOverview.observationsInvalidated,
+		markedIncorrect: practiceReviewOverview.practiceResultsInvalidated,
 		feedbackDelivered: overviewFeedbackSlots(practiceReviewOverview.feedback).find(
 			(slot) => slot.key === "DELIVERED",
 		)?.count,
@@ -24,20 +24,20 @@ describe("practiceTotals", () => {
 	it("pins the totals row to the figures of the tiles", () => {
 		const totals = practiceTotals(practiceReviewOverview, practiceReviewOverview.practices);
 		expect({
-			observations: totals.observations,
+			results: totals.results,
 			notMet: totals.notMet,
 			notApplicable: totals.notApplicable,
 			undetermined: totals.undetermined,
 			markedIncorrect: totals.markedIncorrect,
 			feedbackDelivered: totals.feedbackDelivered,
 		}).toStrictEqual(tileFigures());
-		// The observation columns add up across the rows to the tile, as every observation is of one
+		// The result columns add up across the rows to the tile, as every result is of one
 		// practice.
 		const rows = practiceReviewOverview.practices;
-		expect(rows.reduce((sum, row) => sum + slotsTotal(observationSlots(row.observations)), 0)).toBe(
-			totals.observations,
+		expect(rows.reduce((sum, row) => sum + slotsTotal(resultSlots(row.practiceResults)), 0)).toBe(
+			totals.results,
 		);
-		expect(rows.reduce((sum, row) => sum + row.observationsInvalidated, 0)).toBe(
+		expect(rows.reduce((sum, row) => sum + row.practiceResultsInvalidated, 0)).toBe(
 			totals.markedIncorrect,
 		);
 	});
@@ -62,15 +62,15 @@ describe("practiceTotals", () => {
 		]);
 	});
 
-	it("counts the practices and observations the filters hide, and keeps them in the totals", () => {
+	it("counts the practices and results the filters hide, and keeps them in the totals", () => {
 		const shown = practiceReviewOverview.practices.filter(
 			(row) => row.practiceSlug !== "thin-controllers",
 		);
 		const totals = practiceTotals(practiceReviewOverview, shown);
-		expect(totals.hidden).toStrictEqual({ practices: 1, observations: 33 });
-		expect(totals.observations).toBe(tileFigures().observations);
+		expect(totals.hidden).toStrictEqual({ practices: 1, results: 33 });
+		expect(totals.results).toBe(tileFigures().results);
 		expect(practiceTotalsNotes(totals)[0]).toBe(
-			"The totals include 1 practice that the filters hide, with 33 observations.",
+			"The totals include 1 practice that the filters hide, with 33 results.",
 		);
 	});
 

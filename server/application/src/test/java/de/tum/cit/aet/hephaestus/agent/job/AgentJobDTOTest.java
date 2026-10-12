@@ -142,15 +142,18 @@ class AgentJobDTOTest extends BaseUnitTest {
     void shouldNameTheTierOfTheReviewModelOnlyWhenTheSnapshotFrozeOne() {
         AgentJob job = jobWithSnapshot(snapshotWithScope(FundingSource.INSTANCE));
         ObjectNode snapshot = (ObjectNode) job.getConfigSnapshot();
-        assertThat(AgentJobDTO.from(job, ReviewRunTargetMapper.from(job)).dataHandlingTier())
+        assertThat(AgentJobDTO.from(job, ReviewRunTargetMapper.from(job), AgentJobDTO.ReviewMoments.NONE)
+                        .dataHandlingTier())
                 .isNull();
 
         snapshot.put("dataHandlingTier", "CLOUD");
-        assertThat(AgentJobDTO.from(job, ReviewRunTargetMapper.from(job)).dataHandlingTier())
+        assertThat(AgentJobDTO.from(job, ReviewRunTargetMapper.from(job), AgentJobDTO.ReviewMoments.NONE)
+                        .dataHandlingTier())
                 .isEqualTo(DataHandlingTier.CLOUD);
 
         snapshot.put("dataHandlingTier", "ORBITAL");
-        assertThat(AgentJobDTO.from(job, ReviewRunTargetMapper.from(job)).dataHandlingTier())
+        assertThat(AgentJobDTO.from(job, ReviewRunTargetMapper.from(job), AgentJobDTO.ReviewMoments.NONE)
+                        .dataHandlingTier())
                 .isNull();
     }
 

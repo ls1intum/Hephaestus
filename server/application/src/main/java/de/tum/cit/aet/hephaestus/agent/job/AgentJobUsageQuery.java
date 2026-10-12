@@ -8,7 +8,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** What one job of a workspace spent on the model, read from the usage ledger. */
+/**
+ * What one job of a workspace spent on the model, read from the usage ledger: the review model attempt by attempt, and
+ * the models its practice scripts called, which bill the same job.
+ */
 @Service
 @RequiredArgsConstructor
 class AgentJobUsageQuery {
@@ -21,11 +24,14 @@ class AgentJobUsageQuery {
         if (agentJobRepository.findByIdAndWorkspaceId(jobId, workspaceId).isEmpty()) {
             throw new EntityNotFoundException("AgentJob", jobId.toString());
         }
-        return AgentJobUsageDTO.of(usageEvents
-                .findByWorkspaceIdAndSourceTypeAndSourceIdOrderBySourceAttemptAsc(
-                        workspaceId, LlmUsageSourceType.AGENT_JOB, jobId)
-                .stream()
-                .map(AgentJobUsageAttemptDTO::from)
-                .toList());
+        return AgentJobUsageDTO.of(
+                usageEvents
+                        .findByWorkspaceIdAndSourceTypeAndSourceIdOrderBySourceAttemptAsc(
+                                workspaceId, LlmUsageSourceType.AGENT_JOB, jobId)
+                        .stream()
+                        .map(AgentJobUsageAttemptDTO::from)
+                        .toList(),
+                usageEvents.findByWorkspaceIdAndSourceTypeInAndSourceIdOrderBySourceAttemptAsc(
+                        workspaceId, LlmUsageSourceType.PRACTICE_SCRIPT, jobId));
     }
 }

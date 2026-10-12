@@ -12,18 +12,18 @@ import de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.AdminVisibleResponseRow;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository.AdminVisibleResponseRow;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewLineageRepository.BindingRow;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewLineageRepository.FeedbackRow;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewLineageRepository.MomentRow;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewLineageRepository.ObservationRow;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewLineageRepository.ResultRow;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewLineageRepository.StartRow;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewLineageDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewLineageFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewLineageMomentDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewLineageObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewLineageResponseDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewLineageResultDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewLineageRunDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup.ReviewRunFacts;
@@ -51,24 +51,23 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * How one observation, piece of feedback, review or piece of work came about, as one bounded chain: work, review,
- * observations, feedback, delivery and the developer's answer. Every list is capped, and the count beside it says how
- * much the cap left out, so a review with many practices or a card bound to many observations still answers in a
- * handful of rows.
+ * How one result, piece of feedback, review or piece of work came about, as one bounded chain: work, review, results,
+ * feedback, delivery and the developer's answer. Every list is capped, and the count beside it says how much the cap
+ * left out, so a review with many practices or a card bound to many results still answers in a handful of rows.
  */
 @Service
 @RequiredArgsConstructor
 class ReviewLineageService {
 
-    /** Observations a review or a piece of work lists. */
-    static final int OBSERVATION_CAP = 6;
+    /** Results a review or a piece of work lists. */
+    static final int RESULT_CAP = 6;
 
-    /** Observations a piece of feedback lists: all it was written from, up to this many. */
-    static final int BOUND_OBSERVATION_CAP = 12;
+    /** Results a piece of feedback lists: all it was written from, up to this many. */
+    static final int BOUND_RESULT_CAP = 12;
 
     static final int FEEDBACK_CAP = 6;
 
-    /** Observations, and pieces of feedback, the whole review lists. */
+    /** Results, and pieces of feedback, the whole review lists. */
     static final int WHOLE_CAP = 100;
 
     /** Moments on the work the whole review lists. */
@@ -81,26 +80,26 @@ class ReviewLineageService {
     private final Clock clock;
 
     /**
-     * @param whole list every observation and piece of feedback of the observation's review, up to
+     * @param whole list every result and piece of feedback of the result's review, up to
      *     {@link #WHOLE_CAP} each, and the work's moments, rather than the short chain a side column shows
      */
     @Transactional(readOnly = true)
-    public ReviewLineageDTO ofObservation(Long workspaceId, UUID observationId, boolean whole) {
-        ObservationRow observation = repository.findObservations(workspaceId, List.of(observationId)).stream()
+    public ReviewLineageDTO ofResult(Long workspaceId, UUID practiceResultId, boolean whole) {
+        ResultRow result = repository.findResults(workspaceId, List.of(practiceResultId)).stream()
                 .findFirst()
-                .orElseThrow(() -> new EntityNotFoundException("Observation", observationId.toString()));
-        UUID reviewId = observation.getAgentJobId();
-        List<UUID> feedbackIds = repository.findFeedbackIdsOfObservation(workspaceId, observationId);
+                .orElseThrow(() -> new EntityNotFoundException("PracticeResult", practiceResultId.toString()));
+        UUID reviewId = result.getAgentJobId();
+        List<UUID> feedbackIds = repository.findFeedbackIdsOfResult(workspaceId, practiceResultId);
         if (whole) {
             return wholeReview(
-                    workspaceId, reviewId, List.of(), Set.of(observationId), feedbackIds, Set.copyOf(feedbackIds));
+                    workspaceId, reviewId, List.of(), Set.of(practiceResultId), feedbackIds, Set.copyOf(feedbackIds));
         }
-        int others = repository.countObservationsOfReview(workspaceId, reviewId) - 1;
+        int others = repository.countResultsOfReview(workspaceId, reviewId) - 1;
         return assemble(
                 workspaceId,
                 reviewId,
-                List.of(observation),
-                Set.of(observationId),
+                List.of(result),
+                Set.of(practiceResultId),
                 Math.max(others, 0),
                 feedbackIds,
                 Set.copyOf(feedbackIds),
@@ -108,7 +107,7 @@ class ReviewLineageService {
                 false);
     }
 
-    /** @param whole as {@link #ofObservation(Long, UUID, boolean)} says */
+    /** @param whole as {@link #ofResult(Long, UUID, boolean)} says */
     @Transactional(readOnly = true)
     public ReviewLineageDTO ofFeedback(Long workspaceId, UUID feedbackId, boolean whole) {
         FeedbackRow feedback = repository.findFeedback(workspaceId, List.of(feedbackId)).stream()
@@ -116,21 +115,19 @@ class ReviewLineageService {
                 .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
         UUID reviewId = feedback.getAgentJobId();
         List<UUID> bound = repository.findBindings(workspaceId, List.of(feedbackId)).stream()
-                .map(BindingRow::getObservationId)
+                .map(BindingRow::getPracticeResultId)
                 .distinct()
                 .toList();
         if (whole) {
             return wholeReview(
                     workspaceId, reviewId, bound, Set.copyOf(bound), List.of(feedbackId), Set.of(feedbackId));
         }
-        List<ObservationRow> listed = ordered(
-                repository.findObservations(
-                        workspaceId, bound.subList(0, Math.min(bound.size(), BOUND_OBSERVATION_CAP))),
-                bound);
-        // Left out: what the cap cut from the observations behind it, and the review's own observations it was not
-        // written from — the siblings the chain collapses.
+        List<ResultRow> listed = ordered(
+                repository.findResults(workspaceId, bound.subList(0, Math.min(bound.size(), BOUND_RESULT_CAP))), bound);
+        // Left out: what the cap cut from the results behind it, and the review's own results it was not written
+        // from — the siblings the chain collapses.
         Set<UUID> chain = new HashSet<>(bound);
-        chain.addAll(repository.findObservationIdsOfReview(workspaceId, reviewId));
+        chain.addAll(repository.findResultIdsOfReview(workspaceId, reviewId));
         return assemble(
                 workspaceId,
                 reviewId,
@@ -143,7 +140,7 @@ class ReviewLineageService {
                 false);
     }
 
-    /** @param whole as {@link #ofObservation(Long, UUID, boolean)} says */
+    /** @param whole as {@link #ofResult(Long, UUID, boolean)} says */
     @Transactional(readOnly = true)
     public ReviewLineageDTO ofReview(Long workspaceId, UUID reviewId, boolean whole) {
         return reviewLineage(workspaceId, reviewId, whole);
@@ -153,8 +150,8 @@ class ReviewLineageService {
         if (whole) {
             return wholeReview(workspaceId, reviewId, List.of(), Set.of(), List.of(), Set.of());
         }
-        List<ObservationRow> listed = repository.findObservationsOfReview(workspaceId, reviewId, OBSERVATION_CAP);
-        int total = repository.countObservationsOfReview(workspaceId, reviewId);
+        List<ResultRow> listed = repository.findResultsOfReview(workspaceId, reviewId, RESULT_CAP);
+        int total = repository.countResultsOfReview(workspaceId, reviewId);
         List<UUID> feedbackIds = repository.findFeedbackIdsOfReview(workspaceId, reviewId);
         return assemble(
                 workspaceId,
@@ -169,35 +166,34 @@ class ReviewLineageService {
     }
 
     /**
-     * Everything one review recorded, for a page that has the room: its observations and the feedback it composed,
-     * each up to {@link #WHOLE_CAP}, joined by the records the request names that another review owns — the
-     * observations a piece of feedback was written from, the feedback written from an observation. The ones the
+     * Everything one review recorded, for a page that has the room: its results and the feedback it composed, each up
+     * to {@link #WHOLE_CAP}, joined by the records the request names that another review owns — the results a piece
+     * of feedback was written from, the feedback written from a result. The ones the
      * request names stay in front, so the cap never cuts them.
      */
     private ReviewLineageDTO wholeReview(
             Long workspaceId,
             UUID reviewId,
-            List<UUID> namedObservations,
-            Set<UUID> focusedObservations,
+            List<UUID> namedResults,
+            Set<UUID> focusedResults,
             List<UUID> namedFeedback,
             Set<UUID> focusedFeedback) {
-        List<UUID> reviewObservations = repository.findObservationIdsOfReview(workspaceId, reviewId);
+        List<UUID> reviewResults = repository.findResultIdsOfReview(workspaceId, reviewId);
         List<UUID> reviewFeedback = repository.findFeedbackIdsOfReview(workspaceId, reviewId);
-        Set<UUID> observationIds = new LinkedHashSet<>(namedObservations);
-        observationIds.addAll(focusedObservations);
-        List<ObservationRow> ownListed = repository.findObservationsOfReview(workspaceId, reviewId, WHOLE_CAP);
-        Set<UUID> allObservations = new HashSet<>(observationIds);
-        allObservations.addAll(reviewObservations);
-        for (ObservationRow row : ownListed) {
-            if (observationIds.size() >= WHOLE_CAP) {
+        Set<UUID> resultIds = new LinkedHashSet<>(namedResults);
+        resultIds.addAll(focusedResults);
+        List<ResultRow> ownListed = repository.findResultsOfReview(workspaceId, reviewId, WHOLE_CAP);
+        Set<UUID> allResults = new HashSet<>(resultIds);
+        allResults.addAll(reviewResults);
+        for (ResultRow row : ownListed) {
+            if (resultIds.size() >= WHOLE_CAP) {
                 break;
             }
-            observationIds.add(row.getId());
+            resultIds.add(row.getId());
         }
-        List<UUID> listedIds = List.copyOf(observationIds);
-        List<ObservationRow> listed = listedIds.isEmpty()
-                ? List.of()
-                : ordered(repository.findObservations(workspaceId, listedIds), listedIds);
+        List<UUID> listedIds = List.copyOf(resultIds);
+        List<ResultRow> listed =
+                listedIds.isEmpty() ? List.of() : ordered(repository.findResults(workspaceId, listedIds), listedIds);
         Set<UUID> feedbackIds = new LinkedHashSet<>(namedFeedback);
         feedbackIds.addAll(focusedFeedback);
         feedbackIds.addAll(reviewFeedback);
@@ -205,8 +201,8 @@ class ReviewLineageService {
                 workspaceId,
                 reviewId,
                 listed,
-                focusedObservations,
-                allObservations.size() - listed.size(),
+                focusedResults,
+                allResults.size() - listed.size(),
                 List.copyOf(feedbackIds),
                 focusedFeedback,
                 WHOLE_CAP,
@@ -216,7 +212,7 @@ class ReviewLineageService {
     /**
      * The chain of the newest review that recorded anything about the work.
      *
-     * @param whole as {@link #ofObservation(Long, UUID, boolean)} says
+     * @param whole as {@link #ofResult(Long, UUID, boolean)} says
      */
     @Transactional(readOnly = true)
     public ReviewLineageDTO ofWork(Long workspaceId, ArtifactKind artifactKind, long artifactId, boolean whole) {
@@ -230,9 +226,9 @@ class ReviewLineageService {
     private ReviewLineageDTO assemble(
             Long workspaceId,
             UUID reviewId,
-            List<ObservationRow> observations,
-            Set<UUID> focusedObservations,
-            int moreObservations,
+            List<ResultRow> results,
+            Set<UUID> focusedResults,
+            int moreResults,
             List<UUID> feedbackIds,
             Set<UUID> focusedFeedback,
             int feedbackCap,
@@ -246,13 +242,13 @@ class ReviewLineageService {
                         .collect(Collectors.groupingBy(
                                 BindingRow::getFeedbackId,
                                 LinkedHashMap::new,
-                                Collectors.mapping(BindingRow::getObservationId, Collectors.toList())));
+                                Collectors.mapping(BindingRow::getPracticeResultId, Collectors.toList())));
         Map<UUID, ReviewLineageResponseDTO> responses = responses(workspaceId, feedback);
 
         ReviewRunFacts facts =
                 reviewRunLookup.findFacts(workspaceId, List.of(reviewId)).get(reviewId);
         // A review that recorded nothing still has a chain while its run exists, such as a queued or coalesced one.
-        if (facts == null && observations.isEmpty() && feedback.isEmpty()) {
+        if (facts == null && results.isEmpty() && feedback.isEmpty()) {
             throw new EntityNotFoundException("Review", reviewId.toString());
         }
         ReviewLineageRunDTO review = facts == null
@@ -267,16 +263,16 @@ class ReviewLineageService {
                         facts.startedAt(),
                         facts.holdReason(),
                         facts.conclusion());
-        ReviewedWorkRefDTO work = work(observations, feedback, facts);
+        ReviewedWorkRefDTO work = work(results, feedback, facts);
         StartRow start = work == null ? null : start(workspaceId, work, reviewId);
 
         return new ReviewLineageDTO(
                 work,
                 review,
-                observations.stream()
-                        .map(row -> observation(row, focusedObservations.contains(row.getId())))
+                results.stream()
+                        .map(row -> result(row, focusedResults.contains(row.getId())))
                         .toList(),
-                Math.max(moreObservations, 0),
+                Math.max(moreResults, 0),
                 feedback.stream()
                         .map(row -> feedback(
                                 row,
@@ -424,10 +420,10 @@ class ReviewLineageService {
      * themselves; the review's own target only names it, and is the fallback when the chain lists no record.
      */
     private static @Nullable ReviewedWorkRefDTO work(
-            List<ObservationRow> observations, List<FeedbackRow> feedback, @Nullable ReviewRunFacts facts) {
+            List<ResultRow> results, List<FeedbackRow> feedback, @Nullable ReviewRunFacts facts) {
         Target target = facts == null ? null : facts.target();
-        if (!observations.isEmpty()) {
-            ObservationRow first = observations.getFirst();
+        if (!results.isEmpty()) {
+            ResultRow first = results.getFirst();
             return ReviewedWorkLabels.ref(ArtifactKind.of(first.getArtifactKind()), first.getArtifactId(), target);
         }
         for (FeedbackRow row : feedback) {
@@ -439,14 +435,14 @@ class ReviewLineageService {
     }
 
     /** Rows in the order of {@code ids}, which a SQL {@code IN} does not keep. */
-    private static List<ObservationRow> ordered(List<ObservationRow> rows, List<UUID> ids) {
-        List<ObservationRow> sorted = new ArrayList<>(rows);
+    private static List<ResultRow> ordered(List<ResultRow> rows, List<UUID> ids) {
+        List<ResultRow> sorted = new ArrayList<>(rows);
         sorted.sort(Comparator.comparingInt(row -> ids.indexOf(row.getId())));
         return sorted;
     }
 
-    private static ReviewLineageObservationDTO observation(ObservationRow row, boolean focus) {
-        return new ReviewLineageObservationDTO(
+    private static ReviewLineageResultDTO result(ResultRow row, boolean focus) {
+        return new ReviewLineageResultDTO(
                 row.getId(),
                 row.getAgentJobId(),
                 row.getSummary(),
@@ -454,6 +450,7 @@ class ReviewLineageService {
                 row.getPracticeName(),
                 Outcome.valueOf(row.getOutcome()),
                 row.getSeverity() == null ? null : Severity.valueOf(row.getSeverity()),
+                Math.toIntExact(row.getProblemCount()),
                 row.getObservedAt(),
                 focus,
                 row.getMarkedIncorrectAt() != null,
@@ -463,7 +460,7 @@ class ReviewLineageService {
     }
 
     private static ReviewLineageFeedbackDTO feedback(
-            FeedbackRow row, List<UUID> observationIds, boolean focus, @Nullable ReviewLineageResponseDTO response) {
+            FeedbackRow row, List<UUID> practiceResultIds, boolean focus, @Nullable ReviewLineageResponseDTO response) {
         return new ReviewLineageFeedbackDTO(
                 row.getId(),
                 row.getAgentJobId(),
@@ -475,7 +472,7 @@ class ReviewLineageService {
                 row.getCreatedAt(),
                 row.getDeliveredAt(),
                 Math.toIntExact(row.getPlacementCount()),
-                observationIds,
+                practiceResultIds,
                 row.getReplacesId(),
                 row.getReplacedById(),
                 row.getReplacedAt(),

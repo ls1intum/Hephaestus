@@ -186,7 +186,7 @@ describe("traceBottleneck for the review itself", () => {
 		const bottleneck = bottleneckOf("failed-with-error");
 		expect(bottleneck).toMatchObject({ kind: "failed", stage: "review", title: "Review failed" });
 		expect(bottleneck.text).toBe(
-			"The model output did not match the review schema twice: observations[2].evidence[0].quote was not found in the diff. It was tried 2 times.",
+			"The model output did not match the review schema twice: results[2].evidence[0].quote was not found in the diff. It was tried 2 times.",
 		);
 	});
 
@@ -208,7 +208,7 @@ describe("traceBottleneck for the review itself", () => {
 		expect(bottleneck).toMatchObject({ kind: "waiting", title: "On hold", span: "queue" });
 	});
 
-	it("says that not-met observations led to no feedback", () => {
+	it("says that not-met results led to no feedback", () => {
 		const bottleneck = bottleneckOf("not-met-silent");
 		expect(bottleneck).toMatchObject({ kind: "lost", title: "Not told" });
 		expect(bottleneck.text).toMatch(/not met, but the review composed no feedback/u);
@@ -258,7 +258,7 @@ describe("traceBottleneck where nothing was lost", () => {
 	});
 
 	it("says nothing had to be sent where every practice was met", () => {
-		const { lineage } = lineageStateCase("observations-no-feedback");
+		const { lineage } = lineageStateCase("results-no-feedback");
 		expect(traceBottleneck(lineage, REVIEW, undefined, NOW).text).toBe(
 			"Nothing on this path had to be sent.",
 		);

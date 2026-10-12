@@ -9,7 +9,6 @@ import {
 	DELIVERY_STATE_DEFS,
 	type DeliveryState,
 } from "@/components/practice-vocabulary/delivery-outcome-defs";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
 import { OUTCOME_DEFS, outcomeCountNoun } from "@/components/practice-vocabulary/outcome-defs";
 import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
 import {
@@ -116,10 +115,7 @@ export function finishedCount(counts: ReviewRunCounts): number {
  * The four outcomes that partition results: the two outcomes of an assessment, then the two
  * ways of not reaching one, each in its registry's count noun.
  */
-export function resultSlots(
-	counts: ReviewResultCounts,
-	scope?: OutcomeScope,
-): OutcomeSlot[] {
+export function resultSlots(counts: ReviewResultCounts, scope?: OutcomeScope): OutcomeSlot[] {
 	const search = scope && scopeSearch(scope, "results");
 	return [
 		{

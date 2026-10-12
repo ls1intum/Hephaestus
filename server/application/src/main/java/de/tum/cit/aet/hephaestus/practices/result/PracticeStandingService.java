@@ -260,8 +260,7 @@ public class PracticeStandingService {
         boolean exercised = evidence != null && !evidence.withoutVerdict().isEmpty();
         boolean notApplicableOnly = evidence != null
                 && exercised
-                && evidence.withoutVerdict().stream()
-                        .allMatch(observation -> observation.getOutcome() == Outcome.NOT_APPLICABLE);
+                && evidence.withoutVerdict().stream().allMatch(result -> result.getOutcome() == Outcome.NOT_APPLICABLE);
         PracticeGroup group = practice.getGroup();
         return new PracticeStandingDTO(
                 practice.getSlug(),

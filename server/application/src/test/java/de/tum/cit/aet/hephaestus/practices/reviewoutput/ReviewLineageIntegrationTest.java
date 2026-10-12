@@ -30,19 +30,19 @@ import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.Reaction;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -86,7 +86,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private WebTestClient webTestClient;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -98,13 +98,13 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
     private ReactionRepository reactionRepository;
 
     @Autowired
-    private ObservationInvalidationRepository invalidationRepository;
+    private PracticeResultInvalidationRepository invalidationRepository;
 
     @Autowired
     private RepositoryRepository repositoryRepository;
@@ -179,7 +179,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private UUID observe(
             Practice measured, AgentJob agentJob, String summary, String outcome, Instant observedAt, long artifactId) {
         UUID id = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
+        practiceResultRepository.insertIfAbsent(
                 id,
                 "occurrence-" + id,
                 agentJob.getId(),
@@ -194,7 +194,10 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 "NOT_MET".equals(outcome) ? "MAJOR" : null,
                 "{}",
                 "Reasoning for " + summary,
-                "recurrence-" + id,
+                "test-scope",
+                null,
+                null,
+                null,
                 observedAt,
                 "LIVE");
         return id;
@@ -287,8 +290,8 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         signalRepository.save(row);
     }
 
-    private void bind(Feedback piece, UUID observationId, int ordinal) {
-        feedbackObservationRepository.insertIfAbsent(piece.getId(), observationId, "PRIMARY", ordinal);
+    private void bind(Feedback piece, UUID practiceResultId, int ordinal) {
+        feedbackEvidenceRepository.insertIfAbsent(piece.getId(), practiceResultId, null, "PRIMARY", ordinal);
     }
 
     private WebTestClient.ResponseSpec get(String query, Object... uriVariables) {
@@ -308,29 +311,29 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    void shouldTraceAnObservationToItsReviewAndTheFeedbackWrittenFromIt() {
+    void shouldTraceAnResultToItsReviewAndTheFeedbackWrittenFromIt() {
         UUID traced = observe("Description omits the why");
         observe("Tests missing");
         observe("Second sibling");
         Feedback piece = compose(workspace, job, 0, FeedbackDeliveryState.DELIVERED, null);
         bind(piece, traced, 0);
 
-        getOk("?kind=OBSERVATION&id={id}", traced)
+        getOk("?kind=RESULT&id={id}", traced)
                 .jsonPath("$.review.id")
                 .isEqualTo(job.getId().toString())
                 .jsonPath("$.review.model")
                 .isEqualTo("claude-test")
                 .jsonPath("$.work.kind")
                 .isEqualTo("scm.pull_request")
-                .jsonPath("$.observations.length()")
+                .jsonPath("$.results.length()")
                 .isEqualTo(1)
-                .jsonPath("$.observations[0].id")
+                .jsonPath("$.results[0].id")
                 .isEqualTo(traced.toString())
-                .jsonPath("$.observations[0].focus")
+                .jsonPath("$.results[0].focus")
                 .isEqualTo(true)
-                .jsonPath("$.observations[0].feedbackCount")
+                .jsonPath("$.results[0].feedbackCount")
                 .isEqualTo(1)
-                .jsonPath("$.moreObservations")
+                .jsonPath("$.moreResults")
                 .isEqualTo(2)
                 .jsonPath("$.feedback.length()")
                 .isEqualTo(1)
@@ -338,7 +341,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .isEqualTo(piece.getId().toString())
                 .jsonPath("$.feedback[0].focus")
                 .isEqualTo(true)
-                .jsonPath("$.feedback[0].observationIds[0]")
+                .jsonPath("$.feedback[0].practiceResultIds[0]")
                 .isEqualTo(traced.toString())
                 .jsonPath("$.feedback[0].deliveryState")
                 .isEqualTo("DELIVERED");
@@ -346,11 +349,11 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    void shouldSayNoFeedbackCameFromAnObservationThatLedToNone() {
+    void shouldSayNoFeedbackCameFromAnResultThatLedToNone() {
         UUID traced = observe("Met the standard");
 
-        getOk("?kind=OBSERVATION&id={id}", traced)
-                .jsonPath("$.observations[0].feedbackCount")
+        getOk("?kind=RESULT&id={id}", traced)
+                .jsonPath("$.results[0].feedbackCount")
                 .isEqualTo(0)
                 .jsonPath("$.feedback.length()")
                 .isEqualTo(0)
@@ -360,7 +363,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    void shouldListEveryObservationFeedbackWasWrittenFromInRenderOrder() {
+    void shouldListEveryResultFeedbackWasWrittenFromInRenderOrder() {
         UUID first = observe("First");
         UUID second = observe("Second");
         UUID third = observe("Third");
@@ -371,19 +374,19 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         bind(piece, second, 2);
 
         getOk("?kind=FEEDBACK&id={id}", piece.getId())
-                .jsonPath("$.observations.length()")
+                .jsonPath("$.results.length()")
                 .isEqualTo(3)
-                .jsonPath("$.observations[0].id")
+                .jsonPath("$.results[0].id")
                 .isEqualTo(third.toString())
-                .jsonPath("$.observations[1].id")
+                .jsonPath("$.results[1].id")
                 .isEqualTo(first.toString())
-                .jsonPath("$.observations[0].focus")
+                .jsonPath("$.results[0].focus")
                 .isEqualTo(true)
-                .jsonPath("$.observations[2].focus")
+                .jsonPath("$.results[2].focus")
                 .isEqualTo(true)
-                .jsonPath("$.moreObservations")
+                .jsonPath("$.moreResults")
                 .isEqualTo(1)
-                .jsonPath("$.feedback[0].observationIds.length()")
+                .jsonPath("$.feedback[0].practiceResultIds.length()")
                 .isEqualTo(3);
     }
 
@@ -422,7 +425,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .createdAt(answeredAt)
                 .build());
 
-        getOk("?kind=OBSERVATION&id={id}", traced)
+        getOk("?kind=RESULT&id={id}", traced)
                 .jsonPath("$.feedback[0].response.disputed")
                 .isEqualTo(true)
                 .jsonPath("$.feedback[0].response.disputeExplanation")
@@ -472,7 +475,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .createdAt(Instant.now())
                 .build());
 
-        byte[] content = getOk("?kind=OBSERVATION&id={id}", traced)
+        byte[] content = getOk("?kind=RESULT&id={id}", traced)
                 .jsonPath("$.feedback.length()")
                 .isEqualTo(3)
                 .jsonPath("$.feedback[?(@.id=='" + addressed.getId() + "')].response.respondedAt")
@@ -499,7 +502,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .reactorUserId(alice.getId())
                 .createdAt(Instant.now().plusSeconds(1))
                 .build());
-        getOk("?kind=OBSERVATION&id={id}", traced)
+        getOk("?kind=RESULT&id={id}", traced)
                 .jsonPath("$.feedback[?(@.id=='" + addressed.getId() + "')].response")
                 .doesNotExist();
     }
@@ -554,15 +557,15 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    void shouldCapAReviewsObservationsAndCountTheRest() {
-        for (int index = 0; index < ReviewLineageService.OBSERVATION_CAP + 2; index++) {
-            observe("Observation " + index);
+    void shouldCapAReviewsResultsAndCountTheRest() {
+        for (int index = 0; index < ReviewLineageService.RESULT_CAP + 2; index++) {
+            observe("Result " + index);
         }
 
         getOk("?kind=REVIEW&id={id}", job.getId())
-                .jsonPath("$.observations.length()")
-                .isEqualTo(ReviewLineageService.OBSERVATION_CAP)
-                .jsonPath("$.moreObservations")
+                .jsonPath("$.results.length()")
+                .isEqualTo(ReviewLineageService.RESULT_CAP)
+                .jsonPath("$.moreResults")
                 .isEqualTo(2)
                 .jsonPath("$.review.status")
                 .isEqualTo("IN_PROGRESS");
@@ -578,7 +581,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         getOk("?kind=WORK&artifactKind=scm.pull_request&artifactId=7")
                 .jsonPath("$.review.id")
                 .isEqualTo(newest.getId().toString())
-                .jsonPath("$.observations[0].summary")
+                .jsonPath("$.results[0].summary")
                 .isEqualTo("Newest review");
     }
 
@@ -588,7 +591,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         UUID theirs = observe(otherPractice, otherJob, "Theirs", "NOT_MET", Instant.now());
         Feedback theirFeedback = compose(otherWorkspace, otherJob, 0, FeedbackDeliveryState.DELIVERED, null);
 
-        get("?kind=OBSERVATION&id={id}", theirs).expectStatus().isNotFound().expectBody(Void.class);
+        get("?kind=RESULT&id={id}", theirs).expectStatus().isNotFound().expectBody(Void.class);
         get("?kind=FEEDBACK&id={id}", theirFeedback.getId())
                 .expectStatus()
                 .isNotFound()
@@ -609,7 +612,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // A later moment folded into the same review does not change what started it.
         recordMoment(work, ScmSignals.PULL_REQUEST_CLOSED, DiscoveredVia.EVENT, job, mergedAt.plusSeconds(5));
 
-        getOk("?kind=OBSERVATION&id={id}", traced)
+        getOk("?kind=RESULT&id={id}", traced)
                 .jsonPath("$.work.id")
                 .isEqualTo(work.getId().toString())
                 .jsonPath("$.workMergedAt")
@@ -626,7 +629,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         recordMoment(
                 work, ScmSignals.PULL_REQUEST_OPENED, DiscoveredVia.MANUAL, job, Instant.parse("2026-09-01T10:00:00Z"));
 
-        getOk("?kind=OBSERVATION&id={id}", traced)
+        getOk("?kind=RESULT&id={id}", traced)
                 .jsonPath("$.workMergedAt")
                 .doesNotExist()
                 .jsonPath("$.reviewTrigger")
@@ -652,7 +655,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         moment.setStateChangedAt(Instant.now());
         signalRepository.save(moment);
 
-        getOk("?kind=OBSERVATION&id={id}&whole=true", traced)
+        getOk("?kind=RESULT&id={id}&whole=true", traced)
                 .jsonPath("$.workMergedAt")
                 .doesNotExist()
                 .jsonPath("$.reviewTrigger")
@@ -663,9 +666,9 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    void shouldListTheWholeReviewAroundAnObservationPastTheShortChainsCaps() {
+    void shouldListTheWholeReviewAroundAnResultPastTheShortChainsCaps() {
         UUID traced = observe("Traced");
-        for (int index = 0; index < ReviewLineageService.OBSERVATION_CAP + 1; index++) {
+        for (int index = 0; index < ReviewLineageService.RESULT_CAP + 1; index++) {
             observe("Sibling " + index);
         }
         Feedback fromTraced = compose(workspace, job, 0, FeedbackDeliveryState.DELIVERED, null);
@@ -678,18 +681,18 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Feedback fromLater = compose(workspace, later, 20, FeedbackDeliveryState.DELIVERED, null);
         bind(fromLater, traced, 0);
 
-        int observations = ReviewLineageService.OBSERVATION_CAP + 2;
+        int observations = ReviewLineageService.RESULT_CAP + 2;
         int feedback = ReviewLineageService.FEEDBACK_CAP + 3;
-        getOk("?kind=OBSERVATION&id={id}&whole=true", traced)
-                .jsonPath("$.observations.length()")
+        getOk("?kind=RESULT&id={id}&whole=true", traced)
+                .jsonPath("$.results.length()")
                 .isEqualTo(observations)
-                .jsonPath("$.moreObservations")
+                .jsonPath("$.moreResults")
                 .isEqualTo(0)
-                .jsonPath("$.observations[0].id")
+                .jsonPath("$.results[0].id")
                 .isEqualTo(traced.toString())
-                .jsonPath("$.observations[0].focus")
+                .jsonPath("$.results[0].focus")
                 .isEqualTo(true)
-                .jsonPath("$.observations[1].focus")
+                .jsonPath("$.results[1].focus")
                 .isEqualTo(false)
                 .jsonPath("$.feedback.length()")
                 .isEqualTo(feedback)
@@ -710,7 +713,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    void shouldListTheWholeReviewAroundFeedbackWithTheObservationsOfAnotherReview() {
+    void shouldListTheWholeReviewAroundFeedbackWithTheResultsOfAnotherReview() {
         AgentJob earlier = persistJob(workspace);
         UUID carried = observe(practice, earlier, "Seen by an earlier review", "NOT_MET", Instant.now());
         UUID own = observe("Seen by this review");
@@ -722,11 +725,11 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         getOk("?kind=FEEDBACK&id={id}&whole=true", piece.getId())
                 .jsonPath("$.review.id")
                 .isEqualTo(job.getId().toString())
-                .jsonPath("$.observations.length()")
+                .jsonPath("$.results.length()")
                 .isEqualTo(3)
-                .jsonPath("$.observations[0].id")
+                .jsonPath("$.results[0].id")
                 .isEqualTo(carried.toString())
-                .jsonPath("$.observations[?(@.focus == true)].id")
+                .jsonPath("$.results[?(@.focus == true)].id")
                 .value(IDS, ids -> assertThat(ids).containsExactlyInAnyOrder(carried.toString(), own.toString()))
                 .jsonPath("$.feedback[0].focus")
                 .isEqualTo(true);
@@ -877,7 +880,7 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Feedback laterPiece = compose(workspace, laterJob, 1, FeedbackDeliveryState.DELIVERED, ownPiece.getId());
         bind(laterPiece, later, 0);
 
-        getOk("?kind=OBSERVATION&id={id}", later)
+        getOk("?kind=RESULT&id={id}", later)
                 .jsonPath("$.review.phase")
                 .isEqualTo("TIMED_OUT")
                 .jsonPath("$.review.status")
@@ -886,9 +889,9 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .isEqualTo("2026-09-01T09:02:53Z")
                 .jsonPath("$.review.outcome")
                 .doesNotExist()
-                .jsonPath("$.observations[0].feedbackCount")
+                .jsonPath("$.results[0].feedbackCount")
                 .isEqualTo(1)
-                .jsonPath("$.observations[0].ownFeedbackCount")
+                .jsonPath("$.results[0].ownFeedbackCount")
                 .isEqualTo(0);
         getOk("?kind=FEEDBACK&id={id}", ownPiece.getId())
                 .jsonPath("$.feedback[0].replacedById")
@@ -905,41 +908,37 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
         agentJobRepository.save(job);
         UUID traced = observe("Held for the budget");
 
-        getOk("?kind=OBSERVATION&id={id}", traced)
-                .jsonPath("$.review.holdReason")
-                .isEqualTo("BUDGET");
+        getOk("?kind=RESULT&id={id}", traced).jsonPath("$.review.holdReason").isEqualTo("BUDGET");
 
         // The executor clears the hold only on claim, so a job cancelled while held keeps the marker.
         job.setStatus(AgentJobStatus.CANCELLED);
         agentJobRepository.save(job);
-        getOk("?kind=OBSERVATION&id={id}", traced)
-                .jsonPath("$.review.holdReason")
-                .doesNotExist();
+        getOk("?kind=RESULT&id={id}", traced).jsonPath("$.review.holdReason").doesNotExist();
     }
 
     @Test
     @WithAdminUser
-    void shouldSayWhenAnObservationWasMarkedIncorrect() {
+    void shouldSayWhenAnResultWasMarkedIncorrect() {
         UUID traced = observe("Wrong when made");
-        invalidationRepository.save(new ObservationInvalidation(
-                observationRepository
+        invalidationRepository.save(new PracticeResultInvalidation(
+                practiceResultRepository
                         .findByIdAndWorkspaceId(traced, workspace.getId())
                         .orElseThrow(),
                 1L,
                 "Wrong when made",
                 Instant.parse("2026-09-01T13:58:00Z")));
 
-        getOk("?kind=OBSERVATION&id={id}", traced)
-                .jsonPath("$.observations[0].invalidated")
+        getOk("?kind=RESULT&id={id}", traced)
+                .jsonPath("$.results[0].invalidated")
                 .isEqualTo(true)
-                .jsonPath("$.observations[0].markedIncorrectAt")
+                .jsonPath("$.results[0].markedIncorrectAt")
                 .isEqualTo("2026-09-01T13:58:00Z");
     }
 
     @Test
     @WithAdminUser
     void shouldRejectARequestThatNamesNothing() {
-        get("?kind=OBSERVATION").expectStatus().isBadRequest().expectBody(Void.class);
+        get("?kind=RESULT").expectStatus().isBadRequest().expectBody(Void.class);
         get("?kind=WORK&artifactId=7").expectStatus().isBadRequest().expectBody(Void.class);
     }
 
@@ -948,6 +947,6 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void shouldForbidAWorkspaceMember() {
         UUID traced = observe("Hidden from members");
 
-        get("?kind=OBSERVATION&id={id}", traced).expectStatus().isForbidden().expectBody(Void.class);
+        get("?kind=RESULT&id={id}", traced).expectStatus().isForbidden().expectBody(Void.class);
     }
 }

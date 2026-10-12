@@ -161,8 +161,8 @@ class PracticeStandingVisibilityTest extends BaseUnitTest {
     @DisplayName("work the visibility policy withholds is not counted as reviewed work either")
     void countsOnlyTheReviewedWorkTheVisibilityPolicyAdmits() {
         Practice practice = practice("robust-error-handling");
-        Observation shown = bad(practice, Severity.MAJOR);
-        Observation withheld = Observation.builder()
+        PracticeResult shown = bad(practice, Severity.MAJOR);
+        PracticeResult withheld = PracticeResult.builder()
                 .id(UUID.randomUUID())
                 .practice(practice)
                 .artifactKind(ArtifactKinds.PULL_REQUEST)

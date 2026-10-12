@@ -12,7 +12,7 @@ import {
 import type { AgentJob } from "@/api/types.gen";
 import {
 	feedbackDetail,
-	observationDetail,
+	resultDetail,
 	practiceCounts,
 	practiceReviewOverview,
 	reviewFeedbackDetail,
@@ -81,7 +81,7 @@ afterEach(() => {
 	server.events.removeListener("request:start", record);
 });
 
-/** A row's own link, named by what it opens and then by its record: "Open observation …, 6 Oct, 14:05". */
+/** A row's own link, named by what it opens and then by its record: "Open result …, 6 Oct, 14:05". */
 function openRow(kind: string, name: string) {
 	return { name: (accessibleName: string) => accessibleName.startsWith(`Open ${kind} ${name},`) };
 }
@@ -97,11 +97,7 @@ describe("practice review levels", () => {
 		const { router } = renderRouteAtWithRouter(`${REVIEWS}/results?severity=["MAJOR"]`);
 
 		await userEvent.click(
-			await screen.findByRole(
-				"link",
-				openRow("observation", observation.summary),
-				ROUTE_RENDER_WAIT,
-			),
+			await screen.findByRole("link", openRow("result", result.summary), ROUTE_RENDER_WAIT),
 		);
 
 		const level = await screen.findByRole("dialog", { name: result.summary }, ROUTE_RENDER_WAIT);
@@ -117,26 +113,22 @@ describe("practice review levels", () => {
 		expect(router.state.location.pathname).toBe(`${REVIEWS}/results`);
 		expect(router.state.location.searchStr).toBe("?severity=MAJOR");
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-		screen.getByRole("link", openRow("observation", observation.summary));
+		screen.getByRole("link", openRow("result", result.summary));
 	});
 
 	/** Closing the level gives focus back to the row it was opened from, so the reader goes on there. */
 	it("returns focus to the row the level was opened from", async () => {
-		const observation = reviewResults.find((row) => row.severity === "MAJOR");
-		assert(observation);
-		renderRouteAtWithRouter(`${REVIEWS}/observations`);
+		const result = reviewResults.find((row) => row.severity === "MAJOR");
+		assert(result);
+		renderRouteAtWithRouter(`${REVIEWS}/results`);
 		const row = await screen.findByRole(
 			"link",
-			openRow("observation", observation.summary),
+			openRow("result", result.summary),
 			ROUTE_RENDER_WAIT,
 		);
 
 		await userEvent.click(row);
-		const level = await screen.findByRole(
-			"dialog",
-			{ name: observation.summary },
-			ROUTE_RENDER_WAIT,
-		);
+		const level = await screen.findByRole("dialog", { name: result.summary }, ROUTE_RENDER_WAIT);
 		await waitFor(() => expect(level.contains(document.activeElement)).toBe(true));
 
 		await userEvent.keyboard("{Escape}");
@@ -144,32 +136,32 @@ describe("practice review levels", () => {
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), ROUTE_RENDER_WAIT);
 		await waitFor(() =>
 			expect(document.activeElement).toBe(
-				screen.getByRole("link", openRow("observation", observation.summary)),
+				screen.getByRole("link", openRow("result", result.summary)),
 			),
 		);
 	});
 
 	/**
-	 * Feedback and its observations reach each other through the story. Following one from the other
+	 * Feedback and its results reach each other through the story. Following one from the other
 	 * replaces the level instead of opening over it, so there is never more than one; it is a step of
 	 * its own, so Back returns to the record it replaced, and dismissing closes to the page.
 	 */
 	/** A link from before that stacked several levels opens the one in front. */
 	it("opens only the front record of a stacked address", async () => {
-		const [source] = reviewFeedbackDetail.observations;
+		const [source] = reviewFeedbackDetail.practiceResults;
 		assert(source);
 		const { router } = renderRouteAtWithRouter(
 			`${REVIEWS}/runs?detail=${encodeURIComponent(
 				JSON.stringify([
 					`feedback:${reviewFeedbackDetail.id}`,
-					`observation:${source.observationId}`,
+					`result:${source.practiceResultId}`,
 				]),
 			)}`,
 		);
 		await screen.findByRole("dialog", { name: source.summary }, ROUTE_RENDER_WAIT);
 		expect(screen.getAllByRole("dialog")).toHaveLength(1);
 		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
-			`observation:${source.observationId}`,
+			`result:${source.practiceResultId}`,
 		]);
 	});
 
@@ -346,7 +338,7 @@ describe("practice review levels", () => {
 	});
 
 	/**
-	 * A practice has no level: its row opens the Observations list filtered to it, with its counts
+	 * A practice has no level: its row opens the Results list filtered to it, with its counts
 	 * over the list's days above the rows and the way to Practice setup.
 	 */
 	/** An address from before that opened a practice as a level opens its sheet. */
@@ -481,16 +473,16 @@ describe("the facts a sheet reads beyond its record", () => {
 		expect(requestsTo(`/agents/jobs/${review.id}/usage`)).toHaveLength(1);
 	});
 
-	it("says an observation came from a review someone requested", async () => {
-		const [row] = reviewObservations;
+	it("says a result came from a review someone requested", async () => {
+		const [row] = reviewResults;
 		assert(row);
-		const detail = observationDetail(row.id);
+		const detail = resultDetail(row.id);
 		server.use(
-			http.get(`*/workspaces/:workspaceSlug/practices/reviews/observations/${row.id}`, () =>
+			http.get(`*/workspaces/:workspaceSlug/practices/reviews/results/${row.id}`, () =>
 				HttpResponse.json({ ...detail, origin: "MANUAL" }),
 			),
 		);
-		renderRouteAtWithRouter(`${REVIEWS}/observations?detail=observation:${row.id}`);
+		renderRouteAtWithRouter(`${REVIEWS}/results?detail=result:${row.id}`);
 
 		const sheet = await screen.findByRole("dialog", { name: row.summary }, ROUTE_RENDER_WAIT);
 		await within(sheet).findByText("Requested", undefined, ROUTE_RENDER_WAIT);
@@ -900,7 +892,7 @@ describe("practices turned off today", () => {
 
 	/** The Practice facet of a list leaves the practice out the same way. */
 	it("leaves a turned-off practice out of the Practice facet until it is asked for", async () => {
-		renderRouteAtWithRouter(`${REVIEWS}/observations`);
+		renderRouteAtWithRouter(`${REVIEWS}/results`);
 		await userEvent.click(
 			await screen.findByRole("combobox", { name: "Practice" }, ROUTE_RENDER_WAIT),
 		);

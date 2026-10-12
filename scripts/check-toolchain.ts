@@ -5,7 +5,7 @@
  * drifts from that shape.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 
 import packageArgument from "npm-package-arg";
@@ -531,7 +531,8 @@ const forbiddenCommand = new RegExp(
 	"u",
 );
 for (const file of tracked) {
-	if (isHistorical(file) || !existsSync(file)) {
+	// A tracked symbolic link is scanned at its target, which is tracked too.
+	if (isHistorical(file) || !existsSync(file) || lstatSync(file).isSymbolicLink()) {
 		continue;
 	}
 	if (forbiddenPath.test(file)) {

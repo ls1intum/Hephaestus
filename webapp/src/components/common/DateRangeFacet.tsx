@@ -12,7 +12,7 @@ import { hasText } from "@/lib/text";
 
 export interface DateRangeFacetProps {
 	/**
-	 * Which date this filters, in the words the rows use: "Observed", "Composed", "Changed".
+	 * Which date this filters, in the words the rows use: "Recorded", "Composed", "Changed".
 	 *
 	 * Required, and deliberately not defaulted to "Date": several screens filter different timestamps
 	 * through this control, and "Date" names the category rather than the value. A filter's name has to

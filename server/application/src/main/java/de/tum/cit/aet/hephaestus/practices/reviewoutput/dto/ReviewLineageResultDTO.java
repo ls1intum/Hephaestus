@@ -8,8 +8,8 @@ import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "An observation in a lineage")
-public record ReviewLineageObservationDTO(
+@Schema(description = "A result in a lineage")
+public record ReviewLineageResultDTO(
         @NonNull UUID id,
 
         @NonNull @Schema(description = "The review that recorded it")
@@ -23,11 +23,15 @@ public record ReviewLineageObservationDTO(
         @Schema(description = "Severity band (null unless outcome is NOT_MET)") @Nullable
         Severity severity,
 
+        @Schema(
+                description = "How many problems the result records; 0 unless outcome is NOT_MET",
+                requiredMode = Schema.RequiredMode.REQUIRED)
+        int problemCount,
+
         @NonNull Instant observedAt,
 
         @Schema(
-                description =
-                        "Whether the request names this observation, or the feedback it names was written from it",
+                description = "Whether the request names this result, or the feedback it names was written from it",
                 requiredMode = Schema.RequiredMode.REQUIRED)
         boolean focus,
 

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import {
 	listPracticeReviewFeedbackOptions,
-	listPracticeReviewObservationsOptions,
+	listPracticeReviewResultsOptions,
 	listPracticeReviewsOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { ReviewTabCounts } from "@/components/admin/practice-reviews/PracticeReviewsLayout";
@@ -12,7 +12,7 @@ import {
 } from "@/components/admin/practice-reviews/review-scope";
 import {
 	feedbackQuery,
-	observationsQuery,
+	resultsQuery,
 	runsQuery,
 } from "@/components/admin/practice-reviews/review-search";
 import { QUERY_RETRIES, sessionRetriesQueries } from "@/runtime/tanstack-query/query-defaults";
@@ -38,7 +38,7 @@ const COUNT_READ = {
 } as const;
 
 /**
- * How many reviews, observations and pieces of feedback each tab lists under the shared scope (the
+ * How many reviews, results and pieces of feedback each tab lists under the shared scope (the
  * developer, groups, practices, dates and the tracked record), read as the total of a one-row page of
  * the tab's own endpoint. Each read is the query the tab's list sends, built from the search the tab's
  * link carries, so a count is what the table shows before its own facets narrow it. A count shows
@@ -56,10 +56,10 @@ export function useReviewTabCounts(
 		}),
 		...COUNT_READ,
 	});
-	const observations = useQuery({
-		...listPracticeReviewObservationsOptions({
+	const results = useQuery({
+		...listPracticeReviewResultsOptions({
 			path,
-			query: observationsQuery(carriedScope("observations", search), COUNT_PAGE),
+			query: resultsQuery(carriedScope("results", search), COUNT_PAGE),
 		}),
 		...COUNT_READ,
 	});
@@ -70,5 +70,5 @@ export function useReviewTabCounts(
 		}),
 		...COUNT_READ,
 	});
-	return { runs: runs.data, observations: observations.data, feedback: feedback.data };
+	return { runs: runs.data, results: results.data, feedback: feedback.data };
 }

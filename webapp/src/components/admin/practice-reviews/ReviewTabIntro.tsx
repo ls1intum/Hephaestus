@@ -8,7 +8,7 @@ const PURPOSES: Record<ReviewTab, string> = {
 	overview: "See whether anything needs you and whether reviews are running.",
 	runs: "See what happened in each review. Open a review to follow it from start to end.",
 	unreviewed: "Find out why no review ran on a piece of work.",
-	observations: "Check whether the reviews judged each practice correctly.",
+	results: "Check whether the reviews judged each practice correctly.",
 	feedback: "See what feedback went out, what did not, and why.",
 };
 

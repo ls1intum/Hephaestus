@@ -14,7 +14,7 @@ import {
 import type { ReviewLineage } from "@/api/types.gen";
 import type { StatusDefs } from "@/components/common/status-def";
 
-import { OBSERVATION_ORIGIN_DEFS, REVIEW_OCCASION_LABELS } from "./observation-origin-defs";
+import { RESULT_ORIGIN_DEFS, REVIEW_OCCASION_LABELS } from "./result-origin-defs";
 
 export type ReviewTrigger = NonNullable<ReviewLineage["reviewTrigger"]>;
 
@@ -79,9 +79,9 @@ export const REVIEW_TRIGGER_DEFS: StatusDefs<ReviewTrigger> = {
 		badgeVariant: "outline",
 		description: "The review started when the conversation went quiet.",
 	},
-	// The origin's own words, so a review and its observations say how it came about alike.
-	REQUESTED: OBSERVATION_ORIGIN_DEFS.MANUAL,
-	BACKFILL: OBSERVATION_ORIGIN_DEFS.BACKFILL,
+	// The origin's own words, so a review and its results say how it came about alike.
+	REQUESTED: RESULT_ORIGIN_DEFS.MANUAL,
+	BACKFILL: RESULT_ORIGIN_DEFS.BACKFILL,
 	SWEEP: {
 		label: REVIEW_OCCASION_LABELS.SWEEP,
 		icon: RefreshCwIcon,

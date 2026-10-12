@@ -26,17 +26,17 @@ import org.springframework.web.server.ResponseStatusException;
  * three surfaces under {@code /practices/reviews} answer a pasted date range identically.
  *
  * <p>{@code subjectUserId}, {@code practiceSlug} and {@code groupSlug} keep the reviews that recorded at least one
- * observation matching all three, with the names and the meaning the observation listing gives them. An observation
- * an admin marked incorrect does not count here, while the observation listing keeps it unless {@code invalidated} is
- * false. Thus, a developer or practice picked on one list narrows the other to the same reviews only when that list
- * leaves out the observations marked incorrect.
+ * result matching all three, with the names and the meaning the result listing gives them. A result an admin marked
+ * incorrect does not count here, while the result listing keeps it unless {@code invalidated} is false. Thus, a
+ * developer or practice picked on one list narrows the other to the same reviews only when that list leaves out the
+ * results marked incorrect.
  *
  * <p>{@code status}, {@code onHold} and {@code waiting} are alternatives: a review matches when it has one of the
  * listed statuses, with {@code onHold} when it is queued on a hold, or with {@code waiting} when it waits for a worker
  * now, as the queue counts it. {@code onHold} or {@code waiting} alone keeps only those reviews.
  *
  * <p>{@code agentJobId}, {@code artifactKind} and {@code artifactId} keep one review, or the reviews of one piece of
- * work, with the names the observation and feedback listings give them.
+ * work, with the names the result and feedback listings give them.
  *
  * @param artifactKind a bare string, not an {@link ArtifactKind}: springdoc would publish a record as
  *     {@code artifactKind.value}. {@link #validated()} parses it.
@@ -68,21 +68,21 @@ public record ReviewRunFilterParams(
 
         @Parameter(
                 description =
-                        "Keep the reviews that recorded an observation about this developer that is not marked incorrect")
+                        "Keep the reviews that recorded a result about this developer that is not marked incorrect")
         @RequestParam(required = false)
         @Positive
         @Nullable
         Long subjectUserId,
 
         @Parameter(
-                description = "Keep the reviews that recorded an observation of any of these practices that is not"
+                description = "Keep the reviews that recorded a result of any of these practices that is not"
                         + " marked incorrect (repeatable)")
         @RequestParam(required = false)
         @Nullable
         List<String> practiceSlug,
 
         @Parameter(
-                description = "Keep the reviews that recorded an observation of a practice in any of these groups"
+                description = "Keep the reviews that recorded a result of a practice in any of these groups"
                         + " that is not marked incorrect (repeatable)")
         @RequestParam(required = false)
         @Nullable
@@ -240,8 +240,8 @@ public record ReviewRunFilterParams(
                 : resultProcessing;
     }
 
-    /** True when no observation filter is set, so the query can skip its subquery. */
-    public boolean anyObservation() {
+    /** True when no result filter is set, so the query can skip its subquery. */
+    public boolean anyResult() {
         return anySubject() && anyPractice() && anyGroup();
     }
 

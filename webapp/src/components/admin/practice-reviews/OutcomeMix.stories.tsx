@@ -7,12 +7,7 @@ import { expectNoPageOverflow } from "@/stories/reflow";
 
 import { practiceReviewOverview, reviewOverviewScope } from "./fixtures";
 import { OutcomeMix } from "./OutcomeMix";
-import {
-	feedbackSlots,
-	markedIncorrectSlot,
-	resultSlots,
-	slotsTotal,
-} from "./review-outcomes";
+import { feedbackSlots, markedIncorrectSlot, resultSlots, slotsTotal } from "./review-outcomes";
 import { ReviewListLink } from "./ReviewListLink";
 
 const resultNoun = (total: number): string => (total === 1 ? "result" : "results");

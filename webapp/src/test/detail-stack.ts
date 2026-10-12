@@ -14,7 +14,7 @@ export function levelsOpenedBy(link: HTMLElement): string[] {
 
 /**
  * The review page a link opens, and the record it focuses: `review:<id>` alone, or
- * `review:<id> focus:observation:<id>`. Read from the path and the router's own search parser.
+ * `review:<id> focus:result:<id>`. Read from the path and the router's own search parser.
  */
 export function reviewPageOpenedBy(link: HTMLElement): string | undefined {
 	const url = new URL(String(link.getAttribute("href")), window.location.origin);
@@ -30,7 +30,7 @@ export function reviewPageOpenedBy(link: HTMLElement): string | undefined {
 }
 
 /**
- * The Practice reviews list a link opens — `runs`, `observations`, `feedback` — and the filters it
+ * The Practice reviews list a link opens — `runs`, `results`, `feedback` — and the filters it
  * sets, read with the router's own search parser.
  */
 export function listOpenedBy(link: HTMLElement): {
@@ -38,8 +38,7 @@ export function listOpenedBy(link: HTMLElement): {
 	search: Record<string, unknown>;
 } {
 	const url = new URL(String(link.getAttribute("href")), window.location.origin);
-	const list = /\/admin\/practices\/reviews\/(?<list>runs|observations|feedback)$/u.exec(
-		url.pathname,
-	)?.groups?.list;
+	const list = /\/admin\/practices\/reviews\/(?<list>runs|results|feedback)$/u.exec(url.pathname)
+		?.groups?.list;
 	return { list, search: parseSearch(url.search) };
 }

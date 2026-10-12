@@ -143,7 +143,7 @@ export function mergedAtOf(
 	return merged;
 }
 
-/** The feedback the trace stands on: the piece itself, an observation's pieces, or the review's own. */
+/** The feedback the trace stands on: the piece itself, a result's pieces, or the review's own. */
 function feedbackOnPath(
 	lineage: ReviewLineage,
 	here: TraceNode | undefined,
@@ -151,8 +151,8 @@ function feedbackOnPath(
 	if (here?.kind === "feedback") {
 		return lineage.feedback.filter((entry) => entry.id === here.id);
 	}
-	if (here?.kind === "observation") {
-		return lineage.feedback.filter((entry) => entry.observationIds.includes(here.id));
+	if (here?.kind === "result") {
+		return lineage.feedback.filter((entry) => entry.practiceResultIds.includes(here.id));
 	}
 	const reviewId = lineage.review?.id;
 	return lineage.feedback.filter(
@@ -482,7 +482,7 @@ function lost(losses: readonly FeedbackLoss[]): { tone: LossTone; icon: LucideIc
 	return { tone, icon: EyeOffIcon };
 }
 
-/** A not-met observation the review told nobody about: worth a look, never a failure. */
+/** A not-met result the review told nobody about: worth a look, never a failure. */
 const NOT_TOLD = { tone: "warning", icon: EyeOffIcon } as const;
 
 type BottleneckJob = Pick<
@@ -591,13 +591,13 @@ function queuedBottleneck(
 	};
 }
 
-/** The not-met observations on the path that led to no feedback at all. */
+/** The not-met results on the path that led to no feedback at all. */
 function silentOnPath(lineage: ReviewLineage, here: TraceNode | undefined) {
 	if (here?.kind === "feedback") {
 		return [];
 	}
 	const silent = silentNotMet(lineage);
-	return here?.kind === "observation" ? silent.filter((entry) => entry.id === here.id) : silent;
+	return here?.kind === "result" ? silent.filter((entry) => entry.id === here.id) : silent;
 }
 
 /** What of the path's feedback was lost: one piece, all of them, or some. */
@@ -620,7 +620,7 @@ function lossBottleneck(
 			kind: "lost",
 			stage: "review",
 			title: "Not told",
-			text: `${silent.length === 1 ? "One observation was" : `${silent.length} observations were`} not met, but the review composed no feedback from ${silent.length === 1 ? "it" : "them"}, so the developer was not told.`,
+			text: `${silent.length === 1 ? "One result was" : `${silent.length} results were`} not met, but the review composed no feedback from ${silent.length === 1 ? "it" : "them"}, so the developer was not told.`,
 			...NOT_TOLD,
 		};
 	}

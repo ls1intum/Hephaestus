@@ -797,7 +797,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
             + " AND p.slug = ANY(CAST(:#{#f.practiceSlugArray()} AS text[]))))\n";
 
     /**
-     * Keeps feedback bound to an observation of a practice in a group asked for, the same way as
+     * Keeps feedback bound to a result of a practice in a group asked for, the same way as
      * {@link #PRACTICE_FILTER}. The group and the practice are the feedback's own workspace's.
      */
     String GROUP_FILTER = "AND (CAST(:#{#f.groupSlugArray()} AS text[]) IS NULL OR f.id IN (SELECT f.id"
@@ -814,10 +814,11 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         """ + "  AND (CAST(:#{#f.locationNames()} AS text[]) IS NULL OR " + LOCATION
             + " = ANY(CAST(:#{#f.locationNames()} AS text[])))\n" + """
           AND (CAST(:#{#f.agentJobId()} AS uuid) IS NULL OR f.agent_job_id = CAST(:#{#f.agentJobId()} AS uuid))
-          AND (CAST(:#{#f.observationId()} AS uuid) IS NULL OR f.id IN (SELECT fo.feedback_id
-              FROM feedback_observation fo
-              JOIN observation o ON o.id = fo.observation_id AND o.workspace_id = :workspaceId
-              WHERE fo.observation_id = CAST(:#{#f.observationId()} AS uuid)))
+          AND (CAST(:#{#f.practiceResultId()} AS uuid) IS NULL OR f.id IN (SELECT fo.feedback_id
+              FROM feedback_evidence fo
+              JOIN practice_result o ON o.id = fo.practice_result_id AND o.workspace_id = :workspaceId
+              WHERE fo.workspace_id = :workspaceId
+                AND fo.practice_result_id = CAST(:#{#f.practiceResultId()} AS uuid)))
           AND (CAST(:#{#f.artifactKindValue()} AS text) IS NULL OR f.artifact_kind = CAST(:#{#f.artifactKindValue()} AS text))
           AND (CAST(:#{#f.artifactId()} AS bigint) IS NULL OR f.artifact_id = CAST(:#{#f.artifactId()} AS bigint))
           AND (CAST(:#{#f.recipientUserId()} AS bigint) IS NULL OR f.recipient_user_id = CAST(:#{#f.recipientUserId()} AS bigint))

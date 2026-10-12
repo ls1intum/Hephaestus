@@ -41,7 +41,7 @@ export function reviewRunLead(saw: ReviewRunSaw): string {
 		return "Waiting to start";
 	}
 	return saw.practices.undetermined > 0
-		? "Some practices remain undetermined"
+		? "Some practices could not be determined"
 		: "Nothing to improve";
 }
 
@@ -57,7 +57,7 @@ export function reviewRunReach(saw: ReviewRunSaw): string {
 	const outcomes = [
 		{ n: met, verb: "met" },
 		{ n: notApplicable, verb: "did not apply" },
-		{ n: undetermined, verb: "undetermined" },
+		{ n: undetermined, verb: "could not be determined" },
 	].filter((outcome) => outcome.n > 0);
 	if (outcomes.length === 0 && reached === undefined) {
 		return saw.progress === "running" || saw.progress === "queued"

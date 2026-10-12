@@ -32,12 +32,12 @@ import type {
 } from "@/api/types.gen";
 import { FeedbackLevel } from "@/components/admin/practice-reviews/FeedbackLevel";
 import { REVIEWABLE_ON_DEMAND } from "@/components/admin/practice-reviews/job-utils";
-import { ResultLevel } from "@/components/admin/practice-reviews/ResultLevel";
 import {
 	PracticeLevel,
 	type PracticeLevelProps,
 } from "@/components/admin/practice-reviews/PracticeLevel";
 import { REQUEST_BLOCKED } from "@/components/admin/practice-reviews/RequestReviewAction";
+import { ResultLevel } from "@/components/admin/practice-reviews/ResultLevel";
 import {
 	levelRecord,
 	type RecordRef,
@@ -67,8 +67,8 @@ import {
 	useFeedbackController,
 	useNextInApprovalQueue,
 } from "@/hooks/use-feedback-controller";
-import { useResultController } from "@/hooks/use-result-controller";
 import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
+import { useResultController } from "@/hooks/use-result-controller";
 import { type ReviewLineageTarget, useReviewLineage } from "@/hooks/use-review-lineage";
 import { useReviewRunController } from "@/hooks/use-review-run-controller";
 import { useSearchState } from "@/lib/search-params";
@@ -168,7 +168,7 @@ export function PracticeReviewDrawer({
 					case "review": {
 						return <ReviewLevelRead {...shared} reviewId={record.id} />;
 					}
-					case "observation": {
+					case "result": {
 						return <ResultLevelRead {...shared} practiceResultId={record.id} />;
 					}
 					case "feedback": {
@@ -214,8 +214,8 @@ interface LevelReadProps {
 // The trace
 // ------------------------------------------------------------------------------------------------
 
-/** The record a trace marks "You started here": the one it was opened for. A practice's is its newest observation. */
-function hereOf(record: RecordRef, newestObservation: string | undefined): TraceNode | undefined {
+/** The record a trace marks "You started here": the one it was opened for. A practice's is its newest result. */
+function hereOf(record: RecordRef, newestResult: string | undefined): TraceNode | undefined {
 	switch (record.kind) {
 		case "review": {
 			return { kind: "review" };
@@ -223,28 +223,26 @@ function hereOf(record: RecordRef, newestObservation: string | undefined): Trace
 		case "work": {
 			return { kind: "work" };
 		}
-		case "observation":
+		case "result":
 		case "feedback": {
 			return { kind: record.kind, id: record.id };
 		}
 		case "practice": {
-			return newestObservation === undefined
-				? undefined
-				: { kind: "observation", id: newestObservation };
+			return newestResult === undefined ? undefined : { kind: "result", id: newestResult };
 		}
 	}
 }
 
 function lineageTarget(
 	record: RecordRef,
-	newestObservation: string | undefined,
+	newestResult: string | undefined,
 ): ReviewLineageTarget | undefined {
 	switch (record.kind) {
 		case "review": {
 			return { kind: "REVIEW", id: record.id, whole: true };
 		}
-		case "observation": {
-			return { kind: "OBSERVATION", id: record.id, whole: true };
+		case "result": {
+			return { kind: "RESULT", id: record.id, whole: true };
 		}
 		case "feedback": {
 			return { kind: "FEEDBACK", id: record.id, whole: true };
@@ -254,9 +252,9 @@ function lineageTarget(
 			return work === undefined ? undefined : { kind: "WORK", ...work, whole: true };
 		}
 		case "practice": {
-			return newestObservation === undefined
+			return newestResult === undefined
 				? undefined
-				: { kind: "OBSERVATION", id: newestObservation, whole: true };
+				: { kind: "RESULT", id: newestResult, whole: true };
 		}
 	}
 }
@@ -272,10 +270,10 @@ function traceTitle(
 		case "review": {
 			return `Review of ${work}`;
 		}
-		case "observation": {
+		case "result": {
 			return (
-				lineage?.observations.find((observation) => observation.id === record.id)?.summary ??
-				PRACTICE_REVIEW_LEVEL_LABELS.observation
+				lineage?.results.find((result) => result.id === record.id)?.summary ??
+				PRACTICE_REVIEW_LEVEL_LABELS.result
 			);
 		}
 		case "feedback": {
@@ -312,7 +310,7 @@ function useRecordedWork(workspaceSlug: string, record: RecordRef) {
 }
 
 /**
- * One record's trace. A practice's trace is the story of its newest observation, narrowed to the
+ * One record's trace. A practice's trace is the story of its newest result, narrowed to the
  * practice; work none of whose moments started a review has no chain, and shows its latest moment.
  * The filter is the reader's while the trace is open; what it shows on top of its steps is the
  * reader's in this browser, for every trace. It marks the record it was opened for, and the mark
@@ -333,7 +331,7 @@ function TraceLevelRead({
 	const [display, setDisplay] = useTraceDisplay();
 	const [filter, setFilter] = useState<TraceFilter>(practiceFilter);
 
-	const newestOptions = listPracticeReviewObservationsOptions({
+	const newestOptions = listPracticeReviewResultsOptions({
 		path: { workspaceSlug },
 		query: { practiceSlug: [record.id], size: 1 },
 	});
@@ -397,7 +395,7 @@ function TraceLevelRead({
 			title={traceTitle(record, ready, practiceName)}
 			description={
 				record.kind === "practice"
-					? "The trace of its newest observation, narrowed to the practice."
+					? "The trace of its newest result, narrowed to the practice."
 					: undefined
 			}
 			chain={chain}

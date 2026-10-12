@@ -119,7 +119,7 @@ const awaitingApproval: ReviewFeedbackDetail = {
  * every record sheet has: a status line, What it is, State and history (composed, decided,
  * withheld with its precise reason, delivered with each comment's permalink, withdrawn, disputed),
  * what it says and its own delivery checks, Technical (closed) and the actions. It is titled by its
- * first line, as its row is. It links to no other record: the observations it was written from
+ * first line, as its row is. It links to no other record: the results it was written from
  * are its trace.
  *
  * Feedback awaiting approval is the same level: the package is expanded, because approving it

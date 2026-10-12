@@ -117,12 +117,12 @@ function filterResults(rows: ReviewResult[], url: URL) {
 
 function filterFeedback(rows: ReviewFeedback[], url: URL) {
 	const recipientUserId = single(url, "recipientUserId");
-	const observationId = single(url, "observationId");
-	const fromObservation = hasText(observationId) ? feedbackIdsFrom(observationId) : undefined;
+	const practiceResultId = single(url, "practiceResultId");
+	const fromResult = hasText(practiceResultId) ? feedbackIdsFrom(practiceResultId) : undefined;
 	return rows.filter(
 		(row) =>
 			withinScope(url, row) &&
-			(fromObservation === undefined || fromObservation.has(row.id)) &&
+			(fromResult === undefined || fromResult.has(row.id)) &&
 			withinDates(url, row.createdAt) &&
 			matches(values(url, "deliveryState"), row.deliveryState) &&
 			matches(values(url, "channel"), row.channel) &&

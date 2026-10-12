@@ -11,7 +11,7 @@ import { nonEmpty } from "@/lib/search-params";
 
 import { AppliedFacetPills, facetPills } from "./AppliedFacetPills";
 import { GlobalScopeRow } from "./GlobalScopeRow";
-import type { PracticeFacetOption } from "./ObservationFilters";
+import type { PracticeFacetOption } from "./ResultFilters";
 import {
 	type ReviewScope,
 	type ReviewTab,
@@ -27,7 +27,7 @@ export interface ScopeFiltersProps {
 	tab: ReviewTab;
 	scope: ReviewScope;
 	onChange: (patch: Partial<ReviewScope>) => void;
-	/** Which date this tab filters, in the words its rows use: "Observed", "Composed". */
+	/** Which date this tab filters, in the words its rows use: "Recorded", "Composed". */
 	dateTitle: string;
 	groups: FacetSource;
 	/** Every practice, with its group. A chosen group narrows what the practice facet offers. */
@@ -36,7 +36,7 @@ export interface ScopeFiltersProps {
 	/** The name of the person in the scope, when the rows already carry it. */
 	personName?: string;
 	/**
-	 * The one review, piece of work or observation the scope is filtered to, by name — set by a "See
+	 * The one review, piece of work or result the scope is filtered to, by name — set by a "See
 	 * all" link or a link from before. A record picked with a crosshair is the selection bar's instead,
 	 * so it is left out here.
 	 */
@@ -52,7 +52,7 @@ export interface ReviewScopeFiltersProps extends ScopeFiltersProps {
 
 /** A filter to one record, as its pill names it. */
 export interface ScopeRecordFilter {
-	facet: "review" | "work" | "observation";
+	facet: "review" | "work" | "result";
 	/** Its name, once read; until then the kind of record stands in. */
 	name: string | undefined;
 }
@@ -60,13 +60,13 @@ export interface ScopeRecordFilter {
 const RECORD_TITLES: Record<ScopeRecordFilter["facet"], string> = {
 	review: "Review",
 	work: "Work",
-	observation: "Observation",
+	result: "Result",
 };
 
 const RECORD_UNNAMED: Record<ScopeRecordFilter["facet"], string> = {
 	review: "one review",
 	work: "one piece of work",
-	observation: "one observation",
+	result: "one result",
 };
 
 /** The person facet's name on every tab: the developer the review observed, or the feedback reached. */
@@ -209,7 +209,7 @@ function ScopePills({
 		onClear: () =>
 			onChange({
 				agentJobId: undefined,
-				observationId: undefined,
+				practiceResultId: undefined,
 				artifactKind: undefined,
 				artifactId: undefined,
 			}),

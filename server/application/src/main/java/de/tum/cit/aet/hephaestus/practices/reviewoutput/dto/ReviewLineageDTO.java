@@ -9,23 +9,23 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 @Schema(
-        description = "How one record came about: the reviewed work, the review, its observations, the feedback written"
+        description = "How one record came about: the reviewed work, the review, its results, the feedback written"
                 + " from them, where that feedback went and how the developer answered. Bounded: each list is capped"
                 + " and the count beside it says how many more there are")
 public record ReviewLineageDTO(
         @Schema(description = "The work the review read; null when the review named no work") @Nullable
         ReviewedWorkRefDTO work,
 
-        @Schema(description = "The review that recorded the observations; null when its record is gone") @Nullable
+        @Schema(description = "The review that recorded the results; null when its record is gone") @Nullable
         ReviewLineageRunDTO review,
 
-        @NonNull @Schema(description = "The observations in the chain, the ones the request names first")
-        List<ReviewLineageObservationDTO> observations,
+        @NonNull @Schema(description = "The results in the chain, the ones the request names first")
+        List<ReviewLineageResultDTO> results,
 
         @Schema(
-                description = "Observations of the review, or behind the listed feedback, that the list leaves out",
+                description = "Results of the review, or behind the listed feedback, that the list leaves out",
                 requiredMode = Schema.RequiredMode.REQUIRED)
-        int moreObservations,
+        int moreResults,
 
         @NonNull @Schema(description = "The feedback in the chain, newest first")
         List<ReviewLineageFeedbackDTO> feedback,

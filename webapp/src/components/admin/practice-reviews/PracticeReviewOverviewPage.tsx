@@ -119,7 +119,7 @@ export function PracticeReviewOverviewPage({
 						previous={previous}
 						previousName={rangeDef.previous}
 						scope={scope}
-						stages={["reviews", "observations"]}
+						stages={["reviews", "results"]}
 					/>
 				)}
 			</Section>

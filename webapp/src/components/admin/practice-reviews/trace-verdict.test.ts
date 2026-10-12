@@ -6,7 +6,7 @@ import {
 	LINEAGE_FB,
 	LINEAGE_OBS,
 	lineageDisputedAndResolved,
-	lineageObservationFocus,
+	lineageResultFocus,
 	wholeReview,
 } from "./lineage-fixtures";
 import {
@@ -14,14 +14,14 @@ import {
 	type LineageStateGroup,
 	lineageStateCase,
 	STATE_FEEDBACK_ID,
-	STATE_OBSERVATION_ID,
+	STATE_RESULT_ID,
 } from "./lineage-state-fixtures";
 import type { TraceNode } from "./review-trace";
 import { traceVerdict, unreviewedVerdict } from "./trace-verdict";
 
 const REVIEW: TraceNode = { kind: "review" };
 const feedbackNode = (id: string): TraceNode => ({ kind: "feedback", id });
-const observationNode = (id: string): TraceNode => ({ kind: "observation", id });
+const resultNode = (id: string): TraceNode => ({ kind: "result", id });
 
 function verdictOf(key: string, node: TraceNode = REVIEW) {
 	const { lineage, reviewOutcome } = lineageStateCase(key);
@@ -33,17 +33,17 @@ function nodesOf(lineage: ReviewLineage): TraceNode[] {
 	return [
 		REVIEW,
 		{ kind: "work" },
-		...lineage.observations.map((entry) => observationNode(entry.id)),
+		...lineage.results.map((entry) => resultNode(entry.id)),
 		...lineage.feedback.map((entry) => feedbackNode(entry.id)),
 	];
 }
 
 describe("omitted chain ownership", () => {
 	it("does not attribute omitted or foreign records to the selected review", () => {
-		const lineage = { ...wholeReview, moreObservations: 9, moreFeedback: 7 };
+		const lineage = { ...wholeReview, moreResults: 9, moreFeedback: 7 };
 		const { sentence } = traceVerdict(lineage, REVIEW);
 		expect(sentence).toMatch(
-			/9 additional observations and 7 additional pieces of feedback in the chain are not listed/u,
+			/9 additional results and 7 additional pieces of feedback in the chain are not listed/u,
 		);
 		expect(sentence).not.toMatch(/composed 12|recorded 12/u);
 	});
@@ -85,7 +85,7 @@ describe("traceVerdict by state group", () => {
 				"This review ran 9 min after a 10 s wait and composed 1 piece of feedback; it reached the developer.",
 			);
 			expect(verdictOf("failed").sentence).toBe(
-				"This review failed after 9 min and recorded 1 observation, but composed no feedback.",
+				"This review failed after 9 min and recorded 1 result, but composed no feedback.",
 			);
 			expect(verdictOf("timed-out").end.kind).toBe("lost");
 			expect(verdictOf("cancelled").sentence).toBe(
@@ -115,18 +115,18 @@ describe("traceVerdict by state group", () => {
 				reason: "withheld (already merged)",
 			});
 		},
-		observations: () => {
-			expect(verdictOf("not-met-silent", observationNode(STATE_OBSERVATION_ID)).sentence).toBe(
-				"This observation was not met but led to no feedback, so the developer was not told.",
+		results: () => {
+			expect(verdictOf("not-met-silent", resultNode(STATE_RESULT_ID)).sentence).toBe(
+				"This result was not met but led to no feedback, so the developer was not told.",
 			);
-			expect(verdictOf("marked-incorrect", observationNode(STATE_OBSERVATION_ID)).sentence).toBe(
-				"This observation was marked incorrect and led to 2 pieces of feedback; one was delivered and has no answer yet, and one was withheld (observation marked incorrect).",
+			expect(verdictOf("marked-incorrect", resultNode(STATE_RESULT_ID)).sentence).toBe(
+				"This result was marked incorrect and led to 2 pieces of feedback; one was delivered and has no answer yet, and one was withheld (result marked incorrect).",
 			);
-			expect(verdictOf("later-review-wrote", observationNode(STATE_OBSERVATION_ID)).end.label).toBe(
+			expect(verdictOf("later-review-wrote", resultNode(STATE_RESULT_ID)).end.label).toBe(
 				"Elsewhere",
 			);
 			expect(verdictOf("empty").sentence).toBe(
-				"This review ran 9 min after a 10 s wait and recorded no observation.",
+				"This review ran 9 min after a 10 s wait and recorded no result.",
 			);
 		},
 		location: () => {
@@ -142,8 +142,8 @@ describe("traceVerdict by state group", () => {
 				"This feedback reached the developer on their practice pages, then was withheld: the author, repository, or base branch is no longer covered by practice review.",
 			);
 			// Ten different ends are counted by kind, not listed one by one.
-			expect(verdictOf("delivery-states", observationNode(STATE_OBSERVATION_ID)).sentence).toBe(
-				"This observation led to 10 pieces of feedback; four are still open, five did not arrive, and one has no known end.",
+			expect(verdictOf("delivery-states", resultNode(STATE_RESULT_ID)).sentence).toBe(
+				"This result led to 10 pieces of feedback; four are still open, five did not arrive, and one has no known end.",
 			);
 		},
 		withholding: () => {
@@ -227,16 +227,16 @@ describe("traceVerdict on the review the stories tell", () => {
 		expect(end.kind).toBe("none");
 	});
 
-	it("tells an observation by what became of each piece written from it", () => {
-		expect(
-			traceVerdict(lineageObservationFocus, observationNode(LINEAGE_OBS.cache404)).sentence,
-		).toBe("This observation led to 1 piece of feedback; it was delivered and answered.");
+	it("tells a result by what became of each piece written from it", () => {
+		expect(traceVerdict(lineageResultFocus, resultNode(LINEAGE_OBS.cache404)).sentence).toBe(
+			"This result led to 1 piece of feedback; it was delivered and answered.",
+		);
 		const { sentence, end } = traceVerdict(
 			lineageDisputedAndResolved,
-			observationNode(LINEAGE_OBS.cache404),
+			resultNode(LINEAGE_OBS.cache404),
 		);
 		expect(sentence).toBe(
-			"This observation led to 2 pieces of feedback; one was delivered and disputed, and one was delivered and resolved by the work.",
+			"This result led to 2 pieces of feedback; one was delivered and disputed, and one was delivered and resolved by the work.",
 		);
 		// The best end of any piece names the path.
 		expect(end.kind).toBe("worked");
@@ -262,10 +262,10 @@ describe("traceVerdict on the review the stories tell", () => {
 });
 
 describe("traceVerdict on a prepared piece, by its channel", () => {
-	const pieceId = lineageObservationFocus.feedback[0]?.id ?? "";
+	const pieceId = lineageResultFocus.feedback[0]?.id ?? "";
 	const prepared = (channel: "IN_CONTEXT" | "IN_APP" | "IN_CHAT"): ReviewLineage => ({
-		...lineageObservationFocus,
-		feedback: lineageObservationFocus.feedback.map((entry) =>
+		...lineageResultFocus,
+		feedback: lineageResultFocus.feedback.map((entry) =>
 			entry.id === pieceId
 				? {
 						...entry,
@@ -291,15 +291,15 @@ describe("traceVerdict on a prepared piece, by its channel", () => {
 		expect(traceVerdict(lineage, feedbackNode(pieceId)).sentence).toBe(
 			`This feedback has not reached the developer yet: ${sentence}.`,
 		);
-		expect(traceVerdict(lineage, observationNode(LINEAGE_OBS.cache404)).sentence).toContain(clause);
+		expect(traceVerdict(lineage, resultNode(LINEAGE_OBS.cache404)).sentence).toContain(clause);
 	});
 });
 
 it("never says a prepared piece on the work or the practice pages goes to a conversation", () => {
 	for (const channel of ["IN_CONTEXT", "IN_APP"] as const) {
 		const lineage: ReviewLineage = {
-			...lineageObservationFocus,
-			feedback: lineageObservationFocus.feedback.map((entry) => ({
+			...lineageResultFocus,
+			feedback: lineageResultFocus.feedback.map((entry) => ({
 				...entry,
 				channel,
 				deliveryState: "PREPARED",

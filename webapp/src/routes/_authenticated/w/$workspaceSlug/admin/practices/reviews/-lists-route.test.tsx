@@ -314,7 +314,7 @@ describe("practice review list routes", () => {
 							location: "SLACK",
 							createdAt: "2026-07-26T16:06:00Z",
 							deliveryState: "DELIVERED",
-							observationCount: 1,
+							resultCount: 1,
 							recipient: { id: 9, login: "grace", name: "Grace Hopper" },
 						},
 					],
@@ -461,8 +461,8 @@ describe("practice review list routes", () => {
 	});
 
 	/**
-	 * The shared scope reaches the reviews endpoint under the names the observation list uses: the
-	 * developer, the practices and the groups that a review recorded an observation of.
+	 * The shared scope reaches the reviews endpoint under the names the result list uses: the
+	 * developer, the practices and the groups that a review recorded a result of.
 	 */
 	it("sends the shared developer, practice, group, range and review to the reviews endpoint", async () => {
 		const { reviewUrls } = recordRequests();
@@ -502,7 +502,7 @@ describe("practice review list routes", () => {
 		expect(screen.getAllByText("Not applied on this list")).toHaveLength(2);
 	});
 
-	/** A group finds the feedback written from observations of any practice in it. */
+	/** A group finds the feedback written from results of any practice in it. */
 	it("sends the group filter to the feedback endpoint", async () => {
 		const { feedbackUrls } = recordRequests();
 
@@ -526,7 +526,7 @@ describe("practice review list routes", () => {
 	 */
 	it.each([
 		["runs", "Created", "Status"],
-		["observations", "Observed", "Outcome"],
+		["results", "Recorded", "Outcome"],
 		["feedback", "Composed", "Channel"],
 	])(
 		"puts the scope above the tabs and the %s tab's own filters below them",
@@ -572,22 +572,20 @@ describe("practice review list routes", () => {
 
 	/** Reset clears the list's own facets; the shared scope stays for this tab and the next. */
 	it("keeps the shared scope when the reader resets the list's own facets", async () => {
-		const { observationUrls } = recordRequests();
+		const { resultUrls } = recordRequests();
 
 		const { router } = renderRouteAtWithRouter(
-			'/w/acme/admin/practices/reviews/observations?subjectUserId=7&outcome=["NOT_MET"]',
+			'/w/acme/admin/practices/reviews/results?subjectUserId=7&outcome=["NOT_MET"]',
 		);
-		await screen.findByText("No observations match these filters", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("No results match these filters", undefined, ROUTE_RENDER_WAIT);
 		await userEvent.click(screen.getByRole("button", { name: "Reset" }));
 
-		await waitFor(() => expect(values(observationUrls.at(-1), "outcome")).toStrictEqual([]));
-		expect(observationUrls.at(-1)?.searchParams.get("subjectUserId")).toBe("7");
+		await waitFor(() => expect(values(resultUrls.at(-1), "outcome")).toStrictEqual([]));
+		expect(resultUrls.at(-1)?.searchParams.get("subjectUserId")).toBe("7");
 		expect(router.state.location.search).toMatchObject({ subjectUserId: 7 });
 
 		await userEvent.click(screen.getByRole("button", { name: "Clear scope" }));
-		await waitFor(() =>
-			expect(observationUrls.at(-1)?.searchParams.get("subjectUserId")).toBeNull(),
-		);
+		await waitFor(() => expect(resultUrls.at(-1)?.searchParams.get("subjectUserId")).toBeNull());
 	});
 
 	/**

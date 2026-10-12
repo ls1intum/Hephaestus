@@ -8,7 +8,7 @@ import {
 	DISCOVERED_VIA_LABELS,
 	SIGNAL_STATE_LABELS,
 } from "@/components/practice-trace/trace-format";
-import type { ObservationOrigin } from "@/components/practice-vocabulary/observation-origin-defs";
+import type { ResultOrigin } from "@/components/practice-vocabulary/result-origin-defs";
 import { DrawerBody } from "@/components/ui/drawer";
 import { hasText } from "@/lib/text";
 
@@ -56,7 +56,7 @@ export interface TraceLevelProps {
 	 */
 	job?: AgentJob;
 	/** How the review came to run, from its row: live, by hand or backfilled. */
-	origin?: ObservationOrigin;
+	origin?: ResultOrigin;
 	/** Where the review stands among the reviews of its work, from its row. */
 	position?: { index: number; total: number };
 	/** The work's record, which the latest moment of work without a review opens. */

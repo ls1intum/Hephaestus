@@ -5,11 +5,11 @@ import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest"
 
 import {
 	feedbackDetail,
-	observationDetail,
+	resultDetail,
 	practiceCounts,
 	reviewFeedback,
 	reviewJob,
-	reviewObservations,
+	reviewResults,
 	reviewPracticeScripts,
 	reviewRuns,
 } from "@/components/admin/practice-reviews/fixtures";
@@ -51,17 +51,17 @@ function heldWorkspaceRead(until: Promise<void>) {
 const REVIEWS = "/w/acme/admin/practices/reviews";
 /**
  * Real version-4 UUIDs: the lists' schema drops a tracked id that is not one, as the fixtures' are.
- * The fixture's review, observation and piece of feedback are served under them.
+ * The fixture's review, result and piece of feedback are served under them.
  */
 const REVIEW = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
-const OBSERVATION_ROW = "9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c";
+const RESULT_ROW = "9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c";
 const FEEDBACK_ROW = "4c2e8a1b-6d3f-4a5c-9e7b-0f1d2c3b4a5e";
-/** The observation of the traced chain that a step opens. */
-const OBSERVATION = LINEAGE_OBS.cache404;
+/** The result of the traced chain that a step opens. */
+const RESULT = LINEAGE_OBS.cache404;
 const TRACE = `trace:review:${REVIEW}`;
 
 const fixtureRun = reviewRuns.find((run) => run.id === LINEAGE_REVIEW_ID);
-const [fixtureObservation] = reviewObservations;
+const [fixtureResult] = reviewResults;
 const [fixtureFeedback] = reviewFeedback;
 
 function page(content: unknown[]) {
@@ -95,8 +95,8 @@ beforeEach(() => {
 		http.get("*/workspaces/:workspaceSlug/practices/reviews", () =>
 			page([{ ...fixtureRun, id: REVIEW }]),
 		),
-		http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", () =>
-			page([{ ...fixtureObservation, id: OBSERVATION_ROW, agentJobId: REVIEW }]),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/results", () =>
+			page([{ ...fixtureResult, id: RESULT_ROW, agentJobId: REVIEW }]),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", () =>
 			page([{ ...fixtureFeedback, id: FEEDBACK_ROW, agentJobId: REVIEW }]),
@@ -105,9 +105,9 @@ beforeEach(() => {
 			HttpResponse.json({ ...reviewJob(LINEAGE_REVIEW_ID), id: String(params.jobId) }),
 		),
 		http.get(
-			"*/workspaces/:workspaceSlug/practices/reviews/observations/:observationId",
+			"*/workspaces/:workspaceSlug/practices/reviews/results/:practiceResultId",
 			({ params }) =>
-				HttpResponse.json({ ...observationDetail(OBSERVATION), id: String(params.observationId) }),
+				HttpResponse.json({ ...resultDetail(RESULT), id: String(params.practiceResultId) }),
 		),
 		...feedbackCountHandlers(),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", ({ params }) =>
@@ -189,22 +189,22 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 		expectNoRecordLinks(sheet);
 	});
 
-	it("tracks an observation from its row: every table narrows to it, and the bar names it", async () => {
-		const first = { ...fixtureObservation, id: OBSERVATION_ROW, agentJobId: REVIEW };
-		assert(fixtureObservation);
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/observations`);
+	it("tracks a result from its row: every table narrows to it, and the bar names it", async () => {
+		const first = { ...fixtureResult, id: RESULT_ROW, agentJobId: REVIEW };
+		assert(fixtureResult);
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}/results`);
 		// The loading table is replaced by the loaded one, so the row is found first and its table after.
 		const track = await screen.findByRole(
 			"button",
-			{ name: `Track observation ${fixtureObservation.summary}` },
+			{ name: `Track result ${fixtureResult.summary}` },
 			ROUTE_RENDER_WAIT,
 		);
-		expect(track.closest("table")?.getAttribute("aria-label")).toBe("Observations");
+		expect(track.closest("table")?.getAttribute("aria-label")).toBe("Results");
 		await userEvent.click(track);
 
 		await waitFor(() =>
 			expect(router.state.location.search).toMatchObject({
-				observationId: first.id,
+				practiceResultId: first.id,
 				agentJobId: first.agentJobId,
 				selected: true,
 			}),
@@ -222,14 +222,14 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 			expect(
 				// The list is read again for the narrowed scope, so the row is found afresh.
 				screen
-					.getByRole("button", { name: `Track observation ${fixtureObservation.summary}` })
+					.getByRole("button", { name: `Track result ${fixtureResult.summary}` })
 					.getAttribute("aria-pressed"),
 			).toBe("true"),
 		);
 		await waitFor(() =>
-			expect(
-				requestsTo("/practices/reviews/observations").at(-1)?.searchParams.get("agentJobId"),
-			).toBe(first.agentJobId),
+			expect(requestsTo("/practices/reviews/results").at(-1)?.searchParams.get("agentJobId")).toBe(
+				first.agentJobId,
+			),
 		);
 	});
 
@@ -336,7 +336,7 @@ describe("a review's sheet", () => {
 	it("asks for what this review's practice scripts did", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId/practice-scripts", () =>
-				HttpResponse.json([reviewPracticeScripts.found]),
+				HttpResponse.json([reviewPracticeScripts.fromCode]),
 			),
 		);
 
@@ -360,7 +360,7 @@ describe("the trace and a record over it", () => {
 		await waitFor(() =>
 			expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
 				TRACE,
-				`observation:${OBSERVATION}`,
+				`result:${RESULT}`,
 			]),
 		);
 		const over = await screen.findByRole(
@@ -368,7 +368,7 @@ describe("the trace and a record over it", () => {
 			{ name: "A cache miss and a permission failure come back as the same 404" },
 			ROUTE_RENDER_WAIT,
 		);
-		// The same sheet as from its row: the observation alone, and no way on to another record.
+		// The same sheet as from its row: the result alone, and no way on to another record.
 		expect(within(over).queryByRole("group", { name: "How this came about" })).toBeNull();
 		expectNoRecordLinks(over);
 		within(over).getByRole("button", { name: "Mark as incorrect" });
@@ -439,7 +439,7 @@ describe("the trace and a record over it", () => {
 		await waitFor(() =>
 			expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
 				TRACE,
-				`observation:${OBSERVATION}`,
+				`result:${RESULT}`,
 			]),
 		);
 		expect(router.state.location.search).not.toHaveProperty("focus");
@@ -457,14 +457,14 @@ describe("the trace and a record over it", () => {
 	it("keeps a sheet over the trace as the deepest level: an address with more keeps the front one", async () => {
 		const { router } = renderRouteAtWithRouter(
 			`${REVIEWS}/runs?detail=${encodeURIComponent(
-				JSON.stringify([TRACE, `review:${REVIEW}`, `observation:${OBSERVATION}`]),
+				JSON.stringify([TRACE, `review:${REVIEW}`, `result:${RESULT}`]),
 			)}`,
 		);
 		await waitFor(
 			() =>
 				expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
 					TRACE,
-					`observation:${OBSERVATION}`,
+					`result:${RESULT}`,
 				]),
 			ROUTE_RENDER_WAIT,
 		);
@@ -479,7 +479,7 @@ describe("the trace and a record over it", () => {
 		const held = deferred<undefined>();
 		server.use(
 			http.get(`*${OTHER}/practices/reviews`, heldWorkspaceRead(held.promise)),
-			http.get(`*${OTHER}/practices/reviews/observations`, heldWorkspaceRead(held.promise)),
+			http.get(`*${OTHER}/practices/reviews/results`, heldWorkspaceRead(held.promise)),
 			http.get(`*${OTHER}/practices/reviews/feedback`, heldWorkspaceRead(held.promise)),
 			http.get(`*${OTHER}/practices/reviews/lineage`, heldWorkspaceRead(held.promise)),
 		);
@@ -587,7 +587,7 @@ describe("a record's sheet is the record alone", () => {
 	 */
 	it.each([
 		["review", `review:${REVIEW}`],
-		["observation", `observation:${OBSERVATION_ROW}`],
+		["result", `result:${RESULT_ROW}`],
 		["feedback", `feedback:${FEEDBACK_ROW}`],
 		["work", "work:issue:1430"],
 		["practice", `practice:${String(practiceCounts[0]?.practiceSlug)}`],
@@ -646,7 +646,7 @@ describe("a sheet over the trace is the sheet from its row", () => {
 	 */
 	it.each([
 		["review", `review:${REVIEW}`],
-		["observation", `observation:${OBSERVATION_ROW}`],
+		["result", `result:${RESULT_ROW}`],
 		["feedback", `feedback:${FEEDBACK_ROW}`],
 		["work", "work:issue:1430"],
 		["practice", `practice:${String(practiceCounts[0]?.practiceSlug)}`],
@@ -695,16 +695,16 @@ describe("the trace of work no review started on", () => {
 });
 
 describe("deep links", () => {
-	it("opens a review's page address that focused an observation as that observation's trace, keeping the selection and the scope", async () => {
+	it("opens a review's page address that focused a result as that result's trace, keeping the selection and the scope", async () => {
 		const { router } = renderRouteAtWithRouter(
-			`${REVIEWS}/review/${REVIEW}?focus=observation:${OBSERVATION}&agentJobId=${REVIEW}&selected=true&practiceSlug=thin-controllers&from=2026-08-01&subjectUserId=7`,
+			`${REVIEWS}/review/${REVIEW}?focus=result:${RESULT}&agentJobId=${REVIEW}&selected=true&practiceSlug=thin-controllers&from=2026-08-01&subjectUserId=7`,
 		);
 		await waitFor(
 			() => expect(router.state.location.pathname).toBe(`${REVIEWS}/runs`),
 			ROUTE_RENDER_WAIT,
 		);
 		expect(router.state.location.search).toMatchObject({
-			detail: `trace:observation:${OBSERVATION}`,
+			detail: `trace:result:${RESULT}`,
 			agentJobId: REVIEW,
 			selected: true,
 			practiceSlug: "thin-controllers",
@@ -713,20 +713,20 @@ describe("deep links", () => {
 		});
 		expect(router.state.location.search).not.toHaveProperty("focus");
 		const sheet = await traceSheet();
-		await waitFor(() => expect(startedAt(sheet)).toBe(`observation:${OBSERVATION}`));
+		await waitFor(() => expect(startedAt(sheet)).toBe(`result:${RESULT}`));
 	});
 
 	it("opens an old review level as the review's sheet", async () => {
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/observations?detail=review:${REVIEW}`);
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}/results?detail=review:${REVIEW}`);
 		const sheet = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
 		await within(sheet).findByRole("heading", { name: "State and history" }, ROUTE_RENDER_WAIT);
-		expect(router.state.location.pathname).toBe(`${REVIEWS}/observations`);
+		expect(router.state.location.pathname).toBe(`${REVIEWS}/results`);
 		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([`review:${REVIEW}`]);
 	});
 
 	it("drops a step an old address still names", async () => {
 		const { router } = renderRouteAtWithRouter(
-			`${REVIEWS}/runs?detail=review:${REVIEW}&focus=observations`,
+			`${REVIEWS}/runs?detail=review:${REVIEW}&focus=results`,
 		);
 		await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
 		expect(router.state.location.search).not.toHaveProperty("focus");

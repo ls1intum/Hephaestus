@@ -24,12 +24,12 @@ import {
 	FEEDBACK_DISPATCH_STATE_DEFS,
 } from "@/components/practice-vocabulary/feedback-dispatch-defs";
 import { FEEDBACK_WITHDRAWN_DEF } from "@/components/practice-vocabulary/feedback-withdrawal-defs";
-import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/result-dispute-defs";
 import {
 	deliveredPlacementType,
 	PLACEMENT_DEFS,
 	placementLabel,
 } from "@/components/practice-vocabulary/placement-defs";
+import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/result-dispute-defs";
 import { WITHHOLDING_REASON_DEFS } from "@/components/practice-vocabulary/withholding-defs";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { hasText } from "@/lib/text";

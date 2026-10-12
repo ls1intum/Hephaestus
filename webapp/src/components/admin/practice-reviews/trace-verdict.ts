@@ -2,7 +2,7 @@ import type {
 	AgentJob,
 	ReviewLineage,
 	ReviewLineageFeedback,
-	ReviewLineageObservation,
+	ReviewLineageResult,
 	TracedSignal,
 } from "@/api/types.gen";
 import type { BadgeVariant } from "@/components/common/status-def";
@@ -31,7 +31,7 @@ import { mergeTiming } from "./trace-bottleneck";
  * - `lost`: it did not arrive, or no longer stands: withheld, rejected, replaced, failed.
  * - `open`: it is still on its way, or delivered with no answer yet; a review still runs.
  * - `answered`: the developer answered it, which stays private to them, or disputed it.
- * - `none`: nothing was sent, and nothing had to be: a met observation, a review with nothing to say.
+ * - `none`: nothing was sent, and nothing had to be: a met result, a review with nothing to say.
  */
 export type TraceEndKind = "worked" | "lost" | "open" | "answered" | "none";
 
@@ -412,7 +412,7 @@ function withheldSentence(
 }
 
 // ------------------------------------------------------------------------------------------------
-// Several pieces: an observation's, a review's
+// Several pieces: a result's, a review's
 // ------------------------------------------------------------------------------------------------
 
 const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
@@ -532,22 +532,19 @@ function endOfMany(feedback: readonly ReviewLineageFeedback[]): TraceEnd {
 }
 
 // ------------------------------------------------------------------------------------------------
-// An observation
+// A result
 // ------------------------------------------------------------------------------------------------
 
-function observationVerdict(
-	lineage: ReviewLineage,
-	observation: ReviewLineageObservation,
-): TraceVerdict {
+function resultVerdict(lineage: ReviewLineage, result: ReviewLineageResult): TraceVerdict {
 	const written = lineage.feedback
-		.filter((entry) => entry.observationIds.includes(observation.id))
+		.filter((entry) => entry.practiceResultIds.includes(result.id))
 		.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-	const marked = observation.invalidated ? "This observation was marked incorrect" : undefined;
+	const marked = result.invalidated ? "This result was marked incorrect" : undefined;
 	if (written.length > 0) {
 		const fates = written.map(feedbackFate);
 		const led = `led to ${countOf(written.length, "piece", "pieces")} of feedback`;
 		return {
-			sentence: `${marked === undefined ? "This observation" : `${marked} and`} ${led}; ${fatesClause(fates)}.`,
+			sentence: `${marked === undefined ? "This result" : `${marked} and`} ${led}; ${fatesClause(fates)}.`,
 			end: endOfMany(written),
 		};
 	}
@@ -557,53 +554,52 @@ function observationVerdict(
 	if (marked !== undefined) {
 		return {
 			sentence: `${marked}, so no feedback from it reached the developer.`,
-			end: end("lost", "an admin marked it incorrect", { at: observation.markedIncorrectAt }),
+			end: end("lost", "an admin marked it incorrect", { at: result.markedIncorrectAt }),
 		};
 	}
-	switch (observation.outcome) {
+	switch (result.outcome) {
 		case "NOT_MET": {
 			if (running) {
 				return {
-					sentence: "This observation has led to no feedback yet, because the review still runs.",
+					sentence: "This result has led to no feedback yet, because the review still runs.",
 					end: end("open", "the review still runs", { since: lineage.review?.createdAt }),
 				};
 			}
 			if (stopped) {
 				return {
 					sentence:
-						"This observation led to no feedback, because the review stopped before it composed any.",
+						"This result led to no feedback, because the review stopped before it composed any.",
 					end: end("lost", "the review stopped before it composed feedback", {
 						at: lineage.review?.finishedAt,
 					}),
 				};
 			}
-			if (observation.feedbackCount > observation.ownFeedbackCount) {
+			if (result.feedbackCount > result.ownFeedbackCount) {
 				return {
-					sentence: "This observation led to no feedback in this review; a later review wrote it.",
+					sentence: "This result led to no feedback in this review; a later review wrote it.",
 					end: end("none", "a later review wrote the feedback", { label: "Elsewhere" }),
 				};
 			}
 			return {
-				sentence:
-					"This observation was not met but led to no feedback, so the developer was not told.",
+				sentence: "This result was not met but led to no feedback, so the developer was not told.",
 				end: end("lost", "no feedback was written from it"),
 			};
 		}
 		case "MET": {
 			return {
-				sentence: "This observation was met and led to no feedback.",
+				sentence: "This result was met and led to no feedback.",
 				end: end("none", "it was met, so nothing had to be sent"),
 			};
 		}
 		case "NOT_APPLICABLE": {
 			return {
-				sentence: "This observation did not apply to the work, so it led to no feedback.",
+				sentence: "This result did not apply to the work, so it led to no feedback.",
 				end: end("none", "the practice did not apply"),
 			};
 		}
 		case "UNDETERMINED": {
 			return {
-				sentence: "This observation stayed undetermined, so it led to no feedback.",
+				sentence: "This result could not be determined, so it led to no feedback.",
 				end: end("none", "the review could not tell"),
 			};
 		}
@@ -628,8 +624,8 @@ function reviewVerdict(
 	const own = lineage.feedback
 		.filter((entry) => entry.agentJobId === review.id)
 		.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-	const observed = lineage.observations.filter((entry) => entry.agentJobId === review.id).length;
-	const recorded = countOf(observed, "observation", "observations");
+	const observed = lineage.results.filter((entry) => entry.agentJobId === review.id).length;
+	const recorded = countOf(observed, "result", "results");
 	const ranFrom = review.startedAt ?? review.createdAt;
 	const ran =
 		review.finishedAt === undefined ? undefined : durationBetween(ranFrom, review.finishedAt);
@@ -639,7 +635,7 @@ function reviewVerdict(
 			? durationBetween(review.createdAt, review.startedAt)
 			: undefined;
 
-	if (lineage.moreObservations > 0 || lineage.moreFeedback > 0) {
+	if (lineage.moreResults > 0 || lineage.moreFeedback > 0) {
 		const phase = {
 			QUEUED: "queued",
 			RUNNING: "running",
@@ -649,7 +645,7 @@ function reviewVerdict(
 			COMPLETED: "completed",
 		}[review.phase];
 		return {
-			sentence: `This review is ${phase}; ${recorded} and ${countOf(own.length, "piece", "pieces")} of feedback from it are listed, while ${countOf(lineage.moreObservations, "additional observation", "additional observations")} and ${countOf(lineage.moreFeedback, "additional piece", "additional pieces")} of feedback in the chain are not listed.`,
+			sentence: `This review is ${phase}; ${recorded} and ${countOf(own.length, "piece", "pieces")} of feedback from it are listed, while ${countOf(lineage.moreResults, "additional result", "additional results")} and ${countOf(lineage.moreFeedback, "additional piece", "additional pieces")} of feedback in the chain are not listed.`,
 			end:
 				own.length > 0
 					? endOfMany(own)
@@ -678,7 +674,7 @@ function reviewVerdict(
 			return {
 				sentence:
 					observed === 0
-						? "This review still runs and has recorded no observation yet."
+						? "This review still runs and has recorded no result yet."
 						: `This review still runs and has recorded ${recorded} so far.`,
 				end: end("open", "the review still runs", { since: ranFrom }),
 			};
@@ -738,8 +734,8 @@ function reviewVerdict(
 		.join(" ");
 	if (observed === 0) {
 		return {
-			sentence: `This review ${how} and recorded no observation.`,
-			end: end("none", "the review recorded no observation"),
+			sentence: `This review ${how} and recorded no result.`,
+			end: end("none", "the review recorded no result"),
 		};
 	}
 	const composed = own.length;
@@ -751,7 +747,7 @@ function reviewVerdict(
 				silent > 0
 					? end(
 							"lost",
-							`${countOf(silent, "not-met observation", "not-met observations")} led to no feedback`,
+							`${countOf(silent, "not-met result", "not-met results")} led to no feedback`,
 						)
 					: end("none", "no feedback was composed"),
 		};
@@ -781,8 +777,8 @@ function reviewVerdict(
 
 /**
  * The verdict on the record in front and the end of its path, read from the chain alone: no model
- * writes it, so the same chain always says the same thing. A review, its observations step and the
- * work tell the review; an observation and a piece of feedback tell themselves. A record the chain
+ * writes it, so the same chain always says the same thing. A review, its results step and the
+ * work tell the review; a result and a piece of feedback tell themselves. A record the chain
  * does not list falls back to the review.
  */
 export function traceVerdict(
@@ -796,10 +792,10 @@ export function traceVerdict(
 			return { sentence: feedbackSentence(lineage, feedback), end: feedbackFate(feedback).end };
 		}
 	}
-	if (here?.kind === "observation") {
-		const observation = lineage.observations.find((entry) => entry.id === here.id);
-		if (observation !== undefined) {
-			return observationVerdict(lineage, observation);
+	if (here?.kind === "result") {
+		const result = lineage.results.find((entry) => entry.id === here.id);
+		if (result !== undefined) {
+			return resultVerdict(lineage, result);
 		}
 	}
 	return reviewVerdict(lineage, reviewOutcome);

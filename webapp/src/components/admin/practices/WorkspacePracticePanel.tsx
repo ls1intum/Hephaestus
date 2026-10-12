@@ -149,7 +149,7 @@ export function WorkspacePracticePanel({
 
 			<DrawerFooter>
 				<Link
-					to="/w/$workspaceSlug/admin/practices/reviews/observations"
+					to="/w/$workspaceSlug/admin/practices/reviews/results"
 					params={{ workspaceSlug }}
 					search={{ practiceSlug: [practice.slug] }}
 					className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}

@@ -552,7 +552,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     admission,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.empty());
+                    Optional.empty(),
+                    mock(LinkedRepairFollowups.class));
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
             when(memberAiPolicy.binding(eq(99L), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))

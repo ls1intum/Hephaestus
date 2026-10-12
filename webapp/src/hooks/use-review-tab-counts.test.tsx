@@ -10,14 +10,14 @@ import { USER_VIEW_STORAGE_KEY } from "@/runtime/user-view/session";
 import { useReviewTabCounts } from "./use-review-tab-counts";
 
 const MINUTE = 60_000;
-const initial = { runs: 10, observations: 20, feedback: 30 };
+const initial = { runs: 10, results: 20, feedback: 30 };
 
 function countReads(status = 200) {
 	let totals = initial;
 	const reads: URL[] = [];
 	const endpoints = [
 		["runs", ""],
-		["observations", "/observations"],
+		["results", "/results"],
 		["feedback", "/feedback"],
 	] as const;
 	server.use(
@@ -34,7 +34,7 @@ function countReads(status = 200) {
 	return {
 		reads,
 		change: () => {
-			totals = { runs: 11, observations: 22, feedback: 33 };
+			totals = { runs: 11, results: 22, feedback: 33 };
 		},
 	};
 }
@@ -74,7 +74,7 @@ describe("practice review tab totals", () => {
 				await vi.advanceTimersByTimeAsync(MINUTE);
 			});
 			await waitFor(() =>
-				expect(result.current).toStrictEqual({ runs: 11, observations: 22, feedback: 33 }),
+				expect(result.current).toStrictEqual({ runs: 11, results: 22, feedback: 33 }),
 			);
 			expect(wire.reads).toHaveLength(6);
 			for (const url of wire.reads) {
@@ -123,7 +123,7 @@ describe("practice review tab totals", () => {
 
 	it.each([
 		{ status: 200, expected: initial },
-		{ status: 500, expected: { runs: undefined, observations: undefined, feedback: undefined } },
+		{ status: 500, expected: { runs: undefined, results: undefined, feedback: undefined } },
 	])(
 		"does not repeat audited user-view reads after a $status response",
 		async ({ status, expected }) => {

@@ -5,8 +5,8 @@ import {
 	getPracticeReviewOverviewOptions,
 	listPracticeReviewResultsInfiniteOptions,
 } from "@/api/@tanstack/react-query.gen";
+import { PracticeResultsSummary } from "@/components/admin/practice-reviews/PracticeResultsSummary";
 import { ResultsListPage } from "@/components/admin/practice-reviews/ResultsListPage";
-import { PracticeObservationsSummary } from "@/components/admin/practice-reviews/PracticeObservationsSummary";
 import { practiceReviewsHead } from "@/components/admin/practice-reviews/review-levels";
 import {
 	dateWindowQuery,
@@ -109,7 +109,7 @@ function PracticeSummaryRead({
 	});
 	const range = toDateRange(search);
 	return (
-		<PracticeObservationsSummary
+		<PracticeResultsSummary
 			workspaceSlug={workspaceSlug}
 			practiceSlug={practiceSlug}
 			practiceName={practiceName}

@@ -5,15 +5,15 @@ import { hasText } from "@/lib/text";
  * The tabs under Practice reviews, each of which keeps the shared scope in its URL, and the Reviews
  * tab's second list, the work no review started on (`unreviewed`), which applies less of it.
  */
-export type ReviewTab = "overview" | "runs" | "unreviewed" | "observations" | "feedback";
+export type ReviewTab = "overview" | "runs" | "unreviewed" | "results" | "feedback";
 
 /**
  * The narrowing that follows the reader from tab to tab: one person, a set of practices and groups, a
- * range of days, and the selection — the work, the review or the observation a list was opened for
+ * range of days, and the selection — the work, the review or the result a list was opened for
  * (`review-selection.ts`).
  *
  * The person has one value but two URL names. The feedback list names the person a piece of feedback
- * is addressed to, `recipientUserId`. Every other tab names the developer an observation is about,
+ * is addressed to, `recipientUserId`. Every other tab names the developer a result is about,
  * `subjectUserId`. Thus, an address that worked before the scope was shared still works.
  */
 export interface ReviewScope {
@@ -25,7 +25,7 @@ export interface ReviewScope {
 	agentJobId?: string;
 	artifactKind?: KnownArtifactKind;
 	artifactId?: number;
-	observationId?: string;
+	practiceResultId?: string;
 	/** A tracked piece of feedback; its review is `agentJobId`. */
 	feedbackId?: string;
 	/** A tracked practice: every list narrows to it, whatever the practice filter holds. */
@@ -41,17 +41,10 @@ export interface ReviewScopeSearch extends Omit<ReviewScope, "personId"> {
 }
 
 /** One part of the scope, as the toolbar shows it. */
-export type ScopeFacet =
-	| "person"
-	| "group"
-	| "practice"
-	| "dates"
-	| "review"
-	| "work"
-	| "observation";
+export type ScopeFacet = "person" | "group" | "practice" | "dates" | "review" | "work" | "result";
 
 /** The selection applies on every list: each one narrows to what follows from it. */
-const SELECTION: readonly ScopeFacet[] = ["review", "work", "observation"];
+const SELECTION: readonly ScopeFacet[] = ["review", "work", "result"];
 
 /**
  * Which parts of the scope each tab's endpoint can filter by. A part a tab cannot apply stays in its
@@ -62,7 +55,7 @@ export const SCOPE_APPLIES: Record<ReviewTab, readonly ScopeFacet[]> = {
 	// Work no review read has no developer, practice or group yet: only when it happened, and which.
 	unreviewed: ["dates", "work"],
 	runs: ["person", "group", "practice", "dates", ...SELECTION],
-	observations: ["person", "group", "practice", "dates", ...SELECTION],
+	results: ["person", "group", "practice", "dates", ...SELECTION],
 	feedback: ["person", "group", "practice", "dates", ...SELECTION],
 };
 
@@ -80,7 +73,7 @@ export function readScope(search: ReviewScopeSearch): ReviewScope {
 		agentJobId: search.agentJobId,
 		artifactKind: search.artifactKind,
 		artifactId: search.artifactKind ? search.artifactId : undefined,
-		observationId: search.observationId,
+		practiceResultId: search.practiceResultId,
 		feedbackId: search.feedbackId,
 		selectedPractice: search.selectedPractice,
 		selected: search.selected,
@@ -121,7 +114,7 @@ export function clearedScope(): ReviewScopeSearch {
 		agentJobId: undefined,
 		artifactKind: undefined,
 		artifactId: undefined,
-		observationId: undefined,
+		practiceResultId: undefined,
 		feedbackId: undefined,
 		selectedPractice: undefined,
 		selected: undefined,
@@ -149,8 +142,8 @@ export function setScopeFacets(scope: ReviewScope): ScopeFacet[] {
 	if (scope.artifactKind !== undefined) {
 		set.push("work");
 	}
-	if (hasText(scope.observationId)) {
-		set.push("observation");
+	if (hasText(scope.practiceResultId)) {
+		set.push("result");
 	}
 	return set;
 }

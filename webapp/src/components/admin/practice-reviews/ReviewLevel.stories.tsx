@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 
+import { practiceScriptRuns } from "@/components/practice-trace/fixtures";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
@@ -42,7 +43,7 @@ const groups = (
 /**
  * One review's sheet, and only the review, in the order every record sheet has: a status line,
  * What it is, State and history, the practices it answered, Technical (closed) and the actions.
- * Its observations, its feedback and when that was read are its trace; the other moments and the
+ * Its results, its feedback and when that was read are its trace; the other moments and the
  * merge are the work's.
  */
 const meta = {
@@ -505,12 +506,14 @@ export const Loading: Story = {
 
 /** The model with the tier of the assignment it ran on, so a reader sees where the work went. */
 export const ModelWithTier: Story = {
-	args: { job: { status: "ready", job: { ...job, model: "gpt-5-nano", dataHandlingTier: "CLOUD" } } },
+	args: {
+		job: { status: "ready", job: { ...job, model: "gpt-5-nano", dataHandlingTier: "CLOUD" } },
+	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		const model = panel.getAllByRole("term").find((term) => term.textContent === "Model");
 		// The tier is its icon, as on every other surface; its name is for a screen reader.
-		await expect(model?.nextElementSibling).toHaveTextContent(/gpt-5-nano\s*Cloud$/u);
+		await expect(model?.nextElementSibling).toHaveTextContent(/^gpt-5-nano · .+\s*Cloud$/u);
 		await expect(panel.getByText("Cloud")).toHaveClass("sr-only");
 		// The calls are the review model's: a practice script's own models are counted elsewhere.
 		await expect(panel.getByText("Review model calls")).toBeVisible();
@@ -525,7 +528,11 @@ export const WithPracticeScripts: Story = {
 	args: {
 		practiceScript: {
 			status: "ready",
-			scripts: [reviewPracticeScripts.found, reviewPracticeScripts.callsNotRated, reviewPracticeScripts.failed],
+			scripts: [
+				reviewPracticeScripts.fromCode,
+				reviewPracticeScripts.callsNotRated,
+				reviewPracticeScripts.failed,
+			],
 		},
 	},
 	play: async () => {
@@ -545,9 +552,7 @@ export const WithPracticeScripts: Story = {
 export const WithoutPracticeScripts: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		await expect(
-			panel.queryByRole("region", { name: "Practice scripts" }),
-		).not.toBeInTheDocument();
+		await expect(panel.queryByRole("region", { name: "Practice scripts" })).not.toBeInTheDocument();
 	},
 };
 
@@ -571,5 +576,49 @@ export const PracticeScriptFailedToLoad: Story = {
 			throw new Error("This story is the error branch");
 		}
 		await expect(args.practiceScript.onRetry).toHaveBeenCalledOnce();
+	},
+};
+
+/**
+ * Under Every practice, each practice that ran a program says how it ran, with at most one link that
+ * fixes the cause. The reasons are in the section Practice scripts on the same sheet, so the line
+ * has no Details link.
+ */
+export const ProgramLines: Story = {
+	args: {
+		trace: (() => {
+			const trace = reviewTraceOf(job);
+			const [first, second, ...rest] = trace.practices;
+			if (first === undefined || second === undefined) {
+				throw new Error("The trace fixture needs two practices");
+			}
+			return {
+				status: "ready" as const,
+				trace: {
+					...trace,
+					practices: [
+						{ ...first, practiceScript: practiceScriptRuns.skipped },
+						{ ...second, practiceScript: practiceScriptRuns.builtin },
+						...rest,
+					],
+				},
+			};
+		})(),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const practices = within(panel.getByRole("list", { name: "Every practice in this review" }));
+		await expect(
+			practices.getByText(
+				/^Practice script did not run: no decision model was set for this review\./u,
+			),
+		).toBeVisible();
+		await expect(
+			practices.getByText(/^Built-in review returned a result through the review\./u),
+		).toBeVisible();
+		await expect(
+			practices.getAllByRole("link", { name: /^Assign a decision model/u }),
+		).toHaveLength(1);
+		await expect(practices.queryByRole("link", { name: /^Details/u })).not.toBeInTheDocument();
 	},
 };

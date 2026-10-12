@@ -1,7 +1,7 @@
 import type {
 	ReviewLineage,
 	ReviewLineageFeedback,
-	ReviewLineageObservation,
+	ReviewLineageResult,
 	ReviewedWorkRef,
 } from "@/api/types.gen";
 import type { BadgeVariant, StatusDef } from "@/components/common/status-def";
@@ -123,7 +123,7 @@ const SHORT_REASON: Record<WithholdingReason, string> = {
 	COMPOSER_DEDUPED: "near duplicate",
 	COMPOSER_WITHHELD: "held back by the review",
 	REPEATS_DELIVERED_NOTE: "repeats a posted note",
-	OBSERVATION_INVALIDATED: "observation marked incorrect",
+	OBSERVATION_INVALIDATED: "result marked incorrect",
 	VOLUME_CAPPED: "over the volume limit",
 	RECIPIENT_OPTED_OUT: "developer opted out",
 	REACTED_DISPUTED: "disputed before",
@@ -243,81 +243,77 @@ export function gapLabel(from: Date, to: Date): string {
 
 const OUTCOME_ORDER: readonly Outcome[] = ["NOT_MET", "MET", "UNDETERMINED", "NOT_APPLICABLE"];
 
-/** The observations by verdict, worst first, with the zeroes left out. */
+/** The results by verdict, worst first, with the zeroes left out. */
 export function verdictCounts(
-	observations: readonly ReviewLineageObservation[],
+	results: readonly ReviewLineageResult[],
 ): { outcome: Outcome; count: number }[] {
 	return OUTCOME_ORDER.map((outcome) => ({
 		outcome,
-		count: observations.filter((observation) => observation.outcome === outcome).length,
+		count: results.filter((result) => result.outcome === outcome).length,
 	})).filter((entry) => entry.count > 0);
 }
 
-/** "5 observations: 3 not met, 2 met". The ones the list leaves out are counted, not judged. */
-export function verdictSummary(lineage: Pick<ReviewLineage, "observations" | "moreObservations">) {
-	const total = lineage.observations.length + lineage.moreObservations;
-	const parts = verdictCounts(lineage.observations).map(
+/** "5 results: 3 not met, 2 met". The ones the list leaves out are counted, not judged. */
+export function verdictSummary(lineage: Pick<ReviewLineage, "results" | "moreResults">) {
+	const total = lineage.results.length + lineage.moreResults;
+	const parts = verdictCounts(lineage.results).map(
 		({ outcome, count }) => `${count} ${OUTCOME_DEFS[outcome].label.toLowerCase()}`,
 	);
-	if (lineage.moreObservations > 0) {
-		parts.push(`${lineage.moreObservations} not listed`);
+	if (lineage.moreResults > 0) {
+		parts.push(`${lineage.moreResults} not listed`);
 	}
-	return `${countOf(total, "observation", "observations")}: ${parts.join(", ")}`;
+	return `${countOf(total, "result", "results")}: ${parts.join(", ")}`;
 }
 
 export function countOf(count: number, singular: string, plural: string): string {
 	return `${count} ${count === 1 ? singular : plural}`;
 }
 
-export interface NumberedObservation {
-	observation: ReviewLineageObservation;
+export interface NumberedResult {
+	result: ReviewLineageResult;
 	number: number;
 }
 
-/** The numbered observations by id, as `numberedObservations` numbers them. */
-export type NumberedById = ReadonlyMap<string, NumberedObservation>;
+/** The numbered results by id, as `numberedResults` numbers them. */
+export type NumberedById = ReadonlyMap<string, NumberedResult>;
 
 /**
- * The observations in the order the chain numbers them: by when they were observed, then by id,
+ * The results in the order the chain numbers them: by when they were observed, then by id,
  * grouped by practice in the order a practice was first observed. The number is the position, from
  * 1. The order rests on the review alone, never on the record a trace was opened from or the order
- * the lineage lists them in, so an observation keeps its number in every trace of its review.
+ * the lineage lists them in, so a result keeps its number in every trace of its review.
  */
-export function numberedObservations(
-	observations: readonly ReviewLineageObservation[],
-): NumberedObservation[] {
-	const byTime = [...observations].sort(
+export function numberedResults(results: readonly ReviewLineageResult[]): NumberedResult[] {
+	const byTime = [...results].sort(
 		(a, b) => a.observedAt.getTime() - b.observedAt.getTime() || a.id.localeCompare(b.id, "en"),
 	);
-	const groups = new Map<string, ReviewLineageObservation[]>();
-	for (const observation of byTime) {
-		const group = groups.get(observation.practiceSlug) ?? [];
-		group.push(observation);
-		groups.set(observation.practiceSlug, group);
+	const groups = new Map<string, ReviewLineageResult[]>();
+	for (const result of byTime) {
+		const group = groups.get(result.practiceSlug) ?? [];
+		group.push(result);
+		groups.set(result.practiceSlug, group);
 	}
-	return [...groups.values()]
-		.flat()
-		.map((observation, index) => ({ observation, number: index + 1 }));
+	return [...groups.values()].flat().map((result, index) => ({ result, number: index + 1 }));
 }
 
 /**
- * Not-met observations of the review that led to no feedback of its own. A met, not applicable or
+ * Not-met results of the review that led to no feedback of its own. A met, not applicable or
  * undetermined one rarely leads to feedback, so it is no loss; feedback a later review wrote from
  * one does not count for this review.
  */
-export function silentNotMet(lineage: ReviewLineage): ReviewLineageObservation[] {
+export function silentNotMet(lineage: ReviewLineage): ReviewLineageResult[] {
 	const reviewId = lineage.review?.id;
-	return lineage.observations.filter(
-		(observation) =>
-			observation.outcome === "NOT_MET" &&
-			(reviewId === undefined || observation.agentJobId === reviewId) &&
-			observation.ownFeedbackCount === 0,
+	return lineage.results.filter(
+		(result) =>
+			result.outcome === "NOT_MET" &&
+			(reviewId === undefined || result.agentJobId === reviewId) &&
+			result.ownFeedbackCount === 0,
 	);
 }
 
 /** How far the chain got, step by step: observed, written, reached the developer, answered. */
 export interface StageCounts {
-	observations: number;
+	results: number;
 	feedback: number;
 	reached: number;
 	answered: number;
@@ -332,7 +328,7 @@ export function stageCounts(lineage: ReviewLineage): StageCounts {
 	);
 	const reached = own.filter(reachedDeveloper);
 	return {
-		observations: lineage.observations.filter(
+		results: lineage.results.filter(
 			(entry) => reviewId === undefined || entry.agentJobId === reviewId,
 		).length,
 		feedback: own.length,

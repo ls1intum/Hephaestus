@@ -5,7 +5,7 @@ import type {
 	ReviewLineage,
 	ReviewLineageFeedback,
 	ReviewLineageMoment,
-	ReviewLineageObservation,
+	ReviewLineageResult,
 } from "@/api/types.gen";
 import type { StatusDef } from "@/components/common/status-def";
 import { REVIEW_RUN_MARKER_DEFS } from "@/components/practice-vocabulary/review-run-marker-defs";
@@ -15,7 +15,7 @@ import {
 } from "@/components/practice-vocabulary/review-status-defs";
 
 import { holdReasonCopy } from "./job-utils";
-import { type NumberedObservation, numberedObservations } from "./lineage-chain";
+import { type NumberedResult, numberedResults } from "./lineage-chain";
 import { reviewMoments, type TraceNode } from "./review-trace";
 
 /**
@@ -29,7 +29,7 @@ export interface ReviewStepState {
 	title: string;
 	/** One line under it, where the state needs one: why it waits, why it assessed nothing. */
 	note?: string;
-	/** The review did not get as far as observing, so an empty observation step says why. */
+	/** The review did not get as far as observing, so an empty result step says why. */
 	assessedNothing?: string;
 }
 
@@ -89,11 +89,11 @@ export function reviewStepState(
 	const def = REVIEW_STATUS_DEFS[phase];
 	const assessedNothing: Partial<Record<AgentJob["status"], string>> = {
 		QUEUED: "The review has not started, so it has observed nothing yet.",
-		RUNNING: "Observations appear as the review reaches each practice.",
-		COMPLETED: "The review ran to the end and recorded no observation.",
-		FAILED: "The review stopped before it recorded an observation.",
-		TIMED_OUT: "The review ran out of time before it recorded an observation.",
-		CANCELLED: "The review was canceled before it recorded an observation.",
+		RUNNING: "Results appear as the review reaches each practice.",
+		COMPLETED: "The review ran to the end and recorded no result.",
+		FAILED: "The review stopped before it recorded a result.",
+		TIMED_OUT: "The review ran out of time before it recorded a result.",
+		CANCELLED: "The review was canceled before it recorded a result.",
 	};
 	return {
 		def,
@@ -117,21 +117,21 @@ export const TRACE_STAGE_LABELS: Record<TraceStage, string> = {
 /**
  * One step on the rail. The work heads the rail and has no time. The moment that started the
  * review is the start; what happened before it folds into one "Before this review" step. The
- * review, a later moment folded into it and its observations are the review stage. The feedback,
+ * review, a later moment folded into it and its results are the review stage. The feedback,
  * the merge where it fell after the start and the line of siblings are the feedback stage. The end
  * of the record's path is the effect.
  */
 export type RailItem =
 	| { kind: "moment"; key: string; at: Date; moment: ReviewLineageMoment }
 	| { kind: "review"; key: "review"; at: Date }
-	| { kind: "observations"; key: "observations"; at: Date | undefined }
+	| { kind: "results"; key: "results"; at: Date | undefined }
 	| { kind: "feedback"; key: string; at: Date; feedback: ReviewLineageFeedback }
 	| { kind: "before"; key: "before"; at: undefined; items: RailItem[] }
 	| {
 			kind: "siblings";
 			key: "siblings";
 			at: undefined;
-			observations: number;
+			results: number;
 			feedback: number;
 	  }
 	| { kind: "end"; key: "end"; at: undefined };
@@ -145,7 +145,7 @@ const RANK: Record<RailItem["kind"], number> = {
 	before: -1,
 	moment: 0,
 	review: 1,
-	observations: 2,
+	results: 2,
 	feedback: 3,
 	siblings: 4,
 	end: 5,
@@ -166,7 +166,7 @@ export function traceStart(lineage: ReviewLineage): Date | undefined {
 
 /** The siblings the simple story folds into one line. */
 export interface StorySiblings {
-	observations: number;
+	results: number;
 	feedback: number;
 }
 
@@ -224,12 +224,12 @@ export function storyRail(
 		staged.review.push({ kind: "review", key: "review", at: new Date(0) });
 	}
 	const reviewId = lineage.review?.id;
-	const own = lineage.observations.filter(
+	const own = lineage.results.filter(
 		(entry) => reviewId === undefined || entry.agentJobId === reviewId,
 	);
 	staged.review.push({
-		kind: "observations",
-		key: "observations",
+		kind: "results",
+		key: "results",
 		at: earliest(own.map((entry) => entry.observedAt)),
 	});
 	for (const entry of feedback) {
@@ -241,7 +241,7 @@ export function storyRail(
 		};
 		(earlier(entry.createdAt) ? before : staged.feedback).push(item);
 	}
-	if (siblings !== undefined && siblings.observations + siblings.feedback > 0) {
+	if (siblings !== undefined && siblings.results + siblings.feedback > 0) {
 		staged.feedback.push({ kind: "siblings", key: "siblings", at: undefined, ...siblings });
 	}
 	staged.effect.push({ kind: "end", key: "end", at: undefined });
@@ -259,7 +259,7 @@ export function storyRail(
 	}));
 }
 
-/** A step with no time of its own keeps its place by kind: observations first, the siblings last. */
+/** A step with no time of its own keeps its place by kind: results first, the siblings last. */
 function inTimeOrder(items: readonly RailItem[]): RailItem[] {
 	return [...items].sort((a, b) => {
 		const at = a.at?.getTime();
@@ -297,17 +297,17 @@ export function writtenBy(
 		: "a later review";
 }
 
-/** An observation another review recorded: one this review did not ask again, since that one had answered. */
+/** A result another review recorded: one this review did not ask again, since that one had answered. */
 export function answeredEarlier(
-	observation: Pick<ReviewLineageObservation, "agentJobId">,
+	result: Pick<ReviewLineageResult, "agentJobId">,
 	review: ReviewLineage["review"],
 ): boolean {
-	return review !== undefined && observation.agentJobId !== review.id;
+	return review !== undefined && result.agentJobId !== review.id;
 }
 
 /**
  * The story around the record the reader came from. A review or the work tells the whole review. An
- * observation tells the feedback written from it, and a piece of feedback tells itself and the
+ * result tells the feedback written from it, and a piece of feedback tells itself and the
  * pieces it replaced or that replaced it; every other piece is a sibling, behind one line.
  */
 export interface StoryFocus {
@@ -328,13 +328,13 @@ export function storyFeedback(
 	if (expanded || here === undefined || here.kind === "work" || here.kind === "review") {
 		return { shown: byTime, siblings: [] };
 	}
-	if (here.kind === "observations" || here.kind === "end" || here.kind === "moment") {
+	if (here.kind === "results" || here.kind === "end" || here.kind === "moment") {
 		return { shown: byTime, siblings: [] };
 	}
 	const told = new Set<string>();
-	if (here.kind === "observation") {
+	if (here.kind === "result") {
 		for (const entry of byTime) {
-			if (entry.observationIds.includes(here.id)) {
+			if (entry.practiceResultIds.includes(here.id)) {
 				told.add(entry.id);
 			}
 		}
@@ -356,23 +356,19 @@ export function storyFeedback(
 }
 
 /**
- * The observations numbered as everywhere on the chain, with the one the reader came from apart.
- * The numbers come from the whole chain, `full`, so a filter hides observations but never renumbers
+ * The results numbered as everywhere on the chain, with the one the reader came from apart.
+ * The numbers come from the whole chain, `full`, so a filter hides results but never renumbers
  * them.
  */
-export function storyObservations(
+export function storyResults(
 	lineage: ReviewLineage,
 	here: TraceNode | undefined,
 	full: ReviewLineage = lineage,
 ) {
-	const shown = new Set(lineage.observations.map((entry) => entry.id));
-	const numbered = numberedObservations(full.observations).filter((entry) =>
-		shown.has(entry.observation.id),
-	);
+	const shown = new Set(lineage.results.map((entry) => entry.id));
+	const numbered = numberedResults(full.results).filter((entry) => shown.has(entry.result.id));
 	const self =
-		here?.kind === "observation"
-			? numbered.find((entry) => entry.observation.id === here.id)
-			: undefined;
+		here?.kind === "result" ? numbered.find((entry) => entry.result.id === here.id) : undefined;
 	return { numbered, self };
 }
 
@@ -387,12 +383,12 @@ function letterAt(index: number): string {
 	return index < 26 ? letter : `${letterAt(Math.floor(index / 26) - 1)}${letter}`;
 }
 
-/** The observations a piece of feedback rests on that the chain lists, by number. */
+/** The results a piece of feedback rests on that the chain lists, by number. */
 export function sourcesOf(
-	feedback: Pick<ReviewLineageFeedback, "observationIds">,
-	numbered: readonly NumberedObservation[],
-): NumberedObservation[] {
+	feedback: Pick<ReviewLineageFeedback, "practiceResultIds">,
+	numbered: readonly NumberedResult[],
+): NumberedResult[] {
 	return numbered
-		.filter((entry) => feedback.observationIds.includes(entry.observation.id))
+		.filter((entry) => feedback.practiceResultIds.includes(entry.result.id))
 		.sort((a, b) => a.number - b.number);
 }

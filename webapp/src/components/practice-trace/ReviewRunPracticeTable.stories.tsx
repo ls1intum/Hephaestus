@@ -269,7 +269,7 @@ export const ResultsAboutTheReader: Story = {
 	args: {
 		canAdminister: false,
 		resultsByPractice: {
-			[reviewed.practiceSlug]: [{ ...detailResult, practiceSlug: reviewed.practiceSlug }],
+			[reviewed.practiceSlug]: [detailResult],
 		},
 	},
 	play: async ({ canvas }) => {

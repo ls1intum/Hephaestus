@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { GlossaryTerm } from "./GlossaryTerm";
 import { SLOW_GAP_SECONDS } from "./lineage-chain";
 import { ConnectorSample, connectorTone } from "./LineageConnectors";
-import { observationChipClass } from "./LineageObservationChip";
+import { resultChipClass } from "./LineageResultChip";
 import {
 	type Dot,
 	FeedbackLetter,
@@ -87,7 +87,7 @@ const ANSWERS: readonly StatusDef[] = [
 	DEVELOPER_ANSWER_DEFS.RESOLVED_BY_WORK,
 ];
 
-const TERMS: readonly TraceTerm[] = ["moment", "observation", "withheld", "coalesced"];
+const TERMS: readonly TraceTerm[] = ["moment", "result", "withheld", "coalesced"];
 
 const SLOW_MINUTES = Math.round(SLOW_GAP_SECONDS / 60);
 
@@ -169,22 +169,18 @@ export function TraceLegend({ open, onOpenChange }: TraceLegendProps) {
 							</LegendGroup>
 						</div>
 						<div className="space-y-4">
-							<LegendGroup title="Observations and feedback">
-								<Entry
-									mark={<Chip className={observationChipClass({ outcome: "NOT_MET" })}>3</Chip>}
-								>
-									<Name>Observation</Name> by number, in its outcome’s colour
+							<LegendGroup title="Results and feedback">
+								<Entry mark={<Chip className={resultChipClass({ outcome: "NOT_MET" })}>3</Chip>}>
+									<Name>Result</Name> by number, in its outcome’s colour
 								</Entry>
 								<Entry
-									mark={
-										<Chip className={observationChipClass({ outcome: "NOT_APPLICABLE" })}>4</Chip>
-									}
+									mark={<Chip className={resultChipClass({ outcome: "NOT_APPLICABLE" })}>4</Chip>}
 								>
 									<Name>Not applicable</Name> hollow, unlike undetermined
 								</Entry>
 								<Entry
 									mark={
-										<Chip className={observationChipClass({ outcome: "MET", invalidated: true })}>
+										<Chip className={resultChipClass({ outcome: "MET", invalidated: true })}>
 											5
 										</Chip>
 									}
@@ -193,22 +189,20 @@ export function TraceLegend({ open, onOpenChange }: TraceLegendProps) {
 								</Entry>
 								<Entry
 									mark={
-										<Chip className={observationChipClass({ outcome: "MET", ringed: true })}>
-											1
-										</Chip>
+										<Chip className={resultChipClass({ outcome: "MET", ringed: true })}>1</Chip>
 									}
 								>
-									<Name>Ringed</Name> the observation you started from
+									<Name>Ringed</Name> the result you started from
 								</Entry>
 								<Entry mark={<FeedbackLetter letter="A" />}>
-									<Name>Feedback</Name> by letter, with its observations under From
+									<Name>Feedback</Name> by letter, with its results under From
 								</Entry>
 							</LegendGroup>
 							<LegendGroup title="Connections">
 								<Entry
 									mark={<ConnectorSample className={connectorTone("destructive", "strong")} />}
 								>
-									<Name>Line</Name> from an observation to each piece written from it
+									<Name>Line</Name> from a result to each piece written from it
 								</Entry>
 								<Entry mark={<ConnectorSample className={connectorTone("destructive", "faint")} />}>
 									<Name>Grey line</Name> off the path of your record
@@ -263,7 +257,7 @@ export function TraceLegend({ open, onOpenChange }: TraceLegendProps) {
 								What the trace cannot show
 							</h4>
 							<ul className="list-disc space-y-0.5 pl-4">
-								<li>Whether an observation is right: only an admin’s “Marked incorrect”.</li>
+								<li>Whether a result is right: only an admin’s “Marked incorrect”.</li>
 								<li>Why the model judged so: only its rationale is stored.</li>
 								<li>Whether the developer read a comment on the work, or learned from it.</li>
 							</ul>

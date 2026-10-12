@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -20,6 +21,14 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     List<LlmUsageEvent> findByWorkspaceIdAndSourceTypeAndSourceIdOrderBySourceAttemptAsc(
             @Param("workspaceId") Long workspaceId,
             @Param("sourceType") LlmUsageSourceType sourceType,
+            @Param("sourceId") UUID sourceId);
+
+    /** Every row one source recorded in a workspace under any of {@code sourceTypes}, first attempt first. */
+    @Query("SELECT e FROM LlmUsageEvent e WHERE e.workspace.id = :workspaceId AND e.sourceType IN :sourceTypes"
+            + " AND e.sourceId = :sourceId ORDER BY e.sourceAttempt, e.occurredAt")
+    List<LlmUsageEvent> findByWorkspaceIdAndSourceTypeInAndSourceIdOrderBySourceAttemptAsc(
+            @Param("workspaceId") Long workspaceId,
+            @Param("sourceTypes") Collection<LlmUsageSourceType> sourceTypes,
             @Param("sourceId") UUID sourceId);
 
     /**

@@ -422,7 +422,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * filter when it has a listed status, with {@code onHold} when it is queued on a hold, as its row's
      * {@code holdReason} says, or with {@code waiting} when it waits for a worker now by the predicate of the queue's
      * {@code waiting} count ({@link #findReviewQueue}): queued, not held for the budget and due at {@code now}, read
-     * from the same app clock. The observation filters keep a run when one of its standing observations matches all
+     * from the same app clock. The result filters keep a run when one of its standing results matches all
      * of them at once: one an admin marked incorrect
      * counts as never made, as the run's own practices and developers read it. The work filter reads the work from the
      * metadata field that {@link ReviewRunTargetMapper} names it by, so it matches the work the run lists. The merge
@@ -452,9 +452,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             + "AND (:#{#filter.anyWork()} = TRUE OR (j.jobType = :#{#filter.workJobType()} "
             + "AND (:#{#filter.anyWorkItem()} = TRUE OR FUNCTION('jsonb_extract_path_text', j.metadata, "
             + ":#{#filter.workIdField()}) = :#{#filter.workIdText()}))) "
-            + "AND (:#{#filter.anyObservation()} = TRUE OR EXISTS (SELECT 1 FROM Observation o "
+            + "AND (:#{#filter.anyResult()} = TRUE OR EXISTS (SELECT 1 FROM PracticeResult o "
             + "JOIN o.practice p LEFT JOIN p.group g WHERE o.agentJobId = j.id AND o.workspaceId = :workspaceId "
-            + "AND NOT EXISTS (SELECT 1 FROM ObservationInvalidation oi WHERE oi.observationId = o.id "
+            + "AND NOT EXISTS (SELECT 1 FROM PracticeResultInvalidation oi WHERE oi.practiceResultId = o.id "
             + "AND oi.restoredAt IS NULL) "
             + "AND (:#{#filter.anySubject()} = TRUE OR o.aboutUserId = :#{#filter.subjectUserIdValue()}) "
             + "AND (:#{#filter.anyPractice()} = TRUE OR p.slug IN :#{#filter.practiceSlugs()}) "
@@ -1513,7 +1513,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
                     + "WHERE id = :id AND workspace_id = :workspaceId AND status = 'COMPLETED' "
                     + "AND metadata ->> '" + LinkedRepairFollowupRequest.SUCCESSOR_REVISION + "' = :previousRevision "
                     + "AND metadata ->> '" + LinkedRepairFollowupRequest.ROOT_JOB + "' = CAST(:rootJobId AS text) "
-                    + "AND COALESCE(metadata ->> '" + ObservationAdmissionService.DIGEST_METADATA_KEY + "', '') = ''",
+                    + "AND COALESCE(metadata ->> '" + ResultAdmissionService.DIGEST_METADATA_KEY + "', '') = ''",
             nativeQuery = true)
     int advanceLinkedRepairSuccessor(
             @Param("id") UUID id,
@@ -1528,7 +1528,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
                             + "AND j.job_type = 'PULL_REQUEST_REVIEW' AND j.purpose = 'PRACTICE_REVIEW' "
                             + "AND j.status = 'COMPLETED' AND (" + ReviewRunTargetMapper.WORK_ID_SQL
                             + ") = CAST(:artifactId AS text) "
-                            + "AND COALESCE(j.metadata ->> '" + ObservationAdmissionService.DIGEST_METADATA_KEY
+                            + "AND COALESCE(j.metadata ->> '" + ResultAdmissionService.DIGEST_METADATA_KEY
                             + "', '') = '' "
                             + "AND j.metadata ->> 'signal' = 'scm.pull_request.linked_issue_updated' "
                             + "AND j.metadata ->> '" + LinkedRepairFollowupRequest.SUCCESSOR_REVISION + "' = :revision "

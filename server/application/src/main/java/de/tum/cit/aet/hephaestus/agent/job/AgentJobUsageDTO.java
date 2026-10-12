@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEvent;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
@@ -14,22 +16,40 @@ public record AgentJobUsageDTO(
         List<AgentJobUsageAttemptDTO> attempts,
 
         @Schema(
-                description = "The cost of every attempt in US dollars; absent when an attempt has no known price or"
-                        + " no usage is recorded")
+                description = "The cost of every attempt in US dollars, the models its practice scripts called"
+                        + " included; absent when an attempt or a script call has no known price, or no usage is"
+                        + " recorded")
         @Nullable
         BigDecimal totalCostUsd,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "Attempts whose price is not known")
-        int unpricedAttempts) {
+        int unpricedAttempts,
 
-    static AgentJobUsageDTO of(List<AgentJobUsageAttemptDTO> attempts) {
+        @Schema(
+                description = "What the models its practice scripts called cost in US dollars, already in"
+                        + " totalCostUsd; absent when no script called a model or a call has no known price")
+        @Nullable
+        BigDecimal practiceScriptCostUsd) {
+
+    /**
+     * @param attempts the review model's usage, one entry per attempt
+     * @param practiceScriptRows the ledger rows of the practice scripts' own model calls in any attempt
+     */
+    static AgentJobUsageDTO of(List<AgentJobUsageAttemptDTO> attempts, List<LlmUsageEvent> practiceScriptRows) {
         int unpriced = (int)
                 attempts.stream().filter(attempt -> attempt.costUsd() == null).count();
-        BigDecimal total = attempts.isEmpty() || unpriced > 0
+        boolean scriptsUnpriced =
+                practiceScriptRows.stream().anyMatch(row -> row.getPricingState() == PricingState.UNPRICED);
+        BigDecimal scripts = practiceScriptRows.isEmpty() || scriptsUnpriced
+                ? null
+                : practiceScriptRows.stream()
+                        .map(row -> Objects.requireNonNullElse(row.getCostUsd(), BigDecimal.ZERO))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = attempts.isEmpty() || unpriced > 0 || scriptsUnpriced
                 ? null
                 : attempts.stream()
                         .map(attempt -> Objects.requireNonNullElse(attempt.costUsd(), BigDecimal.ZERO))
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new AgentJobUsageDTO(attempts, total, unpriced);
+                        .reduce(Objects.requireNonNullElse(scripts, BigDecimal.ZERO), BigDecimal::add);
+        return new AgentJobUsageDTO(attempts, total, unpriced, scripts);
     }
 }

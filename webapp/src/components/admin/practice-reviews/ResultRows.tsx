@@ -6,8 +6,6 @@ import { useNow } from "@/components/common/use-now";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { ReviewRunWorkCell } from "@/components/practice-trace/ReviewRunDayTable";
 import { ClaimCurrentnessBadge } from "@/components/practice-vocabulary/ClaimCurrentness";
-import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/result-dispute-defs";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import { PracticeTableRow } from "@/components/practice-vocabulary/PracticeTable";
 import {
@@ -16,6 +14,8 @@ import {
 	type RecordTableColumn,
 	RecordTimeCell,
 } from "@/components/practice-vocabulary/RecordTable";
+import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/result-dispute-defs";
+import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { StatusLabel } from "@/components/practice-vocabulary/StatusTooltip";
 import { TableCell } from "@/components/ui/table";
@@ -204,9 +204,7 @@ export function ResultRow({ result, withDay = false }: ResultRowProps) {
 					{hasException && (
 						<span className="flex flex-wrap items-center gap-1.5">
 							<ClaimCurrentnessBadge currentness={result.claimCurrentness} />
-							{result.invalidatedAt !== undefined && (
-								<StatusBadge def={MARKED_INCORRECT_DEF} />
-							)}
+							{result.invalidatedAt !== undefined && <StatusBadge def={MARKED_INCORRECT_DEF} />}
 							{result.disputedAt !== undefined && (
 								<StatusBadge def={DEVELOPER_RESPONSE_DEFS.DISPUTED} />
 							)}

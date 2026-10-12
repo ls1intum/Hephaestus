@@ -5,7 +5,7 @@ import {
 	groupFacetOptions,
 	type PracticeFacetOption,
 	practiceFacetOptions,
-} from "@/components/admin/practice-reviews/ObservationFilters";
+} from "@/components/admin/practice-reviews/ResultFilters";
 import type { ReviewPeople } from "@/components/admin/practice-reviews/ReviewPersonFacet";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { useReviewPeople } from "@/hooks/use-review-people";

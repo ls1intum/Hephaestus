@@ -35,8 +35,8 @@ public record ReviewLineageFeedbackDTO(
                 requiredMode = Schema.RequiredMode.REQUIRED)
         int placementCount,
 
-        @NonNull @Schema(description = "Every observation it was written from, in render order")
-        List<UUID> observationIds,
+        @NonNull @Schema(description = "Every result it was written from, in render order")
+        List<UUID> practiceResultIds,
 
         @Schema(description = "The earlier feedback it replaced; null on a first delivery") @Nullable
         UUID replacesId,
@@ -48,7 +48,7 @@ public record ReviewLineageFeedbackDTO(
         Instant replacedAt,
 
         @Schema(
-                description = "Whether the request names this feedback, or the observation it names led to it",
+                description = "Whether the request names this feedback, or the result it names led to it",
                 requiredMode = Schema.RequiredMode.REQUIRED)
         boolean focus,
 

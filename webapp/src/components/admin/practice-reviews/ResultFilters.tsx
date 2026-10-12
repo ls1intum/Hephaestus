@@ -169,9 +169,9 @@ export function ResultFilters({
 			scope={readScope(search)}
 			onChange={(patch) => onPatch(scopeSearch("results", patch))}
 			onClearScope={onClearScope}
-			// "Observed", not "Date": this range filters `observedAt`, while the same control on the
+			// "Recorded", not "Date": this range filters `observedAt`, while the same control on the
 			// feedback list filters when the feedback was composed.
-			dateTitle="Observed"
+			dateTitle="Recorded"
 			groups={groups}
 			practices={practices}
 			people={people}

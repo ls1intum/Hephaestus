@@ -4,7 +4,6 @@ import { statusValues } from "@/components/common/status-def";
 import { REVIEW_FILTER_MAX_LENGTH } from "@/components/practice-trace/trace-format";
 import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
-import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
 import {
@@ -92,7 +91,7 @@ const enumValues = <T extends string>(allowed: readonly T[]) =>
  */
 const scope = {
 	agentJobId: uuidParam,
-	observationId: uuidParam,
+	practiceResultId: uuidParam,
 	feedbackId: uuidParam,
 	selectedPractice: z.string().min(1).max(REVIEW_FILTER_MAX_LENGTH).optional().catch(undefined),
 	artifactKind: z.enum(ARTIFACT_KIND_VALUES).optional().catch(undefined),
@@ -202,7 +201,7 @@ export const overviewSearchSchema = z
 
 /**
  * One review's own page keeps the scope for the tabs, and adds the record it opens on: `focus`,
- * `observation:<id>`, `feedback:<id>` or `work` (`review-trace.ts`).
+ * `result:<id>`, `feedback:<id>` or `work` (`review-trace.ts`).
  */
 export const reviewPageSearchSchema = z
 	.object({
@@ -230,7 +229,7 @@ export function dateWindowQuery(search: { from?: string; to?: string }) {
 	};
 }
 
-/** The selection as the review, observation and feedback lists filter by it. */
+/** The selection as the review, result and feedback lists filter by it. */
 function selectionQuery(search: ReviewScopeSearch) {
 	return {
 		agentJobId: search.agentJobId,
@@ -305,7 +304,7 @@ export function workWithoutReviewQuery(search: Partial<RunsSearch>, size: number
 export function feedbackQuery(search: Partial<FeedbackSearch>, size: number) {
 	return {
 		...scopeQuery(search),
-		observationId: search.observationId,
+		practiceResultId: search.practiceResultId,
 		size,
 		deliveryState: search.deliveryState,
 		suppressionReason:

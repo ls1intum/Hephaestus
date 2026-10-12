@@ -24,6 +24,6 @@ public record PracticeRevisionDTO(
 
         @Schema(
                 requiredMode = Schema.RequiredMode.REQUIRED,
-                description = "Whether what a review checks changed, so observations made before it no longer reflect"
+                description = "Whether what a review checks changed, so results recorded before it no longer reflect"
                         + " the practice. A change to the wording around it, or to when it runs, does not count.")
         boolean reviewRulesChanged) {}

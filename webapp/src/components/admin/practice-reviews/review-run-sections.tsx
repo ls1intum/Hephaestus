@@ -13,7 +13,11 @@ import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { ResultCount } from "@/components/common/ResultCount";
 import { SelectFilter } from "@/components/common/SelectFilter";
-import { earlierReviewOf, runPractices } from "@/components/practice-trace/ReviewRunPracticeTable";
+import {
+	earlierReviewOf,
+	PracticeScriptTraceLine,
+	runPractices,
+} from "@/components/practice-trace/ReviewRunPracticeTable";
 import { REVIEW_FILTER_MAX_LENGTH } from "@/components/practice-trace/trace-format";
 import { TraceOutcomeBadge } from "@/components/practice-trace/TraceOutcomeBadge";
 import {
@@ -28,7 +32,7 @@ import { hasText } from "@/lib/text";
 
 import {
 	feedbackSlots,
-	observationSlots,
+	resultSlots,
 	type OutcomeSlot,
 } from "@/components/admin/practice-reviews/review-outcomes";
 
@@ -56,7 +60,7 @@ function groupNameOf(entry: PracticeTraceEntry): string {
 	return hasText(entry.groupName) ? entry.groupName : UNGROUPED;
 }
 
-/** "1 met observation, 3 not met observations", or `none` when nothing was counted. */
+/** "1 met result, 3 not met results", or `none` when nothing was counted. */
 function slotText(slots: readonly OutcomeSlot[], none: string): string {
 	const counted = slots.filter((slot) => slot.count > 0);
 	return counted.length === 0
@@ -66,7 +70,7 @@ function slotText(slots: readonly OutcomeSlot[], none: string): string {
 
 /** The review's counts, said once, as the head line of its practices. */
 export function reviewCountsLine(summary: ReviewRunSummary): string {
-	return `${slotText(observationSlots(summary.observations), "No observations")} · Feedback: ${slotText(
+	return `${slotText(resultSlots(summary.practiceResults), "No results")} · Feedback: ${slotText(
 		feedbackSlots(summary.feedback),
 		"none composed",
 	)}`;
@@ -76,6 +80,8 @@ export function reviewCountsLine(summary: ReviewRunSummary): string {
 export type PracticeGroupLook = Pick<PracticeGroup, "slug" | "icon" | "color">;
 
 interface ReviewPracticesProps {
+	/** Where a practice script line's fix links lead, such as AI models for a missing model. */
+	workspaceSlug: string;
 	job: AgentJob;
 	trace: RunTraceState;
 	summary: ReviewRunSummary | undefined;
@@ -90,6 +96,7 @@ interface ReviewPracticesProps {
  * practice's. A list rather than a table, so a row reflows at 390px instead of scrolling.
  */
 export function ReviewPractices({
+	workspaceSlug,
 	job,
 	trace,
 	summary,
@@ -185,6 +192,7 @@ export function ReviewPractices({
 					{rows.map((entry) => (
 						<PracticeRow
 							key={entry.practiceSlug}
+							workspaceSlug={workspaceSlug}
 							entry={entry}
 							reviewId={job.id}
 							group={workspaceGroups?.find((candidate) => candidate.slug === entry.groupSlug)}
@@ -202,23 +210,23 @@ function practiceReason(entry: PracticeTraceEntry, reviewId: string): string {
 		return "Answered by an earlier review of the same code.";
 	}
 	if (entry.outcome === "REVIEWED") {
-		return entry.observationCount === 1
-			? "1 observation"
-			: `${entry.observationCount} observations`;
+		return entry.practiceResultCount === 1 ? "1 result" : `${entry.practiceResultCount} results`;
 	}
 	return entry.explanation;
 }
 
 /**
  * One practice: its state as a coloured badge, its name over its group in the group's colour, and
- * the reason for its state. How the review answered it, observation by observation, is its trace's:
- * counted verdicts here cost a read of every observation and said little the state does not.
+ * the reason for its state. How the review answered it, result by result, is its trace's:
+ * counted verdicts here cost a read of every result and said little the state does not.
  */
 function PracticeRow({
+	workspaceSlug,
 	entry,
 	reviewId,
 	group,
 }: {
+	workspaceSlug: string;
 	entry: PracticeTraceEntry;
 	reviewId: string;
 	group: PracticeGroupLook | undefined;
@@ -240,8 +248,19 @@ function PracticeRow({
 						className="text-xs"
 					/>
 				</span>
-				<span className="min-w-0 text-pretty text-muted-foreground">
-					{practiceReason(entry, reviewId)}
+				<span className="flex min-w-0 flex-col gap-1 text-pretty text-muted-foreground">
+					<span>{practiceReason(entry, reviewId)}</span>
+					{entry.practiceScript !== undefined && (
+						<span className="text-xs">
+							<PracticeScriptTraceLine
+								workspaceSlug={workspaceSlug}
+								entry={entry}
+								run={entry.practiceScript}
+								reviewLink={undefined}
+								details={false}
+							/>
+						</span>
+					)}
 				</span>
 			</div>
 		</li>

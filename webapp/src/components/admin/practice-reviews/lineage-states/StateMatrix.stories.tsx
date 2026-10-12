@@ -16,7 +16,7 @@ import {
 
 /**
  * Every state the story of a review can meet, one small chain per state: how the review ran, what
- * started it, the merge against it, its observations, where its feedback went and what became of
+ * started it, the merge against it, its results, where its feedback went and what became of
  * it, an admin's decision, the developer's answer, and many records at once. Each case heads its
  * story with the verdict the chain gives and ends it with where the review's path ended. A story per
  * group, and one with all of them.
@@ -33,7 +33,7 @@ const GROUPS: readonly LineageStateGroup[] = [
 	"review",
 	"trigger",
 	"merge",
-	"observations",
+	"results",
 	"location",
 	"delivery",
 	"withholding",
@@ -122,7 +122,7 @@ export const Trigger = groupStory("trigger");
 export const Merge = groupStory("merge");
 
 /** Every verdict by severity, marked incorrect, an earlier review's answers, none, and 24. */
-export const Observations = groupStory("observations");
+export const Results = groupStory("results");
 
 /** GitHub, GitLab, another provider, their practice pages, Heph in the app and in Slack. */
 export const Location = groupStory("location");
@@ -139,7 +139,7 @@ export const Decision = groupStory("decision");
 /** Answered (privately), disputed with a reason, resolved by the work, no answer. */
 export const Response = groupStory("response");
 
-/** Many pieces of feedback from a few observations. */
+/** Many pieces of feedback from a few results. */
 export const Volume = groupStory("volume");
 
 /** Every group on one page. */

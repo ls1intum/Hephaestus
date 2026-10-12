@@ -9,7 +9,7 @@ export type CurrentPractice = Pick<Practice, "slug" | "autonomy">;
 
 /**
  * Whether a practice is turned off in this workspace today: its autonomy is Off now, whatever it was
- * when its observations were made. A practice that is no longer in the workspace is turned off too.
+ * when its results were made. A practice that is no longer in the workspace is turned off too.
  * While the practices load, nothing is: a list must not hide rows on a guess.
  */
 export function isTurnedOff(

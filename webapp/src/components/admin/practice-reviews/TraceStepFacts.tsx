@@ -18,7 +18,7 @@ import {
 	feedbackLocation,
 	gapLabel,
 	isSlowGap,
-	type NumberedObservation,
+	type NumberedResult,
 	stageCounts,
 } from "./lineage-chain";
 import { writtenBy } from "./lineage-story";
@@ -31,14 +31,14 @@ export interface TraceStepFactsProps {
 	lineage: ReviewLineage;
 	/** The step whose facts these are. */
 	node: TraceNode;
-	numbered: readonly NumberedObservation[];
+	numbered: readonly NumberedResult[];
 	letters: ReadonlyMap<string, string>;
 	/** The record the trace was opened for, whose verdict already heads the trace. */
 	here?: TraceNode;
 	/** The review's own record, where the page has it: its retries. */
 	job?: AgentJob;
 	/**
-	 * Whether every step shows its facts, as "Expand all" asks. The observations' table then names
+	 * Whether every step shows its facts, as "Expand all" asks. The results' table then names
 	 * each practice, so a piece of feedback does not name them again.
 	 */
 	everyStep?: boolean;
@@ -46,9 +46,9 @@ export interface TraceStepFactsProps {
 
 /**
  * What "Expand all" and the system info add under a step: only what the step's own line does not
- * already say. A moment, the count of observations and the end say everything on their line, so
+ * already say. A moment, the count of results and the end say everything on their line, so
  * they add nothing and draw no box. The review adds its times, model, retries and error; the work
- * its link and merge; an observation what became of it; a piece of feedback where exactly it went,
+ * its link and merge; a result what became of it; a piece of feedback where exactly it went,
  * its timeline and the practices it was written from.
  */
 export function traceStepFacts(props: TraceStepFactsProps): ReactElement | null {
@@ -58,7 +58,7 @@ export function traceStepFacts(props: TraceStepFactsProps): ReactElement | null 
 	switch (node.kind) {
 		case "end":
 		case "moment":
-		case "observations": {
+		case "results": {
 			return null;
 		}
 		case "work": {
@@ -67,10 +67,10 @@ export function traceStepFacts(props: TraceStepFactsProps): ReactElement | null 
 		case "review": {
 			return lineage.review === undefined ? null : <ReviewFacts lineage={lineage} job={job} />;
 		}
-		case "observation": {
-			const entry = numbered.find((candidate) => candidate.observation.id === node.id);
+		case "result": {
+			const entry = numbered.find((candidate) => candidate.result.id === node.id);
 			return entry === undefined ? null : (
-				<ObservationFacts lineage={lineage} entry={entry} told={told} />
+				<ResultFacts lineage={lineage} entry={entry} told={told} />
 			);
 		}
 		case "feedback": {
@@ -90,29 +90,29 @@ export function traceStepFacts(props: TraceStepFactsProps): ReactElement | null 
 }
 
 /**
- * An observation: what became of it in one sentence, unless the trace stands on it and says so on
+ * A result: what became of it in one sentence, unless the trace stands on it and says so on
  * top, the day it was observed, and when an admin marked it incorrect.
  */
-function ObservationFacts({
+function ResultFacts({
 	lineage,
 	entry,
 	told,
 }: {
 	lineage: ReviewLineage;
-	entry: NumberedObservation;
+	entry: NumberedResult;
 	told: boolean;
 }) {
-	const { observation } = entry;
-	const node: TraceNode = { kind: "observation", id: observation.id };
+	const { result } = entry;
+	const node: TraceNode = { kind: "result", id: result.id };
 	return (
 		<FactList>
 			{!told && <Fact label="Outcome">{traceVerdict(lineage, node).sentence}</Fact>}
-			<Fact label="Observed">
-				<DayTime at={observation.observedAt} />
+			<Fact label="Recorded">
+				<DayTime at={result.observedAt} />
 			</Fact>
-			{observation.markedIncorrectAt !== undefined && (
+			{result.markedIncorrectAt !== undefined && (
 				<Fact label="Marked incorrect">
-					<DayTime at={observation.markedIncorrectAt} from={observation.observedAt} />
+					<DayTime at={result.markedIncorrectAt} from={result.observedAt} />
 				</Fact>
 			)}
 		</FactList>
@@ -193,7 +193,7 @@ function WorkFacts({ lineage }: { lineage: ReviewLineage }) {
 function StageLine({ lineage }: { lineage: ReviewLineage }) {
 	const counts = stageCounts(lineage);
 	const stages = [
-		countOf(counts.observations, "listed observation", "listed observations"),
+		countOf(counts.results, "listed result", "listed results"),
 		countOf(counts.feedback, "listed piece of feedback", "listed pieces of feedback"),
 		`${counts.reached} reached the developer`,
 		`${counts.answered} answered`,
@@ -322,7 +322,7 @@ function FeedbackFacts({
 }: {
 	feedback: ReviewLineageFeedback;
 	lineage: ReviewLineage;
-	numbered: readonly NumberedObservation[];
+	numbered: readonly NumberedResult[];
 	letters: ReadonlyMap<string, string>;
 	told: boolean;
 	namesSources: boolean;
@@ -330,9 +330,7 @@ function FeedbackFacts({
 	const location = feedbackLocation(feedback, lineage.work);
 	const timeline = feedbackTimeline(feedback);
 	const elsewhere = writtenBy(feedback, lineage.review);
-	const sources = numbered.filter(({ observation }) =>
-		feedback.observationIds.includes(observation.id),
-	);
+	const sources = numbered.filter(({ result }) => feedback.practiceResultIds.includes(result.id));
 	return (
 		<FactList>
 			<Fact label="Channel">{feedbackLocationSentence(location, lineage.work)}</Fact>
@@ -360,15 +358,15 @@ function FeedbackFacts({
 			{namesSources && sources.length > 0 && (
 				<Fact label="Written from">
 					<ul className="space-y-0.5">
-						{sources.map(({ observation, number }) => (
-							<li key={observation.id}>
+						{sources.map(({ result, number }) => (
+							<li key={result.id}>
 								<span className="text-muted-foreground tabular-nums">{number}</span>{" "}
-								{observation.practiceName}
+								{result.practiceName}
 								<span className="text-muted-foreground">
-									{` · ${OUTCOME_DEFS[observation.outcome].label.toLowerCase()}${
-										observation.severity === undefined
+									{` · ${OUTCOME_DEFS[result.outcome].label.toLowerCase()}${
+										result.severity === undefined
 											? ""
-											: `, ${SEVERITY_DEFS[observation.severity].label.toLowerCase()}`
+											: `, ${SEVERITY_DEFS[result.severity].label.toLowerCase()}`
 									}`}
 								</span>
 							</li>

@@ -20,7 +20,7 @@ import {
 	isSlowGap,
 } from "./lineage-chain";
 import { writtenBy } from "./lineage-story";
-import { LineageSourceChips } from "./LineageObservationChip";
+import { LineageSourceChips } from "./LineageResultChip";
 import {
 	FeedbackLetter,
 	LineageTimes,
@@ -52,7 +52,7 @@ function feedbackTone(feedback: ReviewLineageFeedback, lineage: ReviewLineage): 
 
 /**
  * Pieces of feedback written one after the other, with nothing on the work between them, as one
- * table on the rail: a row per piece with its letter, its channel, its state, the observations it was
+ * table on the rail: a row per piece with its letter, its channel, its state, the results it was
  * written from by number, and when it was composed. Its dot takes the tone of the piece that most
  * needs a look, and the rail is dashed into it after a long wait.
  */
@@ -99,7 +99,7 @@ export function FeedbackTableStep({
 
 /**
  * One piece of feedback as a row: its letter, the channel it went by, where it went or why not with
- * how the developer answered, the observations it was written from, and when it was composed with
+ * how the developer answered, the results it was written from, and when it was composed with
  * the wait since the row above. With system info, every fact of the piece with its time under its
  * state.
  */
@@ -377,8 +377,8 @@ function FeedbackDetails({
 }
 
 /**
- * The observations a piece was written from, as chips. A piece another review wrote may rest on
- * observations this chain does not list: those are counted as that review's, never as missing.
+ * The results a piece was written from, as chips. A piece another review wrote may rest on
+ * results this chain does not list: those are counted as that review's, never as missing.
  */
 function FeedbackSources({
 	feedback,
@@ -391,9 +391,9 @@ function FeedbackSources({
 	elsewhere: "an earlier review" | "a later review" | undefined;
 	connectors: boolean;
 }) {
-	const listed = feedback.observationIds.filter((id) => byId.has(id)).length;
+	const listed = feedback.practiceResultIds.filter((id) => byId.has(id)).length;
 	if (elsewhere !== undefined && listed === 0) {
-		return `From ${countOf(feedback.observationIds.length, "observation", "observations")} that review recorded`;
+		return `From ${countOf(feedback.practiceResultIds.length, "result", "results")} that review recorded`;
 	}
 	return (
 		<LineageSourceChips

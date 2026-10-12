@@ -13,11 +13,11 @@ export interface TraceDisplay {
 	 */
 	system: boolean;
 	/**
-	 * The other observations and feedback of the record the reader started from, which otherwise
-	 * fold into one line. The review's observations table opens and folds on its own.
+	 * The other results and feedback of the record the reader started from, which otherwise
+	 * fold into one line. The review's results table opens and folds on its own.
 	 */
 	siblings: boolean;
-	/** Lines from each observation to the feedback written from it. */
+	/** Lines from each result to the feedback written from it. */
 	connections: boolean;
 }
 
@@ -37,12 +37,12 @@ export const TRACE_DISPLAY_PARTS: readonly {
 	{
 		part: "siblings",
 		label: "Siblings",
-		hint: "The other observations and feedback of the record you started from, not one line",
+		hint: "The other results and feedback of the record you started from, not one line",
 	},
 	{
 		part: "connections",
 		label: "Connections",
-		hint: "Lines from each observation to the feedback written from it, as the From column says",
+		hint: "Lines from each result to the feedback written from it, as the From column says",
 	},
 ];
 

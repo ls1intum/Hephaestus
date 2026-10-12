@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { cn } from "cn";
-import { BrainCircuit, ChevronDown, CircleHelpIcon, InfoIcon, type LucideIcon } from "lucide-react";
+import { BrainCircuit, ChevronDown, CircleHelpIcon, InfoIcon } from "lucide-react";
 import {
 	type ReactElement,
 	type ReactNode,
@@ -25,6 +25,7 @@ import { FOCUS_RING } from "@/components/common/focus";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { LoadState, PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import type { StatusDef } from "@/components/common/status-def";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { AiMark } from "@/components/icons/AiMark";
 import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
@@ -129,7 +130,7 @@ interface TierColumn {
 	 */
 	tier: DataHandlingTier;
 	label: string;
-	icon: LucideIcon;
+	icon: StatusDef["icon"];
 }
 
 const TIER_COLUMNS: readonly TierColumn[] = [

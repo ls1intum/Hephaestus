@@ -232,7 +232,7 @@ export const SortIsNotAFilter: Story = {
 };
 
 /**
- * A group is part of the shared scope: it finds the feedback written from observations of any
+ * A group is part of the shared scope: it finds the feedback written from results of any
  * practice in it, and it narrows the practices on offer.
  */
 export const ReportsAChosenGroup: Story = {

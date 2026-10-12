@@ -376,10 +376,10 @@ public class PracticeReviewOutputController {
 
     @GetMapping("/lineage")
     @Operation(
-            summary = "Trace how an observation, piece of feedback, review or piece of work came about",
-            description = "Returns the chain from the reviewed work through the review and its observations to the"
+            summary = "Trace how a result, piece of feedback, review or piece of work came about",
+            description = "Returns the chain from the reviewed work through the review and its results to the"
                     + " feedback written from them, where it went, whether the developer answered or disputes it"
-                    + " (never their rating or private notes) and whether their work resolved it. OBSERVATION,"
+                    + " (never their rating or private notes) and whether their work resolved it. RESULT,"
                     + " FEEDBACK and REVIEW take `id`; WORK takes `artifactKind` and `artifactId` and traces the"
                     + " newest review of that work. Each list is capped and carries a count of what it leaves out.",
             operationId = "getPracticeReviewLineage")
@@ -411,7 +411,7 @@ public class PracticeReviewOutputController {
     public ResponseEntity<ReviewLineageDTO> getLineage(
             WorkspaceContext workspaceContext,
             @RequestParam ReviewLineageKind kind,
-            @Parameter(description = "The observation, feedback or review id; required unless kind is WORK")
+            @Parameter(description = "The result, feedback or review id; required unless kind is WORK")
                     @RequestParam(required = false)
                     @Nullable
                     UUID id,
@@ -425,7 +425,7 @@ public class PracticeReviewOutputController {
                     @Nullable
                     Long artifactId,
             @Parameter(
-                            description = "true lists the whole review around the record: every observation and piece"
+                            description = "true lists the whole review around the record: every result and piece"
                                     + " of feedback of the review, up to 100 each, and the work's moments; false keeps"
                                     + " the short chain")
                     @RequestParam(defaultValue = "false")
@@ -433,7 +433,7 @@ public class PracticeReviewOutputController {
         Long workspaceId = workspaceContext.id();
         return ResponseEntity.ok(
                 switch (kind) {
-                    case OBSERVATION -> lineageService.ofObservation(workspaceId, recordId(id), whole);
+                    case RESULT -> lineageService.ofResult(workspaceId, recordId(id), whole);
                     case FEEDBACK -> lineageService.ofFeedback(workspaceId, recordId(id), whole);
                     case REVIEW -> lineageService.ofReview(workspaceId, recordId(id), whole);
                     case WORK -> ofWork(workspaceId, artifactKind, artifactId, whole);

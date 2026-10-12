@@ -76,8 +76,8 @@ describe("openInStack", () => {
 	});
 
 	it("replaces the level in front on a one-level surface, and that is not a push", () => {
-		expect(openInStack(["feedback:a"], "observation:o", { single: true })).toStrictEqual({
-			detail: ["observation:o"],
+		expect(openInStack(["feedback:a"], "result:o", { single: true })).toStrictEqual({
+			detail: ["result:o"],
 			pushed: false,
 		});
 	});

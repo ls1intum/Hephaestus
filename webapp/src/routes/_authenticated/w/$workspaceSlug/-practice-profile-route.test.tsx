@@ -318,12 +318,12 @@ async function openPractice(router: Awaited<ReturnType<typeof renderProfile>>) {
 	);
 }
 
-/** The practice level opens on its feedback; the observations are the tab beside it. */
-async function showObservations() {
+/** The practice level opens on its feedback; the results are the tab beside it. */
+async function showResults() {
 	fireEvent.click(
-		await screen.findByRole("tab", { name: /^Observations/u, selected: false }, ROUTE_RENDER_WAIT),
+		await screen.findByRole("tab", { name: /^Results/u, selected: false }, ROUTE_RENDER_WAIT),
 	);
-	await screen.findByRole("tab", { name: /^Observations/u, selected: true });
+	await screen.findByRole("tab", { name: /^Results/u, selected: true });
 }
 
 /**
@@ -698,7 +698,7 @@ describe("practice profile route", () => {
 	it("opens and closes a result without writing the URL, so leaving the level takes one step", async () => {
 		const router = await renderProfile();
 		await openPractice(router);
-		await showObservations();
+		await showResults();
 		const entries = router.history.length;
 		const searchStr = () => router.state.location.searchStr;
 		const before = searchStr();
@@ -733,11 +733,11 @@ describe("practice profile route", () => {
 		// The page under the open drawer is hidden from the accessibility tree, so the level's own
 		// heading is what says the route has rendered.
 		const { router } = renderRouteAtWithRouter(
-			`${PAGE}?detail=${encodeURIComponent(JSON.stringify([group, practiceEntry]))}&practiceTab=observations`,
+			`${PAGE}?detail=${encodeURIComponent(JSON.stringify([group, practiceEntry]))}&practiceTab=results`,
 		);
 		await screen.findByRole("heading", { name: practice.name }, ROUTE_RENDER_WAIT);
 		const search = () => router.state.location.search;
-		expect(search().practiceTab).toBe("observations");
+		expect(search().practiceTab).toBe("results");
 
 		fireEvent.click(screen.getByRole("button", { name: "Back" }));
 
@@ -925,7 +925,7 @@ describe("practice profile in a user view", () => {
 		const ratings = screen.queryAllByRole("button", { name: "Helpful" }).length;
 		const answers = screen.queryAllByRole("button", { name: "I fixed this" }).length;
 		await openPractice(router);
-		await showObservations();
+		await showResults();
 		await screen.findByText("Why it was noted", undefined, ROUTE_RENDER_WAIT);
 		return {
 			ratings,
