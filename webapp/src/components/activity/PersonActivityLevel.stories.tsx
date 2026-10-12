@@ -107,6 +107,21 @@ export const Loading: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.queryByRole("link", { name: /^Reviews/u })).not.toBeInTheDocument();
+		await expect(panel.queryByRole("table", { name: "Repositories" })).not.toBeInTheDocument();
+	},
+};
+
+export const UpdatingRepositories: Story = {
+	args: { overview: { status: "ready", overview: OVERVIEW, stale: true } },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const region = panel.getByRole("region", { name: "Repositories" });
+		await expect(region).toHaveAttribute("aria-busy", "true");
+		await expect(within(region).getByRole("table", { name: "Repositories" })).toBeVisible();
+		const cue = within(region).getByText("Updating repository counts…");
+		await expect(cue).toBeVisible();
+		await expect(cue.getBoundingClientRect().width).toBeGreaterThan(1);
+		await expect(cue.getBoundingClientRect().height).toBeGreaterThan(1);
 	},
 };
 
@@ -130,6 +145,7 @@ export const Failed: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getAllByRole("alert")).toHaveLength(2);
+		await expect(panel.queryByRole("table", { name: "Repositories" })).not.toBeInTheDocument();
 	},
 };
 
