@@ -1,13 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { EvidenceCitation, ObservationDetail } from "@/api/types.gen";
-import { detailObservation } from "@/stories/practice-detail-story-mock-data";
+import type { EvidenceCitation, PracticeResultDetail } from "@/api/types.gen";
+import { detailResult } from "@/stories/practice-detail-story-mock-data";
 
-import { ReviewObservationRow, type ReviewObservationRowProps } from "./ReviewObservationRow";
+import { ReviewResultRow, type ReviewResultRowProps } from "./ReviewResultRow";
 
-const observation: ObservationDetail = {
-	...detailObservation,
+const result: PracticeResultDetail = {
+	...detailResult,
 	id: "00000000-0000-0000-0000-000000000001",
 	feedbackResponse: { feedbackId: "00000000-0000-0000-0000-000000000002", usefulness: "HELPFUL" },
 	practiceSlug: "explain-decisions",
@@ -15,12 +15,13 @@ const observation: ObservationDetail = {
 	summary: "The reason for the timeout is missing",
 	outcome: "NOT_MET",
 	severity: "MINOR",
+	observations: [],
 };
 
-function renderOpen(props: Partial<ReviewObservationRowProps> = {}) {
+function renderOpen(props: Partial<ReviewResultRowProps> = {}) {
 	return render(
 		<ul>
-			<ReviewObservationRow observation={observation} onRespond={vi.fn()} {...props} />
+			<ReviewResultRow result={result} onRespond={vi.fn()} {...props} />
 		</ul>,
 	);
 }
@@ -36,13 +37,24 @@ const citation = (path: string): EvidenceCitation => ({
 	quoteRedacted: false,
 });
 
-describe("ReviewObservationRow", () => {
+/** A quote of the pull request itself, which folds with every other quote of it in one list. */
+const core = (quote: string): EvidenceCitation => ({
+	sourceKind: "scm.pull-request.core",
+	artifactPath: "owner/repo#1",
+	path: "inputs/context/metadata.json",
+	startLine: 1,
+	endLine: 1,
+	quote,
+	quoteRedacted: false,
+});
+
+describe("ReviewResultRow", () => {
 	it("keeps a diff pair that could not fold as two blocks, each with its own key", () => {
 		// A key collision is only ever reported on the console, so the diagnostic is the assertion.
 		using keyWarning = vi.spyOn(console, "error").mockReturnValue(undefined);
 		renderOpen({
-			observation: {
-				...observation,
+			result: {
+				...result,
 				evidence: {
 					citations: [
 						{ ...citation("src/config.ts"), side: "OLD", quote: "const timeout = 30;" },
@@ -53,6 +65,7 @@ describe("ReviewObservationRow", () => {
 							quoteRedacted: true,
 						},
 					],
+					undecidability: [],
 				},
 			},
 		});
@@ -63,10 +76,63 @@ describe("ReviewObservationRow", () => {
 		screen.getByText("Not quoted. The passage was withheld, so only its location was kept.");
 	});
 
+	it("quotes each problem's place under that problem, never folded into another's", () => {
+		renderOpen({
+			result: {
+				...result,
+				observations: [
+					{
+						observationId: "a",
+						position: 0,
+						severity: "MAJOR",
+						summary: "The title says nothing",
+						explanation: "It names the ticket only.",
+						citations: [core('"title" : "PROJ-12"')],
+					},
+					{
+						observationId: "b",
+						position: 1,
+						severity: "MINOR",
+						summary: "The body is empty",
+						explanation: "There is no description.",
+						citations: [core('"body" : ""')],
+					},
+				],
+			},
+		});
+
+		const problems = screen.getAllByRole("listitem").filter((item) => item.closest("ol") !== null);
+		expect(problems).toHaveLength(2);
+		expect(problems[0]?.textContent).toContain('"title" : "PROJ-12"');
+		expect(problems[0]?.textContent).not.toContain('"body" : ""');
+		expect(problems[1]?.textContent).toContain('"body" : ""');
+		screen.getByText("Not met · 2 problems");
+	});
+
+	it("lists what could not be settled as open questions, never as a check", () => {
+		renderOpen({
+			result: {
+				...result,
+				outcome: "UNDETERMINED",
+				evidence: {
+					citations: [],
+					undecidability: [
+						{ openQuestion: "Was the move requested?", wouldSettleIt: "The linked issue." },
+					],
+				},
+			},
+		});
+
+		screen.getByText("Open questions");
+		screen.getByText("Was the move requested?");
+		screen.getByText("The linked issue.");
+		expect(screen.queryByText("What was checked")).toBeNull();
+	});
+
 	it("shows the authored next step without substituting the provider comment", () => {
 		renderOpen({
-			observation: {
-				...observation,
+			result: {
+				...result,
 				nextStep: "Split the commit so the rename can be reverted on its own.",
 				deliveredFeedback:
 					"<!-- hephaestus:summary -->\nProvider comment.\n<sub>AI-generated</sub>",
@@ -78,10 +144,10 @@ describe("ReviewObservationRow", () => {
 		expect(screen.queryByText(/Provider comment/u)).toBeNull();
 	});
 
-	it("keeps an unavailable next step absent while preserving the observation response", () => {
+	it("keeps an unavailable next step absent while preserving the response", () => {
 		renderOpen({
-			observation: {
-				...observation,
+			result: {
+				...result,
 				nextStep: undefined,
 				deliveredFeedback:
 					"<!-- hephaestus:summary -->\nProvider comment.\n<sub>AI-generated</sub>",
@@ -96,7 +162,7 @@ describe("ReviewObservationRow", () => {
 	});
 
 	it("refuses a dispute made of blanks through the field rather than in silence", () => {
-		const onRespond = vi.fn<NonNullable<ReviewObservationRowProps["onRespond"]>>();
+		const onRespond = vi.fn<NonNullable<ReviewResultRowProps["onRespond"]>>();
 		renderOpen({ onRespond });
 
 		fireEvent.click(screen.getByRole("button", { name: "Disputed" }));
@@ -112,7 +178,7 @@ describe("ReviewObservationRow", () => {
 	});
 
 	it("closes a dispute's band on Skip without recording it", () => {
-		const onRespond = vi.fn<NonNullable<ReviewObservationRowProps["onRespond"]>>();
+		const onRespond = vi.fn<NonNullable<ReviewResultRowProps["onRespond"]>>();
 		renderOpen({ onRespond });
 
 		fireEvent.click(screen.getByRole("button", { name: "Disputed" }));
@@ -126,12 +192,12 @@ describe("ReviewObservationRow", () => {
 	});
 
 	it("withdraws a recorded response, comment and all, when its button is pressed again", () => {
-		const onRespond = vi.fn<NonNullable<ReviewObservationRowProps["onRespond"]>>();
+		const onRespond = vi.fn<NonNullable<ReviewResultRowProps["onRespond"]>>();
 		renderOpen({
-			observation: {
-				...observation,
+			result: {
+				...result,
 				feedbackResponse: {
-					...observation.feedbackResponse,
+					...result.feedbackResponse,
 					feedbackId: "00000000-0000-0000-0000-000000000002",
 					resolution: "ADDRESSED",
 					comment: "Applied in the next revision.",
@@ -150,9 +216,9 @@ describe("ReviewObservationRow", () => {
 
 		expect(onRespond).toHaveBeenCalledExactlyOnceWith(
 			{
-				...observation,
+				...result,
 				feedbackResponse: {
-					...observation.feedbackResponse,
+					...result.feedbackResponse,
 					feedbackId: "00000000-0000-0000-0000-000000000002",
 					resolution: "ADDRESSED",
 					comment: "Applied in the next revision.",

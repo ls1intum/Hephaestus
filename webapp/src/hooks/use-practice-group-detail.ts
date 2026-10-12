@@ -52,7 +52,7 @@ export interface PracticeGroupDetail {
 /**
  * The open detail levels' data: the group level's practices, read off the standings the page
  * already holds, and the practice level's picture and guide, its review-run feed and the responses
- * written on it. The feed carries every observation in full, so opening one loads nothing. Each
+ * written on it. The feed carries every result in full, so opening one loads nothing. Each
  * query is gated on its level actually being open, so a closed drawer costs nothing and the group
  * level never fetches what it does not show.
  */

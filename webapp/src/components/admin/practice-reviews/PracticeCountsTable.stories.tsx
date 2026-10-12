@@ -60,7 +60,7 @@ export const Default: Story = {
 				.map((header) => header.textContent.trim()),
 		).toEqual([
 			"Practice",
-			"Number of observations",
+			"Number of results",
 			"Not met",
 			"Not applicable",
 			"Undetermined",
@@ -123,10 +123,10 @@ export const Default: Story = {
 			"7 of 12",
 		]);
 		await userEvent.click(
-			canvas.getByRole("button", { name: "How Number of observations is counted" }),
+			canvas.getByRole("button", { name: "How Number of results is counted" }),
 		);
 		await expect(
-			await screen.findByRole("dialog", { name: "How Number of observations is counted" }),
+			await screen.findByRole("dialog", { name: "How Number of results is counted" }),
 		).not.toHaveTextContent("percentage");
 		await userEvent.keyboard("{Escape}");
 		// A practice that fired twice and led to no feedback still reads as a row, its feedback a

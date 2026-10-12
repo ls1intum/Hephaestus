@@ -17,7 +17,7 @@ function group(slug: string, name: string, displayOrder = 0): PracticeGroup {
 }
 
 function standing(slug: string, value: PracticeGroupStanding["standing"]): PracticeGroupStanding {
-	return { groupSlug: slug, groupName: slug, standing: value, observations: [], sources: [] };
+	return { groupSlug: slug, groupName: slug, standing: value, practiceResults: [], sources: [] };
 }
 
 const slugsOf = (groups: PracticeGroup[]) => groups.map((entry) => entry.slug);

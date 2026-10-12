@@ -24,7 +24,7 @@ import {
 	FEEDBACK_DISPATCH_STATE_DEFS,
 } from "@/components/practice-vocabulary/feedback-dispatch-defs";
 import { FEEDBACK_WITHDRAWN_DEF } from "@/components/practice-vocabulary/feedback-withdrawal-defs";
-import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/observation-dispute-defs";
+import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/result-dispute-defs";
 import {
 	deliveredPlacementType,
 	PLACEMENT_DEFS,
@@ -123,7 +123,7 @@ function deliveredFigure(feedback: FeedbackRecord): string | undefined {
  * developer's words — what it says and its own delivery checks, and the technical facts.
  *
  * Its actions are the footer: approve or reject while it awaits approval, withdraw or restore a card
- * on the developer's practice pages otherwise. The observations it was written from, the review that
+ * on the developer's practice pages otherwise. The results it was written from, the review that
  * wrote it and when it was read are its trace.
  */
 export function FeedbackLevel({
@@ -548,7 +548,7 @@ function dispatchCarried(dispatch: ReviewFeedbackDispatch): string {
 /** What the current state means, in one sentence, in place of an alert. */
 function feedbackNow(feedback: FeedbackRecord): ReactNode {
 	if (activeWithdrawal(feedback) !== undefined) {
-		return "It is off the developer’s practice pages and out of the feedback given to later reviews and Heph. The observations behind it are unchanged.";
+		return "It is off the developer’s practice pages and out of the feedback given to later reviews and Heph. The results behind it are unchanged.";
 	}
 	if (feedback.dispute !== undefined) {
 		return "While the dispute stands, a later review of the same work does not raise the same point again.";
@@ -660,14 +660,14 @@ function WithdrawalPopover({
 							trigger: "Restore feedback",
 							title: "Restore this feedback",
 							description:
-								"It returns to the developer’s practice pages if its observations can still be shown there. Nothing is sent again.",
+								"It returns to the developer’s practice pages if its results can still be shown there. Nothing is sent again.",
 							placeholder: "Why the feedback was right after all…",
 						}
 					: {
 							trigger: "Withdraw feedback",
 							title: "Withdraw this feedback",
 							description:
-								"It comes off the developer’s practice pages and out of the feedback given to later reviews and Heph. The observations behind it are unchanged. A developer who already saw it sees that it was withdrawn, not your reason.",
+								"It comes off the developer’s practice pages and out of the feedback given to later reviews and Heph. The results behind it are unchanged. A developer who already saw it sees that it was withdrawn, not your reason.",
 							placeholder: "What the feedback got wrong…",
 						}
 			}

@@ -217,7 +217,7 @@ export function PracticeGroupDetailDrawer({
 								onOpenGroup={openGroup && (() => onClose(groupIndex + 1))}
 								tab={practiceTab}
 								onTabChange={(tab) => onSelectionChange({ practiceTab: tab })}
-								observations={{
+								results={{
 									onRespond: detail.respond,
 									pendingResponses: detail.pendingResponses,
 								}}

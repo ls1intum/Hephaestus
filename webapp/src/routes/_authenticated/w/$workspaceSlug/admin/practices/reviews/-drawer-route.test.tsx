@@ -17,7 +17,7 @@ import {
 	practiceReviewOverview,
 	reviewFeedbackDetail,
 	reviewJob,
-	reviewObservations,
+	reviewResults,
 	reviewRuns,
 	workspacePractices,
 } from "@/components/admin/practice-reviews/fixtures";
@@ -91,10 +91,10 @@ describe("practice review levels", () => {
 	 * A row opens its record over the list rather than instead of it, so closing the record is the
 	 * list exactly as the reader left it — filters and all.
 	 */
-	it("opens an observation over its filtered list and closes back to that list", async () => {
-		const observation = reviewObservations.find((row) => row.severity === "MAJOR");
-		assert(observation);
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/observations?severity=["MAJOR"]`);
+	it("opens a result over its filtered list and closes back to that list", async () => {
+		const result = reviewResults.find((row) => row.severity === "MAJOR");
+		assert(result);
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}/results?severity=["MAJOR"]`);
 
 		await userEvent.click(
 			await screen.findByRole(
@@ -104,15 +104,9 @@ describe("practice review levels", () => {
 			),
 		);
 
-		const level = await screen.findByRole(
-			"dialog",
-			{ name: observation.summary },
-			ROUTE_RENDER_WAIT,
-		);
-		within(level).getByRole("heading", { name: observation.summary });
-		expect(router.state.location.searchStr).toBe(
-			`?severity=MAJOR&detail=observation:${observation.id}`,
-		);
+		const level = await screen.findByRole("dialog", { name: result.summary }, ROUTE_RENDER_WAIT);
+		within(level).getByRole("heading", { name: result.summary });
+		expect(router.state.location.searchStr).toBe(`?severity=MAJOR&detail=result:${result.id}`);
 
 		fireEvent.keyDown(document.body, { key: "Escape" });
 
@@ -120,7 +114,7 @@ describe("practice review levels", () => {
 			() => expect(router.state.location.search).not.toHaveProperty("detail"),
 			ROUTE_RENDER_WAIT,
 		);
-		expect(router.state.location.pathname).toBe(`${REVIEWS}/observations`);
+		expect(router.state.location.pathname).toBe(`${REVIEWS}/results`);
 		expect(router.state.location.searchStr).toBe("?severity=MAJOR");
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 		screen.getByRole("link", openRow("observation", observation.summary));
@@ -128,7 +122,7 @@ describe("practice review levels", () => {
 
 	/** Closing the level gives focus back to the row it was opened from, so the reader goes on there. */
 	it("returns focus to the row the level was opened from", async () => {
-		const observation = reviewObservations.find((row) => row.severity === "MAJOR");
+		const observation = reviewResults.find((row) => row.severity === "MAJOR");
 		assert(observation);
 		renderRouteAtWithRouter(`${REVIEWS}/observations`);
 		const row = await screen.findByRole(

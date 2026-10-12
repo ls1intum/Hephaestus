@@ -46,7 +46,7 @@ export const WITHHOLDING_FAMILY_DEFS: StatusDefs<WithholdingFamily> = {
 		label: "An admin corrected it",
 		icon: CircleSlashIcon,
 		badgeVariant: "outline",
-		description: "A workspace admin marked an observation behind it as incorrect.",
+		description: "A workspace admin marked a result behind it as incorrect.",
 	},
 	HOUSEKEEPING: {
 		label: "Housekeeping",
@@ -117,7 +117,7 @@ export const WITHHOLDING_REASON_DEFS: Record<WithholdingReason, string> = {
 	REACTED_DISPUTED: "The developer disputed feedback like this before.",
 	REACTED_NOT_APPLICABLE: "The developer marked feedback like this not applicable before.",
 	OBSERVATION_INVALIDATED:
-		"A workspace admin marked an observation behind it as incorrect, so nothing more of it was sent.",
+		"A workspace admin marked a result behind it as incorrect, so nothing more of it was sent.",
 	COMPOSER_DEDUPED: "Nearly the same as other feedback from the same review.",
 	COMPOSER_WITHHELD: "The review decided, with a reason, not to put this on the work.",
 	REPEATS_DELIVERED_NOTE:

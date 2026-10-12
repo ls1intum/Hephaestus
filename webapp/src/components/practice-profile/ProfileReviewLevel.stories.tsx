@@ -11,7 +11,7 @@ import { expectSettledVisible } from "@/stories/overlay";
 import { groups } from "@/stories/practice-profile-story-mock-data";
 import {
 	openProfileReviewRun,
-	openProfileRunObservations,
+	openProfileRunResults,
 } from "@/stories/profile-review-runs-story-mock-data";
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { daysBefore } from "@/stories/story-clock";
@@ -32,7 +32,7 @@ const namedTrace = {
 const loaded = {
 	status: "ready",
 	run: openProfileReviewRun,
-	observations: openProfileRunObservations,
+	practiceResults: openProfileRunResults,
 	activity: { status: "ready", trace: namedTrace },
 } satisfies ProfileReviewDetailState;
 
@@ -105,8 +105,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * The table lists this review's answers only: every observation's own words where a practice said
- * something about the reader, and the recorded reason where it did not.
+ * The table lists this review's answers only: every result's own words and verdict where a practice
+ * said something about the reader, and the recorded reason where it did not. The verdict counts a
+ * result's problems and, on the reader's own view, never ranks them.
  */
 export const Default: Story = {
 	play: async ({ args }) => {
@@ -124,12 +125,15 @@ export const Default: Story = {
 		await expect(
 			within(table).getByText("The refactor and the fix arrived together"),
 		).toBeVisible();
-		await expect(
-			within(table).getByText("A dependency bump rode along with the behaviour change"),
-		).toBeVisible();
+		await expect(within(table).getByText("Not met · 3 problems")).toBeVisible();
+		await expect(within(table).getByText("Each commit carries one concern")).toBeVisible();
+		await expect(within(table).getByText("Could not determine")).toBeVisible();
 		await expect(
 			within(table).getByText("The review ended before it reached this practice."),
 		).toBeVisible();
+		for (const severity of ["Critical", "Major", "Minor", "Trivial"]) {
+			await expect(within(table).queryByText(severity)).toBeNull();
+		}
 		// The unfiltered table states no count: the tab already carries it.
 		await expect(screen.queryByText(/^\d+ practices?\.$/u)).toBeNull();
 		await expect(
@@ -171,7 +175,7 @@ function answeredEarlier(practiceSlug: string, practiceName: string): PracticeTr
 		occasionedBy: PUSHED,
 		occasionedById: "sig-ready",
 		reviewId: EARLIER_REVIEW,
-		observationCount: 0,
+		practiceResultCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	};
@@ -221,7 +225,7 @@ export const AnsweredByAnEarlierReview: Story = {
 		await expect(table.getAllByText(REUSED)).toHaveLength(2);
 		await expect(table.getAllByRole("link", { name: "Open the earlier review" })).toHaveLength(2);
 		await expect(
-			table.getAllByText("No new observations in this review, so nothing was sent"),
+			table.getAllByText("No new results in this review, so nothing was sent"),
 		).toHaveLength(2);
 		await expect(table.getAllByText(/^Rests on New commits pushed/u)[0]).toBeVisible();
 		await expect(table.getByText("The refactor and the fix arrived together")).toBeVisible();
@@ -258,13 +262,13 @@ export const FilterOnAMomentNobodyWatches: Story = {
 	},
 };
 
-/** An observation with no words of its own falls back to the practice's recorded reason. */
-export const ObservationWithoutASummary: Story = {
+/** A result with no words of its own falls back to the practice's recorded reason. */
+export const ResultWithoutASummary: Story = {
 	args: {
 		state: {
 			...loaded,
-			observations: openProfileRunObservations.map((observation) => ({
-				...observation,
+			practiceResults: openProfileRunResults.map((result) => ({
+				...result,
 				summary: "",
 			})),
 		},
@@ -281,10 +285,10 @@ export const MarkedIncorrect: Story = {
 	args: {
 		state: {
 			...loaded,
-			observations: openProfileRunObservations.map((observation, index) =>
+			practiceResults: openProfileRunResults.map((result, index) =>
 				index === 0
 					? {
-							...observation,
+							...result,
 							outcome: "MET",
 							severity: undefined,
 							summary: "The changes each have a clear purpose",
@@ -292,7 +296,7 @@ export const MarkedIncorrect: Story = {
 							invalidationReason:
 								"The review imported a reason that is not in the merge request description.",
 						}
-					: observation,
+					: result,
 			),
 		},
 	},
@@ -302,9 +306,7 @@ export const MarkedIncorrect: Story = {
 		await expect(table.getByText("The changes each have a clear purpose")).toBeVisible();
 		await expect(table.getAllByText("Marked incorrect")).toHaveLength(1);
 		await expect(table.getByText(/^Reason: The review imported a reason/u)).toBeVisible();
-		await expect(
-			table.getByText("A dependency bump rode along with the behaviour change"),
-		).toBeVisible();
+		await expect(table.getByText("Each commit carries one concern")).toBeVisible();
 		await expectNoPanelOverflow(panel);
 	},
 };
@@ -342,7 +344,7 @@ export const NothingReached: Story = {
 	args: {
 		state: {
 			...loaded,
-			observations: [],
+			practiceResults: [],
 			activity: { status: "ready", trace: { ...artifactTrace, practices: [] } },
 		},
 	},
@@ -363,7 +365,7 @@ export const RunningWithNothingReached: Story = {
 		state: {
 			...loaded,
 			run: { ...openProfileReviewRun, status: "IN_PROGRESS", practicesEvaluated: undefined },
-			observations: [],
+			practiceResults: [],
 			activity: { status: "ready", trace: { ...artifactTrace, practices: [] } },
 		},
 	},

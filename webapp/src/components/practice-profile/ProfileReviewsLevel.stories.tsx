@@ -66,9 +66,9 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Newest first under a heading per day. A row leads with the practices that slipped, by name, and
- * under it counts the practices that were met, did not apply, or remained undetermined, and how many practices
- * the review reached. "Request review" is offered only on the rows whose work
- * the reader may ask about, and feedback is linked where the provider's comment can be addressed
+ * under it counts the practices that were met, did not apply, or could not be determined, and how
+ * many practices the review reached. "Request review" is offered only on the rows whose work the
+ * reader may ask about, and feedback is linked where the provider's comment can be addressed
  * and counted elsewhere.
  */
 export const Default: Story = {
@@ -79,7 +79,7 @@ export const Default: Story = {
 		await expect(screen.getByLabelText("Timeframe")).toHaveTextContent("All time");
 		await expect(screen.getByText("Review 2")).toBeVisible();
 		await expect(
-			screen.getByText("one practice met, one undetermined · three practices reached"),
+			screen.getByText("one practice met, one could not be determined · three practices reached"),
 		).toBeVisible();
 		await expect(
 			screen.getByText("one practice met, five did not apply · nine practices reached"),
@@ -199,8 +199,8 @@ export const AskingForAReview: Story = {
 	},
 };
 
-/** A finished review that left a practice undetermined does not claim there is nothing to improve. */
-export const UndeterminedResults: Story = {
+/** A finished review that could not determine a practice does not claim there is nothing to improve. */
+export const CouldNotDetermineResults: Story = {
 	args: {
 		feed: feedOf([
 			{
@@ -221,7 +221,7 @@ export const UndeterminedResults: Story = {
 	},
 	play: async () => {
 		await settledDrawerPanel();
-		await expect(screen.getAllByText("Some practices remain undetermined")).toHaveLength(2);
+		await expect(screen.getAllByText("Some practices could not be determined")).toHaveLength(2);
 		await expect(screen.queryByText("Nothing to improve")).toBeNull();
 	},
 };

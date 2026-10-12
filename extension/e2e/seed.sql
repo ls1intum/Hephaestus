@@ -163,7 +163,9 @@ ON CONFLICT (id) DO NOTHING;
 -- Recorded native-comment scenarios, confined to this disposable fixture origin. These rows simulate
 -- provider outcomes; no model, provider post, dispatch or outbox event is created. Each account sees
 -- only its own three units: two share a summary and one records a successful part of a failed package.
--- Comment URLs are deterministic fixture anchors, never addresses of real external comments.
+-- Each of the three units rests on one result about the recipient: the first is not met, with one
+-- problem, and the other two are met. Comment URLs are deterministic fixture anchors, never addresses
+-- of real external comments.
 DO $$
 DECLARE
   target record;
@@ -172,7 +174,8 @@ DECLARE
   run_id uuid;
   feedback_id uuid;
   placement_id uuid;
-  observation_id uuid;
+  result_id uuid;
+  problem_citation jsonb;
   page_url text;
   comment_base bigint;
   fixture_time timestamptz := '2026-09-27 08:00:00+00';
@@ -268,19 +271,40 @@ BEGIN
       END IF;
 
       IF item.ordinal <= 3 THEN
-        observation_id := format('8f1e2026-%s-4d00-8000-%s', lpad(target.number::text, 4, '0'),
+        result_id := format('8f1e2026-%s-4d00-8000-%s', lpad(target.number::text, 4, '0'),
           lpad(item.ordinal::text, 12, '0'))::uuid;
-        INSERT INTO observation(id, occurrence_key, agent_job_id, workspace_id, practice_id,
+        problem_citation := jsonb_build_object('sourceKind', 'scm.pull-request.diff',
+          'artifactPath', 'context/diff.patch', 'path', 'README.md', 'side', 'NEW', 'startLine', 12,
+          'endLine', 12, 'quote', 'Synthetic line', 'quoteRedacted', false);
+        INSERT INTO practice_result(id, occurrence_key, agent_job_id, workspace_id, practice_id,
           practice_revision_id, artifact_kind, artifact_id, about_user_id, summary,
-          outcome, severity, origin, observed_at, evidence_rationale)
-        VALUES(observation_id, 'extension-native-feedback-' || target.number || '-' || item.ordinal,
+          outcome, severity, evidence, origin, observed_at, evidence_rationale, scope_key)
+        VALUES(result_id, 'extension-native-feedback-' || target.number || '-' || item.ordinal,
           run_id, 20, 923100 + item.ordinal, 923100 + item.ordinal, 'scm.pull_request', target.artifact_id,
-          target.recipient_id, 'Synthetic browser-test observation; no model reviewed this work.',
-          'MET', NULL, 'MANUAL', fixture_time,
-          'Synthetic evidence for deterministic browser validation only.')
+          target.recipient_id, 'Synthetic browser-test result; no model reviewed this work.',
+          CASE WHEN item.ordinal = 1 THEN 'NOT_MET' ELSE 'MET' END,
+          CASE WHEN item.ordinal = 1 THEN 'MAJOR' ELSE NULL END,
+          CASE WHEN item.ordinal = 1 THEN jsonb_build_object('citations', jsonb_build_array(problem_citation))
+            ELSE NULL END,
+          'MANUAL', fixture_time,
+          'Synthetic evidence for deterministic browser validation only.',
+          'scm.pull_request:' || target.artifact_id || ':AUTHOR')
         ON CONFLICT(id) DO NOTHING;
-        INSERT INTO feedback_observation(feedback_id, observation_id, role, ordinal)
-        VALUES(feedback_id, observation_id, 'PRIMARY', 0) ON CONFLICT DO NOTHING;
+        -- A not met result has at least one problem; the check runs when the transaction commits.
+        IF item.ordinal = 1 THEN
+          INSERT INTO practice_observation(id, workspace_id, practice_result_id, position, severity, summary,
+            explanation, citations)
+          VALUES(format('8f1e2026-%s-4e00-8000-%s', lpad(target.number::text, 4, '0'),
+              lpad(item.ordinal::text, 12, '0'))::uuid, 20, result_id, 0, 'MAJOR',
+            'Synthetic browser-test problem; no model reviewed this work.',
+            'Synthetic explanation for deterministic browser validation only.',
+            jsonb_build_array(problem_citation))
+          ON CONFLICT(id) DO NOTHING;
+        END IF;
+        INSERT INTO feedback_evidence(id, workspace_id, feedback_id, practice_result_id, observation_id, role, ordinal)
+        VALUES(format('8f1e2026-%s-4f00-8000-%s', lpad(target.number::text, 4, '0'),
+            lpad(item.ordinal::text, 12, '0'))::uuid, 20, feedback_id, result_id, NULL, 'PRIMARY', 0)
+        ON CONFLICT DO NOTHING;
       END IF;
     END LOOP;
 

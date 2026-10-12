@@ -1,5 +1,5 @@
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
+import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
 import { Badge } from "@/components/ui/badge";
 
 import { reviewOrdinalLabel } from "./review-run-groups";
@@ -12,9 +12,9 @@ export function LatestReviewTag() {
 	return <Badge variant="secondary">Latest</Badge>;
 }
 
-/** A review somebody asked for, in the observation-origin registry's entry for the same fact. */
+/** A review somebody asked for, in the result-origin registry's entry for the same fact. */
 export function RequestedReviewTag() {
-	return <StatusBadge def={OBSERVATION_ORIGIN_DEFS.MANUAL} />;
+	return <StatusBadge def={RESULT_ORIGIN_DEFS.MANUAL} />;
 }
 
 /**

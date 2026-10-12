@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
 	InAppFeedback,
-	ObservationDetail,
 	PracticeGuidance,
+	PracticeResultDetail,
 	PracticeSignal,
 	PracticeTraceEntry,
 	ProfileReviewRun,
@@ -19,7 +19,7 @@ import { formatDayTime, type Wire } from "@/lib/dates";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { clearUserView } from "@/runtime/user-view/session";
-import { detailObservation, detailRun } from "@/stories/practice-detail-story-mock-data";
+import { detailResult, detailRun } from "@/stories/practice-detail-story-mock-data";
 import { bundledGuidance } from "@/stories/practice-guidance-story-mock-data";
 import {
 	groups,
@@ -30,7 +30,7 @@ import {
 } from "@/stories/practice-profile-story-mock-data";
 import {
 	openProfileReviewRun,
-	openProfileRunObservations,
+	openProfileRunResults,
 	profileReviewRuns,
 } from "@/stories/profile-review-runs-story-mock-data";
 import { STORY_NOW } from "@/stories/story-clock";
@@ -53,13 +53,13 @@ if (!first) {
 /** Narrowed once, so the helpers below can read it without a guard each. */
 const practice = first;
 
-/** One review of the first practice, so its level has an observation to show. */
-const observation = {
-	...detailObservation,
+/** One review of the first practice, so its level has a result to show. */
+const result = {
+	...detailResult,
 	practiceSlug: practice.slug,
 	practiceName: practice.name,
 };
-const run = { ...detailRun, observations: [observation] };
+const run = { ...detailRun, practiceResults: [result] };
 
 /** The review before the open one, on the same merge request. */
 const [, earlierOnSameWork] = profileReviewRuns;
@@ -94,7 +94,7 @@ beforeEach(() => {
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/feedback/in-app", () => HttpResponse.json([])),
 		// The practice level's one query, answered as soon as it opens; it carries every
-		// observation in full, so opening one asks for nothing more.
+		// result in full, so opening one asks for nothing more.
 		http.get("*/workspaces/:workspaceSlug/practice-groups/:groupSlug/review-runs", () =>
 			HttpResponse.json({ content: [run], hasNext: false, page: 0, size: 10 }),
 		),
@@ -106,7 +106,7 @@ beforeEach(() => {
 			HttpResponse.json({ content: profileReviewRuns, hasNext: false, page: 0, size: 10 }),
 		),
 		http.get("*/workspaces/:workspaceSlug/practice-profile/review-runs/:reviewId", () =>
-			HttpResponse.json({ run: openProfileReviewRun, observations: [observation] }),
+			HttpResponse.json({ run: openProfileReviewRun, practiceResults: [result] }),
 		),
 		http.get(
 			"*/workspaces/:workspaceSlug/practices/trace/:artifactKind/:artifactId",
@@ -143,7 +143,7 @@ const COMMIT_SUBJECTS = {
 	practiceName: "Commit subjects explain each change",
 } as const;
 
-/** The earlier review assessed one practice itself, and observed it. */
+/** The earlier review assessed one practice itself, and recorded a result. */
 const producerRun = {
 	...earlierOnSameWork,
 	practicesEvaluated: 1,
@@ -152,13 +152,13 @@ const producerRun = {
 	slippedPractices: [COMMIT_SUBJECTS],
 } satisfies ProfileReviewRun;
 
-const producerObservation = {
-	...detailObservation,
+const producerResult = {
+	...detailResult,
 	...COMMIT_SUBJECTS,
 	id: "00000000-0000-0000-0000-0000000002b1",
 	summary: "Two commits are titled only “fix”",
 	observedAt: earlierOnSameWork.reviewedAt,
-} satisfies ObservationDetail;
+} satisfies PracticeResultDetail;
 
 const readySignal = artifactTrace.signals.find((signal) => signal.id === "sig-ready");
 if (!readySignal) {
@@ -210,7 +210,7 @@ const pushedTrace = {
 				"An earlier review checked this practice on the same code, so this review did not assess it again.",
 			occasionedBy: PUSHED,
 			occasionedById: "sig-ready",
-			observationCount: 0,
+			practiceResultCount: 0,
 		} satisfies PracticeTraceEntry,
 	],
 };
@@ -222,11 +222,10 @@ const producerTrace = {
 	practices: [
 		{
 			...commitSubjects,
-			explanation:
-				"Reviewed when the work was marked ready for review. One observation was recorded.",
+			explanation: "Reviewed when the work was marked ready for review. One result was recorded.",
 			occasionedBy: READY,
 			occasionedById: "sig-ready-earlier",
-			observationCount: 1,
+			practiceResultCount: 1,
 		} satisfies PracticeTraceEntry,
 	],
 };
@@ -248,11 +247,11 @@ function reuseHandlers(runReads: string[], { earlierGone = false } = {}) {
 		http.get("*/workspaces/:workspaceSlug/practice-profile/review-runs/:reviewId", ({ params }) => {
 			runReads.push(String(params.reviewId));
 			if (params.reviewId !== producerRun.reviewId) {
-				return HttpResponse.json({ run: pushedRun, observations: openProfileRunObservations });
+				return HttpResponse.json({ run: pushedRun, practiceResults: openProfileRunResults });
 			}
 			return earlierGone
 				? HttpResponse.json({ status: 404, title: "Not Found" }, { status: 404 })
-				: HttpResponse.json({ run: producerRun, observations: [producerObservation] });
+				: HttpResponse.json({ run: producerRun, practiceResults: [producerResult] });
 		}),
 		http.get(
 			"*/workspaces/:workspaceSlug/practices/trace/:artifactKind/:artifactId",
@@ -522,7 +521,7 @@ describe("practice profile route", () => {
 			http.get("*/workspaces/:workspaceSlug/practice-profile/review-runs/:reviewId", ({ params }) =>
 				HttpResponse.json({
 					run: profileReviewRuns.find((candidate) => candidate.reviewId === params.reviewId),
-					observations: [],
+					practiceResults: [],
 				}),
 			),
 		);
@@ -584,7 +583,7 @@ describe("practice profile route", () => {
 				http.get("*/workspaces/:workspaceSlug/practice-profile/review-runs/:reviewId", () =>
 					HttpResponse.json({
 						run: { ...openProfileReviewRun, status },
-						observations: [observation],
+						practiceResults: [result],
 					}),
 				),
 				http.get(
@@ -657,13 +656,13 @@ describe("practice profile route", () => {
 		expect(router.state.location.search.feedback).toBe("resolved");
 		await waitFor(() => expect(runReads).toContain(earlierOnSameWork.reviewId));
 		await waitFor(() => expect(tracedReviewIds).toContain(earlierOnSameWork.reviewId));
-		// The level is the earlier review's own: its recorded count, its one practice, its observation.
+		// The level is the earlier review's own: its recorded count, its one practice, its result.
 		await screen.findByText(
 			"one practice assessed in this review · one practice listed",
 			undefined,
 			SETTLE_WAIT,
 		);
-		await screen.findByText(producerObservation.summary, undefined, SETTLE_WAIT);
+		await screen.findByText(producerResult.summary, undefined, SETTLE_WAIT);
 	});
 
 	it("shows an earlier review that is no longer the reader's as not found, without asking again", async () => {
@@ -696,7 +695,7 @@ describe("practice profile route", () => {
 		expect(reads).toBe(1);
 	});
 
-	it("opens and closes an observation without writing the URL, so leaving the level takes one step", async () => {
+	it("opens and closes a result without writing the URL, so leaving the level takes one step", async () => {
 		const router = await renderProfile();
 		await openPractice(router);
 		await showObservations();
@@ -704,8 +703,8 @@ describe("practice profile route", () => {
 		const searchStr = () => router.state.location.searchStr;
 		const before = searchStr();
 
-		// The observation arrives open, with what the feed carries; a press closes it in place.
-		const rowName = { name: new RegExp(observation.summary, "u") };
+		// The result arrives open, with what the feed carries; a press closes it in place.
+		const rowName = { name: new RegExp(result.summary, "u") };
 		const row = () => screen.getByRole("button", rowName);
 		// The feed is its own request: under load it lands after the level does.
 		await screen.findByRole("button", rowName, ROUTE_RENDER_WAIT);
@@ -902,7 +901,7 @@ describe("practice introduction", () => {
 
 /**
  * A user view is an administrator reading the developer's page: everything the developer would
- * answer — a rating, a comment, the card's own answer, a response to an observation — is theirs
+ * answer — a rating, a comment, the card's own answer, a response to a result — is theirs
  * alone, so none of it is
  * offered. The developer's own visit is the control that shows the same controls are there.
  */
@@ -917,7 +916,7 @@ describe("practice profile in a user view", () => {
 	afterEach(clearUserView);
 
 	/**
-	 * The card's rating and answer buttons on the page, then the observation's response on the
+	 * The card's rating and answer buttons on the page, then the result's response on the
 	 * practice level — the one of the two that offers a dispute of its own.
 	 */
 	async function responseControls() {
@@ -931,7 +930,7 @@ describe("practice profile in a user view", () => {
 		return {
 			ratings,
 			answers,
-			observationResponse: screen.queryAllByRole("button", { name: "Disputed" }).length,
+			resultResponse: screen.queryAllByRole("button", { name: "Disputed" }).length,
 		};
 	}
 
@@ -939,7 +938,7 @@ describe("practice profile in a user view", () => {
 		await expect(responseControls()).resolves.toStrictEqual({
 			ratings: 1,
 			answers: 1,
-			observationResponse: 1,
+			resultResponse: 1,
 		});
 	});
 
@@ -957,7 +956,7 @@ describe("practice profile in a user view", () => {
 		await expect(responseControls()).resolves.toStrictEqual({
 			ratings: 0,
 			answers: 0,
-			observationResponse: 0,
+			resultResponse: 0,
 		});
 	});
 });

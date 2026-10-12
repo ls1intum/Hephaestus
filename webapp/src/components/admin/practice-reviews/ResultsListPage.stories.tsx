@@ -1,7 +1,7 @@
 import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
-import type { ReviewObservation } from "@/api/types.gen";
+import type { ReviewResult } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
@@ -10,16 +10,16 @@ import { expectNoPageOverflow } from "@/stories/reflow";
 import { StatefulPatch } from "@/stories/stateful";
 
 import {
-	manyObservations,
+	manyResults,
 	practiceGroups,
-	reviewObservations,
+	reviewResults,
 	selects,
 	workspaceMembers,
 	workspacePractices,
 } from "./fixtures";
-import { groupFacetOptions, practiceFacetOptions } from "./ObservationFilters";
-import { ObservationsListPage } from "./ObservationsListPage";
-import { type ObservationsSearch, observationsQuery, REVIEW_PAGE_SIZE } from "./review-search";
+import { groupFacetOptions, practiceFacetOptions } from "./ResultFilters";
+import { ResultsListPage } from "./ResultsListPage";
+import { type ResultsSearch, resultsQuery, REVIEW_PAGE_SIZE } from "./review-search";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 
 const PEOPLE: ReviewPeople = {
@@ -43,14 +43,14 @@ const PRACTICES: FacetSource = {
 	isError: false,
 };
 
-const loadMoreObservations = fn();
+const loadMoreResults = fn();
 
 /**
- * Every row a story has to choose from. It travels in the `observations` arg because that is the
- * prop the screen reads, and {@link observationPage} narrows it to its first page before the screen
+ * Every row a story has to choose from. It travels in the `results` arg because that is the
+ * prop the screen reads, and {@link resultPage} narrows it to its first page before the screen
  * sees it — so an arg set in Controls is a pool to filter, not a page already cut.
  */
-const pool = loadedList<ReviewObservation>;
+const pool = loadedList<ReviewResult>;
 
 /**
  * The route fetches; this screen only draws what it is handed. To keep the facets live in a story
@@ -60,19 +60,19 @@ const pool = loadedList<ReviewObservation>;
  */
 const SEVERITY_RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, INFO: 3 };
 
-/** The server's "Most actionable first" (`ObservationRepository.OPERATOR_ORDER`), as a sort key. */
-function actionabilityKey(observation: ReviewObservation): number {
-	if (observation.outcome === "NOT_MET") {
-		return SEVERITY_RANK[observation.severity ?? ""] ?? 4;
+/** The server's "Most actionable first" (`PracticeResultRepository.OPERATOR_ORDER`), as a sort key. */
+function actionabilityKey(result: ReviewResult): number {
+	if (result.outcome === "NOT_MET") {
+		return SEVERITY_RANK[result.severity ?? ""] ?? 4;
 	}
-	return observation.outcome === "MET" ? 10 : 20;
+	return result.outcome === "MET" ? 10 : 20;
 }
 
 /** The rows in the order the server would send them for `search`. */
 function inServerOrder(
-	list: PagedListState<ReviewObservation>,
-	search: ObservationsSearch,
-): PagedListState<ReviewObservation> {
+	list: PagedListState<ReviewResult>,
+	search: ResultsSearch,
+): PagedListState<ReviewResult> {
 	if (list.status !== "ready" || search.order !== "ACTIONABILITY") {
 		return list;
 	}
@@ -83,11 +83,11 @@ function inServerOrder(
 	return { ...list, rows };
 }
 
-function observationPage(
-	list: PagedListState<ReviewObservation>,
-	search: ObservationsSearch,
-): PagedListState<ReviewObservation> {
-	const query = observationsQuery(search, REVIEW_PAGE_SIZE);
+function resultPage(
+	list: PagedListState<ReviewResult>,
+	search: ResultsSearch,
+): PagedListState<ReviewResult> {
+	const query = resultsQuery(search, REVIEW_PAGE_SIZE);
 	return narrowedList(
 		inServerOrder(list, search),
 		(row) =>
@@ -104,7 +104,7 @@ function observationPage(
 }
 
 const meta = {
-	component: ObservationsListPage,
+	component: ResultsListPage,
 	parameters: {
 		layout: "fullscreen",
 		chromatic: { viewports: [320, 768, 1440] },
@@ -119,7 +119,7 @@ const meta = {
 			origin: undefined,
 		},
 		onSearchChange: fn(),
-		observations: pool(reviewObservations),
+		results: pool(reviewResults),
 		groups: GROUPS,
 		practices: PRACTICES,
 		// The facet needs a label per slug; the hover card on a row's practice name needs the record.
@@ -131,19 +131,19 @@ const meta = {
 	render: (args) => (
 		<StatefulPatch initial={args.search}>
 			{(search, onSearchChange) => (
-				<ObservationsListPage
+				<ResultsListPage
 					{...args}
 					search={search}
 					onSearchChange={(patch) => {
 						args.onSearchChange(patch);
 						onSearchChange(patch);
 					}}
-					observations={observationPage(args.observations, search)}
+					results={resultPage(args.results, search)}
 				/>
 			)}
 		</StatefulPatch>
 	),
-} satisfies Meta<typeof ObservationsListPage>;
+} satisfies Meta<typeof ResultsListPage>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -168,7 +168,7 @@ async function pickFacet(
 
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		await canvas.findByText("12 observations.");
+		await canvas.findByText("12 results.");
 		// Every facet sits in the row, with no toggle to open first.
 		for (const name of [
 			"Group",
@@ -182,7 +182,7 @@ export const Default: Story = {
 		}
 		await expect(canvas.queryByRole("button", { name: /More filters/u })).toBeNull();
 		canvas.getByRole("combobox", { name: "Developer" });
-		canvas.getByRole("button", { name: "Observed" });
+		canvas.getByRole("button", { name: "Recorded" });
 		// A pull request, a chat thread and a document all reach this list and have to read as one
 		// language, so one row of each work kind is asserted rather than any one row.
 		canvas.getByText("The controller delegates before it does anything else");
@@ -194,9 +194,9 @@ export const Default: Story = {
 export const FilterToOneSeverity: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 observations.");
+		await canvas.findByText("13 results.");
 		await pickFacet(canvas, userEvent, "Severity", /Major/u);
-		await canvas.findByText("2 observations match your filters.");
+		await canvas.findByText("2 results match your filters.");
 		await expect(canvas.queryByText(/leaks the ledger’s table name/u)).not.toBeInTheDocument();
 	},
 };
@@ -204,12 +204,12 @@ export const FilterToOneSeverity: Story = {
 export const FilterToOnePerson: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 observations.");
+		await canvas.findByText("13 results.");
 		await userEvent.click(canvas.getByRole("combobox", { name: "Developer" }));
 		const listbox = await screen.findByRole("listbox");
 		await userEvent.click(await within(listbox).findByRole("option", { name: /Grace Hopper/u }));
 		await canvas.findByRole("combobox", { name: "Developer: Grace Hopper" });
-		await canvas.findByText("2 observations match your filters.");
+		await canvas.findByText("2 results match your filters.");
 	},
 };
 
@@ -247,26 +247,26 @@ export const NarrowedToTheSelectedObservation: Story = {
 export const FilteredToNothing: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 observations.");
+		await canvas.findByText("13 results.");
 		await pickFacet(canvas, userEvent, "Severity", /Critical/u);
 		await pickFacet(canvas, userEvent, "Group", /Testing/u);
-		await canvas.findByText("No observations match these filters");
+		await canvas.findByText("No results match these filters");
 		canvas.getByRole("button", { name: "Reset" });
 		await userEvent.click(canvas.getByRole("button", { name: "Clear all filters" }));
-		await canvas.findByText("12 observations.");
+		await canvas.findByText("13 results.");
 	},
 };
 
 /**
- * `ACTIONABILITY` is the server's ordering, not one the browser applies: not met observations
- * worst-first, then met observations, then the observations that judged nothing. The control's only
+ * `ACTIONABILITY` is the server's ordering, not one the browser applies: not met results
+ * worst-first, then met results, then the results that judged nothing. The control's only
  * job is to put the choice in the search the route turns into a request — that the endpoint spells it
  * `sort` is pinned by `-lists-route.test.tsx`, which is the only place the wire name can be checked.
  */
 export const SortByActionability: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ args, canvas, userEvent }) => {
-		await canvas.findByText("12 observations.");
+		await canvas.findByText("13 results.");
 		await userEvent.click(canvas.getByRole("combobox", { name: /Sort/u }));
 		await userEvent.click(await screen.findByRole("option", { name: "Most actionable first" }));
 		await expect(args.onSearchChange).toHaveBeenLastCalledWith(
@@ -306,14 +306,14 @@ export const MobileAppliedFilters: Story = {
 		viewport: { defaultViewport: "reflow" },
 	},
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 observations.");
+		await canvas.findByText("13 results.");
 		await pickFacet(canvas, userEvent, "Severity", /Major/u);
-		await canvas.findByText("2 observations match your filters.");
+		await canvas.findByText("2 results match your filters.");
 		// Queried by label rather than by role because whether the `sm:` breakpoint is live depends on
 		// how the runner applies the viewport, while what the pill says and does must hold either way.
 		await canvas.findByTitle("Severity: Major");
 		await userEvent.click(canvas.getByLabelText("Clear severity filter (Major)"));
-		await canvas.findByText("12 observations.");
+		await canvas.findByText("13 results.");
 		await expectNoPageOverflow();
 	},
 };
@@ -321,8 +321,8 @@ export const MobileAppliedFilters: Story = {
 export const PickADateRange: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 observations.");
-		await userEvent.click(canvas.getByRole("button", { name: "Observed" }));
+		await canvas.findByText("13 results.");
+		await userEvent.click(canvas.getByRole("button", { name: "Recorded" }));
 		const dialog = await screen.findByRole("dialog");
 		// The month is the only `role="grid"` on screen and the day buttons are the only buttons
 		// inside it. Testing Library maps a `<td>` to `cell`, not `gridcell`, whatever role its
@@ -345,22 +345,22 @@ export const SeverityFacetOpen: Story = {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Severity" }));
 		const listbox = await screen.findByRole("listbox");
 		await within(listbox).findByRole("option", { name: /Critical/u });
-		within(listbox).getByRole("option", { name: /Informational/u });
+		within(listbox).getByRole("option", { name: /Trivial/u });
 	},
 };
 
 /**
- * More observations than the first page: the count is the server's, and the next page is asked for
+ * More results than the first page: the count is the server's, and the next page is asked for
  * when the end of the list scrolls into view.
  */
 export const LoadsMoreAtTheEnd: Story = {
-	args: { observations: pool(manyObservations(64), { onLoadMore: loadMoreObservations }) },
+	args: { results: pool(manyResults(64), { onLoadMore: loadMoreResults }) },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
-		await canvas.findByText("64 observations.");
-		const more = canvas.getByRole("button", { name: "Show more observations" });
+		await canvas.findByText("64 results.");
+		const more = canvas.getByRole("button", { name: "Show more results" });
 		more.scrollIntoView();
-		await waitFor(async () => expect(loadMoreObservations).toHaveBeenCalled());
+		await waitFor(async () => expect(loadMoreResults).toHaveBeenCalled());
 	},
 };
 
@@ -370,7 +370,7 @@ export const Mobile: Story = {
 		viewport: { defaultViewport: "reflow" },
 	},
 	play: async ({ canvas }) => {
-		await canvas.findByText("12 observations.");
+		await canvas.findByText("13 results.");
 		await expectNoPageOverflow();
 	},
 };
@@ -382,29 +382,32 @@ export const Mobile: Story = {
 export const LoadFailed: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	args: {
-		observations: { status: "error", error: { status: 500 }, onRetry: fn() },
+		results: { status: "error", error: { status: 500 }, onRetry: fn() },
 	},
 	play: async ({ canvas }) => {
-		await canvas.findByText("We could not load observations");
+		await canvas.findByText("We could not load results");
 	},
 };
 
 export const Loading: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
-	args: { observations: { status: "loading" } },
+	args: { results: { status: "loading" } },
 	play: async ({ canvas }) => {
-		await expect(await canvas.findByRole("table", { name: "Observations" })).toHaveAttribute(
+		await expect(await canvas.findByRole("table", { name: "Results" })).toHaveAttribute(
 			"aria-busy",
 			"true",
 		);
 	},
 };
 
-/** Nothing has been observed yet, which is not the same as a filter that matched nothing. */
-export const NoObservationsYet: Story = {
+/** Nothing has been reviewed yet, which is not the same as a filter that matched nothing. */
+export const NoResultsYet: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
-	args: { observations: pool([]) },
+	args: { results: pool([]) },
 	play: async ({ canvas }) => {
-		await canvas.findByText("No observations yet");
+		await canvas.findByText("No results yet");
+		await expect(
+			canvas.getByText("Results appear after a practice review completes."),
+		).toBeVisible();
 	},
 };

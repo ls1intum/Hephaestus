@@ -1,8 +1,4 @@
-import type {
-	ReviewFeedbackCounts,
-	ReviewObservationCounts,
-	ReviewRunCounts,
-} from "@/api/types.gen";
+import type { ReviewFeedbackCounts, ReviewResultCounts, ReviewRunCounts } from "@/api/types.gen";
 import { type StatusDef, statusValues } from "@/components/common/status-def";
 import {
 	DELIVERY_FAMILY_DEFS,
@@ -13,20 +9,21 @@ import {
 	DELIVERY_STATE_DEFS,
 	type DeliveryState,
 } from "@/components/practice-vocabulary/delivery-outcome-defs";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
+import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
 import { OUTCOME_DEFS, outcomeCountNoun } from "@/components/practice-vocabulary/outcome-defs";
+import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
 import {
 	REVIEW_STATUS_DEFS,
 	type ReviewStatus,
 } from "@/components/practice-vocabulary/review-status-defs";
 import { toDayParam } from "@/lib/date-range-search";
 
-import type { FeedbackSearch, ObservationsSearch, RunsSearch } from "./review-search";
+import type { FeedbackSearch, ResultsSearch, RunsSearch } from "./review-search";
 
 /** A list tab, filtered: where a count opens. */
 export type ReviewListTarget =
 	| { list: "runs"; search: Partial<RunsSearch> }
-	| { list: "observations"; search: Partial<ObservationsSearch> }
+	| { list: "results"; search: Partial<ResultsSearch> }
 	| { list: "feedback"; search: Partial<FeedbackSearch> };
 
 /**
@@ -36,7 +33,7 @@ export type ReviewListTarget =
 export interface OutcomeSlot {
 	key: string;
 	def: StatusDef;
-	/** The count's noun for this count: "met observation", "not met observations", "delivered". */
+	/** The count's noun for this count: "met result", "not met results", "delivered". */
 	label: string;
 	count: number;
 	target?: ReviewListTarget;
@@ -60,9 +57,9 @@ export interface OutcomeScope {
  */
 export const OUTCOME_LEGEND_LABELS = {
 	reviews: "Reviews by outcome",
-	observations: "Observations by outcome",
-	/** The counts that overlap the observations' outcomes, listed apart from them. */
-	checkedObservations: "Observations checked by an admin",
+	results: "Results by outcome",
+	/** The counts that overlap the results' outcomes, listed apart from them. */
+	checkedResults: "Results checked by an admin",
 	/** The reviews of the range without an outcome yet, listed apart from the outcomes. */
 	openReviews: "Reviews not finished yet",
 	feedback: "Feedback by delivery",
@@ -116,28 +113,28 @@ export function finishedCount(counts: ReviewRunCounts): number {
 }
 
 /**
- * The four results that partition observations: the two outcomes of an assessment, then the two
+ * The four outcomes that partition results: the two outcomes of an assessment, then the two
  * ways of not reaching one, each in its registry's count noun.
  */
-export function observationSlots(
-	counts: ReviewObservationCounts,
+export function resultSlots(
+	counts: ReviewResultCounts,
 	scope?: OutcomeScope,
 ): OutcomeSlot[] {
-	const search = scope && scopeSearch(scope, "observations");
+	const search = scope && scopeSearch(scope, "results");
 	return [
 		{
 			key: "met",
 			def: OUTCOME_DEFS.MET,
 			label: outcomeCountNoun("MET", counts.met),
 			count: counts.met,
-			target: search && { list: "observations", search: { ...search, outcome: ["MET"] } },
+			target: search && { list: "results", search: { ...search, outcome: ["MET"] } },
 		},
 		{
 			key: "notMet",
 			def: OUTCOME_DEFS.NOT_MET,
 			label: outcomeCountNoun("NOT_MET", counts.notMet),
 			count: counts.notMet,
-			target: search && { list: "observations", search: { ...search, outcome: ["NOT_MET"] } },
+			target: search && { list: "results", search: { ...search, outcome: ["NOT_MET"] } },
 		},
 		...(["NOT_APPLICABLE", "UNDETERMINED"] as const).map((status) => ({
 			key: status,
@@ -145,7 +142,7 @@ export function observationSlots(
 			label: lower(OUTCOME_DEFS[status]),
 			count: status === "NOT_APPLICABLE" ? counts.notApplicable : counts.undetermined,
 			target: search && {
-				list: "observations" as const,
+				list: "results" as const,
 				search: { ...search, outcome: [status] },
 			},
 		})),
@@ -153,8 +150,8 @@ export function observationSlots(
 }
 
 /**
- * Observations an admin marked incorrect. They overlap the partition — an incorrect met observation
- * is still a met observation — so this count is listed beside the mix, never added into it.
+ * Results an admin marked incorrect. They overlap the partition — an incorrect met result is
+ * still a met result — so this count is listed beside the mix, never added into it.
  */
 export function markedIncorrectSlot(count: number, scope?: OutcomeScope): OutcomeSlot {
 	return {
@@ -163,8 +160,8 @@ export function markedIncorrectSlot(count: number, scope?: OutcomeScope): Outcom
 		label: lower(MARKED_INCORRECT_DEF),
 		count,
 		target: scope && {
-			list: "observations",
-			search: { ...scopeSearch(scope, "observations"), invalidated: true },
+			list: "results",
+			search: { ...scopeSearch(scope, "results"), invalidated: true },
 		},
 	};
 }

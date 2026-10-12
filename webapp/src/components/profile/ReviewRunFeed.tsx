@@ -21,12 +21,12 @@ import { ReviewRunTimeline, type ReviewRunTimelineProps } from "./ReviewRunTimel
 
 export interface ReviewRunFeedProps extends Pick<
 	ReviewRunTimelineProps,
-	"observations" | "showPracticeName" | "initiallyOpen"
+	"results" | "showPracticeName" | "initiallyOpen"
 > {
 	feed: ReviewRunFeedState;
 	/**
 	 * The runs this surface shows, when they are not simply the feed's — a practice's own level
-	 * narrows them to its observations.
+	 * narrows them to its results.
 	 */
 	runs?: PracticeGroupReviewRun[];
 	/** How many run cards the skeleton draws, so nothing jumps when the real ones land. */
@@ -46,7 +46,7 @@ export function ReviewRunFeed({
 	feed,
 	runs,
 	skeletonRows,
-	observations,
+	results,
 	showPracticeName,
 	initiallyOpen,
 	emptyTitle,
@@ -71,9 +71,7 @@ export function ReviewRunFeed({
 	if (shown.length === 0 && feed.hasMore) {
 		return (
 			<div className="flex flex-col items-start gap-2">
-				<p className="text-sm text-muted-foreground">
-					The latest reviews have no observations here.
-				</p>
+				<p className="text-sm text-muted-foreground">The latest reviews have no results here.</p>
 				{emptyAction}
 				<EarlierReviews {...feed} loadingRow={RUN_CARD_SKELETON} />
 			</div>
@@ -97,7 +95,7 @@ export function ReviewRunFeed({
 		<>
 			<ReviewRunTimeline
 				runs={shown}
-				observations={observations}
+				results={results}
 				showPracticeName={showPracticeName}
 				initiallyOpen={initiallyOpen}
 				continues={feed.hasMore}

@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 
 import type {
 	GetArtifactTraceResponse,
-	ObservationDetail,
 	PracticeGroup,
+	PracticeResultDetail,
 	ProfileReviewRun,
 	ReviewedWorkRef,
 } from "@/api/types.gen";
@@ -54,13 +54,13 @@ import {
 } from "./practice-profile-search";
 
 /**
- * One review and what it observed about the reader, with this work's review activity: every
+ * One review and its results about the reader, with this work's review activity: every
  * practice's answer, asked for this review, and every occurrence recorded about the work. The
  * activity is its own read, so the tabs wait for it rather than claim the review reached nothing.
  */
 export type ProfileReviewDetailState = PanelState<{
 	run: ProfileReviewRun;
-	observations: ObservationDetail[];
+	practiceResults: PracticeResultDetail[];
 	activity: PanelState<{ trace: GetArtifactTraceResponse }>;
 }>;
 
@@ -183,11 +183,11 @@ export function ProfileReviewLevel({
 	} else if (state.activity.status === "loading") {
 		body = <LoadingBody />;
 	} else {
-		const observationsByPractice: Record<string, ObservationDetail[] | undefined> = {};
-		for (const observation of state.observations) {
-			const recorded = observationsByPractice[observation.practiceSlug] ?? [];
-			recorded.push(observation);
-			observationsByPractice[observation.practiceSlug] = recorded;
+		const resultsByPractice: Record<string, PracticeResultDetail[] | undefined> = {};
+		for (const result of state.practiceResults) {
+			const recorded = resultsByPractice[result.practiceSlug] ?? [];
+			recorded.push(result);
+			resultsByPractice[result.practiceSlug] = recorded;
 		}
 		const counts: Record<ReviewTab, number> = {
 			practices: practices.length,
@@ -218,7 +218,7 @@ export function ProfileReviewLevel({
 						workspaceSlug={workspaceSlug}
 						entries={practices}
 						signals={signals}
-						observationsByPractice={observationsByPractice}
+						resultsByPractice={resultsByPractice}
 						groups={groups}
 						filters={filters}
 						onFiltersChange={onFiltersChange}

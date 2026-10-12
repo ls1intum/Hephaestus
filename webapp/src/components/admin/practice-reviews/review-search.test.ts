@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
 	feedbackQuery,
 	feedbackSearchSchema,
-	observationsQuery,
-	observationsSearchSchema,
+	resultsQuery,
+	resultsSearchSchema,
 	onePracticeQuery,
 	runsQuery,
 	runsSearchSchema,
@@ -18,7 +18,7 @@ describe("practice review search", () => {
 			from: "not-a-date",
 			page: -4,
 		});
-		const observations = observationsSearchSchema.parse({
+		const results = resultsSearchSchema.parse({
 			outcome: ["MET", "MET", "unknown"],
 			severity: "MAJOR",
 			from: "2026-08-10",
@@ -33,8 +33,8 @@ describe("practice review search", () => {
 		expect(feedback.from).toBeUndefined();
 		// The lists have no pages, so a `page` in the URL is dropped.
 		expect("page" in feedback).toBe(false);
-		expect(observations).toMatchObject({ outcome: ["MET"], severity: ["MAJOR"] });
-		expect(observations.to).toBeUndefined();
+		expect(results).toMatchObject({ outcome: ["MET"], severity: ["MAJOR"] });
+		expect(results.to).toBeUndefined();
 		expect(feedbackSearchSchema.parse({ to: "2026-07-03" }).to).toBeUndefined();
 	});
 
@@ -96,15 +96,15 @@ describe("practice review search", () => {
 	});
 
 	it("sends the chosen ordering as the parameter the endpoint names, and nothing when it is the default", () => {
-		const chosen = observationsSearchSchema.parse({ order: "ACTIONABILITY" });
-		const untouched = observationsSearchSchema.parse({});
+		const chosen = resultsSearchSchema.parse({ order: "ACTIONABILITY" });
+		const untouched = resultsSearchSchema.parse({});
 		// The word another route already owns: a `sort=name` arriving from anywhere else is not an
 		// ordering this list has, so it is dropped rather than sent on to the API.
-		const foreign = observationsSearchSchema.parse({ order: "name" });
+		const foreign = resultsSearchSchema.parse({ order: "name" });
 
-		expect(observationsQuery(chosen, 25).sort).toBe("ACTIONABILITY");
-		expect(observationsQuery(untouched, 25).sort).toBeUndefined();
-		expect(observationsQuery(foreign, 25).sort).toBeUndefined();
+		expect(resultsQuery(chosen, 25).sort).toBe("ACTIONABILITY");
+		expect(resultsQuery(untouched, 25).sort).toBeUndefined();
+		expect(resultsQuery(foreign, 25).sort).toBeUndefined();
 	});
 
 	it("names the one practice a list narrows to, the tracked one first", () => {
@@ -120,11 +120,9 @@ describe("practice review search", () => {
 	});
 });
 
-describe("observation outcome filter", () => {
+describe("result outcome filter", () => {
 	it("sends all four outcomes through one filter", () => {
 		const outcome = ["MET", "NOT_MET", "NOT_APPLICABLE", "UNDETERMINED"];
-		expect(
-			observationsQuery(observationsSearchSchema.parse({ outcome }), 25).outcome,
-		).toStrictEqual(outcome);
+		expect(resultsQuery(resultsSearchSchema.parse({ outcome }), 25).outcome).toStrictEqual(outcome);
 	});
 });

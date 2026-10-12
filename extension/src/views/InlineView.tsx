@@ -256,16 +256,16 @@ function RowContent({ subject }: { subject: WorkSubject }) {
 	);
 }
 
-/** The report on the work's own page, with the reader's observations once they open it. */
+/** The report on the work's own page, with the reader's results once they open it. */
 function PageContent() {
 	const view = useRememberedView();
 	const { expanded, workspaceSlug, remember, webAppOrigin } = view;
 	const review = useWorkReview(THE_PAGE, workspaceSlug, view.settled);
 	const { ready } = review;
 	const slug = ready?.workspace.slug ?? "";
-	const observations = useQuery({
-		queryKey: ["observations", slug],
-		queryFn: async () => ask({ type: "list-observations", workspaceSlug: slug }),
+	const results = useQuery({
+		queryKey: ["results", slug],
+		queryFn: async () => ask({ type: "list-results", workspaceSlug: slug }),
 		enabled: ready !== undefined && expanded,
 		refetchInterval: review.refetchInterval,
 	});
@@ -283,14 +283,14 @@ function PageContent() {
 		<PageReport
 			state={review.state}
 			feedback={review.feedback}
-			observations={ready === undefined || !expanded ? undefined : loadable(observations)}
+			results={ready === undefined || !expanded ? undefined : loadable(results)}
 			activity={review.activity}
 			webAppOrigin={webAppOrigin}
 			expanded={expanded}
 			onToggle={() => remember({ expanded: !expanded, workspaceSlug })}
 			onRetry={review.retry}
-			onRetryObservations={() => {
-				void observations.refetch();
+			onRetryResults={() => {
+				void results.refetch();
 			}}
 			onOpenSettings={openSettings}
 			onChooseWorkspace={(chosen) => remember({ expanded, workspaceSlug: chosen })}

@@ -1,13 +1,13 @@
 {
 	"include": ["**/*.ts", "**/*.tsx", ".storybook/**/*.ts", ".storybook/**/*.tsx"],
-	// The Playwright tree runs on Node and carries its own `tsconfig.json`.
-	"exclude": ["e2e"],
+	// The Playwright tree and the oxlint plugin run on Node and carry their own `tsconfig.json`.
+	"exclude": ["e2e", "tools"],
 	"compilerOptions": {
 		"target": "ES2022",
 		"jsx": "react-jsx",
 		"module": "ESNext",
 		// Vite's default browser target decides the lib, and `toSorted` and `Promise.withResolvers`
-		// are past it. Only `e2e/`, which runs on Node, widens it (`e2e/tsconfig.json`).
+		// are past it. Only `e2e/` and `tools/`, which run on Node, widen it (their own `tsconfig.json`).
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"types": ["vite/client"],
 		/* Bundler mode */

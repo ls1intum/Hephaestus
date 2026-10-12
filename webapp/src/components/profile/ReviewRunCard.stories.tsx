@@ -1,22 +1,23 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn } from "storybook/test";
 
-import type { ObservationDetail, PracticeGroupReviewRun } from "@/api/types.gen";
+import type { PracticeGroupReviewRun, PracticeResultDetail } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { daysBefore } from "@/stories/story-clock";
 
 import { ReviewRunCard } from "./ReviewRunCard";
 
-/** What every observation of the run below shares: the work, the moment, the ordinary origin. */
+/** What every result of the run below shares: the work, the moment, the ordinary origin. */
 const onTheRun = {
 	outcome: "MET",
 	observedAt: daysBefore(2),
 	origin: "LIVE",
 	claimCurrentness: "CURRENT",
+	observations: [],
 	artifactId: 902,
 	artifactKind: "scm.pull_request",
 	artifactUrl: "https://github.com/HephaestusTest/practice-validation/pull/902",
-} satisfies Partial<ObservationDetail>;
+} satisfies Partial<PracticeResultDetail>;
 
 const run: PracticeGroupReviewRun = {
 	reviewId: "00000000-0000-0000-0000-000000000101",
@@ -29,7 +30,7 @@ const run: PracticeGroupReviewRun = {
 		container: "HephaestusTest/practice-validation",
 		url: "https://github.com/HephaestusTest/practice-validation/pull/902",
 	},
-	observations: [
+	practiceResults: [
 		{
 			...onTheRun,
 			id: "00000000-0000-0000-0000-000000000102",
@@ -61,7 +62,7 @@ const meta = {
 	component: ReviewRunCard,
 	tags: ["autodocs"],
 	parameters: { layout: "padded" },
-	args: { run, observations: { onRespond: fn() } },
+	args: { run, results: { onRespond: fn() } },
 	decorators: [
 		(Story) => (
 			<ol>
@@ -75,7 +76,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * The work at the head, linked; under it every observation open. The row whose delivered feedback
+ * The work at the head, linked; under it every result open. The row whose delivered feedback
  * has no recorded comment link offers the reviewed work instead.
  */
 export const Default: Story = {
@@ -88,7 +89,7 @@ export const Default: Story = {
 			"href",
 			onTheRun.artifactUrl,
 		);
-		for (const { summary } of run.observations) {
+		for (const { summary } of run.practiceResults) {
 			await expect(canvas.getByRole("button", { name: new RegExp(summary, "u") })).toHaveAttribute(
 				"aria-expanded",
 				"true",
@@ -149,8 +150,8 @@ export const WithoutALink: Story = {
 			...run,
 			reviewId: "00000000-0000-0000-0000-000000000204",
 			reviewedWork: { ...run.reviewedWork, url: undefined, container: undefined },
-			observations: run.observations.map((observation) => ({
-				...observation,
+			practiceResults: run.practiceResults.map((result) => ({
+				...result,
 				artifactUrl: undefined,
 			})),
 		},
@@ -164,7 +165,7 @@ export const WithoutALink: Story = {
 const soleRun: PracticeGroupReviewRun = {
 	...run,
 	reviewId: "00000000-0000-0000-0000-000000000206",
-	observations: [
+	practiceResults: [
 		{
 			...onTheRun,
 			id: "00000000-0000-0000-0000-000000000107",
@@ -183,25 +184,25 @@ const soleRun: PracticeGroupReviewRun = {
 };
 
 /**
- * One observation is one thing: the summary leads, the work it was seen on is the small line
- * under it, and no head is divided off above them.
+ * One result is one thing: the summary leads, the work it was seen on is the small line under it,
+ * and no head is divided off above them.
  */
-export const OneObservation: Story = {
+export const OneResult: Story = {
 	args: { run: soleRun },
 	play: async ({ canvas }) => {
-		const [, observationRow] = canvas.getAllByRole("listitem");
-		if (!observationRow) {
-			throw new Error("Expected the card's one observation row.");
+		const [, resultRow] = canvas.getAllByRole("listitem");
+		if (!resultRow) {
+			throw new Error("Expected the card's one result row.");
 		}
 		// The row is the first thing in the card, so no head is divided off above it.
-		const rows = observationRow.closest("ul");
+		const rows = resultRow.closest("ul");
 		await expect(rows?.parentElement?.firstElementChild).toBe(rows);
 
-		// The work a head would name is inside the observation's own row, still linked.
+		// The work a head would name is inside the result's own row, still linked.
 		const summary = canvas.getByText("The refactor and the fix arrived together");
 		const work = canvas.getByRole("link", { name: /^#902/u });
-		await expect(observationRow).toContainElement(summary);
-		await expect(observationRow).toContainElement(work);
+		await expect(resultRow).toContainElement(summary);
+		await expect(resultRow).toContainElement(work);
 		await expect(canvas.getByText("HephaestusTest/practice-validation")).toBeVisible();
 		// The summary is the anchor, so it comes first and the work reads as the note beneath it.
 		await expect(summary.compareDocumentPosition(work)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
@@ -213,7 +214,7 @@ export const OneObservation: Story = {
 const denseRun: PracticeGroupReviewRun = {
 	...run,
 	reviewId: "00000000-0000-0000-0000-000000000205",
-	observations: [
+	practiceResults: [
 		{
 			...onTheRun,
 			id: "00000000-0000-0000-0000-000000000111",
@@ -254,7 +255,7 @@ const denseRun: PracticeGroupReviewRun = {
 		},
 	],
 };
-export const ManyObservations: Story = {
+export const ManyResults: Story = {
 	args: { run: denseRun, initiallyOpen: "none" },
 	play: async ({ canvas, userEvent }) => {
 		// The delivered problem is in the first rows, not behind "Show more", although the run lists it last.
@@ -271,10 +272,10 @@ export const ManyObservations: Story = {
 		// A strength is the one held back, and the button counts it rather than saying "more".
 		const held = "The description states the goal";
 		await expect(canvas.queryByText(held)).toBeNull();
-		await userEvent.click(canvas.getByRole("button", { name: "Show 1 more observation" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Show 1 more result" }));
 		await expect(canvas.getByText(held)).toBeVisible();
-		for (const observation of denseRun.observations) {
-			await expect(canvas.getByText(observation.summary)).toBeVisible();
+		for (const result of denseRun.practiceResults) {
+			await expect(canvas.getByText(result.summary)).toBeVisible();
 		}
 
 		await userEvent.click(canvas.getByRole("button", { name: "Show less" }));

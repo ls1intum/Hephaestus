@@ -24,9 +24,9 @@ interface EvidenceFileBlockProps {
 }
 
 /**
- * One quoted citation behind an observation. A `code` locator captions the path and lines; an
- * `object` one points into the runner's own context, which the reader cannot open, so it captions
- * the source's name and no numbers.
+ * One quoted citation behind a result or one of its problems. A `code` locator captions the path
+ * and lines; an `object` one points into the runner's own context, which the reader cannot open,
+ * so it captions the source's name and no numbers.
  */
 export function EvidenceFileBlock({ location }: EvidenceFileBlockProps) {
 	const source = evidenceSourceDef(location.sourceKind);

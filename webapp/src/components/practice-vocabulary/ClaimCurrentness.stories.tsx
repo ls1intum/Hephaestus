@@ -15,7 +15,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Stale: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("This observation is no longer current")).toBeVisible();
+		await expect(canvas.getByText("This result is no longer current")).toBeVisible();
 	},
 };
 
@@ -27,12 +27,12 @@ export const Stale: Story = {
 export const Unverifiable: Story = {
 	args: { currentness: "UNVERIFIABLE" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("We cannot verify this observation")).toBeVisible();
+		await expect(canvas.getByText("We cannot verify this result")).toBeVisible();
 	},
 };
 
 /**
- * A result on the current practice standard is the norm, and a banner saying so on every observation is a line
+ * A result on the current practice standard is the norm, and a banner saying so on every result is a line
  * every reader learns to skip — which is what would make the exceptions above invisible.
  */
 export const Current: Story = {

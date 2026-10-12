@@ -1,7 +1,7 @@
 import type {
 	ArtifactTrace,
 	DeliveredWorkFeedback,
-	PageResponseDtoObservationList,
+	PageResponseDtoPracticeResultList,
 	ReviewContext as ReviewContextDTO,
 	Workspace,
 	WorkspaceListItem,
@@ -9,7 +9,7 @@ import type {
 import { consentRequired, stale, WorkerError } from "~/background/errors";
 import type { InstanceConfig } from "~/background/storage";
 import {
-	type ObservationPage,
+	type ResultPage,
 	type ReadyContext,
 	type ReviewContext,
 	THE_PAGE,
@@ -37,14 +37,14 @@ export interface ContextApi {
 	trace: (slug: string, kind: string, id: number) => Promise<ArtifactTrace | null>;
 }
 
-/** The reads behind the report on the work's own page: the reader's observations and comments. */
+/** The reads behind the report on the work's own page: the reader's results and comments. */
 export interface DetailsApi extends ContextApi {
-	ownObservations: (
+	ownResults: (
 		slug: string,
 		kind: string,
 		id: number,
 		size: number,
-	) => Promise<PageResponseDtoObservationList>;
+	) => Promise<PageResponseDtoPracticeResultList>;
 	workFeedback: (slug: string, workUrl: string) => Promise<DeliveredWorkFeedback>;
 }
 
@@ -336,12 +336,12 @@ function requiredTotal(total: number | undefined, returned: number): number {
 	return total;
 }
 
-/** How many observations a report lists before it points to the web app for the rest. */
-export const OBSERVATION_PAGE_SIZE = 25;
+/** How many results a report lists before it points to the web app for the rest. */
+export const RESULT_PAGE_SIZE = 25;
 
 /**
  * Refuses a list with any row about other work. A server that predates the exact-work filter ignores
- * it and answers with the reader's whole feed; that must never be shown as this work's observations.
+ * it and answers with the reader's whole feed; that must never be shown as this work's results.
  */
 function requireOnlyThisWork(
 	works: readonly ({ kind: string; id: string | number } | undefined)[],
@@ -356,20 +356,20 @@ function requireOnlyThisWork(
 }
 
 /**
- * The reader's own observations on the work, most severe first, projected field by field. Everyone,
+ * The reader's own results on the work, most severe first, projected field by field. Everyone,
  * admins included, reads only their own here; every developer's are the web app's.
  */
-export async function observationPage(
+export async function resultPage(
 	env: ContextEnvironment<DetailsApi>,
 	tabId: number,
 	workspaceSlug: string,
-): Promise<ObservationPage> {
+): Promise<ResultPage> {
 	const { context, stillShowing } = await requireReady(env, tabId, workspaceSlug);
-	const answer = await env.api.ownObservations(
+	const answer = await env.api.ownResults(
 		workspaceSlug,
 		context.work.kind,
 		Number(context.work.id),
-		OBSERVATION_PAGE_SIZE,
+		RESULT_PAGE_SIZE,
 	);
 	const content = answer.content ?? [];
 	requireOnlyThisWork(
@@ -387,6 +387,10 @@ export async function observationPage(
 			severity: row.severity,
 			claimCurrentness: row.claimCurrentness,
 			observedAt: row.observedAt,
+			problems: row.problems.map((problem) => ({
+				severity: problem.severity,
+				summary: problem.summary,
+			})),
 		})),
 		total: requiredTotal(answer.totalElements, content.length),
 		fetchedAt: env.now().toISOString(),

@@ -6,7 +6,7 @@ import { WITHHOLDING_FAMILY_DEFS } from "@/components/practice-vocabulary/withho
 import { nonEmpty } from "@/lib/search-params";
 
 import { listFacet } from "./AppliedFacetPills";
-import type { PracticeFacetOption } from "./ObservationFilters";
+import type { PracticeFacetOption } from "./ResultFilters";
 import { clearedScope, hasAppliedScope, readScope, scopeSearch } from "./review-scope";
 import type { FeedbackSearch, FeedbackSort } from "./review-search";
 import { ReviewFilterBar } from "./ReviewFilterBar";
@@ -27,7 +27,7 @@ const SORT_ITEMS: [ReviewSortItem<FeedbackSort>, ...ReviewSortItem<FeedbackSort>
 
 /**
  * The facets this list owns, cleared: what the toolbar's Reset clears. `order` is excluded, as on the
- * observations list, and so is the shared scope, which "Clear scope" owns.
+ * results list, and so is the shared scope, which "Clear scope" owns.
  */
 export function clearedFeedbackFacets(): Partial<FeedbackSearch> {
 	return {
@@ -62,9 +62,9 @@ export interface FeedbackFiltersProps {
 	onReset: () => void;
 	/** Clears the shared scope, on this tab and every tab after it. */
 	onClearScope: () => void;
-	/** The groups whose practices' observations the feedback was written from. */
+	/** The groups whose practices' results the feedback was written from. */
 	groups: FacetSource;
-	/** The practices whose observations the feedback was written from. */
+	/** The practices whose results the feedback was written from. */
 	practices: FacetSource<PracticeFacetOption>;
 	people: ReviewPeople;
 	/** How many rows the filters currently select, or `undefined` while that is unknown. */
@@ -111,7 +111,7 @@ export function FeedbackFilters({
 			onChange={(patch) => onPatch(scopeSearch("feedback", patch))}
 			onClearScope={onClearScope}
 			// "Composed" rather than "Date": this range filters when the feedback was written, which is
-			// not when it was delivered and not when the observation behind it was made.
+			// not when it was delivered and not when the result behind it was recorded.
 			dateTitle="Composed"
 			groups={groups}
 			practices={practices}

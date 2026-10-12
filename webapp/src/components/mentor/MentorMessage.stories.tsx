@@ -50,8 +50,9 @@ export const FormattedReply: Story = {
 };
 
 /**
- * Feedback Heph gave about an observation renders in place with the reply's markdown, and is copied
- * with the prose around it. A link stored before links carried their feedback shows nothing.
+ * Feedback Heph gave about a result, or about one problem in it, renders in place with the reply's
+ * markdown, and is copied with the prose around it. A link stored before links carried their
+ * feedback shows nothing.
  */
 export const ReplyWithFeedback: Story = {
 	args: { message: REPLY_WITH_FEEDBACK },
@@ -61,6 +62,7 @@ export const ReplyWithFeedback: Story = {
 		await expect(args.onCopy).toHaveBeenCalledWith(
 			"I looked at your latest pull request, **Cache the practice catalog**.\n" +
 				"Your description names **the decision**, a five-minute cache, but not why it beat invalidating on write.\n" +
+				"The commit `Fix stuff` does not say what it changes.\n" +
 				"What made you pick the time-based cache?",
 		);
 	},

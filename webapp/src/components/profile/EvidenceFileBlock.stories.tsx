@@ -11,7 +11,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"One quoted citation behind an observation: its source as header, the quote beneath. A code " +
+					"One quoted citation behind a result or one of its problems: its source as header, the quote beneath. A code " +
 					"source is located by line and keeps a pinned gutter; an object source is named by the " +
 					"registry's words alone, because its path and numbers are offsets into the runner's own " +
 					"serialised context rather than a place a reader could open.",
@@ -110,13 +110,13 @@ export const BareFileName: Story = {
 export const LongLines: Story = {
 	args: {
 		location: {
-			path: "server/src/main/java/de/tum/cit/aet/hephaestus/practices/observation/ObservationRepository.java",
+			path: "server/src/main/java/de/tum/cit/aet/hephaestus/practices/result/PracticeResultRepository.java",
 			startLine: 1,
 			endLine: 2,
 			sourceKind: "scm.pull-request.diff",
 			redacted: false,
 			snippet: [
-				'SELECT o.agent_job_id AS "jobId", MAX(o.observed_at) AS "reviewedAt" FROM observation o JOIN practice p ON p.id = o.practice_id JOIN practice_group g ON g.id = p.practice_group_id',
+				'SELECT o.agent_job_id AS "jobId", MAX(o.observed_at) AS "reviewedAt" FROM practice_result o JOIN practice p ON p.id = o.practice_id JOIN practice_group g ON g.id = p.practice_group_id',
 				"WHERE o.about_user_id = :aboutUserId AND p.workspace_id = :workspaceId AND g.slug = :groupSlug AND o.presence <> 'NOT_APPLICABLE'",
 			].join("\n"),
 		},

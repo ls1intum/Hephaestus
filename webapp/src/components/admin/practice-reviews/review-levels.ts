@@ -13,19 +13,19 @@ import { reviewArtifactTypeFromSlug, reviewArtifactTypeSlug } from "@/lib/artifa
 
 /**
  * What Practice reviews opens over its tabs, as `?detail=kind:id`, by what each is called in a
- * level's header. Every record opens as its own sheet: a review, an observation, a piece of
+ * level's header. Every record opens as its own sheet: a review, a result, a piece of
  * feedback, a piece of work and a practice. `trace` is the trace of one of them
  * (`trace:review:<id>`), and a record opened from a trace is the one level over it
  * (`review-layers.ts`).
  */
-const LEVEL_KINDS = ["review", "observation", "feedback", "work", "practice", "trace"] as const;
+const LEVEL_KINDS = ["review", "result", "feedback", "work", "practice", "trace"] as const;
 
 export type PracticeReviewLevelKind = (typeof LEVEL_KINDS)[number];
 export type PracticeReviewLevel = DetailStackEntry<PracticeReviewLevelKind>;
 
 export const PRACTICE_REVIEW_LEVEL_LABELS = {
 	review: "Review",
-	observation: "Observation",
+	result: "Result",
 	feedback: "Feedback",
 	work: "Work",
 	practice: "Practice",
@@ -47,8 +47,8 @@ export const practiceReviewsSearchSchema = rangeFilterSchema.extend({
 	...detailStackSchema(LEVEL_KINDS).shape,
 	/**
 	 * The feedback level in front was opened as the approval queue, from Needs you, so it steps
-	 * through every piece awaiting approval. Opened any other way — a list row, a review, an
-	 * observation — the same level shows that one piece alone.
+	 * through every piece awaiting approval. Opened any other way — a list row, a review, a
+	 * result — the same level shows that one piece alone.
 	 */
 	queue: z.literal("approvals").optional().catch(undefined),
 });
@@ -56,7 +56,7 @@ export const practiceReviewsSearchSchema = rangeFilterSchema.extend({
 export type PracticeReviewsSearch = z.infer<typeof practiceReviewsSearchSchema>;
 
 /**
- * A Practice reviews route's `head`: the record open in front — "Observation · Practice reviews" —
+ * A Practice reviews route's `head`: the record open in front — "Result · Practice reviews" —
  * or, with none open, the tab. Every route under the layout uses it, because the router takes the
  * title of the deepest match, so the layout alone cannot name a level opened over a list.
  */
@@ -75,9 +75,9 @@ export function parsePracticeReviewLevels(raw: string[] | undefined): PracticeRe
 
 export const reviewLevel = (jobId: string): PracticeReviewLevel => ({ kind: "review", id: jobId });
 
-export const observationLevel = (observationId: string): PracticeReviewLevel => ({
-	kind: "observation",
-	id: observationId,
+export const resultLevel = (practiceResultId: string): PracticeReviewLevel => ({
+	kind: "result",
+	id: practiceResultId,
 });
 
 export const feedbackLevel = (feedbackId: string): PracticeReviewLevel => ({

@@ -1,22 +1,25 @@
 import { useId } from "react";
 
 import { claimCurrentnessNote } from "@/components/practice-vocabulary/claim-currentness";
-import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
+import { OUTCOME_DEFS, resultVerdict } from "@/components/practice-vocabulary/outcome-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 
 import { cn } from "cn";
 import { statusDefOr } from "~/components/common/status";
 import { INDENT, ListSkeleton, LoadError, Truncated } from "~/components/report/report-parts";
 import type { Loadable } from "~/components/report/report-summary";
-import type { ObservationPage, ObservationRow } from "~/shared/review-context";
+import type { ResultPage, ResultRow } from "~/shared/review-context";
 
-export interface ObservationListProps {
-	observations: Loadable<ObservationPage>;
+export interface ResultListProps {
+	results: Loadable<ResultPage>;
 	onRetry: () => void;
 }
 
-/** Labels and icons come from the shared outcome registry; severity applies only to Not met. */
-function verdict(row: ObservationRow) {
+/**
+ * Labels and icons come from the shared outcome registry; the problem count and the severity apply
+ * only to Not met.
+ */
+function verdict(row: ResultRow) {
 	let tone = "text-muted-foreground";
 	if (row.outcome === "MET") {
 		tone = "text-success";
@@ -25,6 +28,7 @@ function verdict(row: ObservationRow) {
 	}
 	return {
 		def: OUTCOME_DEFS[row.outcome],
+		label: resultVerdict(row.outcome, row.problems.length),
 		tone,
 		severity:
 			row.outcome === "NOT_MET" && row.severity !== undefined
@@ -33,8 +37,8 @@ function verdict(row: ObservationRow) {
 	};
 }
 
-function Observation({ row }: { row: ObservationRow }) {
-	const { def, tone, severity } = verdict(row);
+function Result({ row }: { row: ResultRow }) {
+	const { def, label, tone, severity } = verdict(row);
 	const Icon = def.icon;
 	const currentnessNote = claimCurrentnessNote(row.claimCurrentness);
 	return (
@@ -44,40 +48,54 @@ function Observation({ row }: { row: ObservationRow }) {
 				<span className="flex flex-wrap items-baseline gap-x-2">
 					<span className="font-medium break-words">{row.practiceName}</span>
 					<span className="text-xs text-muted-foreground">
-						{def.label}
+						{label}
 						{severity === undefined ? null : ` · ${severity}`}
 						{currentnessNote === undefined ? null : ` · ${currentnessNote}`}
 					</span>
 				</span>
 				<span className="break-words text-muted-foreground">{row.summary}</span>
+				{row.outcome === "NOT_MET" && row.problems.length > 0 ? (
+					<ul
+						aria-label="Problems"
+						className="mt-1 list-disc space-y-0.5 pl-4 text-muted-foreground"
+					>
+						{row.problems.map((problem, index) => (
+							// A list row carries no problem id; a problem's place in its result is stable.
+							<li key={index} className="break-words">
+								{problem.summary}
+							</li>
+						))}
+					</ul>
+				) : null}
 			</div>
 		</li>
 	);
 }
 
 /**
- * The reader's own observations on this work, as the review concluded them — each practice, its
- * outcome and one sentence. Why and the evidence behind each are the web app's to show; here nothing
- * opens further.
+ * The reader's own results on this work, as the review concluded them — each practice, its
+ * outcome and one sentence, and under a result that is not met the one line of each problem. Why,
+ * where each problem is and the evidence behind it are the web app's to show; here nothing opens
+ * further.
  */
-export function ObservationList({ observations, onRetry }: ObservationListProps) {
+export function ResultList({ results, onRetry }: ResultListProps) {
 	const heading = useId();
 	let body;
-	if (observations.status === "loading") {
+	if (results.status === "loading") {
 		body = <ListSkeleton />;
-	} else if (observations.status === "error") {
-		body = <LoadError message={observations.message} onRetry={onRetry} />;
-	} else if (observations.data.rows.length === 0) {
+	} else if (results.status === "error") {
+		body = <LoadError message={results.message} onRetry={onRetry} />;
+	} else if (results.data.rows.length === 0) {
 		body = (
 			<p className={cn(INDENT, "py-1.5 text-sm text-muted-foreground")}>
-				No observations about your work here.
+				No results about your work here.
 			</p>
 		);
 	} else {
-		const { rows, total } = observations.data;
+		const { rows, total } = results.data;
 		body = (
 			<>
-				<Truncated items={rows} render={(row) => <Observation key={row.id} row={row} />} />
+				<Truncated items={rows} render={(row) => <Result key={row.id} row={row} />} />
 				{total > rows.length ? (
 					<p className={cn(INDENT, "pb-1 text-xs text-muted-foreground")}>
 						Showing the {rows.length} most severe of {total}.
@@ -92,7 +110,7 @@ export function ObservationList({ observations, onRetry }: ObservationListProps)
 				id={heading}
 				className={cn(INDENT, "pt-2 pb-0.5 text-xs font-semibold text-muted-foreground")}
 			>
-				Your observations
+				Your results
 			</h3>
 			{body}
 		</section>

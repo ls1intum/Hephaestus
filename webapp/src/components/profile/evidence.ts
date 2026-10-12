@@ -1,4 +1,4 @@
-import type { EvidenceCitation, ObservationDetail } from "@/api/types.gen";
+import type { EvidenceCitation, PracticeResultEvidence } from "@/api/types.gen";
 import { evidenceSourceDef } from "@/components/practice-vocabulary/evidence-source-defs";
 import { andList } from "@/lib/text";
 
@@ -18,8 +18,12 @@ export interface EvidenceLocation {
 	 */
 	change?: { before: string; after: string };
 }
-export function toEvidenceLocations(evidence: ObservationDetail["evidence"]): EvidenceLocation[] {
-	return foldObjectSources(foldDiffSides(evidence?.citations ?? []));
+/**
+ * Citations as the blocks the profile draws: a result's own, one problem's, or an example's. Each
+ * list folds on its own, so a quote never joins a block of another problem.
+ */
+export function toEvidenceLocations(citations: EvidenceCitation[]): EvidenceLocation[] {
+	return foldObjectSources(foldDiffSides(citations));
 }
 
 /** One block as the fold sees it: the citation it is built from, and the change it grew into. */
@@ -147,16 +151,15 @@ export interface EvidenceCheck {
 }
 
 /**
- * What the review checked when it recorded no strength and no problem, in the warrant it wrote:
- * what it looked for and how far it reached before finding nothing (a search), why this practice
- * had nothing to judge here (an inapplicability), or what it could not settle (an undecidability).
- * A review writes at most one of the three about one observation, so the first one present is the
- * whole list.
+ * What the review checked, in the warrant it wrote: what it looked for and how far it reached before
+ * finding nothing (a search), or why this practice had nothing to judge here (an inapplicability).
+ * A review writes at most one of the two about one result, so the first one present is the whole
+ * list. What it could not settle is not a check: the row lists those as open questions.
  *
  * Nothing here is inferred: a pair exists only where the reviewer wrote the sentence behind it,
  * and the sources it consulted are named in the registry's words rather than by their wire kind.
  */
-export function toEvidenceCheck(evidence: ObservationDetail["evidence"]): EvidenceCheck[] {
+export function toEvidenceCheck(evidence: PracticeResultEvidence | undefined): EvidenceCheck[] {
 	const search = evidence?.search;
 	if (search) {
 		return [
@@ -171,13 +174,6 @@ export function toEvidenceCheck(evidence: ObservationDetail["evidence"]): Eviden
 			{ term: "Looks for", detail: inapplicability.subject },
 			...consultedCheck(inapplicability.consulted),
 			{ term: "Nothing to judge because", detail: inapplicability.ruledOutBy },
-		];
-	}
-	const undecidability = evidence?.undecidability;
-	if (undecidability) {
-		return [
-			{ term: "Open question", detail: undecidability.openQuestion },
-			{ term: "Would settle it", detail: undecidability.wouldSettleIt },
 		];
 	}
 	return [];

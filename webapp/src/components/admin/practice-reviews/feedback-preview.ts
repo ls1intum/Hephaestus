@@ -49,7 +49,7 @@ function flattenMarkdown(source: string): string[] {
 		if (!trimmed) {
 			continue;
 		}
-		// A horizontal rule separates two observations; in one line of prose it is a false sentence break.
+		// A horizontal rule separates two results; in one line of prose it is a false sentence break.
 		if (/^(?<rule>[-*_])\k<rule>{2,}$/u.test(trimmed.replaceAll(/\s/gu, ""))) {
 			continue;
 		}

@@ -11,7 +11,7 @@ import { firstNonBlank, hasText } from "@/lib/text";
 /**
  * The people a review list can be filtered by, fetched once per workspace and shared by every facet
  * on the screen — TanStack Query deduplicates by key, so the Delivery page's Recipient facet and the
- * Observations page's Developer facet cost one request between them.
+ * Results page's Developer facet cost one request between them.
  *
  * <p>Lives here rather than in the facet so the facet takes people as a prop: it is the same control
  * whether its list came from the API, from a fixture, or from a page that already had one.

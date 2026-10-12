@@ -78,7 +78,7 @@ function DiagnosticItem({
  *     rendered as a bare number rather than a bar: a "full = healthy" budget bar beside the job bar's
  *     "full = done" would put two bars on one card filling for opposite reasons. Only a budget about to
  *     run out earns colour, and the reset window lives one hover away.
- *  3. Ceiling only: the window budget is a real observation but the live remaining is not (reported once
+ *  3. Ceiling only: the window budget is a real reading but the live remaining is not (reported once
  *     and since rolled over, or a vendor that never sends it). Show the ceiling — never a fabricated
  *     remaining, and never `— / N` which reads as a gauge.
  *  4. Nothing renderable → `null`.
@@ -184,7 +184,7 @@ function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
 		);
 	}
 
-	// Every row is gated on a real observation, so a connection that reports none (a fresh Slack
+	// Every row is gated on a real reading, so a connection that reports none (a fresh Slack
 	// workspace before its first event) has nothing to qualify — render no empty row rather than an
 	// invisible flex box the surrounding `space-y-4` would still pad around.
 	if (diagnostics.length === 0) {

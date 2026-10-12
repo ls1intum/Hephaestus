@@ -1,7 +1,7 @@
 import type {
 	FeedbackResponseRequest,
-	ObservationDetail,
 	PracticeGroupReviewRun,
+	PracticeResultDetail,
 } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
 import {
@@ -38,12 +38,12 @@ export function reviewRunFeedState<TRun>(
 }
 
 /**
- * The reader's response to an observation, as the route wires it: one object handed down the feed
- * to every row. Whether a row is open is the row's own — the feed carries every observation in
- * full, so nothing is loaded when one opens and there is nothing for the route to hold.
+ * The reader's response to a result, as the route wires it: one object handed down the feed to
+ * every row. Whether a row is open is the row's own — the feed carries every result in full, so
+ * nothing is loaded when one opens and there is nothing for the route to hold.
  */
-export interface ObservationControls {
-	onRespond?: (observation: ObservationDetail, response: FeedbackResponseRequest) => void;
+export interface ResultControls {
+	onRespond?: (result: PracticeResultDetail, response: FeedbackResponseRequest) => void;
 	/**
 	 * The response being written to each piece of feedback; a row shows it over the one it arrived
 	 * with, and its buttons wait until the write lands.

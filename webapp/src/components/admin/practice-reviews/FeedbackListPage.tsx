@@ -61,7 +61,7 @@ export function FeedbackListPage({
 	record,
 }: FeedbackListPageProps) {
 	const rows = feedback.status === "ready" ? feedback.rows : [];
-	// Guarded on the filter being set: see `ObservationsListPage`. Unfiltered, row zero is whoever
+	// Guarded on the filter being set: see `ResultsListPage`. Unfiltered, row zero is whoever
 	// sorts first, and their name would be shown against a different person's id.
 	const filteredRecipient = search.recipientUserId == null ? undefined : rows[0]?.recipient;
 	const recipientName =

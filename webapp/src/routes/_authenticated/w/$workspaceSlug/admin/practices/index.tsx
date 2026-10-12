@@ -682,7 +682,7 @@ function PracticeCatalogRoute() {
 						<AlertDialogTitle>Delete group “{deletingGroup?.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
 							Choose whether to keep this group’s practices in the workspace or delete them with the
-							group. Deleting practices also permanently deletes their observations. You cannot undo
+							group. Deleting practices also permanently deletes their results. You cannot undo
 							this.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
@@ -743,7 +743,7 @@ function PracticeCatalogRoute() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete practice “{deletingPractice?.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This permanently deletes the practice and its observations. You cannot undo this.
+							This permanently deletes the practice and its results. You cannot undo this.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

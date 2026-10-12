@@ -34,7 +34,7 @@ export function PracticeFeedbackSection({
 					<FieldDescription>
 						Turn this off to stop new comments on issues, pull requests, and merge requests you
 						author, and related Slack reminders. Reviews still run, and workspace admins can still
-						see the resulting observations.
+						see the results.
 					</FieldDescription>
 				</FieldContent>
 				<Switch

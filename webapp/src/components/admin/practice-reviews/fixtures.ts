@@ -6,9 +6,12 @@ import type {
 	AutonomyAssignment,
 	DeliveryPolicyTrace,
 	EvidenceCitation,
+	Observation,
+	OpenQuestion,
 	Practice,
 	PracticeReviewBucket,
 	PracticeReviewCounts,
+	PracticeResultExample,
 	PracticeReviewOverview,
 	PracticeReviewQueue,
 	PracticeReviewQueueItem,
@@ -20,9 +23,9 @@ import type {
 	ReviewFeedbackDetail,
 	ReviewFeedbackLocationCounts,
 	ReviewFeedbackReasonCount,
-	ReviewObservation,
-	ReviewObservationCounts,
-	ReviewObservationDetail,
+	ReviewResult,
+	ReviewResultCounts,
+	ReviewResultDetail,
 	ReviewPracticeScripts,
 	ReviewRunSummary,
 	ReviewRunTarget,
@@ -49,7 +52,7 @@ import { minutesAfter, minutesBefore, STORY_NOW } from "@/stories/story-clock";
 import type { OutcomeScope } from "./review-outcomes";
 import type { OverviewRegionState } from "./review-states";
 
-// The only thing written by hand is REVIEW_FIXTURE: reviews, their observations and the feedback
+// The only thing written by hand is REVIEW_FIXTURE: reviews, their results and the feedback
 // those drove. Every count, preview, truncation flag and summary is computed from it below, so a
 // fixture whose tallies contradict the records they count is not something you can write.
 
@@ -94,7 +97,7 @@ export const workspaceMembers: WorkspaceMembership[] = [
 // ---------------------------------------------------------------------------------------------
 
 /**
- * A run's target, written once per piece of work. The ref an observation or a piece of feedback
+ * A run's target, written once per piece of work. The ref a result or a piece of feedback
  * carries is `reviewedWork`, labelled the way the server's `ReviewedWorkLabels` labels it: `#22` for
  * a pull request or an issue, `!425` for a merge request, `#channel` for a conversation, its title
  * for a document.
@@ -373,21 +376,35 @@ interface FeedbackSpec {
 	replaces?: string;
 	/** Where an inline note landed. Absent means it was posted as a summary on the work. */
 	anchoredAt?: { path: string; startLine: number; endLine: number };
-	/** Observations it draws on, in render order; the first leads it. */
+	/** Results it draws on, in render order; the first leads it. */
 	from: string[];
 }
 
-interface ObservationSpec {
-	outcome: ReviewObservation["outcome"];
+/** One located problem under a not met result: an observation on the wire. */
+interface ProblemSpec {
+	severity: Observation["severity"];
+	summary: string;
+	explanation: string;
+	citations: EvidenceCitation[];
+	nextStep?: string;
+}
+
+interface ResultSpec {
+	outcome: ReviewResult["outcome"];
 	id: string;
 	summary: string;
 	evidenceRationale: string;
 	practiceSlug: string;
 	group: GroupSlug;
-	severity?: ReviewObservation["severity"];
-	claimCurrentness?: ReviewObservation["claimCurrentness"];
+	severity?: ReviewResult["severity"];
+	claimCurrentness?: ReviewResult["claimCurrentness"];
 	observedAt: string;
+	/** The result's own citations; each problem carries its own. */
 	evidence?: EvidenceCitation[];
+	/** A not met result's problems, in display order. Its severity is at least the worst of them. */
+	problems?: ProblemSpec[];
+	openQuestions?: OpenQuestion[];
+	example?: PracticeResultExample;
 }
 
 interface RunSpec {
@@ -395,10 +412,10 @@ interface RunSpec {
 	work: ReviewWork;
 	status: ReviewRunSummary["status"];
 	startedAt: string;
-	/** Whose work this review was about; every observation and every recipient inherits it. */
+	/** Whose work this review was about; every result and every recipient inherits it. */
 	developer: ReviewSubject;
-	origin?: ReviewObservation["origin"];
-	observations: ObservationSpec[];
+	origin?: ReviewResult["origin"];
+	results: ResultSpec[];
 	feedback: FeedbackSpec[];
 }
 
@@ -499,7 +516,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		status: "COMPLETED",
 		startedAt: "2026-07-28T13:35:00Z",
 		developer: ada,
-		observations: [
+		results: [
 			{
 				id: "55555555-5555-5555-5555-555555555555",
 				summary: "The controller delegates before it does anything else",
@@ -514,7 +531,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 						"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryController.java",
 						61,
 						64,
-						"var page = reviewQueryService.observations(workspaceSlug, filter, pageable);\nreturn ResponseEntity.ok(page.map(ReviewObservationDTO::from));",
+						"var page = reviewQueryService.results(workspaceSlug, filter, pageable);\nreturn ResponseEntity.ok(page.map(ReviewResultDTO::from));",
 					),
 				],
 			},
@@ -529,24 +546,67 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				severity: "MAJOR",
 				observedAt: "2026-07-28T13:39:00Z",
 				evidence: [
-					diff(
-						"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryService.java",
-						116,
-						119,
-						"return repository.findVisible(workspaceId, id)\n    .orElseThrow(() -> new NotFoundException());",
-					),
-					cited(
-						"scm.repository.tree",
-						"server/application/src/main/java/de/tum/cit/aet/hephaestus/core/security/WorkspaceGuard.java",
-						'throw new ForbiddenException("No grant on workspace " + slug);',
-						88,
-					),
 					cited(
 						"scm.review-threads",
 						"Review thread on ReviewQueryService.java",
 						"Do we lose the difference between 'gone' and 'not yours' here?",
 					),
 				],
+				problems: [
+					{
+						severity: "MAJOR",
+						summary: "A missing row and a missing grant both become a 404",
+						explanation:
+							"`findVisible` returns an empty `Optional` in both cases, and `orElseThrow` turns either into a `NotFoundException`.",
+						citations: [
+							diff(
+								"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryService.java",
+								116,
+								119,
+								"return repository.findVisible(workspaceId, id)\n    .orElseThrow(() -> new NotFoundException());",
+							),
+						],
+						nextStep:
+							"Fetch the row first, then check the grant, and answer 403 when the caller may not read it.",
+					},
+					{
+						severity: "MINOR",
+						summary: "The guard’s 403 never reaches this endpoint",
+						explanation:
+							"`WorkspaceGuard` already throws a `ForbiddenException` with the workspace in its message, but this lookup runs before the guard is asked.",
+						citations: [
+							cited(
+								"scm.repository.tree",
+								"server/application/src/main/java/de/tum/cit/aet/hephaestus/core/security/WorkspaceGuard.java",
+								'throw new ForbiddenException("No grant on workspace " + slug);',
+								88,
+							),
+						],
+					},
+					{
+						severity: "INFO",
+						summary: "The NotFoundException carries no message",
+						explanation: "The log line says only that something was not found, not which review.",
+						citations: [
+							diff(
+								"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryService.java",
+								119,
+								119,
+								"    .orElseThrow(() -> new NotFoundException());",
+							),
+						],
+						nextStep: "Name the review id in the exception.",
+					},
+				],
+				example: {
+					note: "The controller maps every error in one handler, so the split costs one new branch there.",
+					citation: diff(
+						"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryController.java",
+						88,
+						90,
+						"@ExceptionHandler(NotFoundException.class)\nResponseEntity<ProblemDetail> notFound(NotFoundException e) {",
+					),
+				},
 			},
 			{
 				id: "77777777-7777-7777-7777-777777777777",
@@ -558,13 +618,36 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				outcome: "NOT_MET",
 				severity: "MINOR",
 				observedAt: "2026-07-28T13:38:00Z",
-				evidence: [
-					diff(
-						"server/application/src/test/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryServiceTest.java",
-						44,
-						46,
-						"@Test\nvoid testCache1() {",
-					),
+				problems: [
+					{
+						severity: "MINOR",
+						summary: "testCache1 and testCache2 name the method, not the read they pin down",
+						explanation:
+							"One is a cold read and one a warm read. A red build names a number, not the behaviour that broke.",
+						citations: [
+							diff(
+								"server/application/src/test/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryServiceTest.java",
+								44,
+								46,
+								"@Test\nvoid testCache1() {",
+							),
+						],
+						nextStep: "Rename them for the read: `returnsTheCachedMembersOnASecondRead`.",
+					},
+					{
+						severity: "INFO",
+						summary: "testCache3 does not say that a membership change evicts",
+						explanation:
+							"The eviction is the most surprising rule of the three, and its name hides it.",
+						citations: [
+							diff(
+								"server/application/src/test/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryServiceTest.java",
+								71,
+								72,
+								"@Test\nvoid testCache3() {",
+							),
+						],
+					},
 				],
 			},
 			{
@@ -577,12 +660,21 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				outcome: "NOT_MET",
 				severity: "INFO",
 				observedAt: "2026-07-28T13:37:00Z",
-				evidence: [
-					cited(
-						"scm.pull-request.core",
-						"Pull request description",
-						"- ReviewQueryService.java\n- ReviewQueryController.java\n- ReviewQueryServiceTest.java",
-					),
+				problems: [
+					{
+						severity: "INFO",
+						summary: "The description does not say what was slow",
+						explanation:
+							"It lists the changed files. A reviewer cannot tell why a cache was the answer rather than a narrower query.",
+						citations: [
+							cited(
+								"scm.pull-request.core",
+								"Pull request description",
+								"- ReviewQueryService.java\n- ReviewQueryController.java\n- ReviewQueryServiceTest.java",
+							),
+						],
+						nextStep: "Add one sentence on what was slow and how slow.",
+					},
 				],
 			},
 		],
@@ -638,7 +730,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		developer: alan,
 		// A confirmed campaign over work that already existed, so nothing from it is spoken aloud.
 		origin: "BACKFILL",
-		observations: [
+		results: [
 			{
 				id: "bbbbbbbb-2222-2222-2222-222222222222",
 				summary: "Invoice numbering leaks the ledger’s table name into the public API",
@@ -650,13 +742,31 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				severity: "CRITICAL",
 				claimCurrentness: "STALE",
 				observedAt: "2026-07-27T09:15:00Z",
+				problems: [
+					{
+						severity: "CRITICAL",
+						summary: "The public invoice response names a ledger column",
+						explanation:
+							"Callers outside billing must learn the storage layout to read an invoice.",
+						citations: [
+							diff(
+								"src/main/java/platform/billing/api/InvoiceResponse.java",
+								22,
+								22,
+								"private Long ledgerSeqNo;",
+							),
+						],
+						nextStep: "Call the field `invoiceNumber` before any caller depends on it.",
+					},
+					{
+						severity: "MINOR",
+						summary: "The changelog repeats the column name",
+						explanation:
+							"The release note tells callers to read `ledgerSeqNo`, which fixes the name in their code.",
+						citations: [diff("CHANGELOG.md", 7, 7, "- Invoices now expose `ledgerSeqNo`.")],
+					},
+				],
 				evidence: [
-					diff(
-						"src/main/java/platform/billing/api/InvoiceResponse.java",
-						22,
-						22,
-						"private Long ledgerSeqNo;",
-					),
 					cited(
 						"outline.documents",
 						"Naming guideline",
@@ -704,7 +814,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		startedAt: "2026-07-26T16:00:00Z",
 		developer: grace,
 		origin: "MANUAL",
-		observations: [
+		results: [
 			{
 				id: "eeeeeeee-3333-3333-3333-333333333333",
 				summary: "The thread ends without naming what was chosen",
@@ -716,16 +826,26 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				severity: "MINOR",
 				claimCurrentness: "UNVERIFIABLE",
 				observedAt: "2026-07-26T16:02:00Z",
+				problems: [
+					{
+						severity: "MINOR",
+						summary: "The last message leaves the choice to the on-call",
+						explanation: "Nobody names the strategy that won, so the thread reads as unfinished.",
+						citations: [
+							cited(
+								"slack.conversation.thread",
+								"Message from Grace Hopper, 16:41",
+								"either works honestly, whatever the on-call prefers",
+								11,
+							),
+						],
+						nextStep: "Post the chosen strategy and who chose it.",
+					},
+				],
 				evidence: [
 					cited(
-						"slack.conversation.thread",
-						"Message from Grace Hopper, 16:41",
-						"either works honestly, whatever the on-call prefers",
-						11,
-					),
-					cited(
 						"hephaestus.observation-history",
-						"Earlier observation on this practice",
+						"Earlier result on this practice",
 						"An earlier thread in the same channel also closed without a written decision.",
 					),
 				],
@@ -778,7 +898,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		status: "COMPLETED",
 		startedAt: "2026-07-25T11:25:00Z",
 		developer: barbara,
-		observations: [
+		results: [
 			{
 				id: "11111111-5555-5555-5555-555555555555",
 				summary: "The runbook opens with the one step that cannot be undone",
@@ -795,6 +915,32 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 						"Before anything else: put the workspace into maintenance. Restores started while writes are landing cannot be replayed.",
 						3,
 					),
+				],
+			},
+			{
+				id: "22222222-5555-5555-5555-555555555555",
+				summary: "Whether the restore order was agreed cannot be told from the page",
+				evidenceRationale:
+					"The runbook states an order of steps, and nothing on the page or linked from it records who chose that order or why.",
+				practiceSlug: "decisions-are-written-down",
+				group: "collaboration",
+				outcome: "UNDETERMINED",
+				observedAt: "2026-07-25T11:29:00Z",
+				openQuestions: [
+					{
+						openQuestion: "Was the restore order agreed with the on-call team?",
+						wouldSettleIt: "A link to the discussion or incident that chose this order.",
+						citation: cited(
+							"docs.document.core",
+							"Runbook: restoring a workspace from backup",
+							"1. Put the workspace into maintenance.",
+							5,
+						),
+					},
+					{
+						openQuestion: "Does the runbook replace the older restore page?",
+						wouldSettleIt: "A note on either page that names the one in force.",
+					},
 				],
 			},
 		],
@@ -828,7 +974,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		status: "COMPLETED",
 		startedAt: "2026-07-29T08:05:00Z",
 		developer: katherine,
-		observations: [
+		results: [
 			{
 				id: "44444444-6666-6666-6666-666666666666",
 				summary: "A dropped delivery is logged at debug and never counted",
@@ -839,13 +985,37 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				outcome: "NOT_MET",
 				severity: "MAJOR",
 				observedAt: "2026-07-29T08:12:00Z",
+				problems: [
+					{
+						severity: "MAJOR",
+						summary: "Giving up on a delivery increments no counter",
+						explanation: "A provider outage looks like a quiet afternoon on every dashboard.",
+						citations: [
+							diff(
+								"server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicy.java",
+								74,
+								75,
+								'log.debug("giving up on {} after {} attempts", subject, attempts);\nreturn;',
+							),
+						],
+						nextStep: "Count the dropped delivery with a Micrometer counter.",
+					},
+					{
+						severity: "MINOR",
+						summary: "The dropped delivery is logged at debug",
+						explanation:
+							"Production logs at info, so the line is never written where anyone reads it.",
+						citations: [
+							diff(
+								"server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicy.java",
+								74,
+								74,
+								'log.debug("giving up on {} after {} attempts", subject, attempts);',
+							),
+						],
+					},
+				],
 				evidence: [
-					diff(
-						"server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicy.java",
-						74,
-						75,
-						'log.debug("giving up on {} after {} attempts", subject, attempts);\nreturn;',
-					),
 					cited(
 						"workspace.project-inventory",
 						"Observability stack",
@@ -881,13 +1051,22 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				outcome: "NOT_MET",
 				severity: "MINOR",
 				observedAt: "2026-07-29T08:10:00Z",
-				evidence: [
-					diff(
-						"server/application/src/main/resources/application.yml",
-						118,
-						118,
-						"retry-buffer:\n  capacity: 5000",
-					),
+				problems: [
+					{
+						severity: "MINOR",
+						summary: "The property says retry-buffer where everything else says outbox",
+						explanation:
+							"An operator reading a dashboard and one editing configuration look for two words.",
+						citations: [
+							diff(
+								"server/application/src/main/resources/application.yml",
+								118,
+								118,
+								"retry-buffer:\n  capacity: 5000",
+							),
+						],
+						nextStep: "Rename the property to `hephaestus.webhook.outbox.*`.",
+					},
 				],
 			},
 		],
@@ -935,7 +1114,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		status: "RUNNING",
 		startedAt: "2026-07-29T09:40:00Z",
 		developer: grace,
-		observations: [],
+		results: [],
 		feedback: [],
 	},
 	{
@@ -944,7 +1123,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		status: "FAILED",
 		startedAt: "2026-07-24T15:02:00Z",
 		developer: alan,
-		observations: [],
+		results: [],
 		feedback: [],
 	},
 ];
@@ -974,24 +1153,22 @@ function preview(spec: FeedbackSpec) {
 }
 
 const allRuns = REVIEW_FIXTURE;
-const allObservationSpecs = allRuns.flatMap((run) =>
-	run.observations.map((observation) => ({ run, observation })),
-);
+const allResultSpecs = allRuns.flatMap((run) => run.results.map((result) => ({ run, result })));
 const allFeedbackSpecs = allRuns.flatMap((run) => run.feedback.map((item) => ({ run, item })));
 
-/** The ids of the feedback written from one observation, as the feedback list filters by it. */
-export function feedbackIdsFrom(observationId: string): ReadonlySet<string> {
-	return new Set(feedbackFor(observationId).map(({ item }) => item.id));
+/** The ids of the feedback written from one result, as the feedback list filters by it. */
+export function feedbackIdsFrom(practiceResultId: string): ReadonlySet<string> {
+	return new Set(feedbackFor(practiceResultId).map(({ item }) => item.id));
 }
 
-/** The feedback drawing on one observation, newest first, as the detail surfaces list it. */
-function feedbackFor(observationId: string) {
+/** The feedback drawing on one result, newest first, as the detail surfaces list it. */
+function feedbackFor(practiceResultId: string) {
 	return allFeedbackSpecs
-		.filter(({ item }) => item.from.includes(observationId))
+		.filter(({ item }) => item.from.includes(practiceResultId))
 		.sort((a, b) => b.item.composedAt.localeCompare(a.item.composedAt));
 }
 
-/** One count per delivery state, as the server reports a review's or an observation's feedback. */
+/** One count per delivery state, as the server reports a review's or a result's feedback. */
 const COUNT_OF: Record<ReviewFeedback["deliveryState"], keyof ReviewFeedbackCounts> = {
 	AWAITING_APPROVAL: "awaitingApproval",
 	DELIVERED: "delivered",
@@ -1054,11 +1231,11 @@ export function locationCounts(rows: readonly ReviewFeedback[]): ReviewFeedbackL
 	});
 }
 
-function disposition(observationId: string): ReviewFeedbackCounts {
-	return feedbackCounts(feedbackFor(observationId).map(({ item }) => item.outcome));
+function disposition(practiceResultId: string): ReviewFeedbackCounts {
+	return feedbackCounts(feedbackFor(practiceResultId).map(({ item }) => item.outcome));
 }
 
-function toObservation(run: RunSpec, spec: ObservationSpec): ReviewObservation {
+function toResult(run: RunSpec, spec: ResultSpec): ReviewResult {
 	const practice = workspacePractices.find((entry) => entry.slug === spec.practiceSlug);
 	if (!practice) {
 		throw new Error(`No practice named ${spec.practiceSlug} in the fixture catalogue`);
@@ -1075,6 +1252,7 @@ function toObservation(run: RunSpec, spec: ObservationSpec): ReviewObservation {
 		origin: run.origin ?? "LIVE",
 		practiceName: practice.name,
 		practiceSlug: practice.slug,
+		problemCount: spec.problems?.length ?? 0,
 		severity: spec.severity,
 		subject: run.developer,
 		summary: spec.summary,
@@ -1110,7 +1288,7 @@ function toFeedback(run: RunSpec, spec: FeedbackSpec): ReviewFeedback {
 		createdAt: new Date(spec.composedAt),
 		deliveredAt: hasText(spec.deliveredAt) ? new Date(spec.deliveredAt) : undefined,
 		deliveryState: spec.outcome,
-		observationCount: spec.from.length,
+		practiceResultCount: spec.from.length,
 		recipient: spec.recipient,
 		replacesId: spec.replaces,
 		subject: run.developer,
@@ -1119,8 +1297,8 @@ function toFeedback(run: RunSpec, spec: FeedbackSpec): ReviewFeedback {
 }
 
 /** Newest first, as the list endpoint returns them. */
-export const reviewObservations: ReviewObservation[] = allObservationSpecs
-	.map(({ run, observation }) => toObservation(run, observation))
+export const reviewResults: ReviewResult[] = allResultSpecs
+	.map(({ run, result }) => toResult(run, result))
 	.sort((a, b) => b.observedAt.getTime() - a.observedAt.getTime());
 
 /** Newest first, as the list endpoint returns them. */
@@ -1137,11 +1315,11 @@ export const reviewRuns: ReviewRunSummary[] = allRuns
 		reviewOutcome: "REVIEWED" as const,
 		target: run.work,
 		createdAt: new Date(run.startedAt),
-		observations: {
-			met: run.observations.filter((o) => o.outcome === "MET").length,
-			notMet: run.observations.filter((o) => o.outcome === "NOT_MET").length,
-			notApplicable: run.observations.filter((o) => o.outcome === "NOT_APPLICABLE").length,
-			undetermined: run.observations.filter((o) => o.outcome === "UNDETERMINED").length,
+		practiceResults: {
+			met: run.results.filter((r) => r.outcome === "MET").length,
+			notMet: run.results.filter((r) => r.outcome === "NOT_MET").length,
+			notApplicable: run.results.filter((r) => r.outcome === "NOT_APPLICABLE").length,
+			undetermined: run.results.filter((r) => r.outcome === "UNDETERMINED").length,
 		},
 		feedback: feedbackCounts(run.feedback.map((f) => f.outcome)),
 		origin: run.origin ?? "LIVE",
@@ -1260,28 +1438,37 @@ export function reviewJob(runId: string): AgentJob {
 	};
 }
 
-export function observationDetail(observationId: string): ReviewObservationDetail {
-	const found = allObservationSpecs.find(({ observation }) => observation.id === observationId);
+export function resultDetail(practiceResultId: string): ReviewResultDetail {
+	const found = allResultSpecs.find(({ result }) => result.id === practiceResultId);
 	if (!found) {
-		throw new Error(`No observation ${observationId} in the fixture`);
+		throw new Error(`No result ${practiceResultId} in the fixture`);
 	}
-	const { run, observation } = found;
-	// The detail replaces the tally with the feedback records the tally was counting.
-	const { feedback: _tally, ...shared } = toObservation(run, observation);
+	const { run, result } = found;
+	// The detail replaces the tallies with the records they were counting.
+	const { feedback: _tally, problemCount: _problems, ...shared } = toResult(run, result);
 	return {
 		...shared,
-		evidence: observation.evidence ? { citations: observation.evidence } : undefined,
-		feedback: feedbackFor(observationId).map(({ item }) => ({
+		evidence: {
+			citations: result.evidence ?? [],
+			undecidability: result.openQuestions ?? [],
+		},
+		observations: (result.problems ?? []).map((problem, position) => ({
+			...problem,
+			observationId: `${result.id}-problem-${position}`,
+			position,
+		})),
+		example: result.example,
+		feedback: feedbackFor(practiceResultId).map(({ item }) => ({
 			feedbackId: item.id,
 			agentJobId: run.id,
 			channel: item.channel,
 			createdAt: new Date(item.composedAt),
 			deliveredAt: hasText(item.deliveredAt) ? new Date(item.deliveredAt) : undefined,
 			deliveryState: item.outcome,
-			role: item.from[0] === observationId ? "PRIMARY" : "SUPPORTING",
+			role: item.from[0] === practiceResultId ? "PRIMARY" : "SUPPORTING",
 			suppressionReason: item.withheldFor,
 		})),
-		evidenceRationale: observation.evidenceRationale,
+		evidenceRationale: result.evidenceRationale,
 		invalidations: [],
 		disputes: [],
 	};
@@ -1386,10 +1573,10 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 		createdAt: new Date(item.composedAt),
 		deliveredAt: hasText(item.deliveredAt) ? new Date(item.deliveredAt) : undefined,
 		deliveryState: item.outcome,
-		observations: item.from.map((observationId, ordinal) => {
-			const source = observationDetail(observationId);
+		practiceResults: item.from.map((practiceResultId, ordinal) => {
+			const source = resultDetail(practiceResultId);
 			return {
-				observationId,
+				practiceResultId,
 				outcome: source.outcome,
 				group: source.group,
 				claimCurrentness: source.claimCurrentness,
@@ -1438,13 +1625,16 @@ export const reviewFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"dddddddd-2222-2222-2222-222222222222",
 );
 
-/** The long, multi-observation note. */
+/** The long note, drawn from two results. */
 export const longFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"44444444-4444-4444-4444-444444444444",
 );
 
-/** An observation whose evidence spans a diff, a repository file and a human review thread. */
-export const reviewObservationDetail: ReviewObservationDetail = observationDetail(
+/**
+ * A not met result with three problems of mixed severity across a diff and a repository file, its own
+ * citation from a human review thread, and an example that admin surfaces never render.
+ */
+export const reviewResultDetail: ReviewResultDetail = resultDetail(
 	"66666666-6666-6666-6666-666666666666",
 );
 
@@ -1461,12 +1651,12 @@ function cycled<T>(specs: readonly T[], index: number): T {
 }
 
 /**
- * The fixture's observations restated across as many days as it takes to fill `count` rows. Cycling
- * the real specs keeps every row a record the server could have produced, unlike a generated
- * `Observation #17`.
+ * The fixture's results restated across as many days as it takes to fill `count` rows. Cycling the
+ * real specs keeps every row a record the server could have produced, unlike a generated
+ * `Result #17`.
  */
-export function manyObservations(count: number): ReviewObservation[] {
-	const base = reviewObservations;
+export function manyResults(count: number): ReviewResult[] {
+	const base = reviewResults;
 	const rows = Array.from({ length: count }, (_, index) => {
 		const source = cycled(base, index);
 		const cycle = Math.floor(index / base.length);
@@ -1535,7 +1725,7 @@ const pullRequestTarget: AgentJob["target"] = {
 };
 const issueTarget: AgentJob["target"] = {
 	type: "scm.issue",
-	title: "Admin read surface for observations and prepared feedback",
+	title: "Admin read surface for results and prepared feedback",
 	reviewedWork: {
 		id: "43",
 		kind: "scm.issue",
@@ -1780,18 +1970,18 @@ export function selects(selected: string[] | undefined, actual: string | undefin
 
 const ZERO_FEEDBACK = feedbackCounts([]);
 
-const observationCounts = (
+const resultCounts = (
 	met: number,
 	notMet: number,
 	notApplicable: number,
 	undetermined: number,
-): ReviewObservationCounts => ({ met, notMet, notApplicable, undetermined });
+): ReviewResultCounts => ({ met, notMet, notApplicable, undetermined });
 
 const countsOf = (
 	practiceSlug: string,
-	observations: ReviewObservationCounts,
+	practiceResults: ReviewResultCounts,
 	feedback: Partial<ReviewFeedbackCounts>,
-	observationsInvalidated = 0,
+	practiceResultsInvalidated = 0,
 ): PracticeReviewCounts => {
 	const practice = workspacePractices.find((entry) => entry.slug === practiceSlug);
 	const practiceGroup = practiceGroups.find((entry) => entry.slug === practice?.groupSlug);
@@ -1802,9 +1992,9 @@ const countsOf = (
 		practiceSlug,
 		practiceName: practice.name,
 		group: { slug: practiceGroup.slug, name: practiceGroup.name },
-		observations,
+		practiceResults,
 		feedback: { ...ZERO_FEEDBACK, ...feedback },
-		observationsInvalidated,
+		practiceResultsInvalidated,
 	};
 };
 
@@ -1817,23 +2007,23 @@ const countsOf = (
 export const practiceCounts: PracticeReviewCounts[] = [
 	countsOf(
 		"thin-controllers",
-		observationCounts(18, 9, 4, 2),
+		resultCounts(18, 9, 4, 2),
 		{ delivered: 7, awaitingApproval: 2, suppressed: 2, failed: 1 },
 		1,
 	),
 	countsOf(
 		"errors-carry-context",
-		observationCounts(6, 11, 1, 3),
+		resultCounts(6, 11, 1, 3),
 		{ delivered: 6, prepared: 1, discarded: 1, superseded: 1 },
 		2,
 	),
-	countsOf("tests-name-the-behaviour", observationCounts(9, 2, 3, 0), { delivered: 2 }),
-	countsOf("the-change-explains-itself", observationCounts(2, 4, 1, 1), {
+	countsOf("tests-name-the-behaviour", resultCounts(9, 2, 3, 0), { delivered: 2 }),
+	countsOf("the-change-explains-itself", resultCounts(2, 4, 1, 1), {
 		delivered: 1,
 		awaitingApproval: 1,
 		suppressed: 1,
 	}),
-	countsOf("product-language", observationCounts(0, 1, 1, 0), {}),
+	countsOf("product-language", resultCounts(0, 1, 1, 0), {}),
 ];
 
 const OVERVIEW_DAYS = REVIEW_RANGE_DEFS["30d"].days;
@@ -1847,7 +2037,7 @@ const PER_DAY = {
 	reviews: [
 		0, 2, 0, 3, 2, 0, 0, 3, 0, 2, 1, 3, 0, 0, 2, 3, 0, 1, 4, 0, 2, 0, 0, 1, 3, 1, 0, 3, 0, 2,
 	],
-	observations: [
+	practiceResults: [
 		0, 5, 3, 0, 0, 6, 1, 4, 3, 7, 0, 0, 4, 5, 0, 2, 8, 1, 4, 0, 0, 2, 6, 2, 1, 5, 0, 4, 1, 4,
 	],
 	feedback: [
@@ -1859,7 +2049,7 @@ function overviewBuckets(perDay: Record<keyof typeof PER_DAY, readonly number[]>
 	return Array.from({ length: OVERVIEW_DAYS }, (_, day): PracticeReviewBucket => ({
 		start: addDays(OVERVIEW_FROM, day),
 		reviews: perDay.reviews[day] ?? 0,
-		observations: perDay.observations[day] ?? 0,
+		practiceResults: perDay.practiceResults[day] ?? 0,
 		feedback: perDay.feedback[day] ?? 0,
 	}));
 }
@@ -1873,9 +2063,9 @@ export const practiceReviewOverview: PracticeReviewOverview = {
 	bucket: "DAY",
 	buckets: overviewBuckets(PER_DAY),
 	reviews: { completed: 31, failed: 2, timedOut: 1, cancelled: 1, running: 1, queued: 2 },
-	// Every observation is of one practice, so the practices' counts add up to these.
-	observations: observationCounts(35, 27, 10, 6),
-	observationsInvalidated: 3,
+	// Every result is of one practice, so the practices' counts add up to these.
+	practiceResults: resultCounts(35, 27, 10, 6),
+	practiceResultsInvalidated: 3,
 	// One piece of feedback citing two practices counts for each, so these are not the practices' sum.
 	feedback: {
 		...ZERO_FEEDBACK,
@@ -1911,12 +2101,12 @@ export const quietPracticeReviewOverview: PracticeReviewOverview = {
 	...practiceReviewOverview,
 	buckets: overviewBuckets({
 		reviews: NOTHING_PER_DAY,
-		observations: NOTHING_PER_DAY,
+		practiceResults: NOTHING_PER_DAY,
 		feedback: NOTHING_PER_DAY,
 	}),
 	reviews: { completed: 0, failed: 0, timedOut: 0, cancelled: 0, running: 0, queued: 0 },
-	observations: observationCounts(0, 0, 0, 0),
-	observationsInvalidated: 0,
+	practiceResults: resultCounts(0, 0, 0, 0),
+	practiceResultsInvalidated: 0,
 	feedback: ZERO_FEEDBACK,
 	practices: [],
 };
@@ -2155,15 +2345,16 @@ export const PRIVATE_FEEDBACK_TEXT =
 	"Private to Barbara: the runbook's first step is the one a tired reader most needs.";
 
 // ---------------------------------------------------------------------------------------------
-// What the practice scripts did before one review: one entry per status the section words.
+// What each practice's program did before one review: one entry per way the section words it.
 
 const decision = { purpose: "PRACTICE_DECISION", need: "REQUIRED", bound: true } as const;
+const custom = { programKind: "CUSTOM" } as const;
 
 export const reviewPracticeScripts = {
-	found: {
+	fromCode: {
 		practiceSlug: "thin-controllers",
 		practiceName: "Thin controllers",
-		run: { status: "OK", leads: 3, models: [{ ...decision, notRated: [] }] },
+		run: { ...custom, status: "OK", path: "CODE", models: [{ ...decision, notRated: [] }] },
 		durationMs: 4200,
 		models: [
 			{
@@ -2180,8 +2371,9 @@ export const reviewPracticeScripts = {
 		practiceName: "Errors carry their context",
 		durationMs: 12_840,
 		run: {
+			...custom,
 			status: "OK",
-			leads: 0,
+			path: "MODELS",
 			models: [
 				{
 					...decision,
@@ -2215,8 +2407,9 @@ export const reviewPracticeScripts = {
 		practiceName: "Small pull requests",
 		durationMs: 2100,
 		run: {
+			...custom,
 			status: "OK",
-			leads: 1,
+			path: "MIXED",
 			models: [{ ...decision, notRated: [{ reason: "BUDGET", count: 3 }] }],
 		},
 		models: [
@@ -2229,16 +2422,24 @@ export const reviewPracticeScripts = {
 			},
 		],
 	},
+	// A practice without a script of its own gets the built-in review, which declares no models.
+	builtIn: {
+		practiceSlug: "the-change-explains-itself",
+		practiceName: "The change explains itself",
+		run: { programKind: "BUILTIN", status: "OK", path: "REVIEW", models: [] },
+		durationMs: 900,
+		models: [],
+	},
 	skipped: {
 		practiceSlug: "product-language",
 		practiceName: "Product language",
-		run: { status: "SKIPPED", leads: 0, models: [{ ...decision, bound: false, notRated: [] }] },
+		run: { ...custom, status: "SKIPPED", models: [{ ...decision, bound: false, notRated: [] }] },
 		models: [{ purpose: "PRACTICE_DECISION", calls: 0, inputTokens: 0, outputTokens: 0 }],
 	},
 	failed: {
 		practiceSlug: "tests-name-the-behaviour",
 		practiceName: "Tests name the behaviour",
-		run: { status: "FAILED", leads: 0, models: [] },
+		run: { ...custom, status: "FAILED", stopReason: "ERROR", models: [] },
 		durationMs: 40,
 		models: [],
 		error: "TypeError: change.files is not iterable at run (tests-name-the-behaviour.ts:14:23)",
@@ -2248,12 +2449,19 @@ export const reviewPracticeScripts = {
 	notFinished: {
 		practiceSlug: "decisions-are-written-down",
 		practiceName: "Decisions are written down",
-		run: { status: "NOT_FINISHED", leads: 0, models: [] },
+		run: { ...custom, status: "NOT_FINISHED", models: [] },
 		models: [{ purpose: "PRACTICE_DECISION", calls: 9, inputTokens: 6300, outputTokens: 54 }],
+	},
+	// The review ended before this program's turn came, so it asked nothing and took no time.
+	notReached: {
+		practiceSlug: "security-review",
+		practiceName: "Security review",
+		run: { ...custom, status: "NOT_REACHED", models: [] },
+		models: [],
 	},
 	removedPractice: {
 		practiceSlug: "retired-practice",
-		run: { status: "TIMED_OUT", leads: 2, models: [] },
+		run: { ...custom, status: "FAILED", stopReason: "DEADLINE", models: [] },
 		durationMs: 15_000,
 		models: [],
 	},

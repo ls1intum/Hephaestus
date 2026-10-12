@@ -1,28 +1,28 @@
 import type { ReactNode } from "react";
 
-import type { ReviewObservation } from "@/api/types.gen";
+import type { ReviewResult } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
 
 import {
-	clearedObservationFacets,
-	clearedObservationFilters,
-	hasObservationFilter,
-	ObservationFilters,
-} from "./ObservationFilters";
-import { ObservationResults, type ObservationResultsState } from "./ObservationResults";
+	clearedResultFacets,
+	clearedResultFilters,
+	hasResultFilter,
+	ResultFilters,
+} from "./ResultFilters";
+import { ResultRows, type ResultRowsState } from "./ResultRows";
 import { clearedScope } from "./review-scope";
-import type { ObservationsSearch } from "./review-search";
+import type { ResultsSearch } from "./review-search";
 import { ReviewListEnd } from "./ReviewListEnd";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { ReviewTabIntro } from "./ReviewTabIntro";
 
-export interface ObservationsListPageProps {
-	search: ObservationsSearch;
-	onSearchChange: (patch: Partial<ObservationsSearch>) => void;
-	/** The observations the current `search` selects, as far as they are loaded. */
-	observations: PagedListState<ReviewObservation>;
+export interface ResultsListPageProps {
+	search: ResultsSearch;
+	onSearchChange: (patch: Partial<ResultsSearch>) => void;
+	/** The results the current `search` selects, as far as they are loaded. */
+	results: PagedListState<ReviewResult>;
 	groups: FacetSource;
 	practices: FacetSource;
 	people: ReviewPeople;
@@ -36,66 +36,66 @@ export interface ObservationsListPageProps {
 }
 
 function resultsState(
-	rows: ReviewObservation[],
+	rows: ReviewResult[],
 	onClearFilters: (() => void) | undefined,
-): ObservationResultsState {
+): ResultRowsState {
 	if (rows.length > 0) {
-		return { status: "ready", observations: rows };
+		return { status: "ready", results: rows };
 	}
 	return onClearFilters
 		? { status: "empty", filtered: true, onClearFilters }
 		: { status: "empty", filtered: false };
 }
 
-export function ObservationsListPage({
+export function ResultsListPage({
 	search,
 	onSearchChange,
-	observations,
+	results,
 	groups,
 	practices,
 	people,
 	record,
 	summary,
-}: ObservationsListPageProps) {
-	const rows = observations.status === "ready" ? observations.rows : [];
+}: ResultsListPageProps) {
+	const rows = results.status === "ready" ? results.rows : [];
 	// Guarded on the filter being set, because that is the only condition under which the first row
 	// names the filtered person — unfiltered, row zero is whoever happens to sort first, and the facet
 	// would put a stranger's name on somebody else's id.
 	const filteredSubject = search.subjectUserId == null ? undefined : rows[0]?.subject;
-	const hasFilter = hasObservationFilter(search);
-	const reset = () => onSearchChange(clearedObservationFilters());
+	const hasFilter = hasResultFilter(search);
+	const reset = () => onSearchChange(clearedResultFilters());
 	// The server sorts "Most actionable first" by outcome and severity, not by time.
 	const byDay = search.order !== "ACTIONABILITY";
 
 	return (
-		<section aria-label="Practice review observations" className="space-y-4">
-			<ReviewTabIntro tab="observations" />
-			<ObservationFilters
+		<section aria-label="Practice review results" className="space-y-4">
+			<ReviewTabIntro tab="results" />
+			<ResultFilters
 				search={search}
 				onPatch={onSearchChange}
-				onReset={() => onSearchChange(clearedObservationFacets())}
+				onReset={() => onSearchChange(clearedResultFacets())}
 				onClearScope={() => onSearchChange(clearedScope())}
 				groups={groups}
 				practices={practices}
 				people={people}
-				total={observations.status === "ready" ? observations.total : undefined}
+				total={results.status === "ready" ? results.total : undefined}
 				subjectName={filteredSubject?.name ?? filteredSubject?.login}
 				record={record}
 			/>
 			{summary}
-			{observations.status === "error" && (
-				<ObservationResults
-					state={{ status: "error", error: observations.error, onRetry: observations.onRetry }}
+			{results.status === "error" && (
+				<ResultRows
+					state={{ status: "error", error: results.error, onRetry: results.onRetry }}
 				/>
 			)}
-			{observations.status === "loading" && <ObservationResults state={{ status: "loading" }} />}
-			{observations.status === "ready" && (
+			{results.status === "loading" && <ResultRows state={{ status: "loading" }} />}
+			{results.status === "ready" && (
 				<>
-					<ObservationResults
+					<ResultRows
 						state={resultsState(rows, hasFilter ? reset : undefined)}
 						byDay={byDay}
 					/>
-					{rows.length > 0 && <ReviewListEnd {...observations} noun="observations" />}
+					{rows.length > 0 && <ReviewListEnd {...results} noun="results" />}
 				</>
 			)}
 		</section>

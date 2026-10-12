@@ -19,7 +19,7 @@ import {
 	workspaceMembers,
 	workspacePractices,
 } from "./fixtures";
-import { practiceFacetOptions } from "./ObservationFilters";
+import { practiceFacetOptions } from "./ResultFilters";
 import { type FeedbackSearch, feedbackQuery, REVIEW_PAGE_SIZE } from "./review-search";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import { STORY_GROUPS } from "./story-scope-sources";

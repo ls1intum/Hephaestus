@@ -3,7 +3,7 @@ import { hasText } from "@/lib/text";
 import type { ChatMessage } from "@/lib/types";
 
 /**
- * The words a message shows the reader, in order: its text, and the feedback its observation links
+ * The words a message shows the reader, in order: its text, and the feedback its result links
  * carry. Reasoning, tool calls and any part kind this client does not model show nothing.
  */
 export function visibleTexts(message: ChatMessage): string[] {

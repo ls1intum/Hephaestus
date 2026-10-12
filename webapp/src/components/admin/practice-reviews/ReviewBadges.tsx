@@ -1,24 +1,34 @@
-import type { ReviewObservation } from "@/api/types.gen";
+import type { Outcome, ReviewResult } from "@/api/types.gen";
 import type { StatusDef } from "@/components/common/status-def";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
-import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
+import { OUTCOME_DEFS, resultVerdict } from "@/components/practice-vocabulary/outcome-defs";
+import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { StatusLabel } from "@/components/practice-vocabulary/StatusTooltip";
 
 /**
- * The result and, for a shortfall, its severity, as words beside their icons. A verdict is not an
+ * The outcome in the words a result's head line uses — "Not met · 3 problems" where its problems are
+ * known — with the registry's icon and colour, so the count travels with the outcome it qualifies.
+ */
+export function resultOutcomeDef(outcome: Outcome, problems: number | undefined): StatusDef {
+	return { ...OUTCOME_DEFS[outcome], label: resultVerdict(outcome, problems) };
+}
+
+export interface ResultOutcomeProps {
+	result: Pick<ReviewResult, "outcome" | "severity">;
+	/** How many problems the result names; omitted where they are not known. */
+	problems?: number;
+}
+
+/**
+ * The outcome and, for a shortfall, its severity, as words beside their icons. A verdict is not an
  * exception, so neither is a badge: the badges on a level are kept for what went wrong.
  */
-export function ObservationResult({
-	observation,
-}: {
-	observation: Pick<ReviewObservation, "outcome" | "severity">;
-}) {
-	const severity = observationSeverity(observation);
+export function ResultOutcome({ result, problems }: ResultOutcomeProps) {
+	const severity = resultSeverity(result);
 	return (
 		<span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-			<StatusLabel def={OUTCOME_DEFS[observation.outcome]} />
+			<StatusLabel def={resultOutcomeDef(result.outcome, problems)} />
 			{severity && <StatusLabel def={severity} />}
 		</span>
 	);
@@ -38,14 +48,14 @@ export function ReviewStatusMark({ def }: { def: StatusDef }) {
 }
 
 /**
- * Severity is only ever read alongside a shortfall — a "Minor" beside a met observation would be
+ * Severity is only ever read alongside a shortfall — a "Minor" beside a met result would be
  * a cost for something that cost nothing.
  */
-export function observationSeverity(
-	observation: Pick<ReviewObservation, "outcome" | "severity">,
+export function resultSeverity(
+	result: Pick<ReviewResult, "outcome" | "severity">,
 ): StatusDef | undefined {
-	return observation.outcome === "NOT_MET" && observation.severity
-		? SEVERITY_DEFS[observation.severity]
+	return result.outcome === "NOT_MET" && result.severity
+		? SEVERITY_DEFS[result.severity]
 		: undefined;
 }
 
@@ -54,9 +64,9 @@ export function observationSeverity(
  * a badge: an origin is a fact about the record, not something that went wrong. The words are the
  * registry's, so the operator's console and the developer's own surface name an origin alike.
  */
-export function ObservationOriginNote({ origin }: { origin: ReviewObservation["origin"] }) {
+export function ResultOriginNote({ origin }: { origin: ReviewResult["origin"] }) {
 	if (origin === "LIVE") {
 		return null;
 	}
-	return <span>{OBSERVATION_ORIGIN_DEFS[origin].label}</span>;
+	return <span>{RESULT_ORIGIN_DEFS[origin].label}</span>;
 }

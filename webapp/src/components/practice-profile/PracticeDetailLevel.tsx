@@ -26,7 +26,7 @@ import {
 import { StandingBadge, TrendNote } from "@/components/practice-vocabulary/StandingBadge";
 import {
 	EMPTY_REVIEW_RUN_FEED,
-	type ObservationControls,
+	type ResultControls,
 	type ReviewRunFeedState,
 } from "@/components/profile/review-runs";
 import { ReviewRunFeed, ReviewRunFeedSkeleton } from "@/components/profile/ReviewRunFeed";
@@ -43,7 +43,7 @@ import { requestedReviewNote } from "./requested-review-note";
 
 const TAB_LABELS: Record<PracticeTab, string> = {
 	feedback: "Feedback",
-	observations: "Observations",
+	results: "Results",
 	guide: "Guide",
 };
 
@@ -78,8 +78,8 @@ export interface PracticeDetailLevelProps {
 	ratingProps?: (feedbackId: string) => FeedbackRatingProps;
 	/** How many rows the feed draws while its first page loads. */
 	skeletonRows: number;
-	/** The reader's response to an observation, from the route. */
-	observations?: ObservationControls;
+	/** The reader's response to a result, from the route. */
+	results?: ResultControls;
 	isLoading: boolean;
 	error?: unknown;
 	onRetry?: () => void;
@@ -103,9 +103,9 @@ const NO_CARDS: PracticeFeedbackCardEntry[] = [];
 
 /**
  * One practice as the level over its group: the practice's introduction, then its tabs — the
- * feedback written about it, which the level opens on, what the reviews of the reader's work found,
+ * feedback written about it, which the level opens on, the results of the reviews of the reader's work,
  * and the practice guide when the practice has one. It is the deepest level, so it is the one that
- * carries the observations — the newest open once the reader turns to them and every earlier one a
+ * carries the results — the newest open once the reader turns to them and every earlier one a
  * press away, each opening and closing on its own.
  */
 export function PracticeDetailLevel({
@@ -120,38 +120,38 @@ export function PracticeDetailLevel({
 	feedbackCards = NO_CARDS,
 	ratingProps,
 	skeletonRows,
-	observations,
+	results,
 	isLoading,
 	error,
 	onRetry,
 	neverApplied = false,
 }: PracticeDetailLevelProps) {
 	// The server narrows which runs reached the practice; the level narrows the same way and shows
-	// only that practice's observations instead of everything the run found.
+	// only that practice's results instead of everything the run found.
 	const runs =
 		feed.status === "ready" && practice
 			? feed.runs
 					.map((run) => ({
 						...run,
-						observations: run.observations.filter(
-							(observation) => observation.practiceSlug === practice.slug,
+						practiceResults: run.practiceResults.filter(
+							(result) => result.practiceSlug === practice.slug,
 						),
 					}))
-					.filter((run) => run.observations.length > 0)
+					.filter((run) => run.practiceResults.length > 0)
 			: [];
 	const feedback = practice
 		? feedbackCardsOf(feedbackCards, practice.slug)
 		: { open: undefined, resolved: [] };
 	const feedbackCount = (feedback.open ? 1 : 0) + feedback.resolved.length;
 	// What each tab counts is what it can show. The feedback cards arrive in one piece, so that
-	// count is always known; the observations are paged, so a number taken from the loaded pages
+	// count is always known; the results are paged, so a number taken from the loaded pages
 	// would be short while earlier runs are still a press away, and would grow under the reader as
 	// they press. An unnumbered tab says less and nothing wrong, so the count waits for the last
 	// page.
 	const counts: Partial<Record<PracticeTab, number>> = {
-		observations:
+		results:
 			feed.status === "ready" && !feed.hasMore
-				? runs.reduce((count, run) => count + run.observations.length, 0)
+				? runs.reduce((count, run) => count + run.practiceResults.length, 0)
 				: undefined,
 		feedback: feedbackCount,
 	};
@@ -176,7 +176,7 @@ export function PracticeDetailLevel({
 			// The tabs and the one they open on, as they will be laid out.
 			<div className="flex flex-col gap-4">
 				<PracticeTabsSkeleton tabs={tabs.length} />
-				{shownTab === "observations" ? (
+				{shownTab === "results" ? (
 					<ReviewRunFeedSkeleton rows={skeletonRows} />
 				) : (
 					<div className="flex flex-col gap-2.5" aria-busy="true">
@@ -230,7 +230,7 @@ export function PracticeDetailLevel({
 							description="Feedback about patterns in your work: the open card, then the ones that resolved, newest first."
 						>
 							{feedbackCount === 0 ? (
-								<FeedbackEmpty description="Feedback appears here once a review sees the same pattern in your work more than once. Feedback posted on a single piece of work stays there. Open its observation to find recorded comment links." />
+								<FeedbackEmpty description="Feedback appears here once a review sees the same pattern in your work more than once. Feedback posted on a single piece of work stays there. Open its result to find recorded comment links." />
 							) : (
 								<div className="flex flex-col gap-6">
 									{feedback.open && (
@@ -255,10 +255,10 @@ export function PracticeDetailLevel({
 							)}
 						</Section>
 					</TabsContent>
-					<TabsContent value="observations" className="min-w-0">
+					<TabsContent value="results" className="min-w-0">
 						<Section
 							size="lg"
-							title="Observations"
+							title="Results"
 							description="Reviews of your work that reached this practice, newest first: why each was noted, the evidence, and the next step."
 						>
 							{hasText(requestedNote) && <p className="max-w-2xl text-sm">{requestedNote}</p>}
@@ -266,14 +266,14 @@ export function PracticeDetailLevel({
 								feed={feed}
 								runs={runs}
 								skeletonRows={skeletonRows}
-								observations={observations}
+								results={results}
 								// The rows are this practice's own, so none repeats its name under the summary.
 								showPracticeName={false}
 								// Every row here reviews the same practice, so the newest is the one the reader
 								// came for; the rest are its history and wait for a press.
 								initiallyOpen="newest"
-								emptyTitle="No observations yet"
-								emptyDescription="An observation appears here after a review checks this practice against your work."
+								emptyTitle="No results yet"
+								emptyDescription="A result appears here after a review checks this practice against your work."
 							/>
 						</Section>
 					</TabsContent>

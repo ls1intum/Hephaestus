@@ -1,29 +1,29 @@
 import { CircleHelp, ClockAlert } from "lucide-react";
 
-import type { ReviewObservation } from "@/api/types.gen";
+import type { PracticeResultDetail } from "@/api/types.gen";
 
-export type Currentness = ReviewObservation["claimCurrentness"];
+export type Currentness = PracticeResultDetail["claimCurrentness"];
 
-const STALE_NOTE = "The practice or the reviewed work changed after this observation.";
+const STALE_NOTE = "The practice or the reviewed work changed after this result.";
 
-/** Shared wording distinguishes an unverifiable observation from a changed practice or reviewed work. */
+/** Shared wording distinguishes an unverifiable result from a changed practice or reviewed work. */
 export const NON_CURRENT = {
 	STALE: {
-		badge: "Historical observation",
+		badge: "Historical result",
 		badgeVariant: "warning",
 		Icon: ClockAlert,
-		title: "This observation is no longer current",
-		description: `${STALE_NOTE} The earlier result remains in the record, but it does not describe the current state.`,
+		title: "This result is no longer current",
+		description: `${STALE_NOTE} It stays in the record, but it does not describe the current state.`,
 		note: STALE_NOTE,
 	},
 	UNVERIFIABLE: {
-		badge: "Unverified observation",
+		badge: "Unverified result",
 		badgeVariant: "outline",
 		Icon: CircleHelp,
-		title: "We cannot verify this observation",
+		title: "We cannot verify this result",
 		description:
-			"The record of what this observation was based on is missing, or it comes from an earlier version of the review. It cannot show whether the practice’s current standard is met.",
-		note: "We cannot verify what this observation was based on.",
+			"The record of what this result was based on is missing, or it comes from an earlier version of the review. It cannot show whether the practice’s current standard is met.",
+		note: "We cannot verify what this result was based on.",
 	},
 } as const satisfies Record<
 	Exclude<Currentness, "CURRENT">,

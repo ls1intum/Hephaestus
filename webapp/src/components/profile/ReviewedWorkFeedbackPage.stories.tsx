@@ -16,13 +16,13 @@ const readyFeed = {
 
 /**
  * The page a comment on a pull request, merge request or issue links to: the reader's own reviews of
- * that work, where each observation can be answered or disputed.
+ * that work, where each result can be answered or disputed.
  */
 const meta = {
 	component: ReviewedWorkFeedbackPage,
 	tags: ["autodocs"],
 	parameters: { layout: "padded" },
-	args: { feed: readyFeed, observations: { onRespond: fn() } },
+	args: { feed: readyFeed, results: { onRespond: fn() } },
 } satisfies Meta<typeof ReviewedWorkFeedbackPage>;
 
 export default meta;

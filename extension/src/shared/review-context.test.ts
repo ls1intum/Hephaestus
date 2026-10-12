@@ -15,7 +15,7 @@ const reviewed: PracticeTraceEntry = {
 	autonomy: "AUTOMATIC",
 	deliveredCount: 0,
 	explanation: "Measured.",
-	observationCount: 1,
+	practiceResultCount: 1,
 	outcome: "REVIEWED",
 	practiceName: "Clear description",
 	practiceSlug: "clear-description",

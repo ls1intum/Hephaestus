@@ -5,7 +5,7 @@ import type {
 	DeliveredWorkFeedback,
 	DeliveredWorkFeedbackItem,
 	DeliveredWorkFeedbackPlacement,
-	ObservationList,
+	PracticeResultList,
 	ReviewContext as ReviewContextDTO,
 	Workspace,
 	WorkspaceListItem,
@@ -15,7 +15,7 @@ import {
 	type ContextEnvironment,
 	type DetailsApi,
 	workFeedback,
-	observationPage,
+	resultPage,
 	resolveContext,
 	WorkspaceDirectory,
 } from "~/background/context";
@@ -237,11 +237,11 @@ function adminDto(id: string): ReviewContextDTO {
 
 const WORK = { id: "101", kind: "scm.pull_request", label: "!1" };
 const OTHER_WORK = { id: "999", kind: "scm.pull_request", label: "!9" };
-const OBSERVATION = "1a2b3c4d-0000-4000-8000-000000000001";
+const RESULT = "1a2b3c4d-0000-4000-8000-000000000001";
 
-function ownRow(overrides: Partial<ObservationList> = {}): ObservationList {
+function ownRow(overrides: Partial<PracticeResultList> = {}): PracticeResultList {
 	return {
-		id: OBSERVATION,
+		id: RESULT,
 		artifactId: 101,
 		artifactKind: "scm.pull_request",
 
@@ -253,6 +253,10 @@ function ownRow(overrides: Partial<ObservationList> = {}): ObservationList {
 		outcome: "NOT_MET",
 		severity: "MAJOR",
 		summary: "The description never says why.",
+		problems: [
+			{ severity: "MAJOR", summary: "The description never says which issue it closes." },
+			{ severity: "MINOR", summary: "The description lists files instead of the change." },
+		],
 		...overrides,
 	};
 }
@@ -285,7 +289,7 @@ function adminEnvironment() {
 				},
 			],
 		})),
-		ownObservations: vi.fn<DetailsApi["ownObservations"]>(async () => ({
+		ownResults: vi.fn<DetailsApi["ownResults"]>(async () => ({
 			content: [ownRow()],
 			totalElements: 1,
 		})),
@@ -320,18 +324,18 @@ function adminEnvironment() {
 	};
 }
 
-describe("the reader's own observations on the tab's work", () => {
+describe("the reader's own results on the tab's work", () => {
 	it.each([
 		["a developer", dto("101")],
 		["a workspace admin", adminDto("101")],
-	])("asks for %s's own observations with the exact work", async (_reader, answer) => {
+	])("asks for %s's own results with the exact work", async (_reader, answer) => {
 		const { env, api } = adminEnvironment();
 		api.resolve.mockResolvedValue(answer);
-		const page = await observationPage(env, 10, "team");
-		expect(api.ownObservations).toHaveBeenCalledWith("team", "scm.pull_request", 101, 25);
+		const page = await resultPage(env, 10, "team");
+		expect(api.ownResults).toHaveBeenCalledWith("team", "scm.pull_request", 101, 25);
 		expect(page).toMatchObject({ total: 1 });
 		expect(page.rows[0]).toStrictEqual({
-			id: OBSERVATION,
+			id: RESULT,
 			practiceName: "Descriptive merge request",
 			practiceSlug: "descriptive-merge-request",
 			summary: "The description never says why.",
@@ -340,31 +344,53 @@ describe("the reader's own observations on the tab's work", () => {
 
 			claimCurrentness: "CURRENT",
 			observedAt: "2026-09-26T11:00:00Z",
+			problems: [
+				{ severity: "MAJOR", summary: "The description never says which issue it closes." },
+				{ severity: "MINOR", summary: "The description lists files instead of the change." },
+			],
 		});
 	});
 
-	it("refuses the observations of another workspace before asking any server", async () => {
+	it("keeps only the severity and the one line of each problem", async () => {
 		const { env, api } = adminEnvironment();
-		await expect(observationPage(env, 10, "other")).rejects.toMatchObject({ code: "stale" });
-		expect(api.ownObservations).not.toHaveBeenCalled();
+		api.resolve.mockResolvedValue(dto("101"));
+		const wider = {
+			severity: "CRITICAL",
+			summary: "The change drops the error.",
+			explanation: "A longer text that a list row never carries.",
+		} as const;
+		api.ownResults.mockResolvedValue({
+			content: [ownRow({ problems: [wider] })],
+			totalElements: 1,
+		});
+		const page = await resultPage(env, 10, "team");
+		expect(page.rows[0]?.problems).toStrictEqual([
+			{ severity: "CRITICAL", summary: "The change drops the error." },
+		]);
+	});
+
+	it("refuses the results of another workspace before asking any server", async () => {
+		const { env, api } = adminEnvironment();
+		await expect(resultPage(env, 10, "other")).rejects.toMatchObject({ code: "stale" });
+		expect(api.ownResults).not.toHaveBeenCalled();
 	});
 
 	it("refuses a list that holds any other work, as a server without the exact filter returns", async () => {
 		const { env, api } = adminEnvironment();
-		api.ownObservations.mockResolvedValue({
+		api.ownResults.mockResolvedValue({
 			content: [ownRow(), ownRow({ id: "other", artifactId: 999 })],
 			totalElements: 2,
 		});
-		await expect(observationPage(env, 10, "team")).rejects.toMatchObject({ code: "server" });
+		await expect(resultPage(env, 10, "team")).rejects.toMatchObject({ code: "server" });
 	});
 
 	it("drops a list whose tab moved to other work while it loaded", async () => {
 		const { env, api, navigate } = adminEnvironment();
-		const answer = Promise.withResolvers<Awaited<ReturnType<DetailsApi["ownObservations"]>>>();
-		api.ownObservations.mockReturnValueOnce(answer.promise);
-		const pending = observationPage(env, 10, "team");
+		const answer = Promise.withResolvers<Awaited<ReturnType<DetailsApi["ownResults"]>>>();
+		api.ownResults.mockReturnValueOnce(answer.promise);
+		const pending = resultPage(env, 10, "team");
 		await vi.waitFor(() => {
-			expect(api.ownObservations).toHaveBeenCalledOnce();
+			expect(api.ownResults).toHaveBeenCalledOnce();
 		});
 		navigate(MR2);
 		answer.resolve({ content: [ownRow()], totalElements: 1 });
@@ -372,11 +398,11 @@ describe("the reader's own observations on the tab's work", () => {
 	});
 
 	it.each([undefined, -1, 0, 1.5, Number.NaN])(
-		"rejects unusable observation total %s instead of claiming completeness",
+		"rejects unusable result total %s instead of claiming completeness",
 		async (total) => {
 			const { env, api } = adminEnvironment();
-			api.ownObservations.mockResolvedValue({ content: [ownRow()], totalElements: total });
-			await expect(observationPage(env, 10, "team")).rejects.toMatchObject({ code: "server" });
+			api.ownResults.mockResolvedValue({ content: [ownRow()], totalElements: total });
+			await expect(resultPage(env, 10, "team")).rejects.toMatchObject({ code: "server" });
 		},
 	);
 });

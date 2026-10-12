@@ -179,7 +179,7 @@ test.describe("inline review activity", () => {
 			{ type: "retry-result-processing", tabId, workspaceSlug: "ext-e2e", jobId: FAILED_JOB },
 			// Admin reads and run changes are the web app's; the extension has no command for them.
 			{ type: "get-review-details", workspaceSlug: "ext-e2e" },
-			{ type: "list-observations", workspaceSlug: "ext-e2e", scope: "workspace" },
+			{ type: "list-results", workspaceSlug: "ext-e2e", scope: "workspace" },
 			{
 				type: "open-action",
 				workspaceSlug: "ext-e2e",
@@ -265,8 +265,8 @@ test.describe("inline review activity", () => {
 		context,
 	}) => {
 		const options = await signIn(context, "e2e", { admin: true });
-		// Opening the report asks for the reader's observations; the answer is held.
-		const hold = await holdServer(context, /\/practices\/observations$/u);
+		// Opening the report asks for the reader's results; the answer is held.
+		const hold = await holdServer(context, /\/practices\/results$/u);
 		const page = await context.newPage();
 		await providerTab(page, GITLAB_MR);
 		const inline = await openInline(page);
@@ -284,7 +284,7 @@ test.describe("inline review activity", () => {
 		await hold.release();
 		for (const surface of [inline, issueInline]) {
 			await expect(surface.getByRole("link", { name: /^Open in Hephaestus/u })).toHaveCount(0);
-			await expect(surface.getByRole("region", { name: "Your observations" })).toHaveCount(0);
+			await expect(surface.getByRole("region", { name: "Your results" })).toHaveCount(0);
 			await expect(surface.getByRole("list", { name: "Comments for you" })).toHaveCount(0);
 			await expect(line(surface)).toContainText("Sign in to");
 		}
@@ -294,7 +294,7 @@ test.describe("inline review activity", () => {
 		context,
 	}) => {
 		const options = await signIn(context, "e2e", { admin: true });
-		const hold = await holdServer(context, /\/practices\/observations$/u);
+		const hold = await holdServer(context, /\/practices\/results$/u);
 		const page = await context.newPage();
 		await providerTab(page, GITLAB_MR);
 		const frame = await openInline(page);
@@ -316,7 +316,7 @@ test.describe("inline review activity", () => {
 		await expect(line(frame)).toContainText("Sign in to");
 		await expect(frame.locator(`a[href="${TRACE_URL}"]`)).toHaveCount(0);
 		await expect(frame.getByRole("list", { name: "Comments for you" })).toHaveCount(0);
-		await expect(frame.getByRole("region", { name: "Your observations" })).toHaveCount(0);
+		await expect(frame.getByRole("region", { name: "Your results" })).toHaveCount(0);
 	});
 
 	test("changes a frame's workspace without retaining the previous workspace's links", async ({
@@ -371,7 +371,7 @@ test.describe("a developer who is not an admin", () => {
 		}
 		await expect(comments.getByText(/^Explain validation, Keep changes focused · /u)).toBeVisible();
 		// No body, and no practice of feedback that was never posted, reaches the comments. (The
-		// reader's own observations below may name that practice: they are about the work.)
+		// reader's own results below may name that practice: they are about the work.)
 		await expect(comments).not.toContainText("E2E_");
 		await expect(frame.locator("body")).not.toContainText("_BODY");
 		const summary = frame.locator(`a[href="${GITLAB_MR6}#note_926001"]`);
@@ -380,7 +380,7 @@ test.describe("a developer who is not an admin", () => {
 		await expect(page).toHaveURL(`${GITLAB_MR6}#note_926001`);
 	});
 
-	test("sees their own observations and request on their work, and no admin detail on another's", async ({
+	test("sees their own results and request on their work, and no admin detail on another's", async ({
 		context,
 	}) => {
 		await acceptNotice("e2e-dev", { admin: false });
@@ -389,8 +389,11 @@ test.describe("a developer who is not an admin", () => {
 		await providerTab(own, GITLAB_MR6);
 		const ownFrame = await openInline(own);
 		await expectWork(ownFrame, `${WEB_APP_URL}/w/ext-e2e/feedback/scm.pull_request/920013`);
-		const observations = ownFrame.getByRole("region", { name: "Your observations" });
-		await expect(observations.getByRole("listitem")).toHaveCount(3);
+		const results = ownFrame.getByRole("region", { name: "Your results" });
+		// One not met result and two met. The seeded run recorded no evidence, so the list names no
+		// problem under the not met result, and the three rows are the only items.
+		await expect(results.getByRole("listitem")).toHaveCount(3);
+		await expect(results).toContainText("Not met · Major");
 		await expect(ownFrame.getByRole("button", { name: "Request review" }).first()).toBeVisible();
 		await expect(ownFrame.getByRole("link", { name: /^Review details/u })).toHaveCount(0);
 
@@ -423,9 +426,7 @@ test("a list reads only the pressed row, and shows its preview at once without a
 	await expect(frame.getByRole("button", { name: "Request review" })).toHaveCount(0);
 	await expect(frame.locator("body")).not.toContainText("E2E_");
 	expect(reads.some((url) => new URL(url).pathname.endsWith("/feedback/on-work"))).toBe(true);
-	expect(reads.some((url) => new URL(url).pathname.endsWith("/practices/observations"))).toBe(
-		false,
-	);
+	expect(reads.some((url) => new URL(url).pathname.endsWith("/practices/results"))).toBe(false);
 	expect(reads.some((url) => new URL(url).pathname.includes("/practices/reviews/"))).toBe(false);
 	// A comment link takes the tab to that comment on the work.
 	const first = frame.getByRole("link").first();

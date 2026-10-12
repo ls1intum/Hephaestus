@@ -6,7 +6,7 @@ import {
 	actionIntentSchema,
 	reviewActionSchema,
 } from "~/shared/review-actions";
-import type { ObservationPage, ReviewContext, WorkFeedback } from "~/shared/review-context";
+import type { ResultPage, ReviewContext, WorkFeedback } from "~/shared/review-context";
 
 /**
  * Every message a view may send the worker, as one closed union. There is no generic request: no
@@ -60,8 +60,8 @@ export const requestSchema = z.discriminatedUnion("type", [
 		subject,
 	}),
 	z.strictObject({ type: z.literal("get-work-feedback"), workspaceSlug: slug, subject }),
-	// The reader's own observations are the work page's: a list row's preview cannot name them.
-	z.strictObject({ type: z.literal("list-observations"), workspaceSlug: slug }),
+	// The reader's own results are the work page's: a list row's preview cannot name them.
+	z.strictObject({ type: z.literal("list-results"), workspaceSlug: slug }),
 	z.strictObject({ type: z.literal("get-report-view") }),
 	z.strictObject({
 		type: z.literal("set-report-view"),
@@ -103,7 +103,7 @@ export const COMMAND_SURFACES: Record<RpcCommand, readonly Surface[]> = {
 	"list-site-access": ["options"],
 	"get-context": ["inline"],
 	"get-work-feedback": ["inline"],
-	"list-observations": ["inline"],
+	"list-results": ["inline"],
 	"get-report-view": ["inline"],
 	"set-report-view": ["inline"],
 	"open-action": ["inline"],
@@ -207,7 +207,7 @@ export interface RpcResponses {
 	"list-site-access": SiteAccessEntry[];
 	"get-context": ReviewContext;
 	"get-work-feedback": WorkFeedback;
-	"list-observations": ObservationPage;
+	"list-results": ResultPage;
 	"get-report-view": ReportViewState;
 	"set-report-view": null;
 	"open-action": null;

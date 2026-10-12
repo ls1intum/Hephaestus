@@ -39,13 +39,13 @@ function isTabCount(url: URL): boolean {
 }
 
 /**
- * Every request the list routes make, with the work, review, observation and feedback URLs recorded.
+ * Every request the list routes make, with the work, review, result and feedback URLs recorded.
  * The screens they feed take their rows as props, so a story mounts them without ever issuing the
  * request — this route test is the only place that can see what went on the wire.
  */
 function recordRequests() {
 	const reviewUrls: URL[] = [];
-	const observationUrls: URL[] = [];
+	const resultUrls: URL[] = [];
 	const feedbackUrls: URL[] = [];
 	const workUrls: URL[] = [];
 	const locationCountUrls: URL[] = [];
@@ -56,10 +56,10 @@ function recordRequests() {
 		http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json([])),
 		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
 		http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([])),
-		http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", ({ request }) => {
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/results", ({ request }) => {
 			const url = new URL(request.url);
 			if (!isTabCount(url)) {
-				observationUrls.push(url);
+				resultUrls.push(url);
 			}
 			return HttpResponse.json(emptyPage);
 		}),
@@ -86,7 +86,7 @@ function recordRequests() {
 			return HttpResponse.json(emptyPage);
 		}),
 	);
-	return { reviewUrls, observationUrls, feedbackUrls, workUrls, locationCountUrls };
+	return { reviewUrls, resultUrls, feedbackUrls, workUrls, locationCountUrls };
 }
 
 function processingReviewsHandler(getReview: () => ReviewRunSummary, polls: URL[], reads: URL[]) {
@@ -146,17 +146,17 @@ describe("practice review list routes", () => {
 	 * because another route already owns the word `sort` in the same search namespace with entirely
 	 * different values; the endpoint spells it `sort`. A list ordered by the server looks exactly like
 	 * a list ordered by the server's default, so nothing but the request itself can catch a rename —
-	 * and this is the surface that exists to put the observations most worth acting on at the top.
+	 * and this is the surface that exists to put the results most worth acting on at the top.
 	 */
 	it("asks the endpoint for the ordering the URL chose, under the name the endpoint uses", async () => {
-		const { observationUrls } = recordRequests();
+		const { resultUrls } = recordRequests();
 
 		renderRouteAtWithRouter(
-			'/w/acme/admin/practices/reviews/observations?order=ACTIONABILITY&severity=["MAJOR"]',
+			'/w/acme/admin/practices/reviews/results?order=ACTIONABILITY&severity=["MAJOR"]',
 		);
-		await screen.findByText("No observations match these filters", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("No results match these filters", undefined, ROUTE_RENDER_WAIT);
 
-		const requested = observationUrls.at(-1);
+		const requested = resultUrls.at(-1);
 		expect(requested?.searchParams.get("sort")).toBe("ACTIONABILITY");
 		expect(requested?.searchParams.get("order")).toBeNull();
 		// The rest of the query travelled too, so a passing `sort` cannot be the only surviving param.
@@ -185,12 +185,12 @@ describe("practice review list routes", () => {
 
 	/** The default ordering is the server's, so nothing is sent rather than a guess at its name. */
 	it("sends no ordering when the reader has not chosen one", async () => {
-		const { observationUrls } = recordRequests();
+		const { resultUrls } = recordRequests();
 
-		renderRouteAtWithRouter("/w/acme/admin/practices/reviews/observations");
-		await screen.findByText("No observations yet", undefined, ROUTE_RENDER_WAIT);
+		renderRouteAtWithRouter("/w/acme/admin/practices/reviews/results");
+		await screen.findByText("No results yet", undefined, ROUTE_RENDER_WAIT);
 
-		expect(observationUrls.at(-1)?.searchParams.get("sort")).toBeNull();
+		expect(resultUrls.at(-1)?.searchParams.get("sort")).toBeNull();
 	});
 
 	it("sends no feedback ordering when the reader has not chosen one", async () => {
@@ -207,14 +207,14 @@ describe("practice review list routes", () => {
 	 * list which forgot either shows more rows than the number the reader clicked.
 	 */
 	it("sends the outcome and marked-incorrect filters to the endpoint", async () => {
-		const { observationUrls } = recordRequests();
+		const { resultUrls } = recordRequests();
 
 		renderRouteAtWithRouter(
-			'/w/acme/admin/practices/reviews/observations?outcome=["NOT_MET"]&invalidated=true',
+			'/w/acme/admin/practices/reviews/results?outcome=["NOT_MET"]&invalidated=true',
 		);
-		await screen.findByText("No observations match these filters", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("No results match these filters", undefined, ROUTE_RENDER_WAIT);
 
-		const requested = observationUrls.at(-1);
+		const requested = resultUrls.at(-1);
 		expect(values(requested, "outcome")).toStrictEqual(["NOT_MET"]);
 		expect(requested?.searchParams.get("invalidated")).toBe("true");
 	});
@@ -240,14 +240,12 @@ describe("practice review list routes", () => {
 
 	/** Live, requested and backfilled reviews are separate populations; the origin travels as asked. */
 	it("sends the origin filter to the endpoint", async () => {
-		const { observationUrls } = recordRequests();
+		const { resultUrls } = recordRequests();
 
-		renderRouteAtWithRouter(
-			'/w/acme/admin/practices/reviews/observations?origin=["MANUAL","BACKFILL"]',
-		);
-		await screen.findByText("No observations match these filters", undefined, ROUTE_RENDER_WAIT);
+		renderRouteAtWithRouter('/w/acme/admin/practices/reviews/results?origin=["MANUAL","BACKFILL"]');
+		await screen.findByText("No results match these filters", undefined, ROUTE_RENDER_WAIT);
 
-		expect(values(observationUrls.at(-1), "origin")).toStrictEqual(["MANUAL", "BACKFILL"]);
+		expect(values(resultUrls.at(-1), "origin")).toStrictEqual(["MANUAL", "BACKFILL"]);
 	});
 
 	/**

@@ -1,4 +1,4 @@
-import type { ObservationDetail, PracticeStanding, TrendSupport } from "@/api/types.gen";
+import type { PracticeResultDetail, PracticeStanding, TrendSupport } from "@/api/types.gen";
 
 const NOTE = "A requested review is evidence only and does not change your standing.";
 
@@ -14,12 +14,12 @@ export function requestedReviewNote(
 	practice: Pick<PracticeStanding, "standing"> & {
 		trendSupport?: Pick<TrendSupport, "opportunities">;
 	},
-	runs: readonly { observations: readonly Pick<ObservationDetail, "origin" | "outcome">[] }[],
+	runs: readonly { practiceResults: readonly Pick<PracticeResultDetail, "origin" | "outcome">[] }[],
 ): string | undefined {
-	const newest = runs[0]?.observations ?? [];
+	const newest = runs[0]?.practiceResults ?? [];
 	const requestedAndClean =
 		newest.length > 0 &&
-		newest.every((observation) => observation.origin === "MANUAL" && observation.outcome === "MET");
+		newest.every((result) => result.origin === "MANUAL" && result.outcome === "MET");
 	const liveJudged = (practice.trendSupport?.opportunities ?? 0) > 0;
 	return practice.standing === "DEVELOPING" && liveJudged && requestedAndClean ? NOTE : undefined;
 }

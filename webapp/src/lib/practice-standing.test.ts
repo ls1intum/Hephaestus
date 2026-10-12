@@ -3,16 +3,16 @@ import { describe, expect, it } from "vitest";
 import type {
 	PracticeGroupTrend,
 	PracticeStanding,
-	PracticeStandingObservation,
+	PracticeStandingResult,
 	PracticeTrend,
 	ReviewedPractice,
 } from "@/api/types.gen";
 
 import { contributingPractices, nextStepOf } from "./practice-standing";
 
-function observation(overrides: Partial<PracticeStandingObservation>): PracticeStandingObservation {
+function result(overrides: Partial<PracticeStandingResult>): PracticeStandingResult {
 	return {
-		observationId: "obs-1",
+		practiceResultId: "result-1",
 		outcome: "NOT_MET",
 		origin: "LIVE",
 		reviewedWorkId: 1,
@@ -23,7 +23,7 @@ function observation(overrides: Partial<PracticeStandingObservation>): PracticeS
 }
 
 function standing(
-	toWorkOn: PracticeStandingObservation[],
+	toWorkOn: PracticeStandingResult[],
 	overrides: Partial<PracticeStanding> = {},
 ): PracticeStanding {
 	return {
@@ -48,26 +48,24 @@ describe("nextStepOf", () => {
 	it("prefers the delivered feedback of the first item to work on", () => {
 		const next = nextStepOf(
 			standing([
-				observation({ deliveredFeedback: "  Split the migration out.  ", title: "Mixed concerns" }),
-				observation({ deliveredFeedback: "Later item" }),
+				result({ deliveredFeedback: "  Split the migration out.  ", title: "Mixed concerns" }),
+				result({ deliveredFeedback: "Later item" }),
 			]),
 		);
 		expect(next).toBe("Split the migration out.");
 	});
 
-	it("falls back to the observation title when nothing was delivered", () => {
-		expect(nextStepOf(standing([observation({ title: " Mixed concerns " })]))).toBe(
-			"Mixed concerns",
-		);
+	it("falls back to the result title when nothing was delivered", () => {
+		expect(nextStepOf(standing([result({ title: " Mixed concerns " })]))).toBe("Mixed concerns");
 	});
 
 	it("withholds a title that only repeats the practice name", () => {
-		expect(nextStepOf(standing([observation({ title: "Small pull requests " })]))).toBeUndefined();
+		expect(nextStepOf(standing([result({ title: "Small pull requests " })]))).toBeUndefined();
 	});
 
 	it("withholds empty delivered feedback as well as a repeated title", () => {
 		expect(
-			nextStepOf(standing([observation({ deliveredFeedback: "", title: "Small pull requests" })])),
+			nextStepOf(standing([result({ deliveredFeedback: "", title: "Small pull requests" })])),
 		).toBeUndefined();
 	});
 });
@@ -79,7 +77,7 @@ describe("contributingPractices", () => {
 		{ slug: "test-first", name: "Test first", groupSlug: "quality" },
 	];
 	const standings = [
-		standing([observation({ deliveredFeedback: "Split the migration out." })], {
+		standing([result({ deliveredFeedback: "Split the migration out." })], {
 			groupSlug: "flow",
 		}),
 		standing([], { slug: "test-first", name: "Test first", groupSlug: "quality" }),

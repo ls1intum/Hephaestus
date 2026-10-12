@@ -5,7 +5,6 @@ import { Button } from "~/components/common/Button";
 import { ExternalLink } from "~/components/common/ExternalLink";
 import { formatDateTime, formatTime } from "~/components/common/format";
 import { CommentList } from "~/components/report/CommentList";
-import { ObservationList } from "~/components/report/ObservationList";
 import { INDENT, ListSkeleton } from "~/components/report/report-parts";
 import {
 	type Loadable,
@@ -16,11 +15,12 @@ import {
 	summarizeReport,
 } from "~/components/report/report-summary";
 import { ReportRow } from "~/components/report/ReportRow";
+import { ResultList } from "~/components/report/ResultList";
 import { WorkspaceChooser } from "~/components/report/WorkspaceChooser";
 import type { ReviewAction } from "~/shared/review-actions";
 import type {
-	ObservationPage,
 	ReadyContext,
+	ResultPage,
 	ReviewActivity,
 	WorkFeedback,
 } from "~/shared/review-context";
@@ -31,8 +31,8 @@ export interface PageReportProps {
 	state: ReportState;
 	/** The reader's own comments on the work. */
 	feedback?: Loadable<WorkFeedback>;
-	/** The reader's own observations, asked for once the report is open. */
-	observations?: Loadable<ObservationPage>;
+	/** The reader's own results, asked for once the report is open. */
+	results?: Loadable<ResultPage>;
 	/** What the server says is happening to a review now (`reviewActivity`), if anything. */
 	activity: ReviewActivity | undefined;
 	/** Where links into Hephaestus may point; nothing else becomes such a link. */
@@ -40,7 +40,7 @@ export interface PageReportProps {
 	expanded: boolean;
 	onToggle: () => void;
 	onRetry: () => void;
-	onRetryObservations: () => void;
+	onRetryResults: () => void;
 	onOpenSettings: () => void;
 	onChooseWorkspace: (slug: string) => void;
 	/** Opens the extension's confirmation window; nothing changes in the page. */
@@ -101,16 +101,16 @@ function Footer({
 }
 
 /**
- * No observation beside comments that are there says nothing worth a section; with no comments either,
+ * No result beside comments that are there says nothing worth a section; with no comments either,
  * it is the one fact the opened report has, and it stays. Loading and failure always show.
  */
 function quietlyEmpty(
-	observations: Loadable<ObservationPage>,
+	results: Loadable<ResultPage>,
 	feedback: Loadable<WorkFeedback> | undefined,
 ): boolean {
 	return (
-		observations.status === "ready" &&
-		observations.data.rows.length === 0 &&
+		results.status === "ready" &&
+		results.data.rows.length === 0 &&
 		feedback?.status === "ready" &&
 		feedback.data.comments.length > 0
 	);
@@ -125,7 +125,7 @@ function Ready({
 	props: PageReportProps;
 	webAppOrigin: string;
 }) {
-	const { feedback, observations, action, stale } = props;
+	const { feedback, results, action, stale } = props;
 	const offer = context.canRequestReview;
 	return (
 		<>
@@ -155,8 +155,8 @@ function Ready({
 					/>
 				</div>
 			)}
-			{observations === undefined || quietlyEmpty(observations, feedback) ? null : (
-				<ObservationList observations={observations} onRetry={props.onRetryObservations} />
+			{results === undefined || quietlyEmpty(results, feedback) ? null : (
+				<ResultList results={results} onRetry={props.onRetryResults} />
 			)}
 			<Footer
 				context={context}

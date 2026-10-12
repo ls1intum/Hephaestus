@@ -2,7 +2,11 @@ import { CircleSlashIcon, Undo2Icon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "cn";
-import type { GetPracticeReviewObservationResponse } from "@/api/types.gen";
+import type {
+	GetPracticeReviewResultResponse,
+	Observation,
+	OpenQuestion,
+} from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -11,20 +15,20 @@ import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { Section } from "@/components/layout/Section";
 import { NON_CURRENT } from "@/components/practice-vocabulary/claim-currentness";
 import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
-import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/observation-dispute-defs";
+import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/result-dispute-defs";
 import {
 	MARKED_INCORRECT_DEF,
 	PROVIDER_COPY_IN_FORCE,
 	PROVIDER_COPY_RESTORED,
-} from "@/components/practice-vocabulary/observation-invalidation-defs";
-import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
+} from "@/components/practice-vocabulary/result-invalidation-defs";
+import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
+import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { Badge } from "@/components/ui/badge";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { hasText } from "@/lib/text";
 
 import { CorrectionReasonPopover } from "./CorrectionReason";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
-import { ObservationEvidence } from "./ObservationEvidence";
 import {
 	ERASED_ACCOUNT,
 	type SheetEvent,
@@ -33,21 +37,22 @@ import {
 	SheetStatusLine,
 	SheetTechnical,
 } from "./RecordSheet";
+import { citationLocation, ResultEvidence } from "./ResultEvidence";
 import { ReviewArtifactLink } from "./ReviewArtifact";
-import { ObservationResult } from "./ReviewBadges";
+import { ResultOutcome } from "./ReviewBadges";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeName } from "./ReviewPracticeLink";
 
-type ObservationRecord = GetPracticeReviewObservationResponse;
+type ResultRecord = GetPracticeReviewResultResponse;
 
-export interface ObservationLevelProps {
+export interface ResultLevelProps {
 	nested?: boolean;
 	path: LevelPath;
-	observation: PanelState<{ observation: ObservationRecord }>;
+	result: PanelState<{ result: ResultRecord }>;
 	/**
-	 * Invalidates (`false`) or restores (`true`) the observation, with the admin's reason. Settles when the
+	 * Invalidates (`false`) or restores (`true`) the result, with the admin's reason. Settles when the
 	 * server has answered; the form keeps the reason until it succeeded.
 	 */
 	onChangeValidity: (valid: boolean, reason: string) => Promise<unknown>;
@@ -55,8 +60,8 @@ export interface ObservationLevelProps {
 }
 
 /** The correction in force, if any: the newest one, until it is restored. */
-function correctionInForce(observation: ObservationRecord) {
-	const latest = observation.invalidations.at(0);
+function correctionInForce(result: ResultRecord) {
+	const latest = result.invalidations.at(0);
 	return latest !== undefined && latest.restoredAt === undefined ? latest : undefined;
 }
 
@@ -64,57 +69,59 @@ function correctionInForce(observation: ObservationRecord) {
  * The one flag the status line has room for, most consequential first: marked incorrect, then
  * disputed, then no longer current.
  */
-function observationFlag(observation: ObservationRecord): ReactNode {
-	if (correctionInForce(observation) !== undefined) {
+function resultFlag(result: ResultRecord): ReactNode {
+	if (correctionInForce(result) !== undefined) {
 		return <StatusBadge def={MARKED_INCORRECT_DEF} />;
 	}
-	if (observation.disputes.length > 0) {
+	if (result.disputes.length > 0) {
 		return <StatusBadge def={DEVELOPER_RESPONSE_DEFS.DISPUTED} />;
 	}
-	if (observation.claimCurrentness !== "CURRENT") {
-		const config = NON_CURRENT[observation.claimCurrentness];
+	if (result.claimCurrentness !== "CURRENT") {
+		const config = NON_CURRENT[result.claimCurrentness];
 		return <Badge variant={config.badgeVariant}>{config.badge}</Badge>;
 	}
 	return undefined;
 }
 
 /**
- * One observation's sheet, and only the observation, in the order every sheet has: the status
- * line (its outcome and severity, the one flag that changes how it reads, when it was observed),
- * what it is, its history — observed, disputed in the developer's own words, marked incorrect and
- * restored, no longer current — why it was raised with every passage of evidence, and the technical
- * facts. Its one decision, mark it incorrect or restore it, is the footer.
+ * One result's sheet, and only the result, in the order every sheet has: the status line (its
+ * outcome with its number of problems and its severity, the one flag that changes how it reads,
+ * when it was recorded), what it is, its history — recorded, disputed in the developer's own words,
+ * marked incorrect and restored, no longer current — why it was raised, the problems it located,
+ * the questions it left open, the passages it cites, and the technical facts. Its one decision,
+ * mark it incorrect or restore it, is the footer.
  *
- * The dispute is shown in full, because it answers this observation. The developer's ratings and
- * private notes are not: they stay theirs. The feedback written from it and when it was read are
- * its trace.
+ * The dispute is shown in full, because it answers this result. The developer's ratings and
+ * private notes are not: they stay theirs. The example a review may record is for the developer's
+ * own pages, so it is not shown here. The feedback written from it and when it was read are its
+ * trace.
  */
-export function ObservationLevel({
+export function ResultLevel({
 	nested,
 	path,
-	observation: state,
+	result: state,
 	onChangeValidity,
 	isChangingValidity,
-}: ObservationLevelProps) {
-	const observation = state.status === "ready" ? state.observation : undefined;
-	const inForce = observation && correctionInForce(observation);
+}: ResultLevelProps) {
+	const result = state.status === "ready" ? state.result : undefined;
+	const inForce = result && correctionInForce(result);
 	const header = (
 		<ReviewLevelHeader
 			nested={nested}
 			path={path}
-			kind="observation"
+			kind="result"
 			loading={state.status === "loading"}
 			chips={
-				observation && (
+				result && (
 					<SheetStatusLine
-						status={<ObservationResult observation={observation} />}
-						flag={observationFlag(observation)}
-						at={{ label: "observed", date: observation.observedAt }}
+						status={<ResultOutcome result={result} problems={result.observations.length} />}
+						flag={resultFlag(result)}
+						at={{ label: "recorded", date: result.observedAt }}
 					/>
 				)
 			}
-			title={observation?.summary}
-			description={observation && <ReviewArtifactLink reviewedWork={observation.reviewedWork} />}
+			title={result?.summary}
+			description={result && <ReviewArtifactLink reviewedWork={result.reviewedWork} />}
 		/>
 	);
 
@@ -126,7 +133,7 @@ export function ObservationLevel({
 					{state.status === "error" ? (
 						<QueryErrorAlert
 							error={state.error}
-							title="We could not load this observation"
+							title="We could not load this result"
 							onRetry={state.onRetry}
 						/>
 					) : (
@@ -137,7 +144,10 @@ export function ObservationLevel({
 		);
 	}
 
-	const { observation: record } = state;
+	const { result: record } = state;
+	const problems = [...record.observations].sort((a, b) => a.position - b.position);
+	const citations = record.evidence?.citations ?? [];
+	const openQuestions = record.evidence?.undecidability ?? [];
 
 	return (
 		<>
@@ -158,9 +168,9 @@ export function ObservationLevel({
 						)}
 						<ReviewFact label="Origin">
 							<span className="space-y-0.5">
-								<span className="block">{OBSERVATION_ORIGIN_DEFS[record.origin].label}</span>
+								<span className="block">{RESULT_ORIGIN_DEFS[record.origin].label}</span>
 								<span className="block text-muted-foreground">
-									{OBSERVATION_ORIGIN_DEFS[record.origin].description}
+									{RESULT_ORIGIN_DEFS[record.origin].description}
 								</span>
 							</span>
 						</ReviewFact>
@@ -168,7 +178,7 @@ export function ObservationLevel({
 				</SheetSection>
 
 				<SheetSection part="state">
-					<SheetHistory events={observationHistory(record)} now={observationNow(record)} />
+					<SheetHistory events={resultHistory(record)} now={resultNow(record)} />
 				</SheetSection>
 
 				<SheetSection part="details">
@@ -181,15 +191,38 @@ export function ObservationLevel({
 								</div>
 							</Section>
 						)}
-						<Section level={4} size="sm" title="Evidence">
-							<ObservationEvidence evidence={record.evidence} />
-						</Section>
+						{problems.length > 0 && (
+							<Section level={4} size="sm" title="Problems">
+								<ol aria-label="Problems" className="space-y-8">
+									{problems.map((problem) => (
+										<ProblemItem key={problem.observationId} problem={problem} />
+									))}
+								</ol>
+							</Section>
+						)}
+						{openQuestions.length > 0 && (
+							<Section level={4} size="sm" title="Open questions">
+								<ul aria-label="Open questions" className="space-y-4 text-sm">
+									{openQuestions.map((question, index) => (
+										<OpenQuestionItem key={`${question.openQuestion}:${index}`} question={question} />
+									))}
+								</ul>
+							</Section>
+						)}
+						{/* A not met result's passages are its problems'. Its own section stands only when it
+						    cites something of its own, or when nothing else on the sheet would say that
+						    nothing was quoted. */}
+						{(citations.length > 0 || problems.length === 0) && (
+							<Section level={4} size="sm" title="Evidence">
+								<ResultEvidence citations={citations} />
+							</Section>
+						)}
 					</div>
 				</SheetSection>
 
 				<SheetTechnical
 					facts={[
-						{ label: "Observation ID", value: <code>{record.id}</code>, copy: record.id },
+						{ label: "Result ID", value: <code>{record.id}</code>, copy: record.id },
 						{
 							label: "Review ID",
 							value: <code>{record.agentJobId}</code>,
@@ -199,11 +232,6 @@ export function ObservationLevel({
 							label: "Practice revision",
 							value:
 								record.practiceRevisionId === undefined ? "—" : String(record.practiceRevisionId),
-						},
-						{
-							label: "Recurrence key",
-							value: hasText(record.recurrenceKey) ? <code>{record.recurrenceKey}</code> : "—",
-							copy: record.recurrenceKey,
 						},
 						{ label: "Currentness", value: <code>{record.claimCurrentness}</code> },
 					]}
@@ -221,13 +249,13 @@ export function ObservationLevel({
 }
 
 /**
- * Observed, each dispute in the developer's own words, each correction and restore with who and
+ * Recorded, each dispute in the developer's own words, each correction and restore with who and
  * why, and when a later review superseded it: one list, oldest first.
  */
-export function observationHistory(observation: ObservationRecord): SheetEvent[] {
+export function resultHistory(result: ResultRecord): SheetEvent[] {
 	const DisputedIcon = DEVELOPER_RESPONSE_DEFS.DISPUTED.icon;
-	const events: SheetEvent[] = [{ key: "observed", at: observation.observedAt, title: "Observed" }];
-	for (const dispute of observation.disputes) {
+	const events: SheetEvent[] = [{ key: "recorded", at: result.observedAt, title: "Recorded" }];
+	for (const dispute of result.disputes) {
 		events.push({
 			key: `disputed-${dispute.feedbackId}`,
 			at: dispute.disputedAt,
@@ -240,7 +268,7 @@ export function observationHistory(observation: ObservationRecord): SheetEvent[]
 			),
 		});
 	}
-	for (const correction of observation.invalidations) {
+	for (const correction of result.invalidations) {
 		events.push({
 			key: correction.id,
 			at: correction.invalidatedAt,
@@ -266,10 +294,10 @@ export function observationHistory(observation: ObservationRecord): SheetEvent[]
 			});
 		}
 	}
-	if (observation.supersededAt !== undefined) {
+	if (result.supersededAt !== undefined) {
 		events.push({
 			key: "superseded",
-			at: observation.supersededAt,
+			at: result.supersededAt,
 			title: "No longer current",
 			detail: "A later change to the reviewed work superseded it.",
 		});
@@ -278,8 +306,8 @@ export function observationHistory(observation: ObservationRecord): SheetEvent[]
 }
 
 /** What the current state means, in one or two sentences, in place of an alert. */
-function observationNow(observation: ObservationRecord): ReactNode {
-	const inForce = correctionInForce(observation);
+function resultNow(result: ResultRecord): ReactNode {
+	const inForce = correctionInForce(result);
 	if (inForce !== undefined) {
 		return (
 			<>
@@ -289,13 +317,55 @@ function observationNow(observation: ObservationRecord): ReactNode {
 			</>
 		);
 	}
-	if (observation.disputes.length > 0) {
-		return "While the dispute stands, a later review of the same work does not raise the same point again. Mark the observation incorrect if it was wrong.";
+	if (result.disputes.length > 0) {
+		return "While the dispute stands, a later review of the same work does not raise the same point again. Mark the result incorrect if it was wrong.";
 	}
-	if (observation.claimCurrentness !== "CURRENT") {
-		return NON_CURRENT[observation.claimCurrentness].description;
+	if (result.claimCurrentness !== "CURRENT") {
+		return NON_CURRENT[result.claimCurrentness].description;
 	}
 	return undefined;
+}
+
+/**
+ * One located problem: its own severity, what it is, why, the passages that place it and what would
+ * fix it. The explanation is the review's text, rendered as the rationale is.
+ */
+function ProblemItem({ problem }: { problem: Observation }) {
+	return (
+		<li className="space-y-3">
+			<div className="flex flex-wrap items-start gap-2">
+				<StatusBadge def={SEVERITY_DEFS[problem.severity]} />
+				<p className="min-w-0 flex-1 basis-48 text-sm font-medium break-words">{problem.summary}</p>
+			</div>
+			<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
+				<UntrustedMarkdown>{problem.explanation}</UntrustedMarkdown>
+			</div>
+			<ResultEvidence citations={problem.citations} />
+			{hasText(problem.nextStep) && (
+				<div className="space-y-1 text-sm">
+					<p className="font-medium">Next step</p>
+					<div className={UNTRUSTED_MARKDOWN_PROSE}>
+						<UntrustedMarkdown>{problem.nextStep}</UntrustedMarkdown>
+					</div>
+				</div>
+			)}
+		</li>
+	);
+}
+
+/** What the review could not settle: never a claim about the work, so never feedback. */
+function OpenQuestionItem({ question }: { question: OpenQuestion }) {
+	return (
+		<li className="space-y-1 break-words">
+			<p className="font-medium">{question.openQuestion}</p>
+			<p className="text-muted-foreground">Would settle it: {question.wouldSettleIt}</p>
+			{question.citation !== undefined && (
+				<p className="text-xs text-muted-foreground">
+					At <code className="break-all">{citationLocation(question.citation)}</code>
+				</p>
+			)}
+		</li>
+	);
 }
 
 function ValidityPopover({
@@ -312,23 +382,23 @@ function ValidityPopover({
 			copy={
 				invalidated
 					? {
-							trigger: "Restore observation",
-							title: "Restore this observation",
+							trigger: "Restore result",
+							title: "Restore this result",
 							description:
 								"It counts again from now on. Feedback that was stopped stays stopped, and nothing is re-sent.",
-							placeholder: "Why the observation was right after all…",
+							placeholder: "Why the result was right after all…",
 						}
 					: {
 							trigger: "Mark as incorrect",
-							title: "Mark this observation as incorrect",
+							title: "Mark this result as incorrect",
 							description:
-								"The review record stays as it was. The developer sees your reason next to the observation.",
-							placeholder: "What the observation got wrong…",
+								"The review record stays as it was. The developer sees your reason next to the result.",
+							placeholder: "What the result got wrong…",
 						}
 			}
 			icon={invalidated ? Undo2Icon : CircleSlashIcon}
 			destructive={!invalidated}
-			name="observation-validity-reason"
+			name="result-validity-reason"
 			disabled={disabled}
 			onSubmit={onSubmit}
 		/>

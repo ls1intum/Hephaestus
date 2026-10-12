@@ -4,7 +4,9 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import {
 	DESCRIPTIVE_PRACTICE,
 	LONG_PAGE,
+	MET_ROW,
 	NO_FEEDBACK,
+	NOT_MET_ROW,
 	OWN_PAGE,
 	READY,
 	READY_ADMIN,
@@ -41,13 +43,13 @@ const meta = {
 	args: {
 		state: READY_ON_GITHUB,
 		feedback: { status: "ready", data: WORK_FEEDBACK },
-		observations: { status: "ready", data: OWN_PAGE },
+		results: { status: "ready", data: OWN_PAGE },
 		activity: undefined,
 		webAppOrigin: WEB_APP,
 		expanded: false,
 		onToggle: fn(),
 		onRetry: fn(),
-		onRetryObservations: fn(),
+		onRetryResults: fn(),
 		onOpenSettings: fn(),
 		onChooseWorkspace: fn(),
 		onAction: fn(),
@@ -56,6 +58,13 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+/** The section's result rows, without the problems listed inside a row. */
+function resultRows(section: HTMLElement) {
+	return within(section)
+		.getAllByRole("listitem")
+		.filter((item) => item.closest("[aria-label='Problems']") === null);
+}
 
 /** The collapsed line's own box, which the page sizes the frame to. */
 function row(canvasElement: HTMLElement): HTMLElement {
@@ -156,14 +165,16 @@ export const Opened: Story = {
 		);
 		// Posted while the rest of its feedback failed: no practice is claimed for it.
 		await expect(within(comments).getByText("Feedback")).toBeVisible();
-		const observations = canvas.getByRole("region", { name: "Your observations" });
-		await expect(within(observations).getAllByRole("listitem")).toHaveLength(5);
-		await expect(within(observations).getByText("Not met · Major")).toBeVisible();
-		await expect(within(observations).getByText("Met", { exact: true })).toBeVisible();
-		await expect(within(observations).getByText("Not applicable", { exact: true })).toBeVisible();
-		await expect(within(observations).getByText("Undetermined", { exact: true })).toBeVisible();
+		const results = canvas.getByRole("region", { name: "Your results" });
+		await expect(resultRows(results)).toHaveLength(5);
+		await expect(within(results).getByText("Not met · 2 problems · Major")).toBeVisible();
+		// Evidence the web app can no longer show: no problem is named, and no count is claimed.
+		await expect(within(results).getByText(/^Not met · Minor/u)).toBeVisible();
+		await expect(within(results).getByText("Met", { exact: true })).toBeVisible();
+		await expect(within(results).getByText("Does not apply", { exact: true })).toBeVisible();
+		await expect(within(results).getByText("Could not determine", { exact: true })).toBeVisible();
 		await expect(
-			within(observations).getByText(/We cannot verify what this observation was based on/u),
+			within(results).getByText(/We cannot verify what this result was based on/u),
 		).toBeVisible();
 		// When, precisely, and at which commit; the rest is in Hephaestus.
 		await expect(canvas.getByText(/^Reviewed .+ at 4f2a9c1\.$/u)).toBeVisible();
@@ -204,7 +215,7 @@ export const ReviewStatusUnavailable: Story = {
 		expanded: true,
 		state: { ...READY_ON_GITHUB, trace: null },
 		feedback: { status: "ready", data: NO_FEEDBACK },
-		observations: { status: "ready", data: { ...OWN_PAGE, rows: [], total: 0 } },
+		results: { status: "ready", data: { ...OWN_PAGE, rows: [], total: 0 } },
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { expanded: true })).toHaveAccessibleName(
@@ -213,19 +224,19 @@ export const ReviewStatusUnavailable: Story = {
 		await expect(
 			canvas.getByText("No review history is available for your account on this work."),
 		).toBeVisible();
-		await expect(canvas.getByText("No observations about your work here.")).toBeVisible();
+		await expect(canvas.getByText("No results about your work here.")).toBeVisible();
 	},
 };
 
-/** Comments and no observation: the empty section would say nothing, so there is none. */
-export const CommentsWithoutObservations: Story = {
+/** Comments and no result: the empty section would say nothing, so there is none. */
+export const CommentsWithoutResults: Story = {
 	args: {
 		expanded: true,
-		observations: { status: "ready", data: { ...OWN_PAGE, rows: [], total: 0 } },
+		results: { status: "ready", data: { ...OWN_PAGE, rows: [], total: 0 } },
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("list", { name: "Comments for you" })).toBeVisible();
-		await expect(canvas.queryByRole("region", { name: "Your observations" })).toBeNull();
+		await expect(canvas.queryByRole("region", { name: "Your results" })).toBeNull();
 	},
 };
 
@@ -241,7 +252,7 @@ export const OlderCommentsNotListed: Story = {
 };
 
 export const FeedbackLoading: Story = {
-	args: { expanded: true, feedback: { status: "loading" }, observations: { status: "loading" } },
+	args: { expanded: true, feedback: { status: "loading" }, results: { status: "loading" } },
 };
 
 export const FeedbackFailed: Story = {
@@ -261,31 +272,53 @@ export const FeedbackFailed: Story = {
 	},
 };
 
-export const ObservationsFailed: Story = {
+export const ResultsFailed: Story = {
 	args: {
 		expanded: true,
-		observations: {
+		results: {
 			status: "error",
 			message: "We could not reach Hephaestus. Check your connection, then try again.",
 		},
 	},
 	play: async ({ canvas, args }) => {
-		const observations = canvas.getByRole("region", { name: "Your observations" });
-		await userEvent.click(within(observations).getByRole("button", { name: "Retry" }));
-		await expect(args.onRetryObservations).toHaveBeenCalledOnce();
+		const results = canvas.getByRole("region", { name: "Your results" });
+		await userEvent.click(within(results).getByRole("button", { name: "Retry" }));
+		await expect(args.onRetryResults).toHaveBeenCalledOnce();
 		await expect(args.onRetry).not.toHaveBeenCalled();
 	},
 };
 
-/** A long first page: the first rows, the rest on request, and what the page holds said plainly. */
-export const ManyObservations: Story = {
-	args: { expanded: true, observations: { status: "ready", data: LONG_PAGE } },
+/**
+ * A result that is not met names each of its problems in one line, in the review's order. Nothing
+ * opens further: where each problem is, and why, are the web app's.
+ */
+export const ProblemsUnderAResult: Story = {
+	args: {
+		expanded: true,
+		results: { status: "ready", data: { ...OWN_PAGE, rows: [NOT_MET_ROW, MET_ROW], total: 2 } },
+	},
 	play: async ({ canvas }) => {
-		const observations = canvas.getByRole("region", { name: "Your observations" });
-		await expect(within(observations).getAllByRole("listitem")).toHaveLength(5);
-		await userEvent.click(within(observations).getByRole("button", { name: "Show 20 more" }));
-		await expect(within(observations).getAllByRole("listitem")).toHaveLength(25);
-		await expect(within(observations).getByText("Showing the 25 most severe of 40.")).toBeVisible();
+		const results = canvas.getByRole("region", { name: "Your results" });
+		await expect(within(results).getByText("Not met · 2 problems · Major")).toBeVisible();
+		const problems = within(results).getByRole("list", { name: "Problems" });
+		const items = within(problems).getAllByRole("listitem");
+		await expect(items.map((item) => item.textContent)).toStrictEqual(
+			NOT_MET_ROW.problems.map((problem) => problem.summary),
+		);
+		await expect(within(results).queryByRole("button", { name: /problem/iu })).toBeNull();
+		await expect(within(results).queryByRole("link")).toBeNull();
+	},
+};
+
+/** A long first page: the first rows, the rest on request, and what the page holds said plainly. */
+export const ManyResults: Story = {
+	args: { expanded: true, results: { status: "ready", data: LONG_PAGE } },
+	play: async ({ canvas }) => {
+		const results = canvas.getByRole("region", { name: "Your results" });
+		await expect(resultRows(results)).toHaveLength(5);
+		await userEvent.click(within(results).getByRole("button", { name: "Show 20 more" }));
+		await expect(resultRows(results)).toHaveLength(25);
+		await expect(within(results).getByText("Showing the 25 most severe of 40.")).toBeVisible();
 	},
 };
 
@@ -333,7 +366,7 @@ export const ReviewIncomplete: Story = {
 };
 
 /**
- * A workspace admin sees what a developer sees: their own comments and observations. Every
+ * A workspace admin sees what a developer sees: their own comments and results. Every
  * developer's records, delivery and runs are the web app's, one link away — not a panel in the page.
  */
 export const WorkspaceAdmin: Story = {

@@ -155,7 +155,7 @@ const pullRequestTarget: AgentJob["target"] = {
 };
 const issueTarget: AgentJob["target"] = {
 	type: "scm.issue",
-	title: "Admin read surface for observations and prepared feedback",
+	title: "Admin read surface for results and prepared feedback",
 	reviewedWork: {
 		id: "43",
 		kind: "scm.issue",

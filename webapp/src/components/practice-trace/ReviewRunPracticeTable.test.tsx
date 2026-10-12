@@ -1,28 +1,28 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ObservationDetail, PracticeTraceEntry, TracedSignal } from "@/api/types.gen";
-import { detailObservation } from "@/stories/practice-detail-story-mock-data";
+import type { PracticeResultDetail, PracticeTraceEntry, TracedSignal } from "@/api/types.gen";
+import { detailResult } from "@/stories/practice-detail-story-mock-data";
 import { groups } from "@/stories/practice-profile-story-mock-data";
 import { daysBefore } from "@/stories/story-clock";
 
 import { artifactTrace } from "./fixtures";
 import { ReviewRunPracticeTable, runPractices } from "./ReviewRunPracticeTable";
 
-const valid: ObservationDetail = {
-	...detailObservation,
+const valid: PracticeResultDetail = {
+	...detailResult,
 	id: "00000000-0000-0000-0000-0000000001aa",
 	practiceSlug: "thin-controllers",
 	summary: "The merge request description never says why",
 };
 
-function table(observations: ObservationDetail[]) {
+function table(results: PracticeResultDetail[]) {
 	return (
 		<ReviewRunPracticeTable
 			workspaceSlug="demo"
 			entries={artifactTrace.practices}
 			signals={artifactTrace.signals}
-			observationsByPractice={{ "thin-controllers": observations }}
+			resultsByPractice={{ "thin-controllers": results }}
 			groups={groups}
 			filters={{}}
 			onFiltersChange={vi.fn()}
@@ -83,13 +83,14 @@ describe("review history corrections", () => {
 		},
 		{ summary: "", visible: valid.summary },
 	])(
-		"keeps a corrected observation with summary $summary distinguishable from its valid sibling, then restores it",
+		"keeps a corrected result with summary $summary distinguishable from its valid sibling, then restores it",
 		({ summary, visible }) => {
-			const corrected: ObservationDetail = {
+			const corrected: PracticeResultDetail = {
 				...valid,
-				id: detailObservation.id,
+				id: detailResult.id,
 				outcome: "MET",
 				severity: undefined,
+				observations: [],
 				summary,
 				invalidatedAt: daysBefore(1),
 				invalidationReason: "The review imported the linked issue's reason.",

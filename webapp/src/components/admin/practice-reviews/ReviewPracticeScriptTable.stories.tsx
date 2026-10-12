@@ -32,8 +32,9 @@ function cellUnder(table: HTMLElement, row: ReturnType<typeof scriptRow>, column
 const guideSection = (link: HTMLElement) => new URL(link.getAttribute("href") ?? "").hash;
 
 /**
- * What each practice's script did before one review. The result is words, never a badge:
- * it is about the script, not about the developer's work.
+ * What each practice's program did before one review: its own script, or the built-in review a
+ * practice without one gets. The result is words, never a badge: it is about the program, not about
+ * the developer's work.
  *
  * No cost and no runner token counts: spend is on AI usage, and the review's own model calls are on
  * the run card.
@@ -45,12 +46,14 @@ const meta = {
 	args: {
 		workspaceSlug: "demo",
 		scripts: [
-			reviewPracticeScripts.found,
+			reviewPracticeScripts.fromCode,
 			reviewPracticeScripts.callsNotRated,
 			reviewPracticeScripts.limitReached,
+			reviewPracticeScripts.builtIn,
 			reviewPracticeScripts.skipped,
 			reviewPracticeScripts.failed,
 			reviewPracticeScripts.notFinished,
+			reviewPracticeScripts.notReached,
 			reviewPracticeScripts.removedPractice,
 		],
 	},
@@ -73,28 +76,34 @@ export const EveryResult: Story = {
 			const head = within(table).getByRole("columnheader", { name: column });
 			await expect(getComputedStyle(head).textAlign).toBe("right");
 		}
-		const results = [
-			"Found 3 places",
-			"Handed the review no places",
+		// How each program reached its result, or why it has none, in the order the rows came.
+		const rows = within(table).getAllByRole("row").slice(1);
+		await expect(
+			// The result's own words lead its cell, ahead of any fix or error under them.
+			rows.map(
+				(row) => cellUnder(table, within(row), "Result").firstChild?.firstChild?.textContent,
+			),
+		).toEqual([
+			"Result from code",
+			"Result from its models",
+			"Result from models and review",
+			"Result from the review",
 			"Did not run",
-			"Failed",
+			"Failed: error",
 			"Did not finish",
-		];
-		for (const result of results) {
-			await expect(within(table).getByText(result)).toBeVisible();
-		}
-		// A script that ran out of time still handed the review what it found by then.
-		await expect(within(table).getByText("Ran out of time, found 2 places")).toBeVisible();
+			"Not reached",
+			"Failed: ran out of time",
+		]);
 		await expect(canvas.queryByText(/\$|USD/u)).not.toBeInTheDocument();
 	},
 };
 
-export const Found: Story = {
-	args: { scripts: [reviewPracticeScripts.found] },
+export const ResultFromCode: Story = {
+	args: { scripts: [reviewPracticeScripts.fromCode] },
 	play: async ({ canvas }) => {
 		const table = canvas.getByRole("table");
 		const row = scriptRow(table, "Thin controllers");
-		await expect(row.getByText("Found 3 places")).toBeVisible();
+		await expect(row.getByText("Result from code")).toBeVisible();
 		// The kind's name is visible, the tier's for a screen reader, beside its icon.
 		await expect(row.getByText("Decision model")).toBeVisible();
 		await expect(row.getByText("Cloud")).toHaveClass("sr-only");
@@ -113,7 +122,7 @@ export const Found: Story = {
 
 /** A run of a minute or more reads in minutes, not in thousands of seconds. */
 export const LongRun: Story = {
-	args: { scripts: [{ ...reviewPracticeScripts.found, durationMs: 3_725_000 }] },
+	args: { scripts: [{ ...reviewPracticeScripts.fromCode, durationMs: 3_725_000 }] },
 	play: async ({ canvas }) => {
 		const table = canvas.getByRole("table");
 		const row = scriptRow(table, "Thin controllers");
@@ -122,22 +131,16 @@ export const LongRun: Story = {
 };
 
 /**
- * The count is model calls, never places. The reasons sit under it, one per line, summed across the
- * script's models, in plain words. Only the unusable answer points at the model, so the result
- * offers that model, and the link names its practice for a screen reader.
- *
- * The script handed the review no places while calls went unrated, so the result never says that
- * it found none: the work may hold places that the unrated calls missed.
+ * The count is model calls. The reasons sit under it, one per line, summed across the script's
+ * models, in plain words. Only the unusable answer points at the model, so the result offers that
+ * model, and the link names its practice for a screen reader.
  */
 export const CallsNotRated: Story = {
 	args: { scripts: [reviewPracticeScripts.callsNotRated] },
 	play: async ({ canvas }) => {
 		const table = canvas.getByRole("table");
 		const row = scriptRow(table, "Errors carry their context");
-		await expect(cellUnder(table, row, "Result")).toHaveTextContent(
-			/^Handed the review no places/u,
-		);
-		await expect(row.queryByText(/found no places/iu)).not.toBeInTheDocument();
+		await expect(cellUnder(table, row, "Result")).toHaveTextContent(/^Result from its models/u);
 		const notRated = cellUnder(table, row, "Not rated");
 		await expect(notRated).toHaveTextContent(/^6/u);
 		await expect(
@@ -200,7 +203,7 @@ export const FailedWithError: Story = {
 	play: async ({ canvas }) => {
 		const table = canvas.getByRole("table");
 		const row = scriptRow(table, "Tests name the behaviour");
-		await expect(row.getByText("Failed")).toBeVisible();
+		await expect(row.getByText("Failed: error")).toBeVisible();
 		// A script that stopped at once still ran, so it does not read as 0.0 s.
 		await expect(cellUnder(table, row, "Time")).toHaveTextContent(/^< 0\.1 s$/u);
 		const error = row.getByText(/^TypeError: change\.files is not iterable/u);
@@ -231,6 +234,38 @@ export const NotFinished: Story = {
 			name: /^Why scripts stop early for Decisions are written down/u,
 		});
 		await expect(guideSection(guide)).toBe("#the-trace-line");
+	},
+};
+
+/**
+ * The review ended before this program's turn came: it asked nothing and took no time. Nothing on
+ * this page brings the turn back, so the guide that says why programs stop early is the way out.
+ */
+export const NotReached: Story = {
+	args: { scripts: [reviewPracticeScripts.notReached] },
+	play: async ({ canvas }) => {
+		const table = canvas.getByRole("table");
+		const row = scriptRow(table, "Security review");
+		await expect(row.getByText("Not reached")).toBeVisible();
+		await expect(cellUnder(table, row, "Calls")).toHaveTextContent("—none");
+		await expect(cellUnder(table, row, "Time")).toHaveTextContent("—none");
+		const guide = row.getByRole("link", { name: /^Why scripts stop early for Security review/u });
+		await expect(guideSection(guide)).toBe("#the-trace-line");
+	},
+};
+
+/**
+ * A practice without a script of its own is reviewed by the built-in review. It declares no models
+ * and has no script anyone here can edit, so its row offers no fix.
+ */
+export const BuiltInReview: Story = {
+	args: { scripts: [reviewPracticeScripts.builtIn] },
+	play: async ({ canvas }) => {
+		const table = canvas.getByRole("table");
+		const row = scriptRow(table, "The change explains itself");
+		await expect(row.getByText("Result from the review")).toBeVisible();
+		await expect(cellUnder(table, row, "Models")).toHaveTextContent("—none");
+		await expect(row.queryByRole("link", { name: /Edit the script/u })).not.toBeInTheDocument();
 	},
 };
 

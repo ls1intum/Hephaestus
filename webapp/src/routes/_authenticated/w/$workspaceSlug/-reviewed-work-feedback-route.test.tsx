@@ -49,7 +49,7 @@ describe("the page a comment on the work links to", () => {
 		);
 		renderRouteAt("/w/acme/feedback/scm.pull_request/1423");
 
-		// One observation of the linked review carries feedback, so one can be disputed.
+		// One result of the linked review carries feedback, so one can be disputed.
 		await userEvent.click(
 			await screen.findByRole("button", { name: "Disputed" }, ROUTE_RENDER_WAIT),
 		);

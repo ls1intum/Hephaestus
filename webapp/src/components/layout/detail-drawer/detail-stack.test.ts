@@ -47,22 +47,23 @@ describe("detailStackSchema", () => {
 
 describe("openInStack", () => {
 	it("appends a level that is not open, as a push", () => {
-		expect(openInStack(["feedback:f"], "observation:o")).toStrictEqual({
-			detail: ["feedback:f", "observation:o"],
+		expect(openInStack(["feedback:f"], "result:o")).toStrictEqual({
+			detail: ["feedback:f", "result:o"],
 			pushed: true,
 		});
 	});
 
 	it("closes down to a level that is already open, rather than repeating it", () => {
-		expect(openInStack(["feedback:f", "observation:o", "review:r"], "observation:o")).toStrictEqual(
-			{ detail: ["feedback:f", "observation:o"], pushed: false },
-		);
+		expect(openInStack(["feedback:f", "result:o", "review:r"], "result:o")).toStrictEqual({
+			detail: ["feedback:f", "result:o"],
+			pushed: false,
+		});
 	});
 
 	it("swaps the top level of a full stack, so the link still opens what it names", () => {
-		const full = ["practice:p", "observation:o", "feedback:f", "review:r"];
+		const full = ["practice:p", "result:o", "feedback:f", "review:r"];
 		expect(openInStack(full, "work:pull-request:1")).toStrictEqual({
-			detail: ["practice:p", "observation:o", "feedback:f", "work:pull-request:1"],
+			detail: ["practice:p", "result:o", "feedback:f", "work:pull-request:1"],
 			pushed: false,
 		});
 	});

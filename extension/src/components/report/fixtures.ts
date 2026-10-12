@@ -1,10 +1,5 @@
 import type { PracticeTraceEntry, ReviewedWorkRef, TracedSignal } from "~/api/types.gen";
-import type {
-	ObservationPage,
-	ObservationRow,
-	ReadyContext,
-	WorkFeedback,
-} from "~/shared/review-context";
+import type { ReadyContext, ResultPage, ResultRow, WorkFeedback } from "~/shared/review-context";
 import { minutesBefore } from "~/stories/story-clock";
 
 export const WEB_APP = "https://heph.example.test";
@@ -14,7 +9,7 @@ export const DESCRIPTIVE_PRACTICE: PracticeTraceEntry = {
 	decidedAt: minutesBefore(42),
 	deliveredCount: 1,
 	explanation: "A review measured this practice on the latest changes.",
-	observationCount: 2,
+	practiceResultCount: 2,
 	outcome: "REVIEWED",
 	practiceName: "Descriptive merge request",
 	practiceSlug: "descriptive-merge-request",
@@ -30,7 +25,7 @@ export const PRACTICES: PracticeTraceEntry[] = [
 		decidedAt: minutesBefore(42),
 		deliveredCount: 0,
 		explanation: "A review measured this practice. Its feedback waits for approval.",
-		observationCount: 1,
+		practiceResultCount: 1,
 		outcome: "REVIEWED",
 		practiceName: "Small, focused changes",
 		practiceSlug: "small-focused-changes",
@@ -42,7 +37,7 @@ export const PRACTICES: PracticeTraceEntry[] = [
 		autonomy: "AUTOMATIC",
 		deliveredCount: 0,
 		explanation: "Nothing happened to this work that this practice watches for.",
-		observationCount: 0,
+		practiceResultCount: 0,
 		outcome: "NOT_OCCASIONED",
 		practiceName: "Merge hygiene",
 		practiceSlug: "merge-hygiene",
@@ -131,7 +126,7 @@ export const READY_ON_GITHUB: ReadyContext = {
 	pageUrl: "https://github.com/HephaestusTest/lifecycle-validation/pull/1",
 };
 
-export const NOT_MET_ROW: ObservationRow = {
+export const NOT_MET_ROW: ResultRow = {
 	id: "1a2b3c4d-0000-4000-8000-000000000001",
 	practiceName: "Descriptive merge request",
 	practiceSlug: "descriptive-merge-request",
@@ -142,9 +137,19 @@ export const NOT_MET_ROW: ObservationRow = {
 
 	claimCurrentness: "CURRENT",
 	observedAt: minutesBefore(42),
+	problems: [
+		{
+			severity: "MAJOR",
+			summary: "The description does not say which issue the change closes.",
+		},
+		{
+			severity: "MINOR",
+			summary: "The description lists the changed files instead of what the login screen does.",
+		},
+	],
 };
 
-export const MET_ROW: ObservationRow = {
+export const MET_ROW: ResultRow = {
 	id: "1a2b3c4d-0000-4000-8000-000000000002",
 	practiceName: "Small, focused changes",
 	practiceSlug: "small-focused-changes",
@@ -153,9 +158,10 @@ export const MET_ROW: ObservationRow = {
 
 	claimCurrentness: "CURRENT",
 	observedAt: minutesBefore(42),
+	problems: [],
 };
 
-export const UNDETERMINED_ROW: ObservationRow = {
+export const UNDETERMINED_ROW: ResultRow = {
 	id: "1a2b3c4d-0000-4000-8000-000000000003",
 	practiceName: "Tests cover the change",
 	practiceSlug: "tests-cover-the-change",
@@ -164,9 +170,10 @@ export const UNDETERMINED_ROW: ObservationRow = {
 	outcome: "UNDETERMINED",
 	claimCurrentness: "CURRENT",
 	observedAt: minutesBefore(42),
+	problems: [],
 };
 
-export const NOT_APPLICABLE_ROW: ObservationRow = {
+export const NOT_APPLICABLE_ROW: ResultRow = {
 	...MET_ROW,
 	id: "1a2b3c4d-0000-4000-8000-000000000005",
 	practiceName: "Explain breaking changes",
@@ -175,23 +182,25 @@ export const NOT_APPLICABLE_ROW: ObservationRow = {
 	summary: "The change does not alter a public interface.",
 };
 
-export const HISTORICAL_ROW: ObservationRow = {
+/** A result whose evidence can no longer be shown, so the list names none of its problems. */
+export const HISTORICAL_ROW: ResultRow = {
 	...NOT_MET_ROW,
 	id: "1a2b3c4d-0000-4000-8000-000000000004",
 	practiceName: "Commit messages explain why",
 	severity: "MINOR",
 	summary: "Two commits are titled only “fix”.",
 	claimCurrentness: "UNVERIFIABLE",
+	problems: [],
 };
 
-export const OWN_PAGE: ObservationPage = {
+export const OWN_PAGE: ResultPage = {
 	rows: [NOT_MET_ROW, HISTORICAL_ROW, MET_ROW, UNDETERMINED_ROW, NOT_APPLICABLE_ROW],
 	total: 5,
 	fetchedAt: minutesBefore(1),
 };
 
 /** A long first page of a longer list: 25 shown of 40 recorded. */
-export const LONG_PAGE: ObservationPage = {
+export const LONG_PAGE: ResultPage = {
 	rows: Array.from({ length: 25 }, (_, index) => ({
 		...(index < 3 ? NOT_MET_ROW : MET_ROW),
 		id: `1a2b3c4d-0000-4000-8000-${String(100 + index).padStart(12, "0")}`,

@@ -70,7 +70,7 @@ const CADENCES: { value: Cadence; label: string }[] = [
 
 /**
  * The same ceiling the server enforces, offered here so an admin picks from what is allowed instead
- * of discovering the rule through a 400. A sweep's observations are counted alongside reviews the
+ * of discovering the rule through a 400. A sweep's results are counted alongside reviews the
  * work itself triggered, and that only holds while its window is "the last few days" — anything
  * longer is a stretch of history somebody chose, which the backfill is for.
  */

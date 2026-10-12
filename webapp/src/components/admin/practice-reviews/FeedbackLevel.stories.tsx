@@ -494,7 +494,7 @@ export const Rejected: Story = {
 
 /**
  * The longest realistic record, at the narrowest width: a rendered body with code, and every
- * observation it was based on.
+ * result it was based on.
  */
 export const Reflow: Story = {
 	args: { feedback: ready(longFeedbackDetail) },
@@ -719,8 +719,8 @@ export const PackageUnavailable: Story = {
 };
 
 /** Nothing to check it against is worth saying, and is not a reason to withhold the decision. */
-export const AwaitingApprovalWithoutObservations: Story = {
-	args: { feedback: ready({ ...awaitingApproval, observations: [] }) },
+export const AwaitingApprovalWithoutResults: Story = {
+	args: { feedback: ready({ ...awaitingApproval, practiceResults: [] }) },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByRole("button", { name: "Approve for delivery" })).toBeEnabled();

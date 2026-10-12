@@ -1,19 +1,19 @@
 import type { FacetOption, FacetSource } from "@/components/common/FacetMultiSelect";
 import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { statusFacetOptions } from "@/components/common/status-def";
+import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import {
 	DEVELOPER_RESPONSE_DEFS,
 	type DeveloperResponse,
-} from "@/components/practice-vocabulary/observation-dispute-defs";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
-import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
-import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
+} from "@/components/practice-vocabulary/result-dispute-defs";
+import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
+import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { nonEmpty } from "@/lib/search-params";
 
 import { listFacet } from "./AppliedFacetPills";
 import { clearedScope, hasAppliedScope, readScope, scopeSearch } from "./review-scope";
-import type { ObservationSort, ObservationsSearch } from "./review-search";
+import type { ResultSort, ResultsSearch } from "./review-search";
 import { ReviewFilterBar } from "./ReviewFilterBar";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ScopeRecordFilter } from "./ReviewScopeFilters";
@@ -22,7 +22,7 @@ import { type ReviewSortItem, ReviewSortSelect } from "./ReviewSortSelect";
 /** Every option wears the badge its rows wear; see the note on `FeedbackFilters`' facets. */
 const OUTCOME_OPTIONS = statusFacetOptions(OUTCOME_DEFS);
 const SEVERITY_OPTIONS = statusFacetOptions(SEVERITY_DEFS);
-const ORIGIN_OPTIONS = statusFacetOptions(OBSERVATION_ORIGIN_DEFS);
+const ORIGIN_OPTIONS = statusFacetOptions(RESULT_ORIGIN_DEFS);
 const RESPONSE_OPTIONS = statusFacetOptions(DEVELOPER_RESPONSE_DEFS);
 
 /** The one boolean the server filters by, as the facet's selection: both or neither is no filter. */
@@ -37,7 +37,7 @@ function disputedFrom(values: DeveloperResponse[]): boolean | undefined {
 	return values.length === 1 ? values[0] === "DISPUTED" : undefined;
 }
 
-const SORT_ITEMS: [ReviewSortItem<ObservationSort>, ...ReviewSortItem<ObservationSort>[]] = [
+const SORT_ITEMS: [ReviewSortItem<ResultSort>, ...ReviewSortItem<ResultSort>[]] = [
 	{ value: "NEWEST", label: "Newest first" },
 	{ value: "ACTIONABILITY", label: "Most actionable first" },
 ];
@@ -46,7 +46,7 @@ const SORT_ITEMS: [ReviewSortItem<ObservationSort>, ...ReviewSortItem<Observatio
  * The facets this list owns, cleared: what the toolbar's Reset clears. `order` is excluded, because
  * sorting does not narrow anything, and the shared scope is excluded, because "Clear scope" owns it.
  */
-export function clearedObservationFacets(): Partial<ObservationsSearch> {
+export function clearedResultFacets(): Partial<ResultsSearch> {
 	return {
 		outcome: undefined,
 		invalidated: undefined,
@@ -57,11 +57,11 @@ export function clearedObservationFacets(): Partial<ObservationsSearch> {
 }
 
 /** Every filter on this list, the shared scope included: what the empty list's button clears. */
-export function clearedObservationFilters(): Partial<ObservationsSearch> {
-	return { ...clearedObservationFacets(), ...clearedScope() };
+export function clearedResultFilters(): Partial<ResultsSearch> {
+	return { ...clearedResultFacets(), ...clearedScope() };
 }
 
-function hasObservationFacet(search: ObservationsSearch): boolean {
+function hasResultFacet(search: ResultsSearch): boolean {
 	return (
 		(search.outcome?.length ?? 0) > 0 ||
 		search.invalidated !== undefined ||
@@ -71,8 +71,8 @@ function hasObservationFacet(search: ObservationsSearch): boolean {
 	);
 }
 
-export function hasObservationFilter(search: ObservationsSearch): boolean {
-	return hasObservationFacet(search) || hasAppliedScope("observations", readScope(search));
+export function hasResultFilter(search: ResultsSearch): boolean {
+	return hasResultFacet(search) || hasAppliedScope("results", readScope(search));
 }
 
 interface NamedGroup {
@@ -113,10 +113,10 @@ export function practiceFacetOptions(
 	}));
 }
 
-export interface ObservationFiltersProps {
-	search: ObservationsSearch;
+export interface ResultFiltersProps {
+	search: ResultsSearch;
 	/** Reports one changed facet. The caller sends the reader back to page one. */
-	onPatch: (patch: Partial<ObservationsSearch>) => void;
+	onPatch: (patch: Partial<ResultsSearch>) => void;
 	/** Clears this list's own facets. The shared scope stays. */
 	onReset: () => void;
 	/** Clears the shared scope, on this tab and every tab after it. */
@@ -134,7 +134,7 @@ export interface ObservationFiltersProps {
 	subjectName?: string;
 }
 
-export function ObservationFilters({
+export function ResultFilters({
 	search,
 	onPatch,
 	onReset,
@@ -145,7 +145,7 @@ export function ObservationFilters({
 	total,
 	record,
 	subjectName,
-}: ObservationFiltersProps) {
+}: ResultFiltersProps) {
 	const outcome = listFacet("Outcome", OUTCOME_OPTIONS, search.outcome, (values) =>
 		onPatch({ outcome: nonEmpty(values) }),
 	);
@@ -165,9 +165,9 @@ export function ObservationFilters({
 	);
 	return (
 		<ReviewFilterBar
-			tab="observations"
+			tab="results"
 			scope={readScope(search)}
-			onChange={(patch) => onPatch(scopeSearch("observations", patch))}
+			onChange={(patch) => onPatch(scopeSearch("results", patch))}
 			onClearScope={onClearScope}
 			// "Observed", not "Date": this range filters `observedAt`, while the same control on the
 			// feedback list filters when the feedback was composed.
@@ -201,10 +201,10 @@ export function ObservationFilters({
 					/>
 				)
 			}
-			hasFacet={hasObservationFacet(search)}
+			hasFacet={hasResultFacet(search)}
 			onReset={onReset}
 			total={total}
-			noun={["observation", "observations"]}
+			noun={["result", "results"]}
 		/>
 	);
 }

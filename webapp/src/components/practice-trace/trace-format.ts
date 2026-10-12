@@ -122,12 +122,12 @@ export function deliveryLabel(entry: PracticeTraceEntry): string {
 			? "1 piece of feedback reached the developer"
 			: `${entry.deliveredCount} pieces of feedback reached the developer`;
 	}
-	if (entry.observationCount === 0) {
-		return "No observations, so nothing was sent";
+	if (entry.practiceResultCount === 0) {
+		return "No results, so nothing was sent";
 	}
-	const observed =
-		entry.observationCount === 1 ? "1 observation" : `${entry.observationCount} observations`;
+	const recorded =
+		entry.practiceResultCount === 1 ? "1 result" : `${entry.practiceResultCount} results`;
 	return entry.withheldReasons.length > 0
-		? `${observed}, none sent`
-		: `${observed}, nothing needed saying`;
+		? `${recorded}, none sent`
+		: `${recorded}, nothing needed saying`;
 }

@@ -8,7 +8,7 @@ import { FacetMultiSelect, type FacetOption } from "@/components/common/FacetMul
 import { InfoLines, InfoTip } from "@/components/common/InfoTip";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
+import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import { OPEN_ROW_BAR, PracticeTableRow } from "@/components/practice-vocabulary/PracticeTable";
 import {
@@ -36,7 +36,7 @@ import {
 import { needsALookFirst, PRACTICE_MARKER_DEFS, practiceMarker } from "./review-attention";
 import { PRACTICE_MARKER_THRESHOLDS } from "./review-attention-thresholds";
 import { practiceLevel } from "./review-levels";
-import { familyCount, observationSlots, slotsTotal } from "./review-outcomes";
+import { familyCount, resultSlots, slotsTotal } from "./review-outcomes";
 import type { OverviewRegionState } from "./review-states";
 import { ReviewSortSelect, type ReviewSortItem } from "./ReviewSortSelect";
 import { type CurrentPractice, isTurnedOff, ShowTurnedOffSwitch } from "./ShowTurnedOffSwitch";
@@ -230,7 +230,7 @@ export function PracticeCountsTable({ state, practices, filter }: PracticeCounts
 					</EmptyMedia>
 					<EmptyTitle>No practice was checked in this range</EmptyTitle>
 					<EmptyDescription>
-						Practices appear here once a review records an observation or feedback about them.
+						Practices appear here once a review records a result or feedback about them.
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
@@ -398,7 +398,7 @@ function Marker({ counts }: { counts: PracticeReviewCounts }) {
 }
 
 function PracticeCountsRow({ counts }: { counts: PracticeReviewCounts }) {
-	const observations = slotsTotal(observationSlots(counts.observations));
+	const results = slotsTotal(resultSlots(counts.practiceResults));
 	return (
 		<PracticeTableRow
 			className={STACKED_FULL_WIDTH}
@@ -428,14 +428,14 @@ function PracticeCountsRow({ counts }: { counts: PracticeReviewCounts }) {
 					<Marker counts={counts} />
 				</span>
 			</TableCell>
-			<TableCell numeric data-label="Observations" className={COUNT_CELL}>
-				<Count value={observations} />
+			<TableCell numeric data-label="Results" className={COUNT_CELL}>
+				<Count value={results} />
 			</TableCell>
 			<TableCell numeric data-label={NOT_MET} className={COUNT_CELL}>
-				<Count value={counts.observations.notMet} of={observations} />
+				<Count value={counts.practiceResults.notMet} of={results} />
 			</TableCell>
 			<TableCell numeric data-label="Not applicable" className={COUNT_CELL}>
-				<Count value={counts.observations.notApplicable} of={observations} />
+				<Count value={counts.practiceResults.notApplicable} of={results} />
 			</TableCell>
 			<TableCell numeric data-label="Undetermined" className={COUNT_CELL}>
 				<Count value={counts.observations.undetermined} of={observations} />

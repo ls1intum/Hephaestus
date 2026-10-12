@@ -14,7 +14,7 @@ import {
 
 const run = (over: Partial<PracticeScriptRun>): PracticeScriptRun => ({
 	status: "OK",
-	leads: 0,
+	programKind: "CUSTOM",
 	models: [],
 	...over,
 });
@@ -31,16 +31,28 @@ const sentence = practiceScriptRunSentence;
 const result = (value: PracticeScriptRun) =>
 	PRACTICE_SCRIPT_RUN_STATUS_DEFS[value.status].result(value);
 
-describe("how a practice script run ended", () => {
+describe("how a practice program run ended", () => {
 	it.each([
-		[run({ leads: 1 }), "Practice script found 1 place to check."],
-		[run({ leads: 4 }), "Practice script found 4 places to check."],
-		[run({ leads: 0 }), "Practice script found no places to check."],
-		[run({ status: "FAILED" }), "Practice script failed."],
-		[run({ status: "TIMED_OUT" }), "Practice script ran out of time."],
+		[run({}), "Practice script returned a result."],
+		[run({ path: "CODE" }), "Practice script returned a result from its code alone."],
+		[run({ path: "MIXED" }), "Practice script returned a result with its models and the review."],
 		[
-			run({ status: "TIMED_OUT", leads: 2 }),
-			"Practice script ran out of time but found 2 places to check.",
+			run({ programKind: "BUILTIN", path: "REVIEW" }),
+			"Built-in review returned a result through the review.",
+		],
+		[run({ status: "FAILED" }), "Practice script stopped without a result."],
+		[
+			run({ status: "FAILED", stopReason: "DEADLINE" }),
+			"Practice script stopped without a result: it ran out of time.",
+		],
+		[
+			run({ status: "FAILED", stopReason: "INVALID_PROGRAM" }),
+			"Practice script stopped without a result: it is not a program the review can run.",
+		],
+		[run({ status: "NOT_REACHED" }), "The review ended before the practice script started."],
+		[
+			run({ status: "NOT_REACHED", programKind: "BUILTIN" }),
+			"The review ended before the built-in review started.",
 		],
 		[run({ status: "NOT_FINISHED" }), "Practice script did not finish."],
 	])("says %o as %s", (value, expected) => {
@@ -48,13 +60,12 @@ describe("how a practice script run ended", () => {
 	});
 
 	it.each([
-		[run({ leads: 1 }), "Found 1 place"],
-		[run({ leads: 3 }), "Found 3 places"],
-		[run({ leads: 0 }), "Found no places"],
-		[run({ status: "SKIPPED", leads: 0 }), "Did not run"],
+		[run({}), "Returned a result"],
+		[run({ path: "MODELS" }), "Result from its models"],
+		[run({ status: "SKIPPED" }), "Did not run"],
 		[run({ status: "FAILED" }), "Failed"],
-		[run({ status: "TIMED_OUT" }), "Ran out of time"],
-		[run({ status: "TIMED_OUT", leads: 2 }), "Ran out of time, found 2 places"],
+		[run({ status: "FAILED", stopReason: "BUDGET" }), "Failed: out of budget"],
+		[run({ status: "NOT_REACHED" }), "Not reached"],
 		[run({ status: "NOT_FINISHED" }), "Did not finish"],
 	])("gives %o the result %s", (value, expected) => {
 		expect(result(value)).toBe(expected);
@@ -78,13 +89,13 @@ describe("how a practice script run ended", () => {
 
 describe("what a practice script run did not rate", () => {
 	it("counts calls, and says nothing when every call was rated", () => {
-		expect(sentence(run({ leads: 2, models: [model({})] }))).toBe(
-			"Practice script found 2 places to check.",
+		expect(sentence(run({ path: "MODELS", models: [model({})] }))).toBe(
+			"Practice script returned a result with its models.",
 		);
 		expect(
 			sentence(
 				run({
-					leads: 2,
+					path: "MODELS",
 					models: [
 						model({ notRated: [{ reason: "DEADLINE", count: 1 }] }),
 						model({
@@ -94,19 +105,10 @@ describe("what a practice script run did not rate", () => {
 					],
 				}),
 			),
-		).toBe("Practice script found 2 places to check. 4 calls were not rated.");
-	});
-
-	it("never says the work held no places when calls went unrated, in the line or the result", () => {
+		).toBe("Practice script returned a result with its models. 4 calls were not rated.");
 		const unrated = model({ notRated: [{ reason: "DEADLINE", count: 1 }] });
-		expect(sentence(run({ leads: 0, models: [unrated] }))).toBe(
-			"Practice script handed the review no places. 1 call was not rated.",
-		);
-		expect(result(run({ leads: 0, models: [unrated] }))).toBe("Handed the review no places");
-		expect(result(run({ leads: 0, models: [model({})] }))).toBe("Found no places");
-		expect(result(run({ leads: 2, models: [unrated] }))).toBe("Found 2 places");
-		expect(sentence(run({ status: "FAILED", leads: 0, models: [unrated] }))).toBe(
-			"Practice script failed. 1 call was not rated.",
+		expect(sentence(run({ status: "FAILED", models: [unrated] }))).toBe(
+			"Practice script stopped without a result. 1 call was not rated.",
 		);
 	});
 
@@ -173,7 +175,27 @@ describe("the one fix a run offers", () => {
 				run({ status: "FAILED", models: [model({ notRated: [{ reason: "REFUSED", count: 1 }] })] }),
 			),
 		).toStrictEqual({ kind: "EDIT" });
+		expect(practiceScriptFix(run({ status: "FAILED", stopReason: "ERROR" }))).toStrictEqual({
+			kind: "EDIT",
+		});
 	});
+
+	it("offers no edit for the built-in review or a cancelled review", () => {
+		expect(
+			practiceScriptFix(run({ status: "FAILED", programKind: "BUILTIN", stopReason: "ERROR" })),
+		).toBeUndefined();
+		expect(practiceScriptFix(run({ status: "FAILED", stopReason: "CANCELLED" }))).toBeUndefined();
+	});
+
+	it.each(["DEADLINE", "BUDGET"] as const)(
+		"sends a program that failed on %s to the guide on programs that stop early",
+		(stopReason) => {
+			expect(practiceScriptFix(run({ status: "FAILED", stopReason }))).toStrictEqual({
+				kind: "GUIDE",
+				guide: "STOPPED_EARLY",
+			});
+		},
+	);
 
 	it.each([
 		["UNAVAILABLE", ["PRACTICE_DECISION"]],
@@ -199,7 +221,7 @@ describe("the one fix a run offers", () => {
 			kind: "CHECK",
 			purpose: "PRACTICE_EMBEDDING",
 		});
-		expect(practiceScriptFix(run({ leads: 3 }))).toBeUndefined();
+		expect(practiceScriptFix(run({ path: "CODE" }))).toBeUndefined();
 	});
 
 	it.each(["BUDGET", "DEADLINE", "TOO_LARGE"] as const)(
@@ -213,15 +235,13 @@ describe("the one fix a run offers", () => {
 		},
 	);
 
-	it.each(["TIMED_OUT", "NOT_FINISHED"] as const)(
-		"sends a script that %s to the guide on scripts that stop early, before any model to check",
+	it.each(["NOT_REACHED", "NOT_FINISHED"] as const)(
+		"sends a program that is %s to the guide on programs that stop early, before any model to check",
 		(status) => {
 			const refused = model({ notRated: [{ reason: "REFUSED", count: 1 }] });
 			const stoppedEarly = { kind: "GUIDE", guide: "STOPPED_EARLY" };
 			expect(practiceScriptFix(run({ status }))).toStrictEqual(stoppedEarly);
-			expect(practiceScriptFix(run({ status, leads: 2, models: [refused] }))).toStrictEqual(
-				stoppedEarly,
-			);
+			expect(practiceScriptFix(run({ status, models: [refused] }))).toStrictEqual(stoppedEarly);
 		},
 	);
 });

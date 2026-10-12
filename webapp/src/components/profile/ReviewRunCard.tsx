@@ -2,7 +2,11 @@ import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { useState } from "react";
 
 import { cn } from "cn";
-import type { ObservationDetail, PracticeGroupReviewRun, ReviewedWorkRef } from "@/api/types.gen";
+import type {
+	PracticeGroupReviewRun,
+	PracticeResultDetail,
+	ReviewedWorkRef,
+} from "@/api/types.gen";
 import { InlineLink } from "@/components/common/InlineLink";
 import { reviewedWorkIcon } from "@/components/icons/reviewed-work-icon";
 import { Button } from "@/components/ui/button";
@@ -10,18 +14,18 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { formatShortDay, formatTime } from "@/lib/dates";
 import { hasText } from "@/lib/text";
 
-import type { ObservationControls } from "./review-runs";
-import { ReviewObservationRow } from "./ReviewObservationRow";
+import type { ResultControls } from "./review-runs";
+import { ReviewResultRow } from "./ReviewResultRow";
 import { TimelineItem } from "./TimelineItem";
 
 export interface ReviewRunCardProps {
 	run: PracticeGroupReviewRun;
-	/** The reader's response to an observation, handed to every row. */
-	observations?: ObservationControls;
+	/** The reader's response to a result, handed to every row. */
+	results?: ResultControls;
 	/** Off on a practice's own level, where every row is that practice and no row repeats it. */
 	showPracticeName?: boolean;
 	/**
-	 * Which of this card's observations arrive open: every one, only the first, or none. Whoever
+	 * Which of this card's results arrive open: every one, only the first, or none. Whoever
 	 * places the card decides — a feed of one practice opens its newest row and leaves the reader
 	 * to open the rest.
 	 */
@@ -30,12 +34,12 @@ export interface ReviewRunCardProps {
 	tailContinues?: boolean;
 }
 
-const NO_CONTROLS: ObservationControls = {};
+const NO_CONTROLS: ResultControls = {};
 
-/** How many observations a card shows before "Show more". */
-const COLLAPSED_OBSERVATION_COUNT = 3;
+/** How many results a card shows before "Show more". */
+const COLLAPSED_RESULT_COUNT = 3;
 
-function observationPriority({ outcome, feedbackResponse }: ObservationDetail): number {
+function resultPriority({ outcome, feedbackResponse }: PracticeResultDetail): number {
 	const delivered = hasText(feedbackResponse?.feedbackId);
 	if (outcome === "NOT_MET") {
 		return delivered ? 0 : 1;
@@ -45,31 +49,31 @@ function observationPriority({ outcome, feedbackResponse }: ObservationDetail): 
 
 /**
  * One review run as a row of the timeline: the day and time in the date column, a dot on the
- * rail, and the card with the reviewed work at its head and the observations as its rows. The head
- * names the work and nothing else: what the run is worth reading is what it observed.
+ * rail, and the card with the reviewed work at its head and the results as its rows. The head
+ * names the work and nothing else: what the run is worth reading is what it concluded.
  *
- * A run that carries one observation has no two things to separate — on a practice's own level a
- * run reviews that practice once, so every card there is that case. It drops the head and merges
- * into one block: the observation's summary and outcome are the block's first line, and the work
+ * A run that carries one result has no two things to separate — on a practice's own level a run
+ * reviews that practice once, so every card there is that case. It drops the head and merges into
+ * one block: the result's summary and verdict are the block's first line, and the work
  * the head would have named is the small line under it.
  */
 export function ReviewRunCard({
 	run,
-	observations = NO_CONTROLS,
+	results = NO_CONTROLS,
 	showPracticeName = true,
 	initiallyOpen = "all",
 	tailContinues = false,
 }: ReviewRunCardProps) {
-	const [showAllObservations, setShowAllObservations] = useState(false);
-	// One observation is one block: the row takes the work line and the card grows no head over it.
-	const merged = run.observations.length === 1;
-	const hiddenCount = Math.max(0, run.observations.length - COLLAPSED_OBSERVATION_COUNT);
-	const orderedObservations = [...run.observations].sort(
-		(a, b) => observationPriority(a) - observationPriority(b),
+	const [showAllResults, setShowAllResults] = useState(false);
+	// One result is one block: the row takes the work line and the card grows no head over it.
+	const merged = run.practiceResults.length === 1;
+	const hiddenCount = Math.max(0, run.practiceResults.length - COLLAPSED_RESULT_COUNT);
+	const orderedResults = [...run.practiceResults].sort(
+		(a, b) => resultPriority(a) - resultPriority(b),
 	);
-	const visibleObservations = showAllObservations
-		? orderedObservations
-		: orderedObservations.slice(0, COLLAPSED_OBSERVATION_COUNT);
+	const visibleResults = showAllResults
+		? orderedResults
+		: orderedResults.slice(0, COLLAPSED_RESULT_COUNT);
 
 	return (
 		<TimelineItem
@@ -87,18 +91,18 @@ export function ReviewRunCard({
 			<div className="min-w-0 overflow-hidden rounded-xl border bg-background">
 				{!merged && <ReviewedWork work={run.reviewedWork} tone="head" />}
 				<ul className="divide-y">
-					{visibleObservations.map((observation, index) => {
-						const feedbackId = observation.feedbackResponse?.feedbackId;
+					{visibleResults.map((result, index) => {
+						const feedbackId = result.feedbackResponse?.feedbackId;
 						return (
-							<ReviewObservationRow
-								key={observation.id}
-								observation={observation}
+							<ReviewResultRow
+								key={result.id}
+								result={result}
 								defaultOpen={initiallyOpen === "all" || (initiallyOpen === "first" && index === 0)}
 								showPracticeName={showPracticeName}
 								work={merged ? <ReviewedWork work={run.reviewedWork} tone="line" /> : undefined}
-								onRespond={observations.onRespond}
+								onRespond={results.onRespond}
 								pendingResponse={
-									hasText(feedbackId) ? observations.pendingResponses?.get(feedbackId) : undefined
+									hasText(feedbackId) ? results.pendingResponses?.get(feedbackId) : undefined
 								}
 							/>
 						);
@@ -111,12 +115,12 @@ export function ReviewRunCard({
 							variant="quiet"
 							size="sm"
 							className="h-8"
-							onClick={() => setShowAllObservations((current) => !current)}
+							onClick={() => setShowAllResults((current) => !current)}
 						>
-							{showAllObservations
+							{showAllResults
 								? "Show less"
-								: `Show ${hiddenCount} more ${hiddenCount === 1 ? "observation" : "observations"}`}
-							{showAllObservations ? (
+								: `Show ${hiddenCount} more ${hiddenCount === 1 ? "result" : "results"}`}
+							{showAllResults ? (
 								<ChevronUpIcon data-icon="inline-end" />
 							) : (
 								<ChevronDownIcon data-icon="inline-end" />
@@ -132,7 +136,7 @@ export function ReviewRunCard({
 /**
  * The work a run reviewed, in the two shapes a card needs it.
  *
- * `head` is the head of a card whose observations are several: the link the rows below it share,
+ * `head` is the head of a card whose results are several: the link the rows below it share,
  * with the repository under it. `line` is the same work under a merged card's summary, on one
  * small line — "#902 · HephaestusTest/practice-validation" — where the summary is the block's
  * anchor and the work it was seen on reads as the note beneath it rather than as a second head.

@@ -80,7 +80,8 @@ function shown(parts: ChatMessage["parts"]): string[] {
 }
 
 describe("shownFeedbackText", () => {
-	const OBSERVATION = "3f0c2b4e-8a1d-4c6e-9b7f-2d5e8a1c4b6f";
+	const RESULT = "3f0c2b4e-8a1d-4c6e-9b7f-2d5e8a1c4b6f";
+	const OBSERVATION = "8d3e6f1a-2b4c-4d5e-9f6a-7b8c9d0e1f2a";
 
 	it("reads a streamed reply's feedback exactly as it reads the stored reply", async () => {
 		const message = await streamed([
@@ -90,16 +91,26 @@ describe("shownFeedbackText", () => {
 			{ type: "text-delta", id: "text-0", delta: "Let me look." },
 			{ type: "text-end", id: "text-0" },
 			{
-				type: "data-observation",
+				type: "data-result",
 				id: "a1",
-				data: { observationId: OBSERVATION, text: "Name the trade-off." },
+				data: { practiceResultId: RESULT, text: "Name the trade-off." },
 			},
 			{
-				type: "data-observation",
+				type: "data-result-observation",
 				id: "a2",
-				data: { observationId: OBSERVATION, text: "Link the issue it closes." },
+				data: {
+					practiceResultId: RESULT,
+					observationId: OBSERVATION,
+					text: "Link the issue it closes.",
+				},
 			},
-			{ type: "data-observation", id: "a3", data: { observationId: OBSERVATION } },
+			// Saved before results had observations: its id names the result.
+			{
+				type: "data-observation",
+				id: "a3",
+				data: { observationId: RESULT, text: "Say what it changes." },
+			},
+			{ type: "data-result", id: "a4", data: { practiceResultId: RESULT } },
 			{ type: "finish" },
 		]);
 		const stored = parseThreadMessages([structuredClone(message)]);
@@ -108,17 +119,28 @@ describe("shownFeedbackText", () => {
 		expect(shown(message.parts)).toStrictEqual([
 			"Name the trade-off.",
 			"Link the issue it closes.",
+			"Say what it changes.",
 		]);
 		expect(shown(stored[0].parts)).toStrictEqual(shown(message.parts));
 	});
 
 	it.each([
-		["a link stored before links carried feedback", { observationId: UUID }],
-		["blank feedback", { observationId: UUID, text: "  " }],
-		["a malformed payload", { observationId: 7, text: "Name the trade-off." }],
-	])("shows nothing for %s", (_name, data) => {
+		["a link stored before links carried feedback", "data-observation", { observationId: UUID }],
+		["blank feedback", "data-result", { practiceResultId: UUID, text: "  " }],
+		["a malformed payload", "data-result", { practiceResultId: 7, text: "Name the trade-off." }],
+		[
+			"an observation link that names no observation",
+			"data-result-observation",
+			{ practiceResultId: UUID, text: "Name the trade-off." },
+		],
+		[
+			"a result link in the saved shape under the new name",
+			"data-result",
+			{ observationId: UUID, text: "Name the trade-off." },
+		],
+	])("shows nothing for %s", (_name, type, data) => {
 		const part = parseThreadMessages([
-			{ id: UUID, role: "assistant", parts: [{ type: "data-observation", id: "p", data }] },
+			{ id: UUID, role: "assistant", parts: [{ type, id: "p", data }] },
 		])?.[0]?.parts[0];
 		assert(part, "A stored link must stay readable");
 		expect(shownFeedbackText(part)).toBeUndefined();
@@ -146,7 +168,7 @@ describe("mentorStatus", () => {
 			{ type: "data-mentor-status", data: { reason: "container-cold" } },
 		],
 		["a state this client does not know", { type: "data-mentor-status", data: { state: "idle" } }],
-		["another data part", { type: "data-observation", data: { state: "warming-up" } }],
+		["another data part", { type: "data-result", data: { state: "warming-up" } }],
 	])("ignores %s", (_name, part) => {
 		expect(mentorStatus(part)).toBeUndefined();
 	});

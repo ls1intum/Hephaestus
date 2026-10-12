@@ -7,14 +7,14 @@ import { StatefulPatch } from "@/stories/stateful";
 
 import { practiceGroups, workspaceMembers, workspacePractices } from "./fixtures";
 import {
-	clearedObservationFacets,
+	clearedResultFacets,
 	groupFacetOptions,
-	ObservationFilters,
+	ResultFilters,
 	type PracticeFacetOption,
 	practiceFacetOptions,
-} from "./ObservationFilters";
+} from "./ResultFilters";
 import { clearedScope } from "./review-scope";
-import type { ObservationsSearch } from "./review-search";
+import type { ResultsSearch } from "./review-search";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 
 const PEOPLE: ReviewPeople = {
@@ -44,10 +44,10 @@ const UNFILTERED = {
 
 	severity: undefined,
 	origin: undefined,
-} satisfies ObservationsSearch;
+} satisfies ResultsSearch;
 
 const meta = {
-	component: ObservationFilters,
+	component: ResultFilters,
 	parameters: { layout: "padded", chromatic: { viewports: [320, 1440] } },
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
@@ -64,9 +64,9 @@ const meta = {
 	// Controlled: `selected` on every facet comes back through the same `search` the choice is
 	// reported on, so a frozen value would leave the whole toolbar looking dead.
 	render: (args) => (
-		<StatefulPatch<ObservationsSearch> initial={args.search}>
+		<StatefulPatch<ResultsSearch> initial={args.search}>
 			{(search, patch) => (
-				<ObservationFilters
+				<ResultFilters
 					{...args}
 					search={search}
 					onPatch={(next) => {
@@ -74,7 +74,7 @@ const meta = {
 						args.onPatch(next);
 					}}
 					onReset={() => {
-						patch(clearedObservationFacets());
+						patch(clearedResultFacets());
 						args.onReset();
 					}}
 					onClearScope={() => {
@@ -85,7 +85,7 @@ const meta = {
 			)}
 		</StatefulPatch>
 	),
-} satisfies Meta<typeof ObservationFilters>;
+} satisfies Meta<typeof ResultFilters>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -93,7 +93,7 @@ type Story = StoryObj<typeof meta>;
 /** Nothing set: no Reset, and the count is the whole list rather than what survived a filter. */
 export const Unfiltered: Story = {
 	play: async ({ canvas }) => {
-		canvas.getByText("12 observations.");
+		canvas.getByText("12 results.");
 		await expect(canvas.queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
 	},
 };
@@ -104,7 +104,7 @@ export const FilteredCountReadsDifferently: Story = {
 		total: 2,
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("2 observations match your filters.");
+		canvas.getByText("2 results match your filters.");
 		canvas.getByRole("button", { name: "Reset" });
 	},
 };
@@ -213,7 +213,7 @@ export const AnOutcomeFromTheOverview: Story = {
 	},
 	parameters: { chromatic: { viewports: [320] }, viewport: { defaultViewport: "reflow" } },
 	play: async ({ args, canvas, userEvent }) => {
-		canvas.getByText("4 observations match your filters.");
+		canvas.getByText("4 results match your filters.");
 		await canvas.findByTitle("Outcome: Met");
 		await userEvent.click(canvas.getByLabelText("Clear outcome filter (Met)"));
 		await expect(args.onPatch).toHaveBeenCalledWith({ outcome: undefined });
@@ -225,7 +225,7 @@ export const AnOutcomeFromTheOverview: Story = {
  * "Marked incorrect" has no facet of its own: it only arrives from the overview's count, so it is a
  * pill the reader can see and drop rather than a control they would never reach for.
  */
-export const OnlyObservationsMarkedIncorrect: Story = {
+export const OnlyResultsMarkedIncorrect: Story = {
 	args: {
 		search: {
 			invalidated: true,
@@ -234,7 +234,7 @@ export const OnlyObservationsMarkedIncorrect: Story = {
 		total: 1,
 	},
 	play: async ({ args, canvas, userEvent }) => {
-		canvas.getByText("1 observation matches your filters.");
+		canvas.getByText("1 result matches your filters.");
 		canvas.getByTitle("Marked incorrect: Only");
 		canvas.getByRole("button", { name: "Reset" });
 		await userEvent.click(
@@ -265,7 +265,7 @@ export const AnOriginOnAPhone: Story = {
 	args: { search: { ...UNFILTERED, origin: ["MANUAL"] }, total: 2 },
 	parameters: { chromatic: { viewports: [320] }, viewport: { defaultViewport: "reflow" } },
 	play: async ({ args, canvas, userEvent }) => {
-		canvas.getByText("2 observations match your filters.");
+		canvas.getByText("2 results match your filters.");
 		await canvas.findByTitle("Origin: Requested");
 		await userEvent.click(canvas.getByRole("button", { name: "Reset" }));
 		await expect(args.onReset).toHaveBeenCalledTimes(1);

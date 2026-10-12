@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { assert, describe, expect, it, vi } from "vitest";
@@ -9,7 +9,7 @@ import {
 	listPracticeProfileReviewRunsInfiniteQueryKey,
 	listPracticeStandingsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
-import { reviewObservationDetail } from "@/components/admin/practice-reviews/fixtures";
+import { reviewResultDetail } from "@/components/admin/practice-reviews/fixtures";
 import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter, testQueryClient } from "@/test/router-harness";
@@ -17,7 +17,7 @@ import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter, testQueryClient } from "@/t
 vi.setConfig({ testTimeout: 20_000 });
 
 /** The level opened by its URL over the list it belongs to, as a shared link opens it. */
-const OBSERVATION_LEVEL = `/w/acme/admin/practices/reviews/observations?detail=observation:${reviewObservationDetail.id}`;
+const RESULT_LEVEL = `/w/acme/admin/practices/reviews/results?detail=result:${reviewResultDetail.id}`;
 
 /**
  * The level's own handlers ahead of the fixture's, which answer the list the level opens over: MSW
@@ -35,13 +35,13 @@ function stub(...handlers: Parameters<typeof server.use>) {
 
 /**
  * The developer's own standings, and the overview's "marked incorrect" under a range the page under
- * the level has not asked for: reads that count the observation without being on screen.
+ * the level has not asked for: reads that count the result without being on screen.
  */
 function countingReads(workspaceSlug: string) {
 	return [
 		listPracticeStandingsQueryKey({ path: { workspaceSlug } }),
 		getPracticeProfileReviewRunQueryKey({
-			path: { workspaceSlug, reviewId: reviewObservationDetail.agentJobId },
+			path: { workspaceSlug, reviewId: reviewResultDetail.agentJobId },
 		}),
 		listPracticeProfileReviewRunsInfiniteQueryKey({ path: { workspaceSlug } }),
 		getPracticeReviewOverviewQueryKey({
@@ -51,53 +51,74 @@ function countingReads(workspaceSlug: string) {
 	];
 }
 
-describe("observation level", () => {
+describe("result level", () => {
 	const correction = {
 		id: "inv-1",
 		reason: "The 404 comes from the router.",
-		invalidatedAt: reviewObservationDetail.observedAt,
+		invalidatedAt: reviewResultDetail.observedAt,
 		invalidatedBy: "Ada",
 		providerCopy: "UPDATED" as const,
 	};
-	const incorrect = { ...reviewObservationDetail, invalidations: [correction] };
+	const incorrect = { ...reviewResultDetail, invalidations: [correction] };
 	const restored = {
-		...reviewObservationDetail,
+		...reviewResultDetail,
 		invalidations: [
 			{
 				...correction,
-				restoredAt: reviewObservationDetail.observedAt,
+				restoredAt: reviewResultDetail.observedAt,
 				restoredBy: "Ada",
 				restorationReason: "The 404 comes from the router.",
 			},
 		],
 	};
+	/**
+	 * The wire carries each problem nested under its result, and the example beside them. The level
+	 * reads the problems and leaves the example to the developer's own pages.
+	 */
+	it("shows the result's problems from the wire and not its example", async () => {
+		stub();
+		renderRouteAtWithRouter(RESULT_LEVEL);
+
+		const level = await screen.findByRole(
+			"dialog",
+			{ name: reviewResultDetail.summary },
+			ROUTE_RENDER_WAIT,
+		);
+		await within(level).findByText("Not met · 3 problems");
+		const problems = within(within(level).getByRole("list", { name: "Problems" }));
+		problems.getByText("A missing row and a missing grant both become a 404");
+		problems.getByText("Trivial");
+		expect(within(level).queryByText(/maps every error in one handler/u)).toBeNull();
+		expect(within(level).queryByText("Example from this work")).toBeNull();
+	});
+
 	it.each([
 		{
 			valid: false,
-			initial: reviewObservationDetail,
+			initial: reviewResultDetail,
 			updated: incorrect,
 			trigger: "Mark as incorrect",
-			success: "Observation marked as incorrect",
+			success: "Result marked as incorrect",
 		},
 		{
 			valid: true,
 			initial: incorrect,
 			updated: restored,
-			trigger: "Restore observation",
-			success: "Observation restored",
+			trigger: "Restore result",
+			success: "Result restored",
 		},
 	])(
 		"changes validity to $valid and refreshes only this workspace's reads",
 		async ({ valid, initial, updated, trigger, success }) => {
 			let sent: unknown;
-			let current: typeof reviewObservationDetail = initial;
+			let current: typeof reviewResultDetail = initial;
 			stub(
 				// Re-read after the change like every other read of it, so it answers as the server would.
-				http.get("*/workspaces/:workspaceSlug/practices/reviews/observations/:observationId", () =>
+				http.get("*/workspaces/:workspaceSlug/practices/reviews/results/:practiceResultId", () =>
 					HttpResponse.json(current),
 				),
 				http.patch(
-					"*/workspaces/:workspaceSlug/practices/reviews/observations/:observationId/validity",
+					"*/workspaces/:workspaceSlug/practices/reviews/results/:practiceResultId/validity",
 					async ({ request }) => {
 						sent = await request.json();
 						current = updated;
@@ -112,7 +133,7 @@ describe("observation level", () => {
 				queryClient.setQueryData(key, {});
 			}
 
-			renderRouteAtWithRouter(OBSERVATION_LEVEL, queryClient);
+			renderRouteAtWithRouter(RESULT_LEVEL, queryClient);
 			const user = userEvent.setup();
 			await user.click(await screen.findByRole("button", { name: trigger }, ROUTE_RENDER_WAIT));
 			await user.type(
@@ -135,16 +156,16 @@ describe("observation level", () => {
 
 	it("keeps the reason and the cached reads when the server refuses the change", async () => {
 		stub(
-			http.get("*/workspaces/:workspaceSlug/practices/reviews/observations/:observationId", () =>
-				HttpResponse.json(reviewObservationDetail),
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/results/:practiceResultId", () =>
+				HttpResponse.json(reviewResultDetail),
 			),
 			http.patch(
-				"*/workspaces/:workspaceSlug/practices/reviews/observations/:observationId/validity",
+				"*/workspaces/:workspaceSlug/practices/reviews/results/:practiceResultId/validity",
 				() =>
 					HttpResponse.json(
 						{
 							status: 409,
-							detail: "Hephaestus is posting feedback that cites this observation right now.",
+							detail: "Hephaestus is posting feedback that cites this result right now.",
 						},
 						{ status: 409 },
 					),
@@ -154,7 +175,7 @@ describe("observation level", () => {
 		const ours = listPracticeStandingsQueryKey({ path: { workspaceSlug: "acme" } });
 		queryClient.setQueryData(ours, []);
 
-		renderRouteAtWithRouter(OBSERVATION_LEVEL, queryClient);
+		renderRouteAtWithRouter(RESULT_LEVEL, queryClient);
 		const user = userEvent.setup();
 		await user.click(
 			await screen.findByRole("button", { name: "Mark as incorrect" }, ROUTE_RENDER_WAIT),
@@ -167,7 +188,7 @@ describe("observation level", () => {
 		assert(submit);
 		await user.click(submit);
 
-		await screen.findByText("We could not change this observation");
+		await screen.findByText("We could not change this result");
 		expect(screen.getByRole("textbox", { name: "Reason" })).toHaveProperty(
 			"value",
 			"The 404 comes from the router.",
@@ -187,16 +208,16 @@ describe("observation level", () => {
 				const outcomes = [from, "UPDATED"] as const;
 				stub(
 					http.get(
-						"*/workspaces/:workspaceSlug/practices/reviews/observations/:observationId",
+						"*/workspaces/:workspaceSlug/practices/reviews/results/:practiceResultId",
 						() => {
 							reads += 1;
 							return HttpResponse.json({
-								...reviewObservationDetail,
+								...reviewResultDetail,
 								invalidations: [
 									{
 										id: "inv-1",
 										reason: "The 404 comes from the router.",
-										invalidatedAt: reviewObservationDetail.observedAt,
+										invalidatedAt: reviewResultDetail.observedAt,
 										invalidatedBy: "Ada",
 										providerCopy: outcomes[Math.min(reads, outcomes.length) - 1],
 									},
@@ -206,7 +227,7 @@ describe("observation level", () => {
 					),
 				);
 
-				renderRouteAtWithRouter(OBSERVATION_LEVEL);
+				renderRouteAtWithRouter(RESULT_LEVEL);
 				await screen.findByText(seen, undefined, ROUTE_RENDER_WAIT);
 				await vi.advanceTimersByTimeAsync(after);
 				await screen.findByText(/now opens with a correction notice/u);

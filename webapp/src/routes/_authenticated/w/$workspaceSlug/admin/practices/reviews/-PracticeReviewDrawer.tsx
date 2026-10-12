@@ -15,7 +15,7 @@ import {
 	getPracticeDefinitionOptionsOptions,
 	getPracticeReviewWorkFactsOptions,
 	listGroupsOptions,
-	listPracticeReviewObservationsOptions,
+	listPracticeReviewResultsOptions,
 	listPracticeReviewsOptions,
 	listPracticeRevisionsOptions,
 	listPracticesOptions,
@@ -32,7 +32,7 @@ import type {
 } from "@/api/types.gen";
 import { FeedbackLevel } from "@/components/admin/practice-reviews/FeedbackLevel";
 import { REVIEWABLE_ON_DEMAND } from "@/components/admin/practice-reviews/job-utils";
-import { ObservationLevel } from "@/components/admin/practice-reviews/ObservationLevel";
+import { ResultLevel } from "@/components/admin/practice-reviews/ResultLevel";
 import {
 	PracticeLevel,
 	type PracticeLevelProps,
@@ -67,7 +67,7 @@ import {
 	useFeedbackController,
 	useNextInApprovalQueue,
 } from "@/hooks/use-feedback-controller";
-import { useObservationController } from "@/hooks/use-observation-controller";
+import { useResultController } from "@/hooks/use-result-controller";
 import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
 import { type ReviewLineageTarget, useReviewLineage } from "@/hooks/use-review-lineage";
 import { useReviewRunController } from "@/hooks/use-review-run-controller";
@@ -169,7 +169,7 @@ export function PracticeReviewDrawer({
 						return <ReviewLevelRead {...shared} reviewId={record.id} />;
 					}
 					case "observation": {
-						return <ObservationLevelRead {...shared} observationId={record.id} />;
+						return <ResultLevelRead {...shared} practiceResultId={record.id} />;
 					}
 					case "feedback": {
 						return (
@@ -484,13 +484,13 @@ function ReviewLevelRead({
 	);
 }
 
-function ObservationLevelRead({
-	observationId,
+function ResultLevelRead({
+	practiceResultId,
 	workspaceSlug,
 	...props
-}: LevelReadProps & { observationId: string }) {
-	const controller = useObservationController(workspaceSlug, observationId);
-	return <ObservationLevel {...props} {...controller} />;
+}: LevelReadProps & { practiceResultId: string }) {
+	const controller = useResultController(workspaceSlug, practiceResultId);
+	return <ResultLevel {...props} {...controller} />;
 }
 
 /**
@@ -566,7 +566,7 @@ function WorkLevelRead({
 		// Current practices or latest occasions waiting for admission keep the trace discoverable.
 		refetchInterval: (result) => (reviewing(result.state.data) ? ACTIVE_REVIEW_POLL_MS : false),
 	});
-	// Practice answers can settle before composition and result processing finish. Follow the runs
+	// Practice results can settle before composition and result processing finish. Follow the runs
 	// that own current answers and the latest admitted occasions, even when older answers mask them.
 	const reviewIds = [
 		...new Set(

@@ -61,7 +61,7 @@ export interface ResponseButtonProps extends Omit<ComponentProps<typeof Button>,
 	quiet?: boolean;
 }
 
-/** One of the responses a reader can give: a card's "Helpful", an observation's "Addressed". */
+/** One of the responses a reader can give: a card's "Helpful", a result's "Addressed". */
 export function ResponseButton({
 	tone,
 	pressed,

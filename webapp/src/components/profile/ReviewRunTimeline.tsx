@@ -1,16 +1,16 @@
 import type { PracticeGroupReviewRun } from "@/api/types.gen";
 
-import type { ObservationControls } from "./review-runs";
+import type { ResultControls } from "./review-runs";
 import { ReviewRunCard } from "./ReviewRunCard";
 
 export interface ReviewRunTimelineProps {
 	runs: PracticeGroupReviewRun[];
-	/** The reader's response to an observation, handed to every card. */
-	observations?: ObservationControls;
+	/** The reader's response to a result, handed to every card. */
+	results?: ResultControls;
 	/** Off on a practice's own level, where every row is that practice and no row repeats it. */
 	showPracticeName?: boolean;
 	/**
-	 * Which observations arrive open. `"all"` is a feed the reader skims for what it found;
+	 * Which results arrive open. `"all"` is a feed the reader skims for what it found;
 	 * `"newest"` opens the newest run's first row alone and leaves every earlier one to a press,
 	 * which is what a practice's own level wants — its rows are all the same practice, so the
 	 * latest is the one the reader came for and the rest are its history.
@@ -22,7 +22,7 @@ export interface ReviewRunTimelineProps {
 
 export function ReviewRunTimeline({
 	runs,
-	observations,
+	results,
 	showPracticeName = true,
 	initiallyOpen = "all",
 	continues = false,
@@ -33,7 +33,7 @@ export function ReviewRunTimeline({
 				<ReviewRunCard
 					key={run.reviewId}
 					run={run}
-					observations={observations}
+					results={results}
 					showPracticeName={showPracticeName}
 					initiallyOpen={cardInitiallyOpen(initiallyOpen, index)}
 					tailContinues={continues && index === runs.length - 1}
@@ -43,7 +43,7 @@ export function ReviewRunTimeline({
 	);
 }
 
-/** Every card open, or only the newest card's first observation. */
+/** Every card open, or only the newest card's first result. */
 function cardInitiallyOpen(
 	initiallyOpen: "all" | "newest",
 	index: number,

@@ -220,11 +220,11 @@ describe("the report's calls", () => {
 		return { built, requests };
 	}
 
-	it("asks for the reader's own observations on one exact piece of work", async () => {
+	it("asks for the reader's own results on one exact piece of work", async () => {
 		const { built, requests } = await api(async () => json({ content: [], totalElements: 0 }));
-		await built.ownObservations("team", "scm.pull_request", 16, 25);
+		await built.ownResults("team", "scm.pull_request", 16, 25);
 		const url = new URL(required(requests[0], "the request").url);
-		expect(url.pathname).toBe("/api/workspaces/team/practices/observations");
+		expect(url.pathname).toBe("/api/workspaces/team/practices/results");
 		expect(Object.fromEntries(url.searchParams)).toStrictEqual({
 			artifactKind: "scm.pull_request",
 			artifactId: "16",
@@ -399,7 +399,7 @@ describe("the report's calls", () => {
 
 	it("never reads the in-app feedback endpoint, which records delivery", async () => {
 		const { built, requests } = await api(async () => json({ content: [], totalElements: 0 }));
-		await built.ownObservations("team", "scm.pull_request", 16, 25);
+		await built.ownResults("team", "scm.pull_request", 16, 25);
 		await built.workFeedback("team", "https://github.com/octo/app/pull/16").catch(() => undefined);
 		expect(requests.some((request) => request.url.includes("/feedback/in-app"))).toBe(false);
 	});

@@ -148,9 +148,9 @@ export function PracticeForm(props: PracticeFormProps) {
 						<h2 className="text-lg font-semibold">What the author declared</h2>
 						<p className="text-sm text-muted-foreground">
 							The requirements above are the author’s own claim about this practice. Nobody has
-							checked them independently, and nothing here says the observations recorded under it
-							are correct. The codes below identify the exact rules and policy that were declared,
-							so a later change to them is visible rather than silent.
+							checked them independently, and nothing here says the results recorded under it are
+							correct. The codes below identify the exact rules and policy that were declared, so a
+							later change to them is visible rather than silent.
 						</p>
 					</div>
 					<PracticeAutomatedReviewValidationSummary
@@ -160,10 +160,10 @@ export function PracticeForm(props: PracticeFormProps) {
 				<Separator />
 				<section className="space-y-4">
 					<div>
-						<h2 className="text-lg font-semibold">What the reviews observed</h2>
+						<h2 className="text-lg font-semibold">What the reviews recorded</h2>
 						<p className="text-sm text-muted-foreground">
-							How its observations turned out and what feedback cited them, with the observations
-							most worth acting on.
+							How its results turned out and what feedback cited them, with the results most worth
+							acting on.
 						</p>
 					</div>
 					<Link

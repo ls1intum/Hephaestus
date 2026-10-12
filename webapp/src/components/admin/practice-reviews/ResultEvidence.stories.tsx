@@ -5,7 +5,7 @@ import type { EvidenceCitation } from "@/api/types.gen";
 import { knownEvidenceSourceKinds } from "@/components/practice-vocabulary/evidence-source-defs";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
-import { ObservationEvidence } from "./ObservationEvidence";
+import { ResultEvidence } from "./ResultEvidence";
 
 /**
  * `path` is what each kind actually puts there: a repo-relative file for the code sources, and a
@@ -36,7 +36,7 @@ const CITATION_BY_KIND: Record<string, { path: string; quote: string }> = {
 	},
 	"scm.issue.comments": {
 		path: "Comment by @ada",
-		quote: "The wording here still says findings — we agreed on observations.",
+		quote: "The wording here still says findings — we agreed on results.",
 	},
 	"docs.document.core": {
 		path: "Reviewing practices",
@@ -67,7 +67,7 @@ const CITATION_BY_KIND: Record<string, { path: string; quote: string }> = {
 		quote: "Prefer one responsive component over a table and a card list.",
 	},
 	"hephaestus.observation-history": {
-		path: "Observation from 3 July",
+		path: "Result from 3 July",
 		quote: "The route exposed an internal pipeline term; raised then, and unchanged since.",
 	},
 	"hephaestus.feedback-history": {
@@ -98,25 +98,23 @@ function citation(sourceKind: string, overrides: Partial<EvidenceCitation> = {})
 }
 
 const meta = {
-	component: ObservationEvidence,
+	component: ResultEvidence,
 	parameters: { layout: "padded", chromatic: { viewports: [320, 1440] } },
 	tags: ["autodocs"],
 	args: {
-		evidence: {
-			citations: [
-				citation("scm.pull-request.diff"),
-				citation("scm.pull-request.diff", {
-					path: "webapp/src/components/admin/practice-reviews/ObservationResults.tsx",
-					side: "OLD",
-					quote: '<TableHead scope="col">Observation</TableHead>',
-					startLine: 82,
-					endLine: 82,
-				}),
-				citation("scm.review-threads"),
-			],
-		},
+		citations: [
+			citation("scm.pull-request.diff"),
+			citation("scm.pull-request.diff", {
+				path: "webapp/src/components/admin/practice-reviews/ResultRows.tsx",
+				side: "OLD",
+				quote: '<TableHead scope="col">Verdict</TableHead>',
+				startLine: 82,
+				endLine: 82,
+			}),
+			citation("scm.review-threads"),
+		],
 	},
-} satisfies Meta<typeof ObservationEvidence>;
+} satisfies Meta<typeof ResultEvidence>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -136,7 +134,7 @@ export const Default: Story = {
 // Keep expected labels independent of the registry so missing labels cannot agree with themselves.
 export const EverySource: Story = {
 	args: {
-		evidence: { citations: knownEvidenceSourceKinds().map((kind) => citation(kind)) },
+		citations: knownEvidenceSourceKinds().map((kind) => citation(kind)),
 	},
 	play: async ({ canvas }) => {
 		// Compared whole rather than one `getByRole` per label, so a kind that arrives without words
@@ -161,7 +159,7 @@ export const EverySource: Story = {
 				"Review comments",
 				"What this project contains",
 				"Referenced documents",
-				"Earlier observations",
+				"Earlier results",
 				"Feedback already sent",
 			].sort(),
 		);
@@ -173,9 +171,7 @@ export const EverySource: Story = {
 /** Only code locators expose source coordinates; object coordinates refer to serialized context. */
 export const LineNumbersOnlyWhereTheyAreReal: Story = {
 	args: {
-		evidence: {
-			citations: [citation("scm.repository.tree"), citation("slack.conversation.thread")],
-		},
+		citations: [citation("scm.repository.tree"), citation("slack.conversation.thread")],
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("webapp/src/lib/artifact-kinds.ts:12–13");
@@ -187,9 +183,7 @@ export const LineNumbersOnlyWhereTheyAreReal: Story = {
 /** A withheld quote still shows its location, because that is the part an operator can act on. */
 export const RedactedQuote: Story = {
 	args: {
-		evidence: {
-			citations: [citation("scm.pull-request.diff", { quote: undefined, quoteRedacted: true })],
-		},
+		citations: [citation("scm.pull-request.diff", { quote: undefined, quoteRedacted: true })],
 	},
 	play: async ({ canvas, canvasElement }) => {
 		canvas.getByText("Not quoted. The passage was withheld, so only its location was kept.");
@@ -200,19 +194,17 @@ export const RedactedQuote: Story = {
 
 export const UnknownSource: Story = {
 	args: {
-		evidence: {
-			citations: [
-				{
-					sourceKind: "wiki.page.body",
-					artifactPath: "inputs/context/wiki.json",
-					path: "Onboarding",
-					quote: "New reviewers shadow an existing reviewer for their first week.",
-					quoteRedacted: false,
-					startLine: 4,
-					endLine: 4,
-				},
-			],
-		},
+		citations: [
+			{
+				sourceKind: "wiki.page.body",
+				artifactPath: "inputs/context/wiki.json",
+				path: "Onboarding",
+				quote: "New reviewers shadow an existing reviewer for their first week.",
+				quoteRedacted: false,
+				startLine: 4,
+				endLine: 4,
+			},
+		],
 	},
 	play: async ({ canvas }) => {
 		// Named generically, never by the source's wire id.
@@ -223,24 +215,25 @@ export const UnknownSource: Story = {
 };
 
 export const NoEvidence: Story = {
-	args: { evidence: null },
+	args: { citations: [] },
 	play: async ({ canvas }) => {
-		canvas.getByText(/Nothing was quoted for this observation/u);
+		await expect(
+			canvas.getByText("Nothing was quoted, so there is no passage to check this against."),
+		).toBeVisible();
+		await expect(canvas.queryByRole("heading")).not.toBeInTheDocument();
 	},
 };
 
 /** A long path and a wide code quote must not push the page sideways on a phone. */
 export const Mobile: Story = {
 	args: {
-		evidence: {
-			citations: [
-				citation("scm.pull-request.diff", {
-					path: "webapp/src/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactKind/$artifactId.tsx",
-					quote:
-						"const detectionOutputRouteNameThatIsMuchLongerThanAnyMobileViewport = buildRouteName();",
-				}),
-			],
-		},
+		citations: [
+			citation("scm.pull-request.diff", {
+				path: "webapp/src/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactKind/$artifactId.tsx",
+				quote:
+					"const detectionOutputRouteNameThatIsMuchLongerThanAnyMobileViewport = buildRouteName();",
+			}),
+		],
 	},
 	parameters: {
 		chromatic: { disableSnapshot: true },
@@ -254,9 +247,7 @@ export const Mobile: Story = {
 
 export const HistoricalSource: Story = {
 	args: {
-		evidence: {
-			citations: [citation("scm.repository.tree", { revision: "b".repeat(40) })],
-		},
+		citations: [citation("scm.repository.tree", { revision: "b".repeat(40) })],
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("b".repeat(40))).toBeVisible();

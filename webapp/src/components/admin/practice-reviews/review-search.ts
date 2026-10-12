@@ -4,8 +4,9 @@ import { statusValues } from "@/components/common/status-def";
 import { REVIEW_FILTER_MAX_LENGTH } from "@/components/practice-trace/trace-format";
 import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
-import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
+import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
+import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
 import {
 	NO_REVIEW_STARTED,
 	ON_HOLD,
@@ -40,14 +41,14 @@ export const REVIEW_PAGE_SIZE = 25;
 export const ACTIVE_REVIEW_POLL_MS = 5000;
 
 /**
- * Every admin read of what reviews produced, which a change to one review, observation or piece of
+ * Every admin read of what reviews produced, which a change to one review, result or piece of
  * feedback can move: its row in any list, every count, the queue and the review time.
  */
 export const PRACTICE_REVIEW_READS: ReadonlySet<string> = new Set([
 	"getPracticeReviewOverview",
 	"listPracticeReviews",
-	"listPracticeReviewObservations",
-	"getPracticeReviewObservation",
+	"listPracticeReviewResults",
+	"getPracticeReviewResult",
 	"listPracticeReviewFeedback",
 	"getPracticeReviewFeedback",
 	"getPracticeReviewLineage",
@@ -58,12 +59,12 @@ export const PRACTICE_REVIEW_READS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Ordering names the server understands. `ACTIONABILITY` puts not met observations first, worst
- * severity down to informational, then met observations, then the observations that judged nothing.
+ * Ordering names the server understands. `ACTIONABILITY` puts not met results first, worst
+ * severity down to trivial, then met results, then the results that judged nothing.
  */
-export const OBSERVATION_SORTS = ["NEWEST", "ACTIONABILITY"] as const;
+export const RESULT_SORTS = ["NEWEST", "ACTIONABILITY"] as const;
 
-export type ObservationSort = (typeof OBSERVATION_SORTS)[number];
+export type ResultSort = (typeof RESULT_SORTS)[number];
 
 /** Ordering names the server understands for feedback: when it was composed, either way round. */
 export const FEEDBACK_SORTS = ["NEWEST", "OLDEST"] as const;
@@ -120,7 +121,7 @@ export const feedbackSearchSchema = z
 		location: enumValues(statusValues(FEEDBACK_LOCATION_DEFS)),
 		recipientUserId: positiveId,
 		practiceSlug: multiValue,
-		// The endpoint's `sort`. The observations list declares `order` too, with other values. A link
+		// The endpoint's `sort`. The results list declares `order` too, with other values. A link
 		// without `from` types `previous` in `search={(previous) => …}` as every route's search, where
 		// a param two sibling routes declare with different types holds both, so returning it to either
 		// list stops compiling: a relative link on either list names its `from`.
@@ -128,7 +129,7 @@ export const feedbackSearchSchema = z
 	})
 	.transform(canonicalDateRange);
 
-export const observationsSearchSchema = z
+export const resultsSearchSchema = z
 	.object({
 		...scope,
 		practiceSlug: multiValue,
@@ -139,9 +140,9 @@ export const observationsSearchSchema = z
 
 		severity: enumValues(statusValues(SEVERITY_DEFS)),
 		subjectUserId: positiveId,
-		origin: enumValues(statusValues(OBSERVATION_ORIGIN_DEFS)),
+		origin: enumValues(statusValues(RESULT_ORIGIN_DEFS)),
 		// The endpoint's `sort`; the feedback list's `order` says what sharing the word costs.
-		order: z.enum(OBSERVATION_SORTS).optional().catch(undefined),
+		order: z.enum(RESULT_SORTS).optional().catch(undefined),
 	})
 	.transform(canonicalDateRange);
 
@@ -213,7 +214,7 @@ export const reviewPageSearchSchema = z
 	.transform(canonicalDateRange);
 
 export type FeedbackSearch = z.infer<typeof feedbackSearchSchema>;
-export type ObservationsSearch = z.infer<typeof observationsSearchSchema>;
+export type ResultsSearch = z.infer<typeof resultsSearchSchema>;
 export type RunsSearch = z.infer<typeof runsSearchSchema>;
 
 /**
@@ -319,7 +320,7 @@ export function feedbackQuery(search: Partial<FeedbackSearch>, size: number) {
 	};
 }
 
-export function observationsQuery(search: Partial<ObservationsSearch>, size: number) {
+export function resultsQuery(search: Partial<ResultsSearch>, size: number) {
 	return {
 		...scopeQuery(search),
 		size,

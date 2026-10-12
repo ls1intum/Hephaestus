@@ -133,7 +133,7 @@ const groupStanding = (
 	standing,
 	direction,
 	trendSupport: direction ? wellSupported : undefined,
-	observations: [],
+	practiceResults: [],
 	sources: standing === "NOT_OBSERVED" ? [] : [{ workKind: ARTIFACT_KIND.pullRequest, count: 6 }],
 	feedbackSpanDays: standing === "NOT_OBSERVED" ? undefined : 42,
 });

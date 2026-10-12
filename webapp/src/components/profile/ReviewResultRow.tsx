@@ -2,7 +2,14 @@ import { cn } from "cn";
 import { ChevronDownIcon } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 
-import type { FeedbackResponseRequest, ObservationDetail } from "@/api/types.gen";
+import type {
+	EvidenceCitation,
+	FeedbackResponseRequest,
+	Observation,
+	OpenQuestion,
+	PracticeResultDetail,
+	PracticeResultExample,
+} from "@/api/types.gen";
 import { FOCUS_RING, FOCUS_RING_INSET } from "@/components/common/focus";
 import { InlineLink } from "@/components/common/InlineLink";
 import { ResponseButton, toneOf } from "@/components/common/ResponseButton";
@@ -17,20 +24,25 @@ import {
 	type FeedbackResolution,
 } from "@/components/practice-vocabulary/feedback-resolution-defs";
 import { FEEDBACK_USEFULNESS_DEFS } from "@/components/practice-vocabulary/feedback-usefulness-defs";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
-import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
-import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
+import { OUTCOME_DEFS, resultVerdict } from "@/components/practice-vocabulary/outcome-defs";
 import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
+import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
+import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
 import { StatusTooltip } from "@/components/practice-vocabulary/StatusTooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { rendersContent } from "@/lib/react-node";
 import { capitalise, hasText } from "@/lib/text";
 
-import { toEvidenceCheck, toEvidenceLocations } from "./evidence";
+import {
+	type EvidenceCheck,
+	type EvidenceLocation,
+	toEvidenceCheck,
+	toEvidenceLocations,
+} from "./evidence";
 import { EvidenceFileBlock } from "./EvidenceFileBlock";
 
 /**
- * The reviewer's own words about this observation, in the Markdown it writes them in: a file, a
+ * The reviewer's own words about this result, in the Markdown it writes them in: a file, a
  * field or a value it quotes comes back as code rather than as a line of stray backticks. The
  * same restricted rendering the feedback card's body gets, so the two never drift apart.
  */
@@ -64,73 +76,140 @@ function DetailSection({ label, className, children }: DetailSectionProps) {
 
 /** A dispute is the one answer the developer writes for somebody else to read. */
 const DISPUTE_AUDIENCE =
-	"Workspace admins read this on the observation, and can mark it incorrect or withdraw the feedback.";
+	"Workspace admins read this on the result, and can mark it incorrect or withdraw the feedback.";
 
-export interface ReviewObservationRowProps {
-	observation: ObservationDetail;
+export interface ReviewResultRowProps {
+	result: PracticeResultDetail;
 	/** Open on arrival; a closed row waits for a press. The card placing the row decides which. */
 	defaultOpen?: boolean;
 	/** Off where every row is the level's own practice, so no row repeats its name. */
 	showPracticeName?: boolean;
 	/**
 	 * The reviewed work, as a small line under the summary. A run's card gives it when the run
-	 * carries this one observation and the two are one block; otherwise the card's own head names
-	 * the work above the rows and this is left out.
+	 * carries this one result and the two are one block; otherwise the card's own head names the
+	 * work above the rows and this is left out.
 	 */
 	work?: ReactNode;
-	onRespond?: (observation: ObservationDetail, response: FeedbackResponseRequest) => void;
+	onRespond?: (result: PracticeResultDetail, response: FeedbackResponseRequest) => void;
 	/**
-	 * The response being written to this observation's feedback: shown over the one it arrived
-	 * with, and its buttons wait until the write lands.
+	 * The response being written to this result's feedback: shown over the one it arrived with, and
+	 * its buttons wait until the write lands.
 	 */
 	pendingResponse?: FeedbackResponseRequest;
 }
 
+const NO_OPEN_QUESTIONS: OpenQuestion[] = [];
+
 /**
- * One observation as a row of its review's card. The outcome is what the reader acts on, so the
- * severity behind it stays in the workspace's admin console rather than ranking the reader's own
- * work here.
+ * What the review wrote about the work, in the order the open row shows it: why, the problems, the
+ * questions it left open, an example, what it checked, and the result's own evidence.
  */
-export function ReviewObservationRow({
-	observation,
+function reasonsOf(result: PracticeResultDetail) {
+	return {
+		rationale: result.evidenceRationale,
+		// In the review's order: the server sends them by position.
+		problems: result.observations,
+		openQuestions: result.evidence?.undecidability ?? NO_OPEN_QUESTIONS,
+		example: result.example,
+		checks: toEvidenceCheck(result.evidence),
+		locations: toEvidenceLocations(result.evidence?.citations ?? []),
+	};
+}
+
+type ResultReasons = ReturnType<typeof reasonsOf>;
+
+function hasReasons(reasons: ResultReasons): boolean {
+	return (
+		hasText(reasons.rationale) ||
+		reasons.problems.length > 0 ||
+		reasons.openQuestions.length > 0 ||
+		reasons.example !== undefined ||
+		reasons.checks.length > 0 ||
+		reasons.locations.length > 0
+	);
+}
+
+/** Each part of what the review wrote, under its own label; a part it did not write is left out. */
+function ReasonSections({ reasons }: { reasons: ResultReasons }) {
+	return (
+		<>
+			{hasText(reasons.rationale) && (
+				<DetailSection label="Why it was noted">
+					<ReviewerText>{reasons.rationale}</ReviewerText>
+				</DetailSection>
+			)}
+			{reasons.problems.length > 0 && (
+				<DetailSection label="Problems" className="gap-1.5">
+					<ProblemList problems={reasons.problems} />
+				</DetailSection>
+			)}
+			{reasons.openQuestions.length > 0 && (
+				<DetailSection label="Open questions" className="gap-1.5">
+					<OpenQuestionList questions={reasons.openQuestions} />
+				</DetailSection>
+			)}
+			{reasons.example !== undefined && (
+				<DetailSection label="Example from this work" className="gap-1.5">
+					<ExampleFromTheWork example={reasons.example} />
+				</DetailSection>
+			)}
+			{reasons.checks.length > 0 && (
+				<DetailSection label="What was checked">
+					<TermList pairs={reasons.checks} />
+				</DetailSection>
+			)}
+			{reasons.locations.length > 0 && (
+				<DetailSection label="Evidence" className="gap-1.5">
+					<EvidenceBlocks locations={reasons.locations} />
+				</DetailSection>
+			)}
+		</>
+	);
+}
+
+/**
+ * One result as a row of its review's card: the verdict on its head, and, open, the problems behind
+ * it, the questions the review left open, and an example from the work. The outcome is what the
+ * reader acts on, so the severity of the result and of each problem stays in the workspace's admin
+ * console rather than ranking the reader's own work here.
+ */
+export function ReviewResultRow({
+	result,
 	defaultOpen = true,
 	showPracticeName = true,
 	work,
 	onRespond,
 	pendingResponse,
-}: ReviewObservationRowProps) {
-	const outcome = OUTCOME_DEFS[observation.outcome];
+}: ReviewResultRowProps) {
+	const outcome = OUTCOME_DEFS[result.outcome];
 	const OutcomeIcon = outcome.icon;
-	const note = claimCurrentnessNote(observation.claimCurrentness);
-	const invalidated = observation.invalidatedAt !== undefined;
-	const evidenceLocations = toEvidenceLocations(observation.evidence);
-	const checks = toEvidenceCheck(observation.evidence);
-	const nextStep = capitalise(observation.nextStep ?? "");
+	const note = claimCurrentnessNote(result.claimCurrentness);
+	const invalidated = result.invalidatedAt !== undefined;
+	const reasons = reasonsOf(result);
+	const nextStep = capitalise(result.nextStep ?? "");
 	// A response needs feedback to respond to and a route that records it.
-	const hasFeedback = hasText(observation.feedbackResponse?.feedbackId);
+	const hasFeedback = hasText(result.feedbackResponse?.feedbackId);
 	const respondTo = hasFeedback ? onRespond : undefined;
-	const commentUrls = observation.feedbackCommentUrls ?? [];
+	const commentUrls = result.feedbackCommentUrls ?? [];
 	// Without a recorded comment link the reviewed work is the nearest truthful place to go, and it
 	// says so rather than posing as a link to the feedback.
 	const workUrl =
-		hasFeedback && commentUrls.length === 0 && hasText(observation.artifactUrl)
-			? observation.artifactUrl
+		hasFeedback && commentUrls.length === 0 && hasText(result.artifactUrl)
+			? result.artifactUrl
 			: undefined;
 	const hasWorkLine = rendersContent(work);
 	const hasBody =
 		invalidated ||
 		note !== undefined ||
-		hasText(observation.evidenceRationale) ||
-		checks.length > 0 ||
-		evidenceLocations.length > 0 ||
+		hasReasons(reasons) ||
 		hasText(nextStep) ||
 		commentUrls.length > 0 ||
 		workUrl !== undefined ||
 		respondTo !== undefined;
 	// The summary is the row's anchor and the heaviest text in it; the practice under it is the pill
-	// every practice surface names a practice with, and it stands alone when the observation has no
+	// every practice surface names a practice with, and it stands alone when the result has no
 	// words of its own.
-	const summary = observation.summary.trim();
+	const summary = result.summary.trim();
 	const showPill = showPracticeName || summary.length === 0;
 
 	// At the reflow width the summary takes the whole line and the outcome and the badges sit under
@@ -145,13 +224,11 @@ export function ReviewObservationRow({
 		<>
 			<span className="flex min-w-0 basis-full flex-col items-start gap-1 text-sm sm:flex-1 sm:basis-0">
 				{summary.length > 0 && <span className="font-medium text-foreground">{summary}</span>}
-				{showPill && <PracticePill name={observation.practiceName} />}
+				{showPill && <PracticePill name={result.practiceName} />}
 			</span>
 			<span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2.5 gap-y-1">
 				{invalidated && <StatusBadge def={MARKED_INCORRECT_DEF} />}
-				{observation.origin !== "LIVE" && (
-					<StatusBadge def={OBSERVATION_ORIGIN_DEFS[observation.origin]} />
-				)}
+				{result.origin !== "LIVE" && <StatusBadge def={RESULT_ORIGIN_DEFS[result.origin]} />}
 				{/* Inside the row's own button the chip is a span, the words visible beside the icon;
 				    on a row that is no control it is the button a keyboard reaches the sentence by. */}
 				<StatusTooltip
@@ -164,11 +241,11 @@ export function ReviewObservationRow({
 					)}
 				>
 					<OutcomeIcon className="size-3.5 shrink-0" aria-hidden />
-					{outcome.label}
+					{resultVerdict(result.outcome, reasons.problems.length)}
 				</StatusTooltip>
 				{hasBody && (
 					<ChevronDownIcon
-						className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]/observation:rotate-180"
+						className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]/result:rotate-180"
 						aria-hidden
 					/>
 				)}
@@ -189,7 +266,7 @@ export function ReviewObservationRow({
 
 	return (
 		<li>
-			<Collapsible className="group/observation" defaultOpen={defaultOpen}>
+			<Collapsible className="group/result" defaultOpen={defaultOpen}>
 				{/* The tint is the wrapper's, not the trigger's: with a work line under it the head is
 				    two lines of one block, and tinting only the first would draw back the seam this
 				    layout exists to remove. */}
@@ -206,50 +283,16 @@ export function ReviewObservationRow({
 						{invalidated && (
 							<p className="text-sm">
 								<span className="font-medium">
-									A workspace admin marked this observation as incorrect.
+									A workspace admin marked this result as incorrect.
 								</span>{" "}
 								It no longer counts toward your standing or what Heph knows about your work.
-								{hasText(observation.invalidationReason) && (
-									<> Their reason: “{observation.invalidationReason}”</>
+								{hasText(result.invalidationReason) && (
+									<> Their reason: “{result.invalidationReason}”</>
 								)}
 							</p>
 						)}
 						{note !== undefined && <p className="text-sm text-muted-foreground">{note}</p>}
-						{hasText(observation.evidenceRationale) && (
-							<DetailSection label="Why it was noted">
-								<ReviewerText>{observation.evidenceRationale}</ReviewerText>
-							</DetailSection>
-						)}
-						{checks.length > 0 && (
-							<DetailSection label="What was checked">
-								{/* A definition list, so the term and what the review wrote for it reach a screen
-								    reader as one pair rather than as two sentences in a row. */}
-								<dl className="grid min-w-0 grid-cols-1 gap-x-3 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
-									{checks.map(({ term, detail }) => (
-										<Fragment key={term}>
-											<dt className="text-muted-foreground">{term}:</dt>
-											<dd className="min-w-0">
-												<ReviewerText>{detail}</ReviewerText>
-											</dd>
-										</Fragment>
-									))}
-								</dl>
-							</DetailSection>
-						)}
-						{evidenceLocations.length > 0 && (
-							<DetailSection label="Evidence" className="gap-1.5">
-								<div className="flex min-w-0 flex-col gap-2">
-									{evidenceLocations.map((location) => (
-										<EvidenceFileBlock
-											// A diff pair only folds when both sides carry a quote, so a redacted side leaves
-											// two citations of the same lines apart: the side and the redaction tell them apart.
-											key={`${location.sourceKind}-${location.path}-${location.revision ?? ""}-${location.startLine}-${location.side ?? ""}-${location.redacted}`}
-											location={location}
-										/>
-									))}
-								</div>
-							</DetailSection>
-						)}
+						<ReasonSections reasons={reasons} />
 						{hasText(nextStep) && (
 							<DetailSection label="Next step">
 								<ReviewerText>{nextStep}</ReviewerText>
@@ -269,8 +312,8 @@ export function ReviewObservationRow({
 						)}
 					</div>
 					{respondTo && (
-						<ObservationResponse
-							observation={observation}
+						<ResultResponse
+							result={result}
 							onRespond={respondTo}
 							pendingResponse={pendingResponse}
 						/>
@@ -282,7 +325,110 @@ export function ReviewObservationRow({
 }
 
 /**
- * The comments that carry this observation's feedback on the reviewed work, in the order the
+ * Muted terms with the reviewer's words for each. A definition list, so a term and what the review
+ * wrote for it reach a screen reader as one pair rather than as two sentences in a row.
+ */
+function TermList({ pairs }: { pairs: EvidenceCheck[] }) {
+	return (
+		<dl className="grid min-w-0 grid-cols-1 gap-x-3 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+			{pairs.map(({ term, detail }) => (
+				<Fragment key={term}>
+					<dt className="text-muted-foreground">{term}:</dt>
+					<dd className="min-w-0">
+						<ReviewerText>{detail}</ReviewerText>
+					</dd>
+				</Fragment>
+			))}
+		</dl>
+	);
+}
+
+/** Quoted places as their blocks, in the order the reviewer cited them. */
+function EvidenceBlocks({ locations }: { locations: EvidenceLocation[] }) {
+	return (
+		<div className="flex min-w-0 flex-col gap-2">
+			{locations.map((location) => (
+				<EvidenceFileBlock
+					// A diff pair only folds when both sides carry a quote, so a redacted side leaves
+					// two citations of the same lines apart: the side and the redaction tell them apart.
+					key={`${location.sourceKind}-${location.path}-${location.revision ?? ""}-${location.startLine}-${location.side ?? ""}-${location.redacted}`}
+					location={location}
+				/>
+			))}
+		</div>
+	);
+}
+
+/**
+ * The blocks of what one problem, open question or example cites. Each list folds on its own, so
+ * a quote never joins the block of another problem.
+ */
+function CitationBlocks({ citations }: { citations: EvidenceCitation[] }) {
+	const locations = toEvidenceLocations(citations);
+	return locations.length > 0 ? <EvidenceBlocks locations={locations} /> : null;
+}
+
+/** One item of a list inside the open row: a block on the row's ground, so items stay apart. */
+const ITEM_CLASS = "flex min-w-0 flex-col gap-1.5 rounded-xl border bg-background p-3";
+
+/**
+ * The problems behind a result that is not met, in the review's order: what is wrong, why, where,
+ * and what to change. No problem carries its severity here, for the reason the row gives.
+ */
+function ProblemList({ problems }: { problems: Observation[] }) {
+	return (
+		<ol aria-label="Problems" className="flex min-w-0 flex-col gap-2">
+			{problems.map((problem) => {
+				const problemNextStep = capitalise(problem.nextStep ?? "");
+				return (
+					<li key={problem.observationId} className={ITEM_CLASS}>
+						<span className="text-sm font-medium text-pretty">{problem.summary.trim()}</span>
+						{hasText(problem.explanation) && <ReviewerText>{problem.explanation}</ReviewerText>}
+						<CitationBlocks citations={problem.citations} />
+						{hasText(problemNextStep) && (
+							<TermList pairs={[{ term: "Next step", detail: problemNextStep }]} />
+						)}
+					</li>
+				);
+			})}
+		</ol>
+	);
+}
+
+/**
+ * What the review could not settle, each with what would settle it. An open question makes no
+ * claim about the work and is never feedback, so it reads as a question and nothing more.
+ */
+function OpenQuestionList({ questions }: { questions: OpenQuestion[] }) {
+	return (
+		<ul aria-label="Open questions" className="flex min-w-0 flex-col gap-2">
+			{questions.map((question) => (
+				<li key={`${question.openQuestion}-${question.wouldSettleIt}`} className={ITEM_CLASS}>
+					<ReviewerText>{question.openQuestion}</ReviewerText>
+					<TermList pairs={[{ term: "Would settle it", detail: question.wouldSettleIt }]} />
+					{question.citation !== undefined && <CitationBlocks citations={[question.citation]} />}
+				</li>
+			))}
+		</ul>
+	);
+}
+
+/**
+ * One place in the work the review points at, with its note on it. It is evidence about the work
+ * on the neutral ground every other block has: never praise, and never in a status colour that
+ * would read as a grade.
+ */
+function ExampleFromTheWork({ example }: { example: PracticeResultExample }) {
+	return (
+		<div className="flex min-w-0 flex-col gap-1.5">
+			<ReviewerText>{example.note}</ReviewerText>
+			<CitationBlocks citations={[example.citation]} />
+		</div>
+	);
+}
+
+/**
+ * The comments that carry this result's feedback on the reviewed work, in the order the
  * server gives: the summary first, then the line notes.
  */
 function FeedbackCommentLinks({ urls }: { urls: string[] }) {
@@ -308,32 +454,28 @@ function FeedbackCommentLinks({ urls }: { urls: string[] }) {
 	);
 }
 
-interface ObservationResponseProps {
-	observation: ObservationDetail;
-	onRespond: NonNullable<ReviewObservationRowProps["onRespond"]>;
+interface ResultResponseProps {
+	result: PracticeResultDetail;
+	onRespond: NonNullable<ReviewResultRowProps["onRespond"]>;
 	pendingResponse?: FeedbackResponseRequest;
 }
 
 /**
  * The reader's response under the row: the three resolutions, what already stands — the rating
  * given on the feedback card and the comment sent with the response — and the comment band a
- * press opens. The endpoint replaces, so the usefulness the observation arrived with travels every
+ * press opens. The endpoint replaces, so the usefulness the result arrived with travels every
  * time.
  */
-function ObservationResponse({
-	observation,
-	onRespond,
-	pendingResponse,
-}: ObservationResponseProps) {
+function ResultResponse({ result, onRespond, pendingResponse }: ResultResponseProps) {
 	// The resolution whose comment band is open; recorded only once Send or Skip closes it.
 	const [pendingResolution, setPendingResolution] = useState<FeedbackResolution>();
 	const isPending = pendingResponse !== undefined;
 	// The response being written stands over the recorded one, so the buttons do not jump back and
 	// then forward again when it lands.
-	const current: FeedbackResponseRequest = pendingResponse ?? observation.feedbackResponse ?? {};
+	const current: FeedbackResponseRequest = pendingResponse ?? result.feedbackResponse ?? {};
 	const shownResolution = pendingResolution ?? current.resolution;
 	const respond = (change: Pick<FeedbackResponseRequest, "resolution" | "comment">) => {
-		onRespond(observation, { usefulness: current.usefulness, ...change });
+		onRespond(result, { usefulness: current.usefulness, ...change });
 	};
 	// A press opens the band for that choice; the chosen one pressed again withdraws it, comment
 	// and all, and a band still open closes without recording anything.
@@ -361,7 +503,7 @@ function ObservationResponse({
 			<DetailSection label="Your response" className="gap-2.5 px-4 pb-4">
 				<div
 					role="group"
-					aria-label={`Your response to ${observation.practiceName}`}
+					aria-label={`Your response to ${result.practiceName}`}
 					className="flex flex-wrap items-center gap-2"
 				>
 					{statusValues(FEEDBACK_RESOLUTION_DEFS).map((value) => {

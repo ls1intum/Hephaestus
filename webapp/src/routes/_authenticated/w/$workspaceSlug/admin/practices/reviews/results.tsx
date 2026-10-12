@@ -3,16 +3,16 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import {
 	getPracticeReviewOverviewOptions,
-	listPracticeReviewObservationsInfiniteOptions,
+	listPracticeReviewResultsInfiniteOptions,
 } from "@/api/@tanstack/react-query.gen";
-import { ObservationsListPage } from "@/components/admin/practice-reviews/ObservationsListPage";
+import { ResultsListPage } from "@/components/admin/practice-reviews/ResultsListPage";
 import { PracticeObservationsSummary } from "@/components/admin/practice-reviews/PracticeObservationsSummary";
 import { practiceReviewsHead } from "@/components/admin/practice-reviews/review-levels";
 import {
 	dateWindowQuery,
-	type ObservationsSearch,
-	observationsQuery,
-	observationsSearchSchema,
+	type ResultsSearch,
+	resultsQuery,
+	resultsSearchSchema,
 	onePracticeQuery,
 	REVIEW_PAGE_SIZE,
 } from "@/components/admin/practice-reviews/review-search";
@@ -28,25 +28,25 @@ import { keepSameSubject } from "@/runtime/tanstack-query/keep-same-subject";
 import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
 
 export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/observations",
+	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/results",
 )({
-	validateSearch: observationsSearchSchema,
-	head: practiceReviewsHead("Observations"),
-	component: ObservationsListRoute,
+	validateSearch: resultsSearchSchema,
+	head: practiceReviewsHead("Results"),
+	component: ResultsListRoute,
 });
 
-function ObservationsListRoute() {
+function ResultsListRoute() {
 	const { workspaceSlug } = Route.useParams();
 	const search = Route.useSearch();
 	const setSearch = useSearchState();
-	const updateSearch = (patch: Partial<ObservationsSearch>) => {
+	const updateSearch = (patch: Partial<ResultsSearch>) => {
 		void setSearch((previous) => ({ ...previous, ...patch }), { replace: true });
 	};
 
-	const observationsQueryResult = useInfiniteQuery({
-		...listPracticeReviewObservationsInfiniteOptions({
+	const resultsQueryResult = useInfiniteQuery({
+		...listPracticeReviewResultsInfiniteOptions({
 			path: { workspaceSlug },
-			query: observationsQuery(search, REVIEW_PAGE_SIZE),
+			query: resultsQuery(search, REVIEW_PAGE_SIZE),
 		}),
 		...pagedModelParams,
 	});
@@ -55,10 +55,10 @@ function ObservationsListRoute() {
 	const summaryPractice = onePracticeQuery(search);
 
 	return (
-		<ObservationsListPage
+		<ResultsListPage
 			search={search}
 			onSearchChange={updateSearch}
-			observations={pagedListState(observationsQueryResult, (observation) => observation.id)}
+			results={pagedListState(resultsQueryResult, (result) => result.id)}
 			groups={groups}
 			practices={practices}
 			people={people}
@@ -92,7 +92,7 @@ function PracticeSummaryRead({
 	workspaceSlug: string;
 	practiceSlug: string;
 	practiceName: string | undefined;
-	search: ObservationsSearch;
+	search: ResultsSearch;
 }) {
 	const window = dateWindowQuery(search);
 	const query = useQuery({

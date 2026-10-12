@@ -3,8 +3,8 @@ import { ArrowRightIcon, ChevronRightIcon, ScanSearchIcon } from "lucide-react";
 import { Fragment, type ReactNode, useId, useState } from "react";
 
 import type {
-	ObservationDetail,
 	PracticeGroup,
+	PracticeResultDetail,
 	PracticeTraceEntry,
 	PracticeScriptRun,
 	TracedSignal,
@@ -22,11 +22,13 @@ import {
 	UNASSIGNED_GROUP_VISUAL,
 } from "@/components/practice-vocabulary/group-visuals";
 import { GroupName } from "@/components/practice-vocabulary/GroupName";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
+import { resultVerdict } from "@/components/practice-vocabulary/outcome-defs";
 import {
 	practiceScriptFix,
 	practiceScriptRunSentence,
 } from "@/components/practice-vocabulary/practice-script-run-status-defs";
+import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
+import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
 import { StatusLabel, StatusTooltip } from "@/components/practice-vocabulary/StatusTooltip";
 import {
 	TRACE_OUTCOME_DEFS,
@@ -60,11 +62,15 @@ export interface ReviewRunPracticeFilters {
 }
 
 /**
- * The words a row needs from one observation. The developer's own read carries the whole
- * observation; an admin's list row carries no correction reason, so that one may be absent.
+ * The words a row needs from one result. The developer's own read carries the whole result with
+ * its problems; an admin's list row carries no correction reason and no problems, so those may be
+ * absent.
  */
-export type PracticeRowObservation = Pick<ObservationDetail, "id" | "summary" | "invalidatedAt"> &
-	Partial<Pick<ObservationDetail, "invalidationReason">>;
+export type PracticeRowResult = Pick<
+	PracticeResultDetail,
+	"id" | "summary" | "outcome" | "invalidatedAt"
+> &
+	Partial<Pick<PracticeResultDetail, "invalidationReason" | "observations">>;
 
 export interface ReviewRunPracticeTableProps {
 	/** Where an admin's fix links lead, such as the AI models page for a missing model for practice scripts. */
@@ -74,10 +80,10 @@ export interface ReviewRunPracticeTableProps {
 	/** The occurrences this work's activity carries, so "Rests on" can name one. */
 	signals: TracedSignal[];
 	/**
-	 * What the review observed about the reader, by practice slug; one practice may have several.
+	 * The review's results about the reader, by practice slug; one practice may have several.
 	 * Absent, each row reads the recorded explanation.
 	 */
-	observationsByPractice?: Record<string, PracticeRowObservation[] | undefined>;
+	resultsByPractice?: Record<string, PracticeRowResult[] | undefined>;
 	/** For the icon and colour a group's name is drawn in; the entry carries the name itself. */
 	groups: PracticeGroup[];
 	filters: ReviewRunPracticeFilters;
@@ -104,12 +110,12 @@ export interface ReviewRunPracticeTableProps {
 	 */
 	reviewLink?: (reviewId: string, label: ReactNode) => ReactNode;
 	/**
-	 * One observation in full, with its evidence. Given, a row with observations opens in place to
+	 * One result in full, with its problems and evidence. Given, a row with results opens in place to
 	 * show them; the caller reads each one only when its row opens.
 	 */
-	renderObservation?: (observationId: string) => ReactNode;
+	renderResult?: (practiceResultId: string) => ReactNode;
 	/**
-	 * The practice the reader came to see: its row opens on arrival, with `renderObservation`, and
+	 * The practice the reader came to see: its row opens on arrival, with `renderResult`, and
 	 * scrolls into view once. Closing it closes it like any other row.
 	 */
 	focusPracticeSlug?: string;
@@ -128,7 +134,7 @@ export interface ReviewRunPracticeTableProps {
 /** Practices the workspace files in no group are still listed, under a name of their own. */
 const UNGROUPED = "Other practices";
 
-const NO_OBSERVATIONS: PracticeRowObservation[] = [];
+const NO_RESULTS: PracticeRowResult[] = [];
 
 /**
  * The practices this review decided, in the trace's order. The trace is asked for this review, which
@@ -177,14 +183,14 @@ function groupNameOf(entry: PracticeTraceEntry): string {
 }
 
 /**
- * Every practice's answer on one piece of work: its outcome, and the observations' own words where
+ * Every practice's answer on one piece of work: its outcome, and its results' own words where
  * it said something about the reader, or the recorded reason where it did not.
  */
 export function ReviewRunPracticeTable({
 	workspaceSlug,
 	entries,
 	signals,
-	observationsByPractice,
+	resultsByPractice,
 	groups,
 	filters,
 	onFiltersChange,
@@ -195,7 +201,7 @@ export function ReviewRunPracticeTable({
 	reviewId,
 	earlierReviewLink,
 	reviewLink,
-	renderObservation,
+	renderResult,
 	focusPracticeSlug,
 	plainState = false,
 	restsOnPerRow = true,
@@ -310,8 +316,8 @@ export function ReviewRunPracticeTable({
 					const group = hasText(entry.groupSlug) ? groupBySlug.get(entry.groupSlug) : undefined;
 					const visual =
 						group === undefined ? UNASSIGNED_GROUP_VISUAL : getGroupVisual(group.icon, group.color);
-					const observations = observationsByPractice?.[entry.practiceSlug] ?? NO_OBSERVATIONS;
-					const expandable = renderObservation !== undefined && observations.length > 0;
+					const results = resultsByPractice?.[entry.practiceSlug] ?? NO_RESULTS;
+					const expandable = renderResult !== undefined && results.length > 0;
 					const open =
 						expandable && (opened.has(entry.practiceSlug) || openOnArrival(entry.practiceSlug));
 					const detailId = `${detailIdBase}-${entry.practiceSlug}`;
@@ -344,7 +350,7 @@ export function ReviewRunPracticeTable({
 									<WhatItSaw
 										workspaceSlug={workspaceSlug}
 										entry={entry}
-										observations={observations}
+										results={results}
 										occurrenceName={
 											restsOnPerRow && hasText(entry.occasionedById)
 												? (signals.find((signal) => signal.id === entry.occasionedById)
@@ -381,9 +387,9 @@ export function ReviewRunPracticeTable({
 								<TableRow variant="static" id={detailId}>
 									<TableCell colSpan={3} className="bg-muted/30 p-4 whitespace-normal">
 										<div className="flex min-w-0 flex-col gap-6">
-											{observations.map((observation) => (
-												<Fragment key={observation.id}>
-													{renderObservation(observation.id)}
+											{results.map((result) => (
+												<Fragment key={result.id}>
+													{renderResult(result.id)}
 												</Fragment>
 											))}
 										</div>
@@ -482,7 +488,7 @@ export function ReviewRunPracticeTableSkeleton({
 interface WhatItSawProps {
 	workspaceSlug: string;
 	entry: PracticeTraceEntry;
-	observations: PracticeRowObservation[];
+	results: PracticeRowResult[];
 	occurrenceName: string | undefined;
 	onShowOccurrence: (signalId: string) => void;
 	canAdminister: boolean;
@@ -492,14 +498,14 @@ interface WhatItSawProps {
 }
 
 /**
- * One line per observation about the reader, or the recorded reason where there is none. The
+ * One line per result about the reader, or the recorded reason where there is none. The
  * catalog's words on the practice never stand in: they say what the practice is about, not what
  * this review made of this work. The operating facts under it are the admin's.
  */
 function WhatItSaw({
 	workspaceSlug,
 	entry,
-	observations,
+	results,
 	occurrenceName,
 	onShowOccurrence,
 	canAdminister,
@@ -509,29 +515,30 @@ function WhatItSaw({
 }: WhatItSawProps) {
 	// Narrowed here: the closure below would not keep a narrowing made in the JSX guard.
 	const occasionedById = hasText(entry.occasionedById) ? entry.occasionedById : undefined;
-	const summaries = observations.filter(
-		(observation) => hasText(observation.summary) || observation.invalidatedAt !== undefined,
+	const summaries = results.filter(
+		(result) => hasText(result.summary) || result.invalidatedAt !== undefined,
 	);
 	return (
 		<span className="flex min-w-0 flex-col items-start gap-2.5">
 			{summaries.length === 0 ? (
 				<span className="text-sm text-muted-foreground">{entry.explanation}</span>
 			) : (
-				summaries.map((observation) => (
+				summaries.map((result) => (
 					<span
-						key={observation.id}
+						key={result.id}
 						className="flex max-w-lg flex-col items-start gap-1 text-sm text-pretty"
 					>
-						{hasText(observation.summary) && (
-							<span className="font-medium">{observation.summary.trim()}</span>
+						{hasText(result.summary) && (
+							<span className="font-medium">{result.summary.trim()}</span>
 						)}
-						{observation.invalidatedAt !== undefined && (
+						<span className="text-muted-foreground">
+							{resultVerdict(result.outcome, result.observations?.length)}
+						</span>
+						{result.invalidatedAt !== undefined && (
 							<>
 								<StatusBadge def={MARKED_INCORRECT_DEF} />
-								{hasText(observation.invalidationReason) && (
-									<span className="text-muted-foreground">
-										Reason: {observation.invalidationReason}
-									</span>
+								{hasText(result.invalidationReason) && (
+									<span className="text-muted-foreground">Reason: {result.invalidationReason}</span>
 								)}
 							</>
 						)}
@@ -543,11 +550,11 @@ function WhatItSaw({
 				<span className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
 					<span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
 						<span>
-							{/* The observations behind a reused answer are the earlier review's; this one made none. */}
+							{/* The results behind a reused answer are the earlier review's; this one made none. */}
 							{earlierReview !== undefined &&
-							entry.observationCount === 0 &&
+							entry.practiceResultCount === 0 &&
 							entry.deliveredCount === 0
-								? "No new observations in this review, so nothing was sent"
+								? "No new results in this review, so nothing was sent"
 								: deliveryLabel(entry)}
 						</span>
 						<AutonomyBadge autonomy={entry.autonomy} />

@@ -14,7 +14,7 @@ import {
 	listPracticeGroupReviewRunsInfiniteQueryKey,
 	replaceFeedbackResponseMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { FeedbackResponseRequest, ObservationDetail } from "@/api/types.gen";
+import type { FeedbackResponseRequest, PracticeResultDetail } from "@/api/types.gen";
 import { isEmptyFeedbackResponse } from "@/components/profile/review-runs";
 import { filedUnder } from "@/hooks/use-pending-mutation-ids";
 import { problemDetailOf } from "@/lib/problem-detail";
@@ -40,7 +40,7 @@ interface FeedbackResponseWriteVariables {
 /**
  * Every query that carries the developer's response to a piece of feedback: the cards, the
  * overview and — when the feedback's group is known — that group's review-run feed, whose
- * observations carry the response too. A write on any surface refreshes them all, so a card
+ * results carry the response too. A write on any surface refreshes them all, so a card
  * behind the drawer never reads a response the level has already replaced. The feed's key is
  * built with no `query`, which matches the feed at every page size and practice.
  */
@@ -72,8 +72,8 @@ const READS_OF_REVIEWED_WORK: ReadonlySet<string> = new Set(["listReviewedWorkRe
 export interface FeedbackResponseWrite {
 	/** Writes the complete response; one with nothing left in it is withdrawn. */
 	write: (feedbackId: string, response: FeedbackResponseRequest) => void;
-	/** Writes the response to the feedback an observation was delivered as; one with none has none. */
-	respond: (observation: ObservationDetail, response: FeedbackResponseRequest) => void;
+	/** Writes the response to the feedback a result was delivered as; one with none has none. */
+	respond: (result: PracticeResultDetail, response: FeedbackResponseRequest) => void;
 	/**
 	 * The response being written to each piece of feedback, from whichever surface; a withdrawal is
 	 * the empty response. A surface shows it over the recorded one until the write has landed.
@@ -125,8 +125,8 @@ export function useFeedbackResponseWrite(
 
 	return {
 		write,
-		respond: (observation, response) => {
-			const feedbackId = observation.feedbackResponse?.feedbackId;
+		respond: (result, response) => {
+			const feedbackId = result.feedbackResponse?.feedbackId;
 			if (hasText(feedbackId)) {
 				write(feedbackId, response);
 			}

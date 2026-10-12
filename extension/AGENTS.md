@@ -52,7 +52,7 @@ the type check on its own. Lint holds tests to the web app's Vitest policy: narr
   It must be a canonical work address for the repository and list kind that the tab shows.
   After every await, the worker reads the tab again.
   Another list, filter, or page makes the request stale.
-  Observations and review requests stay the work page's own.
+  Results and review requests stay the work page's own.
 - **A review change is confirmed only in the extension's own window.**
   The provider page can cover or move the report frame.
   Thus, the frame never sends a review change. `action.html` is a top-level page that is not
@@ -74,7 +74,8 @@ the type check on its own. Lint holds tests to the web app's Vitest policy: narr
   Everyone, including admins, sees the comments Hephaestus recorded posting on the work for them (`getOwnDeliveredWorkFeedback`).
   The extension counts each provider comment once.
   It links only to an anchor on this work's own pages.
-  When the report opens, readers also see their own observations and named own-review trace.
+  When the report opens, readers also see their own results and named own-review trace.
+  A result that is not met shows the one-line summary of each problem under it.
   No feedback body is ever read or rendered. The comment is read on
   the provider. The provider's comment handles stay in the worker. Every developer's records, the review's delivery, and its runs stay in the web app.
   An admin reaches them through one **Review details** link.

@@ -10,16 +10,16 @@ import { OutcomeMix } from "./OutcomeMix";
 import {
 	feedbackSlots,
 	markedIncorrectSlot,
-	observationSlots,
+	resultSlots,
 	slotsTotal,
 } from "./review-outcomes";
 import { ReviewListLink } from "./ReviewListLink";
 
-const observationNoun = (total: number): string => (total === 1 ? "observation" : "observations");
+const resultNoun = (total: number): string => (total === 1 ? "result" : "results");
 const feedbackNoun = (total: number): string =>
 	total === 1 ? "piece of feedback" : "pieces of feedback";
 
-const OBSERVATIONS = observationSlots(practiceReviewOverview.observations, reviewOverviewScope);
+const RESULTS = resultSlots(practiceReviewOverview.practiceResults, reviewOverviewScope);
 const FEEDBACK = feedbackSlots(practiceReviewOverview.feedback, reviewOverviewScope);
 
 /**
@@ -27,8 +27,8 @@ const FEEDBACK = feedbackSlots(practiceReviewOverview.feedback, reviewOverviewSc
  * count wears the words, icon and tone of the registry that owns its value. The counts are text: the
  * card has one link, to the list it counts, passed as `link`.
  *
- * A flag such as "marked incorrect" overlaps the parts — a met observation marked incorrect is
- * still a met observation — so it is listed apart, under its own name, and never added.
+ * A flag such as "marked incorrect" overlaps the parts — a met result marked incorrect is
+ * still a met result — so it is listed apart, under its own name, and never added.
  */
 const meta = {
 	component: OutcomeMix,
@@ -43,16 +43,16 @@ const meta = {
 	],
 	tags: ["autodocs"],
 	args: {
-		total: slotsTotal(OBSERVATIONS),
-		slots: OBSERVATIONS,
+		total: slotsTotal(RESULTS),
+		slots: RESULTS,
 		flags: {
-			label: "Observations checked by an admin",
+			label: "Results checked by an admin",
 			slots: [
-				markedIncorrectSlot(practiceReviewOverview.observationsInvalidated, reviewOverviewScope),
+				markedIncorrectSlot(practiceReviewOverview.practiceResultsInvalidated, reviewOverviewScope),
 			],
 		},
-		noun: observationNoun,
-		label: "Observations by outcome",
+		noun: resultNoun,
+		label: "Results by outcome",
 		delta: "12 more than the previous 30 days",
 		children: <p className="text-xs text-muted-foreground">The total over time draws here.</p>,
 	},
@@ -67,18 +67,18 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Observations: Story = {
+export const Results: Story = {
 	play: async ({ canvas }) => {
-		const legend = within(canvas.getByRole("list", { name: "Observations by outcome" }));
+		const legend = within(canvas.getByRole("list", { name: "Results by outcome" }));
 		await expect(legend.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
-			"35 met observations",
-			"27 not met observations",
-			"10 not applicable",
-			"6 undetermined",
+			"35 met results",
+			"27 not met results",
+			"10 does not apply",
+			"6 could not determine",
 		]);
 		// The counts are text: the card it sits in has one link, to the list it counts.
 		await expect(canvas.queryByRole("link")).not.toBeInTheDocument();
-		const flags = within(canvas.getByRole("list", { name: "Observations checked by an admin" }));
+		const flags = within(canvas.getByRole("list", { name: "Results checked by an admin" }));
 		flags.getByText("3", { exact: false });
 	},
 };
@@ -158,8 +158,8 @@ export const WordsOnly: Story = {
 export const NothingCounted: Story = {
 	args: {
 		total: 0,
-		slots: observationSlots({ met: 0, notMet: 0, notApplicable: 0, undetermined: 0 }),
-		flags: { label: "Observations checked by an admin", slots: [markedIncorrectSlot(0)] },
+		slots: resultSlots({ met: 0, notMet: 0, notApplicable: 0, undetermined: 0 }),
+		flags: { label: "Results checked by an admin", slots: [markedIncorrectSlot(0)] },
 		delta: "Same as the previous 30 days",
 		children: undefined,
 	},

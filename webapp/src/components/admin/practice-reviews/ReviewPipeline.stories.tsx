@@ -14,11 +14,11 @@ import {
 import type { OverviewRegionState, PreviousReviewPeriodState } from "./review-states";
 import { ReviewPipeline } from "./ReviewPipeline";
 
-/** The thirty days before: fewer reviews, as many observations, more feedback. */
+/** The thirty days before: fewer reviews, as many results, more feedback. */
 const PREVIOUS: PracticeReviewOverview = {
 	...quietPracticeReviewOverview,
 	reviews: { completed: 30, failed: 0, timedOut: 0, cancelled: 0, running: 0, queued: 0 },
-	observations: { met: 40, notMet: 30, notApplicable: 5, undetermined: 3 },
+	practiceResults: { met: 40, notMet: 30, notApplicable: 5, undetermined: 3 },
 	feedback: { ...feedbackCounts([]), delivered: 30 },
 };
 
@@ -122,9 +122,9 @@ export const Default: Story = {
 			"1 failed to deliver",
 			"1 replaced by newer",
 		]);
-		// The marked-incorrect count overlaps the observations' outcomes, so it is listed apart.
+		// The marked-incorrect count overlaps the results' outcomes, so it is listed apart.
 		await expect(
-			within(canvas.getByRole("list", { name: "Observations checked by an admin" })).getByRole(
+			within(canvas.getByRole("list", { name: "Results checked by an admin" })).getByRole(
 				"listitem",
 			),
 		).toHaveTextContent("3 marked incorrect");

@@ -5,11 +5,35 @@ import type { ChatMessage as ThreadMessage } from "@/api/types.gen";
 import { hasText } from "@/lib/text";
 import type { ChatMessage, ChatTurn } from "@/lib/types";
 
-/** A `data-observation` part's data. A link stored without `text` showed nothing and proves nothing. */
-export const observationDataSchema = z.object({
+/**
+ * A `data-result` part's data: Heph linked feedback to one practice result. A link stored without
+ * `text` showed nothing and proves nothing.
+ */
+export const resultLinkDataSchema = z.object({
+	practiceResultId: z.uuid(),
+	text: z.string().optional(),
+});
+
+/** A `data-result-observation` part's data: the same link, narrowed to one observation of the result. */
+export const resultObservationLinkDataSchema = resultLinkDataSchema.extend({
+	observationId: z.uuid(),
+});
+
+/**
+ * A `data-observation` part's data, as threads saved before results had observations stored it.
+ * Its id names the result, so it reads as a result link.
+ */
+const savedResultLinkDataSchema = z.object({
 	observationId: z.uuid(),
 	text: z.string().optional(),
 });
+
+/** Every part kind that links feedback, with the check its payload must pass. */
+const FEEDBACK_LINK_SCHEMAS: Record<string, z.ZodType<{ text?: string }> | undefined> = {
+	"data-result": resultLinkDataSchema,
+	"data-result-observation": resultObservationLinkDataSchema,
+	"data-observation": savedResultLinkDataSchema,
+};
 
 /** A `data-mentor-status` part's data. */
 export const mentorStatusDataSchema = z.object({
@@ -45,10 +69,11 @@ export function mentorTurn(status: ChatStatus, state: MentorTurnState | undefine
 
 /** Parsed where it is read, so a streamed part and a stored one pass the same check. */
 export function shownFeedbackText(part: ChatMessage["parts"][number]): string | undefined {
-	if (part.type !== "data-observation") {
+	const schema = FEEDBACK_LINK_SCHEMAS[part.type];
+	if (schema === undefined || !("data" in part)) {
 		return undefined;
 	}
-	const parsed = observationDataSchema.safeParse(part.data);
+	const parsed = schema.safeParse(part.data);
 	return parsed.success && hasText(parsed.data.text?.trim()) ? parsed.data.text : undefined;
 }
 

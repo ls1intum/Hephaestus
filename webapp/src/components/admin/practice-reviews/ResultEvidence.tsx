@@ -1,29 +1,30 @@
 import { ShieldAlertIcon } from "lucide-react";
 
-import type {
-	EvidenceCitation,
-	ObservationEvidence as ObservationEvidenceData,
-} from "@/api/types.gen";
+import type { EvidenceCitation } from "@/api/types.gen";
 import {
 	codeCitationLocator,
 	DIFF_SIDE_LABELS,
+	evidenceSourceDef,
 	type EvidenceSourceGroup,
 	groupCitationsBySource,
 } from "@/components/practice-vocabulary/evidence-source-defs";
 import { Badge } from "@/components/ui/badge";
 import { hasText } from "@/lib/text";
 
-export interface ObservationEvidenceProps {
-	evidence: ObservationEvidenceData | null | undefined;
+export interface ResultEvidenceProps {
+	/** The passages one claim cites: a result's own, or one of its problems'. */
+	citations: EvidenceCitation[];
 }
 
-/** Non-code coordinates refer to serialized input, not a location a reader can open in the source. */
-export function ObservationEvidence({ evidence }: ObservationEvidenceProps) {
-	const citations = evidence?.citations ?? [];
+/**
+ * The passages behind a result or one of its problems, by source. Non-code coordinates refer to
+ * serialized input, not a location a reader can open in the source.
+ */
+export function ResultEvidence({ citations }: ResultEvidenceProps) {
 	if (citations.length === 0) {
 		return (
 			<p className="text-sm text-muted-foreground">
-				Nothing was quoted for this observation, so there is no passage to check it against.
+				Nothing was quoted, so there is no passage to check this against.
 			</p>
 		);
 	}
@@ -85,6 +86,13 @@ function EvidenceSourceSection({ group }: { group: EvidenceSourceGroup }) {
 			</ul>
 		</section>
 	);
+}
+
+/** Where a passage sits: a file coordinate for code, the object's name for anything else. */
+export function citationLocation(citation: EvidenceCitation): string {
+	return evidenceSourceDef(citation.sourceKind).locator === "code"
+		? codeCitationLocator(citation)
+		: citation.path;
 }
 
 function CitationHeader({

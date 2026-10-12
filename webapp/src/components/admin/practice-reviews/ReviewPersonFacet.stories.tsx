@@ -72,7 +72,7 @@ export const Default: Story = {
 	},
 };
 
-/** "Recipient" on Delivery, "Developer" on Observations — the two are not always the same person. */
+/** "Recipient" on Delivery, "Developer" on Results — the two are not always the same person. */
 export const NamedForItsList: Story = {
 	args: { title: "Recipient" },
 };

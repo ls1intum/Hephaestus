@@ -25,11 +25,11 @@ export function ReviewListLink({ workspaceSlug, destination, ...props }: ReviewL
 				/>
 			);
 		}
-		case "observations": {
+		case "results": {
 			return (
 				<Link
 					{...props}
-					to="/w/$workspaceSlug/admin/practices/reviews/observations"
+					to="/w/$workspaceSlug/admin/practices/reviews/results"
 					params={{ workspaceSlug }}
 					search={destination.search}
 				/>

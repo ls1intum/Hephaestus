@@ -1,28 +1,28 @@
 import { CircleSlashIcon } from "lucide-react";
 
-import type { ObservationInvalidation } from "@/api/types.gen";
+import type { PracticeResultInvalidation } from "@/api/types.gen";
 
 import type { StatusDef } from "@/components/common/status-def";
 
-export type ProviderCopy = ObservationInvalidation["providerCopy"];
+export type ProviderCopy = PracticeResultInvalidation["providerCopy"];
 
 /**
- * The mark on an observation a workspace admin found wrong when it was made. `note` is what a count
- * of marked observations does and does not say, for every surface that shows one.
+ * The mark on a result a workspace admin found wrong when it was made. `note` is what a count of
+ * marked results does and does not say, for every surface that shows one.
  */
 export const MARKED_INCORRECT_DEF: StatusDef & { note: string } = {
 	label: "Marked incorrect",
 	icon: CircleSlashIcon,
 	badgeVariant: "destructive",
 	description:
-		"A workspace admin marked this observation as incorrect. It counts toward nothing current.",
-	note: "Only observations an admin found wrong are marked. An unmarked one is not confirmed correct.",
+		"A workspace admin marked this result as incorrect. It counts toward nothing current.",
+	note: "Only results an admin found wrong are marked. An unmarked one is not confirmed correct.",
 };
 
 /** What became of the comments already on the work while a correction is in force. */
 export const PROVIDER_COPY_IN_FORCE: Record<ProviderCopy, string> = {
 	PENDING:
-		"Hephaestus is still correcting the comments it posted about this observation, or it is still checking whether a comment it tried to post arrived.",
+		"Hephaestus is still correcting the comments it posted about this result, or it is still checking whether a comment it tried to post arrived.",
 	NONE: "No comment about it was found on the work.",
 	UPDATED:
 		"Every summary comment Hephaestus posted about it now opens with a correction notice, or has since been deleted.",
@@ -38,6 +38,5 @@ export const PROVIDER_COPY_RESTORED: Record<ProviderCopy, string | undefined> = 
 	NONE: undefined,
 	UPDATED: "The correction notice was removed from posted comments.",
 	INLINE_REMAINS: undefined,
-	UNRESOLVED:
-		"A summary comment could not be edited, so it may not match the restored observation.",
+	UNRESOLVED: "A summary comment could not be edited, so it may not match the restored result.",
 };

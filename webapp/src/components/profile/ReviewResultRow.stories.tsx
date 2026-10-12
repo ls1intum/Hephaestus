@@ -1,28 +1,31 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, within } from "storybook/test";
 
-import type { FeedbackResponseRequest, ObservationDetail } from "@/api/types.gen";
+import type { FeedbackResponseRequest, PracticeResultDetail } from "@/api/types.gen";
 import { formatDay } from "@/lib/dates";
 import { expectSettledVisible } from "@/stories/overlay";
 import {
+	detailResult,
+	metWithExample,
 	nextStepWithoutDelivery,
 	searchedAndFoundNothing,
+	undeterminedResult,
 } from "@/stories/practice-detail-story-mock-data";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 import { daysBefore } from "@/stories/story-clock";
 import { expectGenuinelyDisabled } from "@/test/controls";
 
-import { ReviewObservationRow } from "./ReviewObservationRow";
+import { ReviewResultRow } from "./ReviewResultRow";
 
-/** The pull request every observation here was seen on. */
+/** The pull request every result here was recorded on. */
 const reviewedWork = {
 	artifactId: 4821,
 	artifactKind: "scm.pull_request",
 	artifactUrl: "https://github.com/owner/repo/pull/4821",
 } as const;
 
-/** Everything the feed can carry about one observation, so every block has something to show. */
+/** Everything the feed can carry about one result, so every block has something to show. */
 const strength = {
 	id: "00000000-0000-0000-0000-000000000101",
 	feedbackResponse: { feedbackId: "00000000-0000-0000-0000-000000000102", usefulness: "HELPFUL" },
@@ -33,6 +36,7 @@ const strength = {
 	observedAt: daysBefore(2),
 	origin: "LIVE",
 	claimCurrentness: "CURRENT",
+	observations: [],
 	...reviewedWork,
 	evidenceRationale:
 		"The comment above the changed branch states why the timeout was raised, so a later reader does not have to reconstruct it from the diff.",
@@ -65,10 +69,11 @@ const strength = {
 				quoteRedacted: false,
 			},
 		],
+		undecidability: [],
 	},
-} satisfies ObservationDetail;
+} satisfies PracticeResultDetail;
 
-/** A problem seen. The wire ranks it, and the row deliberately does not show the rank. */
+/** A result not met. The wire ranks it, and the row deliberately does not show the rank. */
 const problemSeen = {
 	id: "00000000-0000-0000-0000-000000000301",
 	practiceSlug: "does-not-swallow-errors",
@@ -79,11 +84,12 @@ const problemSeen = {
 	observedAt: daysBefore(2),
 	origin: "LIVE",
 	claimCurrentness: "CURRENT",
+	observations: [],
 	...reviewedWork,
-} satisfies ObservationDetail;
+} satisfies PracticeResultDetail;
 
 /** One row per outcome, with no expanded evidence. */
-const outcomes: ObservationDetail[] = [
+const outcomes: PracticeResultDetail[] = [
 	problemSeen,
 	{
 		id: "00000000-0000-0000-0000-000000000201",
@@ -94,6 +100,7 @@ const outcomes: ObservationDetail[] = [
 		observedAt: daysBefore(2),
 		origin: "LIVE",
 		claimCurrentness: "CURRENT",
+		observations: [],
 		...reviewedWork,
 	},
 	{
@@ -105,6 +112,7 @@ const outcomes: ObservationDetail[] = [
 		observedAt: daysBefore(2),
 		origin: "LIVE",
 		claimCurrentness: "CURRENT",
+		observations: [],
 		...reviewedWork,
 	},
 	{
@@ -116,15 +124,16 @@ const outcomes: ObservationDetail[] = [
 		observedAt: daysBefore(2),
 		origin: "LIVE",
 		claimCurrentness: "CURRENT",
+		observations: [],
 		...reviewedWork,
 	},
 ];
 
 const meta = {
-	component: ReviewObservationRow,
+	component: ReviewResultRow,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
-	args: { observation: strength, onRespond: fn() },
+	args: { result: strength, onRespond: fn() },
 	decorators: [
 		(Story) => (
 			<ul className="divide-y rounded-lg border">
@@ -132,7 +141,7 @@ const meta = {
 			</ul>
 		),
 	],
-} satisfies Meta<typeof ReviewObservationRow>;
+} satisfies Meta<typeof ReviewResultRow>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -179,7 +188,7 @@ export const Default: Story = {
  */
 export const StaleWithoutEvidence: Story = {
 	args: {
-		observation: {
+		result: {
 			...strength,
 			claimCurrentness: "STALE",
 			evidenceRationale: undefined,
@@ -188,7 +197,7 @@ export const StaleWithoutEvidence: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.getByText("The practice or the reviewed work changed after this observation."),
+			canvas.getByText("The practice or the reviewed work changed after this result."),
 		).toBeVisible();
 		await expect(canvas.queryByText("Why it was noted")).not.toBeInTheDocument();
 		await expect(canvas.queryByText("Evidence")).not.toBeInTheDocument();
@@ -202,7 +211,7 @@ export const StaleWithoutEvidence: Story = {
  */
 export const MarkedIncorrect: Story = {
 	args: {
-		observation: {
+		result: {
 			...strength,
 			invalidatedAt: daysBefore(1),
 			invalidationReason: "Issue #1 was still open; it closes when the merge request is merged.",
@@ -210,6 +219,9 @@ export const MarkedIncorrect: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Marked incorrect")).toBeVisible();
+		await expect(
+			canvas.getByText("A workspace admin marked this result as incorrect."),
+		).toBeVisible();
 		await expect(
 			canvas.getByText(/Issue #1 was still open; it closes when the merge request is merged\./u),
 		).toBeVisible();
@@ -222,7 +234,7 @@ export const MarkedIncorrect: Story = {
  */
 export const Responded: Story = {
 	args: {
-		observation: {
+		result: {
 			...strength,
 			feedbackResponse: {
 				feedbackId: "00000000-0000-0000-0000-000000000102",
@@ -244,9 +256,9 @@ export const Responded: Story = {
 	},
 };
 
-/** An observation with no words of its own is named by its practice alone, still as the pill. */
-export const UntitledObservation: Story = {
-	args: { observation: { ...strength, summary: "" }, showPracticeName: false },
+/** A result with no words of its own is named by its practice alone, still as the pill. */
+export const UntitledResult: Story = {
+	args: { result: { ...strength, summary: "" }, showPracticeName: false },
 	play: async ({ canvas }) => {
 		await expect(canvas.getAllByText(strength.practiceName)).toHaveLength(1);
 		await expect(canvas.getByText(strength.practiceName)).toBeVisible();
@@ -260,8 +272,8 @@ export const UntitledObservation: Story = {
 export const EveryOutcome: Story = {
 	render: (args) => (
 		<>
-			{outcomes.map((observation) => (
-				<ReviewObservationRow key={observation.id} {...args} observation={observation} />
+			{outcomes.map((result) => (
+				<ReviewResultRow key={result.id} {...args} result={result} />
 			))}
 		</>
 	),
@@ -270,8 +282,8 @@ export const EveryOutcome: Story = {
 		await expect(buttons.map((button) => button.textContent)).toStrictEqual([
 			"Not met",
 			"Met",
-			"Not applicable",
-			"Undetermined",
+			"Does not apply",
+			"Could not determine",
 		]);
 		for (const button of buttons) {
 			await expect(button).not.toHaveAttribute("aria-expanded");
@@ -288,7 +300,7 @@ export const EveryOutcome: Story = {
  */
 export const FeedbackPending: Story = {
 	args: {
-		observation: {
+		result: {
 			...strength,
 			feedbackResponse: {
 				feedbackId: "00000000-0000-0000-0000-000000000102",
@@ -300,11 +312,11 @@ export const FeedbackPending: Story = {
 	render: (args) => (
 		<Stateful<FeedbackResponseRequest | undefined> initial={args.pendingResponse}>
 			{(pendingResponse, setPendingResponse) => (
-				<ReviewObservationRow
+				<ReviewResultRow
 					{...args}
 					pendingResponse={pendingResponse}
-					onRespond={(observation, response) => {
-						args.onRespond?.(observation, response);
+					onRespond={(result, response) => {
+						args.onRespond?.(result, response);
 						setPendingResponse(response);
 					}}
 				/>
@@ -408,7 +420,7 @@ export const OutcomeExplained: Story = {
  */
 export const MobileReflow: Story = {
 	args: {
-		observation: { ...strength, outcome: "NOT_MET", severity: "MAJOR", origin: "BACKFILL" },
+		result: { ...strength, outcome: "NOT_MET", severity: "MAJOR", origin: "BACKFILL" },
 	},
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async ({ canvas }) => {
@@ -423,7 +435,7 @@ export const MobileReflow: Story = {
  * missing can be judged against the search that reported it.
  */
 export const SearchedAndFoundNothing: Story = {
-	args: { observation: searchedAndFoundNothing },
+	args: { result: searchedAndFoundNothing },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("What was checked")).toBeVisible();
 		await expect(canvas.getByText("Looked for:")).toBeVisible();
@@ -449,10 +461,10 @@ export const SearchedAndFoundNothing: Story = {
 /**
  * The next step the review wrote about this work, with nothing delivered from it. It is the row's
  * one next step either way: the delivery may have been withheld or rewritten, and two sentences
- * about the same observation cannot both be acted on.
+ * about the same result cannot both be acted on.
  */
 export const NextStepWithoutDelivery: Story = {
-	args: { observation: nextStepWithoutDelivery },
+	args: { result: nextStepWithoutDelivery },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Next step")).toBeVisible();
 		await expect(
@@ -470,7 +482,7 @@ export const NextStepWithoutDelivery: Story = {
  */
 export const FeedbackOnTheWork: Story = {
 	args: {
-		observation: {
+		result: {
 			...strength,
 			feedbackCommentUrls: [
 				"https://github.com/owner/repo/pull/4821#issuecomment-1",
@@ -496,7 +508,7 @@ export const FeedbackOnTheWork: Story = {
  * work under its own name and never presents it as the feedback comment.
  */
 export const NoFeedbackLinkRecorded: Story = {
-	args: { observation: { ...strength, feedbackCommentUrls: undefined } },
+	args: { result: { ...strength, feedbackCommentUrls: undefined } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("link", { name: /Open reviewed work/u })).toHaveAttribute(
 			"href",
@@ -504,5 +516,86 @@ export const NoFeedbackLinkRecorded: Story = {
 		);
 		await expect(canvas.queryByText("Feedback on the work")).toBeNull();
 		await expect(canvas.queryByRole("link", { name: /feedback comment/u })).toBeNull();
+	},
+};
+
+/**
+ * Not met, with three problems. The head counts them, and each problem opens with what is wrong,
+ * then why in the reviewer's words, where, and what to change. Neither the result nor a problem
+ * shows its severity: the reader's own view never ranks their work.
+ */
+export const NotMetWithProblems: Story = {
+	args: { result: detailResult },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByRole("button", { name: new RegExp(detailResult.summary, "u") }),
+		).toHaveTextContent("Not met · 3 problems");
+		const problems = canvas.getByRole("list", { name: "Problems" });
+		const items = within(problems).getAllByRole("listitem");
+		await expect(items).toHaveLength(3);
+		await expect(
+			within(items[0] ?? problems).getByText("The caching change hides inside the package move"),
+		).toBeVisible();
+		// The explanation is the reviewer's Markdown: a class name it quotes is code.
+		await expect(within(problems).getByText("PracticeCatalogLoader").tagName).toBe("CODE");
+		await expect(
+			within(problems).getByText("Move the class in one commit and add the cache in the next."),
+		).toBeVisible();
+		for (const label of ["Critical", "Major", "Minor", "Trivial"]) {
+			await expect(canvas.queryByText(label)).toBeNull();
+		}
+		// A problem's place in the diff is quoted under it, not under the result.
+		await expect(
+			within(problems).getByText(
+				'@Cacheable(cacheNames = "practice-catalog", key = "#workspaceId")',
+			),
+		).toBeVisible();
+	},
+};
+
+/**
+ * The review could not settle the practice. Each open question says what would settle it and,
+ * where the review asked about one place, quotes it. A question is not feedback and no problem.
+ */
+export const CouldNotDetermine: Story = {
+	args: { result: undeterminedResult },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Could not determine")).toBeVisible();
+		const questions = canvas.getByRole("list", { name: "Open questions" });
+		await expect(within(questions).getAllByRole("listitem")).toHaveLength(2);
+		await expect(
+			within(questions).getByText("Was the package move asked for in the linked issue?"),
+		).toBeVisible();
+		await expect(within(questions).getAllByText("Would settle it:")).toHaveLength(2);
+		await expect(
+			within(questions).getByText("The text of issue #880, which the description links."),
+		).toBeVisible();
+		await expect(within(questions).getByText('"body" : "Closes #880"')).toBeVisible();
+		await expect(canvas.queryByText("Problems")).toBeNull();
+		await expect(canvas.queryByText("What was checked")).toBeNull();
+	},
+};
+
+/**
+ * Met, with one place in the work the review points at. It reads as evidence about the work, on
+ * the neutral ground every other block has: no praise and no status colour.
+ */
+export const ExampleFromThisWork: Story = {
+	args: { result: metWithExample },
+	play: async ({ canvas }) => {
+		const example = canvas.getByText("Example from this work").parentElement;
+		if (example === null) {
+			throw new Error("The example has no section around its label.");
+		}
+		await expect(
+			within(example).getByText(
+				"This commit moves the loader and changes nothing else, so it can be reverted on its own.",
+			),
+		).toBeVisible();
+		await expect(
+			within(example).getByText("package de.tum.cit.aet.hephaestus.practices.catalog;"),
+		).toBeVisible();
+		await expect(example.querySelector("[class*='success']")).toBeNull();
+		await expect(canvas.queryByText(/great|well done|nice work/iu)).toBeNull();
 	},
 };

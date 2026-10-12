@@ -126,12 +126,12 @@ export const ALL_PRACTICE_GROUPS_LEVEL: DetailStackEntry<PracticeProfileDetailLe
 };
 
 /**
- * The practice level's tabs: the feedback written about the practice, what the reviews found, and
- * the practice guide. The catalog's words on the practice open the level above them. The choice is
+ * The practice level's tabs: the feedback written about the practice, the results of the reviews,
+ * and the practice guide. The catalog's words on the practice open the level above them. The choice is
  * the `practiceTab` search param; the feedback leads and is where the level opens, and the level
  * shows the guide only for a practice that has one.
  */
-export const PRACTICE_TABS = ["feedback", "observations", "guide"] as const;
+export const PRACTICE_TABS = ["feedback", "results", "guide"] as const;
 
 export type PracticeTab = (typeof PRACTICE_TABS)[number];
 
@@ -161,7 +161,7 @@ export const DEFAULT_FEEDBACK_TAB: FeedbackTab = "open";
 /**
  * What the page itself reads out of the URL: the table's sort, the feedback tab, and the selection
  * inside the open levels — the practice level's tab, and the review levels' filters and tab. A
- * hand-typed value a surface cannot show reads as the default. Which observations are open is not
+ * hand-typed value a surface cannot show reads as the default. Which results are open is not
  * here: every one arrives open and closes on its own, and nothing addresses one.
  */
 const practiceProfileFilterSchema = z.object({

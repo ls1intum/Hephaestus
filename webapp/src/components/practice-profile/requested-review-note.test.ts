@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ObservationDetail } from "@/api/types.gen";
+import type { PracticeResultDetail } from "@/api/types.gen";
 
 import { requestedReviewNote } from "./requested-review-note";
 
@@ -11,8 +11,11 @@ const developing = {
 	trendSupport: { opportunities: 4 },
 } satisfies Practice;
 
-function run(origin: ObservationDetail["origin"], ...outcomes: ObservationDetail["outcome"][]) {
-	return { observations: outcomes.map((outcome) => ({ origin, outcome })) };
+function run(
+	origin: PracticeResultDetail["origin"],
+	...outcomes: PracticeResultDetail["outcome"][]
+) {
+	return { practiceResults: outcomes.map((outcome) => ({ origin, outcome })) };
 }
 
 describe("requestedReviewNote", () => {

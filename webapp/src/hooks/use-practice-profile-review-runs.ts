@@ -138,7 +138,7 @@ export function usePracticeProfileReviewRuns({
 	const open: ProfileReviewDetailState = panelState(runQuery, (detail) => ({
 		status: "ready" as const,
 		run: detail.run,
-		observations: detail.observations,
+		practiceResults: detail.practiceResults,
 		activity: panelState(traceQuery, (trace) => ({ status: "ready" as const, trace })),
 	}));
 

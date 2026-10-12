@@ -1,6 +1,10 @@
-import type { ObservationDetail, ProfileReviewRun, ReviewedWorkRef } from "@/api/types.gen";
+import type { PracticeResultDetail, ProfileReviewRun, ReviewedWorkRef } from "@/api/types.gen";
 
-import { detailObservation } from "./practice-detail-story-mock-data";
+import {
+	detailResult,
+	metWithExample,
+	undeterminedResult,
+} from "./practice-detail-story-mock-data";
 import { issue, pullRequest } from "./practice-profile-story-mock-data";
 import { daysBefore } from "./story-clock";
 
@@ -104,14 +108,13 @@ export const runningProfileReviewRun: ProfileReviewRun = {
 	...nothingCounted,
 };
 
-/** What the open review observed about the reader: two observations, both on Thin controllers. */
-export const openProfileRunObservations: ObservationDetail[] = [
-	{ ...detailObservation, practiceSlug: "thin-controllers", practiceName: "Thin controllers" },
-	{
-		...detailObservation,
-		id: "00000000-0000-0000-0000-0000000001aa",
-		practiceSlug: "thin-controllers",
-		practiceName: "Thin controllers",
-		summary: "A dependency bump rode along with the behaviour change",
-	},
+/**
+ * The open review's results about the reader, one per practice it decided: Thin controllers not met
+ * with three problems, Product language met with an example from the work, and Migration safety
+ * left open.
+ */
+export const openProfileRunResults: PracticeResultDetail[] = [
+	{ ...detailResult, practiceSlug: "thin-controllers", practiceName: "Thin controllers" },
+	{ ...metWithExample, practiceSlug: "product-language", practiceName: "Product language" },
+	{ ...undeterminedResult, practiceSlug: "migration-safety", practiceName: "Migration safety" },
 ];

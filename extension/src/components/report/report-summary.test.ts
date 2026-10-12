@@ -11,7 +11,7 @@ function practice(overrides: Partial<PracticeTraceEntry>): PracticeTraceEntry {
 		autonomy: "AUTOMATIC",
 		deliveredCount: 0,
 		explanation: "",
-		observationCount: 0,
+		practiceResultCount: 0,
 		outcome: "REVIEWED",
 		practiceName: "Clear work",
 		practiceSlug: "clear-work",

@@ -45,7 +45,7 @@ function ReviewedWorkFeedbackRoute() {
 	return (
 		<ReviewedWorkFeedbackPage
 			feed={reviewRunFeedState(runs)}
-			observations={readOnly ? undefined : { onRespond: respond, pendingResponses }}
+			results={readOnly ? undefined : { onRespond: respond, pendingResponses }}
 		/>
 	);
 }

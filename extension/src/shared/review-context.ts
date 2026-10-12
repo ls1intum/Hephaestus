@@ -1,4 +1,4 @@
-import type { ArtifactTrace, ObservationDetail, ReviewedWorkRef } from "~/api/types.gen";
+import type { ArtifactTrace, PracticeResultList, ReviewedWorkRef } from "~/api/types.gen";
 import type { WorkPageView } from "~/shared/work-url";
 
 /**
@@ -86,9 +86,12 @@ export type ReviewContext =
 	| ReadyContext
 	| { status: "error"; message: string };
 
-/** One of the reader's own observations on the work, as the report lists it. */
-export type ObservationRow = Pick<
-	ObservationDetail,
+/**
+ * One of the reader's own results on the work, as the report lists it: one practice's verdict and,
+ * when it is not met, the one line of each problem under it.
+ */
+export type ResultRow = Pick<
+	PracticeResultList,
 	| "id"
 	| "practiceName"
 	| "practiceSlug"
@@ -97,12 +100,13 @@ export type ObservationRow = Pick<
 	| "severity"
 	| "claimCurrentness"
 	| "observedAt"
+	| "problems"
 >;
 
-export interface ObservationPage {
+export interface ResultPage {
 	/** The first page, most severe first. */
-	rows: ObservationRow[];
-	/** Every observation about the reader's work here; counts over `rows` are exact only up to it. */
+	rows: ResultRow[];
+	/** Every result about the reader's work here; counts over `rows` are exact only up to it. */
 	total: number;
 	fetchedAt: string;
 }

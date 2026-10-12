@@ -30,7 +30,7 @@ export interface ResponseCommentBandProps {
 }
 
 /**
- * The band a response opens under a card's footer or an observation's response buttons, on the
+ * The band a response opens under a card's footer or a result's response buttons, on the
  * action band's ground: a label, one line for Heph, and Skip or Send. The caller mounts it only
  * while the response is being given and keys it on the choice, so a draft never survives into
  * another choice's band.

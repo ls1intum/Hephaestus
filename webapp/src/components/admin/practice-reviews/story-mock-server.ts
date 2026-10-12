@@ -1,6 +1,6 @@
 import { HttpResponse, http } from "msw";
 
-import type { ReviewFeedback, ReviewObservation } from "@/api/types.gen";
+import type { ReviewFeedback, ReviewResult } from "@/api/types.gen";
 import { artifactTrace, tracedArtifacts } from "@/components/practice-trace/fixtures";
 import { hasText } from "@/lib/text";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
@@ -11,7 +11,7 @@ import {
 	locationCounts,
 	mergedPullRequestFacts,
 	mockJobUsageTwoAttempts,
-	observationDetail,
+	resultDetail,
 	openIssueFacts,
 	practiceGroups,
 	practiceReviewOverview,
@@ -21,7 +21,7 @@ import {
 	reasonCounts,
 	reviewFeedback,
 	reviewJob,
-	reviewObservations,
+	reviewResults,
 	reviewRuns,
 	workspaceMembers,
 	workspacePractices,
@@ -97,7 +97,7 @@ function page(rows: unknown[], url: URL) {
 	});
 }
 
-function filterObservations(rows: ReviewObservation[], url: URL) {
+function filterResults(rows: ReviewResult[], url: URL) {
 	const subjectUserId = single(url, "subjectUserId");
 	const invalidated = single(url, "invalidated");
 	const disputed = single(url, "disputed");
@@ -138,7 +138,7 @@ function filterFeedback(rows: ReviewFeedback[], url: URL) {
  */
 const ACTIONABILITY_RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, INFO: 3 };
 
-function actionability(row: ReviewObservation): number {
+function actionability(row: ReviewResult): number {
 	switch (row.outcome) {
 		case "NOT_MET": {
 			return ACTIONABILITY_RANK[row.severity ?? "INFO"] ?? 4;
@@ -153,7 +153,7 @@ function actionability(row: ReviewObservation): number {
 	}
 }
 
-function sortObservations(rows: ReviewObservation[], url: URL) {
+function sortResults(rows: ReviewResult[], url: URL) {
 	if (single(url, "sort") !== "ACTIONABILITY") {
 		return rows;
 	}
@@ -166,26 +166,22 @@ function sortObservations(rows: ReviewObservation[], url: URL) {
 }
 
 export interface ReviewMockOptions {
-	observations?: ReviewObservation[];
+	results?: ReviewResult[];
 	feedback?: ReviewFeedback[];
 	/**
-	 * Answer an observation query with a 400 unless it asks for this ordering. A screen that shows
-	 * only the observations most worth acting on has to request that ordering, and a mock that ignores
+	 * Answer a result query with a 400 unless it asks for this ordering. A screen that shows only
+	 * the results most worth acting on has to request that ordering, and a mock that ignores
 	 * `sort` answers a screen that forgot to ask exactly as it answers one that remembered.
 	 */
-	requireObservationSort?: string;
+	requireResultSort?: string;
 }
 
 /**
  * Spread into a story's `msw.handlers` with the handlers that story overrides placed *before* it:
  * MSW matches the first handler that fits.
  */
-export function reviewHandlers({
-	observations,
-	feedback,
-	requireObservationSort,
-}: ReviewMockOptions = {}) {
-	const observationRows = observations ?? reviewObservations;
+export function reviewHandlers({ results, feedback, requireResultSort }: ReviewMockOptions = {}) {
+	const resultRows = results ?? reviewResults;
 	const feedbackRows = feedback ?? reviewFeedback;
 	return [
 		// One fixed range whatever `from` and `zone` asked for: the overview's counts are the server's
@@ -199,19 +195,16 @@ export function reviewHandlers({
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/queue", () =>
 			HttpResponse.json(busyReviewQueue),
 		),
-		http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", ({ request }) => {
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/results", ({ request }) => {
 			const url = new URL(request.url);
-			if (hasText(requireObservationSort) && single(url, "sort") !== requireObservationSort) {
-				return HttpResponse.json(
-					{ detail: `Expected sort=${requireObservationSort}` },
-					{ status: 400 },
-				);
+			if (hasText(requireResultSort) && single(url, "sort") !== requireResultSort) {
+				return HttpResponse.json({ detail: `Expected sort=${requireResultSort}` }, { status: 400 });
 			}
-			return page(sortObservations(filterObservations(observationRows, url), url), url);
+			return page(sortResults(filterResults(resultRows, url), url), url);
 		}),
 		http.get(
-			"*/workspaces/:workspaceSlug/practices/reviews/observations/:observationId",
-			({ params }) => HttpResponse.json(observationDetail(String(params.observationId))),
+			"*/workspaces/:workspaceSlug/practices/reviews/results/:practiceResultId",
+			({ params }) => HttpResponse.json(resultDetail(String(params.practiceResultId))),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", ({ request }) => {
 			const url = new URL(request.url);

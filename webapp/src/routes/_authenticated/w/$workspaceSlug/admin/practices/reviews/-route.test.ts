@@ -133,10 +133,10 @@ describe("practice review routes", () => {
 		// The Work tab is gone: its address lands on the Reviews tab, showing the work without a review.
 		["Reviews", `${REVIEWS}/work`],
 		["Reviews", `${REVIEWS}/runs`],
-		["Observations", `${REVIEWS}/observations`],
+		["Results", `${REVIEWS}/results`],
 		["Feedback", `${REVIEWS}/feedback`],
 		// A level is opened over the tab the reader is on, and never moves them off it.
-		["Observations", `${REVIEWS}/observations?detail=feedback:${FEEDBACK}`],
+		["Results", `${REVIEWS}/results?detail=feedback:${FEEDBACK}`],
 	])("marks only %s as current on %s", async (expectedCurrent, url) => {
 		renderRouteAtWithRouter(url);
 
@@ -157,7 +157,7 @@ describe("practice review routes", () => {
 	 * on that tab.
 	 */
 	it.each([
-		["/observations", `subjectUserId=7&severity=${encodeURIComponent('["MAJOR"]')}`],
+		["/results", `subjectUserId=7&severity=${encodeURIComponent('["MAJOR"]')}`],
 		["/feedback", `recipientUserId=7&location=${encodeURIComponent('["GITHUB"]')}`],
 		["/runs", `subjectUserId=7&status=${encodeURIComponent('["FAILED"]')}`],
 		["/work", "subjectUserId=7&kind=scm.issue"],
@@ -197,7 +197,7 @@ describe("practice review routes", () => {
 	it("keeps a chosen range on the overview and off every tab", async () => {
 		renderRouteAtWithRouter(`${REVIEWS}?range=90d`);
 		const navigation = await sectionNavigation();
-		for (const tab of ["Overview", "Reviews", "Observations", "Feedback"]) {
+		for (const tab of ["Overview", "Reviews", "Results", "Feedback"]) {
 			expect(carriedSearch(sectionLink(navigation, tab))).toStrictEqual({});
 		}
 	});

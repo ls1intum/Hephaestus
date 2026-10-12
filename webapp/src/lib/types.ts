@@ -1,15 +1,22 @@
 import type { UIMessage } from "ai";
 import type { z } from "zod";
 
-import type { mentorStatusDataSchema, observationDataSchema } from "@/lib/chat-validation";
+import type {
+	mentorStatusDataSchema,
+	resultLinkDataSchema,
+	resultObservationLinkDataSchema,
+} from "@/lib/chat-validation";
 
 /**
- * Mirrors `UIMessageChunk.DataObservation` and `UIMessageChunk.DataMentorStatus`; read them through
- * `shownFeedbackText` and `mentorStatus`, which check the payload.
+ * Mirrors the server's result link parts and `UIMessageChunk.DataMentorStatus`; read them through
+ * `shownFeedbackText` and `mentorStatus`, which check the payload. A thread saved before the result
+ * links keeps `data-observation` parts, which the index signature admits and `shownFeedbackText`
+ * reads as result links.
  */
 export interface CustomUIDataTypes {
 	[name: string]: unknown;
-	observation: z.infer<typeof observationDataSchema>;
+	result: z.infer<typeof resultLinkDataSchema>;
+	"result-observation": z.infer<typeof resultObservationLinkDataSchema>;
 	"mentor-status": z.infer<typeof mentorStatusDataSchema>;
 }
 

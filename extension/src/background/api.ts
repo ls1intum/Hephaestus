@@ -7,7 +7,7 @@ import {
 	getOwnDeliveredWorkFeedback,
 	getWorkspace,
 	listIdentityProviders,
-	listObservations,
+	listResults,
 	listReviewedWorkReviewRuns,
 	listWorkspaces,
 	logoutClientSession,
@@ -21,7 +21,7 @@ import type {
 	CurrentUserView,
 	DeliveredWorkFeedback,
 	IdentityProviderView,
-	PageResponseDtoObservationList,
+	PageResponseDtoPracticeResultList,
 	ReviewRequestOutcome,
 	ReviewContext as ReviewContextDTO,
 	Workspace,
@@ -281,18 +281,18 @@ export class AuthenticatedApi {
 	}
 
 	/**
-	 * The reader's own observations on one piece of work, most severe first. Not-applicable rows are
+	 * The reader's own results on one piece of work, most severe first. Not-applicable rows are
 	 * left out: they say the practice had nothing to judge here, which the web app's trace explains.
 	 */
-	async ownObservations(
+	async ownResults(
 		workspaceSlug: string,
 		artifactKind: string,
 		artifactId: number,
 		size: number,
-	): Promise<PageResponseDtoObservationList> {
+	): Promise<PageResponseDtoPracticeResultList> {
 		return body(
 			await this.#call(async (client) =>
-				listObservations({
+				listResults({
 					client,
 					path: { workspaceSlug },
 					query: { artifactKind, artifactId, displayableOnly: true, sort: "SEVERITY", size },

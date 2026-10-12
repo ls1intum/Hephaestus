@@ -89,7 +89,7 @@ export const Default: Story = {
 		await expect(sections.getAllByRole("link").map((link) => link.textContent)).toEqual([
 			"Overview",
 			"Reviews",
-			"Observations",
+			"Results",
 			"Feedback",
 		]);
 		await expect(sections.getByRole("link", { name: "Reviews" })).toHaveAttribute(
@@ -213,7 +213,7 @@ export const CurrentSection: Story = {
 		);
 		// Overview's address is a prefix of every other section's, so it is the one a fuzzy match would
 		// also mark.
-		for (const name of ["Overview", "Reviews", "Observations"]) {
+		for (const name of ["Overview", "Reviews", "Results"]) {
 			await expect(sections.getByRole("link", { name })).not.toHaveAttribute("aria-current");
 		}
 		await expect(sections.queryByRole("tab")).not.toBeInTheDocument();

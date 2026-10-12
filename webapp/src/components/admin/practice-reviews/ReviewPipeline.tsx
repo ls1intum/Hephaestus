@@ -19,7 +19,7 @@ import {
 	finishedCount,
 	markedIncorrectSlot,
 	OUTCOME_LEGEND_LABELS,
-	observationSlots,
+	resultSlots,
 	type OutcomeScope,
 	scopeSearch,
 	overviewFeedbackSlots,
@@ -90,21 +90,21 @@ const STAGES: readonly StageDef[] = [
 		}),
 	},
 	{
-		key: "observations",
-		title: "Observations",
+		key: "results",
+		title: "Results",
 		icon: ScanSearchIcon,
-		noun: (count) => (count === 1 ? "observation" : "observations"),
-		perBucket: (bucket) => bucket.observations,
-		total: (overview) => slotsTotal(observationSlots(overview.observations)),
+		noun: (count) => (count === 1 ? "result" : "results"),
+		perBucket: (bucket) => bucket.practiceResults,
+		total: (overview) => slotsTotal(resultSlots(overview.practiceResults)),
 		// The outcome's own word, one form for all four: "35 met", "27 not met", "10 not applicable".
 		slots: (overview, scope) =>
-			observationSlots(overview.observations, scope).map((slot) => ({
+			resultSlots(overview.practiceResults, scope).map((slot) => ({
 				...slot,
 				label: slot.def.label.toLowerCase(),
 			})),
 		flags: (overview, scope) => ({
-			label: OUTCOME_LEGEND_LABELS.checkedObservations,
-			slots: [markedIncorrectSlot(overview.observationsInvalidated, scope)],
+			label: OUTCOME_LEGEND_LABELS.checkedResults,
+			slots: [markedIncorrectSlot(overview.practiceResultsInvalidated, scope)],
 		}),
 	},
 	{
@@ -126,7 +126,7 @@ const GRID_COLUMNS: Partial<Record<number, string>> = {
 };
 
 /**
- * The stages work flows through — reviews ran, recorded observations, composed feedback — a tile
+ * The stages work flows through — reviews ran, recorded results, composed feedback — a tile
  * each, in the recipe of Activity's tiles: the total, how it compares with the period before, its
  * volume over the range, then what it split into. Each stage is counted by its own date, so the
  * tiles stand side by side rather than claiming one caused the next. The tile's title has no link,

@@ -6,7 +6,7 @@ import { assert, describe, expect, it, vi } from "vitest";
 
 import {
 	getPracticeReviewOverviewQueryKey,
-	listPracticeReviewObservationsQueryKey,
+	listPracticeReviewResultsQueryKey,
 	listPracticeReviewsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import {
@@ -44,9 +44,9 @@ function proposalWire(deliveryState: "AWAITING_APPROVAL" | "PREPARED") {
 						placement.type === "SUMMARY" ? { ...placement, body } : placement,
 					),
 		createdAt: reviewFeedbackDetail.createdAt.toISOString(),
-		observations: reviewFeedbackDetail.observations.map((observation) => ({
-			...observation,
-			observedAt: observation.observedAt.toISOString(),
+		practiceResults: reviewFeedbackDetail.practiceResults.map((result) => ({
+			...result,
+			observedAt: result.observedAt.toISOString(),
 		})),
 	};
 }
@@ -63,7 +63,7 @@ function seedCountingReads(queryClient: QueryClient, workspaceSlug: string) {
 			query: { from: new Date("2026-01-01T00:00:00Z"), zone: "UTC" },
 		}),
 		listPracticeReviewsQueryKey({ path, query: { status: ["COMPLETED"] } }),
-		listPracticeReviewObservationsQueryKey({ path, query: { agentJobId: "cached-review" } }),
+		listPracticeReviewResultsQueryKey({ path, query: { agentJobId: "cached-review" } }),
 	];
 	for (const key of keys) {
 		queryClient.setQueryData(key, {});
@@ -130,7 +130,7 @@ describe("feedback approval level", () => {
 			expect(screen.queryByRole("button", { name: "Approve for delivery" })).toBeNull(),
 		);
 		// Every count of it moved: the overview's "awaiting approval", a review's tally, an
-		// observation's feedback — in this workspace only.
+		// result's feedback — in this workspace only.
 		const invalidated = (keys: typeof ours) =>
 			keys.map((key) => queryClient.getQueryState(key)?.isInvalidated);
 		expect(invalidated(ours)).toStrictEqual([true, true, true]);
@@ -454,7 +454,7 @@ describe("feedback approval level", () => {
 		/** A record opened from the queue while a decision is in flight is still there once it lands. */
 		it("keeps a record opened from the queue while a decision is in flight", async () => {
 			// Another record, opened while the decision on the oldest in the queue is in flight.
-			const [source] = feedbackDetail(oldest.id).observations;
+			const [source] = feedbackDetail(oldest.id).practiceResults;
 			assert(source);
 			const approved: string[] = [];
 			serveQueue(approved);
@@ -470,8 +470,8 @@ describe("feedback approval level", () => {
 
 			await queueSteps("1 of 3");
 			await userEvent.click(screen.getByRole("button", { name: "Approve and open next" }));
-			// A sheet links to no other record: the reader opens the observation from its address.
-			const opened = [`observation:${source.observationId}`];
+			// A sheet links to no other record: the reader opens the result from its address.
+			const opened = [`result:${source.practiceResultId}`];
 			await router.navigate({
 				to: ".",
 				search: (previous: Record<string, unknown>) => ({ ...previous, detail: opened }),

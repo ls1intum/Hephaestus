@@ -7,7 +7,7 @@ import { daysBefore } from "@/stories/story-clock";
 
 import { ReviewRunTimeline } from "./ReviewRunTimeline";
 
-/** Two runs on different kinds of work, each with what the feed carries about its observations. */
+/** Two runs on different kinds of work, each with what the feed carries about its results. */
 const runs: PracticeGroupReviewRun[] = [
 	detailRun,
 	{
@@ -18,7 +18,7 @@ const runs: PracticeGroupReviewRun[] = [
 			id: "42",
 			label: "#dev-hephaestus",
 		},
-		observations: [
+		practiceResults: [
 			{
 				id: "00000000-0000-0000-0000-000000000202",
 				practiceSlug: "asks-answerable-questions",
@@ -28,6 +28,7 @@ const runs: PracticeGroupReviewRun[] = [
 				observedAt: daysBefore(5),
 				origin: "LIVE",
 				claimCurrentness: "CURRENT",
+				observations: [],
 				artifactId: 42,
 				artifactKind: "chat.conversation_thread",
 				evidenceRationale:
@@ -41,19 +42,19 @@ const meta = {
 	component: ReviewRunTimeline,
 	tags: ["autodocs"],
 	parameters: { layout: "padded" },
-	args: { runs, observations: { onRespond: fn() } },
+	args: { runs, results: { onRespond: fn() } },
 } satisfies Meta<typeof ReviewRunTimeline>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * A group's feed: every observation open on arrival with what the feed carries, each row naming
+ * A group's feed: every result open on arrival with what the feed carries, each row naming
  * its practice, and each closing on its own without disturbing the others.
  */
 export const Default: Story = {
 	play: async ({ canvas, userEvent }) => {
-		const summaries = runs.flatMap((run) => run.observations.map(({ summary }) => summary));
+		const summaries = runs.flatMap((run) => run.practiceResults.map(({ summary }) => summary));
 		for (const summary of summaries) {
 			await expect(canvas.getByRole("button", { name: new RegExp(summary, "u") })).toHaveAttribute(
 				"aria-expanded",

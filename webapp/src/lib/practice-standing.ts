@@ -11,9 +11,8 @@ export function nextStepOf(practiceStanding?: PracticeStanding): string | undefi
 		return undefined;
 	}
 	const deliveredGuidance = firstAction.deliveredFeedback?.trim();
-	const observationTitle = firstAction.title.trim();
-	const distinctTitle =
-		observationTitle === practiceStanding.name.trim() ? undefined : observationTitle;
+	const resultTitle = firstAction.title.trim();
+	const distinctTitle = resultTitle === practiceStanding.name.trim() ? undefined : resultTitle;
 	return [deliveredGuidance, distinctTitle].find((value) => value !== undefined && value !== "");
 }
 

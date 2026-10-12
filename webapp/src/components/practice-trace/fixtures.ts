@@ -243,13 +243,13 @@ const practiceTraceEntries = [
 		autonomy: "AUTOMATIC",
 		outcome: "REVIEWED",
 		explanation:
-			"Reviewed on the commits pushed at 14:48. Three observations were recorded and one was raised with you; the rest repeated a point already made on this pull request.",
+			"Reviewed on the commits pushed at 14:48. Three results were recorded on this pull request and one was raised with you; the rest repeated a point already made on it.",
 		watches: [READY, PUSHED],
 		occasionedBy: READY,
 		occasionedById: "sig-ready",
 		decidedAt: new Date("2026-08-06T10:19:00Z"),
 		reviewId: "11111111-1111-1111-1111-111111111111",
-		observationCount: 3,
+		practiceResultCount: 3,
 		deliveredCount: 1,
 		withheldReasons: ["COMPOSER_DEDUPED"],
 	},
@@ -261,13 +261,13 @@ const practiceTraceEntries = [
 		autonomy: "HUMAN_APPROVAL",
 		outcome: "REVIEWED",
 		explanation:
-			"Reviewed, and two observations were recorded. This practice is set to Review before sending, so nothing was said to you; raise its autonomy to Send automatically to hear about results like these.",
+			"Reviewed, and two results were recorded. This practice is set to Review before sending, so nothing was said to you; raise its autonomy to Send automatically to hear about results like these.",
 		watches: [READY],
 		occasionedBy: READY,
 		occasionedById: "sig-ready",
 		decidedAt: new Date("2026-08-06T10:19:00Z"),
 		reviewId: "11111111-1111-1111-1111-111111111111",
-		observationCount: 2,
+		practiceResultCount: 2,
 		deliveredCount: 0,
 		withheldReasons: ["PRACTICE_REQUIRES_APPROVAL"],
 	},
@@ -284,7 +284,7 @@ const practiceTraceEntries = [
 		occasionedBy: PUSHED,
 		occasionedById: "sig-sync-b71d0a52",
 		reviewId: "22222222-2222-2222-2222-222222222222",
-		observationCount: 0,
+		practiceResultCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
@@ -302,7 +302,7 @@ const practiceTraceEntries = [
 		watches: [READY],
 		occasionedBy: ASKED_BY_HAND,
 		occasionedById: "sig-review-requested",
-		observationCount: 0,
+		practiceResultCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
@@ -319,7 +319,7 @@ const practiceTraceEntries = [
 		occasionedBy: PUSHED,
 		occasionedById: "sig-sync-9ab3c410",
 		decidedAt: new Date("2026-08-06T14:48:00Z"),
-		observationCount: 0,
+		practiceResultCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
@@ -336,7 +336,7 @@ const practiceTraceEntries = [
 		occasionedById: "sig-ready",
 		decidedAt: new Date("2026-08-06T10:19:00Z"),
 		reviewId: "11111111-1111-1111-1111-111111111111",
-		observationCount: 0,
+		practiceResultCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
@@ -354,7 +354,7 @@ const practiceTraceEntries = [
 		occasionedById: "sig-ready",
 		decidedAt: new Date("2026-08-06T10:19:00Z"),
 		reviewId: "11111111-1111-1111-1111-111111111111",
-		observationCount: 0,
+		practiceResultCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
@@ -368,7 +368,7 @@ const practiceTraceEntries = [
 		explanation:
 			"This workspace has turned this practice off, so it was not run. A workspace admin can turn it back on in the practice settings.",
 		watches: [READY],
-		observationCount: 0,
+		practiceResultCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
@@ -382,7 +382,7 @@ const practiceTraceEntries = [
 		explanation:
 			"Nothing this practice watches for has happened on this pull request yet. It reacts when a review is submitted.",
 		watches: [REVIEW_SUBMITTED],
-		observationCount: 0,
+		practiceResultCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
@@ -396,7 +396,7 @@ const practiceTraceEntries = [
 		explanation:
 			"This practice needs a chat integration, and this workspace has none connected. It will start answering once one is.",
 		watches: [REPLIED],
-		observationCount: 0,
+		practiceResultCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
@@ -413,7 +413,7 @@ const practiceTraceEntries = [
 		occasionedBy: PUSHED,
 		occasionedById: "sig-sync-b71d0a52",
 		decidedAt: new Date("2026-08-07T09:42:00Z"),
-		observationCount: 0,
+		practiceResultCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
@@ -429,26 +429,28 @@ const practiceTraceEntries = [
 		occasionedById: "sig-ready",
 		decidedAt: new Date("2026-08-06T10:21:00Z"),
 		reviewId: "33333333-3333-3333-3333-333333333333",
-		observationCount: 0,
+		practiceResultCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
 ] satisfies PracticeTraceEntry[];
 
-/** What a practice's script did in one review, one run per way it can end. */
+/** What a practice's program did in one review, one run per way it can end. */
 export const practiceScriptRuns = {
-	found: { status: "OK", leads: 4, models: [] },
+	returned: { programKind: "CUSTOM", status: "OK", path: "CODE", models: [] },
+	builtin: { programKind: "BUILTIN", status: "OK", path: "REVIEW", models: [] },
 	skipped: {
+		programKind: "CUSTOM",
 		status: "SKIPPED",
-		leads: 0,
 		models: [
 			{ purpose: "PRACTICE_DECISION", need: "REQUIRED", bound: false, notRated: [] },
 			{ purpose: "PRACTICE_EMBEDDING", need: "OPTIONAL", bound: true, notRated: [] },
 		],
 	},
 	partial: {
+		programKind: "CUSTOM",
 		status: "OK",
-		leads: 3,
+		path: "MODELS",
 		models: [
 			{
 				purpose: "PRACTICE_DECISION",
@@ -468,8 +470,9 @@ export const practiceScriptRuns = {
 		],
 	},
 	ratedNone: {
+		programKind: "CUSTOM",
 		status: "OK",
-		leads: 0,
+		path: "MODELS",
 		models: [
 			{
 				purpose: "PRACTICE_DECISION",
@@ -479,9 +482,10 @@ export const practiceScriptRuns = {
 			},
 		],
 	},
-	timedOut: {
-		status: "TIMED_OUT",
-		leads: 2,
+	outOfTime: {
+		programKind: "CUSTOM",
+		status: "FAILED",
+		stopReason: "DEADLINE",
 		models: [
 			{
 				purpose: "PRACTICE_DECISION",
@@ -491,8 +495,9 @@ export const practiceScriptRuns = {
 			},
 		],
 	},
-	notFinished: { status: "NOT_FINISHED", leads: 0, models: [] },
-	failed: { status: "FAILED", leads: 0, models: [] },
+	notReached: { programKind: "CUSTOM", status: "NOT_REACHED", models: [] },
+	notFinished: { programKind: "CUSTOM", status: "NOT_FINISHED", models: [] },
+	failed: { programKind: "CUSTOM", status: "FAILED", stopReason: "ERROR", models: [] },
 } satisfies Record<string, PracticeScriptRun>;
 
 export const deniedDeliveryPolicyEvaluation: DeliveryPolicyTrace = {
@@ -566,7 +571,7 @@ export const untouchedArtifactTrace = {
 			explanation:
 				"This workspace has turned this practice off, so it was not run. A workspace admin can turn it back on in the practice settings.",
 			watches: [ISSUE_OPENED],
-			observationCount: 0,
+			practiceResultCount: 0,
 			deliveredCount: 0,
 			withheldReasons: [],
 		},
