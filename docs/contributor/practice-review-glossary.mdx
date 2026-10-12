@@ -109,10 +109,10 @@ The **door** is what a person or a provider did. `DiscoveredVia` is how we came 
 | ----------------------------------------------- | ----------------------------- | -------------------------- | ------------------ | ------------------------------------ |
 | A provider event on connected work              | `EVENT`                       | Live event                 | `LIVE`             | yes                                  |
 | Reconciling with the provider                   | `SYNC`                        | Noticed during a sync      | `LIVE`             | **no**, for pull requests and issues |
-| `/hephaestus review` in a merge request comment | `MANUAL`                      | Requested by hand          | `MANUAL`           | yes                                  |
-| The *Request review* button                     | `MANUAL`                      | Requested by hand          | `MANUAL`           | yes                                  |
-| A confirmed campaign over past work             | `BACKFILL`                    | Backfill of past work      | `BACKFILL`         | yes                                  |
-| A recurring sweep schedule                      | `SWEEP`                       | Found by a recurring check | `LIVE`             | yes                                  |
+| `/hephaestus review` in a merge request comment | `MANUAL`                      | Requested                  | `MANUAL`           | yes                                  |
+| The *Request review* button                     | `MANUAL`                      | Requested                  | `MANUAL`           | yes                                  |
+| A confirmed campaign over past work             | `BACKFILL`                    | Backfilled                 | `BACKFILL`         | yes                                  |
+| A recurring sweep schedule                      | `SWEEP`                       | Scheduled check            | `LIVE`             | yes                                  |
 
 - **The comment command and the button are indistinguishable afterwards.** Both record `MANUAL`. Nothing
   downstream can tell them apart. (A third path, the dev trigger, records `MANUAL` too.)
@@ -530,7 +530,7 @@ The ledger keeps it.
 
 ### Practice profile overview
 
-The overview is the Practice profile's account of which practices were met and what changed.
+The overview is the Practice profile's account of what changed.
 It reads standings and the feedback ledger and composes sentences on the page.
 Nothing in it is a second standing or resolution rule.
 Its rules, in one place:
@@ -550,11 +550,6 @@ Its rules, in one place:
   5. A standing that moved up.
   6. A first observation.
   7. A trend that turned.
-  8. A practice that was met.
-- **A met practice is dropped** from what is holding up well if it also slipped in the window.
-  The same applies if it fell back or got new feedback in the window.
-  A met practice that moved up is not a contradiction.
-  A met practice that slipped is.
 
 ## Machine names
 
@@ -606,6 +601,7 @@ Its rules, in one place:
 | Delivery policy stage                 | `stage`                                                                                          | `DeliveryPolicyStage`                                                    | `delivery_policy_evaluation.stage`                                                                  |
 | Delivery policy surface               | `surface`                                                                                        | `DeliveryPolicySurface`                                                  | `delivery_policy_evaluation.surface`                                                                |
 | Feedback channel                      | `channel`                                                                                        | `FeedbackChannel`                                                        | `feedback.channel`                                                                                  |
+| Feedback location                     | `location`, and `/feedback/locations` for its counts                                             | `FeedbackLocation`                                                       | derived, never stored: `FeedbackRepository.LOCATION`                                                |
 | Feedback suppression reason           | `suppressionReason`                                                                              | `FeedbackSuppressionReason`                                              | `feedback.suppression_reason`                                                                       |
 | Composed feedback unit                | not on the HTTP API                                                                              | `ComposedFeedbackUnit`                                                   | never stored as such — parsed from `out/feedback.json`                                              |
 | Composer action                       | inside `out/feedback.json`                                                                       | `ComposedFeedbackUnit.Action`                                            | not stored                                                                                          |
