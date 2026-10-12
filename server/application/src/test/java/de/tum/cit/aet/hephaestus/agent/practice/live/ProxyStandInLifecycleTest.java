@@ -79,16 +79,13 @@ class ProxyStandInLifecycleTest {
 
                 harness.closeProxy();
 
-                assertThat(harness.tasks
-                                .submit(() -> {
-                                    try {
-                                        return socket.getInputStream().read() == -1;
-                                    } catch (SocketException connectionReset) {
-                                        return true;
-                                    }
-                                })
-                                .get(3, TimeUnit.SECONDS))
-                        .isTrue();
+                boolean connectionClosed;
+                try {
+                    connectionClosed = socket.getInputStream().read() == -1;
+                } catch (SocketException connectionReset) {
+                    connectionClosed = true;
+                }
+                assertThat(connectionClosed).isTrue();
                 assertThat(harness.accepted.getCount())
                         .as("an incomplete request is never forwarded")
                         .isEqualTo(1);
