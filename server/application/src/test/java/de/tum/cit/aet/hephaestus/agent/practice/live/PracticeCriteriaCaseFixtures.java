@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.StreamSupport;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -155,9 +156,25 @@ final class PracticeCriteriaCaseFixtures {
                 if (!scenario.path("expected").has(slug)) {
                     continue;
                 }
-                index.addObject()
+                ObjectNode entry = index.addObject()
                         .put("slug", slug)
                         .put("name", practice.path("name").asString());
+                List<JsonNode> requirements = StreamSupport.stream(
+                                practice.path("evidenceRequirements").spliterator(), false)
+                        .toList();
+                ArrayNode readsSources = entry.putArray("readsSources");
+                requirements.stream()
+                        .map(need -> need.path("sourceKind").asString())
+                        .distinct()
+                        .sorted()
+                        .forEach(readsSources::add);
+                ArrayNode exhaustiveSources = entry.putArray("exhaustiveSources");
+                requirements.stream()
+                        .filter(need -> need.path("stance").asString().equals("EXHAUSTIVE"))
+                        .map(need -> need.path("sourceKind").asString())
+                        .distinct()
+                        .sorted()
+                        .forEach(exhaustiveSources::add);
                 String preamble = practice.path("preamble")
                         .asString(coreKind.equals("scm.issue.core") ? "scm.issue" : "scm.pull_request");
                 String criteria =
