@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.92.0
+
+### Minor Changes
+
+- Workspace admins can use the admin API to trace a practice review from its trigger through observations and delivery, inspect the current queue, review timing and model usage, and read recorded work and practice versions. Shared filters and counts agree across these reads, including reviews that finished after a merge.
+
+  Missing or deleted work is distinguished from a failed read, reviews waiting before a retry are excluded from the claimable queue, and withheld feedback is no longer reported as a posted comment. Private feedback text, ratings and private response notes remain hidden from workspace admins.
+
+  **Operators:** Clients that read raw job output must use the dedicated observation and feedback endpoints instead. Administrative job responses no longer return raw output; typed review outcomes, timing and usage remain available.
+
+- Practice reviews has four tabs: Overview, Reviews, Observations and Feedback. Shared developer, group, practice and date filters stay as you switch tabs, while each list keeps its own filters. Work without a review appears under **No review started**, with the recorded reason.
+
+  Select a row to open its record, **Track** to narrow related records, or **Trace** to follow its history. Review requests require confirmation and stay disabled while the same work is being reviewed. Lists load progressively, older links still open the matching record, and loading, errors and completed reviews update without losing the selected scope.
+
+- Workspace admins can follow the history of a review, observation, piece of feedback or reviewed work in one trace. It shows what started the review, where time was spent, which observations supported feedback, recorded delivery checks and outcomes, and where the path stopped or still waits.
+
+  Filters, a legend and links to each record help explain corrections, disputes and later work that resolved feedback. Private feedback text, ratings and private response notes remain hidden. The trace and its record sheets support narrow screens, keyboard navigation and browser history.
+
+- The Practice profile opens directly on all open feedback. Each card separates why feedback was raised, the next step, the reviewed work that supports it, and your response. Its timeline distinguishes earlier evidence from the clean work that can resolve it, and response and rating controls explain what they do.
+
+  Practice details open on Feedback, standings explain the work they rest on, and practices with no applicable or observed work fold into labelled rows. Links between your profile and Practices across the workspace preserve where you came from. Loading, empty states, touch explanations, keyboard focus and narrow-screen tables are clearer.
+
+- Practices switched off for a workspace leave its members’ Practice profiles and Practices across the workspace, including their standings and feedback cards. Groups with no practice being reviewed no longer look like missing results.
+
+  Practice setup and admin views keep the historical observations and feedback. Turning a practice off does not erase those records.
+
+- The Practice reviews overview separates the current queue from the selected review period. Choose Today, 7, 30 or 90 days, or All time; the overview retains that choice within the tab.
+
+  Review, observation and feedback counts open exactly the matching records. Delivery is grouped by channel and withholding reason, and practices with many undecided or non-applicable observations are easier to inspect. Review time shows the median of whole reviews, with a proportional stage breakdown. Live queue updates pause in hidden tabs and stop when no review can progress.
+
+- The Practice profile overview response's top-level `holdingUp` and `reviewedWork` fields are deprecated. Both fields continue to carry their full calculated values, so existing clients keep working. A future removal will follow the published deprecation policy. The separate reviewed-work counts in standing and practice-group responses remain supported.
+
+### Patch Changes
+
+- Dark mode separates panels, nested panels and cards more clearly from the content behind them. Borders around cards, tables and panels are easier to see. The application’s light theme is unchanged.
+
+  Product illustrations have been refreshed to match the shipped theme.
+
+- Detail panels use consistent layering across Practice reviews, the Practice profile, activity, the catalogue, surveys and Practice setup. Nested panels remain distinguishable, text stays sharp, and records fit narrow screens.
+
+  Closing panels restores focus and browser history correctly. Slow actions do not reopen or close another panel, and choosing **Keep editing** preserves the current edits without repeating the discard prompt.
+
+- Repositories added to a token-based GitHub workspace no longer take the identifier of a GitLab project with the same name. Sync corrects previously stored mismatches so the repositories appear in the workspace’s lists.
+- Workspace reads no longer include work from another integration’s repository with the same name. This applies to Practice reviews, Heph context, past-work campaigns and other reads of monitored repositories.
+- Practices across the workspace keeps explanations behind accessible info buttons instead of repeating them beside every figure. Pointer, keyboard and touch users can read what the counts, ranges and colours mean.
+
+  Tables stack on narrow screens. While counts load, tiles and group bars keep their final shape, with an announced loading status and reduced-motion support.
+
 ## 0.91.1
 
 ### Patch Changes
