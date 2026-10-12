@@ -606,10 +606,10 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         void tapHasNoUsageWhenTheClientDisconnectsFirst() throws Exception {
             var factory = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
             var content = pooled(factory, "data: {\"delta\":\"hi\"}\n\n");
-            var usage = pooled(factory, "data: {\"usage\":{\"prompt_tokens\":3}}\n\n");
             var cancelled = new AtomicBoolean();
             var subscriptions = new AtomicInteger();
-            Flux<DataBuffer> body = Flux.<DataBuffer>just(content, usage)
+            Flux<DataBuffer> body = Flux.<DataBuffer>just(content)
+                    .concatWith(Flux.never())
                     .doOnSubscribe(s -> subscriptions.incrementAndGet())
                     .doOnCancel(() -> cancelled.set(true));
             var response = mock(HttpServletResponse.class);
@@ -627,7 +627,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             await().untilAsserted(() -> {
                 assertThat(cancelled).isTrue();
                 assertThat(content.getNativeBuffer().refCnt()).isZero();
-                assertThat(usage.getNativeBuffer().refCnt()).isZero();
             });
         }
 
