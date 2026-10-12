@@ -9,6 +9,10 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.providers.IssueContentSource;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -23,6 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
@@ -107,6 +112,12 @@ import tools.jackson.databind.ObjectMapper;
 class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
 
     private static final String OWN_FEEDBACK = "<!-- hephaestus:practice-review:00000000 -->\nRecord the export.";
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private ConnectionService connectionService;
 
     @Autowired
     private IssueRepository issues;
@@ -286,6 +297,26 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
         monitor.setWorkspace(workspace);
         monitor.setNameWithOwner(repository.getNameWithOwner());
         monitors.save(monitor);
+        IntegrationKind kind = type == IdentityProviderType.GITHUB ? IntegrationKind.GITHUB : IntegrationKind.GITLAB;
+        ConnectionConfig config = type == IdentityProviderType.GITHUB
+                ? new ConnectionConfig.GitHubAppConfig(4101L, workspace.getAccountLogin(), null, Set.of())
+                : new ConnectionConfig.GitLabConfig(
+                        provider.getServerUrl(),
+                        null,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of(),
+                        null);
+        Connection connection = connections.saveAndFlush(new Connection(workspace, kind, "discussion-test", config));
+        connectionService.transition(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "discussion-test",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
         UUID beforeDelivery = storedSnapshot();
         String closedRecord = storedDigest();
         int occasions = updates().size();

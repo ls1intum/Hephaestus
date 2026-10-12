@@ -15,6 +15,10 @@ import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPrepare
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextQueryRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
@@ -31,6 +35,8 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRevision;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalState;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -55,6 +61,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,6 +90,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  * tier mocks these repositories and would pass either way.
  */
 class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceIntegrationTest {
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private ConnectionService connectionService;
 
     @Autowired
     private ReviewRepositoryPreparer repositoryPreparer;
@@ -147,6 +160,20 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
     void seedMonitoredWork() {
         User owner = persistUser("read-scope-owner");
         workspace = createWorkspace("read-scope-ws", "Read Scope WS", "read-scope-org", AccountType.ORG, owner);
+        Connection connection = connections.saveAndFlush(new Connection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "read-scope-test",
+                new ConnectionConfig.GitHubAppConfig(9301L, workspace.getAccountLogin(), null, Set.of())));
+        connectionService.transition(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "read-scope-test",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
         author = persistUser("read-scope-author");
 
         repository = new Repository();
