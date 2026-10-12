@@ -69,8 +69,8 @@ export function withheldClass(reason: WithholdingReason): WithheldClass {
 }
 
 /**
- * What a practice's observations suggest an admin look at: a practice that never applies here costs
- * reviews and tells nobody anything, and one that often cannot decide may lack the evidence it needs.
+ * What a practice's observations suggest an admin look at: a practice that mostly does not apply here
+ * costs reviews and tells nobody much, and one that often cannot decide may lack the evidence it needs.
  */
 export type PracticeMarker = "NEVER_APPLIES" | "OFTEN_UNDECIDED";
 
@@ -82,7 +82,7 @@ export interface PracticeMarkerDef {
 
 export const PRACTICE_MARKER_DEFS: Record<PracticeMarker, PracticeMarkerDef> = {
 	NEVER_APPLIES: {
-		label: "Never applies here",
+		label: "Mostly not applicable",
 		reason: (part, whole) =>
 			`Not applicable in ${part} of ${whole} observations. Consider turning it off for this workspace.`,
 	},

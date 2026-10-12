@@ -105,6 +105,21 @@ describe("what became of a piece of feedback", () => {
 		]);
 	});
 
+	it("says a withdrawn piece was delivered only where a delivery is recorded", () => {
+		const withdrawn = lineageStateCase("decisions").lineage.feedback.find(
+			(entry) => entry.withdrawnAt !== undefined,
+		);
+		assert(withdrawn?.deliveredAt !== undefined);
+		expect(branchOutcome(withdrawn, undefined).detail).toMatch(
+			/^Delivered .+, then taken off them\.$/u,
+		);
+		const prepared = { ...withdrawn, deliveryState: "PREPARED" as const, deliveredAt: undefined };
+		expect(branchOutcome(prepared, undefined)).toMatchObject({
+			text: "Withdrawn by an admin",
+			detail: "Taken back before it reached the developer.",
+		});
+	});
+
 	it("says a card was shown before it was withheld", () => {
 		expect(outcomes("shown-then-withheld")).toStrictEqual([
 			"Delivered, later withheld: no longer covered",
@@ -138,7 +153,19 @@ describe("what the chain lost", () => {
 		const counts = stageCounts(wholeReview);
 		const own = wholeReview.feedback.filter((entry) => entry.agentJobId === wholeReview.review?.id);
 		expect(own.length).toBeLessThan(wholeReview.feedback.length);
-		expect(counts.feedback).toBe(own.length + wholeReview.moreFeedback);
+		expect(counts.feedback).toBe(own.length);
+	});
+
+	it("keeps omitted chain records separate from the selected review's listed records", () => {
+		const lineage = { ...wholeReview, moreObservations: 9, moreFeedback: 7 };
+		const counts = stageCounts(lineage);
+		expect(counts.feedback).toBe(
+			wholeReview.feedback.filter((entry) => entry.agentJobId === wholeReview.review?.id).length,
+		);
+		expect(counts.observations).toBe(
+			wholeReview.observations.filter((entry) => entry.agentJobId === wholeReview.review?.id)
+				.length,
+		);
 	});
 
 	it("counts an answer apart from work that resolved it", () => {

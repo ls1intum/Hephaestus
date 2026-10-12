@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import type { ReviewLineage, TracedSignal } from "@/api/types.gen";
 
@@ -37,6 +37,17 @@ function nodesOf(lineage: ReviewLineage): TraceNode[] {
 		...lineage.feedback.map((entry) => feedbackNode(entry.id)),
 	];
 }
+
+describe("omitted chain ownership", () => {
+	it("does not attribute omitted or foreign records to the selected review", () => {
+		const lineage = { ...wholeReview, moreObservations: 9, moreFeedback: 7 };
+		const { sentence } = traceVerdict(lineage, REVIEW);
+		expect(sentence).toMatch(
+			/9 additional observations and 7 additional pieces of feedback in the chain are not listed/u,
+		);
+		expect(sentence).not.toMatch(/composed 12|recorded 12/u);
+	});
+});
 
 describe("traceVerdict on every state", () => {
 	const cases = Object.entries(LINEAGE_STATE_CASES).flatMap(([group, entries]) =>
@@ -158,6 +169,17 @@ describe("traceVerdict by state group", () => {
 			expect(verdictOf("decisions", feedbackNode(withdrawn?.id ?? "")).sentence).toBe(
 				"This feedback reached the developer on their practice pages, then an admin withdrew it.",
 			);
+			// A prepared card can be withdrawn before it was delivered: nothing says it reached them.
+			assert(withdrawn?.withdrawnAt !== undefined);
+			const prepared = { ...withdrawn, deliveryState: "PREPARED" as const, deliveredAt: undefined };
+			const unsent = {
+				...lineage,
+				feedback: lineage.feedback.map((entry) => (entry.id === withdrawn.id ? prepared : entry)),
+			};
+			expect(traceVerdict(unsent, feedbackNode(withdrawn.id))).toMatchObject({
+				sentence: "This feedback did not reach the developer: an admin withdrew it first.",
+				end: { kind: "lost", reason: "an admin withdrew it before it reached the developer" },
+			});
 		},
 		response: () => {
 			const { lineage } = lineageStateCase("responses");

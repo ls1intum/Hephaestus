@@ -146,9 +146,22 @@ const PREPARED_FOR: Record<
 function feedbackFate(feedback: ReviewLineageFeedback): FeedbackFate {
 	const { response } = feedback;
 	if (feedback.withdrawnAt !== undefined) {
+		// A prepared piece can be withdrawn too: only a recorded delivery says it was delivered.
+		const delivered = reachedDeveloper(feedback);
 		return {
-			end: end("lost", "an admin withdrew it after it was delivered", { at: feedback.withdrawnAt }),
-			clause: ["was delivered, then withdrawn", "were delivered, then withdrawn"],
+			end: end(
+				"lost",
+				delivered
+					? "an admin withdrew it after it was delivered"
+					: "an admin withdrew it before it reached the developer",
+				{ at: feedback.withdrawnAt },
+			),
+			clause: delivered
+				? ["was delivered, then withdrawn", "were delivered, then withdrawn"]
+				: [
+						"was withdrawn before it reached the developer",
+						"were withdrawn before they reached the developer",
+					],
 			phrase: "withdrawn by an admin",
 		};
 	}
@@ -310,7 +323,9 @@ function feedbackSentence(lineage: ReviewLineage, feedback: ReviewLineageFeedbac
 	const reached = `This feedback reached the developer ${place}`;
 	const { response } = feedback;
 	if (feedback.withdrawnAt !== undefined) {
-		return `${reached}, then an admin withdrew it.`;
+		return reachedDeveloper(feedback)
+			? `${reached}, then an admin withdrew it.`
+			: "This feedback did not reach the developer: an admin withdrew it first.";
 	}
 	switch (feedback.deliveryState) {
 		case "DISCARDED": {
@@ -439,10 +454,11 @@ function fatesClause(fates: readonly FeedbackFate[]): string {
 	return joinAnd(parts);
 }
 
+// An answer says only that the developer answered: what they did with it stays private to them.
 const KIND_CLAUSE: Record<TraceEndKind, readonly [singular: string, plural: string]> = {
 	worked: ["worked", "worked"],
 	open: ["is still open", "are still open"],
-	answered: ["was answered but not taken up", "were answered but not taken up"],
+	answered: ["was answered", "were answered"],
 	lost: ["did not arrive", "did not arrive"],
 	none: ["has no known end", "have no known end"],
 };
@@ -450,7 +466,7 @@ const KIND_CLAUSE: Record<TraceEndKind, readonly [singular: string, plural: stri
 const KIND_PHRASE: Record<TraceEndKind, string> = {
 	worked: "worked",
 	open: "open",
-	answered: "not taken up",
+	answered: "answered",
 	lost: "did not arrive",
 	none: "with no known end",
 };
@@ -613,7 +629,7 @@ function reviewVerdict(
 		.filter((entry) => entry.agentJobId === review.id)
 		.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 	const observed = lineage.observations.filter((entry) => entry.agentJobId === review.id).length;
-	const recorded = countOf(observed + lineage.moreObservations, "observation", "observations");
+	const recorded = countOf(observed, "observation", "observations");
 	const ranFrom = review.startedAt ?? review.createdAt;
 	const ran =
 		review.finishedAt === undefined ? undefined : durationBetween(ranFrom, review.finishedAt);
@@ -622,6 +638,26 @@ function reviewVerdict(
 		review.startedAt.getTime() - review.createdAt.getTime() >= 1000
 			? durationBetween(review.createdAt, review.startedAt)
 			: undefined;
+
+	if (lineage.moreObservations > 0 || lineage.moreFeedback > 0) {
+		const phase = {
+			QUEUED: "queued",
+			RUNNING: "running",
+			FAILED: "failed",
+			TIMED_OUT: "timed out",
+			CANCELLED: "canceled",
+			COMPLETED: "completed",
+		}[review.phase];
+		return {
+			sentence: `This review is ${phase}; ${recorded} and ${countOf(own.length, "piece", "pieces")} of feedback from it are listed, while ${countOf(lineage.moreObservations, "additional observation", "additional observations")} and ${countOf(lineage.moreFeedback, "additional piece", "additional pieces")} of feedback in the chain are not listed.`,
+			end:
+				own.length > 0
+					? endOfMany(own)
+					: end("none", "unlisted chain records have no known review ownership", {
+							label: "Not known",
+						}),
+		};
+	}
 
 	switch (review.phase) {
 		case "QUEUED": {
@@ -641,7 +677,7 @@ function reviewVerdict(
 		case "RUNNING": {
 			return {
 				sentence:
-					observed + lineage.moreObservations === 0
+					observed === 0
 						? "This review still runs and has recorded no observation yet."
 						: `This review still runs and has recorded ${recorded} so far.`,
 				end: end("open", "the review still runs", { since: ranFrom }),
@@ -655,7 +691,7 @@ function reviewVerdict(
 			];
 			const after = ran === undefined ? "" : ` after ${ran}`;
 			let what = `and composed ${countOf(own.length, "piece", "pieces")} of feedback`;
-			if (observed + lineage.moreObservations === 0) {
+			if (observed === 0) {
 				what = "with nothing recorded";
 			} else if (own.length === 0) {
 				what = `and recorded ${recorded}, but composed no feedback`;
@@ -700,13 +736,13 @@ function reviewVerdict(
 	]
 		.filter((entry) => entry !== undefined)
 		.join(" ");
-	if (observed + lineage.moreObservations === 0) {
+	if (observed === 0) {
 		return {
 			sentence: `This review ${how} and recorded no observation.`,
 			end: end("none", "the review recorded no observation"),
 		};
 	}
-	const composed = own.length + lineage.moreFeedback;
+	const composed = own.length;
 	const silent = silentNotMet(lineage).length;
 	if (composed === 0) {
 		return {

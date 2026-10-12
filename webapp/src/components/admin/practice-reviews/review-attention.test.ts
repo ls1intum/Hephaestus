@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	needsALookFirst,
 	percentText,
+	PRACTICE_MARKER_DEFS,
 	practiceMarker,
 	shareOf,
 	withheldClass,
@@ -45,12 +46,15 @@ const observed = (met: number, notMet: number, notApplicable: number, undetermin
 });
 
 describe("practiceMarker", () => {
-	it("marks a practice that never applies from 90 % not applicable", () => {
-		expect(practiceMarker(observed(1, 1, 18, 0))).toStrictEqual({
+	it("marks a practice that mostly does not apply from 90 % not applicable", () => {
+		const marked = practiceMarker(observed(1, 1, 18, 0));
+		expect(marked).toStrictEqual({
 			marker: "NEVER_APPLIES",
 			part: 18,
 			whole: 20,
 		});
+		// It applied twice, so its label must not say it never applies.
+		expect(PRACTICE_MARKER_DEFS.NEVER_APPLIES.label).toBe("Mostly not applicable");
 		expect(practiceMarker(observed(2, 1, 17, 0))).toBeUndefined();
 	});
 

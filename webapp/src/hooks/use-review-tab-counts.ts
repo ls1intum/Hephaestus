@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import {
 	listPracticeReviewFeedbackOptions,
@@ -28,12 +28,11 @@ const total = (page: { page?: { totalElements?: number } }) => page.page?.totalE
 /**
  * What every count read shares. A count is decoration on a tab, so a failed read is retried quietly
  * and, after its last retry, asked for again a minute later instead of leaving the tab without its
- * count until a reload. A user view retries nothing, as every read of it is audited. Until the new read
- * answers, the last count stands (`keepPreviousData`); a count never known shows nothing.
+ * count until a reload. A user view retries nothing, as every read of it is audited. A count of
+ * another scope or workspace is never shown as this one's: until its own read answers, it shows nothing.
  */
 const COUNT_READ = {
 	select: total,
-	placeholderData: keepPreviousData,
 	retry: (failureCount: number) => sessionRetriesQueries() && failureCount < QUERY_RETRIES,
 	retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 8000),
 	refetchInterval: (query: { state: { status: string } }) =>
@@ -45,7 +44,7 @@ const COUNT_READ = {
  * developer, groups, practices, dates and the tracked record), read as the total of a one-row page of
  * the tab's own endpoint. Each read is the query the tab's list sends, built from the search the tab's
  * link carries, so a count is what the table shows before its own facets narrow it. A count shows
- * nothing until it is known, and keeps the last one while the scope changes (`COUNT_READ`).
+ * nothing until it is known for this scope (`COUNT_READ`).
  */
 export function useReviewTabCounts(
 	workspaceSlug: string,

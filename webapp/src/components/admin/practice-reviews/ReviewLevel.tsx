@@ -472,7 +472,7 @@ export function reviewHistory(job: AgentJob): SheetEvent[] {
 	return events;
 }
 
-/** "$0.04", or why there is no total: nothing reached the model, or an attempt has no price. */
+/** "$0.04", or why there is no total: no usage recorded, or an attempt has no price. */
 function costText(usage: PanelState<{ usage: AgentJobUsage }> | undefined): string {
 	if (usage === undefined || usage.status === "error") {
 		return "—";
@@ -482,7 +482,7 @@ function costText(usage: PanelState<{ usage: AgentJobUsage }> | undefined): stri
 	}
 	const { attempts, totalCostUsd, unpricedAttempts } = usage.usage;
 	if (attempts.length === 0) {
-		return "Nothing recorded: no attempt reached the model";
+		return "No usage recorded";
 	}
 	if (totalCostUsd !== undefined) {
 		return attempts.length > 1
@@ -509,7 +509,7 @@ function UsageAttempts({ attempts }: { attempts: AgentJobUsageAttempt[] }) {
 			<ol className="space-y-1 text-sm">
 				{attempts.map((attempt) => (
 					<li key={attempt.attempt} className="flex flex-wrap gap-x-2 tabular-nums">
-						<span className="font-medium">Attempt {attempt.attempt}</span>
+						<span className="font-medium">Attempt {attempt.attempt + 1}</span>
 						<span>{attemptCostText(attempt)}</span>
 						<span className="text-muted-foreground">
 							{formatTokens(attempt.inputTokens)} read · {formatTokens(attempt.outputTokens)}{" "}

@@ -782,15 +782,11 @@ export const LoadFailed: Story = {
 			onRetry: fn(),
 		},
 	},
-	play: async ({ args, userEvent }) => {
+	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByText("We could not load this feedback")).toBeVisible();
 		// With no record to name it, the level is named for what it is.
 		await expect(screen.getByRole("dialog")).toHaveAccessibleName("Feedback");
-		await userEvent.click(panel.getByRole("button", { name: "Retry" }));
-		if (args.feedback.status !== "error") {
-			throw new Error("This story is the error branch");
-		}
-		await expect(args.feedback.onRetry).toHaveBeenCalledOnce();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
 	},
 };

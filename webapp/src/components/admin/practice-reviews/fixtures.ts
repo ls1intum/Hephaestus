@@ -1587,7 +1587,7 @@ export const mockJobCancelledOnBudget: AgentJob = {
 export const mockJobUsageTwoAttempts: AgentJobUsage = {
 	attempts: [
 		{
-			attempt: 1,
+			attempt: 0,
 			occurredAt: new Date("2026-05-20T10:02:00Z"),
 			model: "openai/gpt-oss-120b",
 			pricingState: "PRICED",
@@ -1601,7 +1601,7 @@ export const mockJobUsageTwoAttempts: AgentJobUsage = {
 			cacheWriteTokens: 0,
 		},
 		{
-			attempt: 2,
+			attempt: 1,
 			occurredAt: new Date("2026-05-20T10:05:00Z"),
 			model: "openai/gpt-oss-120b",
 			pricingState: "PRICED",
@@ -1623,7 +1623,7 @@ export const mockJobUsageTwoAttempts: AgentJobUsage = {
 export const mockJobUsageUnpriced: AgentJobUsage = {
 	attempts: [
 		{
-			attempt: 1,
+			attempt: 0,
 			occurredAt: new Date("2026-05-20T10:05:00Z"),
 			model: "acme/house-model",
 			pricingState: "UNPRICED",

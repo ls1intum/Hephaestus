@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ReviewRunSummary } from "@/api/types.gen";
 import { reviewRuns } from "@/components/admin/practice-reviews/fixtures";
+import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
 import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
@@ -86,6 +87,22 @@ function recordRequests() {
 		}),
 	);
 	return { reviewUrls, observationUrls, feedbackUrls, workUrls, locationCountUrls };
+}
+
+function processingReviewsHandler(getReview: () => ReviewRunSummary, polls: URL[], reads: URL[]) {
+	return http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
+		const url = new URL(request.url);
+		const processingPoll = values(url, "resultProcessing").includes("PENDING");
+		if (!isTabCount(url)) {
+			(processingPoll ? polls : reads).push(url);
+		}
+		const review = getReview();
+		const rows = processingPoll && review.resultProcessing !== "PENDING" ? [] : [review];
+		return HttpResponse.json({
+			content: rows,
+			page: { number: 0, size: 25, totalElements: rows.length, totalPages: 1 },
+		});
+	});
 }
 
 /** Two finished reviews, so the second page's row shows that it arrived. */
@@ -347,6 +364,46 @@ describe("practice review list routes", () => {
 		await screen.findByText("No reviews match these filters", undefined, ROUTE_RENDER_WAIT);
 
 		expect(values(reviewUrls.at(-1), "resultProcessing")).toStrictEqual(["FAILED"]);
+	});
+
+	/**
+	 * A completed review whose results are still processed changes after it stopped, also under a
+	 * status filter that names no active status: the list follows it until processing settles, reads
+	 * itself again, and then stops asking.
+	 */
+	it("follows a completed review until its results are processed, then stops", async () => {
+		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+		try {
+			const { reviewUrls } = recordRequests();
+			const processingPolls: URL[] = [];
+			let review: ReviewRunSummary = { ...FIRST_PAGE, resultProcessing: "PENDING" };
+			server.use(processingReviewsHandler(() => review, processingPolls, reviewUrls));
+
+			renderRouteAtWithRouter('/w/acme/admin/practices/reviews/runs?status=["COMPLETED"]');
+			await screen.findByText(FIRST_PAGE.target.title, undefined, ROUTE_RENDER_WAIT);
+			const table = await screen.findByRole(
+				"table",
+				{ name: "Practice reviews, newest first" },
+				ROUTE_RENDER_WAIT,
+			);
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			// The interval is faked, so the waits poll on vitest's own timer rather than on setInterval.
+			await vi.waitFor(() => expect(processingPolls.length).toBeGreaterThan(0));
+			expect(values(processingPolls.at(-1), "status")).toStrictEqual(["COMPLETED"]);
+			expect(within(table).queryByText("Result processing failed")).toBeNull();
+
+			review = { ...review, resultProcessing: "FAILED" };
+			const listReads = reviewUrls.length;
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			await vi.waitFor(() => expect(reviewUrls.length).toBeGreaterThan(listReads));
+			await screen.findByText("Result processing failed", undefined, ROUTE_RENDER_WAIT);
+
+			const settled = processingPolls.length;
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS * 2);
+			expect(processingPolls).toHaveLength(settled);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	/** The overview's count of reviews that finished after the merge opens this list with the filter. */

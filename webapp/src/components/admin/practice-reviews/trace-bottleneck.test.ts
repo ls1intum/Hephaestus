@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import type { ReviewLineage, ReviewLineageFeedback } from "@/api/types.gen";
 import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
@@ -347,5 +347,20 @@ describe("feedbackLoss", () => {
 		for (const piece of lineage.feedback) {
 			expect(feedbackLoss(piece, lineage)).toBeUndefined();
 		}
+	});
+
+	it("says a withdrawn piece was delivered only where a delivery is recorded", () => {
+		const { lineage } = lineageStateCase("decisions");
+		const withdrawn = lineage.feedback.find((entry) => entry.withdrawnAt !== undefined);
+		assert(withdrawn?.deliveredAt !== undefined);
+		expect(feedbackLoss(withdrawn, lineage)?.text).toBe(
+			"An admin withdrew it after it was delivered.",
+		);
+		// A prepared card on the practice pages can be withdrawn before it was delivered.
+		const prepared = { ...withdrawn, deliveryState: "PREPARED" as const, deliveredAt: undefined };
+		expect(feedbackLoss(prepared, lineage)).toMatchObject({
+			title: "Withdrawn",
+			text: "An admin withdrew it before it reached the developer.",
+		});
 	});
 });

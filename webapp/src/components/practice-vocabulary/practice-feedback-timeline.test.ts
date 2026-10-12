@@ -42,12 +42,12 @@ describe("timelinePieces", () => {
 		expect(pieces.at(-1)?.outcome).toBe("MET");
 	});
 
-	it("puts the evidence before the clean work since the feedback, each part in time order", () => {
+	it("orders interleaved evidence and clean work by their actual review times", () => {
 		const pieces = timelinePieces(
 			[problem(19, "2026-09-06"), problem(17, "2026-08-28")],
 			[clean(21, "2026-09-07"), clean(18, "2026-09-01")],
 		);
-		expect(labels(pieces)).toStrictEqual(["#17", "#19", "#18", "#21"]);
+		expect(labels(pieces)).toStrictEqual(["#17", "#18", "#19", "#21"]);
 	});
 
 	it("shows a piece reviewed twice twice, each under its own key", () => {

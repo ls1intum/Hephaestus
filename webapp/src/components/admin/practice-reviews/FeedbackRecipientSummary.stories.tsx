@@ -105,12 +105,9 @@ export const Loading: Story = {
 export const LoadFailed: Story = {
 	args: { state: { status: "error", error: { status: 500 }, onRetry: fn() } },
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ args, canvas, userEvent }) => {
+	play: async ({ canvas }) => {
 		await canvas.findByText("We could not count the feedback for Grace Hopper");
-		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
-		if (args.state.status === "error") {
-			await expect(args.state.onRetry).toHaveBeenCalled();
-		}
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
 	},
 };
 

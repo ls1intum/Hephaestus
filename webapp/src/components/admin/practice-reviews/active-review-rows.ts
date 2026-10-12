@@ -6,6 +6,13 @@ export const ACTIVE_REVIEW_STATUSES = ["QUEUED", "RUNNING"] as const;
 export const isActiveReview = (review: Pick<ReviewRunSummary, "status">) =>
 	(ACTIVE_REVIEW_STATUSES as readonly string[]).includes(review.status);
 
+/**
+ * A review that has stopped but whose results the server still processes: its row changes until
+ * processing is DELIVERED or FAILED. This is the job's state, not the state of its feedback.
+ */
+export const isProcessingReview = (review: Pick<ReviewRunSummary, "status" | "resultProcessing">) =>
+	!isActiveReview(review) && review.resultProcessing === "PENDING";
+
 /** How many active reviews one poll reads at most: the server's largest page. */
 export const ACTIVE_REVIEW_POLL_SIZE = 100;
 
@@ -29,6 +36,8 @@ export function reconcileActiveRows(
 	loaded: readonly ReviewRunSummary[],
 	active: readonly ReviewRunSummary[],
 	activeComplete: boolean,
+	// The rows the poll follows: the active reviews, or the reviews whose results are processed.
+	follows: (review: ReviewRunSummary) => boolean = isActiveReview,
 ): ActiveRowsReconciliation {
 	const loadedById = new Map(loaded.map((review) => [review.id, review]));
 	const activeIds = new Set(active.map((review) => review.id));
@@ -44,6 +53,6 @@ export function reconcileActiveRows(
 	);
 	// A truncated poll cannot say a loaded review left the active set.
 	const left =
-		activeComplete && loaded.some((review) => isActiveReview(review) && !activeIds.has(review.id));
+		activeComplete && loaded.some((review) => follows(review) && !activeIds.has(review.id));
 	return { updated, refetch: arrived || left };
 }

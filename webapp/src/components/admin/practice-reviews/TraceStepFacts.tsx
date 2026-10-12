@@ -193,8 +193,8 @@ function WorkFacts({ lineage }: { lineage: ReviewLineage }) {
 function StageLine({ lineage }: { lineage: ReviewLineage }) {
 	const counts = stageCounts(lineage);
 	const stages = [
-		countOf(counts.observations, "observation", "observations"),
-		countOf(counts.feedback, "piece of feedback", "pieces of feedback"),
+		countOf(counts.observations, "listed observation", "listed observations"),
+		countOf(counts.feedback, "listed piece of feedback", "listed pieces of feedback"),
 		`${counts.reached} reached the developer`,
 		`${counts.answered} answered`,
 	];

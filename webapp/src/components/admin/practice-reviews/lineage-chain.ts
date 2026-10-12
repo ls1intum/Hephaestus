@@ -179,7 +179,10 @@ export function branchOutcome(
 		return {
 			def: FEEDBACK_WITHDRAWN_DEF,
 			text: "Withdrawn by an admin",
-			detail: `Delivered ${lowerFirst(location.label)}, then taken off them.`,
+			// A prepared piece can be withdrawn too: only a recorded delivery says it was delivered.
+			detail: reachedDeveloper(feedback)
+				? `Delivered ${lowerFirst(location.label)}, then taken off them.`
+				: "Taken back before it reached the developer.",
 			at: feedback.withdrawnAt,
 			kind: "withheld",
 		};
@@ -321,16 +324,17 @@ export interface StageCounts {
 }
 
 export function stageCounts(lineage: ReviewLineage): StageCounts {
-	// The review's own: feedback another review wrote from the same observations is on the story,
-	// but counting it here would say this review wrote more than its own steps list.
+	// Only listed records belong to a known review; omitted chain records may belong to another.
 	const reviewId = lineage.review?.id;
 	const own = lineage.feedback.filter(
 		(entry) => reviewId === undefined || entry.agentJobId === reviewId,
 	);
 	const reached = own.filter(reachedDeveloper);
 	return {
-		observations: lineage.observations.length + lineage.moreObservations,
-		feedback: own.length + lineage.moreFeedback,
+		observations: lineage.observations.filter(
+			(entry) => reviewId === undefined || entry.agentJobId === reviewId,
+		).length,
+		feedback: own.length,
 		reached: reached.length,
 		answered: reached.filter((entry) => entry.response?.respondedAt !== undefined).length,
 		resolvedByWork: reached.filter((entry) => entry.response?.resolvedByWorkAt !== undefined)

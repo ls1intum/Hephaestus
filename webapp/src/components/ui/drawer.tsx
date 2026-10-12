@@ -177,8 +177,8 @@ function DrawerContent({
 						// exact frame its child's exit completes, so a side panel that animates height jumps at that
 						// frame; on the x axis it is `inset-y-0` and its height never legitimately changes.
 						"group/drawer-popup pointer-events-auto fixed z-50 m-(--drawer-inset,0px) flex max-h-(--drawer-content-max-height,none) min-h-0 w-(--drawer-content-width,auto) transform-[translate3d(var(--translate-x,0px),var(--translate-y,0px),0)_scale(var(--stack-scale))] flex-col bg-background text-popover-foreground shadow-lg ease-(--drawer-ease) will-change-transform surface-raised outline-none select-none",
-						"data-[swipe-axis=y]:h-(--drawer-content-height) data-[swipe-axis=y]:transition-[transform,height,opacity,filter,background-color] data-[swipe-axis=y]:[interpolate-size:allow-keywords]",
-						"data-[swipe-axis=x]:transition-[transform,opacity,filter,background-color]",
+						"data-[swipe-axis=y]:h-(--drawer-content-height) data-[swipe-axis=y]:transition-[transform,height,opacity,filter] data-[swipe-axis=y]:[interpolate-size:allow-keywords]",
+						"data-[swipe-axis=x]:transition-[transform,opacity,filter]",
 						"data-nested-drawer-open:overflow-hidden data-nested-drawer-open:brightness-95",
 						// Bleed — paints past the anchored edge so an overscrolled drawer shows no gap.
 						"after:pointer-events-none after:absolute after:bg-(--drawer-bleed-background,var(--background)) data-[swipe-axis=x]:after:inset-y-0 data-[swipe-axis=x]:after:w-(--bleed) data-[swipe-axis=y]:after:inset-x-0 data-[swipe-axis=y]:after:h-(--bleed) data-[swipe-direction=down]:after:top-full data-[swipe-direction=left]:after:right-full data-[swipe-direction=right]:after:left-full data-[swipe-direction=up]:after:bottom-full",

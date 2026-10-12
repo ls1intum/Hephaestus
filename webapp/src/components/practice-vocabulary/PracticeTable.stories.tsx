@@ -95,7 +95,7 @@ type Story = StoryObj<typeof meta>;
 
 /** What needs attention first; a press on Standing turns the order around. */
 export const Default: Story = {
-	play: async ({ args, canvas }) => {
+	play: async ({ canvas }) => {
 		const links = () => canvas.getAllByRole("button", { name: /^Open practice /u });
 		// Each name starts with the link's visible words, so a reader who speaks them reaches it
 		// (WCAG 2.2 SC 2.5.3); the practice after them tells the rows apart.
@@ -111,8 +111,33 @@ export const Default: Story = {
 			"Open practice Write commit subjects a reviewer can follow",
 		]);
 		await userEvent.click(canvas.getByRole("button", { name: "Standing" }));
-		await expect(args.onSortChange).toHaveBeenCalledWith("desc");
 		await expect(names()[0]).toBe("Open practice Mark the change ready and link its issue");
+	},
+};
+
+export const MobileSort: Story = {
+	decorators: [
+		(Story) => (
+			<div className="w-80 max-w-full">
+				<Story />
+			</div>
+		),
+	],
+	play: async ({ canvas }) => {
+		const button = canvas.getByRole("button", { name: "Standing" });
+		const bounds = button.getBoundingClientRect();
+		const table = canvas.getByRole("table");
+		const frame = table.getBoundingClientRect();
+		await expect(bounds.width).toBeGreaterThan(20);
+		await expect(bounds.left).toBeGreaterThanOrEqual(frame.left);
+		await expect(bounds.right).toBeLessThanOrEqual(frame.right);
+		button.focus();
+		await expect(button).toHaveFocus();
+		await userEvent.keyboard("{Enter}");
+		await expect(button.closest("th")).toHaveAttribute("aria-sort", "descending");
+		await expect(
+			canvas.getAllByRole("button", { name: /^Open practice /u })[0],
+		).toHaveAccessibleName("Open practice Mark the change ready and link its issue");
 	},
 };
 

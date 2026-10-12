@@ -37,6 +37,7 @@ const SCOPE_ONE_CONCERN = {
 	condition: CLEAN_CONDITION,
 	cleanNeeded: 3,
 	timestamp: inStoryYear("09-09T14:10"),
+	preparedAt: inStoryYear("09-09T14:10"),
 } satisfies Partial<PracticeFeedbackCardEntry>;
 
 /** The page's first card: new, three problems in the strip, nothing clean yet. */
@@ -70,12 +71,13 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		condition: CLEAN_CONDITION,
 		cleanNeeded: SCOPE_ONE_CONCERN.cleanNeeded,
 		timestamp: SCOPE_ONE_CONCERN.timestamp,
+		preparedAt: SCOPE_ONE_CONCERN.timestamp,
 		reviewedWork: [
 			{ ref: pullRequest(17), date: inStoryYear("08-28T00:00"), outcome: "NOT_MET" },
 			{ ref: pullRequest(19), date: inStoryYear("09-06T00:00"), outcome: "NOT_MET" },
 			{ ref: pullRequest(20), date: inStoryYear("09-03T00:00"), outcome: "NOT_MET" },
 		],
-		cleanWork: [clean(21, inStoryYear("09-07T00:00")), clean(22, inStoryYear("09-09T00:00"))],
+		cleanWork: [clean(21, inStoryYear("09-10T00:00")), clean(22, inStoryYear("09-11T00:00"))],
 		state: "open",
 	},
 	{
@@ -89,13 +91,14 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 			{ ref: pullRequest(16), date: inStoryYear("08-24T00:00"), outcome: "NOT_MET" },
 			{ ref: pullRequest(18), date: inStoryYear("09-01T00:00"), outcome: "NOT_MET" },
 		],
-		cleanWork: [clean(20, inStoryYear("09-03T00:00"))],
+		cleanWork: [clean(20, inStoryYear("09-10T00:00"))],
 		nextStep:
 			"Open the description with the problem and the decision you took, then the file list.",
 		condition: CLEAN_CONDITION,
 		cleanNeeded: 3,
 		state: "open",
 		timestamp: inStoryYear("09-09T14:10"),
+		preparedAt: inStoryYear("09-09T14:10"),
 	},
 	{
 		feedbackId: "reviewable-diff-size",
@@ -122,6 +125,7 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		cleanNeeded: 3,
 		state: "open",
 		timestamp: inStoryYear("09-09T14:10"),
+		preparedAt: inStoryYear("09-09T14:10"),
 	},
 	{
 		// The third of the three examples the cards are read against: the review dialogue, as the
@@ -148,6 +152,7 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		cleanNeeded: 3,
 		state: "open",
 		timestamp: inStoryYear("09-04T09:32"),
+		preparedAt: inStoryYear("09-04T09:32"),
 	},
 	{
 		feedbackId: "acceptance-criteria",
@@ -170,6 +175,7 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		cleanNeeded: 3,
 		state: "open",
 		timestamp: inStoryYear("09-02T16:45"),
+		preparedAt: inStoryYear("09-02T16:45"),
 	},
 ];
 
@@ -204,6 +210,7 @@ const RESOLVED_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		cleanNeeded: 3,
 		state: "resolved",
 		timestamp: inStoryYear("09-09T14:10"),
+		preparedAt: inStoryYear("09-06T14:10"),
 	},
 	{
 		feedbackId: "review-comments-specific-resolved",
@@ -237,6 +244,7 @@ const RESOLVED_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		cleanNeeded: 3,
 		state: "resolved",
 		timestamp: inStoryYear("09-02T11:40"),
+		preparedAt: inStoryYear("08-21T11:40"),
 	},
 	{
 		feedbackId: "status-updates-resolved",
@@ -269,6 +277,7 @@ const RESOLVED_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		cleanNeeded: 3,
 		state: "marked",
 		timestamp: inStoryYear("08-27T16:05"),
+		preparedAt: inStoryYear("08-13T16:05"),
 	},
 ];
 

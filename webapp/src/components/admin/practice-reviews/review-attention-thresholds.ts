@@ -30,7 +30,7 @@ export const PROBLEM_THRESHOLDS = {
 } as const;
 
 /**
- * Markers on the overview's practices (report F8): "Never applies here" from 90 % of a practice's
+ * Markers on the overview's practices (report F8): "Mostly not applicable" from 90 % of a practice's
  * observations not applicable, "Often undecided" from 30 % undetermined. Each only once the practice
  * has 20 observations in the range, so a handful of reviews never marks it. In the first course,
  * three practices were not applicable in every observation, and two undecided in a third to a half.

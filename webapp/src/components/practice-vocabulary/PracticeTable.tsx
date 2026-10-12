@@ -176,12 +176,13 @@ export interface PracticeTableProps<TRow> extends PracticeTableBody<TRow> {
 /**
  * Below the width the columns need (`min-w-152`), as in a sheet on a phone, a row is no longer a
  * line of columns that scrolls sideways out of sight: it stacks, the subject's name first and whole,
- * then the standing and the counts side by side, then the row's link. The head stays for a screen
- * reader.
+ * then the standing and the counts side by side, then the row's link. The Standing sort stays
+ * visible; the other headings stay available to a screen reader.
  */
 export const STACKED = [
 	"@max-[38rem]:block @max-[38rem]:min-w-0",
-	"@max-[38rem]:[&_thead]:sr-only @max-[38rem]:[&_tbody]:block",
+	"@max-[38rem]:[&_thead]:block @max-[38rem]:[&_tbody]:block",
+	"@max-[38rem]:[&_th:not([data-standing-sort])]:sr-only @max-[38rem]:[&_th[data-standing-sort]]:block @max-[38rem]:[&_th[data-standing-sort]]:w-auto @max-[38rem]:[&_th[data-standing-sort]]:p-0",
 	"@max-[38rem]:[&_tr]:flex @max-[38rem]:[&_tr]:flex-wrap @max-[38rem]:[&_tr]:items-start @max-[38rem]:[&_tr]:gap-x-4 @max-[38rem]:[&_tr]:gap-y-2 @max-[38rem]:[&_tr]:px-3 @max-[38rem]:[&_tr]:py-3",
 	"@max-[38rem]:[&_td]:block @max-[38rem]:[&_td]:min-w-0 @max-[38rem]:[&_td]:p-0 @max-[38rem]:[&_td]:whitespace-normal",
 	"@max-[38rem]:[&_td[data-subject]]:order-first @max-[38rem]:[&_td[data-subject]]:basis-full",
@@ -207,7 +208,11 @@ export function PracticeTable<TRow>({
 			sections={sections?.(columns)}
 			head={
 				<>
-					<TableHead aria-sort={sort === "asc" ? "ascending" : "descending"} className="w-60">
+					<TableHead
+						data-standing-sort
+						aria-sort={sort === "asc" ? "ascending" : "descending"}
+						className="w-60"
+					>
 						<SortButton
 							sorted={sort}
 							onToggle={() => onSortChange(sort === "asc" ? "desc" : "asc")}

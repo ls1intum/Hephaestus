@@ -9,12 +9,14 @@ import {
 	listTracedArtifactsInfiniteQueryKey,
 	listTracedArtifactsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
+import type { AgentJob } from "@/api/types.gen";
 import {
 	feedbackDetail,
 	observationDetail,
 	practiceCounts,
 	practiceReviewOverview,
 	reviewFeedbackDetail,
+	reviewJob,
 	reviewObservations,
 	reviewRuns,
 	workspacePractices,
@@ -22,7 +24,7 @@ import {
 import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
 import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
-import { artifactTrace } from "@/components/practice-trace/fixtures";
+import { artifactTrace, tracedArtifacts } from "@/components/practice-trace/fixtures";
 import { browserTimeZone } from "@/lib/dates";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -699,6 +701,69 @@ describe("work without a review", () => {
 			const settled = requestsTo(TRACE).length;
 			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS * 2);
 			expect(requestsTo(TRACE)).toHaveLength(settled);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	/**
+	 * Practice answers can settle before their run's results are processed. The sheet follows that run
+	 * while processing waits, reads the work again once it ends, and then stops asking.
+	 */
+	it("follows a run whose results wait to be processed after its answers settled, then reads the work again", async () => {
+		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+		try {
+			const jobId = "11111111-1111-1111-1111-111111111111";
+			const JOB = `/agents/jobs/${jobId}`;
+			const issue = tracedArtifacts.find((work) => work.artifactId === 1430);
+			assert(issue);
+			let job: AgentJob = { ...reviewJob(jobId), deliveryStatus: "PENDING" };
+			let row = { ...issue, reviewedSignalCount: 0 };
+			server.use(
+				// Every answer settled, nothing waiting: only the run's processing is left to follow.
+				http.get("*/workspaces/:workspaceSlug/practices/trace/:artifactKind/:artifactId", () =>
+					HttpResponse.json({ ...SETTLED_TRACE, artifactKind: "scm.issue", artifactId: 1430 }),
+				),
+				http.get(`*/workspaces/:workspaceSlug${JOB}`, () => HttpResponse.json(job)),
+				http.get("*/workspaces/:workspaceSlug/practices/trace", () =>
+					HttpResponse.json({
+						content: [row],
+						page: { number: 0, size: 1, totalElements: 1, totalPages: 1 },
+					}),
+				),
+			);
+			const workReads = () =>
+				requestsTo(LIST).filter((url) => url.searchParams.get("artifactId") === "1430").length;
+			renderRouteAtWithRouter(`${REVIEWS}/runs?detail=work:issue:1430`);
+			const sheet = await screen.findByRole(
+				"dialog",
+				{ name: /practice-binding contract/u },
+				ROUTE_RENDER_WAIT,
+			);
+			await within(sheet).findByText(
+				"2 moments, none started a review",
+				undefined,
+				ROUTE_RENDER_WAIT,
+			);
+			await waitFor(() => expect(requestsTo(JOB).length).toBeGreaterThan(0), ROUTE_RENDER_WAIT);
+
+			// Processing waits: the run is read again, the work is not.
+			const pendingReads = requestsTo(JOB).length;
+			const before = workReads();
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			// The interval is faked, so the waits poll on vitest's own timer rather than on setInterval.
+			await vi.waitFor(() => expect(requestsTo(JOB).length).toBeGreaterThan(pendingReads));
+			expect(workReads()).toBe(before);
+
+			job = { ...job, deliveryStatus: "DELIVERED" };
+			row = { ...row, reviewedSignalCount: 1 };
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			await vi.waitFor(() => expect(workReads()).toBeGreaterThan(before));
+			await within(sheet).findByText("2 moments, 1 started a review", undefined, ROUTE_RENDER_WAIT);
+
+			const settled = requestsTo(JOB).length;
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS * 2);
+			expect(requestsTo(JOB)).toHaveLength(settled);
 		} finally {
 			vi.useRealTimers();
 		}

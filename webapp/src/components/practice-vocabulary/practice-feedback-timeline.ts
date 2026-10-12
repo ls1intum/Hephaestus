@@ -1,7 +1,7 @@
 import type { CleanWork, ReviewedWorkOutcome } from "./PracticeFeedbackCard";
 
 /**
- * The card's timeline is a window on the newest reviews of this developer's work, at most this
+ * The card's timeline is a window on the supplied reviews of this developer's work, at most this
  * many, the evidence and the clean work alike: a glance at the pattern, not a log of every place it
  * was seen. The older pieces fold into one "N earlier" place at the start of the line.
  */
@@ -24,9 +24,8 @@ export const cleanLabel = ({
 const byDate = (a: { date: Date }, b: { date: Date }) => a.date.getTime() - b.date.getTime();
 
 /**
- * The timeline: the evidence behind the feedback, then the clean work since it was created, each
- * part oldest to newest. The evidence always predates the feedback and the clean work follows it,
- * so the card can draw the moment between them. The window keeps the newest, at most `limit`.
+ * The supplied evidence and clean work, ordered by their recorded review timestamps. The window
+ * keeps the newest supplied records, at most `limit`; evidence need not predate the card.
  */
 export function timelinePieces(
 	reviewedWork: ReviewedWorkOutcome[],
@@ -35,15 +34,16 @@ export function timelinePieces(
 ): TimelinePiece[] {
 	return [
 		// The same thread can be reviewed twice on different days.
-		...reviewedWork
-			.map((work) => ({ ...work, key: `${work.ref.kind} ${work.ref.id} ${work.date.getTime()}` }))
-			.sort(byDate),
-		...cleanWork
-			.map((clean) => ({
-				...clean,
-				key: `${clean.ref.kind} ${clean.ref.id} clean`,
-				outcome: "MET" as const,
-			}))
-			.sort(byDate),
-	].slice(-limit);
+		...reviewedWork.map((work) => ({
+			...work,
+			key: `${work.ref.kind} ${work.ref.id} ${work.date.getTime()}`,
+		})),
+		...cleanWork.map((clean) => ({
+			...clean,
+			key: `${clean.ref.kind} ${clean.ref.id} clean`,
+			outcome: "MET" as const,
+		})),
+	]
+		.sort(byDate)
+		.slice(-limit);
 }

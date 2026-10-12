@@ -283,7 +283,10 @@ export function feedbackLoss(
 	if (feedback.withdrawnAt !== undefined) {
 		return {
 			title: "Withdrawn",
-			text: "An admin withdrew it after it was delivered.",
+			// A prepared piece can be withdrawn too: only a recorded delivery says it was delivered.
+			text: reachedDeveloper(feedback)
+				? "An admin withdrew it after it was delivered."
+				: "An admin withdrew it before it reached the developer.",
 			short: "withdrawn by an admin",
 			tone: "secondary",
 		};

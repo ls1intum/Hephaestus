@@ -146,7 +146,7 @@ function stageSummary(stage: RailStage["stage"], full: ReviewLineage): ReactNode
 		}
 		return (
 			<span className="text-2xs text-muted-foreground tabular-nums">
-				{`${countOf(counts.feedback, "piece", "pieces")}, ${counts.reached} reached the developer`}
+				{`${countOf(counts.feedback, "listed piece", "listed pieces")}, ${counts.reached} reached the developer`}
 			</span>
 		);
 	}

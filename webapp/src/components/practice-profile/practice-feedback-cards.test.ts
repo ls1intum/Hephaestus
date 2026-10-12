@@ -95,6 +95,7 @@ describe("toFeedbackCard", () => {
 		expect(card).toMatchObject({
 			state: "resolved",
 			timestamp: new Date("2026-09-05T08:00:00Z"),
+			preparedAt: feedback.preparedAt,
 		});
 		expect(card.condition).toStrictEqual([
 			{ type: "text", text: "Resolved by the work on 5 September · " },

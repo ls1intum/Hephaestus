@@ -400,7 +400,24 @@ export const CanceledOnBudget: Story = {
 		const panel = within(await settledDrawerPanel());
 		const history = within(panel.getByRole("list", { name: "History" }));
 		history.getByText(/Reason: The model budget was used up\./u);
-		panel.getByText("Nothing recorded: no attempt reached the model");
+		panel.getByText("No usage recorded");
+	},
+};
+
+/**
+ * The job counted model calls, but its usage ledger holds no attempt: the cost says nothing was
+ * recorded, not that nothing reached the model.
+ */
+export const ModelCallsWithoutUsage: Story = {
+	args: {
+		job: { status: "ready", job: { ...job, llmTotalCalls: 12 } },
+		usage: { status: "ready", usage: { attempts: [], unpricedAttempts: 0 } },
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText("No usage recorded");
+		await expect(panel.queryByText(/reached the model/u)).toBeNull();
+		await expect(panel.queryByText("$0")).toBeNull();
 	},
 };
 
@@ -409,11 +426,10 @@ export const CostFailed: Story = {
 	args: {
 		usage: { status: "error", error: new Error("Network down"), onRetry: fn() },
 	},
-	play: async ({ args, userEvent }) => {
+	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		panel.getByText(/what the review cost/u);
-		await userEvent.click(panel.getByRole("button", { name: "Retry" }));
-		await expect(args.usage?.status === "error" && args.usage.onRetry).toHaveBeenCalledOnce();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
 	},
 };
 

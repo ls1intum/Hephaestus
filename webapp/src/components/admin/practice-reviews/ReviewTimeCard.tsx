@@ -51,9 +51,9 @@ export interface ReviewTimeCardProps {
  * median of whole reviews, from the moment on the work that started each, or its request, until its
  * comment was posted on the work, and under it the same time as one bar split into the stages a
  * review's trace names, Until asked, Queue, Preparation, Execution and To developer, with the
- * unsplit Run of older reviews where the range has some, each as wide as its part of the
- * median, with a legend of each stage's time, so the parts add up to it. Then one line of figures:
- * how many reviews of the range finished, the comments lost because the work merged first, and the
+ * unsplit Run of older reviews where the range has some, each as wide as its share of the reviews'
+ * total time, with a legend of that share of the median, so the parts add up to it. Then one line of
+ * figures: how many reviews of the range finished, the feedback lost because the work merged first, and the
  * reviews that finished after the merge. Where no review posted a comment on the work, as in a course whose feedback goes
  * to the practice pages, the part says so and measures to the end of the review instead. What each
  * figure means is in the (i) beside the caption.
@@ -123,14 +123,20 @@ export function ReviewTimeCard({
  */
 function timeInfo(timing: PracticeReviewTiming | undefined) {
 	const byMerge = timing?.finishedAfterMergeStartedByMerge ?? 0;
+	const typical = timing === undefined ? undefined : typicalReview(timing);
 	// A stage only some ranges have, the unsplit run of older reviews, is explained where it shows.
-	const shownKeys =
-		timing === undefined ? undefined : typicalReview(timing)?.stages.map((stage) => stage.def.key);
-	const shown = new Set(shownKeys);
+	const shown = new Set(typical?.stages.map((stage) => stage.def.key));
 	return [
 		{
 			term: "Median",
-			text: "of whole reviews, from what started each to its comment on the work. The stages add up to it.",
+			text:
+				typical?.until === "end"
+					? "of whole reviews, from what started each to the end of the review, as no review posted a comment on the work."
+					: "of whole reviews, from what started each to its comment on the work.",
+		},
+		{
+			term: "Stages",
+			text: "split that median by each stage's share of the total time of the reviews measured. They add up to the median, but are not each stage's own median.",
 		},
 		...REVIEW_STAGES.filter((stage) => stage.optional !== true || shown.has(stage.key)).map(
 			(stage) => ({ term: stage.label, text: stage.text }),
@@ -141,7 +147,7 @@ function timeInfo(timing: PracticeReviewTiming | undefined) {
 		},
 		{
 			term: "Lost to merge",
-			text: "counts comments withheld because the work was merged first.",
+			text: "counts pieces of feedback withheld because the work was merged first.",
 		},
 		{
 			term: "Finished after merge",
@@ -231,8 +237,8 @@ function TimeFigures({ timing, during }: { timing: PracticeReviewTiming; during:
 }
 
 /**
- * The range's figures in one line: the reviews that finished, and, when there are any, the comments
- * lost to the merge and the reviews that finished after it, each a link to what it counts.
+ * The range's figures in one line: the reviews that finished, and, when there are any, the pieces of
+ * feedback lost to the merge and the reviews that finished after it, each a link to what it counts.
  */
 function RangeFigures({
 	workspaceSlug,

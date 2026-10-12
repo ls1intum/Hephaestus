@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,12 +26,26 @@ import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { tracedArtifacts } from "@/components/practice-trace/fixtures";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
-import { sleep } from "@/test/async";
+import { deferred, sleep } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
 // deadlock backstop, not a budget these renders were meant to fit inside.
 vi.setConfig({ testTimeout: 30_000 });
+
+function readsOldReview(url: URL) {
+	return (
+		url.pathname.endsWith(`/agents/jobs/${LINEAGE_REVIEW_ID}`) ||
+		url.searchParams.get("agentJobId") === LINEAGE_REVIEW_ID
+	);
+}
+
+function heldWorkspaceRead(until: Promise<void>) {
+	return async () => {
+		await until;
+		return HttpResponse.json({});
+	};
+}
 
 const REVIEWS = "/w/acme/admin/practices/reviews";
 /**
@@ -423,6 +437,47 @@ describe("the trace and a record over it", () => {
 				]),
 			ROUTE_RENDER_WAIT,
 		);
+	});
+
+	/**
+	 * Another workspace and person, with its replies held: neither the last workspace's tab counts nor
+	 * its chain stand in, and the last chain's review is not read under the new workspace.
+	 */
+	it("shows no counts or chain of the last workspace while the next one's replies are held", async () => {
+		const OTHER = "/workspaces/other";
+		const held = deferred<undefined>();
+		server.use(
+			http.get(`*${OTHER}/practices/reviews`, heldWorkspaceRead(held.promise)),
+			http.get(`*${OTHER}/practices/reviews/observations`, heldWorkspaceRead(held.promise)),
+			http.get(`*${OTHER}/practices/reviews/feedback`, heldWorkspaceRead(held.promise)),
+			http.get(`*${OTHER}/practices/reviews/lineage`, heldWorkspaceRead(held.promise)),
+		);
+		try {
+			const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs`);
+			await screen.findByRole("link", { name: "Reviews, 1" }, ROUTE_RENDER_WAIT);
+			await act(async () => router.history.push(`${REVIEWS}/runs?detail=${TRACE}`));
+			within(await traceSheet()).getByText("You started here");
+			await act(async () =>
+				router.history.push(
+					`/w/other/admin/practices/reviews/runs?detail=${TRACE}&subjectUserId=7`,
+				),
+			);
+			const otherReads = () => requested.filter((url) => url.pathname.startsWith(`${OTHER}/`));
+			await waitFor(() => {
+				expect(otherReads().some((url) => url.pathname.endsWith("/lineage"))).toBe(true);
+				expect(
+					otherReads().filter((url) => url.pathname === `${OTHER}/practices/reviews`),
+				).not.toHaveLength(0);
+			}, ROUTE_RENDER_WAIT);
+			const tabs = document.querySelector('nav[aria-label="Practice review sections"]');
+			assert(tabs);
+			expect(tabs.querySelector('[aria-label^="Reviews,"]')).toBeNull();
+			expect(tabs.querySelectorAll('[aria-label$=", 1"]')).toHaveLength(0);
+			expect(screen.queryByText("You started here")).toBeNull();
+			expect(otherReads().filter(readsOldReview)).toStrictEqual([]);
+		} finally {
+			await act(async () => held.resolve(undefined));
+		}
 	});
 });
 

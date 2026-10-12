@@ -1,5 +1,6 @@
 import {
 	type InfiniteData,
+	type QueryKey,
 	useInfiniteQuery,
 	useQuery,
 	useQueryClient,
@@ -12,12 +13,17 @@ import {
 	listPracticeReviewsOptions,
 	listTracedArtifactsInfiniteOptions,
 } from "@/api/@tanstack/react-query.gen";
-import { listPracticeReviews } from "@/api/sdk.gen";
-import type { PagedModelReviewRunSummary } from "@/api/types.gen";
+import { listPracticeReviews, type Options } from "@/api/sdk.gen";
+import type {
+	ListPracticeReviewsData,
+	PagedModelReviewRunSummary,
+	ReviewRunSummary,
+} from "@/api/types.gen";
 import {
 	ACTIVE_REVIEW_POLL_SIZE,
 	ACTIVE_REVIEW_STATUSES,
 	isActiveReview,
+	isProcessingReview,
 	reconcileActiveRows,
 } from "@/components/admin/practice-reviews/active-review-rows";
 import { REVIEWABLE_ON_DEMAND } from "@/components/admin/practice-reviews/job-utils";
@@ -137,7 +143,8 @@ function ReviewRunsRoute() {
  * While a loaded review is queued or running, re-read only the active reviews under the same
  * filters, every few seconds: their rows change in place, and the loaded pages are read again once,
  * when a review starts or stops being active. Re-reading every loaded page on the timer cost one
- * request per page per tab.
+ * request per page per tab. A stopped review whose results are still processed is followed the same
+ * way until they are DELIVERED or FAILED.
  */
 function useActiveReviewPoll(
 	workspaceSlug: string,
@@ -145,7 +152,6 @@ function useActiveReviewPoll(
 	data: InfiniteData<PagedModelReviewRunSummary> | undefined,
 	enabled: boolean,
 ) {
-	const queryClient = useQueryClient();
 	const listQuery = runsQuery(search, REVIEW_PAGE_SIZE);
 	const listKey = listPracticeReviewsInfiniteOptions({
 		path: { workspaceSlug },
@@ -158,22 +164,54 @@ function useActiveReviewPoll(
 	const statuses = ACTIVE_REVIEW_STATUSES.filter((status) =>
 		listQuery.status === undefined ? !heldListed : listQuery.status.includes(status),
 	);
-	const polling = enabled && (statuses.length > 0 || heldListed) && loaded.some(isActiveReview);
-	const activeRequest = {
-		path: { workspaceSlug },
-		query: {
-			...listQuery,
-			status: statuses.length > 0 ? [...statuses] : undefined,
-			size: ACTIVE_REVIEW_POLL_SIZE,
+	useLoadedRowsPoll(listKey, {
+		polling: enabled && (statuses.length > 0 || heldListed) && loaded.some(isActiveReview),
+		request: {
+			path: { workspaceSlug },
+			query: {
+				...listQuery,
+				status: statuses.length > 0 ? [...statuses] : undefined,
+				size: ACTIVE_REVIEW_POLL_SIZE,
+			},
 		},
-	};
+		follows: isActiveReview,
+	});
+	// The API cannot ask for "active or still processing" in one read, so a stopped review whose
+	// results are still processed has its own poll, under the list's own filters.
+	const processingListed =
+		listQuery.resultProcessing === undefined || listQuery.resultProcessing.includes("PENDING");
+	useLoadedRowsPoll(listKey, {
+		polling: enabled && processingListed && loaded.some(isProcessingReview),
+		request: {
+			path: { workspaceSlug },
+			query: { ...listQuery, resultProcessing: ["PENDING"], size: ACTIVE_REVIEW_POLL_SIZE },
+		},
+		follows: isProcessingReview,
+	});
+}
+
+/**
+ * One poll of the rows a list follows, applied to its loaded pages as it lands: the rows it has news
+ * of change in place, and the pages are read again only when a followed row left or a new row arrived.
+ */
+function useLoadedRowsPoll(
+	listKey: QueryKey,
+	{
+		polling,
+		request,
+		follows,
+	}: {
+		polling: boolean;
+		request: Options<ListPracticeReviewsData>;
+		follows: (review: ReviewRunSummary) => boolean;
+	},
+) {
+	const queryClient = useQueryClient();
 	useQuery({
-		...listPracticeReviewsOptions(activeRequest),
-		// Each poll is applied to the loaded pages as it lands: the rows it has news of change in
-		// place, and the pages are read again only when a review started or stopped being active.
+		...listPracticeReviewsOptions(request),
 		queryFn: async ({ signal }) => {
 			const { data: polled } = await listPracticeReviews({
-				...activeRequest,
+				...request,
 				signal,
 				throwOnError: true,
 			});
@@ -184,6 +222,7 @@ function useActiveReviewPoll(
 					?.pages.flatMap((page) => page.content ?? []) ?? [],
 				rows,
 				(polled.page?.totalElements ?? rows.length) <= rows.length,
+				follows,
 			);
 			if (refetch) {
 				void queryClient.invalidateQueries({ queryKey: listKey, exact: true });

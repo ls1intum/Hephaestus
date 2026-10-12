@@ -190,7 +190,7 @@ const MARKED_PRACTICES = {
 };
 
 /**
- * "Never applies here" from 90 % not applicable, "Often undecided" from 30 % undetermined, each from
+ * "Mostly not applicable" from 90 % not applicable, "Often undecided" from 30 % undetermined, each from
  * 20 observations: the marked practices lead, the stronger marker first, and "Busiest first" puts
  * the table back in the server's order.
  */
@@ -221,7 +221,7 @@ export const NeedsALookFirst: Story = {
 		]);
 		const wiki = canvas.getByRole("row", { name: /Wiki pages/u });
 		await expect(
-			within(wiki).getByText("Never applies here").closest("[data-marker]"),
+			within(wiki).getByText("Mostly not applicable").closest("[data-marker]"),
 		).toHaveAttribute(
 			"title",
 			"Not applicable in 29 of 30 observations. Consider turning it off for this workspace.",
@@ -298,7 +298,7 @@ export const LongNamesAndMarkers: Story = {
 		await expect(name).toHaveAttribute("title", expect.stringContaining("with every change"));
 		await expect(name.scrollWidth).toBeGreaterThan(name.clientWidth);
 		// The marker sits on the name's line, not under it.
-		const marker = canvas.getByText("Never applies here").closest("[data-marker]");
+		const marker = canvas.getByText("Mostly not applicable").closest("[data-marker]");
 		await expect(marker?.parentElement).toBe(name.parentElement);
 	},
 };

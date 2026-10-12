@@ -213,8 +213,9 @@ function useArrived(): boolean {
 
 /**
  * Gives focus back to what opened the stack once the last level has gone: the row, link or button
- * the reader left from, so a keyboard reader continues where they were. Levels open from the
- * address rather than from a trigger Base UI knows, so its own return has nothing to go back to.
+ * the reader left from, so a keyboard reader continues where they were. URL-controlled navigation
+ * can blur that control before the popup mounts; this covers that case only when the framework
+ * has not already returned focus to a connected target.
  *
  * The opener is the last element focused before the first level opened. Focus while a level is
  * open is never the opener, even outside every level: a Select, menu or popover inside a level is

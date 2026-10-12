@@ -99,8 +99,8 @@ const COLUMN_INFO = {
 		"Every observation the reviews recorded about this practice in the range: met, not met, not applicable and undetermined.",
 	notMet:
 		"The observations of this practice whose outcome was not met, out of all its observations.",
-	notApplicable: `The observations where the practice did not apply to the work, out of all its observations. From ${minimumObservations} observations, a practice where ${Math.round(neverAppliesShare * 100)} % or more do not apply is marked "Never applies here".`,
-	undetermined: `The observations where the review could not decide, out of all its observations. From ${minimumObservations} observations, a practice where ${Math.round(oftenUndecidedShare * 100)} % or more are undetermined is marked "Often undecided".`,
+	notApplicable: `The observations where the practice did not apply to the work, out of all its observations. From ${minimumObservations} observations, a practice where ${Math.round(neverAppliesShare * 100)} % or more do not apply is marked "${PRACTICE_MARKER_DEFS.NEVER_APPLIES.label}".`,
+	undetermined: `The observations where the review could not decide, out of all its observations. From ${minimumObservations} observations, a practice where ${Math.round(oftenUndecidedShare * 100)} % or more are undetermined is marked "${PRACTICE_MARKER_DEFS.OFTEN_UNDECIDED.label}".`,
 	markedIncorrect: `The observations an admin marked incorrect, out of all its observations. They keep their outcome too. ${MARKED_INCORRECT_DEF.note}`,
 	feedbackDelivered:
 		"The feedback about this practice that reached the developer, in full or in part, out of all the feedback composed about it in the range: delivered, waiting, withheld or failed. A piece replaced by a newer one is not counted.",
@@ -132,8 +132,8 @@ const STACKED_FULL_WIDTH =
  * "19 of 89", out of that practice's observations, so the reader can judge the share without a
  * percentage to compare, and the feedback delivered out of the feedback composed about it
  * (`feedbackComposed`). Each column's (i) says how its count is reached. By default the
- * practices that need a look lead, each with one marker: one that never applies here costs reviews
- * and tells nobody anything, and one that is often undecided may lack the evidence it needs
+ * practices that need a look lead, each with one marker: one that mostly does not apply here costs
+ * reviews and tells nobody much, and one that is often undecided may lack the evidence it needs
  * (`review-attention-thresholds.ts`). The most observations marked incorrect, then undetermined,
  * follow, then the rest busiest first; the reader can sort the whole table busiest first, and the
  * choice is kept in the URL with the filters. It is drawn as the Reviews table is, without the

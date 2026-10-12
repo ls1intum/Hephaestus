@@ -108,8 +108,10 @@ export function FeedbackWorkTimeline({
 	cleanKeys,
 	earlier,
 	missing,
+	createdAt,
 }: {
 	pieces: TimelinePiece[];
+	createdAt: Date;
 	cleanKeys: Set<string>;
 	earlier: number;
 	/** The clean pieces still missing to resolve the feedback; zero once it can no longer resolve. */
@@ -123,16 +125,16 @@ export function FeedbackWorkTimeline({
 	const between = (index: number): Joint =>
 		isClean(index) && isClean(index + 1) ? "clean" : "plain";
 	const last = pieces.length - 1;
-	// Where the work since the feedback starts: the evidence comes first (`timelinePieces`).
-	const firstSince = pieces.findIndex((_, index) => isClean(index));
+	// Compare recorded review times; evidence ownership alone does not establish chronology.
+	const firstSince = pieces.findIndex((piece) => piece.date.getTime() >= createdAt.getTime());
 	const split = firstSince === -1 ? pieces.length : firstSince;
-	const hasDivider = split > 0 || earlier > 0;
+	const hasDivider = split > 0;
 	const tail: Joint = missing > 0 ? "missing" : "none";
 	const before = (index: number): Joint => {
 		if (index > 0) {
 			return between(index - 1);
 		}
-		return earlier > 0 || (hasDivider && split === 0) ? "plain" : "none";
+		return earlier > 0 ? "plain" : "none";
 	};
 	const after = (index: number): Joint => {
 		if (hasDivider && index === split - 1) {

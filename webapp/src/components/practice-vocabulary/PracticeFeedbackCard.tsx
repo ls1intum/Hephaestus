@@ -110,12 +110,14 @@ export interface PracticeFeedbackCardEntry {
 	nextStep: string;
 	/**
 	 * How the feedback resolves, or how it did: on an open card the meter's tooltip and
-	 * description, on any other the sentence under "Your last reviewed work".
+	 * description, on any other the sentence under "Work reviewed for this practice".
 	 */
 	condition: FeedbackTextSegment[];
 	state: FeedbackState;
 	/** When the feedback was created or, once `state` is resolved or closed, when that happened. */
 	timestamp: Date;
+	/** Immutable preparation time; the footer timestamp may instead describe a later closure. */
+	preparedAt: Date;
 }
 
 /** The card props that let one piece of feedback be rated and answered. */
@@ -245,7 +247,7 @@ const workKey = (ref: { kind: string; id: string | number }) => `${ref.kind} ${r
 /**
  * One piece of practice feedback in zones a reader takes in at a glance. The top says what it is
  * about, its explanation under "Why this was raised"; the tinted band under it, what to do next;
- * "Your last reviewed work", where the practice was seen on the left, and on the right how close
+ * "Work reviewed for this practice", where the practice was seen on the left, and on the right how close
  * the clean work is to resolving it and the reader's own way to close it; and the footer, when it
  * was written and how the reader rates it. Thin rules separate
  * them: above and below the band, and above the footer. Students in the first interview round found
@@ -266,6 +268,7 @@ export function PracticeFeedbackCard({
 		condition,
 		state,
 		timestamp,
+		preparedAt,
 	},
 	usefulness,
 	resolution,
@@ -436,7 +439,7 @@ export function PracticeFeedbackCard({
 			</div>
 
 			{/*
-			 * Your last reviewed work: on the left, where the practice was seen, along the timeline; on the
+			 * Work reviewed for this practice: on the left, where the practice was seen, along the timeline; on the
 			 * right, one compact block for the status and the action: how close the clean work is to
 			 * resolving it, then the reader's own way to close it, left-aligned inside the block and the
 			 * block set to the right. A narrow card stacks the block under the timeline, full width. A
@@ -446,7 +449,7 @@ export function PracticeFeedbackCard({
 				<div className="grid gap-x-10 gap-y-4 @xl/progress:grid-cols-[minmax(0,1fr)_auto]">
 					<div className="flex min-w-0 flex-col gap-2.5">
 						<div className="flex flex-col gap-1">
-							<h4 className={ZONE_HEADING}>Your last reviewed work</h4>
+							<h4 className={ZONE_HEADING}>Work reviewed for this practice</h4>
 							{/* The rule in sight on an open card; once it no longer holds, the closing sentence. */}
 							<p data-progress-rule="" className="text-xs text-muted-foreground">
 								{open ? (
@@ -458,6 +461,7 @@ export function PracticeFeedbackCard({
 						</div>
 						<FeedbackWorkTimeline
 							pieces={shown}
+							createdAt={preparedAt}
 							cleanKeys={cleanKeys}
 							earlier={earlier}
 							missing={missing}

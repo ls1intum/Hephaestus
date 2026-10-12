@@ -231,7 +231,8 @@ describe("a long wait", () => {
 describe("the review's sentence", () => {
 	it("names how many of the listed pieces reached the developer when some are not listed", () => {
 		const { sentence } = traceVerdict({ ...wholeReview, moreFeedback: 3 }, { kind: "review" });
-		expect(sentence).toMatch(/of the 5 listed reached the developer/u);
+		expect(sentence).toMatch(/5 pieces of feedback from it are listed/u);
+		expect(sentence).toMatch(/3 additional pieces of feedback in the chain are not listed/u);
 	});
 });
 

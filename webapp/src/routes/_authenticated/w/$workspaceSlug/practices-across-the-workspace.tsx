@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Navigate, stripSearchParams } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -39,6 +39,7 @@ import {
 } from "@/components/practices-across-the-workspace/WorkspaceGroupLevel";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { pageHead } from "@/lib/page-title";
+import { keepSameSubject } from "@/runtime/tanstack-query/keep-same-subject";
 
 /** The reader's own group and practice levels live in their Practice profile, which this level links to. */
 const LEVEL_KINDS = ["practice-group"] as const;
@@ -74,10 +75,11 @@ function PracticesAcrossTheWorkspace() {
 		staleTime: ACROSS_WORKSPACE_STALE_MS,
 	});
 	// One request per window: the server checks each window against its privacy rule on its own.
+	// Another window of this workspace stands in, marked stale; another workspace's never does.
 	const tilesQuery = useQuery({
 		...getPracticesAcrossWorkspaceTilesOptions({ path: { workspaceSlug }, query: { window } }),
 		enabled,
-		placeholderData: keepPreviousData,
+		placeholderData: keepSameSubject({ workspaceSlug }),
 		staleTime: ACROSS_WORKSPACE_STALE_MS,
 	});
 	const stack = parseDetailStack(detail, LEVEL_KINDS);

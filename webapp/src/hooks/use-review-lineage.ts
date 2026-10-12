@@ -1,4 +1,4 @@
-import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 
 import { getPracticeReviewLineageOptions } from "@/api/@tanstack/react-query.gen";
 import type { GetPracticeReviewLineageData, ReviewLineage } from "@/api/types.gen";
@@ -14,8 +14,8 @@ export type ReviewLineageTarget = GetPracticeReviewLineageData["query"];
  * a failure here costs the reader the chain and not the record.
  *
  * Undefined when there is nothing to trace: a link that names no work, or work no review recorded
- * anything about (a 404, which asking again answers the same way). A story centred on another record
- * keeps the one it showed until the new one arrives, so it does not blank out between two steps.
+ * anything about (a 404, which asking again answers the same way). Another record or workspace never
+ * shows the previous chain: its review would be read under the new key.
  */
 export function useReviewLineage(
 	workspaceSlug: string,
@@ -28,7 +28,6 @@ export function useReviewLineage(
 	const query = useQuery({
 		...options,
 		queryFn: target === undefined ? skipToken : options.queryFn,
-		placeholderData: keepPreviousData,
 		retry: retryUnlessNotFound,
 	});
 	if (target === undefined || problemStatusOf(query.error) === 404) {

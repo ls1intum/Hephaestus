@@ -57,6 +57,7 @@ function card(
 		condition: [],
 		state: "new",
 		timestamp: new Date(now - hoursAgo * HOUR),
+		preparedAt: new Date(now - hoursAgo * HOUR),
 	};
 }
 

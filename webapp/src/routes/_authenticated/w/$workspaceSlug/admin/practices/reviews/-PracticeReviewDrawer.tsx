@@ -1,9 +1,16 @@
-import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	queryOptions,
+	skipToken,
+	useQueries,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
 import {
 	getAgentJobOptions,
+	getAgentJobQueryKey,
 	getArtifactTraceOptions,
 	getPracticeDefinitionOptionsOptions,
 	getPracticeReviewWorkFactsOptions,
@@ -16,6 +23,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import { getPracticeReviewWorkFacts } from "@/api/sdk.gen";
 import type {
+	AgentJob,
 	ArtifactTrace,
 	GetPracticeReviewWorkFactsResponse,
 	ReviewLineage,
@@ -556,15 +564,60 @@ function WorkLevelRead({
 		// Current practices or latest occasions waiting for admission keep the trace discoverable.
 		refetchInterval: (result) => (reviewing(result.state.data) ? ACTIVE_REVIEW_POLL_MS : false),
 	});
+	// Practice answers can settle before composition and result processing finish. Follow the runs
+	// that own current answers and the latest admitted occasions, even when older answers mask them.
+	const reviewIds = [
+		...new Set(
+			[
+				...(traceQuery.data?.practices ?? []),
+				...latestSignals(
+					traceQuery.data?.signals.filter((entry) => entry.reviewId !== undefined) ?? [],
+				),
+			].flatMap((entry) => (entry.reviewId === undefined ? [] : [entry.reviewId])),
+		),
+	].sort();
+	const processing = useQueries({
+		queries: reviewIds.map((jobId) =>
+			queryOptions({
+				...getAgentJobOptions({ path: { workspaceSlug, jobId } }),
+				refetchOnMount: "always",
+				refetchInterval: (result) =>
+					processingReview(result.state.data) ? ACTIVE_REVIEW_POLL_MS : false,
+			}),
+		),
+		combine: (results) => results.some((result) => processingReview(result.data)),
+	});
 	// The work's counts change when its reviews settle, so the row is read again once they have.
 	const queryClient = useQueryClient();
-	const running = reviewing(traceQuery.data);
+	const running = reviewing(traceQuery.data) || processing;
 	const wasRunning = useRef(running);
 	useEffect(() => {
 		const before = wasRunning.current;
 		wasRunning.current = running;
 		if (before && !running) {
 			void queryClient.invalidateQueries({ queryKey: options.queryKey });
+		}
+	});
+	// A retry can reuse a settled run's ID, so a changed answer reads its run again. Compared as text,
+	// not as the trace's Dates, so a refreshed but unchanged trace reads nothing.
+	const assessmentVersion = traceQuery.data?.practices
+		.map(
+			(entry) =>
+				`${entry.practiceSlug}:${entry.reviewId ?? ""}:${entry.outcome}:${entry.decidedAt?.getTime() ?? ""}`,
+		)
+		.sort()
+		.join("|");
+	const assessed = useRef(assessmentVersion);
+	useEffect(() => {
+		const before = assessed.current;
+		assessed.current = assessmentVersion;
+		if (before === undefined || before === assessmentVersion) {
+			return;
+		}
+		for (const jobId of reviewIds) {
+			void queryClient.invalidateQueries({
+				queryKey: getAgentJobQueryKey({ path: { workspaceSlug, jobId } }),
+			});
 		}
 	});
 	const factsOptions = getPracticeReviewWorkFactsOptions({
@@ -700,6 +753,11 @@ function reviewing(trace: ArtifactTrace | undefined): boolean {
 				entry.state === "RECORDED" || entry.state === "PENDING" || entry.state === "DEFERRED",
 		)
 	);
+}
+
+/** A run still works, or its results still wait to be processed. */
+function processingReview(job: AgentJob | undefined): boolean {
+	return job?.status === "QUEUED" || job?.status === "RUNNING" || job?.deliveryStatus === "PENDING";
 }
 
 /** Keep every tie: provider timestamps can have less precision than separate review occasions. */

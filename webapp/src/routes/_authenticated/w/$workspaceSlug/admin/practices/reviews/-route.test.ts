@@ -316,25 +316,31 @@ describe("practice review page titles", () => {
 		expect(reads.count()).toBe(2);
 	});
 
-	/** A scope change reads every count again; until the new one is known the last one stands. */
-	it("keeps a tab's count while a scope change reads it again", async () => {
+	/** A scope change must not attribute the previous total to a new person while its read is held. */
+	it("hides the previous scope's count until the new one is known", async () => {
 		const scoped = heldScopedCount();
-		// Ahead of the unscoped count, since a handler given first answers first.
 		server.use(scoped.handler, countRead("/practices/reviews/observations", 13_308, []));
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs`);
-		const navigation = await sectionNavigation();
-		await within(navigation).findByRole(
-			"link",
-			{ name: "Observations, 13,308", hidden: true },
-			ROUTE_RENDER_WAIT,
-		);
-		await router.navigate({
-			to: ".",
-			search: (previous: Record<string, unknown>) => ({ ...previous, subjectUserId: 7 }),
-		});
-		await waitFor(() => expect(scoped.asked()).toBe(true));
-		within(navigation).getByRole("link", { name: "Observations, 13,308", hidden: true });
-		scoped.release();
-		await within(navigation).findByRole("link", { name: "Observations, 42", hidden: true });
+		try {
+			const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs`);
+			const navigation = await sectionNavigation();
+			await within(navigation).findByRole(
+				"link",
+				{ name: "Observations, 13,308", hidden: true },
+				ROUTE_RENDER_WAIT,
+			);
+			await router.navigate({
+				to: ".",
+				search: (previous: Record<string, unknown>) => ({ ...previous, subjectUserId: 7 }),
+			});
+			await waitFor(() => expect(scoped.asked()).toBe(true));
+			expect(
+				within(navigation).queryByRole("link", { name: "Observations, 13,308", hidden: true }),
+			).toBeNull();
+			within(navigation).getByRole("link", { name: "Observations", hidden: true });
+			scoped.release();
+			await within(navigation).findByRole("link", { name: "Observations, 42", hidden: true });
+		} finally {
+			scoped.release();
+		}
 	});
 });

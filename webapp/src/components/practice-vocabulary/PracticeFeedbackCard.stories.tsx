@@ -16,8 +16,8 @@ const clean = (number: number, day: string) => ({
 	ref: pullRequest(number),
 	date: inStoryYear(`${day}T00:00`),
 });
-const twoClean = [clean(21, "09-07"), clean(22, "09-09")];
-const threeClean = [clean(20, "09-07"), clean(21, "09-08"), clean(22, "09-09")];
+const twoClean = [clean(21, "09-10"), clean(22, "09-11")];
+const threeClean = [clean(20, "09-10"), clean(21, "09-11"), clean(22, "09-12")];
 
 /** The outcomes the timeline draws, in its order, read off the markers on its line. */
 const outcomesOnTheLine = (list: HTMLElement) =>
@@ -67,7 +67,7 @@ type Story = StoryObj<typeof meta>;
  * New feedback, nothing clean yet: the "New" badge in the accent and the blue wash. The top says
  * what it is about, with the whole explanation under "Why this was raised" and the practice's own
  * words as a small link. The tinted band says the next step;
- * "Your last reviewed work" under it holds the timeline on the left and the clean meter with the
+ * "Work reviewed for this practice" under it holds the timeline on the left and the clean meter with the
  * reader's own answers on the right; the footer holds the ratings as quiet icon buttons. Thin
  * rules: above and below the band, and above the footer.
  */
@@ -87,9 +87,11 @@ export const New: Story = {
 		await expect(why).toBeVisible();
 		// The card's three section headings read as one set: one size, weight and colour, and one
 		// step above what each names.
-		const sectionHeadings = ["Why this was raised", "Next step", "Your last reviewed work"].map(
-			(name) => within(article).getByRole("heading", { name, level: 4 }),
-		);
+		const sectionHeadings = [
+			"Why this was raised",
+			"Next step",
+			"Work reviewed for this practice",
+		].map((name) => within(article).getByRole("heading", { name, level: 4 }));
 		const looks = sectionHeadings.map((heading) => {
 			const style = getComputedStyle(heading);
 			return [style.fontSize, style.fontWeight, style.color].join(" ");
@@ -137,7 +139,7 @@ export const New: Story = {
 		await expect(rule).toBeVisible();
 		await expect(
 			within(article)
-				.getByRole("heading", { name: "Your last reviewed work" })
+				.getByRole("heading", { name: "Work reviewed for this practice" })
 				.compareDocumentPosition(rule),
 		).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 		// A keyboard reaches the meter, and focusing it opens the sentence as its tooltip.
@@ -162,7 +164,7 @@ export const New: Story = {
 		const inOrder = [
 			within(article).getByRole("heading", { name: args.card.headline }),
 			within(article).getByRole("heading", { name: "Next step" }),
-			within(article).getByRole("heading", { name: "Your last reviewed work" }),
+			within(article).getByRole("heading", { name: "Work reviewed for this practice" }),
 			timeline,
 			within(article).getByRole("group", { name: "Or mark it yourself" }),
 			within(article).getByRole("group", { name: "Rate this feedback" }),
@@ -284,7 +286,7 @@ export const TwoOfThreeClean: Story = {
 				.map((link) => link.textContent.replace(" (opens in a new tab)", "")),
 		).toStrictEqual(["#17", "#20", "#19", "#21", "#22"]);
 		await expect(timeline.getAllByRole("listitem").at(-1)).toHaveTextContent(
-			/#22.*9 September, clean$/u,
+			/#22.*11 September, clean$/u,
 		);
 		// The missing place is drawn, not read: the meter already says it.
 		await expect(canvas.getByText("resolves")).toBeVisible();
@@ -382,7 +384,7 @@ export const LongHistory: Story = {
 };
 
 /**
- * "Your last reviewed work" on a card of its full width: the left side is the timeline, the
+ * "Work reviewed for this practice" on a card of its full width: the left side is the timeline, the
  * right side one compact block, well apart from it. In the block the meter and its count share one
  * line, the label "Or mark it yourself" follows, then the two answers in a row of one height; the
  * block's left edges align, and the block stands at the zone's right edge. A card narrower than
@@ -839,7 +841,7 @@ export const MixedWork: Story = {
 				{ ref: pullRequest(17), date: inStoryYear("08-28T00:00"), outcome: "NOT_MET" },
 				{ ref: issue(13), date: inStoryYear("09-03T00:00"), outcome: "NOT_MET" },
 			],
-			cleanWork: [{ ref: conversation("#releases"), date: inStoryYear("09-05T00:00") }],
+			cleanWork: [{ ref: conversation("#releases"), date: inStoryYear("09-10T00:00") }],
 		},
 	},
 	play: async ({ canvas }) => {
@@ -847,6 +849,31 @@ export const MixedWork: Story = {
 		await expect(within(list).getAllByRole("listitem")).toHaveLength(3);
 		await expect(linkedWork(list)).toStrictEqual(["#17", "#13"]);
 		await expect(within(list).getByText("#releases")).toBeVisible();
+	},
+};
+
+export const InterleavedReviewTimes: Story = {
+	args: {
+		card: { ...card, preparedAt: inStoryYear("09-02T00:00"), cleanWork: [clean(21, "09-04")] },
+	},
+	play: async ({ canvas }) => {
+		const list = canvas.getByRole("list", { name: "Where it happened" });
+		await expect(linkedWork(list)).toStrictEqual(["#17", "#20", "#21", "#19"]);
+		await expect(within(list).getByText("Feedback created")).toBeVisible();
+		await expect(within(list).getAllByRole("listitem")[3]).not.toHaveTextContent(
+			"before this feedback",
+		);
+		await expect([...list.querySelectorAll("[data-before-feedback]")]).toHaveLength(1);
+	},
+};
+
+export const OnlyReviewsAfterCreation: Story = {
+	args: { card: { ...card, preparedAt: inStoryYear("08-01T00:00") } },
+	play: async ({ canvas }) => {
+		const list = canvas.getByRole("list", { name: "Where it happened" });
+		await expect(within(list).queryByText("Feedback created")).toBeNull();
+		await expect([...list.querySelectorAll("[data-before-feedback]")]).toHaveLength(0);
+		await expect(list).not.toHaveTextContent("before this feedback");
 	},
 };
 
@@ -883,7 +910,7 @@ export const WorkWithoutAnAddress: Story = {
 					outcome: "NOT_MET",
 				},
 			],
-			cleanWork: [{ ref: conversation("#releases"), date: inStoryYear("08-20T00:00") }],
+			cleanWork: [{ ref: conversation("#releases"), date: inStoryYear("09-10T00:00") }],
 		},
 	},
 	play: async ({ canvas }) => {
@@ -898,7 +925,7 @@ export const WorkWithoutAnAddress: Story = {
 
 /**
  * The practice's review rules changed after the card was written: it closes unresolved, keeps its
- * evidence, wears no wash, draws no clean-work meter, and says why under "Your last reviewed work".
+ * evidence, wears no wash, draws no clean-work meter, and says why under "Work reviewed for this practice".
  */
 export const Closed: Story = {
 	args: {
@@ -908,6 +935,7 @@ export const Closed: Story = {
 			cleanWork: twoClean,
 			condition: [text("Closed on 9 September · the practice’s review rules changed")],
 			timestamp: inStoryYear("09-09T09:00"),
+			preparedAt: inStoryYear("09-08T09:00"),
 		},
 	},
 	play: async ({ canvas }) => {
