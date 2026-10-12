@@ -939,6 +939,76 @@ describe("Workspace activity", () => {
 		expect(readsOf("/activity/people/8/work")[0]?.searchParams.get("team")).toBe("core");
 	});
 
+	it("marks retained repository counts until the newly selected range arrives", async () => {
+		const held = deferred();
+		const api = {
+			repository: { id: 1, key: "acme/api", name: "api" },
+			counts: {
+				...counts,
+				contributions: 3,
+				pullRequestsOpened: 1,
+				pullRequestsReviewed: 2,
+				comments: 2,
+			},
+		};
+		const web = {
+			repository: { id: 2, key: "acme/web", name: "web" },
+			counts: {
+				...counts,
+				contributions: 2,
+				pullRequestsOpened: 1,
+				pullRequestsMerged: 0,
+				pullRequestsReviewed: 1,
+				comments: 2,
+			},
+		};
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/activity/people/:userId", () =>
+				HttpResponse.json({ ...personDetail, repositories: [api, web] }),
+			),
+		);
+		const { router } = renderRouteAtWithRouter("/w/acme/workspace-activity?detail=person:ada-lrz");
+		try {
+			const level = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
+			const region = await within(level).findByRole("region", { name: "Repositories" });
+			expect(region.getAttribute("aria-busy")).not.toBe("true");
+			within(region).getByRole("cell", { name: "3" });
+			server.use(
+				http.get("*/workspaces/:workspaceSlug/activity/people/:userId", async () => {
+					await held.promise;
+					return HttpResponse.json({
+						...personDetail,
+						counts: { ...counts, contributions: 9, pullRequestsOpened: 6 },
+						weeks: personDetail.weeks.map((week) => ({
+							...week,
+							counts: { ...counts, contributions: 9, pullRequestsOpened: 6 },
+						})),
+						repositories: [
+							{ ...api, counts: { ...api.counts, contributions: 7, pullRequestsOpened: 5 } },
+							web,
+						],
+					});
+				}),
+			);
+			await router.navigate({
+				to: "/w/$workspaceSlug/workspace-activity",
+				params: { workspaceSlug: "acme" },
+				search: { detail: ["person:ada-lrz"], range: "30d" },
+			});
+			await waitFor(() => expect(region.getAttribute("aria-busy")).toBe("true"));
+			within(region).getByRole("cell", { name: "3" });
+			expect(within(region).getByRole("paragraph").textContent).toBe("Updating repository counts…");
+			held.resolve();
+			await waitFor(() => expect(region.getAttribute("aria-busy")).not.toBe("true"));
+			expect(within(region).queryByRole("cell", { name: "3" })).toBeNull();
+			expect(within(region).queryByText("Updating repository counts…")).toBeNull();
+			within(region).getByRole("cell", { name: "7" });
+			within(region).getByRole("cell", { name: "acme/api" });
+		} finally {
+			held.resolve();
+		}
+	});
+
 	it("reads a category stacked over a person as that person's", async () => {
 		renderRouteAtWithRouter("/w/acme/workspace-activity?detail=person:bob&detail=activity:reviews");
 

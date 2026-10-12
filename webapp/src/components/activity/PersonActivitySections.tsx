@@ -1,10 +1,13 @@
 import type { ReactElement } from "react";
 
+import { cn } from "cn";
+
 import { Section } from "@/components/layout/Section";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 
 import type { ActivityOverviewState } from "./activity-buckets";
 import { type ActivityPeriod, periodLabel } from "./activity-period";
+import { STALE } from "./activity-tones";
 import { ActivityRepositoryTable } from "./ActivityRepositoryTable";
 import { ActivityTiles } from "./ActivityTiles";
 import { ActivityWorkLog, type ActivityWorkLogState, type WorkLogSubject } from "./ActivityWorkLog";
@@ -36,13 +39,21 @@ export function PersonActivitySections({
 	subject,
 }: PersonActivitySectionsProps) {
 	const repositories = overview.status === "ready" ? overview.overview.repositories : [];
+	const stale = overview.status === "ready" && overview.stale;
 	return (
 		<>
 			<Section level={level} size="lg" title={periodLabel(period)} actions={periodActions}>
 				<ActivityTiles state={overview} providerType={providerType} />
 			</Section>
 			{repositories.length > 1 && (
-				<Section level={level} size="lg" title="Repositories">
+				<Section
+					level={level}
+					size="lg"
+					title="Repositories"
+					description={stale ? "Updating repository counts…" : undefined}
+					aria-busy={stale || undefined}
+					className={cn(stale && STALE)}
+				>
 					<ActivityRepositoryTable repositories={repositories} providerType={providerType} />
 				</Section>
 			)}
