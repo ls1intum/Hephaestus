@@ -81,6 +81,12 @@ A server with its worker role enabled uses one root for both.
 Attempt folders use the same root.
 Sandbox inputs and results pass through the authenticated worker gateway.
 
+Preparation failures record the stage and a known failure type without exception text.
+File and database failure types remain visible when preparation wraps the cause.
+A diagnostic type does not grant a retry.
+Eligibility and retry limits are unchanged.
+Earlier failures without a retained cause cannot be classified retrospectively.
+
 PostgreSQL retains admitted observations and their citation verification results.
 Delivery does not require the worker's source files.
 [ADR 0041](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0041-compose-1x-kubernetes-2.md#evidence-admission-and-deletion) defines the storage and cleanup contract.

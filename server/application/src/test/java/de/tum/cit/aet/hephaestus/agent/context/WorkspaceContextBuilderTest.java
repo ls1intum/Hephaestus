@@ -22,6 +22,8 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.review.AutomatedReviewFence;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -172,6 +174,53 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             assertThatThrownBy(() -> builderOf(bad).build(reviewRequest()))
                     .isInstanceOf(JobPreparationException.class)
                     .hasMessageContaining("Required content provider failed");
+        }
+
+        @Test
+        void shouldRetainTheTypedCauseWhenARequiredProviderFails() {
+            var file = new IOException("file failed");
+            var io = new UncheckedIOException(file);
+            var collection = new EvidenceCollectionException("collection failed", io);
+            var provider = new ContentSource() {
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
+
+                @Override
+                public boolean required() {
+                    return true;
+                }
+
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {
+                    throw collection;
+                }
+            };
+            assertThatThrownBy(() -> builderOf(provider).build(reviewRequest()))
+                    .isInstanceOf(JobPreparationException.class)
+                    .hasCause(collection)
+                    .hasRootCause(file);
+        }
+
+        @Test
+        void shouldRetainTheTypedCauseWhenWorkspaceFolderCaptureFails() {
+            var kind = new SourceKind("workspace.project-inventory");
+            var file = new IOException("file failed");
+            var io = new UncheckedIOException(file);
+            var folder = mock(WorkspaceFolderRenderer.class);
+            when(folder.supports(any())).thenReturn(true);
+            when(folder.sourceKinds()).thenReturn(Set.of(kind));
+            when(folder.capture(any(), any())).thenThrow(io);
+            var manifests = mock(JobFolderIndexBuilder.class);
+            when(manifests.stagedSources(any())).thenReturn(Set.of(kind));
+            when(manifests.isSourceUsePermitted(any(), any())).thenReturn(true);
+            var builder = new WorkspaceContextBuilder(List.of(folder), new SimpleMeterRegistry(), manifests);
+            var plan = new EvidencePlan(new SourceContractVersion("1.3.0"), ArtifactKinds.PULL_REQUEST);
+            assertThatThrownBy(() -> builder.prepare(reviewRequest(), plan))
+                    .isInstanceOf(JobPreparationException.class)
+                    .hasCause(io)
+                    .hasRootCause(file);
         }
 
         @Test
