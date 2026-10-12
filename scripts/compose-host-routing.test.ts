@@ -252,35 +252,31 @@ await test("application metrics stay on the private network in both Compose depl
 	}
 });
 
-await test("Compose passes the operator's database pool size to the worker only", () => {
+await test("Compose passes the operator's pool size and memory headroom to the worker only", () => {
 	const app = parseDocument(
 		readFileSync(new URL("../docker/compose.app.yaml", import.meta.url), "utf8"),
-	);
-	// Passed through without a value, so an unset variable leaves the worker profile's default in force.
-	const workerPool = ["services", "application-worker", "environment", "HIKARI_MAXIMUM_POOL_SIZE"];
-	assert.ok(app.hasIn(workerPool), "the worker receives the operator's pool size");
-	assert.equal(app.getIn(workerPool), null);
-	// The other roles keep the application's own default; only the worker is raised.
-	assert.equal(
-		app.getIn(["services", "application-server", "environment", "HIKARI_MAXIMUM_POOL_SIZE"]),
-		undefined,
 	);
 	const core = parseDocument(
 		readFileSync(new URL("../docker/compose.core.yaml", import.meta.url), "utf8"),
 	);
-	assert.equal(
-		core.getIn(["services", "webhook-server", "environment", "HIKARI_MAXIMUM_POOL_SIZE"]),
-		undefined,
-	);
 	const singleHost = parseDocument(
 		readFileSync(new URL("../docker/self-host/compose.single-host.yaml", import.meta.url), "utf8"),
 	);
-	for (const role of ["application-server", "application-worker", "webhook-server"]) {
-		assert.equal(
-			singleHost.getIn(["services", role, "environment", "HIKARI_MAXIMUM_POOL_SIZE"]),
-			undefined,
-			`single-host ${role} inherits its pool size`,
-		);
+	for (const key of ["HIKARI_MAXIMUM_POOL_SIZE", "BPL_JVM_HEAD_ROOM"]) {
+		// Passed through without a value, so an unset variable leaves the worker's own default in force.
+		const worker = ["services", "application-worker", "environment", key];
+		assert.ok(app.hasIn(worker), `the worker receives the operator's ${key}`);
+		assert.equal(app.getIn(worker), null);
+		// The other roles keep their own defaults.
+		assert.equal(app.getIn(["services", "application-server", "environment", key]), undefined);
+		assert.equal(core.getIn(["services", "webhook-server", "environment", key]), undefined);
+		for (const role of ["application-server", "application-worker", "webhook-server"]) {
+			assert.equal(
+				singleHost.getIn(["services", role, "environment", key]),
+				undefined,
+				`single-host ${role} receives no ${key}`,
+			);
+		}
 	}
 });
 

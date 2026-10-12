@@ -343,6 +343,23 @@ If PostgreSQL allows 100 connections and reserves 3, then 25 remain for migratio
 This example is only an illustration.
 More replicas or larger pools use more connections, and other clients need their own headroom.
 
+### Memory headroom
+
+When the JVM starts, the buildpack's memory calculator sets the Java memory from the container's memory limit.
+`BPL_JVM_HEAD_ROOM` is an optional percentage of that limit.
+The calculator keeps this percentage out of the Java memory that it calculates.
+The heap must also leave room for the worker's file cache and for other memory that the container uses outside the JVM.
+
+The default headroom is 0 %.
+Thus, if you increase the container memory limit, the heap can also increase at the next start.
+Select the headroom for the actual workload of your worker.
+
+The split Compose stack passes `BPL_JVM_HEAD_ROOM` to the worker only.
+If you do not set it, the buildpack's default behavior applies.
+The value applies only when the JVM starts.
+To apply a change, drain and restart the worker, as [Graceful drain](#graceful-drain) describes.
+For the calculation, see the [Paketo memory calculator](https://paketo.io/docs/reference/java-reference/#memory-calculator).
+
 ## Graceful drain
 
 On SIGTERM, the worker does these actions in order:
