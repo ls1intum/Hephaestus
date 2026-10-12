@@ -64,7 +64,9 @@ git rebase --exec 'git commit --amend --no-edit -S' origin/main
 
 A pull request title or body carries no model, agent, harness, or tool attribution.
 `AGENTS.md` § Pull requests has the rule.
-The `Verify commit identity` job in `pull-request.yml` checks the body for it.
+The `Validate PR` job in `pull-request.yml` checks the body for it.
+Its primary-author check follows the [commit identity policy](docs/contributor/ci-cd.mdx#quality-gates).
+Keep the original authorship when a maintainer corrects another developer’s pull request.
 
 A commit trailer is different.
 `Co-authored-by:` is Git's own way to record who or what worked on a commit.

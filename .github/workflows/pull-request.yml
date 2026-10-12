@@ -26,7 +26,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Load trusted title policy
+      - name: Load trusted PR policies
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -36,6 +36,7 @@ jobs:
           sparse-checkout: |
             commitlint.config.ts
             package.json
+            scripts/review-policy.ts
           sparse-checkout-cone-mode: false
 
       - name: Read title policy and validate header limits
@@ -119,9 +120,14 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         continue-on-error: true
+        env:
+          MAINTAINERS: ${{ vars.REVIEW_POLICY_MAINTAINERS }}
         with:
           script: |
             const { writeFile } = require("node:fs/promises");
+            const { pathToFileURL } = await import("node:url");
+            const { parseMaintainers } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/review-policy.ts`).href);
+            const maintainers = parseMaintainers(process.env.MAINTAINERS);
 
             // `authors(first:1)` is the primary author alone: a co-author after the first is a
             // credit, not the identity the commit is attributed to.
@@ -153,10 +159,10 @@ jobs:
             // `renovate[bot]`. Deriving the one from the other keeps bots under the same rule
             // rather than exempting them.
             const expected = author.__typename === "Bot" ? `${author.login}[bot]` : author.login;
-            const offenders = nodes.filter(
-              ({ commit }) =>
-                commit.authors.nodes[0]?.user?.login?.toLowerCase() !== expected.toLowerCase(),
-            );
+            const offenders = nodes.filter(({ commit }) => {
+              const resolved = commit.authors.nodes[0]?.user?.login?.toLowerCase();
+              return resolved === undefined || (resolved !== expected.toLowerCase() && !maintainers.has(resolved));
+            });
             if (offenders.length === 0) return;
 
             const listed = offenders.map(({ commit }) => {
@@ -169,18 +175,17 @@ jobs:
               [
                 "## Commit identity check failed",
                 "",
-                `Every commit here must be authored by @${expected}, the account that opened this`,
-                "pull request. These are not:",
+                `Every commit's primary author must resolve to @${expected} or a maintainer listed`,
+                "in REVIEW_POLICY_MAINTAINERS. These do not:",
                 "",
                 ...listed,
                 "",
-                "Point `git config user.email` at an address on that account, then re-author them:",
-                "",
-                `    git rebase -i --exec "git commit --amend --no-edit --reset-author" origin/${pull.base.ref}`,
+                "For your own commits, use an email address registered to your GitHub account.",
+                "Preserve other contributors' authorship when making corrections.",
                 "",
               ].join("\n"),
             );
-            core.setFailed(`${offenders.length} commit(s) do not resolve to @${expected}.`);
+            core.setFailed(`${offenders.length} commit(s) do not resolve to @${expected} or a listed maintainer.`);
 
       - name: "Comment on PR with the offending commits"
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
@@ -214,7 +219,7 @@ jobs:
           script: |
             const { writeFile } = require("node:fs/promises");
 
-            // Mirrors `scripts/lib/model-attribution.ts`; this job has no checkout to import it.
+            // Mirrors `scripts/lib/model-attribution.ts`, which the sparse checkout does not include.
             // `scripts/pull-request-workflows.test.ts` executes this policy against real descriptions.
             const patterns = [
               {
