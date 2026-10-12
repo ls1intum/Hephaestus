@@ -44,6 +44,7 @@ public class AgentJobController {
     private final AgentJobService agentJobService;
     private final AgentJobLifecycleService agentJobLifecycleService;
     private final ReviewRunTargets reviewRunTargets;
+    private final AgentJobUsageQuery usageQuery;
 
     @GetMapping
     @Operation(summary = "List agent jobs for a workspace")
@@ -78,6 +79,26 @@ public class AgentJobController {
     public ResponseEntity<AgentJobDTO> getAgentJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
         AgentJob job = agentJobService.getJob(workspaceContext.id(), jobId);
         return ResponseEntity.ok(dto(workspaceContext, job));
+    }
+
+    @GetMapping("/{jobId}/usage")
+    @Operation(
+            summary = "Get what an agent job spent on the model, per attempt",
+            description = "One entry per attempt with recorded usage, read from the usage ledger, with its tokens,"
+                    + " pricing state and cost. The total is absent while an attempt has no known price.",
+            operationId = "getAgentJobUsage")
+    @ApiResponse(
+            responseCode = "200",
+            description = "Usage returned",
+            content = @Content(schema = @Schema(implementation = AgentJobUsageDTO.class)))
+    @ApiResponse(
+            responseCode = "404",
+            description = "Job not found in this workspace",
+            content = @Content(schema = @Schema(hidden = true)))
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<AgentJobUsageDTO> getAgentJobUsage(
+            WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
+        return ResponseEntity.ok(usageQuery.usage(workspaceContext.id(), jobId));
     }
 
     @PostMapping("/{jobId}/cancel")
@@ -118,6 +139,9 @@ public class AgentJobController {
     }
 
     private AgentJobDTO dto(WorkspaceContext workspaceContext, AgentJob job) {
-        return AgentJobDTO.from(job, reviewRunTargets.of(workspaceContext.id(), job));
+        return AgentJobDTO.from(
+                job,
+                reviewRunTargets.of(workspaceContext.id(), job),
+                agentJobService.reviewMoments(workspaceContext.id(), job.getId()));
     }
 }

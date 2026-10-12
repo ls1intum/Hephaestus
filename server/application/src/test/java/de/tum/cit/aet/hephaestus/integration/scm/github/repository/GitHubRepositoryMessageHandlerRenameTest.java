@@ -121,7 +121,7 @@ class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
         assertThat(repository.getHtmlUrl()).isEqualTo("https://github.com/" + NEW_FULL_NAME);
         verify(repositoryRepository).save(repository);
         // The monitor re-key + consumer rebuild — without this the live feed stays frozen.
-        verify(syncTargetProvider).reconcileSyncTargetsForRepository(NATIVE_ID, NEW_FULL_NAME);
+        verify(syncTargetProvider).reconcileSyncTargetsForRepository(PROVIDER_ID, NATIVE_ID, NEW_FULL_NAME);
         // Never by the stale name.
         verify(repositoryRepository, never()).findByNameWithOwner(anyString());
     }
@@ -137,7 +137,8 @@ class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
         handler.handleEvent(transferredEvent());
 
         assertThat(repository.getNameWithOwner()).isEqualTo("HephaestusTest/TestRepository");
-        verify(syncTargetProvider).reconcileSyncTargetsForRepository(NATIVE_ID, "HephaestusTest/TestRepository");
+        verify(syncTargetProvider)
+                .reconcileSyncTargetsForRepository(PROVIDER_ID, NATIVE_ID, "HephaestusTest/TestRepository");
     }
 
     @Test
@@ -145,35 +146,65 @@ class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
         stubProvider();
         when(repositoryRepository.findByNativeIdAndProviderId(NATIVE_ID, PROVIDER_ID))
                 .thenReturn(Optional.empty());
-        when(repositoryRepository.findByNameWithOwner(OLD_FULL_NAME)).thenReturn(Optional.empty());
 
         handler.handleEvent(renamedEvent());
 
         verify(repositoryRepository, never()).save(any());
         // The monitor is what the NATS filter is built from, so it must be re-keyed regardless.
-        verify(syncTargetProvider).reconcileSyncTargetsForRepository(NATIVE_ID, NEW_FULL_NAME);
+        verify(syncTargetProvider).reconcileSyncTargetsForRepository(PROVIDER_ID, NATIVE_ID, NEW_FULL_NAME);
     }
 
     @Test
-    void fallsBackToThePreviousNameForLegacyRowsWithoutANativeId() {
-        Repository repository = new Repository();
-        repository.setNameWithOwner(OLD_FULL_NAME);
-        // No IdentityProvider row configured -> the stable-id lookup cannot run.
-        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com"))
+    void shouldNotRenameAReplacementAtThePreviousNameWhenThePayloadHasAKnownId() {
+        stubProvider();
+        Repository replacement = new Repository();
+        replacement.setNativeId(NATIVE_ID + 1);
+        replacement.setNameWithOwner(OLD_FULL_NAME);
+        when(repositoryRepository.findByNativeIdAndProviderId(NATIVE_ID, PROVIDER_ID))
                 .thenReturn(Optional.empty());
-        when(repositoryRepository.findByNameWithOwner(OLD_FULL_NAME)).thenReturn(Optional.of(repository));
 
         handler.handleEvent(renamedEvent());
 
+        assertThat(replacement.getNameWithOwner()).isEqualTo(OLD_FULL_NAME);
+        verify(repositoryRepository, never()).findByNameWithOwnerAndProviderId(anyString(), anyLong());
+        verify(repositoryRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldUseTheScopedPreviousNameOnlyWhenThePayloadHasNoId() {
+        stubProvider();
+        Repository repository = new Repository();
+        repository.setNativeId(NATIVE_ID);
+        repository.setNameWithOwner(OLD_FULL_NAME);
+        when(repositoryRepository.findByNameWithOwnerAndProviderId(OLD_FULL_NAME, PROVIDER_ID))
+                .thenReturn(Optional.of(repository));
+        GitHubRepositoryEventDTO event = renamedEvent();
+        handler.handleEvent(new GitHubRepositoryEventDTO(
+                "renamed",
+                new GitHubRepositoryRefDTO(null, "R_node", NEW_NAME, NEW_FULL_NAME, false, null, "main"),
+                event.changes(),
+                null,
+                null));
         assertThat(repository.getNameWithOwner()).isEqualTo(NEW_FULL_NAME);
-        verify(syncTargetProvider).reconcileSyncTargetsForRepository(NATIVE_ID, NEW_FULL_NAME);
+        assertThat(repository.getNativeId()).isEqualTo(NATIVE_ID);
+        verify(repositoryRepository, never()).findByNativeIdAndProviderId(anyLong(), anyLong());
+    }
+
+    @Test
+    void renamesNothingWithoutTheProviderTheEventCameFrom() {
+        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com"))
+                .thenReturn(Optional.empty());
+
+        handler.handleEvent(renamedEvent());
+
+        verify(repositoryRepository, never()).save(any());
+        verify(syncTargetProvider, never()).reconcileSyncTargetsForRepository(anyLong(), any(), any());
     }
 
     @Test
     void unrelatedActionsDoNotTouchTheMonitors() {
         var archived =
                 new GitHubRepositoryEventDTO("archived", repositoryRef(NEW_NAME, NEW_FULL_NAME), null, null, null);
-        when(repositoryRepository.findByNameWithOwner(NEW_FULL_NAME)).thenReturn(Optional.empty());
 
         handler.handleEvent(archived);
 

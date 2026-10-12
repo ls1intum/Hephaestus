@@ -2,7 +2,12 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -10,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -21,6 +27,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -34,6 +41,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +55,12 @@ import tools.jackson.databind.ObjectMapper;
 class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
+    private ConnectionRepository sourceConnections;
+
+    @Autowired
+    private ConnectionService sourceConnectionService;
+
+    @Autowired
     private WebTestClient webTestClient;
 
     @Autowired
@@ -57,6 +71,9 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
 
     @Autowired
     private ObservationRepository observationRepository;
+
+    @Autowired
+    private PracticeGroupRepository practiceGroupRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
@@ -215,6 +232,20 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
     }
 
     private long persistMonitoredPullRequest(String title) {
+        Connection source = sourceConnections.saveAndFlush(new Connection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "pat",
+                new ConnectionConfig.GitHubPatConfig("review-summary-org", null, Set.of())));
+        sourceConnectionService.transition(
+                source,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "review-read-test",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
         Repository repository = new Repository();
         repository.setNativeId(9311L);
         repository.setProvider(ensureGitHubProvider());
@@ -410,6 +441,81 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
                 .isEqualTo(failed.getId().toString());
     }
 
+    /**
+     * "On hold" is a status value of its own: alone it keeps the queued reviews that wait on a hold, and beside a
+     * status it adds them to that status's reviews.
+     */
+    @Test
+    @WithAdminUser
+    void shouldListTheReviewsOnHoldAloneOrBesideAStatus() {
+        Instant at = Instant.parse("2026-03-10T00:00:00Z");
+        AgentJob held = persistReviewAt(workspace, at, AgentJobStatus.QUEUED);
+        held.setHoldReason("BUDGET");
+        jobRepository.save(held);
+        AgentJob failed = persistReviewAt(workspace, at.plusSeconds(60), AgentJobStatus.FAILED);
+        persistReviewAt(workspace, at.plusSeconds(120), AgentJobStatus.COMPLETED);
+
+        listReviews("?onHold=true")
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(held.getId().toString())
+                .jsonPath("$.content[0].holdReason")
+                .isEqualTo("BUDGET");
+        listReviews("?onHold=true&status=FAILED")
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(2)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(failed.getId().toString())
+                .jsonPath("$.content[1].id")
+                .isEqualTo(held.getId().toString());
+        // The set-up's own queued review waits on no hold, so "Queued" keeps it and "On hold" does not.
+        listReviews("?status=QUEUED").jsonPath("$.page.totalElements").isEqualTo(2);
+        listReviews("?onHold=false").jsonPath("$.page.totalElements").isEqualTo(4);
+    }
+
+    /**
+     * "Waiting" keeps exactly the reviews the queue counts as waiting: queued, not held for the AI budget and due now.
+     * A held review and one backing off before a retry are queued too, but the queue does not count them, so the list
+     * a Waiting figure opens must not show them either.
+     */
+    @Test
+    @WithAdminUser
+    void shouldListExactlyTheReviewsTheQueueCountsAsWaiting() {
+        Instant at = Instant.parse("2026-03-10T00:00:00Z");
+        AgentJob due = persistReviewAt(workspace, at, AgentJobStatus.QUEUED);
+        AgentJob held = persistReviewAt(workspace, at.plusSeconds(60), AgentJobStatus.QUEUED);
+        held.setHoldReason(AgentJob.HOLD_REASON_BUDGET);
+        jobRepository.save(held);
+        AgentJob backingOff = persistReviewAt(workspace, at.plusSeconds(120), AgentJobStatus.QUEUED);
+        backingOff.setAvailableAt(Instant.now().plusSeconds(3600));
+        jobRepository.save(backingOff);
+        persistReviewAt(workspace, at.plusSeconds(180), AgentJobStatus.RUNNING);
+
+        // The set-up's own review is queued and due as well, so it waits beside the one seeded here.
+        listReviews("?waiting=true")
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(2)
+                .jsonPath("$.content[*].id")
+                .isEqualTo(List.of(job.getId().toString(), due.getId().toString()));
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/practices/reviews/queue", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.waiting")
+                .isEqualTo(2);
+        // "Queued" keeps all four queued reviews; "Waiting" beside "On hold" adds the held one.
+        listReviews("?status=QUEUED").jsonPath("$.page.totalElements").isEqualTo(4);
+        listReviews("?waiting=true&onHold=true")
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(3);
+        listReviews("?waiting=false").jsonPath("$.page.totalElements").isEqualTo(5);
+    }
+
     @Test
     @WithAdminUser
     void shouldListOnlyReviewsWhoseResultProcessingFailedWhenFilteredByIt() {
@@ -442,6 +548,109 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
                 .jsonPath("$.content[0].resultProcessing")
                 .doesNotExist();
         listReviews("").jsonPath("$.page.totalElements").isEqualTo(4);
+    }
+
+    /**
+     * The developer, practice and group filters keep a review when one of its observations matches all of
+     * them, with the meaning the observation list gives the same names.
+     */
+    @Test
+    @WithAdminUser
+    void shouldListTheReviewsThatObservedTheDeveloperPracticeAndGroupWhenFilteredByThem() {
+        PracticeGroup group = new PracticeGroup();
+        group.setWorkspace(workspace);
+        group.setSlug("reviewing");
+        group.setName("Reviewing");
+        practice.setGroup(practiceGroupRepository.save(group));
+        practiceRepository.save(practice);
+        Instant at = Instant.parse("2026-03-10T00:00:00Z");
+        AgentJob observedOther = persistReviewAt(workspace, at, AgentJobStatus.COMPLETED);
+        User other = persistUser("review-summary-other");
+        insertObservationFor(observedOther, other, practice);
+        insertObservationFor(job, subject, practice);
+        persistReviewAt(workspace, at.plusSeconds(60), AgentJobStatus.COMPLETED);
+
+        listReviews("").jsonPath("$.page.totalElements").isEqualTo(3);
+        listReviews("?subjectUserId=" + subject.getId())
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(job.getId().toString());
+        listReviews("?practiceSlug=review-quality")
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(2);
+        listReviews("?practiceSlug=unknown").jsonPath("$.page.totalElements").isEqualTo(0);
+        listReviews("?groupSlug=reviewing&subjectUserId=" + other.getId())
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(observedOther.getId().toString());
+        listReviews("?groupSlug=unknown").jsonPath("$.page.totalElements").isEqualTo(0);
+    }
+
+    /** A review or a piece of work chosen on one list narrows this one to the same reviews, in this workspace only. */
+    @Test
+    @WithAdminUser
+    void shouldListOneReviewOrTheReviewsOfOneWorkWhenFilteredByThem() {
+        Instant at = Instant.parse("2026-03-10T00:00:00Z");
+        reviewOfPullRequest(job, 7);
+        AgentJob earlierOfSameWork = reviewOfPullRequest(persistReviewAt(workspace, at, AgentJobStatus.COMPLETED), 7);
+        reviewOfPullRequest(persistReviewAt(workspace, at, AgentJobStatus.COMPLETED), 8);
+        AgentJob issueReview = persistReviewAt(workspace, at, AgentJobStatus.COMPLETED);
+        issueReview.setJobType(AgentJobType.ISSUE_REVIEW);
+        issueReview.setMetadata(objectMapper.valueToTree(Map.of("issue_id", 7)));
+        jobRepository.save(issueReview);
+        AgentJob foreign = reviewOfPullRequest(persistReviewAt(otherWorkspace, at, AgentJobStatus.COMPLETED), 7);
+
+        listReviews("?agentJobId=" + job.getId())
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(job.getId().toString());
+        listReviews("?agentJobId=" + foreign.getId())
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(0);
+        listReviews("?artifactKind=scm.pull_request&artifactId=7")
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(2)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(job.getId().toString())
+                .jsonPath("$.content[1].id")
+                .isEqualTo(earlierOfSameWork.getId().toString());
+        listReviews("?artifactKind=scm.issue&artifactId=7")
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(issueReview.getId().toString());
+        listReviews("?artifactKind=scm.pull_request")
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(3);
+        listReviews("?artifactKind=scm.pull_request&artifactId=7&agentJobId=" + job.getId())
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(1);
+        listReviews("?artifactKind=docs.unknown_kind&artifactId=7")
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(0);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldRejectOneItemOfWorkWithoutItsKind() {
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/practices/reviews?artifactId=7", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody()
+                .jsonPath("$.detail")
+                .isEqualTo("Choose a kind of work before you filter by one item.");
+    }
+
+    private AgentJob reviewOfPullRequest(AgentJob review, long pullRequestId) {
+        review.setMetadata(objectMapper.valueToTree(Map.of("pull_request_id", pullRequestId, "title", "Work")));
+        return jobRepository.save(review);
     }
 
     /** A backwards window is a mistake, not an empty page — the siblings answer it the same way. */
@@ -521,6 +730,28 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         result.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         result.setConfigSnapshot(objectMapper.valueToTree(Map.of("model", "test")));
         return jobRepository.save(result);
+    }
+
+    private void insertObservationFor(AgentJob review, User about, Practice observed) {
+        UUID id = UUID.randomUUID();
+        observationRepository.insertIfAbsent(
+                id,
+                "filter-" + id,
+                review.getId(),
+                workspace.getId(),
+                observed.getId(),
+                null,
+                ArtifactKinds.PULL_REQUEST.value(),
+                7L,
+                about.getId(),
+                "Observed",
+                "NOT_MET",
+                "MINOR",
+                "{}",
+                "Reasoning",
+                "filter-" + id,
+                Instant.now(),
+                "LIVE");
     }
 
     private void insertObservation(String title, String outcome, @Nullable String severity) {

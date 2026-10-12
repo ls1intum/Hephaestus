@@ -39,6 +39,7 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
     private static final long SYNC_TARGET_ID = 42L;
     private static final long WORKSPACE_ID = 1L;
     private static final long NATIVE_ID = 555L;
+    private static final long PROVIDER_ID = 7L;
     private static final String OLD_NAME = "acme/old-widgets";
     private static final String NEW_NAME = "acme/new-widgets";
 
@@ -140,7 +141,8 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
         first.setId(SYNC_TARGET_ID);
         RepositoryToMonitor second = monitor(NATIVE_ID, OLD_NAME);
         second.setId(SYNC_TARGET_ID + 1);
-        when(repositoryToMonitorRepository.findByNativeId(NATIVE_ID)).thenReturn(List.of(first, second));
+        when(repositoryToMonitorRepository.findByNativeIdOnSourceProvider(NATIVE_ID, PROVIDER_ID))
+                .thenReturn(List.of(first, second));
         when(repositoryToMonitorRepository.findById(SYNC_TARGET_ID)).thenReturn(Optional.of(first));
         when(repositoryToMonitorRepository.findById(SYNC_TARGET_ID + 1)).thenReturn(Optional.of(second));
         when(workspace.getId()).thenReturn(WORKSPACE_ID);
@@ -152,7 +154,7 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
                 .when(natsConsumerService)
                 .ifAvailable(any());
 
-        provider.reconcileSyncTargetsForRepository(NATIVE_ID, NEW_NAME);
+        provider.reconcileSyncTargetsForRepository(PROVIDER_ID, NATIVE_ID, NEW_NAME);
 
         assertThat(first.getNameWithOwner()).isEqualTo(NEW_NAME);
         assertThat(second.getNameWithOwner()).isEqualTo(NEW_NAME);
@@ -161,9 +163,9 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
 
     @Test
     void shouldNotRekeyByNameWhenTheWebhookCarriesNoStableId() {
-        provider.reconcileSyncTargetsForRepository(null, NEW_NAME);
+        provider.reconcileSyncTargetsForRepository(PROVIDER_ID, null, NEW_NAME);
 
-        verify(repositoryToMonitorRepository, never()).findByNativeId(any());
+        verify(repositoryToMonitorRepository, never()).findByNativeIdOnSourceProvider(any(), any());
         verify(repositoryToMonitorRepository, never()).save(any());
     }
 

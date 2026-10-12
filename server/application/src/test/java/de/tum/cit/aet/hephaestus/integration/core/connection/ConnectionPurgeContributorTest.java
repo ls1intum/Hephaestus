@@ -90,6 +90,7 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
         contributor(List.of(connectionStrategy)).deleteWorkspaceData(WORKSPACE_ID);
 
         assertThat(tornDownWithCredentials).isTrue();
+        verify(connectionStrategy).eraseLocalData(erasureRef(connection));
         assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(connection.getCredentialsEncrypted()).isNull();
         verify(syncJobService, never()).requestCancelForTeardown(anyLong());
@@ -110,6 +111,7 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
 
         assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);
         assertThat(connection.getCredentialsEncrypted()).isNotNull();
+        verify(connectionStrategy, never()).eraseLocalData(any());
     }
 
     @Test

@@ -56,7 +56,13 @@ public class ConnectionPurgeContributor implements WorkspacePurgeContributor {
                             "workspace-purge",
                             "workspace-" + workspaceId + "-purge-" + c.getId(),
                             "Cascade from workspace PURGE"),
-                    () -> revokeProvider(c, strategy));
+                    () -> revokeProvider(c, strategy),
+                    () -> {
+                        if (strategy != null) {
+                            strategy.eraseLocalData(
+                                    new IntegrationRef(c.getKind(), workspaceId, c.getInstanceKey(), c.getId()));
+                        }
+                    });
         }
     }
 

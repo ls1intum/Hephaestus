@@ -91,6 +91,8 @@ describe("contributingPractices", () => {
 		previousOpportunities: 5,
 		opportunities: 10,
 		opportunitiesUntilComparable: 0,
+		standingWork: 5,
+		reviewedWork: 10,
 		ropeHalfWidth: 0.1,
 	};
 	const trend: PracticeGroupTrend = {

@@ -11,7 +11,12 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -48,6 +53,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,6 +90,12 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
             InAppFeedbackBody.render("A way of working", "What recurs.", "One thing to try.");
     /** Evidence that cites nothing, which the evidence authorization withholds from every reader. */
     private static final String WITHHELD_EVIDENCE_JSON = "{\"citations\":[]}";
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private ConnectionService connectionService;
 
     @Autowired
     private PracticeGroupRepository groupRepository;
@@ -700,6 +712,7 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
 
         @BeforeEach
         void seedRenamedWork() {
+            connectGitHub(workspace);
             repository = persistMonitoredRepository();
             long pullRequestId = persistPullRequest(repository, developer, 78);
             // The run recorded "Pull request 78"; the mirror now holds the name the author gave it.
@@ -757,6 +770,7 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
 
         @BeforeEach
         void seedRealWork() {
+            connectGitHub(workspace);
             Repository repository = persistMonitoredRepository();
             sharedPullRequestId = persistPullRequest(repository, developer, 77);
             sharedRun = persistPullRequestReview(workspace, 77, LATEST_RUN_AT.plusSeconds(300));
@@ -836,6 +850,7 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
             Workspace other = createWorkspace(
                     "profile-runs-monitor", "Monitor WS", "profile-runs-monitor-org", AccountType.ORG, otherOwner);
             Repository elsewhere = persistRepository(9103L, "elsewhere");
+            connectGitHub(other);
             monitor(other, elsewhere);
             long pullRequestId = persistPullRequest(elsewhere, colleague, 82);
             Instant at = LATEST_RUN_AT.plusSeconds(800);
@@ -913,6 +928,23 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
                     .isEqualTo(expected);
             readRun(reviewId).jsonPath("$.run.mayRequest").isEqualTo(expected);
         }
+    }
+
+    private void connectGitHub(Workspace target) {
+        Connection connection = connections.saveAndFlush(new Connection(
+                target,
+                IntegrationKind.GITHUB,
+                "profile-runs-test",
+                new ConnectionConfig.GitHubAppConfig(9101L, target.getAccountLogin(), null, Set.of())));
+        connectionService.transition(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "profile-runs-test",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
     }
 
     private Repository persistMonitoredRepository() {

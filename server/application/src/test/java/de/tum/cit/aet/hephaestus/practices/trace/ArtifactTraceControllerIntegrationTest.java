@@ -817,6 +817,168 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                     .jsonPath("$.content.length()")
                     .isEqualTo(0);
         }
+
+        @Test
+        @WithMentorUser
+        void shouldListOnePieceOfWorkWhenFilteredByItsKindAndId() {
+            recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.RECORDED, null, null);
+            recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.RECORDED, null, null, READY_AT, 483L);
+            recordSignal(
+                    otherWorkspace, ScmSignals.PULL_REQUEST_READY, SignalState.RECORDED, null, null, READY_AT, 484L);
+
+            get(
+                            LIST + "?artifactKind={kind}&artifactId={id}",
+                            workspace.getWorkspaceSlug(),
+                            ArtifactKinds.PULL_REQUEST.value(),
+                            483L)
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].artifactId")
+                    .isEqualTo(483);
+            get(
+                            LIST + "?artifactKind={kind}&artifactId={id}",
+                            workspace.getWorkspaceSlug(),
+                            ArtifactKinds.PULL_REQUEST.value(),
+                            484L)
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(0);
+            get(LIST + "?artifactId={id}", workspace.getWorkspaceSlug(), 483L)
+                    .expectStatus()
+                    .isBadRequest();
+            get(LIST + "?artifactKind=&artifactId={id}", workspace.getWorkspaceSlug(), 483L)
+                    .expectStatus()
+                    .isBadRequest();
+        }
+
+        /** Half-open like the review lists: a signal at {@code from} is in, one at {@code to} is out. */
+        @Test
+        @WithMentorUser
+        void shouldCountOnlyTheSignalsInsideTheWindowWhenAWindowIsGiven() {
+            Instant later = READY_AT.plusSeconds(86_400);
+            recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.RECORDED, null, null, READY_AT);
+            recordSignal(workspace, ScmSignals.PULL_REQUEST_MERGED, SignalState.RECORDED, null, null, later);
+
+            get(LIST + "?from={from}&to={to}", workspace.getWorkspaceSlug(), READY_AT, later)
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].artifactId")
+                    .isEqualTo(ARTIFACT_ID)
+                    .jsonPath("$.content[0].signalCount")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].lastSignalAt")
+                    .value(String.class, at -> assertThat(Instant.parse(at)).isEqualTo(READY_AT));
+
+            get(LIST + "?from={from}", workspace.getWorkspaceSlug(), later.plusSeconds(1))
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(0);
+        }
+
+        /**
+         * Work none of whose moments started a review, each with its latest moment and why that started none.
+         * Work one moment of which started a review is left out, and so is another workspace's.
+         */
+        @Test
+        @WithMentorUser
+        void shouldListOnlyTheWorkNoReviewStartedOnWhenAskedForWorkWithoutAReview() {
+            AgentJob job = persistJob();
+            recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.TRIGGERED, null, job.getId());
+            recordSignal(
+                    workspace,
+                    ScmSignals.PULL_REQUEST_READY,
+                    SignalState.RECORDED,
+                    null,
+                    null,
+                    READY_AT.minusSeconds(60),
+                    483L);
+            recordSignal(
+                    workspace,
+                    ScmSignals.PULL_REQUEST_MERGED,
+                    SignalState.PENDING,
+                    SignalStateReason.BUDGET_EXHAUSTED,
+                    null,
+                    READY_AT,
+                    483L);
+            recordSignal(
+                    otherWorkspace, ScmSignals.PULL_REQUEST_READY, SignalState.RECORDED, null, null, READY_AT, 484L);
+
+            get(LIST + "?withoutReview=true", workspace.getWorkspaceSlug())
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].artifactId")
+                    .isEqualTo(483)
+                    .jsonPath("$.content[0].reviewedSignalCount")
+                    .isEqualTo(0)
+                    .jsonPath("$.content[0].lastSignal.state")
+                    .isEqualTo("PENDING")
+                    .jsonPath("$.content[0].lastSignal.stateReason")
+                    .isEqualTo("BUDGET_EXHAUSTED")
+                    .jsonPath("$.content[0].lastSignal.stateReasonDescription")
+                    .isEqualTo(SignalStateReason.BUDGET_EXHAUSTED.describe());
+
+            get(LIST, workspace.getWorkspaceSlug())
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(2);
+        }
+
+        /** The review a later moment started is outside the window, so inside it the work started none. */
+        @Test
+        @WithMentorUser
+        void shouldJudgeWorkWithoutAReviewByTheMomentsInsideTheWindow() {
+            Instant later = READY_AT.plusSeconds(86_400);
+            AgentJob job = persistJob();
+            recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.RECORDED, null, null, READY_AT);
+            recordSignal(workspace, ScmSignals.PULL_REQUEST_MERGED, SignalState.TRIGGERED, null, job.getId(), later);
+
+            get(LIST + "?withoutReview=true&to={to}", workspace.getWorkspaceSlug(), later)
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].lastSignal.state")
+                    .isEqualTo("RECORDED");
+            get(LIST + "?withoutReview=true", workspace.getWorkspaceSlug())
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(0);
+        }
+
+        @Test
+        @WithUser
+        void shouldRefuseAMemberWhoAsksForWorkWithoutAReview() {
+            get(LIST + "?withoutReview=true", workspace.getWorkspaceSlug())
+                    .expectStatus()
+                    .isForbidden()
+                    .expectBody(Void.class);
+        }
+
+        @Test
+        @WithMentorUser
+        void shouldRejectTheWindowWhenItEndsBeforeItStarts() {
+            get(LIST + "?from={from}&to={to}", workspace.getWorkspaceSlug(), READY_AT, READY_AT.minusSeconds(1))
+                    .expectStatus()
+                    .isBadRequest();
+        }
     }
 
     private void assertOwnTraceCounts(User developer, boolean ownEndpoint) {

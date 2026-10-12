@@ -83,6 +83,7 @@ interface DeliveredWorkFeedbackRepository extends Repository<Feedback, UUID> {
     @Query("""
         SELECT DISTINCT c.nativeId AS nativeId, c.htmlUrl AS url FROM IssueComment c
         JOIN RepositoryToMonitor monitor ON monitor.nameWithOwner = c.issue.repository.nameWithOwner
+            AND monitor_covers_repository(monitor.workspace.id, monitor.nativeId, c.issue.repository.nativeId, c.issue.repository.provider.id) = true
         WHERE monitor.workspace.id = :workspaceId AND c.issue.id = :artifactId
           AND c.provider = c.issue.provider AND c.nativeId IN :nativeIds
         """)
@@ -94,6 +95,7 @@ interface DeliveredWorkFeedbackRepository extends Repository<Feedback, UUID> {
     @Query("""
         SELECT DISTINCT c.nativeId AS nativeId, c.htmlUrl AS url FROM PullRequestReviewComment c
         JOIN RepositoryToMonitor monitor ON monitor.nameWithOwner = c.pullRequest.repository.nameWithOwner
+            AND monitor_covers_repository(monitor.workspace.id, monitor.nativeId, c.pullRequest.repository.nativeId, c.pullRequest.repository.provider.id) = true
         WHERE monitor.workspace.id = :workspaceId AND c.pullRequest.id = :artifactId
           AND c.provider = c.pullRequest.provider AND c.nativeId IN :nativeIds
         """)

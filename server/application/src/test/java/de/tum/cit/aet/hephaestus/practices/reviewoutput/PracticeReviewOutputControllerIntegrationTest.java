@@ -10,6 +10,11 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
+import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
+import de.tum.cit.aet.hephaestus.mentor.ChatThread;
+import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
+import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
@@ -111,6 +116,12 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
     @Autowired
     private ReactionRepository reactionRepository;
+
+    @Autowired
+    private ChatThreadRepository chatThreadRepository;
+
+    @Autowired
+    private ChatMessageRepository chatMessageRepository;
 
     private Workspace workspace;
     private Workspace otherWorkspace;
@@ -996,6 +1007,58 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
     @DisplayName("Feedback ledger")
     class Ledger {
 
+        // The group filter keeps the feedback bound to an observation of a practice in the group, and intersects with
+        // the practice filter.
+        @Test
+        @WithAdminUser
+        void shouldListTheFeedbackOfTheGroupsPracticesWhenFilteredByGroup() {
+            PracticeGroup group = persistGroup(workspace, "communication", "Communication");
+            practiceA.setGroup(group);
+            practiceRepository.save(practiceA);
+            Feedback inGroup = persistUnit(workspace, job, alice, 0, FeedbackDeliveryState.DELIVERED, null, "In group");
+            bind(inGroup, insertProblem(practiceA, job, alice, "Grouped", "MAJOR"));
+            Feedback ungrouped =
+                    persistUnit(workspace, job, bob, 1, FeedbackDeliveryState.DELIVERED, null, "Ungrouped");
+            bind(ungrouped, insertProblem(practiceB, job, bob, "Not grouped", "MAJOR"));
+            persistUnit(workspace, job, alice, 2, FeedbackDeliveryState.DELIVERED, null, "Unbound");
+
+            getOk(FEEDBACK + "?groupSlug=communication", workspace.getWorkspaceSlug())
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].id")
+                    .isEqualTo(inGroup.getId().toString());
+            expectFeedbackTotal("?groupSlug=communication&practiceSlug=" + practiceB.getSlug(), 0);
+            expectFeedbackTotal("?groupSlug=unknown", 0);
+            expectFeedbackTotal("", 3);
+        }
+
+        /** Only the feedback written from the observation, and none from another workspace's binding to it. */
+        @Test
+        @WithAdminUser
+        void shouldListTheFeedbackWrittenFromOneObservationWhenFilteredByIt() {
+            UUID observed = insertProblem(practiceA, job, alice, "Observed", "MAJOR");
+            UUID sibling = insertProblem(practiceB, job, alice, "Sibling", "MAJOR");
+            Feedback fromIt = persistUnit(workspace, job, alice, 0, FeedbackDeliveryState.DELIVERED, null, "From it");
+            bind(fromIt, observed);
+            bind(persistUnit(workspace, job, alice, 1, FeedbackDeliveryState.DELIVERED, null, "Sibling"), sibling);
+            bind(
+                    persistUnit(otherWorkspace, otherJob, bob, 0, FeedbackDeliveryState.DELIVERED, null, "Foreign"),
+                    observed);
+            UUID foreignObservation =
+                    insertObservation(otherPractice, otherJob, bob, "Foreign", "NOT_MET", "MAJOR", 7L, Instant.now());
+            bind(
+                    persistUnit(workspace, job, alice, 2, FeedbackDeliveryState.DELIVERED, null, "Cross-bound"),
+                    foreignObservation);
+
+            getOk(FEEDBACK + "?observationId=" + observed, workspace.getWorkspaceSlug())
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].id")
+                    .isEqualTo(fromIt.getId().toString());
+            expectFeedbackTotal("?observationId=" + foreignObservation, 0);
+            expectFeedbackTotal("", 3);
+        }
+
         /** Each overview feedback count opens the feedback list, filtered to its one delivery state, on the same rows. */
         @Test
         @WithAdminUser
@@ -1238,6 +1301,36 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
         @Test
         @WithAdminUser
+        void listsTheChecksAReviewRanForItselfUnderTheReview() {
+            Feedback unit = persistUnit(
+                    workspace,
+                    job,
+                    alice,
+                    0,
+                    FeedbackDeliveryState.SUPPRESSED,
+                    FeedbackSuppressionReason.RECIPIENT_OPTED_OUT,
+                    "Withheld");
+            deliveryPolicyEvaluationRepository.save(
+                    policyEvaluation(job, unit.getId(), DeliveryPolicySurface.ARTIFACT));
+            deliveryPolicyEvaluationRepository.save(policyEvaluation(job, null, DeliveryPolicySurface.CONVERSATION));
+
+            getOk(
+                            "/workspaces/{slug}/practices/reviews/runs/{id}/delivery-checks",
+                            workspace.getWorkspaceSlug(),
+                            job.getId())
+                    .jsonPath("$.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].surface")
+                    .isEqualTo("CONVERSATION");
+            getOk(FEEDBACK + "/{id}", workspace.getWorkspaceSlug(), unit.getId())
+                    .jsonPath("$.deliveryPolicy.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$.deliveryPolicy[0].surface")
+                    .isEqualTo("ARTIFACT");
+        }
+
+        @Test
+        @WithAdminUser
         void filtersByStateReasonAndRun() {
             persistUnit(workspace, job, alice, 0, FeedbackDeliveryState.DELIVERED, null, "Delivered");
             persistUnit(
@@ -1272,6 +1365,63 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .isEqualTo(1)
                     .jsonPath("$.content[0].bodyPreview")
                     .isEqualTo("Other run");
+        }
+
+        /**
+         * The overview's withheld feedback by reason opens the list filtered to the same state, reasons and range, so
+         * each count by reason must match the list's total under that filter, and only the range's, workspace's
+         * withheld rows count.
+         */
+        @Test
+        @WithAdminUser
+        void shouldCountWithheldFeedbackByReasonAsTheListFiltersIt() {
+            Instant inside = Instant.parse("2026-02-03T12:00:00Z");
+            FeedbackSuppressionReason capped = FeedbackSuppressionReason.VOLUME_CAPPED;
+            FeedbackSuppressionReason deduped = FeedbackSuppressionReason.COMPOSER_DEDUPED;
+            persistUnit(workspace, job, alice, 0, FeedbackDeliveryState.SUPPRESSED, capped, null, inside);
+            persistUnit(workspace, job, alice, 1, FeedbackDeliveryState.SUPPRESSED, capped, null, inside);
+            persistUnit(workspace, job, alice, 2, FeedbackDeliveryState.SUPPRESSED, deduped, null, inside);
+            persistUnit(workspace, job, alice, 3, FeedbackDeliveryState.DELIVERED, null, "Delivered", inside);
+            // Withheld without a recorded reason: one count with no reason, in the same read.
+            persistUnit(workspace, job, alice, 6, FeedbackDeliveryState.SUPPRESSED, null, null, inside);
+            // Part of it was delivered: it carries a reason, but it is not withheld.
+            persistUnit(workspace, job, alice, 4, FeedbackDeliveryState.PARTIALLY_DELIVERED, capped, "Half", inside);
+            // Outside the range and in another workspace: counted by neither.
+            persistUnit(
+                    workspace,
+                    job,
+                    alice,
+                    5,
+                    FeedbackDeliveryState.SUPPRESSED,
+                    deduped,
+                    null,
+                    Instant.parse("2026-02-08T00:00:00Z"));
+            persistUnit(otherWorkspace, otherJob, bob, 0, FeedbackDeliveryState.SUPPRESSED, capped, null, inside);
+            String filter = "deliveryState=SUPPRESSED&from=2026-02-01T00:00:00Z&to=2026-02-08T00:00:00Z";
+
+            getOk(FEEDBACK + "/reasons?" + filter, workspace.getWorkspaceSlug())
+                    .jsonPath("$.length()")
+                    .isEqualTo(3)
+                    .jsonPath("$[2].reason")
+                    .doesNotExist()
+                    .jsonPath("$[2].count")
+                    .isEqualTo(1)
+                    .jsonPath("$[?(@.reason == 'VOLUME_CAPPED')].count")
+                    .isEqualTo(List.of(2))
+                    .jsonPath("$[?(@.reason == 'COMPOSER_DEDUPED')].count")
+                    .isEqualTo(List.of(1))
+                    .jsonPath("$[0].bodyPreview")
+                    .doesNotExist();
+            expectFeedbackTotal("?suppressionReason=VOLUME_CAPPED&" + filter, 2);
+            expectFeedbackTotal("?suppressionReason=COMPOSER_DEDUPED&" + filter, 1);
+        }
+
+        @Test
+        @WithAdminUser
+        void rejectsAnInvalidFilterOnTheCountsByReason() {
+            get(FEEDBACK + "/reasons?from=2026-01-20T00:00:00Z&to=2026-01-10T00:00:00Z", workspace.getWorkspaceSlug())
+                    .expectStatus()
+                    .isBadRequest();
         }
 
         @Test
@@ -1569,6 +1719,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .feedback(unit)
                     .placementType(PlacementType.SUMMARY)
                     .postedCommentRef("comment-1")
+                    .postedCommentUrl("https://github.com/acme/repo/pull/1#issuecomment-1")
                     .createdAt(createdAt.plusSeconds(2))
                     .build());
             feedbackPlacementRepository.save(FeedbackPlacement.builder()
@@ -1581,6 +1732,8 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             getOk(FEEDBACK + "/{id}", workspace.getWorkspaceSlug(), unit.getId())
                     .jsonPath("$.placements[0].placementType")
                     .isEqualTo("SUMMARY")
+                    .jsonPath("$.placements[0].postedCommentUrl")
+                    .isEqualTo("https://github.com/acme/repo/pull/1#issuecomment-1")
                     .jsonPath("$.placements[1].anchorPath")
                     .isEqualTo("src/A.java")
                     .jsonPath("$.placements[2].anchorPath")
@@ -1785,6 +1938,160 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             UUID observation = insertProblem(practiceA, job, alice, "Claim", "MINOR");
 
             patchValidity(workspace, observation, false, "Members cannot correct")
+                    .expectStatus()
+                    .isForbidden()
+                    .expectBody(Void.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("Feedback location")
+    class Locations {
+
+        private static final String LOCATIONS = FEEDBACK + "/locations";
+
+        private int positions = 0;
+
+        private Feedback unit(
+                Workspace ws, AgentJob agentJob, User recipient, FeedbackChannel channel, FeedbackDeliveryState state) {
+            return feedbackRepository.save(Feedback.builder()
+                    .agentJobId(agentJob.getId())
+                    .workspaceId(ws.getId())
+                    .artifactKind(ArtifactKinds.PULL_REQUEST)
+                    .artifactId(7L)
+                    .recipientUserId(recipient.getId())
+                    .aboutUserId(recipient.getId())
+                    .channel(channel)
+                    .position(positions++)
+                    .deliveryState(state)
+                    .source(FeedbackSource.AGENT)
+                    .createdAt(Instant.now())
+                    .build());
+        }
+
+        /** Links {@code unit} to an assistant turn of a thread on {@code surface}, as a delivered conversation does. */
+        private void raiseIn(Feedback unit, Workspace ws, User recipient, ThreadSurface surface) {
+            ChatThread thread = new ChatThread();
+            thread.setId(UUID.randomUUID());
+            thread.setTitle(surface + " thread");
+            thread.setUser(recipient);
+            thread.setWorkspace(ws);
+            thread.setSurface(surface);
+            chatThreadRepository.save(thread);
+            ChatMessage turn = new ChatMessage();
+            turn.setId(UUID.randomUUID());
+            turn.setThread(thread);
+            turn.setRole(ChatMessage.Role.ASSISTANT);
+            turn.setStatus(ChatMessage.Status.completed);
+            turn.setParts(OBJECT_MAPPER.valueToTree(List.of(Map.of("type", "text", "text", "A turn"))));
+            chatMessageRepository.saveAndFlush(turn);
+            feedbackPlacementRepository.save(FeedbackPlacement.builder()
+                    .feedback(unit)
+                    .placementType(PlacementType.CONVERSATION_TURN)
+                    .chatMessageId(turn.getId())
+                    .createdAt(Instant.now())
+                    .build());
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldNameFilterAndCountFeedbackByLocationWhenEveryChannelHasFeedback() {
+            job.setIntegrationKind(IntegrationKind.GITHUB);
+            agentJobRepository.save(job);
+            AgentJob gitlabJob = persistJob(workspace);
+            gitlabJob.setIntegrationKind(IntegrationKind.GITLAB);
+            agentJobRepository.save(gitlabJob);
+
+            Feedback onGitHub =
+                    unit(workspace, job, alice, FeedbackChannel.IN_CONTEXT, FeedbackDeliveryState.DELIVERED);
+            unit(workspace, job, alice, FeedbackChannel.IN_CONTEXT, FeedbackDeliveryState.FAILED);
+            Feedback onGitLab =
+                    unit(workspace, gitlabJob, alice, FeedbackChannel.IN_CONTEXT, FeedbackDeliveryState.DELIVERED);
+            Feedback inApp = unit(workspace, job, alice, FeedbackChannel.IN_CHAT, FeedbackDeliveryState.DELIVERED);
+            raiseIn(inApp, workspace, alice, ThreadSurface.WEB);
+            Feedback inSlack = unit(workspace, job, alice, FeedbackChannel.IN_CHAT, FeedbackDeliveryState.DELIVERED);
+            raiseIn(inSlack, workspace, alice, ThreadSurface.SLACK_DM);
+            unit(workspace, job, alice, FeedbackChannel.IN_CHAT, FeedbackDeliveryState.PREPARED);
+            unit(workspace, job, alice, FeedbackChannel.IN_APP, FeedbackDeliveryState.SUPPRESSED);
+            // Bob's feedback and another workspace's stay out of Alice's counts.
+            unit(workspace, job, bob, FeedbackChannel.IN_CONTEXT, FeedbackDeliveryState.DELIVERED);
+            unit(otherWorkspace, otherJob, alice, FeedbackChannel.IN_CONTEXT, FeedbackDeliveryState.DELIVERED);
+
+            String slug = workspace.getWorkspaceSlug();
+            getOk(FEEDBACK + "/{id}", slug, onGitHub.getId())
+                    .jsonPath("$.location")
+                    .isEqualTo("GITHUB");
+            getOk(FEEDBACK + "/{id}", slug, onGitLab.getId())
+                    .jsonPath("$.location")
+                    .isEqualTo("GITLAB");
+            getOk(FEEDBACK + "/{id}", slug, inSlack.getId())
+                    .jsonPath("$.location")
+                    .isEqualTo("SLACK");
+
+            getOk(FEEDBACK + "?location=GITHUB&deliveryState=DELIVERED", slug)
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(2)
+                    .jsonPath("$.content[0].location")
+                    .isEqualTo("GITHUB")
+                    .jsonPath("$.content[1].location")
+                    .isEqualTo("GITHUB");
+            getOk(FEEDBACK + "?location=HEPH&location=SLACK&recipientUserId={id}", slug, alice.getId())
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(2);
+            getOk(FEEDBACK + "?location=HEPH", slug)
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].id")
+                    .isEqualTo(inApp.getId().toString())
+                    .jsonPath("$.content[0].location")
+                    .isEqualTo("HEPH");
+            getOk(FEEDBACK + "?location=NEXT_CONVERSATION", slug)
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].deliveryState")
+                    .isEqualTo("PREPARED");
+
+            getOk(LOCATIONS + "?recipientUserId={id}", slug, alice.getId())
+                    .jsonPath("$.length()")
+                    .isEqualTo(6)
+                    .jsonPath("$[0].location")
+                    .isEqualTo("GITHUB")
+                    .jsonPath("$[0].feedback.delivered")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].feedback.failed")
+                    .isEqualTo(1)
+                    .jsonPath("$[1].location")
+                    .isEqualTo("GITLAB")
+                    .jsonPath("$[1].feedback.delivered")
+                    .isEqualTo(1)
+                    .jsonPath("$[2].location")
+                    .isEqualTo("HEPH")
+                    .jsonPath("$[3].location")
+                    .isEqualTo("SLACK")
+                    .jsonPath("$[4].location")
+                    .isEqualTo("NEXT_CONVERSATION")
+                    .jsonPath("$[4].feedback.prepared")
+                    .isEqualTo(1)
+                    .jsonPath("$[5].location")
+                    .isEqualTo("PRACTICE_PAGES")
+                    .jsonPath("$[5].feedback.suppressed")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldNameOtherWorkWhenTheReviewNamesNoProvider() {
+            unit(workspace, job, alice, FeedbackChannel.IN_CONTEXT, FeedbackDeliveryState.DELIVERED);
+
+            getOk(FEEDBACK, workspace.getWorkspaceSlug())
+                    .jsonPath("$.content[0].location")
+                    .isEqualTo("OTHER_WORK");
+        }
+
+        @Test
+        @WithUser
+        void shouldForbidTheCountsWhenTheCallerIsAMember() {
+            get(LOCATIONS, workspace.getWorkspaceSlug())
                     .expectStatus()
                     .isForbidden()
                     .expectBody(Void.class);

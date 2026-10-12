@@ -13,7 +13,7 @@ public interface ProvisioningListener {
 
     void onRepositoriesAdded(Long installationId, List<RepositorySnapshot> repositories);
 
-    void onRepositoriesRemoved(Long installationId, List<String> repositoryNames);
+    void onRepositoriesRemoved(Long installationId, List<RepositoryRemoval> repositories);
 
     void onAccountRenamed(Long installationId, @Nullable String oldLogin, String newLogin);
 
@@ -28,6 +28,9 @@ public interface ProvisioningListener {
      * Contains the minimal information needed to create a Repository entity.
      */
     record RepositorySnapshot(long id, String nameWithOwner, String name, boolean isPrivate) {}
+
+    /** A removal keeps the native repository id carried by the payload; null only for a payload that omitted it. */
+    record RepositoryRemoval(@Nullable Long nativeId, String nameWithOwner) {}
 
     record InstallationData(
             Long installationId,

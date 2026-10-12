@@ -32,6 +32,9 @@ public record ReviewPlacementDTO(
         @Schema(description = "Provider-native comment identifier") @Nullable
         String postedCommentRef,
 
+        @Schema(description = "Permalink of the posted provider comment; null when the provider gave none") @Nullable
+        String postedCommentUrl,
+
         @Schema(description = "Mentor chat-message identifier") @Nullable
         UUID chatMessageId) {
     public static ReviewPlacementDTO from(FeedbackPlacement placement) {
@@ -44,6 +47,7 @@ public record ReviewPlacementDTO(
                 placement.getAnchorEndLine(),
                 placement.getAnchorSide(),
                 placement.getPostedCommentRef(),
+                placement.getPostedCommentUrl(),
                 placement.getChatMessageId());
     }
 }

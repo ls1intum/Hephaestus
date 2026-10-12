@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.MonitoredRepositoryScope;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import jakarta.persistence.LockModeType;
@@ -56,8 +57,10 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             SELECT i.id FROM issue i
              WHERE i.repository_id = :repositoryId AND i.deleted_at IS NULL
                AND i.issue_type IS DISTINCT FROM 'PULL_REQUEST'
-               AND EXISTS (SELECT 1 FROM repository_to_monitor m JOIN repository r ON r.name_with_owner = m.name_with_owner
-                           WHERE m.workspace_id = :workspaceId AND r.id = i.repository_id)
+               AND EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r
+                           ON r.name_with_owner = rtm.name_with_owner AND\s""" + MonitoredRepositoryScope.NATIVE_RTM_R + """
+
+                           WHERE rtm.workspace_id = :workspaceId AND r.id = i.repository_id)
         )
         SELECT w.id AS "issueId", p.posted_comment_ref AS "externalRef", p.posted_comment_url AS "url"
           FROM work w JOIN feedback f ON f.artifact_kind = 'scm.issue' AND f.artifact_id = w.id
@@ -226,6 +229,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @Query("SELECT j.id AS id, j.jobType AS jobType, j.integrationKind AS integrationKind, j.metadata AS metadata, "
             + "j.status AS status, j.practiceTriggerMode AS triggerMode, j.output AS output, "
+            + "j.createdAt AS createdAt, j.llmModel AS llmModel, j.completedAt AS completedAt, "
+            + "j.startedAt AS startedAt, j.holdReason AS holdReason, "
             + "(SELECT MAX(d.deliveredExternalUrl) FROM FeedbackDispatch d WHERE d.workspaceId = j.workspace.id "
             + "AND d.agentJobId = j.id AND d.deliveredExternalRef = j.deliveryCommentId) AS feedbackUrl "
             + "FROM AgentJob j WHERE j.workspace.id = :workspaceId AND j.id IN :ids")
@@ -242,6 +247,20 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
         @Nullable
         String getFeedbackUrl();
+
+        Instant getCreatedAt();
+
+        @Nullable
+        String getLlmModel();
+
+        @Nullable
+        Instant getCompletedAt();
+
+        @Nullable
+        Instant getStartedAt();
+
+        @Nullable
+        String getHoldReason();
     }
 
     /**
@@ -249,13 +268,15 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * repository this workspace monitors on its connected provider and no team here hides from contributions.
      * Requires the aliases {@code i} (the work) and {@code r} (its repository).
      */
-    String OWN_SCM_WORK = """
+    String OWN_SCM_WORK = "\n" + """
               AND i.author_id = :developerId
               AND i.deleted_at IS NULL
               AND r.provider_id = :providerId
               AND EXISTS (
                   SELECT 1 FROM repository_to_monitor rtm
-                  WHERE rtm.workspace_id = :workspaceId AND rtm.name_with_owner = r.name_with_owner)
+                  WHERE rtm.workspace_id = :workspaceId AND rtm.name_with_owner = r.name_with_owner
+                    AND\s""" + MonitoredRepositoryScope.NATIVE_RTM_R + """
+            )
               AND NOT EXISTS (
                   SELECT 1 FROM workspace_team_repository_settings wtrs
                   WHERE wtrs.workspace_id = :workspaceId
@@ -389,30 +410,156 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     }
 
     /**
-     * One page of review runs narrowed by {@code filter}.
+     * One page of practice review runs narrowed by {@code filter}.
      *
      * <p>The window is inclusive at {@code from} and exclusive at {@code to}, the same half-open convention the
      * observation and feedback listings use, so a day picked in both surfaces means the same day; a null bound drops
      * out of the predicate. The bounds are bound on their own rather than read from {@code filter}: {@code CAST(:from
      * AS Instant)} types a null bound only when Hibernate sees an {@code Instant} parameter. A run whose results have
-     * no processing status yet matches only when the filter leaves result processing open.
+     * no processing status yet matches only when the filter leaves result processing open. A review matches the status
+     * filter when it has a listed status, with {@code onHold} when it is queued on a hold, as its row's
+     * {@code holdReason} says, or with {@code waiting} when it waits for a worker now by the predicate of the queue's
+     * {@code waiting} count ({@link #findReviewQueue}): queued, not held for the budget and due at {@code now}, read
+     * from the same app clock. The observation filters keep a run when one of its standing observations matches all
+     * of them at once: one an admin marked incorrect
+     * counts as never made, as the run's own practices and developers read it. The work filter reads the work from the
+     * metadata field that {@link ReviewRunTargetMapper} names it by, so it matches the work the run lists. The merge
+     * filter keeps the pull request reviews that completed after the work was merged, as {@link #findTimingSignals}
+     * counts them: a review cancelled, failed or timed out after the merge produced no feedback that came late.
      */
     @Query("SELECT j.id AS id, j.status AS status, j.deliveryStatus AS deliveryStatus, j.jobType AS jobType, "
             + "j.integrationKind AS integrationKind, j.metadata AS metadata, j.createdAt AS createdAt, "
             + "function('jsonb_extract_path_text', j.output, 'outcome') AS reviewOutcome FROM AgentJob j "
-            + "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose "
-            + "AND j.status IN :#{#filter.statuses()} "
+            + "WHERE j.workspace.id = :workspaceId "
+            + "AND j.purpose = de.tum.cit.aet.hephaestus.agent.config.AgentPurpose.PRACTICE_REVIEW "
+            + "AND (:#{#filter.anyStatus()} = TRUE "
+            + "OR (:#{#filter.hasListedStatus()} = TRUE AND j.status IN :#{#filter.statuses()}) "
+            + "OR (:#{#filter.heldOnly()} = TRUE AND j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.QUEUED "
+            + "AND j.holdReason IS NOT NULL) "
+            + "OR (:#{#filter.waitingOnly()} = TRUE "
+            + "AND j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.QUEUED "
+            + "AND (j.holdReason IS NULL "
+            + "OR j.holdReason <> '" + AgentJob.HOLD_REASON_BUDGET + "') "
+            + "AND j.availableAt <= :now)) "
             + "AND (:#{#filter.anyResultProcessing()} = TRUE "
             + "OR j.deliveryStatus IN :#{#filter.resultProcessingStates()}) "
             + "AND (CAST(:from AS Instant) IS NULL OR j.createdAt >= :from) "
-            + "AND (CAST(:to AS Instant) IS NULL OR j.createdAt < :to)")
+            + "AND (CAST(:to AS Instant) IS NULL OR j.createdAt < :to) "
+            + "AND (:#{#filter.anyReview()} = TRUE OR j.id = :#{#filter.agentJobIdValue()}) "
+            + "AND :#{#filter.reviewableWork()} = TRUE "
+            + "AND (:#{#filter.anyWork()} = TRUE OR (j.jobType = :#{#filter.workJobType()} "
+            + "AND (:#{#filter.anyWorkItem()} = TRUE OR FUNCTION('jsonb_extract_path_text', j.metadata, "
+            + ":#{#filter.workIdField()}) = :#{#filter.workIdText()}))) "
+            + "AND (:#{#filter.anyObservation()} = TRUE OR EXISTS (SELECT 1 FROM Observation o "
+            + "JOIN o.practice p LEFT JOIN p.group g WHERE o.agentJobId = j.id AND o.workspaceId = :workspaceId "
+            + "AND NOT EXISTS (SELECT 1 FROM ObservationInvalidation oi WHERE oi.observationId = o.id "
+            + "AND oi.restoredAt IS NULL) "
+            + "AND (:#{#filter.anySubject()} = TRUE OR o.aboutUserId = :#{#filter.subjectUserIdValue()}) "
+            + "AND (:#{#filter.anyPractice()} = TRUE OR p.slug IN :#{#filter.practiceSlugs()}) "
+            + "AND (:#{#filter.anyGroup()} = TRUE OR g.slug IN :#{#filter.groupSlugs()}))) "
+            + "AND (:#{#filter.anyMergeTiming()} = TRUE OR (j.jobType = :#{#filter.mergedWorkJobType()} "
+            + "AND EXISTS (SELECT 1 FROM PullRequest pr WHERE pr.id = CAST(FUNCTION('jsonb_extract_path_text', "
+            + "j.metadata, 'pull_request_id') AS Long) AND pr.mergedAt < j.completedAt) "
+            + "AND j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.COMPLETED))")
     Page<ReviewRunSummaryRow> findReviewRunSummaries(
             @Param("workspaceId") Long workspaceId,
-            @Param("purpose") AgentPurpose purpose,
             @Param("filter") ReviewRunFilterParams filter,
             @Param("from") @Nullable Instant from,
             @Param("to") @Nullable Instant to,
+            @Param("now") Instant now,
             Pageable pageable);
+
+    /**
+     * The pull request {@code pr} that the pull request review {@code j} reviewed. A native join condition, so every
+     * query that asks whether a review came after its merge reads the same pull request.
+     */
+    String REVIEWED_PULL_REQUEST = "j.job_type = 'PULL_REQUEST_REVIEW' AND pr.issue_type = 'PULL_REQUEST'"
+            + " AND pr.id = CAST(j.metadata ->> '" + ReviewRunTargetMapper.PULL_REQUEST_ID_FIELD + "' AS bigint)";
+
+    /**
+     * Whether review {@code j} finished after its pull request {@code pr} was merged: it completed after the merge. A
+     * review cancelled, failed or timed out after the merge produced no feedback that came late. False, never null,
+     * when {@code pr} is absent or not merged. The JPQL merge filter of {@link #findReviewRunSummaries} states the
+     * same test; {@code PracticeReviewTimingIntegrationTest} pins that the list, its rows and the count agree.
+     */
+    String FINISHED_AFTER_MERGE =
+            "(j.status = 'COMPLETED' AND pr.merged_at IS NOT NULL AND pr.merged_at < j.completed_at)";
+
+    /** Whether the merge of {@code pr} started review {@code j}. Binds {@code :mergedSignal}. */
+    String STARTED_BY_MERGE = """
+        EXISTS (SELECT 1 FROM artifact_signal s
+                WHERE s.workspace_id = j.workspace_id AND s.artifact_kind = 'scm.pull_request'
+                  AND s.artifact_id = pr.id AND s.signal_name = :mergedSignal AND s.job_id = j.id)
+        """;
+
+    /**
+     * What the admin review list says of each run beyond its counts: how many practices it measured, from the
+     * coverage ledger in its output, and its place among the practice reviews of the same work, counted from the
+     * oldest in the list order. {@code evaluated} is null when the run wrote no whole-number count, and
+     * {@code position} and {@code reviewsOnWork} are 0 when the run names no work. {@code holdReason} is set only
+     * while the run is queued; the merge columns say whether a completed pull request review finished after its work
+     * was merged, as {@link #findTimingSignals} counts it, and whether the merge itself started it. The count states the work with
+     * {@link ReviewRunTargetMapper#WORK_ID_SQL}, exactly as the {@code idx_agent_job_review_work} index holds it, so it reads one index range per listed run over the reviews
+     * of its own work, never the workspace's other jobs.
+     */
+    @Query(
+            value = """
+        SELECT j.id AS "id",
+               CASE WHEN jsonb_typeof(j.output -> 'practiceCoverage' -> 'evaluated') = 'number'
+                         AND (j.output -> 'practiceCoverage' ->> 'evaluated') ~ '^[0-9]+$'
+                    THEN CAST(j.output -> 'practiceCoverage' ->> 'evaluated' AS integer) END AS "evaluated",
+               on_work.position AS "position",
+               on_work.reviews AS "reviewsOnWork",
+               CASE WHEN j.status = 'QUEUED' THEN j.hold_reason END AS "holdReason",
+        """ + FINISHED_AFTER_MERGE + """
+                   AS "finishedAfterMerge",
+               (
+        """ + FINISHED_AFTER_MERGE + " AND " + STARTED_BY_MERGE + """
+               ) AS "startedByMerge"
+        FROM agent_job j
+        CROSS JOIN LATERAL (SELECT
+        """
+                    + ReviewRunTargetMapper.WORK_ID_SQL + """
+                AS id) work
+        CROSS JOIN LATERAL (
+            SELECT COUNT(*) FILTER (WHERE (e.created_at, e.id) <= (j.created_at, j.id)) AS position,
+                   COUNT(*) AS reviews
+            FROM agent_job e
+            WHERE work.id IS NOT NULL
+              AND e.workspace_id = j.workspace_id
+              AND e.purpose = j.purpose
+              AND e.job_type = j.job_type
+              AND (
+        """ + ReviewRunTargetMapper.WORK_ID_SQL + """
+                  ) = work.id) on_work
+        LEFT JOIN issue pr ON
+        """
+                    + REVIEWED_PULL_REQUEST + """
+        WHERE j.workspace_id = :workspaceId AND j.id IN :ids
+        """,
+            nativeQuery = true)
+    List<ReviewRunListFactsRow> findReviewRunListFacts(
+            @Param("workspaceId") Long workspaceId,
+            @Param("ids") Collection<UUID> ids,
+            @Param("mergedSignal") String mergedSignal);
+
+    interface ReviewRunListFactsRow {
+        UUID getId();
+
+        @Nullable
+        Integer getEvaluated();
+
+        Long getPosition();
+
+        Long getReviewsOnWork();
+
+        @Nullable
+        String getHoldReason();
+
+        Boolean getFinishedAfterMerge();
+
+        Boolean getStartedByMerge();
+    }
 
     /**
      * Jobs of {@code purpose} created in {@code [from, to)}, the window {@link #findReviewRunSummaries} filters by, by
@@ -438,12 +585,329 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             @Param("to") Instant to,
             @Param("starts") Long[] starts);
 
+    /**
+     * When the workspace's first job of {@code purpose} was created: where "all time" starts, so a range over all of
+     * a workspace's reviews needs no lower bound from the caller. Empty when the workspace has none.
+     */
+    @Query(value = """
+        SELECT MIN(j.created_at) FROM agent_job j
+        WHERE j.workspace_id = :workspaceId AND j.purpose = :#{#purpose.name()}
+        """, nativeQuery = true)
+    Optional<Instant> findFirstCreatedAt(
+            @Param("workspaceId") Long workspaceId, @Param("purpose") AgentPurpose purpose);
+
     interface StatusBucketCount {
         Integer getBucket();
 
         AgentJobStatus getStatus();
 
         Long getCount();
+    }
+
+    /**
+     * Whether feedback {@code f} was posted on the work by the review itself: in context, without an admin's approval
+     * it waited for. A person's wait is not the review's time. A native predicate over {@code f}.
+     */
+    String POSTED_BY_ITSELF = """
+        f.channel = 'IN_CONTEXT' AND NOT EXISTS (SELECT 1 FROM feedback_approval a
+                                                 WHERE a.feedback_id = f.id AND a.workspace_id = f.workspace_id)
+        """;
+
+    /**
+     * Whether feedback {@code f} reaches the developer to read: on their practice pages or in a conversation, so its
+     * delivery is when they first read it. A native predicate over {@code f}.
+     */
+    String READ_BY_DEVELOPER = "f.channel IN ('IN_APP', 'IN_CHAT')";
+
+    /**
+     * The jobs of {@code purpose} created in {@code [from, to)} as {@code jobs}, the window
+     * {@link #findReviewRunSummaries} filters by, with what each delivered as {@code delivered}, how long each waited
+     * to be asked for as {@code asked}, and two sets of whole reviews, each stage of a review clamped at zero since a
+     * retry can move a start past the end before it: {@code commented}, the reviews that posted a comment on the work
+     * by themselves, with all five stages, and {@code finished}, the completed reviews, with the four stages until
+     * their end. A run splits into preparation and model at {@code execution_started_at}; a review without it, such
+     * as one recorded before that moment was, counts its whole run as {@code unsplit}, so it stays in both sets and
+     * its stages still add up to its time. {@code asked} runs from the first moment on the work that names the review, the one that started
+     * it as the review's trace reads it, to the request; it is zero for a review no moment started, such as one an
+     * admin or developer asked for (its signal is recorded just before the request) or a backfill or sweep (their
+     * signal carries the work's last update, not a moment that asked for the review), and for a moment recorded
+     * after the request. A comment that an admin approved first waited for a person, so it is left out. A native
+     * fragment to follow {@code WITH}; it binds
+     * {@code :workspaceId}, {@code :purpose}, {@code :from} and {@code :to}.
+     */
+    String REVIEW_SPANS = """
+        jobs AS (
+            SELECT j.id, j.status, j.created_at, j.started_at, j.execution_started_at, j.completed_at
+            FROM agent_job j
+            WHERE j.workspace_id = :workspaceId
+              AND j.purpose = :#{#purpose.name()}
+              AND j.created_at >= :from
+              AND j.created_at < :to
+        ), moments AS (
+            SELECT s.job_id, MIN(s.occurred_at) AS moment_at
+            FROM artifact_signal s
+            JOIN jobs ON jobs.id = s.job_id
+            WHERE s.workspace_id = :workspaceId
+              AND s.discovered_via IN ('EVENT', 'SYNC')
+            GROUP BY s.job_id
+        ), asked AS (
+            SELECT jobs.id,
+                   COALESCE(GREATEST(extract(epoch from jobs.created_at - m.moment_at), 0), 0) AS asked
+            FROM jobs LEFT JOIN moments m ON m.job_id = jobs.id
+        ), delivered AS (
+            SELECT f.agent_job_id,
+                   MIN(f.delivered_at) FILTER (WHERE
+        """ + POSTED_BY_ITSELF + """
+                   ) AS first_posted_at,
+                   MIN(f.delivered_at) FILTER (WHERE
+        """ + READ_BY_DEVELOPER + """
+                   ) AS first_read_at
+            FROM feedback f
+            JOIN jobs ON jobs.id = f.agent_job_id
+            WHERE f.workspace_id = :workspaceId AND f.delivered_at IS NOT NULL
+            GROUP BY f.agent_job_id
+        ), runs AS (
+            SELECT jobs.id,
+                   COALESCE(GREATEST(extract(epoch from jobs.execution_started_at - jobs.started_at), 0), 0)
+                       AS preparation,
+                   COALESCE(GREATEST(extract(epoch from jobs.completed_at - jobs.execution_started_at), 0), 0)
+                       AS model,
+                   CASE WHEN jobs.execution_started_at IS NULL
+                        THEN GREATEST(extract(epoch from jobs.completed_at - jobs.started_at), 0)
+                        ELSE 0 END AS unsplit
+            FROM jobs
+            WHERE jobs.started_at IS NOT NULL AND jobs.completed_at IS NOT NULL
+        ), commented AS (
+            SELECT a.asked,
+                   GREATEST(extract(epoch from jobs.started_at - jobs.created_at), 0) AS queue,
+                   r.preparation, r.model, r.unsplit,
+                   GREATEST(extract(epoch from d.first_posted_at - jobs.completed_at), 0) AS posted
+            FROM jobs JOIN delivered d ON d.agent_job_id = jobs.id JOIN asked a ON a.id = jobs.id
+            JOIN runs r ON r.id = jobs.id
+            WHERE d.first_posted_at IS NOT NULL
+        ), finished AS (
+            SELECT a.asked,
+                   GREATEST(extract(epoch from jobs.started_at - jobs.created_at), 0) AS queue,
+                   r.preparation, r.model, r.unsplit
+            FROM jobs JOIN asked a ON a.id = jobs.id JOIN runs r ON r.id = jobs.id
+            WHERE jobs.status = 'COMPLETED'
+        )
+        """;
+
+    /**
+     * How long each stage took for the jobs of {@code purpose} created in {@code [from, to)}, as
+     * {@link #REVIEW_SPANS} reads them: one row per stage that measured at least one job. A stage measures a job once
+     * both of its ends are recorded, whatever the job's status: {@code QUEUE} counts a retried job's earlier attempt
+     * as waiting, and {@code MODEL} counts failed and timed-out runs. {@code POSTED} ends at the first comment the job
+     * posted on the work by itself. {@code ASKED} measures the reviews a moment started before their request, from that
+     * moment to the request. {@code TOTAL} is one figure per review over {@code commented}, from the moment that
+     * started it, or the request where none did, to that comment, and {@code FINISHED} one per review over
+     * {@code finished}, from the same start to the end of the review, so each median and p90 is of whole reviews. {@code READ} is not a pipeline stage: it ends when a
+     * developer first opened the job's feedback on their practice pages or was shown it in a conversation. Every row
+     * also carries the same {@link StageSecondsRow} sums, so the figures and the shares come from one snapshot.
+     */
+    @Query(value = "WITH " + REVIEW_SPANS + """
+        , spans AS (
+            SELECT 'ASKED' AS stage, extract(epoch from jobs.created_at - m.moment_at) AS seconds
+            FROM jobs JOIN moments m ON m.job_id = jobs.id
+            WHERE m.moment_at < jobs.created_at
+            UNION ALL
+            SELECT 'QUEUE', extract(epoch from started_at - created_at)
+            FROM jobs WHERE started_at IS NOT NULL
+            UNION ALL
+            SELECT 'PREPARATION', extract(epoch from execution_started_at - started_at)
+            FROM jobs WHERE started_at IS NOT NULL AND execution_started_at IS NOT NULL
+            UNION ALL
+            SELECT 'MODEL', extract(epoch from completed_at - execution_started_at)
+            FROM jobs WHERE execution_started_at IS NOT NULL AND completed_at IS NOT NULL
+            UNION ALL
+            SELECT 'POSTED', extract(epoch from d.first_posted_at - jobs.completed_at)
+            FROM jobs JOIN delivered d ON d.agent_job_id = jobs.id
+            WHERE jobs.completed_at IS NOT NULL AND d.first_posted_at IS NOT NULL
+            UNION ALL
+            SELECT 'TOTAL', asked + queue + preparation + model + unsplit + posted FROM commented
+            UNION ALL
+            SELECT 'FINISHED', asked + queue + preparation + model + unsplit FROM finished
+            UNION ALL
+            SELECT 'READ', extract(epoch from d.first_read_at - jobs.completed_at)
+            FROM jobs JOIN delivered d ON d.agent_job_id = jobs.id
+            WHERE jobs.completed_at IS NOT NULL AND d.first_read_at IS NOT NULL
+        ), stages AS (
+            SELECT stage,
+                   COUNT(*) AS count,
+                   CAST(round(percentile_cont(0.5) WITHIN GROUP (ORDER BY GREATEST(seconds, 0))) AS bigint) AS median,
+                   CAST(round(percentile_cont(0.9) WITHIN GROUP (ORDER BY GREATEST(seconds, 0))) AS bigint) AS p90
+            FROM spans
+            GROUP BY stage
+        )
+        SELECT s.stage AS "stage", s.count AS "count", s.median AS "median", s.p90 AS "p90",
+               c.asked AS "commentedAsked", c.queue AS "commentedQueue",
+               c.preparation AS "commentedPreparation", c.model AS "commentedModel",
+               c.unsplit AS "commentedUnsplit", c.posted AS "commentedPosted",
+               f.asked AS "finishedAsked", f.queue AS "finishedQueue", f.preparation AS "finishedPreparation",
+               f.model AS "finishedModel", f.unsplit AS "finishedUnsplit"
+        FROM stages s
+        CROSS JOIN (SELECT CAST(SUM(asked) AS double precision) AS asked,
+                           CAST(SUM(queue) AS double precision) AS queue,
+                           CAST(SUM(preparation) AS double precision) AS preparation,
+                           CAST(SUM(model) AS double precision) AS model,
+                           CAST(SUM(unsplit) AS double precision) AS unsplit,
+                           CAST(SUM(posted) AS double precision) AS posted
+                    FROM commented) c
+        CROSS JOIN (SELECT CAST(SUM(asked) AS double precision) AS asked,
+                           CAST(SUM(queue) AS double precision) AS queue,
+                           CAST(SUM(preparation) AS double precision) AS preparation,
+                           CAST(SUM(model) AS double precision) AS model,
+                           CAST(SUM(unsplit) AS double precision) AS unsplit
+                    FROM finished) f
+        """, nativeQuery = true)
+    List<StageTimingRow> findStageTimings(
+            @Param("workspaceId") Long workspaceId,
+            @Param("purpose") AgentPurpose purpose,
+            @Param("from") Instant from,
+            @Param("to") Instant to);
+
+    /**
+     * Where the time of whole reviews went, over the same reviews as {@code TOTAL} and {@code FINISHED} in
+     * {@link #findStageTimings}: each stage's seconds summed over {@code commented} and over {@code finished}, so a
+     * stage's part of a set is its sum over the set's. Every sum is null when its set is empty.
+     */
+    interface StageSecondsRow {
+        @Nullable
+        Double getCommentedAsked();
+
+        @Nullable
+        Double getCommentedQueue();
+
+        @Nullable
+        Double getCommentedPreparation();
+
+        @Nullable
+        Double getCommentedModel();
+
+        /** The run of the reviews without an execution start, which cannot be split. */
+        @Nullable
+        Double getCommentedUnsplit();
+
+        @Nullable
+        Double getCommentedPosted();
+
+        @Nullable
+        Double getFinishedAsked();
+
+        @Nullable
+        Double getFinishedQueue();
+
+        @Nullable
+        Double getFinishedPreparation();
+
+        @Nullable
+        Double getFinishedModel();
+
+        @Nullable
+        Double getFinishedUnsplit();
+    }
+
+    interface StageTimingRow extends StageSecondsRow {
+        String getStage();
+
+        Long getCount();
+
+        Long getMedian();
+
+        Long getP90();
+    }
+
+    /**
+     * The reviews that need a look: those waiting for a worker since before {@code waitingSince} other than budget
+     * holds, counted from when they became available so a requeued review waits from its requeue, whenever it was
+     * requested, and, among the jobs created in {@code [from, to)}, the pull request reviews that
+     * completed after their work was merged, the ones of those that the merge started, and the
+     * feedback created in the range that was withheld because the work was already merged. The merge test is
+     * {@link #FINISHED_AFTER_MERGE}, as the review list reads it.
+     */
+    @Query(
+            value = """
+        SELECT
+          (SELECT COUNT(*) FROM agent_job j
+           WHERE j.workspace_id = :#{#query.workspaceId()} AND j.purpose = :#{#query.purpose().name()} AND j.status = 'QUEUED'
+             AND j.available_at < :#{#query.waitingSince()} AND j.hold_reason IS DISTINCT FROM :#{#query.budget()}) AS "waitingLong",
+          late.finished AS "finishedAfterMerge",
+          late.started_by_merge AS "finishedAfterMergeStartedByMerge",
+          (SELECT COUNT(*) FROM feedback f
+           WHERE f.workspace_id = :#{#query.workspaceId()} AND f.suppression_reason = 'ARTIFACT_MERGED'
+             AND f.created_at >= :#{#query.from()} AND f.created_at < :#{#query.to()}) AS "feedbackWithheldAsMerged"
+        FROM (
+          SELECT COUNT(*) AS finished,
+                 COUNT(*) FILTER (WHERE
+        """ + STARTED_BY_MERGE + """
+                 ) AS started_by_merge
+          FROM agent_job j
+          JOIN issue pr ON
+        """ + REVIEWED_PULL_REQUEST + """
+          WHERE j.workspace_id = :#{#query.workspaceId()}
+            AND j.purpose = :#{#query.purpose().name()}
+            AND j.created_at >= :#{#query.from()}
+            AND j.created_at < :#{#query.to()}
+            AND
+        """ + FINISHED_AFTER_MERGE + """
+        ) late
+        """,
+            nativeQuery = true)
+    ReviewTimingSignalsRow findTimingSignals(
+            @Param("query") ReviewTimingSignalsQuery query, @Param("mergedSignal") String mergedSignal);
+
+    /**
+     * What {@link #findTimingSignals} counts over: the jobs of one purpose created in {@code [from, to)}, a wait
+     * longer than since {@code waitingSince} and the budget hold reason.
+     */
+    record ReviewTimingSignalsQuery(
+            Long workspaceId, AgentPurpose purpose, Instant from, Instant to, Instant waitingSince, String budget) {}
+
+    interface ReviewTimingSignalsRow {
+        Long getWaitingLong();
+
+        Long getFinishedAfterMerge();
+
+        Long getFinishedAfterMergeStartedByMerge();
+
+        Long getFeedbackWithheldAsMerged();
+    }
+
+    /**
+     * When one run first posted a comment on the work by itself, as {@link #findStageTimings} times it; when a
+     * developer first read its feedback on their practice pages or in a conversation; and when the pull request it
+     * reviewed was merged. Each is null when it has not happened, or for a run that reviewed other work. Empty when
+     * the workspace has no such run.
+     */
+    @Query(
+            value = """
+        SELECT (SELECT MIN(f.delivered_at) FROM feedback f
+                WHERE f.agent_job_id = j.id AND f.workspace_id = j.workspace_id AND
+        """ + POSTED_BY_ITSELF + """
+               ) AS "firstFeedbackPostedAt",
+               (SELECT MIN(f.delivered_at) FROM feedback f
+                WHERE f.agent_job_id = j.id AND f.workspace_id = j.workspace_id AND
+        """ + READ_BY_DEVELOPER + """
+               ) AS "firstFeedbackReadAt",
+               (SELECT pr.merged_at FROM issue pr WHERE
+        """ + REVIEWED_PULL_REQUEST + """
+               ) AS "workMergedAt"
+        FROM agent_job j
+        WHERE j.id = :id AND j.workspace_id = :workspaceId
+        """,
+            nativeQuery = true)
+    Optional<ReviewRunMomentsRow> findReviewRunMoments(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
+
+    interface ReviewRunMomentsRow {
+        @Nullable
+        Instant getFirstFeedbackPostedAt();
+
+        @Nullable
+        Instant getFirstFeedbackReadAt();
+
+        @Nullable
+        Instant getWorkMergedAt();
     }
 
     @Query("SELECT j FROM AgentJob j JOIN FETCH j.workspace WHERE j.id = :id AND j.workspace.id = :workspaceId")
@@ -1502,5 +1966,107 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         DeliveryStatus getDeliveryStatus();
 
         Instant getCreatedAt();
+    }
+
+    /**
+     * The practice review queue of one workspace as it stands now, in one pass over its queued and running jobs:
+     * how many run, how many distinct workers run them, how many wait other than
+     * budget holds and since when the oldest of those became available to a worker, so a requeued review waits from
+     * its requeue and one still backing off before a retry does not wait yet, and how many are held for budget. The reviews that finished
+     * since {@code dayAgo}, and of those since {@code hourAgo}, are counted apart over the terminal jobs; a cancelled
+     * review is not counted in these completion figures.
+     */
+    @Query(value = """
+        SELECT
+          active.running AS "running",
+          active.workers AS "activeWorkers",
+          active.waiting AS "waiting",
+          active.oldest_waiting AS "oldestWaitingSince",
+          active.held AS "heldForBudget",
+          done.last_hour AS "finishedLastHour",
+          done.last_day AS "finishedLastDay"
+        FROM (
+          SELECT COUNT(*) FILTER (WHERE j.status = 'RUNNING') AS running,
+                 COUNT(DISTINCT j.worker_id) FILTER (WHERE j.status = 'RUNNING') AS workers,
+                 COUNT(*) FILTER (WHERE j.status = 'QUEUED' AND j.hold_reason IS DISTINCT FROM :budget
+                                    AND j.available_at <= :now) AS waiting,
+                 MIN(j.available_at) FILTER (WHERE j.status = 'QUEUED' AND j.hold_reason IS DISTINCT FROM :budget
+                                             AND j.available_at <= :now) AS oldest_waiting,
+                 COUNT(*) FILTER (WHERE j.status = 'QUEUED' AND j.hold_reason = :budget) AS held
+          FROM agent_job j
+          WHERE j.workspace_id = :workspaceId AND j.purpose = :#{#purpose.name()}
+            AND j.status IN ('QUEUED', 'RUNNING')
+        ) active
+        CROSS JOIN (
+          SELECT COUNT(*) FILTER (WHERE j.completed_at >= :hourAgo) AS last_hour,
+                 COUNT(*) AS last_day
+          FROM agent_job j
+          WHERE j.workspace_id = :workspaceId AND j.purpose = :#{#purpose.name()}
+            AND j.status IN ('COMPLETED', 'FAILED', 'TIMED_OUT')
+            AND j.completed_at >= :dayAgo
+        ) done
+        """, nativeQuery = true)
+    ReviewQueueRow findReviewQueue(
+            @Param("workspaceId") Long workspaceId,
+            @Param("purpose") AgentPurpose purpose,
+            @Param("budget") String budget,
+            @Param("now") Instant now,
+            @Param("hourAgo") Instant hourAgo,
+            @Param("dayAgo") Instant dayAgo);
+
+    interface ReviewQueueRow {
+        long getRunning();
+
+        long getActiveWorkers();
+
+        long getWaiting();
+
+        @Nullable
+        Instant getOldestWaitingSince();
+
+        long getHeldForBudget();
+
+        long getFinishedLastHour();
+
+        long getFinishedLastDay();
+    }
+
+    /**
+     * The practice reviews at the head of one workspace's queue: the running ones first, longest running first,
+     * then the queued ones, longest available first, and the budget holds last, since nothing runs them until the cap
+     * is lifted. A review still backing off before a retry is left out until it is available, as in
+     * {@link #findReviewQueue}. The page bounds how many are read.
+     */
+    @Query("SELECT j.id AS id, j.status AS status, j.jobType AS jobType, j.integrationKind AS integrationKind, "
+            + "j.metadata AS metadata, j.holdReason AS holdReason, j.createdAt AS createdAt, "
+            + "j.startedAt AS startedAt, j.availableAt AS availableAt FROM AgentJob j "
+            + "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose "
+            + "AND j.status IN (de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.RUNNING, "
+            + "de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.QUEUED) "
+            + "AND (j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.RUNNING "
+            + "OR j.holdReason = :budget OR j.availableAt <= :now) "
+            + "ORDER BY CASE WHEN j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.RUNNING THEN 0 "
+            + "WHEN j.holdReason IS NULL OR j.holdReason <> :budget THEN 1 ELSE 2 END, "
+            + "CASE WHEN j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.RUNNING "
+            + "THEN COALESCE(j.startedAt, j.createdAt) ELSE j.availableAt END, j.id")
+    List<ReviewQueueItemRow> findReviewQueueHead(
+            @Param("workspaceId") Long workspaceId,
+            @Param("purpose") AgentPurpose purpose,
+            @Param("budget") String budget,
+            @Param("now") Instant now,
+            Pageable pageable);
+
+    interface ReviewQueueItemRow extends ReviewRunTargetRow {
+        AgentJobStatus getStatus();
+
+        @Nullable
+        String getHoldReason();
+
+        Instant getCreatedAt();
+
+        @Nullable
+        Instant getStartedAt();
+
+        Instant getAvailableAt();
     }
 }

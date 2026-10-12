@@ -4,9 +4,12 @@ import static de.tum.cit.aet.hephaestus.practices.observation.trend.TrendObserva
 import static de.tum.cit.aet.hephaestus.practices.observation.trend.TrendObservations.noVerdict;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -139,12 +142,65 @@ class GroupTrendAggregatorTest {
         assertThat(group.support().opportunitiesUntilComparable()).isEqualTo(6);
     }
 
+    @Test
+    void shouldCountWorkSeveralPracticesJudgedOnce() {
+        // Pull request 2 is judged by both practices: the group was reviewed on three pieces of work, not four.
+        PracticeTrend naming = PracticeTrendCalculator.calculatePractice(
+                "naming",
+                List.of(
+                        judged(1L, "2026-05-01T09:00:00Z", Outcome.MET),
+                        judged(2L, "2026-05-02T09:00:00Z", Outcome.NOT_MET)),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                properties);
+        PracticeTrend testing = PracticeTrendCalculator.calculatePractice(
+                "testing",
+                List.of(
+                        judged(2L, "2026-05-02T09:00:00Z", Outcome.MET),
+                        judged(3L, "2026-05-03T09:00:00Z", Outcome.MET),
+                        noVerdict(4L, "2026-05-04T09:00:00Z")),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                properties);
+
+        PracticeTrend group = GroupTrendAggregator.aggregate(
+                "quality", List.of("naming", "testing"), List.of(naming, testing), properties);
+
+        assertThat(group.support().reviewedWork()).isEqualTo(3);
+        assertThat(group.support().standingWork()).isEqualTo(3);
+        assertThat(group.support().reviewedWorkKind()).isNotNull();
+    }
+
+    @Test
+    void shouldReadTheGroupsStandingWorkOffEveryPracticeNotOnlyTheComparedOnes() {
+        List<Observation> compared = new ArrayList<>();
+        for (int day = 1; day <= 8; day++) {
+            compared.add(judged(day, "2026-05-%02dT09:00:00Z".formatted(day), Outcome.MET));
+        }
+        PracticeTrend full = PracticeTrendCalculator.calculatePractice(
+                "naming", compared, Instant.parse("2026-01-01T00:00:00Z"), properties);
+        PracticeTrend thin = PracticeTrendCalculator.calculatePractice(
+                "testing",
+                List.of(judged(50L, "2026-05-20T09:00:00Z", Outcome.NOT_MET)),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                properties);
+
+        PracticeTrend group = GroupTrendAggregator.aggregate(
+                "quality", List.of("naming", "testing"), List.of(full, thin), properties);
+
+        assertThat(group.support().comparablePractices()).isEqualTo(1);
+        // The compared practice's newest four, and the thin practice's one: both vote in the standing.
+        assertThat(group.support().standingWork()).isEqualTo(5);
+        assertThat(group.support().reviewedWork()).isEqualTo(9);
+    }
+
     private PracticeTrend trend(String slug, BetaPosterior.Difference difference) {
         TrendSupport support = new TrendSupport(
                 4,
                 4,
                 8,
                 0,
+                4,
+                8,
+                null,
                 null,
                 null,
                 null,
@@ -161,6 +217,7 @@ class GroupTrendAggregatorTest {
                 OutcomeVector.EMPTY,
                 OutcomeVector.EMPTY,
                 List.of(),
+                Set.of(),
                 difference);
     }
 }

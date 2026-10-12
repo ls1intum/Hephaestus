@@ -154,22 +154,23 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     }
 
     @Override
-    public void onRepositoriesRemoved(Long installationId, List<String> repositoryNames) {
-        if (installationId == null || repositoryNames == null || repositoryNames.isEmpty()) {
+    public void onRepositoriesRemoved(Long installationId, List<RepositoryRemoval> repositories) {
+        if (installationId == null || repositories == null || repositories.isEmpty()) {
             log.debug(
                     "Skipped repositories removed event: reason=missingData, installationId={}, hasRepositories={}",
                     installationId,
-                    repositoryNames != null && !repositoryNames.isEmpty());
+                    repositories != null && !repositories.isEmpty());
             return;
         }
 
-        for (String nameWithOwner : repositoryNames) {
-            repositoryMonitorService.removeRepositoryMonitorForInstallation(installationId, nameWithOwner);
+        for (RepositoryRemoval repository : repositories) {
+            repositoryMonitorService.removeRepositoryMonitorForInstallation(
+                    installationId, repository.nameWithOwner(), repository.nativeId());
         }
         log.info(
                 "Removed repositories from monitor: installationId={}, repoCount={}",
                 installationId,
-                repositoryNames.size());
+                repositories.size());
     }
 
     @Override

@@ -365,7 +365,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private List<DeliveryPolicyEvaluation> evaluationsFor(Workspace workspace, AgentJob job) {
-        return evaluationRepository.findByWorkspaceIdAndAgentJobIdAndFeedbackIdIsNullAndSurfaceOrderByEvaluatedAtAsc(
-                workspace.getId(), job.getId(), DeliveryPolicySurface.CONVERSATION);
+        return evaluationRepository.findByWorkspaceIdAndAgentJobIdAndFeedbackIdIsNullOrderByEvaluatedAtAsc(
+                workspace.getId(), job.getId());
     }
 }

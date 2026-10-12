@@ -4,6 +4,8 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.FeedbackObservationVisibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
@@ -168,6 +170,33 @@ public class InAppFeedbackEvidence {
 
     private static ReviewClaimCurrentness currentness(Observation observation) {
         return ReviewClaimCurrentness.of(observation.getPracticeRevision(), observation.getPractice());
+    }
+
+    /**
+     * When the developer's later work resolved each of these pieces of feedback, for an operator tracing one: only a
+     * card prepared for their practice pages, read by {@link #workResolutions} over its visible evidence as the
+     * card itself reads it. Feedback the work has not resolved, and feedback on any other channel, is absent.
+     */
+    public Map<UUID, Instant> resolvedByWorkAt(Long workspaceId, Collection<Feedback> feedback, Instant now) {
+        List<Feedback> cards = feedback.stream()
+                .filter(piece -> piece.getChannel() == FeedbackChannel.IN_APP)
+                .filter(piece -> piece.getDeliveryState() == FeedbackDeliveryState.PREPARED
+                        || piece.getDeliveryState() == FeedbackDeliveryState.DELIVERED)
+                .toList();
+        if (cards.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, List<Observation>> evidence =
+                visibleEvidence(workspaceId, cards.stream().map(Feedback::getId).toList());
+        Map<UUID, Instant> resolved = new LinkedHashMap<>();
+        workResolutions(workspaceId, cards, evidence, practiceChangedAt(evidence), now)
+                .forEach((feedbackId, resolution) -> {
+                    Instant resolvedAt = resolution.resolvedAt();
+                    if (resolvedAt != null) {
+                        resolved.put(feedbackId, resolvedAt);
+                    }
+                });
+        return resolved;
     }
 
     /**

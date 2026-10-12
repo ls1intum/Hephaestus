@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository.ReviewRunTargetRow;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup.Target;
@@ -11,7 +12,47 @@ import tools.jackson.databind.JsonNode;
 
 final class ReviewRunTargetMapper {
 
+    private static final String PULL_REQUEST_ID = "pull_request_id";
+    private static final String ISSUE_ID = "issue_id";
+    private static final String SLACK_THREAD_ID = "slack_thread_id";
+    private static final String DOCUMENT_ID = "docs_document_id";
+
+    /**
+     * The work a review names, as text: the metadata field {@link #workKey} names per review type. Columns are left
+     * unqualified so the expression reads the nearest {@code agent_job} in scope. It is exactly the expression of the
+     * {@code idx_agent_job_review_work} index (changelog {@code 1791557968341}), which PostgreSQL uses only for a
+     * query that states the same expression; {@code ReviewWorkIdSqlTest} fails when the two diverge.
+     */
+    static final String WORK_ID_SQL = "CASE job_type"
+            + " WHEN 'PULL_REQUEST_REVIEW' THEN metadata ->> '" + PULL_REQUEST_ID + "'"
+            + " WHEN 'ISSUE_REVIEW' THEN metadata ->> '" + ISSUE_ID + "'"
+            + " WHEN 'CONVERSATION_REVIEW' THEN metadata ->> '" + SLACK_THREAD_ID + "'"
+            + " WHEN 'DOCUMENT_REVIEW' THEN metadata ->> '" + DOCUMENT_ID + "' END";
+
+    /** The metadata field that names a pull request review's work, for the queries that read only those. */
+    static final String PULL_REQUEST_ID_FIELD = PULL_REQUEST_ID;
+
+    /** The review type that reviews one kind of work, and the metadata field that names the work. */
+    record WorkKey(AgentJobType jobType, String idField) {}
+
     private ReviewRunTargetMapper() {}
+
+    /** The inverse of {@link #from}: how a run names work of {@code kind}, or null for a kind no review reads. */
+    static @Nullable WorkKey workKey(ArtifactKind kind) {
+        if (kind.equals(ArtifactKinds.PULL_REQUEST)) {
+            return new WorkKey(AgentJobType.PULL_REQUEST_REVIEW, PULL_REQUEST_ID);
+        }
+        if (kind.equals(ArtifactKinds.ISSUE)) {
+            return new WorkKey(AgentJobType.ISSUE_REVIEW, ISSUE_ID);
+        }
+        if (kind.equals(ArtifactKinds.CONVERSATION_THREAD)) {
+            return new WorkKey(AgentJobType.CONVERSATION_REVIEW, SLACK_THREAD_ID);
+        }
+        if (kind.equals(ArtifactKinds.DOCUMENT)) {
+            return new WorkKey(AgentJobType.DOCUMENT_REVIEW, DOCUMENT_ID);
+        }
+        return null;
+    }
 
     static Target from(AgentJob job) {
         return from(job.getJobType(), job.getIntegrationKind(), job.getMetadata());
@@ -27,7 +68,7 @@ final class ReviewRunTargetMapper {
             case PULL_REQUEST_REVIEW ->
                 new Target(
                         ArtifactKinds.PULL_REQUEST,
-                        longValue(metadata, "pull_request_id"),
+                        longValue(metadata, PULL_REQUEST_ID),
                         integrationKind,
                         integerValue(metadata, "pr_number"),
                         requiredTextValue(metadata, "title", "Pull request"),
@@ -37,7 +78,7 @@ final class ReviewRunTargetMapper {
             case ISSUE_REVIEW ->
                 new Target(
                         ArtifactKinds.ISSUE,
-                        longValue(metadata, "issue_id"),
+                        longValue(metadata, ISSUE_ID),
                         integrationKind,
                         integerValue(metadata, "issue_number"),
                         requiredTextValue(metadata, "title", "Issue"),
@@ -47,7 +88,7 @@ final class ReviewRunTargetMapper {
             case CONVERSATION_REVIEW ->
                 new Target(
                         ArtifactKinds.CONVERSATION_THREAD,
-                        longValue(metadata, "slack_thread_id"),
+                        longValue(metadata, SLACK_THREAD_ID),
                         integrationKind,
                         null,
                         "Conversation",
@@ -60,7 +101,7 @@ final class ReviewRunTargetMapper {
             case DOCUMENT_REVIEW ->
                 new Target(
                         ArtifactKinds.DOCUMENT,
-                        longValue(metadata, "docs_document_id"),
+                        longValue(metadata, DOCUMENT_ID),
                         integrationKind,
                         null,
                         requiredTextValue(metadata, "title", "Document"),

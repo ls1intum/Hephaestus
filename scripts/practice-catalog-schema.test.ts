@@ -143,3 +143,23 @@ await test("the schema permits omitted optional occasion fields", () => {
 	});
 	assert.equal(validate(value), true, JSON.stringify(validate.errors));
 });
+
+/**
+ * The words a developer and an admin read. A rename of the review output field `reasoning` to
+ * `evidenceRationale` once ran over this file as plain text and shipped "Record significant
+ * decisions and the evidenceRationale" (v0.74.0 to v0.80.x); workspaces copy these words on adoption,
+ * so a slip here outlives the fix. Criteria may name code, so only names carry the identifier check.
+ */
+await test("no shipped text carries a review output field or a name a code identifier", () => {
+	const raw = readFileSync(new URL(`${resource}default-catalog.json`, import.meta.url), "utf8");
+	assert.doesNotMatch(raw, /\b(?:evidenceRationale|practiceSlug)\b/u);
+	const camelCase = /\b[a-z]{2,}[A-Z][a-z]+/u;
+	for (const groupValue of asArray(catalogue.groups, "groups")) {
+		const group = asRecord(groupValue, "group");
+		assert.doesNotMatch(String(group.name), camelCase, `group ${String(group.slug)}`);
+		for (const practiceValue of asArray(group.practices, "practices")) {
+			const practice = asRecord(practiceValue, "practice");
+			assert.doesNotMatch(String(practice.name), camelCase, `name of ${String(practice.slug)}`);
+		}
+	}
+});

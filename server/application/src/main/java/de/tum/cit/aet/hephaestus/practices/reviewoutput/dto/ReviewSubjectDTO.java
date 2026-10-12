@@ -4,7 +4,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.modulith.NamedInterface;
 
+@NamedInterface("review-output")
 public record ReviewSubjectDTO(
         @NonNull Long id,
 

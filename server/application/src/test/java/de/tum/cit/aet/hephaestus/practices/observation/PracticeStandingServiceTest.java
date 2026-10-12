@@ -77,6 +77,8 @@ class PracticeStandingServiceTest extends BaseUnitTest {
 
     private PracticeStandingService practiceStandingService;
 
+    private final List<Practice> workspacePractices = new ArrayList<>();
+
     @BeforeEach
     void setUp() {
         lenient().when(clock.instant()).thenReturn(NOW);
@@ -84,6 +86,9 @@ class PracticeStandingServiceTest extends BaseUnitTest {
             Collection<Observation> observations = invocation.getArgument(1);
             return observations.stream().map(Observation::getId).collect(Collectors.toSet());
         });
+        lenient()
+                .when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
+                .thenAnswer(invocation -> List.copyOf(workspacePractices));
         lenient()
                 .when(workspaceReviewDefaultsProvider.forWorkspace(WORKSPACE_ID))
                 .thenReturn(WorkspaceReviewDefaults.UNSET);
@@ -185,8 +190,10 @@ class PracticeStandingServiceTest extends BaseUnitTest {
         return new UUID(0L, artifactId);
     }
 
-    private static Practice practice(String slug) {
+    /** A practice of the workspace: the standings list only practices the workspace still reviews. */
+    private Practice practice(String slug) {
         Practice practice = new Practice();
+        workspacePractices.add(practice);
         practice.setSlug(slug);
         practice.setName("Handling failure robustly");
         practice.setCriteria("ordinary criteria");

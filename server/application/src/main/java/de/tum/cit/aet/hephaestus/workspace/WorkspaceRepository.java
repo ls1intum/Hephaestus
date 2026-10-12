@@ -190,6 +190,7 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
         SELECT m.workspace.id
         FROM RepositoryToMonitor m
         JOIN Repository r ON r.nameWithOwner = m.nameWithOwner
+            AND monitor_covers_repository(m.workspace.id, m.nativeId, r.nativeId, r.provider.id) = true
         WHERE r.id = :repositoryId
         ORDER BY m.workspace.id
         """)

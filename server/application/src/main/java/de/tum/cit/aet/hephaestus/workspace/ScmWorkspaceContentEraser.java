@@ -81,11 +81,7 @@ public class ScmWorkspaceContentEraser {
         // Derived rows must be removed before the artifacts they reference.
         eventPublisher.publishEvent(new ScmMirrorErasedEvent(workspaceId));
 
-        List<String> monitoredNames = repositoryToMonitorRepository.findByWorkspaceId(workspaceId).stream()
-                .map(RepositoryToMonitor::getNameWithOwner)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .toList();
+        List<Long> repositoryIds = repositoryToMonitorRepository.findSourceRepositoryIds(workspaceId);
 
         // Flush monitor removals before checking whether their repositories became orphaned.
         workspace.getRepositoriesToMonitor().clear();
@@ -93,9 +89,9 @@ public class ScmWorkspaceContentEraser {
 
         int erased = 0;
         int shared = 0;
-        for (String nameWithOwner : monitoredNames) {
-            long remaining = repositoryToMonitorRepository.countByNameWithOwner(nameWithOwner);
-            repositoryMonitorService.deleteRepositoryIfOrphaned(nameWithOwner);
+        for (Long repositoryId : repositoryIds) {
+            long remaining = repositoryToMonitorRepository.countForRepository(repositoryId);
+            repositoryMonitorService.deleteRepositoryIfOrphaned(repositoryId);
             if (remaining > 0) {
                 shared++;
             } else {

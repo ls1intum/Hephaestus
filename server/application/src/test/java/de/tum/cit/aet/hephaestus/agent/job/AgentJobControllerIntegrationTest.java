@@ -4,7 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -21,6 +26,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +49,12 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Autowired
     private PullRequestRepository pullRequestRepository;
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private ConnectionService connectionService;
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -67,6 +79,101 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of(
                 "agent_type", "CLAUDE_CODE", "model", "claude-sonnet-4-20250514", "upstreamModelId", "gpt-5.4-mini")));
         return agentJobRepository.save(job);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldOmitComposedFeedbackFromAdminDetailAndListWithoutChangingStoredOutput() {
+        Workspace workspace = setupWorkspace();
+        AgentJob job = createJob(workspace, AgentJobStatus.COMPLETED);
+        UUID covering = UUID.randomUUID();
+        var output = OBJECT_MAPPER
+                .createObjectNode()
+                .put("outcome", "SUPERSEDED")
+                .put("coveringJobId", covering.toString())
+                .put("rawOutput", "{\"observations\":[]}");
+        output.set("runnerDebug", OBJECT_MAPPER.readTree("""
+            {"turns":[{"label":"private-feedback","stored":2}]}
+            """));
+        output.set("feedback", OBJECT_MAPPER.readTree("""
+            {"review":{"summary":{"body":"PUBLIC-COMPOSITION"}},
+             "units":[{"channel":"IN_APP","body":"PRIVATE-APP-BODY"},
+                      {"channel":"IN_CHAT","notes":{"situation":"PRIVATE-CHAT-NOTES"}}],
+             "proposedBundles":[{"body":"PRIVATE-PROPOSAL"}]}
+            """));
+        job.setLlmTotalCalls(5);
+        job.setOutput(output);
+        agentJobRepository.saveAndFlush(job);
+
+        for (String suffix : List.of("/" + job.getId(), "")) {
+            String response = webTestClient
+                    .get()
+                    .uri("/workspaces/{slug}/agents/jobs" + suffix, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String.class)
+                    .returnResult()
+                    .getResponseBody();
+            assertThat(response)
+                    .isNotNull()
+                    .doesNotContain("PRIVATE-APP-BODY", "PRIVATE-CHAT-NOTES", "PRIVATE-PROPOSAL", "PUBLIC-COMPOSITION")
+                    .doesNotContain("rawOutput", "runnerDebug", "private-feedback")
+                    .contains("SUPERSEDED", covering.toString(), "\"llmTotalCalls\":5");
+        }
+        assertThat(agentJobRepository.findById(job.getId()).orElseThrow().getOutput())
+                .isEqualTo(output);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldKeepUsageUnknownWhenTheJobHasCallsButNoLedgerEntry() {
+        Workspace workspace = setupWorkspace();
+        AgentJob job = createJob(workspace, AgentJobStatus.RUNNING);
+        job.setLlmTotalCalls(5);
+        agentJobRepository.saveAndFlush(job);
+
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/agents/jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.llmTotalCalls")
+                .isEqualTo(5);
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/agents/jobs/{id}/usage", workspace.getWorkspaceSlug(), job.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.attempts.length()")
+                .isEqualTo(0)
+                .jsonPath("$.totalCostUsd")
+                .doesNotExist()
+                .jsonPath("$.unpricedAttempts")
+                .isEqualTo(0);
+
+        Workspace other = createWorkspace(
+                "other-job-ws",
+                "Other Job Workspace",
+                "other-job-org",
+                AccountType.ORG,
+                persistUser("other-job-owner"));
+        ensureAdminMembership(other);
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/agents/jobs/{id}/usage", other.getWorkspaceSlug(), job.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
     }
 
     @Test
@@ -306,6 +413,20 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     private long persistMonitoredPullRequest(Workspace workspace, String title) {
+        Connection connection = connections.saveAndFlush(new Connection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "pat",
+                new ConnectionConfig.GitHubPatConfig("job-org", null, Set.of())));
+        connectionService.transition(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "job-title-test",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
         Repository repository = new Repository();
         repository.setNativeId(9301L);
         repository.setProvider(ensureGitHubProvider());

@@ -64,7 +64,8 @@ class DeterministicGroupGuidanceComposerTest {
                 List.of(item()),
                 List.of(),
                 null,
-                null);
+                null,
+                false);
 
         String guidance = DeterministicGroupGuidanceComposer.compose(
                 PracticeGroupStandingDTO.Standing.MIXED, List.of(oneSetback));
@@ -88,7 +89,8 @@ class DeterministicGroupGuidanceComposerTest {
                 List.of(item()),
                 List.of(item()),
                 null,
-                null);
+                null,
+                false);
 
         String guidance =
                 DeterministicGroupGuidanceComposer.compose(PracticeGroupStandingDTO.Standing.STRENGTH, List.of(fixed));
@@ -141,7 +143,8 @@ class DeterministicGroupGuidanceComposerTest {
                 toWorkOn,
                 strengths,
                 null,
-                null);
+                null,
+                false);
     }
 
     private static PracticeStandingObservationDTO item() {

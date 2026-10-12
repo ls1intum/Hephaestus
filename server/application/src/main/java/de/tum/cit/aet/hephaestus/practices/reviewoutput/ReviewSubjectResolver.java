@@ -10,15 +10,18 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Component;
 
+/** The developers that admin review lists and sheets name, by user id; the one place that reads them. */
 @Component
+@NamedInterface("review-output")
 @RequiredArgsConstructor
-class ReviewSubjectResolver {
+public class ReviewSubjectResolver {
 
     private final UserRepository userRepository;
 
-    Map<Long, ReviewSubjectDTO> resolve(Collection<? extends @Nullable Long> userIds) {
+    public Map<Long, ReviewSubjectDTO> resolve(Collection<? extends @Nullable Long> userIds) {
         Set<Long> ids = userIds.stream().filter(Objects::nonNull).collect(Collectors.toSet());
         if (ids.isEmpty()) {
             return Map.of();

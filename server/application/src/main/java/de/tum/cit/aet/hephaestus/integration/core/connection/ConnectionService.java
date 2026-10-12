@@ -487,17 +487,22 @@ public class ConnectionService {
     /**
      * Disconnects for mandatory erasure without allowing a sync job to delay credential removal. {@code
      * revoke} runs with this transaction suspended, so its provider calls hold no transaction open; its
-     * failure still propagates and rolls the transition back.
+     * failure still propagates and rolls the transition back. Local data is then erased under the
+     * lifecycle lock before the connection loses its source authority or credentials.
      */
     @Transactional
-    public Connection disconnectForErasure(Connection connection, TransitionRequest req, Runnable revoke) {
+    public Connection disconnectForErasure(
+            Connection connection, TransitionRequest req, Runnable revoke, Runnable erase) {
         if (req.next() != IntegrationState.UNINSTALLED) {
             throw new IllegalArgumentException("Disconnect must transition to UNINSTALLED");
         }
         return applyTransition(
                 connection,
                 req,
-                locked -> providerTeardownTemplate.executeWithoutResult(status -> revoke.run()),
+                locked -> {
+                    providerTeardownTemplate.executeWithoutResult(status -> revoke.run());
+                    erase.run();
+                },
                 /* fenceOnActiveSyncJob */ false);
     }
 

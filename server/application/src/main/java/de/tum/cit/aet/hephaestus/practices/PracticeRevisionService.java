@@ -1,10 +1,14 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeRevisionDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -70,5 +74,60 @@ public class PracticeRevisionService {
         return practice.getCurrentRevision() == null
                 ? null
                 : practice.getCurrentRevision().getRevisionNumber();
+    }
+
+    /**
+     * Every stored version of the practice, newest first, each with the parts of the definition that differ from the
+     * version before it.
+     */
+    @Transactional(readOnly = true)
+    public List<PracticeRevisionDTO> history(Practice practice) {
+        List<PracticeRevision> revisions =
+                practiceRevisionRepository.findByPracticeIdOrderByRevisionNumberAsc(practice.getId());
+        List<PracticeRevisionDTO> history = new ArrayList<>(revisions.size());
+        PracticeRevision previous = null;
+        for (PracticeRevision revision : revisions) {
+            history.add(new PracticeRevisionDTO(
+                    Objects.requireNonNull(revision.getId(), "a stored revision has an id"),
+                    revision.getRevisionNumber(),
+                    Objects.requireNonNull(revision.getCreatedAt(), "a stored revision has a creation time"),
+                    previous == null ? List.of() : changed(previous, revision),
+                    previous != null
+                            && !Objects.equals(
+                                    previous.getReviewRuleFingerprint(), revision.getReviewRuleFingerprint())));
+            previous = revision;
+        }
+        return history.reversed();
+    }
+
+    /** The parts that differ, in {@link PracticeDefinitionField} order; every field is compared. */
+    private static List<PracticeDefinitionField> changed(PracticeRevision before, PracticeRevision after) {
+        return Arrays.stream(PracticeDefinitionField.values())
+                .filter(field -> !Objects.equals(value(field, before), value(field, after)))
+                .toList();
+    }
+
+    /**
+     * One part of a stored version. Exhaustive like {@code PracticeDefinitionMerge#value}, so a new definition field
+     * fails the build here rather than going missing from the version history.
+     */
+    private static @Nullable Object value(PracticeDefinitionField field, PracticeRevision revision) {
+        return switch (field) {
+            case NAME -> revision.getName();
+            case SIGNALS -> revision.getSignals();
+            case EVIDENCE_REQUIREMENTS -> revision.getEvidenceRequirements();
+            case REVIEW_WHEN -> revision.getReviewWhen();
+            case SUBJECT -> revision.getSubject();
+            case PRECONDITION -> revision.getPrecondition();
+            case CRITERIA -> revision.getCriteria();
+            case PRECOMPUTE_SCRIPT -> revision.getPrecomputeScript();
+            case AUTOMATED_REVIEW_POLICY -> revision.getAutomatedReviewPolicy();
+            case WHY_IT_MATTERS -> revision.getWhyItMatters();
+            case WHAT_GOOD_LOOKS_LIKE -> revision.getWhatGoodLooksLike();
+            case GROUP_SLUG -> revision.getGroupSlug();
+            case DELIVERY_BEHAVIOR -> revision.getDeliveryBehavior();
+            case VISUAL -> revision.getVisual();
+            case GUIDE -> revision.getGuide();
+        };
     }
 }

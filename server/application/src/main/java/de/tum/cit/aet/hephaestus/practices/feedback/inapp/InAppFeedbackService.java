@@ -15,11 +15,14 @@ import de.tum.cit.aet.hephaestus.practices.feedback.inapp.dto.InAppEvidenceDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.dto.InAppFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.CurrentResponseRow;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution.Work;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup.Target;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkLabels;
@@ -74,6 +77,7 @@ public class InAppFeedbackService {
     private final ReviewRunLookup reviewRunLookup;
     private final ReactionRepository reactionRepository;
     private final FeedbackWithdrawalRepository withdrawalRepository;
+    private final WorkspaceReviewDefaultsProvider workspaceReviewDefaults;
     private final Clock clock;
 
     /**
@@ -172,9 +176,14 @@ public class InAppFeedbackService {
                 workspaceId, shown.stream().map(Feedback::getId).toList());
         // Hidden, not deleted. Feedback whose evidence source's authorization was withdrawn must stop being shown,
         // but the ledger still records that we said it, which is the whole point of a ledger. Feedback whose
-        // practice changed its review rules stays, closed, and the card says so.
+        // practice changed its review rules stays, closed, and the card says so. Feedback on a practice the
+        // workspace switched off is hidden the same way: the profile shows nothing for a practice it no longer
+        // reviews, and the admin views still read the ledger.
+        PracticeAutonomy workspaceDefault =
+                workspaceReviewDefaults.forWorkspace(workspaceId).defaultAutonomy();
         List<Feedback> rows = shown.stream()
                 .filter(feedback -> evidence.containsKey(feedback.getId()))
+                .filter(feedback -> reviewed(evidence.getOrDefault(feedback.getId(), List.of()), workspaceDefault))
                 .toList();
         Map<UUID, FeedbackResponseDTO> responses = evidence.isEmpty()
                 ? Map.of()
@@ -183,6 +192,13 @@ public class InAppFeedbackService {
                                 CurrentResponseRow::getFeedbackId,
                                 row -> FeedbackResponseDTO.from(row.getFeedbackId(), row)));
         return new Reads(rows, withdrawnAt, evidence, feedbackEvidence.practiceChangedAt(evidence), responses);
+    }
+
+    /** Whether the workspace still reviews the practice the evidence is about. */
+    private static boolean reviewed(List<Observation> evidence, PracticeAutonomy workspaceDefault) {
+        return evidence.isEmpty()
+                || AutonomyResolver.effectiveAutonomyOf(evidence.getFirst().getPractice(), workspaceDefault)
+                        .admitsReview();
     }
 
     /**

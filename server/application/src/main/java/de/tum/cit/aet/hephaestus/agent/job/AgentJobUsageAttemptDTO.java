@@ -1,0 +1,60 @@
+package de.tum.cit.aet.hephaestus.agent.job;
+
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEvent;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
+import java.time.Instant;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
+/** What one attempt of a job spent, as the usage ledger recorded it. */
+@Schema(description = "The model usage and cost of one attempt of a job")
+public record AgentJobUsageAttemptDTO(
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                description = "The zero-based attempt number, 0 for the first run")
+        int attempt,
+
+        @NonNull @Schema(description = "When the usage was recorded")
+        Instant occurredAt,
+
+        @Schema(description = "The model the attempt called") @Nullable
+        String model,
+
+        @NonNull
+        @Schema(
+                description = "PRICED has a cost; NO_CHARGE is a real $0; UNPRICED means no price was known, so its"
+                        + " cost is absent rather than $0")
+        PricingState pricingState,
+
+        @NonNull @Schema(description = "Who pays: the instance's shared models, or the workspace's own provider")
+        FundingSource fundingSource,
+
+        @Schema(description = "Cost in US dollars; absent while UNPRICED") @Nullable
+        BigDecimal costUsd,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int totalCalls,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long inputTokens,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long outputTokens,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long reasoningTokens,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long cacheReadTokens,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long cacheWriteTokens) {
+
+    static AgentJobUsageAttemptDTO from(LlmUsageEvent event) {
+        return new AgentJobUsageAttemptDTO(
+                event.getSourceAttempt(),
+                event.getOccurredAt(),
+                event.getModel(),
+                event.getPricingState(),
+                event.getFundingSource(),
+                event.getPricingState() == PricingState.UNPRICED ? null : event.getCostUsd(),
+                event.getTotalCalls(),
+                event.getInputTokens(),
+                event.getOutputTokens(),
+                event.getReasoningTokens(),
+                event.getCacheReadTokens(),
+                event.getCacheWriteTokens());
+    }
+}

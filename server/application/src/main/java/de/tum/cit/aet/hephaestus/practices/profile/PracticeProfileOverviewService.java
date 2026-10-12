@@ -143,6 +143,9 @@ public class PracticeProfileOverviewService {
                 firstObservedAt,
                 targets));
         changes.addAll(feedbackChanges(feedback, window, targets));
+        // A practice switched off for the workspace says nothing on the profile, its feedback included.
+        Set<String> reviewed = after.practices().keySet();
+        changes.removeIf(change -> change.practiceSlug() != null && !reviewed.contains(change.practiceSlug()));
         changes.sort(Comparator.comparing(ProfileChangeDTO::at).reversed());
         return new PracticeProfileOverviewDTO(
                 OverviewWindowDTO.from(window),
@@ -435,7 +438,7 @@ public class PracticeProfileOverviewService {
             PracticeTrend.CleanWork cleanWork = practice.trend().cleanWork();
             ArtifactKind kind = cleanWork.kind();
             Instant since = cleanWork.since();
-            if (kind == null || since == null || !practice.isHolding()) {
+            if (kind == null || since == null || !practice.isHolding(practiceStandingService.standingWindow())) {
                 continue;
             }
             held.add(new HeldPracticeDTO(

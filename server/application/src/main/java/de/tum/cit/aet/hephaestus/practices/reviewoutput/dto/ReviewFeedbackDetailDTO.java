@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackLocation;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.FeedbackApprovalDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkRefDTO;
@@ -30,6 +31,13 @@ public record ReviewFeedbackDetailDTO(
         ReviewSubjectDTO subject,
 
         @NonNull FeedbackChannel channel,
+
+        @NonNull
+        @Schema(
+                description = "Where the feedback appears, by the provider that shows it: the channel split where the"
+                        + " provider is known")
+        FeedbackLocation location,
+
         @NonNull FeedbackDeliveryState deliveryState,
 
         @Schema(description = "Why delivery stopped; set on withheld or terminally partial feedback") @Nullable
@@ -59,6 +67,13 @@ public record ReviewFeedbackDetailDTO(
         @NonNull @Schema(description = "Recorded placements; empty when none")
         List<ReviewPlacementDTO> placements,
 
+        @NonNull
+        @Schema(
+                description = "Every delivery of a package carrying this feedback to the provider, oldest first:"
+                        + " its state, attempts, next attempt and last error. Empty for feedback that never goes to"
+                        + " a provider, and for feedback no delivery was started for.")
+        List<ReviewFeedbackDispatchDTO> dispatches,
+
         @Schema(description = "Reviewed source revision for an immutable approval package") @Nullable
         String reviewedRevision,
 
@@ -82,11 +97,13 @@ public record ReviewFeedbackDetailDTO(
         FeedbackDisputeDTO dispute) {
     public static ReviewFeedbackDetailDTO from(
             Feedback feedback,
+            FeedbackLocation location,
             @Nullable ReviewedWorkRefDTO reviewedWork,
             @Nullable ReviewSubjectDTO recipient,
             @Nullable ReviewSubjectDTO subject,
             List<ReviewBoundObservationDTO> observations,
             List<ReviewPlacementDTO> placements,
+            List<ReviewFeedbackDispatchDTO> dispatches,
             @Nullable FeedbackApprovalDTO approval,
             List<DeliveryPolicyTraceDTO> deliveryPolicy,
             List<FeedbackWithdrawalDTO> withdrawals,
@@ -99,6 +116,7 @@ public record ReviewFeedbackDetailDTO(
                 recipient,
                 subject,
                 feedback.getChannel(),
+                location,
                 feedback.getDeliveryState(),
                 feedback.getSuppressionReason(),
                 feedback.getReplacesId(),
@@ -108,6 +126,7 @@ public record ReviewFeedbackDetailDTO(
                 bodyVisible ? feedback.getBody() : null,
                 observations,
                 placements,
+                dispatches,
                 feedback.getReviewedRevision(),
                 bodyVisible
                         ? feedback.getProposedPlacements().stream()

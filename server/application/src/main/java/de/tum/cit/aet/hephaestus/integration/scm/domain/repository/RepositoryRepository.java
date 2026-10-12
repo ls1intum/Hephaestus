@@ -88,8 +88,10 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      */
     @Query("""
         SELECT r FROM Repository r LEFT JOIN FETCH r.provider
-        WHERE r.nameWithOwner IN (
-            SELECT m.nameWithOwner FROM RepositoryToMonitor m WHERE m.workspace.id = :workspaceId
+        WHERE EXISTS (
+            SELECT 1 FROM RepositoryToMonitor m
+            WHERE m.workspace.id = :workspaceId AND m.nameWithOwner = r.nameWithOwner
+                AND monitor_covers_repository(m.workspace.id, m.nativeId, r.nativeId, r.provider.id) = true
         )
         ORDER BY r.nameWithOwner
         """)
@@ -103,8 +105,10 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     @Query("""
         SELECT r FROM Repository r JOIN FETCH r.provider p
         WHERE p.id = :providerId
-        AND r.nameWithOwner IN (
-            SELECT m.nameWithOwner FROM RepositoryToMonitor m WHERE m.workspace.id = :workspaceId
+        AND EXISTS (
+            SELECT 1 FROM RepositoryToMonitor m
+            WHERE m.workspace.id = :workspaceId AND m.nameWithOwner = r.nameWithOwner
+                AND monitor_covers_repository(m.workspace.id, m.nativeId, r.nativeId, r.provider.id) = true
         )
         ORDER BY r.nameWithOwner
         """)

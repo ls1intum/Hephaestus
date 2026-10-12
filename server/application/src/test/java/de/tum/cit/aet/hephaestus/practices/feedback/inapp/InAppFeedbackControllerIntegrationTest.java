@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseRequestD
 import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
@@ -124,6 +125,24 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
                 .get()
                 .extracting(Feedback::getDeliveryState)
                 .isEqualTo(FeedbackDeliveryState.PREPARED);
+    }
+
+    @Test
+    @WithUser
+    @DisplayName("feedback on a practice the workspace switched off is not on the page")
+    void shouldHideFeedbackWhenItsPracticeIsSwitchedOff() {
+        Feedback feedback = persistInAppCard(
+                job,
+                developer,
+                7000,
+                FeedbackDeliveryState.PREPARED,
+                "You keep shipping untested changes",
+                "Across your last three pull requests the tests did not move with the code.");
+        bind(feedback, persistObservation(practice, job, developer, 101L));
+        practice.setAutonomy(PracticeAutonomy.OFF);
+        practice = practiceRepository.saveAndFlush(practice);
+
+        readInAppPage(workspace).jsonPath("$.length()").isEqualTo(0);
     }
 
     /**

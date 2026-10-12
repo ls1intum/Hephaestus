@@ -33,7 +33,8 @@ interface ReviewableArtifactOwnershipRepository extends JpaRepository<Issue, Lon
         WHERE i.id IN :ids AND TYPE(i) = :type
           AND EXISTS (
               SELECT 1 FROM RepositoryToMonitor rtm
-              WHERE rtm.workspace.id = :workspaceId AND rtm.nameWithOwner = i.repository.nameWithOwner)
+              WHERE rtm.workspace.id = :workspaceId AND rtm.nameWithOwner = i.repository.nameWithOwner
+                  AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, i.repository.nativeId, i.repository.provider.id) = true)
         """)
     Set<Long> findIdsInWorkspace(
             @Param("workspaceId") Long workspaceId,
@@ -54,7 +55,8 @@ interface ReviewableArtifactOwnershipRepository extends JpaRepository<Issue, Lon
         WHERE i.id IN :ids
           AND EXISTS (
               SELECT 1 FROM RepositoryToMonitor rtm
-              WHERE rtm.workspace.id = :workspaceId AND rtm.nameWithOwner = i.repository.nameWithOwner)
+              WHERE rtm.workspace.id = :workspaceId AND rtm.nameWithOwner = i.repository.nameWithOwner
+                  AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, i.repository.nativeId, i.repository.provider.id) = true)
         """)
     List<ReviewedWorkTitle> findCurrentTitles(
             @Param("workspaceId") Long workspaceId, @Param("ids") Collection<Long> ids);
@@ -69,9 +71,9 @@ interface ReviewableArtifactOwnershipRepository extends JpaRepository<Issue, Lon
      * The repositories this workspace monitors under {@code nameWithOwner} on the provider server at
      * {@code serverUrl}, with that provider row fetched so the caller can check its kind.
      *
-     * <p>Unlike the two checks above, the provider server is part of the join: a name is only unique per
-     * provider, and the same namespace and project can exist on two GitLab servers, of which the
-     * workspace is connected to one. Case-insensitive because providers route paths that way, so a
+     * <p>Beyond the provider kind and native id the two checks above compare, the provider server is part
+     * of the join: a name is only unique per provider, and the same namespace and project can exist on two
+     * GitLab servers, of which the workspace is connected to one. Case-insensitive because providers route paths that way, so a
      * caller must refuse anything but exactly one row rather than pick one. A monitor that already
      * recorded the provider's native id must agree with it; older rows without one still match by name.
      */
@@ -79,10 +81,10 @@ interface ReviewableArtifactOwnershipRepository extends JpaRepository<Issue, Lon
         SELECT DISTINCT r FROM Repository r
         JOIN FETCH r.provider p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, r.nativeId, r.provider.id) = true
         WHERE rtm.workspace.id = :workspaceId
           AND p.serverUrl = :serverUrl
           AND LOWER(r.nameWithOwner) = LOWER(:nameWithOwner)
-          AND (rtm.nativeId IS NULL OR rtm.nativeId = r.nativeId)
         """)
     List<Repository> findMonitoredRepositories(
             @Param("workspaceId") long workspaceId,

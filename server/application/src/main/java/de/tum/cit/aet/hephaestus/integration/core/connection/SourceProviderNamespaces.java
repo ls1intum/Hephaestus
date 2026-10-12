@@ -35,7 +35,7 @@ public class SourceProviderNamespaces {
         events.publishEvent(new PersonProviderInstanceRegistered(Objects.requireNonNull(provider.getId())));
     }
 
-    static @Nullable String configuredUrl(ConnectionConfig config) {
+    public static @Nullable String configuredUrl(ConnectionConfig config) {
         return switch (config) {
             case ConnectionConfig.GitHubAppConfig c -> c.serverUrl();
             case ConnectionConfig.GitHubPatConfig c -> c.serverUrl();

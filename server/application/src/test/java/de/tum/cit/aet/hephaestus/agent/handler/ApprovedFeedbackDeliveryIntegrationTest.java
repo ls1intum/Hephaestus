@@ -1000,7 +1000,10 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(Void.class);
+                .expectBody()
+                // The decision names its admin here as the feedback detail does, not as an erased account.
+                .jsonPath("$.decidedBy")
+                .isNotEmpty();
     }
 
     private void makeRetryDue(Feedback proposal) {

@@ -30,6 +30,7 @@ public interface ReviewBackfillScopeRepository extends JpaRepository<Issue, Long
         SELECT COUNT(p) FROM PullRequest p
         JOIN p.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, r.nativeId, r.provider.id) = true
         WHERE rtm.workspace.id = :workspaceId
           AND TYPE(p) = PullRequest
           AND p.deletedAt IS NULL
@@ -43,6 +44,7 @@ public interface ReviewBackfillScopeRepository extends JpaRepository<Issue, Long
         SELECT p.id FROM PullRequest p
         JOIN p.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, r.nativeId, r.provider.id) = true
         WHERE rtm.workspace.id = :workspaceId
           AND TYPE(p) = PullRequest
           AND p.deletedAt IS NULL
@@ -62,6 +64,7 @@ public interface ReviewBackfillScopeRepository extends JpaRepository<Issue, Long
         SELECT COUNT(i) FROM Issue i
         JOIN i.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, r.nativeId, r.provider.id) = true
         WHERE rtm.workspace.id = :workspaceId
           AND TYPE(i) = Issue
           AND i.deletedAt IS NULL
@@ -75,6 +78,7 @@ public interface ReviewBackfillScopeRepository extends JpaRepository<Issue, Long
         SELECT i.id FROM Issue i
         JOIN i.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, r.nativeId, r.provider.id) = true
         WHERE rtm.workspace.id = :workspaceId
           AND TYPE(i) = Issue
           AND i.deletedAt IS NULL

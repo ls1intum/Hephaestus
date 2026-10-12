@@ -2,12 +2,15 @@ package de.tum.cit.aet.hephaestus.practices.profile.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
+import org.springframework.modulith.NamedInterface;
 
+@NamedInterface("review-run-outcomes")
 @Schema(
-        description = "What one run decided about each practice it observed for this developer against the"
+        description = "What one run decided about each practice it observed against the"
                 + " practice's whole positive standard, one count per practice however many observations it"
                 + " recorded; an invalidated observation decides nothing, and a met or not-met outcome recorded"
-                + " under an earlier or missing assessment scheme counts as undetermined")
+                + " under an earlier or missing assessment scheme counts as undetermined. The practice profile counts"
+                + " only what the run observed about the calling developer")
 public record ReviewPracticeOutcomesDTO(
         @NonNull @Schema(description = "Practices with at least one counted not-met outcome")
         Integer notMet,

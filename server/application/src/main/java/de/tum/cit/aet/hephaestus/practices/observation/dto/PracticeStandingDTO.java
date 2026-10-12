@@ -44,7 +44,12 @@ public record PracticeStandingDTO(
         TrendDirection direction,
 
         @Nullable @Schema(description = "Evidence support and provenance for the direction")
-        TrendSupportDTO trendSupport) {
+        TrendSupportDTO trendSupport,
+
+        @Schema(
+                description = "True when the newest review of each piece of work in the look-back found that this"
+                        + " practice did not apply to it; false when anything else was recorded, or nothing at all")
+        boolean notApplicableOnly) {
     /**
      * Coarse, human standing derived from the developer's most recent evidence for this practice.
      *

@@ -26,7 +26,10 @@ public record AgentJobDTO(
         @Schema(description = "Job metadata (routing/display info)") @Nullable
         Object metadata,
 
-        @Schema(description = "Job output (agent results)") @Nullable
+        @Schema(
+                description =
+                        "Raw output is not returned by administrative job reads; use the authorized observation and feedback endpoints")
+        @Nullable
         Object output,
 
         @NonNull
@@ -64,6 +67,15 @@ public record AgentJobDTO(
 
         @Schema(description = "Human-readable error message") @Nullable
         String errorMessage,
+
+        @Schema(description = "Why a CANCELLED job was cancelled; available on job detail, absent otherwise") @Nullable
+        AgentJobCancellationReason cancellationReason,
+
+        @Schema(
+                description = "The id the job's log lines and spans carry, to find them in the logs; available on"
+                        + " job detail")
+        @Nullable
+        String traceId,
 
         @Schema(description = DeliveryStatus.DESCRIPTION) @Nullable
         DeliveryStatus deliveryStatus,
@@ -107,6 +119,24 @@ public record AgentJobDTO(
         @Schema(description = "Timestamp when the job completed") @Nullable
         Instant completedAt,
 
+        @Schema(
+                description = "When this review first posted feedback on the work without waiting for an admin's"
+                        + " approval; available on review detail, absent until then")
+        @Nullable
+        Instant firstFeedbackPostedAt,
+
+        @Schema(
+                description = "When a developer first read this review's feedback on their practice pages or in a"
+                        + " conversation; available on review detail, absent until then")
+        @Nullable
+        Instant firstFeedbackReadAt,
+
+        @Schema(
+                description = "When the reviewed pull request or merge request was merged; available on review detail,"
+                        + " absent for other work and for work that is not merged")
+        @Nullable
+        Instant workMergedAt,
+
         @Schema(description = "LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)") @Nullable
         String llmModel,
 
@@ -147,7 +177,18 @@ public record AgentJobDTO(
                                 + "practice was asked.")
         @Nullable
         List<AnsweredPracticeDTO> answeredPractices) {
-    public static AgentJobDTO from(AgentJob job, Target target) {
+    /**
+     * What a review's detail adds to the job: when it first posted on the work, when a developer first read its
+     * feedback, and when its work was merged.
+     */
+    public record ReviewMoments(
+            @Nullable Instant firstFeedbackPostedAt,
+            @Nullable Instant firstFeedbackReadAt,
+            @Nullable Instant workMergedAt) {
+        public static final ReviewMoments NONE = new ReviewMoments(null, null, null);
+    }
+
+    public static AgentJobDTO from(AgentJob job, Target target, ReviewMoments moments) {
         JsonNode snapshot = job.getConfigSnapshot();
         return new AgentJobDTO(
                 job.getId(),
@@ -155,22 +196,27 @@ public record AgentJobDTO(
                 job.getStatus(),
                 ReviewRunTargetDTO.from(target),
                 job.getMetadata(),
-                job.getOutput(),
+                null,
                 ReviewRunOutcome.fromJobOutput(job.getOutput()),
                 ReviewRunOutcome.coveringJobId(job.getOutput()),
                 redactInstanceBaseUrl(snapshot),
                 snapshotString(snapshot, "upstreamModelId"),
                 job.getExitCode(),
                 job.getErrorMessage(),
+                job.getCancellationReason(),
+                job.getTraceId(),
                 job.getDeliveryStatus(),
                 job.getDeliveryCommentId(),
                 job.getRetryCount(),
                 job.getAvailableAt(),
-                job.getHoldReason(),
+                AgentJob.holdWhileQueued(job.getStatus(), job.getHoldReason()),
                 job.getCreatedAt(),
                 job.getStartedAt(),
                 job.getExecutionStartedAt(),
                 job.getCompletedAt(),
+                moments.firstFeedbackPostedAt(),
+                moments.firstFeedbackReadAt(),
+                moments.workMergedAt(),
                 job.getLlmModel(),
                 job.getLlmModelVersion(),
                 job.getLlmTotalCalls(),
@@ -196,22 +242,27 @@ public record AgentJobDTO(
                 row.getStatus(),
                 ReviewRunTargetDTO.from(target),
                 row.getMetadata(),
-                row.getOutput(),
+                null,
                 ReviewRunOutcome.fromJobOutput(row.getOutput()),
                 ReviewRunOutcome.coveringJobId(row.getOutput()),
                 redactInstanceBaseUrl(snapshot),
                 snapshotString(snapshot, "upstreamModelId"),
                 row.getExitCode(),
                 row.getErrorMessage(),
+                null,
+                null,
                 row.getDeliveryStatus(),
                 row.getDeliveryCommentId(),
                 row.getRetryCount(),
                 row.getAvailableAt(),
-                row.getHoldReason(),
+                AgentJob.holdWhileQueued(row.getStatus(), row.getHoldReason()),
                 row.getCreatedAt(),
                 row.getStartedAt(),
                 row.getExecutionStartedAt(),
                 row.getCompletedAt(),
+                null,
+                null,
+                null,
                 row.getLlmModel(),
                 row.getLlmModelVersion(),
                 row.getLlmTotalCalls(),

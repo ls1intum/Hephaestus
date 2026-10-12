@@ -177,7 +177,7 @@ management:
             server:
                 # The API has more route templates than Boot's default 100. The integration test
                 # checks this bounded budget against registered mappings and rejects raw URI tags.
-                max-uri-tags: 256
+                max-uri-tags: 320
     tracing:
         # Raw prompts never enter span attributes.
         sampling:

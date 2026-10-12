@@ -762,6 +762,32 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     int BODY_PREVIEW_LENGTH = 320;
 
     /**
+     * The {@link FeedbackLocation} of feedback {@code f}, as a native text expression: the one definition that the
+     * operator list's column, its filter and the counts by location share, so a count and its filtered list agree.
+     * The provider of work is the integration of the review that composed the feedback, which is also where
+     * {@code ReviewedWorkRefDTO#provider} comes from. A conversation's provider is the surface of the thread whose turn
+     * the feedback is linked to. {@code chk_chat_thread_surface} allows only {@code WEB} and {@code SLACK_DM}. Every
+     * subquery carries the workspace by hand, as every query on this table does.
+     */
+    String LOCATION = """
+        (CASE f.channel
+            WHEN 'IN_APP' THEN 'PRACTICE_PAGES'
+            WHEN 'IN_CONTEXT' THEN COALESCE(
+                (SELECT CASE j.integration_kind WHEN 'GITHUB' THEN 'GITHUB' WHEN 'GITLAB' THEN 'GITLAB' END
+                 FROM agent_job j WHERE j.id = f.agent_job_id AND j.workspace_id = f.workspace_id),
+                'OTHER_WORK')
+            ELSE COALESCE(
+                (SELECT CASE t.surface WHEN 'SLACK_DM' THEN 'SLACK' ELSE 'HEPH' END
+                 FROM feedback_placement fp
+                 JOIN chat_message m ON m.id = fp.chat_message_id
+                 JOIN chat_thread t ON t.id = m.thread_id AND t.workspace_id = f.workspace_id
+                 WHERE fp.feedback_id = f.id
+                 ORDER BY fp.created_at, fp.id
+                 LIMIT 1),
+                'NEXT_CONVERSATION')
+        END)""";
+
+    /**
      * Keeps feedback bound to an observation of a practice asked for, by {@link #WITH_BOUND_OBSERVATIONS}. The
      * subquery's own {@code f} shadows the outer one.
      */
@@ -770,17 +796,34 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
             + " JOIN practice p ON p.id = o.practice_id WHERE f.workspace_id = :workspaceId"
             + " AND p.slug = ANY(CAST(:#{#f.practiceSlugArray()} AS text[]))))\n";
 
+    /**
+     * Keeps feedback bound to an observation of a practice in a group asked for, the same way as
+     * {@link #PRACTICE_FILTER}. The group and the practice are the feedback's own workspace's.
+     */
+    String GROUP_FILTER = "AND (CAST(:#{#f.groupSlugArray()} AS text[]) IS NULL OR f.id IN (SELECT f.id"
+            + WITH_BOUND_OBSERVATIONS
+            + " JOIN practice p ON p.id = o.practice_id"
+            + " JOIN practice_group pg ON pg.id = p.practice_group_id AND pg.workspace_id = f.workspace_id"
+            + " WHERE f.workspace_id = :workspaceId"
+            + " AND pg.slug = ANY(CAST(:#{#f.groupSlugArray()} AS text[]))))\n";
+
     String OPERATOR_PREDICATES = """
           AND (CAST(:#{#f.deliveryStateNames()} AS text[]) IS NULL OR f.delivery_state = ANY(CAST(:#{#f.deliveryStateNames()} AS text[])))
           AND (CAST(:#{#f.suppressionReasonNames()} AS text[]) IS NULL OR f.suppression_reason = ANY(CAST(:#{#f.suppressionReasonNames()} AS text[])))
           AND (CAST(:#{#f.channelNames()} AS text[]) IS NULL OR f.channel = ANY(CAST(:#{#f.channelNames()} AS text[])))
+        """ + "  AND (CAST(:#{#f.locationNames()} AS text[]) IS NULL OR " + LOCATION
+            + " = ANY(CAST(:#{#f.locationNames()} AS text[])))\n" + """
           AND (CAST(:#{#f.agentJobId()} AS uuid) IS NULL OR f.agent_job_id = CAST(:#{#f.agentJobId()} AS uuid))
+          AND (CAST(:#{#f.observationId()} AS uuid) IS NULL OR f.id IN (SELECT fo.feedback_id
+              FROM feedback_observation fo
+              JOIN observation o ON o.id = fo.observation_id AND o.workspace_id = :workspaceId
+              WHERE fo.observation_id = CAST(:#{#f.observationId()} AS uuid)))
           AND (CAST(:#{#f.artifactKindValue()} AS text) IS NULL OR f.artifact_kind = CAST(:#{#f.artifactKindValue()} AS text))
           AND (CAST(:#{#f.artifactId()} AS bigint) IS NULL OR f.artifact_id = CAST(:#{#f.artifactId()} AS bigint))
           AND (CAST(:#{#f.recipientUserId()} AS bigint) IS NULL OR f.recipient_user_id = CAST(:#{#f.recipientUserId()} AS bigint))
           AND (CAST(:#{#f.from()} AS timestamptz) IS NULL OR f.created_at >= CAST(:#{#f.from()} AS timestamptz))
           AND (CAST(:#{#f.to()} AS timestamptz) IS NULL OR f.created_at < CAST(:#{#f.to()} AS timestamptz))
-        """ + PRACTICE_FILTER;
+        """ + PRACTICE_FILTER + GROUP_FILTER;
 
     /**
      * The operator's page of feedback.
@@ -812,6 +855,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
                     + " f.replaces_id AS \"replacesId\","
                     + " f.created_at AS \"createdAt\","
                     + " f.delivered_at AS \"deliveredAt\","
+                    + " " + LOCATION + " AS \"location\","
                     +
                     // IN_APP and IN_CHAT bodies are withheld from the operator surface in SQL rather than in
                     // a mapper, so a second projection cannot forget. One is the developer's private page, the other
@@ -861,6 +905,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
         FeedbackChannel getChannel();
 
+        FeedbackLocation getLocation();
+
         FeedbackDeliveryState getDeliveryState();
 
         @Nullable
@@ -880,6 +926,59 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         Boolean getBodyTruncated();
 
         Long getObservationCount();
+    }
+
+    /** The {@link FeedbackLocation} of one piece of feedback, by {@link #LOCATION}; empty when it is not here. */
+    @Query(
+            value = "SELECT " + LOCATION + " FROM feedback f WHERE f.id = :id AND f.workspace_id = :workspaceId",
+            nativeQuery = true)
+    Optional<String> findLocation(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
+
+    /**
+     * The operator feedback list's rows under {@code filter}, counted by {@link #LOCATION} and delivery state. A
+     * location with no feedback has no row.
+     */
+    @Query(
+            value = "SELECT f.location AS \"location\"," + STATE_COUNTS + """
+        FROM (
+            SELECT
+        """ + LOCATION + """
+             AS location, f.delivery_state
+            FROM feedback f WHERE f.workspace_id = :workspaceId
+        """ + OPERATOR_PREDICATES
+                    + """
+        ) f
+        GROUP BY f.location
+        """,
+            nativeQuery = true)
+    List<LocationFeedbackCounts> summarizeForWorkspaceByLocation(
+            @Param("workspaceId") Long workspaceId, @Param("f") FeedbackQueryFilter filter);
+
+    interface LocationFeedbackCounts extends FeedbackStateCounts {
+        FeedbackLocation getLocation();
+    }
+
+    /**
+     * The operator feedback list's rows under {@code filter} that carry a suppression reason, counted by that reason,
+     * and the withheld rows that carry none as one row with a null reason, so a reader takes both from one read. Only
+     * the reason and a number leave SQL: no body, rating or comment. A reason with no feedback has no row.
+     */
+    @Query(value = """
+        SELECT f.suppression_reason AS "reason", COUNT(*) AS "count"
+        FROM feedback f WHERE f.workspace_id = :workspaceId
+            AND (f.suppression_reason IS NOT NULL OR f.delivery_state = 'SUPPRESSED')
+        """ + OPERATOR_PREDICATES + """
+        GROUP BY f.suppression_reason
+        """, nativeQuery = true)
+    List<ReasonFeedbackCount> summarizeForWorkspaceByReason(
+            @Param("workspaceId") Long workspaceId, @Param("f") FeedbackQueryFilter filter);
+
+    interface ReasonFeedbackCount {
+        /** Null for withheld feedback whose reason is not recorded. */
+        @Nullable
+        FeedbackSuppressionReason getReason();
+
+        Long getCount();
     }
 
     /**

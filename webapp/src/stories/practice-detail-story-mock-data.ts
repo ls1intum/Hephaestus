@@ -11,6 +11,7 @@ import type {
 	PracticeGroupReviewRun,
 	PracticeStanding,
 } from "@/api/types.gen";
+import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
 import { daysBefore } from "@/stories/story-clock";
 
 import { packagingGroup, practicesByGroup, pullRequest } from "./practice-profile-story-mock-data";
@@ -34,6 +35,9 @@ const detailDepth: Record<string, Partial<PracticeStanding>> = {
 			previousOpportunities: 5,
 			opportunities: 11,
 			opportunitiesUntilComparable: 0,
+			standingWork: 4,
+			reviewedWork: 11,
+			reviewedWorkKind: ARTIFACT_KIND.pullRequest,
 			calendarSpanDays: 12,
 			bundleSize: 4,
 			ropeHalfWidth: 0.15,

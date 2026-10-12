@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenServic
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.cit.aet.hephaestus.workspace.ScmWorkspaceContentEraser;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceLifecycleService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
@@ -71,6 +72,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     private final ConnectionService connectionService;
     private final WorkspaceLifecycleService workspaceLifecycleService;
     private final IntegrationAttentionService attention;
+    private final ScmWorkspaceContentEraser contentEraser;
 
     public GitHubLifecycleListener(
             NatsConnectionProperties natsProperties,
@@ -86,7 +88,8 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
             OrganizationService organizationService,
             ConnectionService connectionService,
             WorkspaceLifecycleService workspaceLifecycleService,
-            IntegrationAttentionService attention) {
+            IntegrationAttentionService attention,
+            ScmWorkspaceContentEraser contentEraser) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
@@ -101,6 +104,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
         this.connectionService = connectionService;
         this.workspaceLifecycleService = workspaceLifecycleService;
         this.attention = attention;
+        this.contentEraser = contentEraser;
     }
 
     @Override
@@ -474,7 +478,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
                 new IntegrationRef(IntegrationKind.GITHUB, workspace.getId(), Long.toString(installationId));
         connectionService
                 .findReferenced(ref)
-                .ifPresent(connection -> connectionService.transition(
+                .ifPresent(connection -> connectionService.disconnectForErasure(
                         connection,
                         new ConnectionService.TransitionRequest(
                                 IntegrationState.UNINSTALLED,
@@ -482,7 +486,9 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
                                 "PROVIDER",
                                 IntegrationKind.GITHUB.name(),
                                 "provider-uninstall-github-" + installationId,
-                                "GitHub reported the installation was deleted")));
+                                "GitHub reported the installation was deleted"),
+                        () -> {},
+                        () -> contentEraser.eraseWorkspaceScmMirror(workspace.getId())));
         Workspace purged = workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
         log.info(
                 "Purged workspace after vendor-side uninstall: installationId={}, workspaceId={}",

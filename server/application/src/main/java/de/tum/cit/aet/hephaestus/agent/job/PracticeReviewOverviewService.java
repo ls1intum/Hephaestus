@@ -12,6 +12,8 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.Pra
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewPracticeGroupDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewObservationCountsDTO;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +21,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +38,22 @@ class PracticeReviewOverviewService {
     private final AgentJobRepository agentJobRepository;
     private final ObservationRepository observationRepository;
     private final FeedbackRepository feedbackRepository;
+
+    /**
+     * All of a workspace's practice reviews as a range: from the first one's request until {@code to}, or now when
+     * absent or later. With no review yet, or none before {@code to}, the range is empty, starting and ending at
+     * {@code to}. It is not capped in length, since it is bounded by the workspace's own history.
+     */
+    @Transactional(readOnly = true)
+    public TimeRange allTime(long workspaceId, @Nullable Instant to, Clock clock) {
+        Instant now = clock.instant();
+        Instant end = to == null || to.isAfter(now) ? now : to;
+        Instant start = agentJobRepository
+                .findFirstCreatedAt(workspaceId, AgentPurpose.PRACTICE_REVIEW)
+                .filter(first -> first.isBefore(end))
+                .orElse(end);
+        return new TimeRange(start, end);
+    }
 
     @Transactional(readOnly = true)
     public PracticeReviewOverviewDTO overview(long workspaceId, TimeBuckets buckets) {

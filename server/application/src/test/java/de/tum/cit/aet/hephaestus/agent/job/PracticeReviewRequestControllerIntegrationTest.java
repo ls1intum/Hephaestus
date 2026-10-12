@@ -9,10 +9,16 @@ import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignal;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignalRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -35,6 +41,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +62,12 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String REQUESTS = "/workspaces/{slug}/practices/review-requests";
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private ConnectionService connectionService;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -101,6 +114,7 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
     void setUpWorkspace() {
         User owner = persistUser("request-owner");
         workspace = createWorkspace("request-ws", "Request WS", "request-org", AccountType.ORG, owner);
+        connectGitHub(workspace);
         ensureAdminMembership(workspace);
         author = persistUser("testuser");
         ensureWorkspaceMembership(workspace, author, WorkspaceRole.MEMBER);
@@ -341,6 +355,7 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
         void monitorTheRepositoryFromASecondWorkspace() {
             User owner = persistUser("second-owner");
             asking = createWorkspace("second-ws", "Second WS", "second-org", AccountType.ORG, owner);
+            connectGitHub(asking);
             ensureWorkspaceMembership(asking, author, WorkspaceRole.MEMBER);
             RepositoryToMonitor monitor = new RepositoryToMonitor();
             monitor.setWorkspace(asking);
@@ -391,6 +406,23 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
                     .bodyValue(body(ArtifactKinds.PULL_REQUEST.value(), pullRequestId))
                     .exchange();
         }
+    }
+
+    private void connectGitHub(Workspace target) {
+        Connection connection = connections.saveAndFlush(new Connection(
+                target,
+                IntegrationKind.GITHUB,
+                "request-test",
+                new ConnectionConfig.GitHubAppConfig(9101L, target.getAccountLogin(), null, Set.of())));
+        connectionService.transition(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "request-test",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
     }
 
     /**

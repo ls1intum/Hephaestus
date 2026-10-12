@@ -38,7 +38,7 @@ class AgentJobDTOTest extends BaseUnitTest {
     void redactsBaseUrlUnlessTheWorkspaceOwnsTheConnection(
             @Nullable FundingSource scope, String expectedBaseUrl, String why) {
         AgentJob job = jobWithSnapshot(snapshotWithScope(scope));
-        AgentJobDTO dto = AgentJobDTO.from(job, ReviewRunTargetMapper.from(job));
+        AgentJobDTO dto = AgentJobDTO.from(job, ReviewRunTargetMapper.from(job), AgentJobDTO.ReviewMoments.NONE);
 
         ObjectNode snapshot = (ObjectNode) dto.configSnapshot();
         assertThat(snapshot.path("baseUrl").asString()).as(why).isEqualTo(expectedBaseUrl);
@@ -57,13 +57,14 @@ class AgentJobDTOTest extends BaseUnitTest {
                 MAPPER.valueToTree(
                         new GeneratedPathReviewDTO(List.of("generated/**"), List.of("generated/client.ts"))));
         job.setEvidenceSnapshot(captured);
-        AgentJobDTO dto = AgentJobDTO.from(job, ReviewRunTargetMapper.from(job));
+        AgentJobDTO dto = AgentJobDTO.from(job, ReviewRunTargetMapper.from(job), AgentJobDTO.ReviewMoments.NONE);
         var policy = dto.generatedPaths();
         assertThat(policy).isNotNull();
         assertThat(policy.patterns()).containsExactly("generated/**");
         assertThat(policy.paths()).containsExactly("generated/client.ts");
         job.setEvidenceSnapshot(MAPPER.createObjectNode());
-        assertThat(AgentJobDTO.from(job, ReviewRunTargetMapper.from(job)).generatedPaths())
+        assertThat(AgentJobDTO.from(job, ReviewRunTargetMapper.from(job), AgentJobDTO.ReviewMoments.NONE)
+                        .generatedPaths())
                 .isNull();
     }
 
@@ -75,7 +76,7 @@ class AgentJobDTOTest extends BaseUnitTest {
         job.setAvailableAt(releaseAt);
         job.setHoldReason(AgentJob.HOLD_REASON_BUDGET);
 
-        AgentJobDTO dto = AgentJobDTO.from(job, ReviewRunTargetMapper.from(job));
+        AgentJobDTO dto = AgentJobDTO.from(job, ReviewRunTargetMapper.from(job), AgentJobDTO.ReviewMoments.NONE);
 
         assertThat(dto.holdReason()).isEqualTo(AgentJob.HOLD_REASON_BUDGET);
         assertThat(dto.availableAt()).isEqualTo(releaseAt);
@@ -86,7 +87,7 @@ class AgentJobDTOTest extends BaseUnitTest {
         AgentJob job = jobWithSnapshot(snapshotWithScope(FundingSource.INSTANCE));
         job.setStatus(AgentJobStatus.QUEUED);
 
-        AgentJobDTO dto = AgentJobDTO.from(job, ReviewRunTargetMapper.from(job));
+        AgentJobDTO dto = AgentJobDTO.from(job, ReviewRunTargetMapper.from(job), AgentJobDTO.ReviewMoments.NONE);
 
         assertThat(dto.holdReason()).isNull();
         assertThat(dto.availableAt())
@@ -103,12 +104,13 @@ class AgentJobDTOTest extends BaseUnitTest {
         job.setExecutionStartedAt(executing);
         job.setCompletedAt(executing.plusSeconds(300));
 
-        AgentJobDTO dto = AgentJobDTO.from(job, ReviewRunTargetMapper.from(job));
+        AgentJobDTO dto = AgentJobDTO.from(job, ReviewRunTargetMapper.from(job), AgentJobDTO.ReviewMoments.NONE);
         assertThat(dto.startedAt()).isEqualTo(started);
         assertThat(dto.executionStartedAt()).isEqualTo(executing);
 
         job.setExecutionStartedAt(null);
-        assertThat(AgentJobDTO.from(job, ReviewRunTargetMapper.from(job)).executionStartedAt())
+        assertThat(AgentJobDTO.from(job, ReviewRunTargetMapper.from(job), AgentJobDTO.ReviewMoments.NONE)
+                        .executionStartedAt())
                 .as("a run from before the boundary was recorded")
                 .isNull();
     }
@@ -123,8 +125,10 @@ class AgentJobDTOTest extends BaseUnitTest {
         coalesced.setOutput(
                 MAPPER.createObjectNode().put("outcome", "COALESCED").put("coveringJobId", covering.toString()));
 
-        AgentJobDTO dto = AgentJobDTO.from(superseded, ReviewRunTargetMapper.from(superseded));
-        AgentJobDTO other = AgentJobDTO.from(coalesced, ReviewRunTargetMapper.from(coalesced));
+        AgentJobDTO dto =
+                AgentJobDTO.from(superseded, ReviewRunTargetMapper.from(superseded), AgentJobDTO.ReviewMoments.NONE);
+        AgentJobDTO other =
+                AgentJobDTO.from(coalesced, ReviewRunTargetMapper.from(coalesced), AgentJobDTO.ReviewMoments.NONE);
 
         assertThat(dto.reviewOutcome()).isEqualTo(ReviewRunOutcome.SUPERSEDED);
         assertThat(dto.coveringJobId()).isEqualTo(covering);

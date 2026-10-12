@@ -442,6 +442,15 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         reconcileSyncTargetInTransaction(syncTargetId, resolvedNativeId, resolvedNameWithOwner);
     }
 
+    /**
+     * Whether the monitor's stored native id is that of another provider instance's repository of its name, as an id
+     * resolved by name alone once took it, and no repository of the workspace's own source provider holds it.
+     */
+    private boolean holdsAnotherInstancesId(RepositoryToMonitor rtm, Long resolvedNativeId) {
+        return rtm.getId() != null
+                && repositoryToMonitorRepository.monitorHoldsAnotherInstancesId(rtm.getId(), resolvedNativeId);
+    }
+
     private void reconcileSyncTargetInTransaction(
             Long syncTargetId, @Nullable Long resolvedNativeId, @Nullable String resolvedNameWithOwner) {
         if (syncTargetId == null) {
@@ -450,8 +459,12 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         repositoryToMonitorRepository.findById(syncTargetId).ifPresent(rtm -> {
             boolean dirty = false;
 
-            // Capture the stable id the first time it resolves.
-            if (rtm.getNativeId() == null && resolvedNativeId != null) {
+            // Capture the stable id the first time it resolves, and replace one proven to belong to another provider
+            // instance's repository of the same name: the scoped queries would hide the monitored repository.
+            if (resolvedNativeId != null
+                    && (rtm.getNativeId() == null
+                            || (!rtm.getNativeId().equals(resolvedNativeId)
+                                    && holdsAnotherInstancesId(rtm, resolvedNativeId)))) {
                 rtm.setNativeId(resolvedNativeId);
                 dirty = true;
             }
@@ -491,13 +504,15 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
 
     @Override
     @Transactional
-    public void reconcileSyncTargetsForRepository(@Nullable Long nativeId, @Nullable String newNameWithOwner) {
+    public void reconcileSyncTargetsForRepository(
+            long providerId, @Nullable Long nativeId, @Nullable String newNameWithOwner) {
         if (nativeId == null || newNameWithOwner == null || newNameWithOwner.isBlank()) {
             return;
         }
-        // Shared repositories mean N monitors for one nativeId — re-key each, reusing the single
+        // Shared repositories mean N monitors for one nativeId on this provider — re-key each, reusing the single
         // re-key/consumer-refresh body so webhook healing and reconcile healing cannot diverge.
-        for (RepositoryToMonitor rtm : repositoryToMonitorRepository.findByNativeId(nativeId)) {
+        for (RepositoryToMonitor rtm :
+                repositoryToMonitorRepository.findByNativeIdOnSourceProvider(nativeId, providerId)) {
             reconcileSyncTargetInTransaction(rtm.getId(), nativeId, newNameWithOwner);
         }
     }
