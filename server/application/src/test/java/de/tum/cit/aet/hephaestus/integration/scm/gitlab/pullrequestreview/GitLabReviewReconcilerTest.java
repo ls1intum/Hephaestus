@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -31,6 +32,9 @@ class GitLabReviewReconcilerTest extends BaseUnitTest {
     private PullRequestReviewRepository reviewRepository;
 
     @Mock
+    private PullRequestRepository pullRequestRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private GitLabReviewReconciler reconciler;
@@ -40,10 +44,11 @@ class GitLabReviewReconcilerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        reconciler = new GitLabReviewReconciler(reviewRepository, eventPublisher);
+        reconciler = new GitLabReviewReconciler(reviewRepository, pullRequestRepository, eventPublisher);
         provider = new IdentityProvider();
         provider.setId(7L);
         pr = new PullRequest();
+        pr.setId(1L);
         pr.setNativeId(4242L);
         approver = new User();
         approver.setNativeId(99L);
@@ -69,6 +74,7 @@ class GitLabReviewReconcilerTest extends BaseUnitTest {
     @Test
     @DisplayName("a requested-changes note becomes a CHANGES_REQUESTED review by its author at its time")
     void shouldRecordChangesRequestedFromTheSystemNote() {
+        when(pullRequestRepository.findById(1L)).thenReturn(Optional.of(pr));
         when(reviewRepository.findByNativeIdAndProviderId(any(), any())).thenReturn(Optional.empty());
         when(reviewRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         Instant requestedAt = Instant.parse("2026-04-15T08:23:58Z");
@@ -94,6 +100,7 @@ class GitLabReviewReconcilerTest extends BaseUnitTest {
     @Test
     @DisplayName("a re-sync of the same requested-changes note updates the row it made before")
     void shouldReuseTheChangesRequestedRowOnResync() {
+        when(pullRequestRepository.findById(1L)).thenReturn(Optional.of(pr));
         PullRequestReview existing = new PullRequestReview();
         existing.setState(PullRequestReview.State.CHANGES_REQUESTED);
         existing.setSubmittedAt(MERGED_AT);
@@ -159,6 +166,7 @@ class GitLabReviewReconcilerTest extends BaseUnitTest {
     @Test
     @DisplayName("a live requested-changes note is recorded and asks for a read once, however often it arrives")
     void shouldAskForAReadOnlyForANewRequestForChanges() {
+        when(pullRequestRepository.findById(1L)).thenReturn(Optional.of(pr));
         PullRequestReview review = approval(APPROVED_AT);
         long nativeId = GitLabReviewReconciler.generateChangesRequestedNativeId("gid://gitlab/Note/5", 99L);
         PullRequestReview recorded = new PullRequestReview();

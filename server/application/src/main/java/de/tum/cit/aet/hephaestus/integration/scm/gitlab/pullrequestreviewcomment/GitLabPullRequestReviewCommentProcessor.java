@@ -8,7 +8,9 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.PostgresStringUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
@@ -41,11 +43,18 @@ public class GitLabPullRequestReviewCommentProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitLabPullRequestReviewCommentProcessor.class);
 
     private final PullRequestReviewCommentRepository commentRepository;
+    private final PullRequestRepository pullRequestRepository;
+    private final PullRequestReviewRepository reviewRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabPullRequestReviewCommentProcessor(
-            PullRequestReviewCommentRepository commentRepository, ApplicationEventPublisher eventPublisher) {
+            PullRequestReviewCommentRepository commentRepository,
+            PullRequestRepository pullRequestRepository,
+            PullRequestReviewRepository reviewRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.commentRepository = commentRepository;
+        this.pullRequestRepository = pullRequestRepository;
+        this.reviewRepository = reviewRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -147,8 +156,31 @@ public class GitLabPullRequestReviewCommentProcessor {
             log.warn("Skipped diff note: reason=belongsToAnotherMergeRequest, nativeId={}", nativeId);
             return null;
         }
-        return existing.map(comment -> updateComment(comment, data, context))
-                .orElseGet(() -> createComment(nativeId, data, context));
+        CommentContext managed = managedContext(context);
+        return existing.map(comment -> updateComment(comment, data, managed))
+                .orElseGet(() -> createComment(nativeId, data, managed));
+    }
+
+    /** Sync hands over detached parents and reviews; collections and event references belong to this write. */
+    private CommentContext managedContext(CommentContext context) {
+        PullRequest parent = pullRequestRepository
+                .findById(Objects.requireNonNull(context.pr().getId()))
+                .orElseThrow(() -> new IllegalStateException("The reviewed merge request no longer exists"));
+        PullRequestReview review = context.review();
+        if (review != null) {
+            review = reviewRepository
+                    .findById(Objects.requireNonNull(review.getId()))
+                    .orElseThrow(() -> new IllegalStateException("The comment's review no longer exists"));
+        }
+        return new CommentContext(
+                context.thread(),
+                parent,
+                context.author(),
+                context.provider(),
+                context.inReplyTo(),
+                review,
+                context.scopeId(),
+                context.authoritative());
     }
 
     private PullRequestReviewComment updateComment(

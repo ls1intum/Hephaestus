@@ -132,9 +132,9 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
                 mock(GitLabProperties.class),
                 pullRequests,
                 new GitLabPullRequestReviewThreadProcessor(reviewThreads, pullRequests, publisher),
-                new GitLabPullRequestReviewCommentProcessor(reviewComments, publisher),
+                new GitLabPullRequestReviewCommentProcessor(reviewComments, pullRequests, reviews, publisher),
                 reviewComments,
-                new GitLabReviewReconciler(reviews, publisher));
+                new GitLabReviewReconciler(reviews, pullRequests, publisher));
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
             var pr = pullRequests.findById(prId).orElseThrow();
             var author = users.findById(authorId).orElseThrow();
@@ -255,9 +255,9 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
                 clients,
                 responses,
                 new GitLabPullRequestReviewThreadProcessor(reviewThreads, pullRequests, ignoredEvents),
-                new GitLabPullRequestReviewCommentProcessor(reviewComments, ignoredEvents),
+                new GitLabPullRequestReviewCommentProcessor(reviewComments, pullRequests, reviews, ignoredEvents),
                 userLookup,
-                new GitLabReviewReconciler(reviews, ignoredEvents),
+                new GitLabReviewReconciler(reviews, pullRequests, ignoredEvents),
                 properties);
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
             var pr = pullRequests.findById(prId).orElseThrow();
