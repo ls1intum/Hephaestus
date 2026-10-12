@@ -3,10 +3,12 @@ import type { ReactNode } from "react";
 import { cn } from "cn";
 import { InlineLink } from "@/components/common/InlineLink";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { STAT_TILE_GRID, StatTile, StatTileSkeleton } from "@/components/common/StatTile";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { levelPathAt } from "@/components/layout/detail-drawer/level-path";
 import { LevelHeader } from "@/components/layout/detail-drawer/LevelHeader";
+import { Section } from "@/components/layout/Section";
 import { DrawerBody } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -22,11 +24,18 @@ import { formatCalendarDate, formatDayRange } from "@/lib/dates";
 import { getProviderTerms, type ProviderType } from "@/lib/provider/provider-terms";
 import { capitalise, hasText } from "@/lib/text";
 
+import {
+	ACTIVITY_CATEGORY_DEFS,
+	ACTIVITY_KIND_DEFS,
+	type ActivityCategoryDef,
+} from "./activity-kind-defs";
 import { contributionsNote, type PeopleRow } from "./activity-people-rows";
 import type { ActivityStackEntry } from "./activity-search";
-import { STALE } from "./activity-tones";
+import { contributionWeekRows } from "./activity-tally";
+import { ACTIVITY_TONES, STALE } from "./activity-tones";
 import { ActivityEmpty, HistoryMark } from "./ActivityEmpty";
 import type { PeopleTableState } from "./ActivityPeopleTable";
+import { BucketBars } from "./BucketBars";
 import { MemberAvatar } from "./MemberAvatar";
 
 export interface PublicPersonDrawerProps {
@@ -97,6 +106,15 @@ function PublicPersonLevel({
 	const ready = people.status === "ready" ? people : undefined;
 	const row = ready?.people.people.find((candidate) => candidate.person.login === login);
 	const span = ready && spanLabel(ready.people.from, ready.people.to);
+	// The profile link sits where a member's level has it; only a person the page lists has one.
+	const profile =
+		row !== undefined && hasText(row.person.htmlUrl) ? (
+			<InlineLink href={row.person.htmlUrl} external>
+				{login} on {getProviderTerms(providerType).displayName}
+			</InlineLink>
+		) : (
+			login
+		);
 	return (
 		<>
 			<LevelHeader
@@ -104,7 +122,12 @@ function PublicPersonLevel({
 				path={path}
 				current={row?.person.name ?? login}
 				mark={row && <MemberAvatar user={row.person} size="lg" />}
-				description={span === undefined ? login : `${login} · ${span}`}
+				description={
+					<p>
+						{profile}
+						{span !== undefined && ` · ${span}`}
+					</p>
+				}
 			/>
 			<DrawerBody
 				className={cn("flex flex-col gap-6 pt-2", ready?.stale === true && STALE)}
@@ -137,58 +160,78 @@ function PublicPersonLevel({
 	);
 }
 
-/** The seven totals `PersonFigures` lists. */
-const TOTALS_COUNT = 7;
+/** The three work totals beside Contributions. */
+const OTHER_TOTALS_COUNT = 3;
 
 const SKELETON_WEEKS = 3;
 
-/** The level's regions before the page's people arrive: the profile link, the totals and the weeks. */
+/** The level's regions before the page's people arrive: the tiles and the weeks. */
 function PersonSkeleton() {
 	return (
-		<div className="space-y-6" aria-hidden inert>
-			<Skeleton className="h-5 w-40" />
-			<div className="space-y-2">
-				<Skeleton className="h-6 w-28" />
-				<div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
-					{Array.from({ length: TOTALS_COUNT }, (_, index) => (
-						<div key={index} className="contents">
-							<Skeleton className="h-5 w-44 max-w-full" />
-							<Skeleton className="h-5 w-8" />
-						</div>
-					))}
+		<>
+			<span className="sr-only">Loading this person’s activity…</span>
+			<div className="space-y-6" aria-hidden inert>
+				<div className="@container space-y-2">
+					<Skeleton className="h-6 w-28" />
+					<ul className={STAT_TILE_GRID}>
+						<li className="flex">
+							<StatTileSkeleton>
+								<Skeleton className="h-16 w-full" />
+							</StatTileSkeleton>
+						</li>
+						{Array.from({ length: OTHER_TOTALS_COUNT }, (_, index) => (
+							<li key={index} className="flex">
+								<StatTileSkeleton />
+							</li>
+						))}
+					</ul>
+				</div>
+				<div className="space-y-2">
+					<Skeleton className="h-6 w-48" />
+					<Table aria-hidden>
+						<TableHeader>
+							<TableRow variant="static">
+								<TableHead>
+									<Skeleton className="h-4 w-16" />
+								</TableHead>
+								<TableHead numeric>
+									<Skeleton className="ml-auto h-4 w-24" />
+								</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{Array.from({ length: SKELETON_WEEKS }, (_, index) => (
+								<TableRow key={index} variant="static">
+									<TableCell>
+										<Skeleton className="h-5 w-32" />
+									</TableCell>
+									<TableCell numeric>
+										<Skeleton className="ml-auto h-5 w-8" />
+									</TableCell>
+								</TableRow>
+							))}
+						</TableBody>
+					</Table>
 				</div>
 			</div>
-			<div className="space-y-2">
-				<Skeleton className="h-6 w-48" />
-				<Table aria-hidden>
-					<TableHeader>
-						<TableRow variant="static">
-							<TableHead>
-								<Skeleton className="h-4 w-16" />
-							</TableHead>
-							<TableHead numeric>
-								<Skeleton className="ml-auto h-4 w-24" />
-							</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{Array.from({ length: SKELETON_WEEKS }, (_, index) => (
-							<TableRow key={index} variant="static">
-								<TableCell>
-									<Skeleton className="h-5 w-32" />
-								</TableCell>
-								<TableCell numeric>
-									<Skeleton className="ml-auto h-5 w-8" />
-								</TableCell>
-							</TableRow>
-						))}
-					</TableBody>
-				</Table>
-			</div>
-		</div>
+		</>
 	);
 }
 
+/** A published total as a tile: the registry's glyph where one means the same thing, else none. */
+interface Total {
+	title: string;
+	value: number;
+	qualifier: string;
+	secondary?: { count: number; label: string };
+	mark?: Pick<ActivityCategoryDef, "icon" | "tone">;
+}
+
+/**
+ * The published totals as the stat tiles a member's level uses, without what the page does not
+ * publish: no breakdown by kind, no comparison with the period before, and no tile that opens a
+ * level, since the page has none to open.
+ */
 function PersonFigures({
 	row,
 	providerType,
@@ -201,15 +244,31 @@ function PersonFigures({
 	span: { from: Date; to: Date };
 }) {
 	const pullRequests = artifactKindNoun(ARTIFACT_KIND.pullRequest, 2, providerType);
-	const { counts, person } = row;
-	const totals: [string, number][] = [
-		["Contributions", counts.contributions],
-		[`${capitalise(pullRequests)} opened`, counts.pullRequestsOpened],
-		[`${capitalise(pullRequests)} merged`, counts.pullRequestsMerged],
-		[`Distinct ${pullRequests} reviewed`, counts.pullRequestsReviewed],
-		["People helped", counts.peopleHelped],
-		["Issues opened", counts.issuesOpened],
-		["Active weeks", counts.activeWeeks],
+	const { counts } = row;
+	const others: Total[] = [
+		{
+			title: capitalise(pullRequests),
+			value: counts.pullRequestsMerged,
+			qualifier: ACTIVITY_CATEGORY_DEFS["pull-requests"].headline.qualifier,
+			secondary: { count: counts.pullRequestsOpened, label: "opened" },
+			mark: ACTIVITY_CATEGORY_DEFS["pull-requests"],
+		},
+		{
+			title: "Reviews",
+			value: counts.pullRequestsReviewed,
+			qualifier: `distinct ${pullRequests}`,
+			secondary: {
+				count: counts.peopleHelped,
+				label: `${counts.peopleHelped === 1 ? "person" : "people"} helped`,
+			},
+			mark: ACTIVITY_CATEGORY_DEFS.reviews,
+		},
+		{
+			title: "Issues",
+			value: counts.issuesOpened,
+			qualifier: "opened",
+			mark: ACTIVITY_KIND_DEFS.ISSUE_OPENED,
+		},
 	];
 	return (
 		<>
@@ -218,35 +277,51 @@ function PersonFigures({
 					These figures are for {spanLabel(span.from, span.to)} while activity updates.
 				</p>
 			)}
-			{hasText(person.htmlUrl) && (
-				<p className="text-sm">
-					<InlineLink href={person.htmlUrl} external>
-						{person.login} on {getProviderTerms(providerType).displayName}
-					</InlineLink>
-				</p>
-			)}
-			<section aria-labelledby="public-person-totals" className="space-y-2">
-				<h3 id="public-person-totals" className="font-medium">
-					In this range
-				</h3>
-				<dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
-					{totals.map(([label, value]) => (
-						<div key={label} className="contents">
-							<dt className="text-muted-foreground">{label}</dt>
-							<dd className="text-right tabular-nums">{value.toLocaleString("en-GB")}</dd>
-						</div>
+			<Section
+				id="public-person-totals"
+				level={3}
+				size="lg"
+				title="In this range"
+				className="@container"
+			>
+				<ul aria-labelledby="public-person-totals-title" className={STAT_TILE_GRID}>
+					<li className="flex">
+						<StatTile
+							variant={counts.contributions > 0 || counts.activeWeeks > 0 ? undefined : "muted"}
+							icon={null}
+							title="Contributions"
+							value={counts.contributions.toLocaleString("en-GB")}
+							detail={
+								<p className="text-xs text-muted-foreground">
+									{counts.activeWeeks.toLocaleString("en-GB")} active{" "}
+									{counts.activeWeeks === 1 ? "week" : "weeks"}
+								</p>
+							}
+						>
+							{counts.contributions > 0 && (
+								<BucketBars
+									rows={contributionWeekRows(row.weeks, span)}
+									bucket="WEEK"
+									span={span}
+									name="Contributions"
+									fill={ACTIVITY_TONES.accent.fill}
+								/>
+							)}
+						</StatTile>
+					</li>
+					{others.map((total) => (
+						<li key={total.title} className="flex">
+							<TotalTile total={total} providerType={providerType} />
+						</li>
 					))}
-				</dl>
+				</ul>
 				<p className="text-xs text-muted-foreground">{contributionsNote(providerType)}</p>
-			</section>
-			<section aria-labelledby="public-person-weeks" className="space-y-2">
-				<h3 id="public-person-weeks" className="font-medium">
-					Contributions by week
-				</h3>
+			</Section>
+			<Section id="public-person-weeks" level={3} size="lg" title="Contributions by week">
 				{row.weeks.length === 0 ? (
 					<p className="text-sm text-muted-foreground">No weekly activity in this range.</p>
 				) : (
-					<Table aria-labelledby="public-person-weeks">
+					<Table aria-labelledby="public-person-weeks-title">
 						<TableHeader>
 							<TableRow variant="static">
 								<TableHead>Week of</TableHead>
@@ -271,7 +346,41 @@ function PersonFigures({
 					Weeks with activity are listed. Each week counts its distinct reviews on its own, so the
 					weeks can add up to more than the range’s total.
 				</p>
-			</section>
+			</Section>
 		</>
+	);
+}
+
+/** One total's tile, muted at zero as a member's tile with nothing behind it is. */
+function TotalTile({ total, providerType }: { total: Total; providerType: ProviderType }) {
+	const { title, value, qualifier, secondary, mark } = total;
+	const active = value > 0 || (secondary !== undefined && secondary.count > 0);
+	const Icon = mark?.icon(providerType);
+	return (
+		<StatTile
+			variant={active ? undefined : "muted"}
+			icon={
+				Icon !== undefined &&
+				mark !== undefined && (
+					<Icon
+						size={16}
+						className={cn(
+							"shrink-0",
+							active ? ACTIVITY_TONES[mark.tone].text : "text-muted-foreground",
+						)}
+					/>
+				)
+			}
+			title={title}
+			value={value.toLocaleString("en-GB")}
+			qualifier={qualifier}
+			detail={
+				secondary === undefined ? undefined : (
+					<p className="text-xs text-muted-foreground">
+						{secondary.count.toLocaleString("en-GB")} {secondary.label}
+					</p>
+				)
+			}
+		/>
 	);
 }

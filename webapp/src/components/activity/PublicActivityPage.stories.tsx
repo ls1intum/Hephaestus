@@ -15,6 +15,7 @@ import { daysBefore } from "@/stories/story-clock";
 import { precedes } from "@/test/dom";
 
 import { parseActivityStack, PUBLIC_ACTIVITY_LEVEL_KINDS } from "./activity-search";
+import { weekStarts } from "./activity-tally";
 import { PublicActivityPage, PublicActivityPageSkeleton } from "./PublicActivityPage";
 
 const activity = publicActivityOf(PEOPLE);
@@ -196,6 +197,29 @@ const adaDetail = {
 	onClose: fn(),
 };
 
+/** Ada's published totals, as the story data counts them. */
+function adaCounts() {
+	const ada = activity.people.find(({ login }) => login === "ada");
+	if (ada === undefined) {
+		throw new Error("The story data has no ada");
+	}
+	return ada.counts;
+}
+
+/**
+ * The figure on the tile with this title, as assistive technology reads it: the chart under a
+ * figure is hidden from it, so the chart's peak label is never mistaken for the figure.
+ */
+function tileFigure(totals: HTMLElement, title: string): HTMLElement {
+	const tile = within(totals)
+		.getAllByRole("listitem")
+		.find((item) => within(item).queryByText(title) !== null);
+	if (tile === undefined) {
+		throw new Error(`The public totals have no ${title} tile`);
+	}
+	return within(tile).getByText(/^[\d,]+$/u, { ignore: "[aria-hidden] *" });
+}
+
 export const PersonDetails: Story = {
 	args: {
 		detail: adaDetail,
@@ -218,7 +242,22 @@ export const PersonDetails: Story = {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByRole("heading", { name: "Ada Lovelace" })).toBeVisible();
 		await expect(panel.getByRole("heading", { name: "In this range" })).toBeVisible();
-		await expect(panel.getByText("Distinct pull requests reviewed")).toBeVisible();
+		const totals = panel.getByRole("list", { name: "In this range" });
+		const counts = adaCounts();
+		await expect(tileFigure(totals, "Contributions")).toHaveTextContent(
+			counts.contributions.toLocaleString("en-GB"),
+		);
+		await expect(tileFigure(totals, "Reviews")).toHaveTextContent(
+			counts.pullRequestsReviewed.toLocaleString("en-GB"),
+		);
+		await expect(within(totals).getByText("2 active weeks")).toBeVisible();
+		await expect(tileFigure(totals, "Pull requests")).toHaveTextContent(
+			String(counts.pullRequestsMerged),
+		);
+		await expect(within(totals).getByText(`${counts.pullRequestsOpened} opened`)).toBeVisible();
+		await expect(within(totals).getByText(`${counts.peopleHelped} people helped`)).toBeVisible();
+		// The page publishes nothing behind a total, so no tile opens anything.
+		await expect(within(totals).queryByRole("link")).not.toBeInTheDocument();
 		const weeks = within(panel.getByRole("table", { name: "Contributions by week" }));
 		await expect(weeks.getByRole("cell", { name: "28 December 2026" })).toBeVisible();
 		await expect(weeks.getByRole("cell", { name: "4 January 2027" })).toBeVisible();
@@ -236,6 +275,162 @@ export const PersonDetails: Story = {
 			"target",
 			"_blank",
 		);
+	},
+};
+
+/** Merges can be public without any of the work counted as Contributions in this range. */
+export const PersonOnlyMerges: Story = {
+	args: {
+		detail: adaDetail,
+		period: {
+			kind: "custom",
+			from: new Date("2026-09-21T00:00:00Z"),
+			to: new Date("2026-09-27T00:00:00Z"),
+		},
+		people: readyPublicPeople(
+			publicActivityOf(PEOPLE, {
+				from: new Date("2026-09-21T00:00:00Z"),
+				to: new Date("2026-09-28T00:00:00Z"),
+				people: activity.people.map((person) => ({
+					...person,
+					counts: {
+						contributions: 0,
+						pullRequestsOpened: 0,
+						pullRequestsMerged: 3,
+						pullRequestsReviewed: 0,
+						peopleHelped: 0,
+						issuesOpened: 0,
+						activeWeeks: 1,
+					},
+					weeks: [{ start: new Date("2026-09-21T00:00:00Z"), contributions: 0 }],
+				})),
+			}),
+		),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const totals = panel.getByRole("list", { name: "In this range" });
+		await expect(tileFigure(totals, "Contributions")).toHaveTextContent("0");
+		await expect(tileFigure(totals, "Pull requests")).toHaveTextContent("3");
+		await expect(panel.getByText("0 opened")).toBeVisible();
+		await expect(panel.getByText("1 active week")).toBeVisible();
+		const weeks = within(panel.getByRole("table", { name: "Contributions by week" }));
+		await expect(weeks.getByRole("cell", { name: "21 September 2026" })).toBeVisible();
+		await expect(weeks.getByRole("cell", { name: "0" })).toBeVisible();
+		await expect(within(totals).queryByRole("link")).not.toBeInTheDocument();
+	},
+};
+
+/** Openings keep the category active even when nothing merged; unrelated zero totals stay muted. */
+export const PersonOnlyOpenings: Story = {
+	args: {
+		detail: adaDetail,
+		period: {
+			kind: "custom",
+			from: new Date("2026-09-21T00:00:00Z"),
+			to: new Date("2026-09-27T00:00:00Z"),
+		},
+		people: readyPublicPeople(
+			publicActivityOf(PEOPLE, {
+				from: new Date("2026-09-21T00:00:00Z"),
+				to: new Date("2026-09-28T00:00:00Z"),
+				people: activity.people.map((person) => ({
+					...person,
+					counts: {
+						contributions: 4,
+						pullRequestsOpened: 4,
+						pullRequestsMerged: 0,
+						pullRequestsReviewed: 0,
+						peopleHelped: 0,
+						issuesOpened: 0,
+						activeWeeks: 1,
+					},
+					weeks: [{ start: new Date("2026-09-21T00:00:00Z"), contributions: 4 }],
+				})),
+			}),
+		),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const totals = panel.getByRole("list", { name: "In this range" });
+		const merged = tileFigure(totals, "Pull requests");
+		await expect(merged).toHaveTextContent("0");
+		await expect(panel.getByText("4 opened")).toBeVisible();
+		await expect(getComputedStyle(merged).color).toBe(
+			getComputedStyle(tileFigure(totals, "Contributions")).color,
+		);
+		await expect(getComputedStyle(tileFigure(totals, "Reviews")).color).not.toBe(
+			getComputedStyle(merged).color,
+		);
+		await expect(getComputedStyle(tileFigure(totals, "Issues")).color).not.toBe(
+			getComputedStyle(merged).color,
+		);
+	},
+};
+
+/** The same supplied totals use singular units when one person and one week are counted. */
+export const PersonSingleton: Story = {
+	args: {
+		detail: adaDetail,
+		people: readyPublicPeople(
+			publicActivityOf(PEOPLE, {
+				people: activity.people.map((person) => ({
+					...person,
+					counts: {
+						contributions: 3,
+						pullRequestsOpened: 1,
+						pullRequestsMerged: 1,
+						pullRequestsReviewed: 1,
+						peopleHelped: 1,
+						issuesOpened: 1,
+						activeWeeks: 1,
+					},
+					weeks: weekStarts(activity.from, activity.to)
+						.slice(-1)
+						.map((start) => ({ start, contributions: 3 })),
+				})),
+			}),
+		),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByText("1 person helped")).toBeVisible();
+		await expect(panel.getByText("1 active week")).toBeVisible();
+		await expect(panel.getByText("1 opened")).toBeVisible();
+	},
+};
+
+/** Provider terminology and profile links follow the published GitLab response. */
+export const PersonGitLab: Story = {
+	decorators: [withProvider("GITLAB")],
+	args: {
+		providerType: "GITLAB",
+		detail: adaDetail,
+		people: readyPublicPeople(
+			publicActivityOf(PEOPLE, {
+				people: activity.people.map((person) => ({
+					...person,
+					profileUrl: `https://gitlab.com/${person.login}`,
+				})),
+			}),
+		),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByText("Merge requests")).toBeVisible();
+		await expect(panel.getByText("distinct merge requests")).toBeVisible();
+		await expect(
+			panel.getByRole("link", { name: "ada on GitLab (opens in a new tab)" }),
+		).toHaveAttribute("href", "https://gitlab.com/ada");
+	},
+};
+
+export const PersonReflow: Story = {
+	args: { detail: adaDetail },
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async () => {
+		await settledDrawerPanel();
+		await expectNoPageOverflow();
 	},
 };
 

@@ -2,7 +2,7 @@ import { cn } from "cn";
 import type { ActivitySparklineWeek } from "@/api/types.gen";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { weekStarts } from "./activity-tally";
+import { contributionWeekRows } from "./activity-tally";
 import { ACTIVITY_TONES } from "./activity-tones";
 
 export interface ActivitySparklineProps {
@@ -25,8 +25,7 @@ const INSET = 1.5;
  * busiest week.
  */
 export function ActivitySparkline({ weeks, span }: ActivitySparklineProps) {
-	const counted = new Map(weeks.map((week) => [week.start.getTime(), week.contributions]));
-	const values = weekStarts(span.from, span.to).map((start) => counted.get(start.getTime()) ?? 0);
+	const values = contributionWeekRows(weeks, span).map(({ count }) => count);
 	const peak = Math.max(0, ...values);
 	const step = values.length > 1 ? (WIDTH - 2 * INSET) / (values.length - 1) : 0;
 	const y = (value: number) =>

@@ -3,6 +3,7 @@ import type {
 	ActivityCounts,
 	ActivityPersonDetail,
 	ActivityRepositoryCounts,
+	ActivitySparklineWeek,
 } from "@/api/types.gen";
 
 import type { ActivityKind } from "./activity-kind-defs";
@@ -77,11 +78,31 @@ export function overviewOf(detail: ActivityPersonDetail): ActivityOverview {
 	return {
 		tally: tallyOf(detail.counts, detail.breakdown),
 		weeks: weekStarts(detail.from, detail.to).map((start) => ({
-			start: new Date(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()),
+			start: localWeekStart(start),
 			tally: counted.get(start.getTime()) ?? EMPTY_TALLY,
 		})),
 		repositories: detail.repositories,
 	};
+}
+
+/**
+ * The published contributions of every week of the span, oldest first, as a chart's rows: each
+ * keyed by its local start like an overview's week. A week the server left out had none.
+ */
+export function contributionWeekRows(
+	weeks: readonly ActivitySparklineWeek[],
+	span: { from: Date; to: Date },
+): { start: number; count: number }[] {
+	const counted = new Map(weeks.map((week) => [week.start.getTime(), week.contributions]));
+	return weekStarts(span.from, span.to).map((start) => ({
+		start: localWeekStart(start).getTime(),
+		count: counted.get(start.getTime()) ?? 0,
+	}));
+}
+
+/** The server's week start, 00:00 UTC on a Monday, as local midnight of that Monday (`ActivityWeek`). */
+function localWeekStart(start: Date): Date {
+	return new Date(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
 }
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;

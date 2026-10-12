@@ -3,7 +3,7 @@ import { createMemoryHistory, createRouter } from "@tanstack/react-router";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http, type PathParams } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 
 import type { PublicActivity, PublicActivityOnboardingRequest } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
@@ -209,8 +209,14 @@ describe("the address of a workspace", () => {
 		await user.click(screen.getByRole("link", { name: "Ada Lovelace" }));
 		const panel = await screen.findByRole("dialog", { name: "Ada Lovelace" });
 		await waitFor(() => expect(router.state.location.search.detail).toBe("person:ada"));
-		const totals = within(panel).getByRole("heading", { name: "In this range" }).closest("section");
-		expect(totals?.querySelector("dd")?.textContent).toBe("5");
+		const totals = within(panel).getByRole("list", { name: "In this range" });
+		const contributions = within(totals)
+			.getAllByRole("listitem")
+			.find((tile) => within(tile).queryByText("Contributions") !== null);
+		assert(contributions);
+		expect(
+			within(contributions).getByText(/^\d+$/u, { ignore: "[aria-hidden] *" }).textContent,
+		).toBe("5");
 		const weeks = within(panel).getByRole("table", { name: "Contributions by week" });
 		expect(within(weeks).getByRole("cell", { name: "5" }).textContent).toBe("5");
 		expect(
