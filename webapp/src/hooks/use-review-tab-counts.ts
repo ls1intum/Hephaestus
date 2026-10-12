@@ -20,23 +20,21 @@ import { QUERY_RETRIES, sessionRetriesQueries } from "@/runtime/tanstack-query/q
 /** One row is the smallest page the endpoints serve; only its total is read. */
 const COUNT_PAGE = 1;
 
-/** How long a count that failed every retry waits before it is asked for once more. */
-export const FAILED_COUNT_RETRY_MS = 60_000;
+/** Count reads refresh once a minute while the page is visible. */
+const COUNT_REFRESH_MS = 60_000;
 
 const total = (page: { page?: { totalElements?: number } }) => page.page?.totalElements;
 
 /**
- * What every count read shares. A count is decoration on a tab, so a failed read is retried quietly
- * and, after its last retry, asked for again a minute later instead of leaving the tab without its
- * count until a reload. A user view retries nothing, as every read of it is audited. A count of
+ * What every count read shares. Counts refresh quietly as reviews progress, including after a
+ * failed read exhausts its retries. A user view repeats nothing, as every read of it is audited. A count of
  * another scope or workspace is never shown as this one's: until its own read answers, it shows nothing.
  */
 const COUNT_READ = {
 	select: total,
 	retry: (failureCount: number) => sessionRetriesQueries() && failureCount < QUERY_RETRIES,
 	retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 8000),
-	refetchInterval: (query: { state: { status: string } }) =>
-		query.state.status === "error" && sessionRetriesQueries() ? FAILED_COUNT_RETRY_MS : false,
+	refetchInterval: () => (sessionRetriesQueries() ? COUNT_REFRESH_MS : false),
 } as const;
 
 /**
