@@ -101,7 +101,7 @@ export function contributionWeekRows(
 }
 
 /** The server's week start, 00:00 UTC on a Monday, as local midnight of that Monday (`ActivityWeek`). */
-function localWeekStart(start: Date): Date {
+export function localWeekStart(start: Date): Date {
 	return new Date(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
 }
 

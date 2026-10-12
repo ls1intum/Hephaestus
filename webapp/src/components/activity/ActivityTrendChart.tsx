@@ -8,6 +8,7 @@ import { useNow } from "@/components/common/use-now";
 import { Button } from "@/components/ui/button";
 import { type ChartConfig, ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
@@ -91,6 +92,10 @@ export function ActivityTrendChart({ state, category, providerType }: ActivityTr
 		0,
 		...def.kinds.flatMap((kind) => overview.weeks.map(({ tally }) => tally[kind])),
 	);
+	const plottedKinds = def.kinds.filter(
+		(kind) => overview.tally[kind] !== 0 || overview.weeks.some((week) => week.tally[kind] !== 0),
+	);
+	const lastPlottedKind = plottedKinds.at(-1);
 	const label = (start: Date) => capitalise(bucketLabel(start, "WEEK", span));
 	return (
 		<div aria-busy={state.stale || undefined} className={cn("space-y-5", state.stale && STALE)}>
@@ -113,20 +118,27 @@ export function ActivityTrendChart({ state, category, providerType }: ActivityTr
 			</dl>
 			<figure aria-labelledby={summaryId} className="space-y-4">
 				<ul className="space-y-4">
-					{def.kinds.map((kind, index) => (
+					{def.kinds.map((kind) => (
 						<KindRow
 							key={kind}
 							kind={kind}
 							overview={overview}
 							scaleMax={scaleMax}
 							label={label}
-							none="None in this range"
+							plot={plottedKinds.includes(kind)}
 							nowMs={nowMs}
 							providerType={providerType}
-							last={index === def.kinds.length - 1}
+							last={kind === lastPlottedKind}
 						/>
 					))}
 				</ul>
+				{plottedKinds.length === 0 && (
+					<Empty>
+						<EmptyHeader>
+							<EmptyTitle>None in this range</EmptyTitle>
+						</EmptyHeader>
+					</Empty>
+				)}
 				<figcaption id={summaryId} className="sr-only">
 					{weeksSummary(overview, span, def.headline.count, def.headline.noun(providerType))}
 				</figcaption>
@@ -169,7 +181,7 @@ function KindRow({
 	overview,
 	scaleMax,
 	label,
-	none,
+	plot,
 	nowMs,
 	providerType,
 	last,
@@ -178,8 +190,7 @@ function KindRow({
 	overview: ActivityOverview;
 	scaleMax: number;
 	label: (start: Date) => string;
-	/** What the row says in its plot when the kind did not happen at all. */
-	none: string;
+	plot: boolean;
 	nowMs: number;
 	providerType: ProviderType;
 	last: boolean;
@@ -199,12 +210,7 @@ function KindRow({
 				{def.label}
 				<span className="font-semibold text-foreground tabular-nums">{total}</span>
 			</p>
-			<div className="relative">
-				{total === 0 && (
-					<p className="absolute inset-x-0 top-0 flex h-14 items-center text-xs text-muted-foreground">
-						{none}
-					</p>
-				)}
+			{plot && (
 				<ChartContainer
 					config={config}
 					className={cn("aspect-auto w-full", last ? "h-24" : "h-16")}
@@ -255,7 +261,7 @@ function KindRow({
 						/>
 					</BarChart>
 				</ChartContainer>
-			</div>
+			)}
 		</li>
 	);
 }
@@ -289,7 +295,11 @@ function BucketTable({
 				<Table bordered aria-label={`${def.label(providerType)} by ${size.noun}`}>
 					<TableHeader>
 						<TableRow variant="static">
-							<TableHead>{capitalise(size.noun)}</TableHead>
+							<TableHead className="sticky left-0 z-20 bg-card">
+								<span className="block w-28 wrap-anywhere whitespace-normal">
+									{capitalise(size.noun)}
+								</span>
+							</TableHead>
 							{def.kinds.map((kind) => (
 								<TableHead key={kind} numeric className="text-right">
 									{ACTIVITY_KIND_DEFS[kind].label}
@@ -305,7 +315,11 @@ function BucketTable({
 					<TableBody>
 						{overview.weeks.map((week) => (
 							<TableRow key={week.start.getTime()} variant="static">
-								<TableCell>{capitalise(bucketLabel(week.start, "WEEK", span))}</TableCell>
+								<TableCell className="sticky left-0 z-20 bg-card">
+									<span className="block w-28 wrap-anywhere whitespace-normal">
+										{capitalise(bucketLabel(week.start, "WEEK", span))}
+									</span>
+								</TableCell>
 								{def.kinds.map((kind) => (
 									<CountCell key={kind} count={week.tally[kind]} />
 								))}

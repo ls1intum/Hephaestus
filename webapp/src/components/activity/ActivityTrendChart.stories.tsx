@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn, waitFor, within } from "storybook/test";
 
 import {
 	MONTH_OVERVIEW,
@@ -65,8 +65,23 @@ export const AsTable: Story = {
 	args: { state: readyOverview(SPARSE_OVERVIEW, "30d"), category: "pull-requests" },
 	play: async ({ canvas, canvasElement, userEvent }) => {
 		await expect(figure(canvasElement, "Busiest week")).toMatch(/^2/u);
-		// A kind that did not happen keeps its row, and says so in it.
-		await expect(canvas.getAllByText("None in this range")).toHaveLength(2);
+		const chart = canvas.getByRole("figure");
+		const kindRows = within(chart).getAllByRole("listitem");
+		await expect(kindRows.map((row) => row.firstElementChild?.textContent)).toStrictEqual([
+			"Opened0",
+			"Merged3",
+			"Closed0",
+		]);
+		await expect(canvas.queryAllByText("None in this range")).toHaveLength(0);
+		const [openedRow, mergedRow, closedRow] = kindRows;
+		if (!openedRow || !mergedRow || !closedRow) {
+			throw new Error("All pull request kinds remain in the chart");
+		}
+		await expect(openedRow.getBoundingClientRect().height).toBeLessThan(48);
+		await expect(closedRow.getBoundingClientRect().height).toBeLessThan(48);
+		await expect(within(mergedRow).getAllByText(/^\d+ \w{3}(?: \d{4})?$/u).length).toBeGreaterThan(
+			0,
+		);
 		await userEvent.click(canvas.getByRole("button", { name: "Show as table" }));
 		const table = canvas.getByRole("table", { name: "Pull requests by week" });
 		const [header, ...rows] = within(table).getAllByRole("row");
@@ -89,10 +104,53 @@ export const AsTable: Story = {
 
 /** Reviews count pull requests, not verdicts, so their table carries its own column for them. */
 export const ReviewsAsTable: Story = {
+	decorators: [
+		(Story) => (
+			<div className="max-w-xs">
+				<Story />
+			</div>
+		),
+	],
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Show as table" }));
 		const table = canvas.getByRole("table", { name: "Reviews by week" });
+		await expectNoPageOverflow();
+		const weekHeader = within(table).getByRole("columnheader", { name: "Week" });
 		await expect(within(table).getByRole("columnheader", { name: "Reviewed" })).toBeVisible();
+		const scroller = table.closest<HTMLElement>("[data-slot='table-container']");
+		const firstWeek = within(table).getAllByRole("row")[1];
+		if (!scroller || !firstWeek) {
+			throw new Error("The weekly table needs its scroll region and first week");
+		}
+		const cells = within(firstWeek).getAllByRole("cell");
+		const week = cells[0];
+		const reviewed = cells.at(-1);
+		if (!week || !reviewed) {
+			throw new Error("The week and reviewed count remain in the row");
+		}
+		const dateLabel = week.textContent;
+		await expect(scroller.scrollWidth).toBeGreaterThan(scroller.clientWidth);
+		await userEvent.tab();
+		await expect(scroller).toHaveFocus();
+		scroller.scrollLeft = scroller.scrollWidth;
+		await waitFor(() => {
+			const left = scroller.getBoundingClientRect().left + scroller.clientLeft;
+			void expect(scroller.scrollLeft).toBeGreaterThan(0);
+			void expect(Math.abs(week.getBoundingClientRect().left - left)).toBeLessThanOrEqual(1);
+			void expect(Math.abs(weekHeader.getBoundingClientRect().left - left)).toBeLessThanOrEqual(1);
+			void expect(week.getBoundingClientRect().width).toBeLessThanOrEqual(130);
+			void expect(reviewed.getBoundingClientRect().left).toBeGreaterThanOrEqual(
+				week.getBoundingClientRect().right - 1,
+			);
+			void expect(reviewed.getBoundingClientRect().right).toBeLessThanOrEqual(
+				left + scroller.clientWidth + 1,
+			);
+		});
+		await expect(week).toHaveTextContent(dateLabel);
+		await expect(reviewed).toHaveTextContent(
+			String(MONTH_OVERVIEW.weeks[0]?.tally.pullRequestsReviewed),
+		);
 	},
 };
 
@@ -115,9 +173,33 @@ export const TwelveMonths: Story = {
 
 export const Empty: Story = {
 	args: { state: readyOverview(QUIET_OVERVIEW, "30d") },
-	play: async ({ canvas, canvasElement }) => {
-		await expect(canvas.getByRole("figure")).toHaveAccessibleName("0 pull requests reviewed");
+	play: async ({ canvas, canvasElement, userEvent }) => {
+		const chart = canvas.getByRole("figure");
+		await expect(chart).toHaveAccessibleName("0 pull requests reviewed");
 		await expect(figure(canvasElement, "Busiest week")).toBeUndefined();
+		await expect(within(chart).getAllByText("None in this range")).toHaveLength(1);
+		await expect(
+			within(chart)
+				.getAllByRole("listitem")
+				.map((row) => row.textContent),
+		).toStrictEqual(["Approved0", "Changes requested0", "Commented0"]);
+		await userEvent.click(canvas.getByRole("button", { name: "Show as table" }));
+		const table = canvas.getByRole("table", { name: "Reviews by week" });
+		const [header, ...rows] = within(table).getAllByRole("row");
+		await expect(
+			within(header ?? table)
+				.getAllByRole("columnheader")
+				.map((cell) => cell.textContent),
+		).toStrictEqual(["Week", "Approved", "Changes requested", "Commented", "Reviewed"]);
+		await expect(rows).toHaveLength(QUIET_OVERVIEW.weeks.length);
+		await expect(
+			rows.flatMap((row) =>
+				within(row)
+					.getAllByRole("cell")
+					.slice(1)
+					.map((cell) => cell.textContent),
+			),
+		).toStrictEqual(Array.from({ length: QUIET_OVERVIEW.weeks.length * 4 }, () => "0"));
 	},
 };
 
