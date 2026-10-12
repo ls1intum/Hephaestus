@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, within } from "storybook/test";
+import { expect, fn, screen, waitFor, within } from "storybook/test";
 
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage } from "@/stories/decorators";
@@ -218,6 +218,8 @@ export const SortIsNotAFilter: Story = {
 		await userEvent.click(sort);
 		await userEvent.click(await screen.findByRole("option", { name: "Oldest first" }));
 		await expect(args.onPatch).toHaveBeenCalledWith({ order: "OLDEST" });
+		// The leaving popup still blocks the pointer under a loaded test pool, so Reset waits for it.
+		await waitFor(async () => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
 
 		await userEvent.click(canvas.getByRole("button", { name: "Reset" }));
 		await expect(sort).toHaveTextContent("Oldest first");
@@ -225,6 +227,7 @@ export const SortIsNotAFilter: Story = {
 		await userEvent.click(sort);
 		await userEvent.click(await screen.findByRole("option", { name: "Newest first" }));
 		await expect(args.onPatch).toHaveBeenLastCalledWith({ order: undefined });
+		await waitFor(async () => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
 	},
 };
 
