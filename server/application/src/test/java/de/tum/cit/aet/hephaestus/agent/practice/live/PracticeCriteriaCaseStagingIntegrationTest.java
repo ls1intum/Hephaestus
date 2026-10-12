@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.StreamSupport;
@@ -39,6 +40,24 @@ class PracticeCriteriaCaseStagingIntegrationTest {
             Files.copy(Path.of("src/main/resources/agent", sidecar), workspace.resolve(sidecar));
         }
         PracticeCriteriaCaseFixtures.stage(workspace, scenario);
+        var practiceIndex = mapper.readTree(
+                workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json").toFile());
+        assertThat(practiceIndex)
+                .extracting(entry -> entry.path("slug").asString())
+                .containsExactlyInAnyOrderElementsOf(scenario.path("expected").propertyNames());
+        if (scenario.path("expected").has("handles-errors-instead-of-swallowing-them")) {
+            var entry = StreamSupport.stream(practiceIndex.spliterator(), false)
+                    .filter(candidate ->
+                            candidate.path("slug").asString().equals("handles-errors-instead-of-swallowing-them"))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(entry.path("exhaustiveSources"))
+                    .extracting(JsonNode::asString)
+                    .containsExactly("scm.pull-request.diff");
+            assertThat(entry.path("readsSources"))
+                    .extracting(JsonNode::asString)
+                    .containsExactly("scm.pull-request.diff", "scm.repository.tree");
+        }
         var index =
                 mapper.readTree(workspace.resolve(SandboxLayout.MANIFEST_PATH).toFile());
         var paths = new HashSet<String>();
@@ -188,6 +207,36 @@ class PracticeCriteriaCaseStagingIntegrationTest {
                         .doesNotContain(scenario.path("reason").asString());
             }
         }
+    }
+
+    @Test
+    void shouldKeepRequiredAndContextualSourcesNonExhaustive() throws Exception {
+        var mapper = JsonMapper.builder().build();
+        Path workspace = root.resolve("non-exhaustive-source-policy");
+        Files.createDirectories(workspace);
+        for (String sidecar : List.of("pi-change.ts", "pi-task-paths.ts")) {
+            Files.copy(Path.of("src/main/resources/agent", sidecar), workspace.resolve(sidecar));
+        }
+        var scenario = mapper.valueToTree(Map.of(
+                "id",
+                "non-exhaustive-source-policy",
+                "workType",
+                "pull_request",
+                "expected",
+                Map.of("scope-one-reviewable-change", "UNDETERMINED"),
+                "files",
+                Map.of("repo/Example.java", "final class Example {}\n")));
+        PracticeCriteriaCaseFixtures.stage(workspace, scenario);
+        var index = mapper.readTree(
+                workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json").toFile());
+        assertThat(index).hasSize(1);
+        assertThat(index.get(0).path("slug").asString()).isEqualTo("scope-one-reviewable-change");
+        assertThat(index.get(0).path("exhaustiveSources")).isEmpty();
+        assertThat(index.get(0).path("readsSources"))
+                .extracting(JsonNode::asString)
+                .containsExactly("scm.pull-request.core", "scm.pull-request.diff", "scm.repository.tree");
+        assertThat(Files.readString(workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json")))
+                .doesNotContain("UNDETERMINED");
     }
 
     @Test
