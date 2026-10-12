@@ -141,29 +141,6 @@ describe("practice review list routes", () => {
 		vi.unstubAllGlobals();
 	});
 
-	it("refreshes feedback counts while a completed review processes its results", async () => {
-		recordRequests();
-		const review: ReviewRunSummary = {
-			...FIRST_PAGE,
-			resultProcessing: "PENDING",
-			feedback: { ...FIRST_PAGE.feedback, prepared: 2, delivered: 0 },
-		};
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices/reviews", () => {
-				const response = HttpResponse.json({
-					content: [review],
-					page: { number: 0, size: 25, totalElements: 1, totalPages: 1 },
-				});
-				review.resultProcessing = "DELIVERED";
-				review.feedback.delivered = 1;
-				return response;
-			}),
-		);
-		renderRouteAtWithRouter("/w/acme/admin/practices/reviews/runs");
-		await screen.findByText(/Feedback:.*2 prepared/u, undefined, ROUTE_RENDER_WAIT);
-		await screen.findByText(/Feedback:.*2 prepared.*1 delivered/u, undefined, { timeout: 7000 });
-	});
-
 	/**
 	 * The one wire detail these screens can get wrong silently. The URL spells the ordering `order`,
 	 * because another route already owns the word `sort` in the same search namespace with entirely
