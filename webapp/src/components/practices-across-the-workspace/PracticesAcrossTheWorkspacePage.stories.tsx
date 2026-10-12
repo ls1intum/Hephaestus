@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { useState } from "react";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 
 import {
 	ACROSS_WORKSPACE,
@@ -11,7 +12,16 @@ import {
 } from "@/stories/practices-across-the-workspace-story-data";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
-import { PracticesAcrossTheWorkspacePage } from "./PracticesAcrossTheWorkspacePage";
+import {
+	FOCUS_FOOTER_COPY,
+	PracticeFocusFooter,
+} from "@/components/practice-focus/PracticeFocusFooter";
+
+import { LOADING_STATUS, SLOW_LOAD_AFTER_MS, SLOW_LOAD_SHORT } from "./across-workspace-copy";
+import {
+	PracticesAcrossTheWorkspacePage,
+	type PracticesAcrossTheWorkspacePageProps,
+} from "./PracticesAcrossTheWorkspacePage";
 
 const meta = {
 	component: PracticesAcrossTheWorkspacePage,
@@ -37,31 +47,64 @@ const figuresSection = (canvas: {
 	getByRole: (role: "heading", options: { level: number; name: string }) => HTMLElement;
 }) => canvas.getByRole("heading", { level: 2, name: "Your figures" }).closest("section");
 
+/** Presses an (i) and returns its panel, which opens in a portal outside the canvas. */
+async function openTip(canvas: { getByRole: typeof screen.getByRole }, name: string) {
+	await userEvent.click(canvas.getByRole("button", { name }));
+	const panel = await screen.findByRole("dialog", { name });
+	await waitFor(async () => {
+		await expect(panel).toBeVisible();
+	});
+	return panel;
+}
+
+async function closeTip() {
+	await userEvent.keyboard("{Escape}");
+}
+
 export const Default: Story = {
 	play: async ({ canvas, args }) => {
-		// A standing is an AI reading of the work, never a grade: the page says so before any count.
+		// A standing is an AI reading of the work, never a grade: the page says so before any count,
+		// in one line, and its (i) says why.
+		await expect(canvas.getByText(/Not a grade\.$/u)).toBeVisible();
+		const about = within(await openTip(canvas, "About this page"));
+		await expect(about.getByText("Not a grade:")).toBeVisible();
 		await expect(
-			canvas.getByText(
-				/Each standing comes from AI review of their work and can be wrong, so it is not a grade\./u,
-			),
+			about.getByText(/each standing comes from AI review of their work and can be wrong\./u),
 		).toBeVisible();
-		// The hints carry the response's own number, 26 in the window, and say plainly that small
-		// counts show too.
+		await closeTip();
+		// The long explanations wait behind an (i): none of them is on the page itself.
+		await expect(canvas.queryByText("Grey band:")).toBeNull();
+		await expect(canvas.queryByText(/Every bar shows all its counts/u)).toBeNull();
+		// The tiles' (i) says plainly what grey and lower mean, each line led by its term in bold, and
+		// holds no count and no window, so it reads the same for every filter.
+		const figures = within(await openTip(canvas, "About your figures"));
+		await expect(figures.getByText("Grey band:")).toBeVisible();
+		await expect(figures.getByText("Grey band:").tagName).toBe("STRONG");
+		// Four short groups, each a labelled group under its own heading.
+		for (const heading of [
+			"What you see",
+			"How to read it",
+			"When the band is missing",
+			"What counts",
+		]) {
+			await expect(figures.getByRole("group", { name: heading })).toBeVisible();
+		}
 		await expect(
-			canvas.getByText(
-				/Hephaestus sorts the 26 developers in this workspace who have a standing in the last 30 days/u,
-			),
+			figures.getByText("lower than for most developers.", { exact: false }),
 		).toBeVisible();
+		const figuresPanel = await screen.findByRole("dialog", { name: "About your figures" });
+		await expect(figuresPanel.textContent).not.toMatch(/\d|last 30 days/u);
+		await closeTip();
+		// The legend's (i) says what grey means, and that small counts show too.
+		const bars = within(await openTip(canvas, "About the bars"));
+		await expect(bars.getByText("Grey, None yet:")).toBeVisible();
+		await expect(bars.getByText(/^no standing yet\./u)).toBeVisible();
 		await expect(
-			canvas.getByText(
-				/When only a few developers are counted, the band can show the value of one person\./u,
-			),
-		).toBeVisible();
-		await expect(
-			canvas.getByText(
+			bars.getByText(
 				/Every bar shows all its counts, however small\. So a small count can let others tell where you stand\./u,
 			),
 		).toBeVisible();
+		await closeTip();
 		// A group with parts of one, two and none draws like any other.
 		await expect(
 			groupsTable(canvas).getByRole("img", {
@@ -110,10 +153,12 @@ export const NobodyYet: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.getByText(
-				"No developer in this workspace has a standing in the last 30 days, so these figures have no typical range.",
+			within(await openTip(canvas, "About your figures")).getByText(
+				"no developer has a standing yet.",
+				{ exact: false },
 			),
 		).toBeVisible();
+		await closeTip();
 		await expect(canvas.getAllByText("No developer is counted here yet.")).toHaveLength(3);
 		// Nobody has open feedback, so that tile says so in place of a band at nought.
 		await expect(canvas.getByText("Most developers here have no open feedback.")).toBeVisible();
@@ -155,14 +200,140 @@ export const Empty: Story = {
 	},
 };
 
+const groupsSection = (canvas: {
+	getByRole: (role: "heading", options: { level: number; name: string }) => HTMLElement;
+}) => canvas.getByRole("heading", { level: 2, name: "All practice groups" }).closest("section");
+
+/** The drawn loading line, found by the (i) it ends with. */
+async function loadingLine(canvas: { findByRole: typeof screen.findByRole }) {
+	const tip = await canvas.findByRole("button", { name: "About the wait" });
+	const line = tip.closest<HTMLElement>("[data-slot=loading-line]");
+	if (line === null) {
+		throw new Error("The (i) About the wait sits outside the loading line");
+	}
+	return line;
+}
+
+const LOADING_ARGS = {
+	state: { status: "loading" },
+	tiles: { status: "loading" },
+} satisfies Partial<PracticesAcrossTheWorkspacePageProps>;
+
+/**
+ * While the server counts: one calm line with a pulsing dot over skeletons in the loaded page's
+ * shape, every region busy, and the page's one announcement in its live region.
+ */
 export const Loading: Story = {
-	args: { state: { status: "loading" }, tiles: { status: "loading" } },
+	args: LOADING_ARGS,
 	play: async ({ canvas }) => {
 		await expect(figuresSection(canvas)).toHaveAttribute("aria-busy", "true");
+		await expect(groupsSection(canvas)).toHaveAttribute("aria-busy", "true");
 		await expect(canvas.getByRole("table", { name: "All practice groups" })).toHaveAttribute(
 			"aria-busy",
 			"true",
 		);
+		await canvas.findByText(LOADING_STATUS, { selector: "[role=status]" });
+		// The drawn line repeats the live region's words, so it is hidden from screen readers.
+		const line = await loadingLine(canvas);
+		// A slow runner may already show the slow wording, so either counts here.
+		await expect(within(line).getByText(/^Counting /u)).toHaveAttribute("aria-hidden", "true");
+		await expect(canvas.getByRole("button", { name: "About the wait" })).toBeVisible();
+	},
+};
+
+/** The counts take longer than usual: the line says so, and the live region does not speak again. */
+export const LoadingSlow: Story = {
+	args: LOADING_ARGS,
+	play: async ({ canvas }) => {
+		await canvas.findByText(SLOW_LOAD_SHORT, undefined, { timeout: SLOW_LOAD_AFTER_MS + 2000 });
+		canvas.getByText(LOADING_STATUS, { selector: "[role=status]" });
+		await expect(canvas.queryByText(SLOW_LOAD_SHORT, { selector: "[role=status]" })).toBeNull();
+		const wait = within(await openTip(canvas, "About the wait"));
+		await expect(wait.getByText("A large course:")).toBeVisible();
+		await closeTip();
+	},
+};
+
+export const LoadingDark: Story = {
+	args: LOADING_ARGS,
+	globals: { theme: "dark" },
+};
+
+/** At 390px the line stays on one line in the gap under the header, and nothing overflows. */
+export const LoadingPhone: Story = {
+	args: LOADING_ARGS,
+	globals: { viewport: { value: "phone390" } },
+	play: async ({ canvas }) => {
+		await expectNoPageOverflow();
+		const line = await loadingLine(canvas);
+		await expect(line.getBoundingClientRect().height).toBeLessThanOrEqual(24);
+		const heading = canvas.getByRole("heading", { level: 2, name: "Your figures" });
+		await expect(line.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+			heading.getBoundingClientRect().top,
+		);
+	},
+};
+
+/** The page as the route draws it: loading until the counts arrive. The button stands in for them. */
+function CountsArrive(props: PracticesAcrossTheWorkspacePageProps) {
+	const [arrived, setArrived] = useState(false);
+	return (
+		<>
+			<PracticesAcrossTheWorkspacePage {...props} {...(arrived ? {} : LOADING_ARGS)} />
+			<button type="button" className="sr-only" onClick={() => setArrived(true)}>
+				Counts arrive
+			</button>
+		</>
+	);
+}
+
+/** Where each region sits and how tall it is, to compare the loading page with the loaded one. */
+function layoutOf(canvas: Parameters<NonNullable<Story["play"]>>[0]["canvas"]) {
+	const figures = figuresSection(canvas);
+	const groups = groupsSection(canvas);
+	const tiles = figures === null ? [] : [...figures.querySelectorAll("li")];
+	const firstRow = canvas
+		.getByRole("table", { name: "All practice groups" })
+		.querySelector("tbody tr");
+	return {
+		figuresHeight: figures?.getBoundingClientRect().height,
+		tileHeights: tiles.map((tile) => tile.getBoundingClientRect().height),
+		groupsTop: groups?.getBoundingClientRect().top,
+		rowHeight: firstRow?.getBoundingClientRect().height,
+	};
+}
+
+/** When the counts arrive the regions stop being busy, and nothing above the rows moves or resizes. */
+export const LoadingToLoaded: Story = {
+	render: (args) => <CountsArrive {...args} />,
+	play: async ({ canvas }) => {
+		await expect(figuresSection(canvas)).toHaveAttribute("aria-busy", "true");
+		await expect(groupsSection(canvas)).toHaveAttribute("aria-busy", "true");
+		const loading = layoutOf(canvas);
+		await userEvent.click(canvas.getByRole("button", { name: "Counts arrive" }));
+		await canvas.findByRole("button", { name: "Open group Packaging work for review" });
+		await expect(figuresSection(canvas)).not.toHaveAttribute("aria-busy");
+		await expect(groupsSection(canvas)).not.toHaveAttribute("aria-busy");
+		await expect(layoutOf(canvas)).toStrictEqual(loading);
+	},
+};
+
+/**
+ * On a phone, two tiles share a row and a title wraps: the figures keep their height as the counts
+ * arrive. The press that loads them scrolls the page, so only the figures are compared.
+ */
+export const LoadingToLoadedPhone: Story = {
+	render: (args) => <CountsArrive {...args} />,
+	globals: { viewport: { value: "phone390" } },
+	play: async ({ canvas }) => {
+		const figures = () => {
+			const { figuresHeight, tileHeights } = layoutOf(canvas);
+			return { figuresHeight, tileHeights };
+		};
+		const loading = figures();
+		await userEvent.click(canvas.getByRole("button", { name: "Counts arrive" }));
+		await canvas.findByRole("button", { name: "Open group Packaging work for review" });
+		await expect(figures()).toStrictEqual(loading);
 	},
 };
 
@@ -194,5 +365,52 @@ export const TilesLoadError: Story = {
 
 export const Reflow: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
-	play: expectNoPageOverflow,
+	play: async (context) => {
+		await expectNoPageOverflow();
+		// The page cannot overflow past a table's own frame, so each table is checked inside it.
+		for (const table of context.canvas.getAllByRole("table")) {
+			await expect(table.offsetWidth).toBeLessThanOrEqual(table.parentElement?.clientWidth ?? 0);
+		}
+	},
+};
+
+const onSwitchToProfile = fn();
+
+/**
+ * Under the table of every group, the way to the same list in
+ * the reader's own Practice profile, as large as a drawer's own action.
+ */
+export const FocusFooter: Story = {
+	args: {
+		focusFooter: (
+			<PracticeFocusFooter
+				{...FOCUS_FOOTER_COPY.workspaceAllGroups}
+				placement="page"
+				accessibleLabel={FOCUS_FOOTER_COPY.workspaceAllGroups.label}
+				onSwitch={onSwitchToProfile}
+			/>
+		),
+	},
+	play: async ({ canvas }) => {
+		const button = canvas.getByRole("button", { name: "See your own standing" });
+		await expect(button).toBeVisible();
+		await expect(button.getBoundingClientRect().height).toBeGreaterThanOrEqual(32);
+		await userEvent.click(button);
+		await expect(onSwitchToProfile).toHaveBeenCalledOnce();
+	},
+};
+
+export const FocusFooterDark: Story = {
+	args: FocusFooter.args,
+	globals: { theme: "dark" },
+};
+
+export const FocusFooterPhone: Story = {
+	args: FocusFooter.args,
+	globals: { viewport: { value: "phone390" } },
+	play: async ({ canvas }) => {
+		await expectNoPageOverflow();
+		const button = canvas.getByRole("button", { name: "See your own standing" });
+		await expect(button.getBoundingClientRect().width).toBeGreaterThan(300);
+	},
 };

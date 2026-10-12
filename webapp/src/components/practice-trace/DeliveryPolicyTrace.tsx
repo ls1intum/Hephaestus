@@ -3,7 +3,7 @@ import type {
 	DeliveryPolicyFactsSnapshot,
 	DeliveryPolicyTrace as DeliveryPolicyTraceData,
 } from "@/api/types.gen";
-import { RelativeTime } from "@/components/common/RelativeTime";
+import { ReviewDayTime } from "@/components/admin/practice-reviews/ReviewDayTime";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import {
 	Accordion,
@@ -55,7 +55,7 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 										{DELIVERY_STAGE_LABELS[evaluation.stage]}
 									</span>
 									<span className="block text-xs font-normal text-muted-foreground">
-										<RelativeTime value={evaluation.evaluatedAt} tooltip={false} />
+										<ReviewDayTime at={evaluation.evaluatedAt} />
 									</span>
 								</span>
 								<Badge variant={evaluation.allowed ? "success" : "warning"}>

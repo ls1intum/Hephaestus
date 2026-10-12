@@ -1,5 +1,5 @@
-import { ArrowRightIcon } from "lucide-react";
-import { type ReactNode, useId } from "react";
+import { ArrowRightIcon, ChevronRightIcon } from "lucide-react";
+import { Fragment, type ReactNode, useId, useState } from "react";
 
 import type {
 	ObservationDetail,
@@ -20,8 +20,12 @@ import {
 import { GroupName } from "@/components/practice-vocabulary/GroupName";
 import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
 import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
-import { StatusTooltip } from "@/components/practice-vocabulary/StatusTooltip";
-import { TRACE_OUTCOME_DEFS } from "@/components/practice-vocabulary/trace-outcome-defs";
+import { StatusLabel, StatusTooltip } from "@/components/practice-vocabulary/StatusTooltip";
+import {
+	TRACE_OUTCOME_DEFS,
+	type TraceOutcome,
+} from "@/components/practice-vocabulary/trace-outcome-defs";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +51,13 @@ export interface ReviewRunPracticeFilters {
 	watches?: string;
 }
 
+/**
+ * The words a row needs from one observation. The developer's own read carries the whole
+ * observation; an admin's list row carries no correction reason, so that one may be absent.
+ */
+export type PracticeRowObservation = Pick<ObservationDetail, "id" | "summary" | "invalidatedAt"> &
+	Partial<Pick<ObservationDetail, "invalidationReason">>;
+
 export interface ReviewRunPracticeTableProps {
 	/** Each practice's answer on the work: one review's, or the latest across every review of it. */
 	entries: PracticeTraceEntry[];
@@ -56,14 +67,14 @@ export interface ReviewRunPracticeTableProps {
 	 * What the review observed about the reader, by practice slug; one practice may have several.
 	 * Absent, each row reads the recorded explanation.
 	 */
-	observationsByPractice?: Record<string, ObservationDetail[] | undefined>;
+	observationsByPractice?: Record<string, PracticeRowObservation[] | undefined>;
 	/** For the icon and colour a group's name is drawn in; the entry carries the name itself. */
 	groups: PracticeGroup[];
 	filters: ReviewRunPracticeFilters;
 	onFiltersChange: (filters: ReviewRunPracticeFilters) => void;
 	/** Opens a practice's own level from its pill. */
-	onOpenPractice: (practiceSlug: string) => void;
-	/** Shows one occurrence on the neighbouring tab, which is where the timeline is. */
+	onOpenPractice?: (practiceSlug: string) => void;
+	/** Shows one moment on the timeline, which the caller places. */
 	onShowOccurrence: (signalId: string) => void;
 	/** Admins also read the delivery sentence, the autonomy and what the answer rests on. */
 	canAdminister?: boolean;
@@ -76,12 +87,32 @@ export interface ReviewRunPracticeTableProps {
 	reviewId?: string;
 	/** How a row answered by an earlier review links to it; the caller owns where reviews open. */
 	earlierReviewLink?: (reviewId: string) => ReactNode;
+	/**
+	 * One observation in full, with its evidence. Given, a row with observations opens in place to
+	 * show them; the caller reads each one only when its row opens.
+	 */
+	renderObservation?: (observationId: string) => ReactNode;
+	/**
+	 * The practice the reader came to see: its row opens on arrival, with `renderObservation`, and
+	 * scrolls into view once. Closing it closes it like any other row.
+	 */
+	focusPracticeSlug?: string;
+	/**
+	 * Each row's state as words, with a badge kept for a state that went wrong, and no tooltip stop:
+	 * for a level that keeps its focus stops for what the reader acts on.
+	 */
+	plainState?: boolean;
+	/**
+	 * `false` leaves out each row's "Rests on" link, for a caller that names the moment once above
+	 * the table: in one review every row rests on the moment that started it.
+	 */
+	restsOnPerRow?: boolean;
 }
 
 /** Practices the workspace files in no group are still listed, under a name of their own. */
 const UNGROUPED = "Other practices";
 
-const NO_OBSERVATIONS: ObservationDetail[] = [];
+const NO_OBSERVATIONS: PracticeRowObservation[] = [];
 
 /**
  * The practices this review decided, in the trace's order. The trace is asked for this review, which
@@ -146,7 +177,36 @@ export function ReviewRunPracticeTable({
 	emptyMessage,
 	reviewId,
 	earlierReviewLink,
+	renderObservation,
+	focusPracticeSlug,
+	plainState = false,
+	restsOnPerRow = true,
 }: ReviewRunPracticeTableProps) {
+	const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
+	const [focusClosed, setFocusClosed] = useState(false);
+	const [focusLanded, setFocusLanded] = useState(false);
+	const openOnArrival = (practiceSlug: string) =>
+		practiceSlug === focusPracticeSlug && !focusClosed;
+	const landOnFocus = (node: HTMLElement | null) => {
+		if (node) {
+			node.scrollIntoView({ block: "start" });
+			setFocusLanded(true);
+		}
+	};
+	const toggle = (practiceSlug: string) => {
+		if (openOnArrival(practiceSlug) && !opened.has(practiceSlug)) {
+			setFocusClosed(true);
+			return;
+		}
+		setOpened((previous) => {
+			const next = new Set(previous);
+			if (!next.delete(practiceSlug)) {
+				next.add(practiceSlug);
+			}
+			return next;
+		});
+	};
+	const detailIdBase = useId();
 	// From the entries, not `groups`: that holds only the groups the reader has a standing in.
 	const groupNames = [...new Set(entries.map(groupNameOf))].sort((left, right) =>
 		left.localeCompare(right),
@@ -218,7 +278,7 @@ export function ReviewRunPracticeTable({
 			{hasFilter && rows.length !== entries.length && (
 				<ResultCount total={rows.length} noun={["practice", "practices"]} hasFilter />
 			)}
-			<PracticesFrame>
+			<PracticesFrame label={tableLabel(reviewId !== undefined)}>
 				{rows.length === 0 && (
 					<TableRow variant="static">
 						<TableCell colSpan={3} className="p-4 whitespace-normal">
@@ -232,50 +292,85 @@ export function ReviewRunPracticeTable({
 					const group = hasText(entry.groupSlug) ? groupBySlug.get(entry.groupSlug) : undefined;
 					const visual =
 						group === undefined ? UNASSIGNED_GROUP_VISUAL : getGroupVisual(group.icon, group.color);
+					const observations = observationsByPractice?.[entry.practiceSlug] ?? NO_OBSERVATIONS;
+					const expandable = renderObservation !== undefined && observations.length > 0;
+					const open =
+						expandable && (opened.has(entry.practiceSlug) || openOnArrival(entry.practiceSlug));
+					const detailId = `${detailIdBase}-${entry.practiceSlug}`;
+					const lands = expandable && !focusLanded && entry.practiceSlug === focusPracticeSlug;
 					return (
-						<TableRow key={entry.practiceSlug}>
-							<TableCell className="align-top whitespace-normal">
-								<StatusTooltip
-									def={TRACE_OUTCOME_DEFS[entry.outcome]}
-									render={
-										<button type="button" aria-label={TRACE_OUTCOME_DEFS[entry.outcome].label} />
-									}
-									className="cursor-help"
-								>
-									<TraceOutcomeBadge outcome={entry.outcome} />
-								</StatusTooltip>
-							</TableCell>
-							<TableCell className="align-top whitespace-normal">
-								<span className="flex min-w-0 flex-col items-start gap-1">
-									<PracticePill
-										name={entry.practiceName}
-										onOpen={() => onOpenPractice(entry.practiceSlug)}
+						<Fragment key={entry.practiceSlug}>
+							<TableRow ref={lands ? landOnFocus : undefined}>
+								<TableCell className="align-top whitespace-normal">
+									<PracticeState outcome={entry.outcome} plain={plainState} />
+								</TableCell>
+								<TableCell className="align-top whitespace-normal">
+									<span className="flex min-w-0 flex-col items-start gap-1">
+										<PracticePill
+											name={entry.practiceName}
+											onOpen={
+												onOpenPractice === undefined
+													? undefined
+													: () => onOpenPractice(entry.practiceSlug)
+											}
+										/>
+										<GroupName
+											name={groupNameOf(entry)}
+											icon={visual.Icon}
+											pill={group === undefined ? undefined : visual.pill}
+											className="text-xs"
+										/>
+									</span>
+								</TableCell>
+								<TableCell className="align-top whitespace-normal">
+									<WhatItSaw
+										entry={entry}
+										observations={observations}
+										occurrenceName={
+											restsOnPerRow && hasText(entry.occasionedById)
+												? (signals.find((signal) => signal.id === entry.occasionedById)
+														?.displayName ?? entry.occasionedBy?.displayName)
+												: undefined
+										}
+										onShowOccurrence={onShowOccurrence}
+										canAdminister={canAdminister}
+										earlierReview={earlierReviewOf(entry, reviewId)}
+										earlierReviewLink={earlierReviewLink}
 									/>
-									<GroupName
-										name={groupNameOf(entry)}
-										icon={visual.Icon}
-										pill={group === undefined ? undefined : visual.pill}
-										className="text-xs"
-									/>
-								</span>
-							</TableCell>
-							<TableCell className="align-top whitespace-normal">
-								<WhatItSaw
-									entry={entry}
-									observations={observationsByPractice?.[entry.practiceSlug] ?? NO_OBSERVATIONS}
-									occurrenceName={
-										hasText(entry.occasionedById)
-											? (signals.find((signal) => signal.id === entry.occasionedById)
-													?.displayName ?? entry.occasionedBy?.displayName)
-											: undefined
-									}
-									onShowOccurrence={onShowOccurrence}
-									canAdminister={canAdminister}
-									earlierReview={earlierReviewOf(entry, reviewId)}
-									earlierReviewLink={earlierReviewLink}
-								/>
-							</TableCell>
-						</TableRow>
+									{expandable && (
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											className="group mt-1 -ml-2"
+											aria-expanded={open}
+											aria-controls={open ? detailId : undefined}
+											onClick={() => toggle(entry.practiceSlug)}
+										>
+											<ChevronRightIcon
+												aria-hidden
+												className="transition-transform group-aria-expanded:rotate-90 motion-reduce:transition-none"
+											/>
+											{open ? "Hide evidence" : "Show evidence"}
+											<span className="sr-only"> for {entry.practiceName}</span>
+										</Button>
+									)}
+								</TableCell>
+							</TableRow>
+							{open && (
+								<TableRow variant="static" id={detailId}>
+									<TableCell colSpan={3} className="bg-muted/30 p-4 whitespace-normal">
+										<div className="flex min-w-0 flex-col gap-6">
+											{observations.map((observation) => (
+												<Fragment key={observation.id}>
+													{renderObservation(observation.id)}
+												</Fragment>
+											))}
+										</div>
+									</TableCell>
+								</TableRow>
+							)}
+						</Fragment>
 					);
 				})}
 			</PracticesFrame>
@@ -283,14 +378,47 @@ export function ReviewRunPracticeTable({
 	);
 }
 
-function PracticesFrame({ busy = false, children }: { busy?: boolean; children: ReactNode }) {
+/**
+ * A row's state. Plain, a state that went wrong is a badge and every other state is words beside
+ * its icon; otherwise the badge is a tooltip's trigger, so a keyboard reaches its sentence.
+ */
+function PracticeState({ outcome, plain }: { outcome: TraceOutcome; plain: boolean }) {
+	const def = TRACE_OUTCOME_DEFS[outcome];
+	if (plain) {
+		return def.badgeVariant === "destructive" || def.badgeVariant === "warning" ? (
+			<TraceOutcomeBadge outcome={outcome} />
+		) : (
+			<StatusLabel def={def} />
+		);
+	}
+	return (
+		<StatusTooltip
+			def={def}
+			render={<button type="button" aria-label={def.label} />}
+			className="cursor-help"
+		>
+			<TraceOutcomeBadge outcome={outcome} />
+		</StatusTooltip>
+	);
+}
+
+/** The table speaks for one review when it lists one, and for the work otherwise. */
+function tableLabel(inReview: boolean): string {
+	return inReview ? "Every practice in this review" : "Every practice on this work";
+}
+
+function PracticesFrame({
+	label,
+	busy = false,
+	children,
+}: {
+	label: string;
+	busy?: boolean;
+	children: ReactNode;
+}) {
 	return (
 		<div className="shrink-0 overflow-hidden rounded-xl border bg-background">
-			<Table
-				aria-label="Every practice on this work"
-				aria-busy={busy || undefined}
-				className="min-w-152"
-			>
+			<Table aria-label={label} aria-busy={busy || undefined} className="min-w-152">
 				<TableHeader>
 					<TableRow>
 						<TableHead className="w-40">State</TableHead>
@@ -304,9 +432,16 @@ function PracticesFrame({ busy = false, children }: { busy?: boolean; children: 
 	);
 }
 
-export function ReviewRunPracticeTableSkeleton({ rows }: { rows: number }) {
+export function ReviewRunPracticeTableSkeleton({
+	rows,
+	inReview = false,
+}: {
+	rows: number;
+	/** The table will list one review, so the loading table carries the same name. */
+	inReview?: boolean;
+}) {
 	return (
-		<PracticesFrame busy>
+		<PracticesFrame label={tableLabel(inReview)} busy>
 			{Array.from({ length: rows }, (_, index) => (
 				<TableRow key={index} variant="static" aria-hidden>
 					<TableCell className="align-top">
@@ -326,7 +461,7 @@ export function ReviewRunPracticeTableSkeleton({ rows }: { rows: number }) {
 
 interface WhatItSawProps {
 	entry: PracticeTraceEntry;
-	observations: ObservationDetail[];
+	observations: PracticeRowObservation[];
 	occurrenceName: string | undefined;
 	onShowOccurrence: (signalId: string) => void;
 	canAdminister: boolean;

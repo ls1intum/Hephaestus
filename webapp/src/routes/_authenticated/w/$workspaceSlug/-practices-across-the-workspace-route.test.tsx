@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PracticesAcrossWorkspaceTiles } from "@/api/types.gen";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
-import { SLOW_LOAD_NOTE } from "@/components/practices-across-the-workspace/across-workspace-copy";
+import {
+	LOADING_STATUS,
+	SLOW_LOAD_SHORT,
+} from "@/components/practices-across-the-workspace/across-workspace-copy";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import {
@@ -159,7 +162,7 @@ describe("Practices across the workspace", () => {
 		await userEvent.click(
 			await screen.findByRole(
 				"button",
-				{ name: "Open in your Practice profile Packaging work for review" },
+				{ name: "See your own standing: Packaging work for review" },
 				ROUTE_RENDER_WAIT,
 			),
 		);
@@ -250,7 +253,7 @@ describe("Practices across the workspace", () => {
 		focusManager.setFocused(undefined);
 	});
 
-	it("says why the page is still empty while the counts take long", async () => {
+	it("says once that it counts, then that the counts take long", async () => {
 		const counted = deferred();
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices/workspace-overview", async () => {
@@ -260,8 +263,16 @@ describe("Practices across the workspace", () => {
 		);
 		renderRouteAtWithRouter(PAGE);
 
-		const note = await screen.findByText(SLOW_LOAD_NOTE, undefined, ROUTE_RENDER_WAIT);
-		expect(note.getAttribute("role")).toBe("status");
+		// One message in the live region, which the slow wording does not replace.
+		const status = await screen.findByText(
+			LOADING_STATUS,
+			{ selector: "[role=status]" },
+			ROUTE_RENDER_WAIT,
+		);
+		await screen.findByText(SLOW_LOAD_SHORT, undefined, ROUTE_RENDER_WAIT);
+		expect(status.textContent).toBe(LOADING_STATUS);
+		// The rest of the note waits behind the (i) beside it.
+		screen.getByRole("button", { name: "About the wait" });
 
 		counted.resolve();
 		await screen.findByRole(
@@ -270,7 +281,9 @@ describe("Practices across the workspace", () => {
 			ROUTE_RENDER_WAIT,
 		);
 		await waitFor(() => {
-			expect(screen.queryByText(SLOW_LOAD_NOTE)).toBeNull();
+			expect(screen.queryByText(SLOW_LOAD_SHORT)).toBeNull();
+			expect(screen.queryByText(LOADING_STATUS)).toBeNull();
+			expect(screen.queryByRole("button", { name: "About the wait" })).toBeNull();
 		});
 	});
 

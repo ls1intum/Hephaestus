@@ -1,10 +1,11 @@
 import { ClipboardCheckIcon } from "lucide-react";
+import { Fragment } from "react";
 
+import { cn } from "cn";
 import type { PracticeGroup, PracticeGroupStanding, PracticeStanding } from "@/api/types.gen";
 import type { LoadState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import type { FeedbackTextSegment } from "@/components/practice-vocabulary/feedback-text";
-import { FeedbackText } from "@/components/practice-vocabulary/FeedbackText";
 import { getGroupVisual } from "@/components/practice-vocabulary/group-visuals";
 import { GroupName } from "@/components/practice-vocabulary/GroupName";
 import type { SortDirection } from "@/components/practice-vocabulary/practice-group-list-order";
@@ -20,6 +21,8 @@ import { StandingCountsList } from "@/components/practice-vocabulary/StandingCou
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell } from "@/components/ui/table";
 
+import { type FoldReason, FoldedPractices, FoldedStandingCell } from "./FoldedPractices";
+import { groupNeverApplied, groupNotObservedYet } from "./practice-folds";
 import { ALL_PRACTICE_GROUPS, NO_PRACTICE_GROUPS } from "./practice-profile-search";
 
 export interface AllPracticeGroupsTableProps {
@@ -43,6 +46,11 @@ export interface AllPracticeGroupsTableProps {
 	/** Opens a practice named inside a group's sentence. */
 	onOpenPractice?: (practiceSlug: string) => void;
 	state: LoadState;
+	/**
+	 * Groups with no practice to show: none added, or all switched off. They join the fold of groups
+	 * not observed yet, so the reader can still open them.
+	 */
+	emptyGroups?: PracticeGroup[];
 }
 
 interface GroupRowProps {
@@ -50,6 +58,11 @@ interface GroupRowProps {
 	standing: PracticeGroupStanding | undefined;
 	practices: PracticeStanding[];
 	sentences?: FeedbackTextSegment[][];
+	/**
+	 * A row of a fold: the standing badge alone, with no trend, ring or counts, since the fold
+	 * already says why the group is there.
+	 */
+	folded?: FoldReason;
 	open: boolean;
 	onOpenGroup?: (group: PracticeGroup) => void;
 	onOpenPractice?: (practiceSlug: string) => void;
@@ -60,6 +73,7 @@ function GroupRow({
 	standing,
 	practices,
 	sentences = NO_SENTENCES,
+	folded,
 	open,
 	onOpenGroup,
 	onOpenPractice,
@@ -78,32 +92,33 @@ function GroupRow({
 				}
 			}
 		>
-			<StandingCell
-				standing={standing?.standing ?? "NOT_OBSERVED"}
-				direction={standing?.direction}
-				support={standing?.trendSupport}
-				scope="group"
-			/>
+			{folded ? (
+				<FoldedStandingCell scope="group" reason={folded} />
+			) : (
+				<StandingCell
+					standing={standing?.standing ?? "NOT_OBSERVED"}
+					direction={standing?.direction}
+					support={standing?.trendSupport}
+					scope="group"
+				/>
+			)}
 
-			<TableCell>
-				<PracticeGroupStandingRing counts={counts} size="sm" />
+			{/* A folded row keeps the cells, empty, so its subject stays in its column. */}
+			<TableCell className={cn(folded && STACKED_HIDDEN)}>
+				{!folded && <PracticeGroupStandingRing counts={counts} size="sm" />}
 			</TableCell>
 
-			<TableCell>
-				<StandingCountsList counts={counts} size="sm" aria-label="Practices by standing" />
-			</TableCell>
-
-			<SubjectCell badge={<GroupName name={group.name} icon={Icon} pill={pill} />}>
-				{sentences.length > 0 && (
-					<ul className="max-w-md list-disc space-y-1 pl-4 text-sm marker:text-muted-foreground">
-						{sentences.map((sentence, index) => (
-							<li key={index}>
-								<FeedbackText segments={sentence} onOpenPractice={onOpenPractice} />
-							</li>
-						))}
-					</ul>
+			<TableCell className={cn(folded && STACKED_HIDDEN)}>
+				{!folded && (
+					<StandingCountsList counts={counts} size="sm" aria-label="Practices by standing" />
 				)}
-			</SubjectCell>
+			</TableCell>
+
+			<SubjectCell
+				badge={<GroupName name={group.name} icon={Icon} pill={pill} />}
+				sentences={sentences}
+				onOpenPractice={onOpenPractice}
+			/>
 		</PracticeTableRow>
 	);
 }
@@ -137,6 +152,13 @@ const loadingRow = (
 
 const NO_SENTENCES: FeedbackTextSegment[][] = [];
 
+/** An empty cell leaves the stacked layout, where it would only add a gap. */
+const STACKED_HIDDEN = "@max-[38rem]:hidden";
+
+const NO_GROUPS: PracticeGroup[] = [];
+
+const HEADS = [{ label: <span className="sr-only">Practices by standing</span>, span: 2 }];
+
 /**
  * Every practice group as one row: its standing and trend, a ring of its practices by standing
  * with the counts spelt out beside it, then the group and what moved inside it, one bullet per
@@ -155,6 +177,7 @@ export function AllPracticeGroupsTable({
 	openGroupSlug,
 	onOpenPractice,
 	state,
+	emptyGroups = NO_GROUPS,
 }: AllPracticeGroupsTableProps) {
 	if (state.status === "error") {
 		return (
@@ -166,29 +189,75 @@ export function AllPracticeGroupsTable({
 		);
 	}
 
+	// Groups whose every practice never applied, and groups no review has observed a practice of
+	// yet (the rest never applied), leave the table for one folded line each under it.
+	const neverApplied = groups.filter((group) =>
+		groupNeverApplied(practicesByGroup[group.slug] ?? []),
+	);
+	// A group with nothing in it has nothing to act on, so it is folded away with the groups nothing
+	// observed yet rather than left out: it still opens.
+	const notObserved = [
+		...groups.filter((group) => groupNotObservedYet(practicesByGroup[group.slug] ?? [])),
+		...emptyGroups,
+	];
+	const shown = groups.filter(
+		(group) => !neverApplied.includes(group) && !notObserved.includes(group),
+	);
+	// Every group with practices sits in a fold: the workspace has practices, so "No practices set
+	// up yet" would be wrong. The folds stand open instead and their own sentences say why. Groups
+	// with no practices do not count: with only those, nothing is set up to observe.
+	const onlyFolded =
+		shown.length === 0 && neverApplied.length + notObserved.length > emptyGroups.length;
+	const renderGroupRow = (group: PracticeGroup, folded?: FoldReason) => (
+		<GroupRow
+			group={group}
+			standing={standings[group.slug]}
+			practices={practicesByGroup[group.slug] ?? []}
+			// A folded group shows as any group without data: no sentence of what moved.
+			sentences={folded ? undefined : sentences[group.slug]}
+			folded={folded}
+			open={group.slug === openGroupSlug}
+			onOpenGroup={onOpenGroup}
+			onOpenPractice={onOpenPractice}
+		/>
+	);
+	// A fold: a toggle row and the folded rows, as sections of the table itself, so they share its
+	// columns.
+	const fold = (folded: PracticeGroup[], reason: FoldReason, columns: number) => (
+		<FoldedPractices
+			count={folded.length}
+			noun="group"
+			reason={reason}
+			columns={columns}
+			defaultOpen={onlyFolded}
+		>
+			{folded.map((group) => (
+				<Fragment key={group.slug}>{renderGroupRow(group, reason)}</Fragment>
+			))}
+		</FoldedPractices>
+	);
+
 	return (
 		<PracticeTable
 			aria-label={ALL_PRACTICE_GROUPS}
 			sort={sort}
 			onSortChange={onSortChange}
-			heads={[{ label: <span className="sr-only">Practices by standing</span>, span: 2 }]}
+			heads={HEADS}
 			subjectHead="Practice group"
-			rows={groups}
+			rows={shown}
 			rowKey={(group) => group.slug}
-			renderRow={(group) => (
-				<GroupRow
-					group={group}
-					standing={standings[group.slug]}
-					practices={practicesByGroup[group.slug] ?? []}
-					sentences={sentences[group.slug]}
-					open={group.slug === openGroupSlug}
-					onOpenGroup={onOpenGroup}
-					onOpenPractice={onOpenPractice}
-				/>
-			)}
-			empty={{ icon: <ClipboardCheckIcon />, ...NO_PRACTICE_GROUPS }}
+			renderRow={(group) => renderGroupRow(group)}
+			empty={onlyFolded ? null : { icon: <ClipboardCheckIcon />, ...NO_PRACTICE_GROUPS }}
 			isLoading={state.status === "loading"}
 			loadingRow={loadingRow}
+			sections={(columns) =>
+				state.status === "loading" ? undefined : (
+					<>
+						{fold(neverApplied, "never-applied", columns)}
+						{fold(notObserved, "not-observed", columns)}
+					</>
+				)
+			}
 		/>
 	);
 }

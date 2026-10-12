@@ -1,23 +1,29 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+
 import { expect, fn, userEvent, within } from "storybook/test";
+import type { PracticeGroup } from "@/api/types.gen";
 
 import {
 	DEFAULT_PRACTICE_GROUP_SORT,
 	sortPracticeGroups,
 } from "@/components/practice-vocabulary/practice-group-list-order";
+import { expectFoldOnTableColumns } from "@/stories/fold-columns";
 import {
 	groups,
 	groupStandings,
 	OVERVIEW_FIXTURE,
+	packagingGroup,
 	practicesByGroup,
 	SHARED_TRANSITION_OVERVIEW,
 } from "@/stories/practice-profile-story-mock-data";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
+import { withProvider } from "@/stories/decorators";
 import { AllPracticeGroupsTable } from "./AllPracticeGroupsTable";
 import { composeOverview } from "./compose-overview";
 
 const meta = {
+	decorators: [withProvider("GITHUB")],
 	component: AllPracticeGroupsTable,
 	tags: ["autodocs"],
 	args: {
@@ -52,20 +58,21 @@ export const Default: Story = {
 			"Open group Communicating in the open",
 			"Open group Acting on review feedback",
 			"Open group Reviewing a teammate's work constructively",
-			"Open group Testing your changes",
 		]);
 		await expect(canvas.getAllByRole("button", { name: "Needs attention" })).toHaveLength(2);
-		await expect(canvas.getByText("Not observed yet")).toBeVisible();
+		// The group no review has observed a practice of yet waits in its fold under the table.
+		await expect(
+			canvas.getByRole("button", { name: "Practice groups not observed yet" }),
+		).toBeVisible();
 		// A trend reads as words, and a group with none says so in the same place.
 		await expect(canvas.getByRole("button", { name: "More difficulties recently" })).toBeVisible();
-		await expect(canvas.getAllByText("Not enough to compare yet")).toHaveLength(3);
+		await expect(canvas.getAllByText("Not enough to compare yet")).toHaveLength(2);
 		const breakdowns = canvas.getAllByRole("list", { name: "Practices by standing" }).map((list) =>
 			within(list)
 				.getAllByRole("listitem")
 				.map((item) => item.textContent),
 		);
 		await expect(breakdowns[0]).toStrictEqual(["2Needs attention", "1Mixed", "2Going well"]);
-		await expect(breakdowns[4]).toStrictEqual(["2Not observed"]);
 		// A group with no event shows its name and nothing beneath it.
 		await expect(canvas.queryByText("Nothing new since the latest run.")).toBeNull();
 		await expect(canvas.getByText("Acting on review feedback").closest("td")?.textContent).toBe(
@@ -73,10 +80,11 @@ export const Default: Story = {
 		);
 
 		// A practice name in a sentence opens the practice, not the group.
-		await userEvent.click(canvas.getByRole("button", { name: "Scope the change to one concern" }));
-		await expect(args.onOpenPractice).toHaveBeenCalledWith("scope-one-reviewable-change");
+		await userEvent.click(canvas.getByRole("button", { name: "Describe what changed and why" }));
+		await expect(args.onOpenPractice).toHaveBeenCalledWith("describe-what-and-why");
 		await expect(args.onOpenGroup).not.toHaveBeenCalled();
 
+		await userEvent.click(canvas.getByRole("button", { name: "Practice groups not observed yet" }));
 		await userEvent.click(canvas.getByRole("button", { name: "Open group Testing your changes" }));
 		await expect(args.onOpenGroup).toHaveBeenCalledWith(groups[4]);
 	},
@@ -93,21 +101,22 @@ export const ManyEvents: Story = {
 			throw new Error("The group's name sits in its cell");
 		}
 		const items = within(cell).getAllByRole("listitem");
-		await expect(items).toHaveLength(6);
-		// Feedback the work fell back on comes first, then new feedback, then the resolutions.
+		// New feedback is the card's to say, so the cell has no bullet for it.
+		await expect(items).toHaveLength(5);
+		await expect(cell).not.toHaveTextContent(/new feedback/u);
+		// Feedback the work fell back on comes first, then the resolutions.
 		await expect(items[0]).toHaveTextContent(
 			"Say which acceptance criteria are done is back to 0 of 3 clean.",
 		);
-		await expect(items[1]).toHaveTextContent("Scope the change to one concern has new feedback.");
 		// Each reference carries its own "(opens in a new tab)", so the sentence is matched to its
 		// first.
-		await expect(items[2]).toHaveTextContent(
+		await expect(items[1]).toHaveTextContent(
 			/^Describe what changed and why resolved by the work after #22/u,
 		);
 		await userEvent.click(
-			within(cell).getByRole("button", { name: "Scope the change to one concern" }),
+			within(cell).getByRole("button", { name: "Describe what changed and why" }),
 		);
-		await expect(args.onOpenPractice).toHaveBeenCalledWith("scope-one-reviewable-change");
+		await expect(args.onOpenPractice).toHaveBeenCalledWith("describe-what-and-why");
 		await expect(args.onOpenGroup).not.toHaveBeenCalled();
 	},
 };
@@ -215,10 +224,181 @@ export const LoadFailed: Story = {
 	},
 };
 
+/**
+ * On a phone the rows stack instead of scrolling sideways: each group's name comes first and is
+ * seen whole, and nothing in the table reaches past its frame.
+ */
 export const MobileReflow: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320] },
 	},
-	play: expectNoPageOverflow,
+	play: async ({ canvas }) => {
+		await expectNoPageOverflow();
+		const table = canvas.getByRole("table");
+		const container = table.parentElement;
+		if (container === null) {
+			throw new Error("The table has no container");
+		}
+		await expect(container.scrollWidth).toBeLessThanOrEqual(container.clientWidth + 1);
+		const [firstRow] = within(table).getAllByRole("row").slice(1);
+		if (firstRow === undefined) {
+			throw new Error("No group rows");
+		}
+		const subject = firstRow.querySelector("[data-subject]");
+		const standing = firstRow.querySelector("td");
+		await expect(subject).not.toBeNull();
+		// The name heads the row: above the standing, not beside it off-screen.
+		await expect(subject?.getBoundingClientRect().top).toBeLessThan(
+			standing?.getBoundingClientRect().top ?? 0,
+		);
+	},
+};
+
+/** The last group with every practice never applied. */
+const lastGroup = groups.at(-1);
+const neverAppliedByGroup = Object.fromEntries(
+	Object.entries(practicesByGroup).map(([slug, practices]) => [
+		slug,
+		slug === lastGroup?.slug
+			? practices.map((practice) => ({
+					...practice,
+					standing: "NO_OPPORTUNITY" as const,
+					notApplicableOnly: true,
+				}))
+			: practices,
+	]),
+);
+
+/**
+ * A group whose every practice never applied leaves the table
+ * for one folded line under it.
+ */
+export const NeverApplied: Story = {
+	args: { practicesByGroup: neverAppliedByGroup },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByRole("button", { name: "Does not apply to your work yet" }),
+		).toBeVisible();
+	},
+};
+
+export const NeverAppliedDark: Story = {
+	args: { practicesByGroup: neverAppliedByGroup },
+	globals: { theme: "dark" },
+};
+
+/**
+ * A group no review has observed a practice of yet leaves
+ * the table for its own folded line, apart from the groups that never applied. The group still
+ * opens from the fold.
+ */
+export const NotObservedGroups: Story = {
+	play: async ({ args, canvas }) => {
+		const trigger = canvas.getByRole("button", {
+			name: "Practice groups not observed yet",
+		});
+		await expect(trigger).toHaveAttribute("aria-expanded", "false");
+		await expect(
+			canvas.queryByRole("button", { name: "Open group Testing your changes" }),
+		).not.toBeInTheDocument();
+		await userEvent.click(trigger);
+		// Opened, the fold's rows join the same table: one header, the same columns.
+		await expect(canvas.getAllByRole("table")).toHaveLength(1);
+		const folded = canvas.getByRole("rowgroup", {
+			name: "Practice groups not observed yet",
+		});
+		await expectFoldOnTableColumns(
+			canvas.getByRole("table", { name: "All practice groups" }).querySelector("tbody tr"),
+			folded,
+		);
+		// One quiet indication per row: the badge, without trend, ring or counts.
+		await expect(within(folded).getByText("Not observed yet")).toBeVisible();
+		await expect(within(folded).queryByText(/compare/u)).toBeNull();
+		await expect(within(folded).queryByRole("list", { name: "Practices by standing" })).toBeNull();
+		await userEvent.click(
+			within(folded).getByRole("button", { name: "Open group Testing your changes" }),
+		);
+		await expect(args.onOpenGroup).toHaveBeenCalledWith(groups[4]);
+	},
+};
+
+export const NotObservedGroupsOpen: Story = {
+	globals: { viewport: { value: "desktop" } },
+	play: async ({ canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Practice groups not observed yet" }));
+		await expectFoldOnTableColumns(
+			canvas.getByRole("table", { name: "All practice groups" }).querySelector("tbody tr"),
+			canvas.getByRole("rowgroup", { name: "Practice groups not observed yet" }),
+		);
+	},
+};
+
+export const NotObservedGroupsDark: Story = {
+	...NotObservedGroupsOpen,
+	globals: { theme: "dark" },
+};
+
+export const NotObservedGroupsPhone: Story = {
+	...NotObservedGroupsOpen,
+	globals: { viewport: { value: "phone390" } },
+};
+
+const mixedSilentGroup = groups[1];
+const mixedSilentByGroup = Object.fromEntries(
+	Object.entries(practicesByGroup).map(([slug, practices]) => [
+		slug,
+		slug === mixedSilentGroup?.slug
+			? practices.map((practice, index) =>
+					index === 0
+						? { ...practice, standing: "NO_OPPORTUNITY" as const, notApplicableOnly: true }
+						: { ...practice, standing: "NOT_OBSERVED" as const },
+				)
+			: practices,
+	]),
+);
+
+/**
+ * A group with one practice that never applied and the others not observed yet has nothing to
+ * show either: its own level holds only folds. It joins the fold of groups not observed yet, so
+ * the table and the group's level agree.
+ */
+export const MixedSilentGroupFolded: Story = {
+	args: { practicesByGroup: mixedSilentByGroup },
+	play: async ({ canvas }) => {
+		const name = `Open group ${mixedSilentGroup?.name ?? ""}`;
+		await expect(canvas.queryByRole("button", { name })).not.toBeInTheDocument();
+		await expect(
+			canvas.queryByRole("button", { name: "Does not apply to your work yet" }),
+		).not.toBeInTheDocument();
+		await userEvent.click(canvas.getByRole("button", { name: "Practice groups not observed yet" }));
+		const folded = canvas.getByRole("rowgroup", { name: "Practice groups not observed yet" });
+		await expect(within(folded).getByRole("button", { name })).toBeVisible();
+	},
+};
+
+const emptyGroup: PracticeGroup = {
+	...packagingGroup,
+	slug: "release-hygiene",
+	name: "Keeping releases tidy",
+};
+
+/**
+ * A group with no practice in it (none added, or all switched off) has nothing to act on, so
+ * it joins the fold of groups not observed yet instead of disappearing. It still opens.
+ */
+export const EmptyGroupFolded: Story = {
+	args: {
+		emptyGroups: [emptyGroup],
+	},
+	play: async ({ args, canvas }) => {
+		const trigger = canvas.getByRole("button", {
+			name: "Practice groups not observed yet",
+		});
+		await userEvent.click(trigger);
+		await userEvent.click(canvas.getByRole("button", { name: "Open group Keeping releases tidy" }));
+		await expect(args.onOpenGroup).toHaveBeenCalledWith(
+			expect.objectContaining({ slug: "release-hygiene" }),
+		);
+	},
 };

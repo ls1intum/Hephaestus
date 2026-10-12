@@ -60,6 +60,32 @@ void test("the demo names only practices that the catalog ships", () => {
 	);
 });
 
+void test("the reader gets a practice that never applied, one not observed yet and a group not observed yet", () => {
+	const outcomes = new Map<string, string[]>();
+	for (const observation of READER_RUNS.flatMap((run) => run.observations)) {
+		outcomes.set(observation.practice, [
+			...(outcomes.get(observation.practice) ?? []),
+			observation.outcome,
+		]);
+	}
+	// The Practice profile's "Does not apply to your work yet" fold: every observation found it did
+	// not apply.
+	assert.deepEqual(
+		[...outcomes]
+			.filter(([, each]) => each.every((outcome) => outcome === "NOT_APPLICABLE"))
+			.map(([practice]) => practice),
+		["changes-dependencies-deliberately"],
+	);
+	// "Practices without observations yet": a practice of a group the reader has observations in
+	// that no run of the reader observes.
+	const observedGroups = new Set([...outcomes.keys()].map((practice) => GROUP_OF.get(practice)));
+	assert.ok(
+		[...GROUP_OF].some(([practice, group]) => observedGroups.has(group) && !outcomes.has(practice)),
+	);
+	// "Practice groups without observations yet": a group the reader has no observation in.
+	assert.ok([...new Set(GROUP_OF.values())].some((group) => !observedGroups.has(group)));
+});
+
 void test("each group places every synthetic developer once, by its numbers", () => {
 	for (const [groupIndex, [group, split]] of Object.entries(SPLITS).entries()) {
 		const counts = { needs: 0, mixed: 0, well: 0, none: 0 };

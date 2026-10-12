@@ -1,9 +1,9 @@
 // The palette this page shares with the practice profile is `webapp/AGENTS.md` § Practice surfaces palette.
 
-import { cn } from "cn";
+import type { ReactNode } from "react";
+
 import { useSpinDelay } from "spin-delay";
 import type { PracticesAcrossWorkspace, PracticesAcrossWorkspaceTiles } from "@/api/types.gen";
-import { STALE } from "@/components/activity/activity-tones";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RangeControls } from "@/components/common/RangeControls";
@@ -16,15 +16,19 @@ import {
 } from "@/components/practice-profile/practice-profile-search";
 import { getGroupVisual } from "@/components/practice-vocabulary/group-visuals";
 import { GroupName } from "@/components/practice-vocabulary/GroupName";
-import { Skeleton } from "@/components/ui/skeleton";
 
+import { InfoGroups, InfoLines, InfoTip } from "@/components/common/InfoTip";
 import {
 	type AcrossWorkspaceWindow,
-	barsHint,
+	FIGURES_PLAIN,
 	GROUPS_LOAD_ERROR,
+	LOADING_LINE_AFTER_MS,
+	LOADING_STATUS,
+	PAGE_INTRO,
+	PAGE_INTRO_SHORT,
 	SLOW_LOAD_AFTER_MS,
 	SLOW_LOAD_NOTE,
-	tilesHint,
+	SLOW_LOAD_SHORT,
 	WINDOW_OPTIONS,
 	windowHeading,
 } from "./across-workspace-copy";
@@ -42,6 +46,8 @@ export interface PracticesAcrossTheWorkspacePageProps {
 	/** The group whose level is open over the page. */
 	openGroupSlug?: string;
 	onOpenGroup: (groupSlug: string) => void;
+	/** The way to the same list of every group in the reader's Practice profile, under the table. */
+	focusFooter?: ReactNode;
 }
 
 /**
@@ -56,26 +62,29 @@ export function PracticesAcrossTheWorkspacePage({
 	onWindowChange,
 	openGroupSlug,
 	onOpenGroup,
+	focusFooter,
 }: PracticesAcrossTheWorkspacePageProps) {
 	const overview = state.status === "ready" ? state.overview : undefined;
 	const windowTiles = tiles.status === "ready" ? tiles.tiles : undefined;
 	const stale = tiles.status === "ready" && tiles.stale === true;
 	const loading = state.status === "loading" || tiles.status === "loading";
-	// The note waits until the counts take noticeably long, then stays long enough to be read.
-	const slow = useSpinDelay(loading, { delay: SLOW_LOAD_AFTER_MS, minDuration: 500 });
 	return (
 		<PageLayout className="space-y-8">
-			<PageHeader
-				title="Practices across the workspace"
-				description="This page shows where the developers in this workspace stand in each practice group. Each standing comes from AI review of their work and can be wrong, so it is not a grade. Your next step is in your Practice profile."
-			/>
-			{/* The live region is there from the start, so the note is announced when it appears. */}
-			<p
-				role="status"
-				className={cn("max-w-3xl text-sm text-muted-foreground", !slow && "sr-only")}
-			>
-				{slow ? SLOW_LOAD_NOTE : null}
-			</p>
+			{/* The loading line hangs in the gap under the header, so nothing moves when it goes. */}
+			<div className="relative">
+				<PageHeader
+					title="Practices across the workspace"
+					description={
+						<>
+							{PAGE_INTRO_SHORT}{" "}
+							<InfoTip label="About this page">
+								<InfoLines lines={PAGE_INTRO} />
+							</InfoTip>
+						</>
+					}
+				/>
+				<LoadingLine loading={loading} />
+			</div>
 
 			{state.status === "error" ? (
 				// Every region reads the overview, so no control on the page can fix this but Retry.
@@ -85,7 +94,14 @@ export function PracticesAcrossTheWorkspacePage({
 					<Section
 						size="lg"
 						title="Your figures"
-						description={windowHeading(window)}
+						description={
+							<>
+								{windowHeading(window)}{" "}
+								<InfoTip label="About your figures">
+									<InfoGroups groups={FIGURES_PLAIN} />
+								</InfoTip>
+							</>
+						}
 						aria-busy={loading || stale || undefined}
 						actions={
 							<RangeControls
@@ -103,46 +119,66 @@ export function PracticesAcrossTheWorkspacePage({
 								onRetry={tiles.onRetry}
 							/>
 						) : (
-							<div className="space-y-3">
-								<WorkspaceTiles
-									tiles={windowTiles}
-									openFeedback={overview?.openFeedback}
-									stale={stale}
-								/>
-								{/* The skeleton holds the hint's place, so nothing moves when it arrives. */}
-								{windowTiles === undefined || overview === undefined ? (
-									<Skeleton className="h-12 w-full max-w-3xl" />
-								) : (
-									<div
-										className={cn(
-											"max-w-3xl space-y-1 text-xs text-muted-foreground",
-											stale && STALE,
-										)}
-									>
-										{tilesHint(windowTiles).map((line) => (
-											<p key={line}>{line}</p>
-										))}
-									</div>
-								)}
-							</div>
+							<WorkspaceTiles
+								tiles={windowTiles}
+								openFeedback={overview?.openFeedback}
+								stale={stale}
+							/>
 						)}
 					</Section>
 
 					<Section
 						size="lg"
 						title={ALL_PRACTICE_GROUPS}
-						description={overview && barsHint("group")}
+						aria-busy={overview === undefined || undefined}
 					>
-						<SplitLegend />
+						<SplitLegend scope="group" />
 						<GroupsTable
 							overview={overview}
 							openGroupSlug={openGroupSlug}
 							onOpenGroup={onOpenGroup}
 						/>
+						{focusFooter}
 					</Section>
 				</>
 			)}
 		</PageLayout>
+	);
+}
+
+/**
+ * One calm line while the server counts: a pulsing dot, what is happening and an (i) on the wait.
+ * After {@link SLOW_LOAD_AFTER_MS} it says the count takes longer than usual. The live region is in
+ * the page from the start and receives one message, once: the slow wording is only drawn, so a
+ * screen reader hears the page is counting once, not again when the wording changes.
+ */
+function LoadingLine({ loading }: { loading: boolean }) {
+	// A read that is in within the delay only flashes the skeletons, never the line.
+	const counting = useSpinDelay(loading, { delay: LOADING_LINE_AFTER_MS, minDuration: 400 });
+	const slow = useSpinDelay(loading, { delay: SLOW_LOAD_AFTER_MS, minDuration: 500 });
+	return (
+		<>
+			<p role="status" className="sr-only">
+				{counting ? LOADING_STATUS : null}
+			</p>
+			{counting && (
+				<div
+					data-slot="loading-line"
+					className="absolute top-full left-0 mt-1.5 flex max-w-full items-center gap-2 text-sm text-muted-foreground"
+				>
+					<span
+						aria-hidden
+						className="size-2 shrink-0 animate-pulse rounded-full bg-mentor motion-reduce:animate-none"
+					/>
+					<span aria-hidden className="truncate">
+						{slow ? SLOW_LOAD_SHORT : LOADING_STATUS}
+					</span>
+					<InfoTip label="About the wait" className="my-0">
+						<InfoLines lines={SLOW_LOAD_NOTE} />
+					</InfoTip>
+				</div>
+			)}
+		</>
 	);
 }
 

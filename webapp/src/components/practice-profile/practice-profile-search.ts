@@ -126,15 +126,16 @@ export const ALL_PRACTICE_GROUPS_LEVEL: DetailStackEntry<PracticeProfileDetailLe
 };
 
 /**
- * The practice level's tabs: what the reviews found, the feedback written from it, and the practice
- * guide. The catalog's words on the practice open the level above them. The choice is the
- * `practiceTab` search param; the level shows the guide only for a practice that has one.
+ * The practice level's tabs: the feedback written about the practice, what the reviews found, and
+ * the practice guide. The catalog's words on the practice open the level above them. The choice is
+ * the `practiceTab` search param; the feedback leads and is where the level opens, and the level
+ * shows the guide only for a practice that has one.
  */
-export const PRACTICE_TABS = ["observations", "feedback", "guide"] as const;
+export const PRACTICE_TABS = ["feedback", "observations", "guide"] as const;
 
 export type PracticeTab = (typeof PRACTICE_TABS)[number];
 
-export const DEFAULT_PRACTICE_TAB: PracticeTab = "observations";
+export const DEFAULT_PRACTICE_TAB: PracticeTab = "feedback";
 
 /** The selection inside an open level; each is cleared when its level closes. */
 export interface PracticeGroupDetailSelection {
@@ -148,14 +149,14 @@ export interface PracticeGroupDetailSelection {
 }
 
 /**
- * Which feedback cards the page lists, chosen by the tab row over them; `PracticeProfilePage`
- * decides what "newest" holds. The choice is the `feedback` search param.
+ * Which feedback cards the page lists, chosen by the tab row over them. The choice is the
+ * `feedback` search param; an older link's `newest`, a tab that is gone, reads as the default.
  */
-export const FEEDBACK_TABS = ["newest", "open", "resolved", "all"] as const;
+export const FEEDBACK_TABS = ["open", "resolved", "all"] as const;
 
 export type FeedbackTab = (typeof FEEDBACK_TABS)[number];
 
-export const DEFAULT_FEEDBACK_TAB: FeedbackTab = "newest";
+export const DEFAULT_FEEDBACK_TAB: FeedbackTab = "open";
 
 /**
  * What the page itself reads out of the URL: the table's sort, the feedback tab, and the selection

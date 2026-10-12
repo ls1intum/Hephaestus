@@ -36,6 +36,7 @@ describe("groupReviewRunsByDay", () => {
 				run("c", new Date(2026, 8, 21, 9, 0)),
 				run("d", new Date(2025, 11, 31, 9, 0)),
 			],
+			(entry) => entry.reviewedAt,
 			NOW,
 		);
 		expect(days.map((day) => [day.label, day.runs.map((entry) => entry.reviewId)])).toStrictEqual([
@@ -60,14 +61,19 @@ describe("runPositionsOnWork", () => {
 describe("reviewOrdinalLabel", () => {
 	it.each([
 		[1, undefined],
-		[2, "2nd review"],
-		[3, "3rd review"],
-		[4, "4th review"],
-		[11, "11th review"],
-		[12, "12th review"],
-		[21, "21st review"],
-		[112, "112th review"],
+		[2, "Review 2"],
+		[3, "Review 3"],
+		[4, "Review 4"],
+		[11, "Review 11"],
+		[12, "Review 12"],
+		[112, "Review 112"],
 	])("labels position %i as %s", (position, label) => {
 		expect(reviewOrdinalLabel(position)).toBe(label);
+	});
+
+	it("counts the work's reviews when it knows them", () => {
+		expect(reviewOrdinalLabel(2, 3)).toBe("Review 2 of 3");
+		// A count that cannot hold the position is not shown.
+		expect(reviewOrdinalLabel(4, 3)).toBe("Review 4");
 	});
 });

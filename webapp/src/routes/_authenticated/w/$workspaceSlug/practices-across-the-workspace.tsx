@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { createFileRoute, Navigate, stripSearchParams, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, stripSearchParams } from "@tanstack/react-router";
 import { z } from "zod";
 
 import {
@@ -13,18 +13,19 @@ import type {
 } from "@/api/types.gen";
 import { type PanelState, panelState, queryLoadState } from "@/components/common/panel-state";
 import {
-	type DetailStackEntry,
-	detailStackKey,
 	detailStackSchema,
 	parseDetailStack,
 } from "@/components/layout/detail-drawer/detail-stack";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import { levelPathAt } from "@/components/layout/detail-drawer/level-path";
 import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
+import { ALL_GROUPS_FOCUS, isFocusSwitchStep } from "@/components/practice-focus/practice-focus";
 import {
-	practiceGroupLevel,
-	practiceLevel,
-} from "@/components/practice-profile/practice-profile-search";
+	FOCUS_FOOTER_COPY,
+	focusSwitchName,
+	PracticeFocusFooter,
+} from "@/components/practice-focus/PracticeFocusFooter";
+import { usePracticeFocusSwitch } from "@/components/practice-focus/use-practice-focus-switch";
 import {
 	ACROSS_THE_WORKSPACE,
 	ACROSS_WORKSPACE_STALE_MS,
@@ -45,6 +46,8 @@ const LEVEL_KINDS = ["practice-group"] as const;
 const searchSchema = z
 	.object({
 		window: z.enum(WINDOW_VALUES).default(DEFAULT_WINDOW).catch(DEFAULT_WINDOW),
+		// The practice row the group level marks, written by a switch from the reader's profile.
+		practice: z.string().min(1).max(200).optional().catch(undefined),
 	})
 	.extend(detailStackSchema(LEVEL_KINDS).shape);
 
@@ -61,8 +64,7 @@ export const Route = createFileRoute(
 
 function PracticesAcrossTheWorkspace() {
 	const { workspaceSlug } = Route.useParams();
-	const { window, detail } = Route.useSearch();
-	const navigate = useNavigate();
+	const { window, detail, practice } = Route.useSearch();
 	const featureState = useWorkspaceFeatures(workspaceSlug);
 	const enabled = featureState.practicesEnabled === true;
 	// The overview does not depend on the window. Both queries can start after the feature read.
@@ -79,17 +81,15 @@ function PracticesAcrossTheWorkspace() {
 		staleTime: ACROSS_WORKSPACE_STALE_MS,
 	});
 	const stack = parseDetailStack(detail, LEVEL_KINDS);
-	const stackControls = useDetailStack(stack);
+	// The marked practice belongs to the group level and leaves the address with it.
+	const stackControls = useDetailStack({
+		levelParams: ["practice"],
+		replaceOnClose: isFocusSwitchStep,
+	});
 	// Typed by this page's search, so a misspelt key does not compile.
 	const setView = (view: Partial<z.infer<typeof searchSchema>>) => stackControls.setView(view);
 	const openGroupSlug = stack[0]?.id;
-	const goToProfile = (levels: DetailStackEntry[]) => {
-		void navigate({
-			to: "/w/$workspaceSlug/practice-profile",
-			params: { workspaceSlug },
-			search: { detail: levels.map(detailStackKey) },
-		});
-	};
+	const focusSwitch = usePracticeFocusSwitch(workspaceSlug);
 
 	if (featureState.practicesEnabled === false) {
 		return <Navigate to="/w/$workspaceSlug" params={{ workspaceSlug }} replace />;
@@ -110,10 +110,11 @@ function PracticesAcrossTheWorkspace() {
 					stale: tilesQuery.isPlaceholderData,
 				}));
 	const overview = state.status === "ready" ? state.overview : undefined;
-	const group = overview?.groups.find((each) => each.groupSlug === openGroupSlug);
+	// Each level reads its own group: a hand-edited address can stack two.
+	const groupOf = (slug: string) => overview?.groups.find((each) => each.groupSlug === slug);
 	const pathAt = levelPathAt(stack, {
 		pageLabel: ACROSS_THE_WORKSPACE,
-		labelOf: () => group?.groupName ?? "Group",
+		labelOf: (entry) => groupOf(entry.id)?.groupName ?? "Group",
 		onClose: stackControls.close,
 	});
 
@@ -126,18 +127,38 @@ function PracticesAcrossTheWorkspace() {
 				onWindowChange={(next) => setView({ window: next })}
 				openGroupSlug={openGroupSlug}
 				onOpenGroup={(groupSlug) => stackControls.open({ kind: "practice-group", id: groupSlug })}
+				focusFooter={
+					<PracticeFocusFooter
+						{...FOCUS_FOOTER_COPY.workspaceAllGroups}
+						placement="page"
+						accessibleLabel={FOCUS_FOOTER_COPY.workspaceAllGroups.label}
+						onSwitch={() => focusSwitch.toProfile(ALL_GROUPS_FOCUS)}
+					/>
+				}
 			/>
 			{/* Only the overview feeds the level, so a failed tiles read leaves it open. */}
-			<DetailDrawerStack stack={stack} size="detailWide" onClose={stackControls.close}>
+			<DetailDrawerStack
+				stack={stack}
+				onClose={stackControls.close}
+				footer={(entry) => (
+					<PracticeFocusFooter
+						{...FOCUS_FOOTER_COPY.workspaceGroup}
+						accessibleLabel={focusSwitchName(
+							FOCUS_FOOTER_COPY.workspaceGroup.label,
+							groupOf(entry.id)?.groupName,
+						)}
+						onSwitch={() => focusSwitch.toProfile({ groupSlug: entry.id })}
+					/>
+				)}
+			>
 				{(entry, level) => (
 					<WorkspaceGroupLevel
-						key={entry.id}
 						nested={level.nested}
 						path={pathAt(level.depth)}
-						state={levelState(state, group)}
-						onGoToProfile={() => goToProfile([practiceGroupLevel(entry.id)])}
+						state={levelState(state, groupOf(entry.id))}
+						focusPracticeSlug={practice}
 						onGoToPractice={(practiceSlug) =>
-							goToProfile([practiceGroupLevel(entry.id), practiceLevel(practiceSlug)])
+							focusSwitch.toProfile({ groupSlug: entry.id, practiceSlug })
 						}
 					/>
 				)}

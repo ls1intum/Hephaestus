@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "cn";
 import type { WorkspaceRange, WorkspaceTile as WorkspaceTileFigure } from "@/api/types.gen";
-import { StatTile, StatTileSkeleton } from "@/components/common/StatTile";
+import { StatTile } from "@/components/common/StatTile";
 import { NEUTRAL_GREY } from "@/components/practice-vocabulary/standing-counts";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -16,6 +16,13 @@ export interface WorkspaceTileProps {
 	/** Said in place of the band and pin when the whole middle half is at nought. */
 	noneSentence?: string;
 }
+
+/**
+ * The title's box: two lines tall wherever the tile's header is narrow enough to wrap a title, so a
+ * loading tile and a loaded one share a height and the figures of a row line up. The header is the
+ * nearest container.
+ */
+const TITLE_BOX = "flex min-h-5 items-center @max-[16rem]:min-h-10";
 
 /**
  * One figure, the reader's own first and the workspace's middle half after, as Apple Health's
@@ -32,7 +39,12 @@ export function WorkspaceTile({
 }: WorkspaceTileProps) {
 	const { yours, middle } = figure;
 	return (
-		<StatTile icon={icon} title={title} value={yours} qualifier={qualifier}>
+		<StatTile
+			icon={icon}
+			title={<span className={TITLE_BOX}>{title}</span>}
+			value={yours}
+			qualifier={qualifier}
+		>
 			<div className="mt-auto flex flex-col gap-1.5">
 				{middle !== undefined && middle.high === 0 && noneSentence !== undefined ? (
 					<p className="text-sm text-muted-foreground">{noneSentence}</p>
@@ -111,14 +123,43 @@ function RangeBar({ yours, middle }: { yours: number; middle?: WorkspaceRange })
 	);
 }
 
-/** The tile's shape while its figure loads: the range in words, then its track with the scale under it. */
+/**
+ * The tile's shape while its figure loads, line for line at the loaded tile's heights: the icon and
+ * title, the value and what it counts, the range in words, then the track with a band on it and the
+ * scale's two ends under it. Static under reduced motion, as every `Skeleton` is.
+ */
 export function WorkspaceTileSkeleton() {
 	return (
-		<StatTileSkeleton>
-			<div className="mt-auto flex flex-col gap-1.5">
-				<Skeleton className="h-5 w-36" />
-				<Skeleton className="mb-5 h-4 w-full" />
-			</div>
-		</StatTileSkeleton>
+		<div aria-hidden className="flex w-full" data-slot="tile-skeleton">
+			<StatTile
+				icon={<Skeleton className="size-4 shrink-0 rounded-full" />}
+				title={
+					<span className={TITLE_BOX}>
+						<Skeleton className="h-3.5 w-36" />
+					</span>
+				}
+				// The value's line with what it counts beside it, at the loaded line's height.
+				value={
+					<span className="flex h-6.5 items-center gap-1.5">
+						<Skeleton className="h-6 w-8" />
+						<Skeleton className="mt-1 h-3.5 w-28" />
+					</span>
+				}
+			>
+				<div className="mt-auto flex flex-col gap-1.5">
+					<span className="flex h-5 items-center">
+						<Skeleton className="h-3.5 w-36" />
+					</span>
+					<div className="relative mb-5 h-4 w-full">
+						<span className="absolute inset-x-0 top-1.5 h-1 rounded-full bg-muted" />
+						<Skeleton className="absolute top-1 left-[30%] h-2 w-[35%] rounded-full bg-muted-foreground/15" />
+						<span className="absolute inset-x-0 top-full flex h-4.5 items-end justify-between">
+							<Skeleton className="h-3 w-2" />
+							<Skeleton className="h-3 w-4" />
+						</span>
+					</div>
+				</div>
+			</StatTile>
+		</div>
 	);
 }

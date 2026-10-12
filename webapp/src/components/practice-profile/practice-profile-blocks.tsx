@@ -1,4 +1,4 @@
-import { MessageSquareTextIcon } from "lucide-react";
+import { ClipboardCheckIcon, MessageSquareTextIcon } from "lucide-react";
 import { type ReactElement, type ReactNode, useId } from "react";
 
 import { SectionLabel } from "@/components/common/SectionLabel";
@@ -52,6 +52,27 @@ export function NoSuchGroup() {
 				<EmptyTitle>We could not find this practice group</EmptyTitle>
 				<EmptyDescription>
 					Check the link, or ask a workspace admin whether it is active in this workspace.
+				</EmptyDescription>
+			</EmptyHeader>
+		</Empty>
+	);
+}
+
+/**
+ * A level opened for a group the page leaves out because nothing in it is reviewed: no practices
+ * were added to it, or every one is switched off. Not a group that never applied to the work —
+ * that one has practices, and they say so.
+ */
+export function GroupWithoutPractices() {
+	return (
+		<Empty variant="outlined">
+			<EmptyHeader>
+				<EmptyMedia variant="icon">
+					<ClipboardCheckIcon />
+				</EmptyMedia>
+				<EmptyTitle>This group has no practices</EmptyTitle>
+				<EmptyDescription>
+					Nothing in it is reviewed in this workspace, so there is nothing to show yet.
 				</EmptyDescription>
 			</EmptyHeader>
 		</Empty>

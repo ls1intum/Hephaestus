@@ -82,6 +82,26 @@ export const EntriesCanTakeFocus: Story = {
 	},
 };
 
+/**
+ * Read for one review, the timeline leads with the moment that started it, under the section's own
+ * title; every other moment on the work waits behind a toggle.
+ */
+export const StartedThisReview: Story = {
+	args: {
+		title: "Why it ran",
+		level: 3,
+		startedReviewId: "11111111-1111-1111-1111-111111111111",
+	},
+	play: async ({ canvas, userEvent }) => {
+		await expect(canvas.getByRole("heading", { name: "Why it ran", level: 3 })).toBeVisible();
+		await expect(canvas.getByText("Marked ready for review")).toBeVisible();
+		await expect(canvas.getByText("Started this review")).toBeVisible();
+		await expect(canvas.queryByText("Opened as a draft")).not.toBeInTheDocument();
+		await userEvent.click(canvas.getByRole("button", { name: "4 other moments on this work" }));
+		await expect(await canvas.findByText("Opened as a draft")).toBeVisible();
+	},
+};
+
 /** Nothing was ever recorded, so no practice was ever asked a question about this work. */
 export const NothingRecorded: Story = {
 	args: { signals: [] },

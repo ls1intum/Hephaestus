@@ -17,9 +17,19 @@ export function RequestedReviewTag() {
 	return <StatusBadge def={OBSERVATION_ORIGIN_DEFS.MANUAL} />;
 }
 
-/** "2nd review", on a later review of the same work; nothing on the first, or while unknown. */
-export function ReviewOrdinalTag({ position }: { position: number | undefined }) {
-	const label = position === undefined ? undefined : reviewOrdinalLabel(position);
+/**
+ * "Review 2 of 3", or "Review 2" while the count is unknown, on a later review of the same work;
+ * nothing on the first, or while unknown.
+ */
+export function ReviewOrdinalTag({
+	position,
+	total,
+}: {
+	position: number | undefined;
+	/** How many reviews the work has, where the list knows it. */
+	total?: number | undefined;
+}) {
+	const label = position === undefined ? undefined : reviewOrdinalLabel(position, total);
 	if (label === undefined) {
 		return null;
 	}

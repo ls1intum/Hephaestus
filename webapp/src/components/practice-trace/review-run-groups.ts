@@ -1,20 +1,24 @@
 import type { ProfileReviewRun } from "@/api/types.gen";
 import { formatWeekdayDay } from "@/lib/dates";
 
-/** One heading of the reviews list and the reviews under it. */
-export interface ReviewRunDay {
+/** One heading of a reviews list and the reviews under it. */
+export interface ReviewRunDay<TRun> {
 	label: string;
-	runs: ProfileReviewRun[];
+	runs: TRun[];
 }
 
 /**
- * The reviews under a heading per day, in the order they arrived. The day is named outright rather
- * than as "Today": a page left open crosses midnight.
+ * The reviews under a heading per day, in the order they arrived, each by the moment `dateOf` reads.
+ * The day is named outright rather than as "Today": a page left open crosses midnight.
  */
-export function groupReviewRunsByDay(runs: ProfileReviewRun[], now: Date): ReviewRunDay[] {
-	const days: ReviewRunDay[] = [];
+export function groupReviewRunsByDay<TRun>(
+	runs: readonly TRun[],
+	dateOf: (run: TRun) => Date,
+	now: Date,
+): ReviewRunDay<TRun>[] {
+	const days: ReviewRunDay<TRun>[] = [];
 	for (const run of runs) {
-		const label = formatWeekdayDay(run.reviewedAt, now);
+		const label = formatWeekdayDay(dateOf(run), now);
 		const last = days.at(-1);
 		if (last?.label === label) {
 			last.runs.push(run);
@@ -46,22 +50,15 @@ export function runPositionsOnWork(runs: ProfileReviewRun[]): Map<string, number
 	return positions;
 }
 
-const ORDINAL_RULES = new Intl.PluralRules("en-US", { type: "ordinal" });
-const ORDINAL_SUFFIXES: Record<Intl.LDMLPluralRule, string> = {
-	zero: "th",
-	one: "st",
-	two: "nd",
-	few: "rd",
-	many: "th",
-	other: "th",
-};
-
 /**
- * "2nd review". The first review of a piece of work is not tagged: every work has one, so the tag
- * would single out none.
+ * "Review 2 of 3", or "Review 2" while the count of the work's reviews is unknown. The first review
+ * of a piece of work is not tagged: every work has one, so the tag would single out none.
  */
-export function reviewOrdinalLabel(position: number): string | undefined {
-	return position <= 1
-		? undefined
-		: `${position}${ORDINAL_SUFFIXES[ORDINAL_RULES.select(position)]} review`;
+export function reviewOrdinalLabel(position: number, total?: number): string | undefined {
+	if (position <= 1) {
+		return undefined;
+	}
+	return total !== undefined && total >= position
+		? `Review ${position} of ${total}`
+		: `Review ${position}`;
 }

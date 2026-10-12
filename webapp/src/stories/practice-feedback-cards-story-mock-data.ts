@@ -162,7 +162,7 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 			{ ref: pullRequest(22), date: inStoryYear("09-09T00:00"), outcome: "NOT_MET" },
 		],
 		// Two clean pieces before #22 put the run at two of three; #22 emptied it again, which is
-		// the fall back the overview's "What needs your attention" reports.
+		// the fall back the overview reports.
 		cleanWork: [],
 		nextStep:
 			"Copy the issue's acceptance criteria into the description and tick the ones the change meets, so the reviewer and the issue's author see the same list.",

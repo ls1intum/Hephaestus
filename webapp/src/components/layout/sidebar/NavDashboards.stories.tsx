@@ -22,7 +22,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** One press reaches the Practice profile from any page; the chevron beside it discloses the workspace view. */
+/** One press reaches the Practice profile from any page; the chevron beside it alone discloses the workspace view. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		// The Practice profile is the workspace home, so it leads; Activity follows it.
@@ -42,6 +42,45 @@ export const PracticePagesOpen: Story = {
 		await expect(pages.getByRole("link", { name: "Across the workspace" })).toHaveAttribute(
 			"href",
 			"/w/aet/practices-across-the-workspace",
+		);
+	},
+};
+
+/** Pressing the profile itself opens it and unfolds the pages under it, sparing the chevron press. */
+export const PressingTheProfileUnfoldsItsPages: Story = {
+	parameters: { router: { initialUrl: "/w/aet/activity" } },
+	play: async ({ canvas }) => {
+		const chevron = canvas.getByRole("button", { name: "Pages under Practice profile" });
+		await expect(chevron).toHaveAttribute("aria-expanded", "false");
+		await userEvent.click(canvas.getByRole("link", { name: "Practice profile" }));
+		await expect(chevron).toHaveAttribute("aria-expanded", "true");
+		await expect(canvas.getByRole("link", { name: "Across the workspace" })).toBeVisible();
+		// The chevron still folds the pages away by itself, and the reader stays on the profile.
+		await userEvent.click(chevron);
+		await expect(chevron).toHaveAttribute("aria-expanded", "false");
+		await expect(canvas.getByRole("link", { name: "Practice profile" })).toHaveAttribute(
+			"data-active",
+		);
+		// A second press on the profile unfolds them again.
+		await userEvent.click(canvas.getByRole("link", { name: "Practice profile" }));
+		await expect(chevron).toHaveAttribute("aria-expanded", "true");
+	},
+};
+
+/** Arriving on the profile with a slide-in layer open, the pages under it are already in sight. */
+export const PracticeProfileWithLayerOpen: Story = {
+	parameters: {
+		router: {
+			initialUrl:
+				"/w/aet/practice-profile?detail=%5B%22practice-groups%3Aall%22%2C%22practice-group%3Atesting-discipline%22%5D",
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByRole("button", { name: "Pages under Practice profile" }),
+		).toHaveAttribute("aria-expanded", "true");
+		await expect(canvas.getByRole("link", { name: "Practice profile" })).toHaveAttribute(
+			"data-active",
 		);
 	},
 };
