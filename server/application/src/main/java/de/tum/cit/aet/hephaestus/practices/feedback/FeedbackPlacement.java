@@ -36,7 +36,7 @@ import org.jspecify.annotations.Nullable;
  * <p>Append-only / {@code @Immutable}: posting outcomes that change over time are represented by
  * writing a new placement row rather than mutating an existing one through the ORM. This is the
  * <em>selector</em> edge (where a body of commentary is anchored), orthogonal to the
- * {@link FeedbackObservation} <em>target</em> edge.
+ * {@link FeedbackEvidence} <em>target</em> edge.
  *
  * <p>The diff-anchor columns are a coupled group: populated only for {@code INLINE} and {@code LOCATION_COMMENT}
  * placements, so all are nullable and NULL means "this surface carries no diff coordinate".

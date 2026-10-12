@@ -78,7 +78,12 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
                 byJob.computeIfAbsent(jobId, id -> new HashMap<>())
                         .put(
                                 run.practiceSlug(),
-                                new PracticeScriptRunDTO(run.getStatus(), run.getLeads(), modelUses(run.getModels())));
+                                new PracticeScriptRunDTO(
+                                        run.getStatus(),
+                                        run.getProgramKind(),
+                                        run.path(),
+                                        run.getStopReason(),
+                                        modelUses(run.getModels())));
             }
         }
         return byJob;

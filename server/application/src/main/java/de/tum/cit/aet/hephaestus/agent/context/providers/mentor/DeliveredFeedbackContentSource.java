@@ -9,13 +9,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.FeedbackObservationVisibility;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository.FeedbackResultVisibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.RecipientFeedbackRow;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -46,10 +46,10 @@ public class DeliveredFeedbackContentSource implements ContentSource {
 
     private final UserRepository userRepository;
     private final FeedbackRepository feedbackRepository;
-    private final FeedbackObservationRepository feedbackObservationRepository;
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
     private final FeedbackWithdrawalRepository withdrawalRepository;
     private final ConversationConsentGate conversationConsentGate;
-    private final ObservationVisibilityPolicy visibilityPolicy;
+    private final ResultVisibilityPolicy visibilityPolicy;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -169,23 +169,23 @@ public class DeliveredFeedbackContentSource implements ContentSource {
     private record Usable(RecipientFeedbackRow row, ReviewClaimCurrentness evidence, boolean withdrawn) {}
 
     /**
-     * The rows whose every bound observation may still be shown to the developer, as on their practice page, and
-     * whose conversation, if any, still has consent; a row bound to no observation is withheld. Evidence the work
+     * The rows whose every bound result may still be shown to the developer, as on their practice page, and
+     * whose conversation, if any, still has consent; a row bound to no result is withheld. Evidence the work
      * or the practice has since moved past stays: a later change does not alter what became of the feedback.
      */
     private List<Usable> authorized(Long workspaceId, List<RecipientFeedbackRow> rows) {
         if (rows.isEmpty()) {
             return List.of();
         }
-        List<FeedbackObservationVisibility> bindings = feedbackObservationRepository.findForVisibility(
+        List<FeedbackResultVisibility> bindings = feedbackEvidenceRepository.findForVisibility(
                 workspaceId, rows.stream().map(RecipientFeedbackRow::getId).toList());
         Set<UUID> visible = visibilityPolicy.permitsShown(
                 workspaceId,
                 bindings.stream()
-                        .map(FeedbackObservationVisibility::getObservation)
+                        .map(FeedbackResultVisibility::getPracticeResult)
                         .toList(),
                 SourceUsePurpose.CONVERSATIONAL_MENTORING);
-        Map<UUID, ReviewClaimCurrentness> shown = FeedbackObservationVisibility.shown(bindings, visible);
+        Map<UUID, ReviewClaimCurrentness> shown = FeedbackResultVisibility.shown(bindings, visible);
         Set<Long> activeThreadIds = conversationConsentGate.activeThreadIds(
                 workspaceId,
                 rows.stream()

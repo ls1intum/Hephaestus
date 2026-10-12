@@ -11,13 +11,13 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -34,8 +34,7 @@ class ReviewFeedbackInAppBodyTest extends BaseUnitTest {
     private static final long WORKSPACE_ID = 7L;
 
     private final FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
-    private final FeedbackObservationRepository feedbackObservationRepository =
-            mock(FeedbackObservationRepository.class);
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository = mock(FeedbackEvidenceRepository.class);
     private final FeedbackPlacementRepository feedbackPlacementRepository = mock(FeedbackPlacementRepository.class);
     private final ReviewSubjectResolver subjectResolver = mock(ReviewSubjectResolver.class);
     private final ReviewRunLookup reviewRunLookup = mock(ReviewRunLookup.class);
@@ -45,7 +44,7 @@ class ReviewFeedbackInAppBodyTest extends BaseUnitTest {
 
     private final ReviewFeedbackQueryService service = new ReviewFeedbackQueryService(
             feedbackRepository,
-            feedbackObservationRepository,
+            feedbackEvidenceRepository,
             feedbackPlacementRepository,
             mock(FeedbackDispatchRepository.class),
             subjectResolver,
@@ -97,7 +96,7 @@ class ReviewFeedbackInAppBodyTest extends BaseUnitTest {
                 .build();
         when(feedbackRepository.findByIdAndWorkspaceId(feedbackId, WORKSPACE_ID))
                 .thenReturn(Optional.of(unit));
-        when(feedbackObservationRepository.findBoundObservations(WORKSPACE_ID, feedbackId))
+        when(feedbackEvidenceRepository.findBoundResults(WORKSPACE_ID, feedbackId))
                 .thenReturn(List.of());
         when(feedbackPlacementRepository.findByFeedbackIdInDisplayOrder(feedbackId))
                 .thenReturn(List.of());

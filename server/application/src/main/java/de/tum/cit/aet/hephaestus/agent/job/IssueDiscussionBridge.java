@@ -26,13 +26,13 @@ public class IssueDiscussionBridge {
 
     private final LockedIssueRow lockedRow;
     private final IssueEvidenceRevision revisions;
-    private final IssueObservationSuperseder superseder;
+    private final IssueResultSuperseder superseder;
     private final ObjectProvider<IssueAgentJobEventListener> listener;
 
     IssueDiscussionBridge(
             LockedIssueRow lockedRow,
             IssueEvidenceRevision revisions,
-            IssueObservationSuperseder superseder,
+            IssueResultSuperseder superseder,
             ObjectProvider<IssueAgentJobEventListener> listener) {
         this.lockedRow = lockedRow;
         this.revisions = revisions;

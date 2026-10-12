@@ -20,12 +20,12 @@ class PracticeAutonomyPolicyTest extends BaseUnitTest {
     class Provenance {
 
         @Test
-        void aBackfilledObservationIsRefusedOnBothInPlaceChannels() {
+        void aBackfilledResultIsRefusedOnBothInPlaceChannels() {
             for (PracticeAutonomy autonomy : PracticeAutonomy.values()) {
                 for (FeedbackChannel channel : new FeedbackChannel[] {
                     FeedbackChannel.IN_CONTEXT, FeedbackChannel.IN_CHAT,
                 }) {
-                    assertThat(PracticeAutonomyPolicy.delivers(ObservationOrigin.BACKFILL, autonomy, channel))
+                    assertThat(PracticeAutonomyPolicy.delivers(ResultOrigin.BACKFILL, autonomy, channel))
                             .as("BACKFILL at autonomy %s, on channel %s", autonomy, channel)
                             .isFalse();
                 }
@@ -34,19 +34,17 @@ class PracticeAutonomyPolicyTest extends BaseUnitTest {
 
         @Test
         void aBackfillIsEntitledToTheInAppChannelAndOnlyThat() {
-            assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.IN_APP))
-                    .isTrue();
-            assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.IN_CONTEXT))
+            assertThat(ResultOrigin.BACKFILL.delivers(FeedbackChannel.IN_APP)).isTrue();
+            assertThat(ResultOrigin.BACKFILL.delivers(FeedbackChannel.IN_CONTEXT))
                     .isFalse();
-            assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.IN_CHAT))
-                    .isFalse();
+            assertThat(ResultOrigin.BACKFILL.delivers(FeedbackChannel.IN_CHAT)).isFalse();
         }
 
         @ParameterizedTest
         @EnumSource(
-                value = ObservationOrigin.class,
+                value = ResultOrigin.class,
                 names = {"LIVE", "MANUAL"})
-        void aMeasurementOfWorkAsItHappenedLeavesEveryChannelToTheTier(ObservationOrigin origin) {
+        void aMeasurementOfWorkAsItHappenedLeavesEveryChannelToTheTier(ResultOrigin origin) {
             assertThat(Arrays.stream(FeedbackChannel.values()).allMatch(origin::delivers))
                     .isTrue();
         }
@@ -59,13 +57,13 @@ class PracticeAutonomyPolicyTest extends BaseUnitTest {
         @Test
         void bothAxesMustAdmitAChannel() {
             assertThat(PracticeAutonomyPolicy.delivers(
-                            ObservationOrigin.LIVE, PracticeAutonomy.AUTOMATIC, FeedbackChannel.IN_CONTEXT))
+                            ResultOrigin.LIVE, PracticeAutonomy.AUTOMATIC, FeedbackChannel.IN_CONTEXT))
                     .isTrue();
             assertThat(PracticeAutonomyPolicy.delivers(
-                            ObservationOrigin.LIVE, PracticeAutonomy.HUMAN_APPROVAL, FeedbackChannel.IN_CONTEXT))
+                            ResultOrigin.LIVE, PracticeAutonomy.HUMAN_APPROVAL, FeedbackChannel.IN_CONTEXT))
                     .isFalse();
             assertThat(PracticeAutonomyPolicy.delivers(
-                            ObservationOrigin.BACKFILL, PracticeAutonomy.AUTOMATIC, FeedbackChannel.IN_CONTEXT))
+                            ResultOrigin.BACKFILL, PracticeAutonomy.AUTOMATIC, FeedbackChannel.IN_CONTEXT))
                     .isFalse();
         }
 
@@ -84,8 +82,7 @@ class PracticeAutonomyPolicyTest extends BaseUnitTest {
         })
         void approvalGatesOnlyThePushedChannel(PracticeAutonomy autonomy, FeedbackChannel channel, boolean delivers) {
             assertThat(autonomy.delivers(channel)).isEqualTo(delivers);
-            for (ObservationOrigin origin :
-                    new ObservationOrigin[] {ObservationOrigin.LIVE, ObservationOrigin.MANUAL}) {
+            for (ResultOrigin origin : new ResultOrigin[] {ResultOrigin.LIVE, ResultOrigin.MANUAL}) {
                 assertThat(PracticeAutonomyPolicy.delivers(origin, autonomy, channel))
                         .as("%s at %s on %s", origin, autonomy, channel)
                         .isEqualTo(delivers);
@@ -103,21 +100,21 @@ class PracticeAutonomyPolicyTest extends BaseUnitTest {
         void theOriginRuleStillBoundsThePullLanes() {
             // A backfill may reach the practice page under HUMAN_APPROVAL, and never the chat.
             assertThat(PracticeAutonomyPolicy.delivers(
-                            ObservationOrigin.BACKFILL, PracticeAutonomy.HUMAN_APPROVAL, FeedbackChannel.IN_APP))
+                            ResultOrigin.BACKFILL, PracticeAutonomy.HUMAN_APPROVAL, FeedbackChannel.IN_APP))
                     .isTrue();
             assertThat(PracticeAutonomyPolicy.delivers(
-                            ObservationOrigin.BACKFILL, PracticeAutonomy.HUMAN_APPROVAL, FeedbackChannel.IN_CHAT))
+                            ResultOrigin.BACKFILL, PracticeAutonomy.HUMAN_APPROVAL, FeedbackChannel.IN_CHAT))
                     .isFalse();
         }
 
         @Test
         void shouldFailClosedWhenAutonomyCannotBeResolved() {
             for (FeedbackChannel channel : FeedbackChannel.values()) {
-                assertThat(PracticeAutonomyPolicy.delivers(ObservationOrigin.LIVE, null, channel))
+                assertThat(PracticeAutonomyPolicy.delivers(ResultOrigin.LIVE, null, channel))
                         .as("unresolved autonomy on %s", channel)
                         .isFalse();
             }
-            assertThat(PracticeAutonomyPolicy.delivers(ObservationOrigin.BACKFILL, null, FeedbackChannel.IN_CONTEXT))
+            assertThat(PracticeAutonomyPolicy.delivers(ResultOrigin.BACKFILL, null, FeedbackChannel.IN_CONTEXT))
                     .isFalse();
         }
     }

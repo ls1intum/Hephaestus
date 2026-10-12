@@ -543,7 +543,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRefuseAPracticeScriptCredentialWhenItCallsAReviewPath() {
+        void shouldRefuseAPracticeScriptRoutingWhenItReachesAReviewPath() {
             authenticate(practiceScriptRouting(ModelKind.CHAT, "openai-completions"));
 
             var result = controller.proxy(
@@ -558,7 +558,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRefuseAReviewCredentialWhenItCallsAPracticeScriptPath() {
+        void shouldRefuseAReviewRoutingWhenItReachesAPracticeScriptPath() {
             authenticate(routing("openai-completions"));
 
             var result = controller.proxyPracticeScript(
@@ -574,10 +574,10 @@ class LlmProxyServiceTest extends BaseUnitTest {
 
         /** 402, not 429: a rate limit also answers 429, and the runner must not report it as a budget. */
         @Test
-        void shouldRefuseWithPaymentRequiredWhenThePracticeScriptCapIsSpent() {
+        void shouldRefuseWithPaymentRequiredWhenTheDirectModelCapIsSpent() {
             var routing = practiceScriptRouting(ModelKind.EMBEDDING, "openai-embeddings");
             authenticate(routing);
-            when(budgetGate.isPracticeScriptCapReached(Objects.requireNonNull(routing.attempt())))
+            when(budgetGate.isDirectModelCapReached(Objects.requireNonNull(routing.attempt())))
                     .thenReturn(true);
 
             var result = controller.proxyPracticeScript(

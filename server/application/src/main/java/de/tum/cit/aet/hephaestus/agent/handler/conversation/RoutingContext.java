@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 /**
- * The audience context for one conversational-routing pass: the {@link RecipientRole} the observations in this
+ * The audience context for one conversational-routing pass: the {@link RecipientRole} the results in this
  * pass are addressed to (see {@link RecipientRole} for the ADR 0021 reviewer deferral).
  */
 public record RoutingContext(RecipientRole recipientRole) {

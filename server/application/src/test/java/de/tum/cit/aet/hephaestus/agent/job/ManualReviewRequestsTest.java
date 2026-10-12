@@ -24,8 +24,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
@@ -153,7 +153,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
                         any(),
                         any(GateDecision.Run.class));
         assertThat(captor.getValue().triggerSignal()).isNull();
-        assertThat(captor.getValue().observationOrigin()).isEqualTo(ObservationOrigin.MANUAL);
+        assertThat(captor.getValue().practiceResultOrigin()).isEqualTo(ResultOrigin.MANUAL);
     }
 
     @Test

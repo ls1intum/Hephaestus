@@ -7,17 +7,17 @@ import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalSer
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackProposalRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.FeedbackApprovalDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.FeedbackWithdrawalService;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationService;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationService;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackLocationCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackReasonCountDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewLineageDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewObservationDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewObservationDetailDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewResultDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewResultDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewWorkFactsDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.UpdateFeedbackWithdrawalRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.UpdateObservationValidityRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.UpdatePracticeResultValidityRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.DeliveryPolicyTraceDTO;
 import de.tum.cit.aet.hephaestus.practices.web.QueryFilterSupport;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
@@ -63,20 +63,20 @@ import org.springframework.web.server.ResponseStatusException;
 @RequireAtLeastWorkspaceAdmin
 public class PracticeReviewOutputController {
 
-    private final ReviewObservationQueryService observationQueryService;
+    private final ReviewResultQueryService practiceResultQueryService;
     private final ReviewFeedbackQueryService feedbackQueryService;
     private final FeedbackApprovalService feedbackApprovalService;
-    private final ObservationInvalidationService invalidationService;
+    private final PracticeResultInvalidationService invalidationService;
     private final FeedbackWithdrawalService withdrawalService;
     private final ReviewLineageService lineageService;
     private final ReviewWorkFactsQueryService workFactsQueryService;
 
-    @GetMapping("/observations")
+    @GetMapping("/results")
     @Operation(
-            summary = "List practice review observations across the workspace",
+            summary = "List practice review results across the workspace",
             description = "Results include linked feedback outcomes and are ordered newest first by default.",
-            operationId = "listPracticeReviewObservations")
-    @ApiResponse(responseCode = "200", description = "Paginated observations returned")
+            operationId = "listPracticeReviewResults")
+    @ApiResponse(responseCode = "200", description = "Paginated results returned")
     @ApiResponse(
             responseCode = "400",
             description = "Invalid filter or pagination",
@@ -84,7 +84,7 @@ public class PracticeReviewOutputController {
                     @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
-    public ResponseEntity<PagedModel<ReviewObservationDTO>> listObservations(
+    public ResponseEntity<PagedModel<ReviewResultDTO>> listResults(
             WorkspaceContext workspaceContext,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "50") @Min(1) @Max(100) int size,
@@ -92,68 +92,66 @@ public class PracticeReviewOutputController {
                             description =
                                     "Sorting strategy. ACTIONABILITY orders NOT_MET by severity (CRITICAL, MAJOR, MINOR, INFO), "
                                             + "then MET, then NOT_APPLICABLE and UNDETERMINED together. Within each rank, "
-                                            + "observation time and ID are descending.")
+                                            + "result time and ID are descending.")
                     @RequestParam(defaultValue = "NEWEST")
-                    ReviewObservationSort sort,
-            @Valid @ParameterObject ReviewObservationFilterParams filter) {
-        return ResponseEntity.ok(new PagedModel<>(observationQueryService.list(
+                    ReviewResultSort sort,
+            @Valid @ParameterObject ReviewResultFilterParams filter) {
+        return ResponseEntity.ok(new PagedModel<>(practiceResultQueryService.list(
                 workspaceContext.id(), filter.toFilter(), sort, PageRequest.of(page, size))));
     }
 
-    @GetMapping("/observations/{observationId}")
-    @Operation(
-            summary = "Get an observation with its evidence and linked feedback",
-            operationId = "getPracticeReviewObservation")
+    @GetMapping("/results/{practiceResultId}")
+    @Operation(summary = "Get a result with its evidence and linked feedback", operationId = "getPracticeReviewResult")
     @ApiResponse(
             responseCode = "200",
-            description = "Observation detail returned",
-            content = @Content(schema = @Schema(implementation = ReviewObservationDetailDTO.class)))
+            description = "Result detail returned",
+            content = @Content(schema = @Schema(implementation = ReviewResultDetailDTO.class)))
     @ApiResponse(
             responseCode = "404",
-            description = "Observation not found in this workspace",
+            description = "Result not found in this workspace",
             content =
                     @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
-    public ResponseEntity<ReviewObservationDetailDTO> getObservation(
-            WorkspaceContext workspaceContext, @PathVariable UUID observationId) {
-        return ResponseEntity.ok(observationQueryService.get(workspaceContext.id(), observationId));
+    public ResponseEntity<ReviewResultDetailDTO> getPracticeResult(
+            WorkspaceContext workspaceContext, @PathVariable UUID practiceResultId) {
+        return ResponseEntity.ok(practiceResultQueryService.get(workspaceContext.id(), practiceResultId));
     }
 
-    @PatchMapping("/observations/{observationId}/validity")
-    @AuditExempt(reason = "The observation_invalidation row is the domain audit trail")
+    @PatchMapping("/results/{practiceResultId}/validity")
+    @AuditExempt(reason = "The practice_result_invalidation row is the domain audit trail")
     @Operation(
-            summary = "Invalidate an observation that was wrong when recorded, or restore it",
-            description = "Invalidating stops feedback citing the observation that has not reached anyone yet. "
+            summary = "Invalidate a result that was wrong when recorded, or restore it",
+            description = "Invalidating stops feedback citing the result that has not reached anyone yet. "
                     + "Feedback already delivered keeps its record, and a comment already posted on the "
                     + "provider stays there. Restoring does not re-send anything.",
-            operationId = "updatePracticeReviewObservationValidity")
+            operationId = "updatePracticeReviewResultValidity")
     @ApiResponse(
             responseCode = "200",
-            description = "Observation detail after the change",
-            content = @Content(schema = @Schema(implementation = ReviewObservationDetailDTO.class)))
+            description = "Result detail after the change",
+            content = @Content(schema = @Schema(implementation = ReviewResultDetailDTO.class)))
     @ApiResponse(
             responseCode = "404",
-            description = "Observation not found in this workspace",
+            description = "Result not found in this workspace",
             content =
                     @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
             responseCode = "409",
-            description = "The observation is already in the requested state",
+            description = "The result is already in the requested state",
             content =
                     @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
-    public ResponseEntity<ReviewObservationDetailDTO> updateObservationValidity(
+    public ResponseEntity<ReviewResultDetailDTO> updateResultValidity(
             WorkspaceContext workspaceContext,
-            @PathVariable UUID observationId,
-            @Valid @RequestBody UpdateObservationValidityRequestDTO request) {
+            @PathVariable UUID practiceResultId,
+            @Valid @RequestBody UpdatePracticeResultValidityRequestDTO request) {
         long actorAccountId = SecurityUtils.getCurrentAccountId().orElseThrow();
         invalidationService.setValidity(
-                workspaceContext.id(), observationId, actorAccountId, request.valid(), request.reason());
-        return ResponseEntity.ok(observationQueryService.get(workspaceContext.id(), observationId));
+                workspaceContext.id(), practiceResultId, actorAccountId, request.valid(), request.reason());
+        return ResponseEntity.ok(practiceResultQueryService.get(workspaceContext.id(), practiceResultId));
     }
 
     @GetMapping("/feedback")
@@ -239,7 +237,7 @@ public class PracticeReviewOutputController {
 
     @GetMapping("/feedback/{feedbackId}")
     @Operation(
-            summary = "Get feedback with its stored body, observations and placements",
+            summary = "Get feedback with its stored body, results and placements",
             operationId = "getPracticeReviewFeedback")
     @ApiResponse(
             responseCode = "200",

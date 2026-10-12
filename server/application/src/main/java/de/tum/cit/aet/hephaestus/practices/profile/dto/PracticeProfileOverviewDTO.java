@@ -10,8 +10,8 @@ import org.jspecify.annotations.Nullable;
  * The practice profile's overview for the calling developer.
  *
  * <p>Every change is measured over {@link #window}. It opens after the previous run and closes now, not at
- * {@code latestRun.at}: the latest run is the newest observation on record, but the feedback it composed
- * lands moments after that observation and the developer's own responses land whenever they respond, and
+ * {@code latestRun.at}: the latest run is the newest result on record, but the feedback it composed
+ * lands moments after that result and the developer's own responses land whenever they respond, and
  * both are "since the latest run" in the only sense a reader means.
  */
 @Schema(description = "What was met, what changed and which work was reviewed over a window of the developer's reviews")

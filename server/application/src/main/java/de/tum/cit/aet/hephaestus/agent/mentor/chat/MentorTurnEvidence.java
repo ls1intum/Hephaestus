@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MergeReadinessContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ObservationHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.RecentAuthoredWorkContentSource;
+import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ResultHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ReviewAttemptsContentSource;
 import java.util.List;
 import java.util.Map;
@@ -60,8 +60,8 @@ final class MentorTurnEvidence {
             "checksObserved",
             "checksObservedAt",
             "latestReviewsStatus");
-    private static final List<String> OBSERVATION_FIELDS = List.of(
-            "id",
+    private static final List<String> RESULT_FIELDS = List.of(
+            "practiceResultId",
             "resource",
             "reviewId",
             "origin",
@@ -83,10 +83,10 @@ final class MentorTurnEvidence {
                 source(mapper, inputs, MergeReadinessContentSource.OUTPUT_KEY, readinessLists, READINESS_FIELDS);
         receipt.set("mergeReadiness", readiness);
 
-        List<String> observationLists = List.of("recentObservations", "abstentions", "earlierObservations");
-        ObjectNode observations = source(
-                mapper, inputs, ObservationHistoryContentSource.OUTPUT_KEY, observationLists, OBSERVATION_FIELDS);
-        receipt.set("observations", observations);
+        List<String> practiceResultLists = List.of("recentResults", "abstentions", "earlierResults");
+        ObjectNode practiceResults =
+                source(mapper, inputs, ResultHistoryContentSource.OUTPUT_KEY, practiceResultLists, RESULT_FIELDS);
+        receipt.set("observations", practiceResults);
 
         List<String> workLists = List.of("pullRequests", "issues");
         ObjectNode authored =
@@ -104,7 +104,7 @@ final class MentorTurnEvidence {
                 receipt,
                 List.of(
                         new Section(readiness, readinessLists),
-                        new Section(observations, observationLists),
+                        new Section(practiceResults, practiceResultLists),
                         new Section(authored, workLists),
                         new Section(attempts, attemptLists)));
     }

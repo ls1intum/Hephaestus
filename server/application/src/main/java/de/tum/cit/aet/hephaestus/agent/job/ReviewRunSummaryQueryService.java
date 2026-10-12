@@ -7,15 +7,15 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository.ReviewRunSummaryRo
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.ReviewFeedbackCounts;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.ReviewObservationCounts;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.StandingRunObservationRow;
-import de.tum.cit.aet.hephaestus.practices.observation.RunPracticeOutcomes;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository.ReviewResultCounts;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository.StandingRunResultRow;
+import de.tum.cit.aet.hephaestus.practices.result.RunPracticeOutcomes;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewSubjectResolver;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewSubjectDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewObservationCountsDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewResultCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup.Target;
 import java.time.Clock;
 import java.util.Comparator;
@@ -44,7 +44,7 @@ class ReviewRunSummaryQueryService {
     private static final List<String> SUBJECT_METADATA_KEYS = List.of("about_user_id", "author_id");
 
     private final AgentJobRepository agentJobRepository;
-    private final ObservationRepository observationRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final FeedbackRepository feedbackRepository;
     private final ReviewSubjectResolver subjectResolver;
     private final ReviewRunTargets reviewRunTargets;
@@ -59,9 +59,9 @@ class ReviewRunSummaryQueryService {
         }
         var jobIds = reviews.stream().map(ReviewRunSummaryRow::getId).toList();
         Map<UUID, Target> targets = reviewRunTargets.of(workspaceId, reviews.getContent());
-        Map<UUID, ReviewObservationCounts> observationCounts =
-                observationRepository.summarizeReviewObservations(workspaceId, jobIds).stream()
-                        .collect(Collectors.toMap(ReviewObservationCounts::getJobId, Function.identity()));
+        Map<UUID, ReviewResultCounts> practiceResultCounts =
+                practiceResultRepository.summarizeReviewResults(workspaceId, jobIds).stream()
+                        .collect(Collectors.toMap(ReviewResultCounts::getJobId, Function.identity()));
         Map<UUID, ReviewFeedbackCounts> feedbackCounts =
                 feedbackRepository.summarizeReviewFeedback(workspaceId, jobIds).stream()
                         .collect(Collectors.toMap(ReviewFeedbackCounts::getJobId, Function.identity()));
@@ -70,22 +70,22 @@ class ReviewRunSummaryQueryService {
                         .findReviewRunListFacts(workspaceId, jobIds, ScmSignals.PULL_REQUEST_MERGED.value())
                         .stream()
                         .collect(Collectors.toMap(ReviewRunListFactsRow::getId, Function.identity()));
-        // An observation an admin marked incorrect counts as never made: it names no developer and no verdict here.
-        Map<UUID, List<StandingRunObservationRow>> observations =
-                observationRepository.findStandingRunObservations(workspaceId, jobIds).stream()
-                        .collect(Collectors.groupingBy(StandingRunObservationRow::getAgentJobId));
+        // A result an admin marked incorrect counts as never made: it names no developer and no verdict here.
+        Map<UUID, List<StandingRunResultRow>> standing =
+                practiceResultRepository.findStandingRunResults(workspaceId, jobIds).stream()
+                        .collect(Collectors.groupingBy(StandingRunResultRow::getAgentJobId));
         Map<UUID, List<Long>> developerIds = reviews.stream()
                 .collect(Collectors.toMap(
                         ReviewRunSummaryRow::getId,
-                        review -> developerIds(review, observations.getOrDefault(review.getId(), List.of()))));
+                        review -> developerIds(review, standing.getOrDefault(review.getId(), List.of()))));
         Map<Long, ReviewSubjectDTO> developers = subjectResolver.resolve(
                 developerIds.values().stream().flatMap(List::stream).toList());
         return reviews.map(review -> {
             UUID id = review.getId();
             ReviewRunListFactsRow facts = listFacts.get(id);
             RunPracticeOutcomes outcomes =
-                    RunPracticeOutcomes.ofCounted(observations.getOrDefault(id, List.of()).stream()
-                            .map(StandingRunObservationRow::counted)
+                    RunPracticeOutcomes.ofCounted(standing.getOrDefault(id, List.of()).stream()
+                            .map(StandingRunResultRow::counted)
                             .toList());
             return new ReviewRunSummaryDTO(
                     id,
@@ -94,7 +94,7 @@ class ReviewRunSummaryQueryService {
                     review.getDeliveryStatus(),
                     ReviewRunTargetDTO.from(Objects.requireNonNull(targets.get(id))),
                     review.getCreatedAt(),
-                    ReviewObservationCountsDTO.from(observationCounts.get(id)),
+                    ReviewResultCountsDTO.from(practiceResultCounts.get(id)),
                     ReviewFeedbackCountsDTO.from(feedbackCounts.get(id)),
                     origin(review.getMetadata()),
                     developerIds.getOrDefault(id, List.of()).stream()
@@ -113,14 +113,14 @@ class ReviewRunSummaryQueryService {
     }
 
     /**
-     * Everyone the run observed, in the order first observed; before it observed anyone, the person its metadata
+     * Everyone the run recorded a result about, in the order first recorded; before it recorded any, the person its metadata
      * names, so a running review already says whose work it reads.
      */
-    private static List<Long> developerIds(ReviewRunSummaryRow review, List<StandingRunObservationRow> observations) {
-        Set<Long> observed = observations.stream()
-                .sorted(Comparator.comparing(StandingRunObservationRow::getObservedAt)
-                        .thenComparing(StandingRunObservationRow::getId))
-                .map(StandingRunObservationRow::getAboutUserId)
+    private static List<Long> developerIds(ReviewRunSummaryRow review, List<StandingRunResultRow> results) {
+        Set<Long> observed = results.stream()
+                .sorted(Comparator.comparing(StandingRunResultRow::getObservedAt)
+                        .thenComparing(StandingRunResultRow::getId))
+                .map(StandingRunResultRow::getAboutUserId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         if (!observed.isEmpty()) {
             return List.copyOf(observed);
@@ -143,7 +143,7 @@ class ReviewRunSummaryQueryService {
     }
 
     /** A list must not fail on one run: an origin this release does not know is left unsaid. */
-    private static @Nullable ObservationOrigin origin(@Nullable JsonNode metadata) {
+    private static @Nullable ResultOrigin origin(@Nullable JsonNode metadata) {
         try {
             return ReviewOutputService.originOf(metadata);
         } catch (JobDeliveryException unknown) {

@@ -52,7 +52,7 @@ class MentorChatMetricsTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("startTimer / stopTimer record one observation on mentor.turn.duration")
+    @DisplayName("startTimer / stopTimer record one result on mentor.turn.duration")
     void timerSampleStops() {
         Timer.Sample sample = metrics.startTimer();
         metrics.stopTimer(sample);

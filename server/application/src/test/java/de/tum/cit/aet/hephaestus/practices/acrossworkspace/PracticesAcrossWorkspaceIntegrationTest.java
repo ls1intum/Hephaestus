@@ -39,9 +39,9 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeGroupStandingService;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeGroupStandingService;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
 import de.tum.cit.aet.hephaestus.testconfig.SqlReadMeasurement;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -367,7 +367,7 @@ class PracticesAcrossWorkspaceIntegrationTest extends AbstractPracticeReviewInte
         // Testing and issue standings move forty days back, in order, before the last 30 days but inside the
         // profile's ninety; packaging and craft stay inside both.
         jdbc.update(
-                "UPDATE observation SET observed_at = observed_at - interval '40 days'"
+                "UPDATE practice_result SET observed_at = observed_at - interval '40 days'"
                         + " WHERE workspace_id = ? AND practice_id IN (?, ?)",
                 workspace.getId(),
                 testing.getId(),
@@ -396,7 +396,7 @@ class PracticesAcrossWorkspaceIntegrationTest extends AbstractPracticeReviewInte
         // Every review moves a hundred days back, in order: the ninety day window reads nobody, all time everyone, and
         // no profile shows a standing any more.
         jdbc.update(
-                "UPDATE observation SET observed_at = observed_at - interval '100 days' WHERE workspace_id = ?",
+                "UPDATE practice_result SET observed_at = observed_at - interval '100 days' WHERE workspace_id = ?",
                 workspace.getId());
 
         tiles("DAYS_90")
@@ -456,7 +456,7 @@ class PracticesAcrossWorkspaceIntegrationTest extends AbstractPracticeReviewInte
     @DisplayName("two others and the reader see every split and every band, a part of one included")
     void shouldShowEverythingWhenOnlyTwoOthersHaveAStanding() {
         jdbc.update("""
-                DELETE FROM observation WHERE workspace_id = ? AND about_user_id IN (
+                DELETE FROM practice_result WHERE workspace_id = ? AND about_user_id IN (
                     SELECT id FROM "user" WHERE login LIKE 'across-%' AND login NOT IN
                     ('across-dev-0', 'across-dev-1'))
                 """, workspace.getId());
@@ -543,13 +543,13 @@ class PracticesAcrossWorkspaceIntegrationTest extends AbstractPracticeReviewInte
 
     /**
      * Evidence that cites a source, as every review since frozen workspace folders does, is checked against the
-     * source's owner once per read, not once per citation: six more developers whose every observation cites a
+     * source's owner once per read, not once per citation: six more developers whose every result cites a
      * repository add no statement either.
      */
     @Test
     @WithUser
-    @DisplayName("the overview and the tiles check a cited repository once per read, however many observations cite it")
-    void shouldRunTheSameStatementsWhenMoreObservationsCiteARepository() {
+    @DisplayName("the overview and the tiles check a cited repository once per read, however many results cite it")
+    void shouldRunTheSameStatementsWhenMoreResultsCiteARepository() {
         citingRepository(member("across-citing-first"));
         List<Long> before = statementsPerRead();
         for (int index = 0; index < 6; index++) {
@@ -607,7 +607,7 @@ class PracticesAcrossWorkspaceIntegrationTest extends AbstractPracticeReviewInte
                         "scm.pull_request",
                         (long) nextNumber,
                         developer.getId(),
-                        "Scale observation",
+                        "Scale result",
                         "MET",
                         evidence,
                         "Evidence",
@@ -618,9 +618,9 @@ class PracticesAcrossWorkspaceIntegrationTest extends AbstractPracticeReviewInte
             }
         }
         insertScaleRows(rows.subList(0, 6_000));
-        List<Long> smaller = measuredReads("6000 observations plus history");
+        List<Long> smaller = measuredReads("6000 results plus history");
         insertScaleRows(rows.subList(6_000, rows.size()));
-        assertThat(measuredReads("24000 observations plus history")).isEqualTo(smaller);
+        assertThat(measuredReads("24000 results plus history")).isEqualTo(smaller);
         try (var requests = Executors.newFixedThreadPool(2)) {
             long start = System.nanoTime();
             var overview = CompletableFuture.supplyAsync(
@@ -640,10 +640,10 @@ class PracticesAcrossWorkspaceIntegrationTest extends AbstractPracticeReviewInte
 
     private void insertScaleRows(List<Object[]> rows) {
         jdbc.batchUpdate("""
-                INSERT INTO observation (id, occurrence_key, agent_job_id, workspace_id, practice_id,
+                INSERT INTO practice_result (id, occurrence_key, agent_job_id, workspace_id, practice_id,
                     practice_revision_id, artifact_kind, artifact_id, about_user_id, summary, outcome,
-                    evidence, evidence_rationale, observed_at, origin)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?)
+                    evidence, evidence_rationale, observed_at, origin, scope_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?, 'scm.pull_request:scale:AUTHOR')
                 """, rows);
     }
 
@@ -764,8 +764,8 @@ class PracticesAcrossWorkspaceIntegrationTest extends AbstractPracticeReviewInte
         read().jsonPath("$.groups[0].split.developers").isEqualTo(28);
     }
 
-    /** A diff citation, a citation of one of the developer's observations, and of the developer when asked. */
-    private static String citingHistory(User developer, UUID observation, boolean citingThePerson) {
+    /** A diff citation, a citation of one of the developer's results, and of the developer when asked. */
+    private static String citingHistory(User developer, UUID practiceResult, boolean citingThePerson) {
         String person = "{\"sourceKind\":\"workspace.project-inventory\",\"artifactPath\":\"context/people/"
                 + developer.getId() + "/person.json\",\"path\":\"person.json\",\"startLine\":1,\"endLine\":1,"
                 + "\"quote\":\"x\",\"quoteRedacted\":false,\"sourceReference\":{\"records\":[{\"type\":"
@@ -777,7 +777,7 @@ class PracticesAcrossWorkspaceIntegrationTest extends AbstractPracticeReviewInte
                 + "{\"sourceKind\":\"hephaestus.observation-history\",\"artifactPath\":\"context/people/"
                 + developer.getId() + "/observations.jsonl\",\"path\":\"observations.jsonl\",\"startLine\":1,"
                 + "\"endLine\":1,\"quote\":\"x\",\"quoteRedacted\":false,\"sourceReference\":{\"records\":"
-                + "[{\"type\":\"observation\",\"id\":\"" + observation + "\",\"person\":" + developer.getId()
+                + "[{\"type\":\"observation\",\"id\":\"" + practiceResult + "\",\"person\":" + developer.getId()
                 + "}]}}]}";
     }
 

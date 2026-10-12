@@ -13,14 +13,14 @@ import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.dto.InAppCleanWorkDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.dto.InAppEvidenceDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.dto.InAppFeedbackDTO;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.CurrentResponseRow;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution.Work;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository.CurrentResponseRow;
+import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution;
+import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution.Work;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup;
@@ -161,7 +161,7 @@ public class InAppFeedbackService {
     private record Reads(
             List<Feedback> rows,
             Map<UUID, Instant> withdrawnAt,
-            Map<UUID, List<Observation>> evidence,
+            Map<UUID, List<PracticeResult>> evidence,
             Map<UUID, Instant> practiceChangedAt,
             Map<UUID, FeedbackResponseDTO> responses) {}
 
@@ -172,7 +172,7 @@ public class InAppFeedbackService {
                 .filter(feedback -> !withdrawnAt.containsKey(feedback.getId())
                         || feedback.getDeliveryState() == FeedbackDeliveryState.DELIVERED)
                 .toList();
-        Map<UUID, List<Observation>> evidence = feedbackEvidence.visibleEvidence(
+        Map<UUID, List<PracticeResult>> evidence = feedbackEvidence.visibleEvidence(
                 workspaceId, shown.stream().map(Feedback::getId).toList());
         // Hidden, not deleted. Feedback whose evidence source's authorization was withdrawn must stop being shown,
         // but the ledger still records that we said it, which is the whole point of a ledger. Feedback whose
@@ -223,7 +223,7 @@ public class InAppFeedbackService {
     /** One card's place on a page: its row, what it rests on, and how it stopped being open, if it did. */
     private record Slot(
             Feedback feedback,
-            List<Observation> evidence,
+            List<PracticeResult> evidence,
             @Nullable Instant withdrawnAt,
             WorkResolution resolution,
             @Nullable FeedbackResponseDTO response,
@@ -272,7 +272,7 @@ public class InAppFeedbackService {
 
     private static Slot slot(Feedback feedback, Reads reads, Map<UUID, WorkResolution> resolutions) {
         UUID id = feedback.getId();
-        List<Observation> evidence = Objects.requireNonNull(reads.evidence().get(id));
+        List<PracticeResult> evidence = Objects.requireNonNull(reads.evidence().get(id));
         Instant withdrawnAt = reads.withdrawnAt().get(id);
         if (withdrawnAt != null) {
             return new Slot(feedback, evidence, withdrawnAt, WorkResolution.NONE, null, null, null);
@@ -302,7 +302,7 @@ public class InAppFeedbackService {
                 workspaceId,
                 page.stream()
                         .flatMap(slot -> Stream.concat(
-                                slot.evidence().stream().map(Observation::getAgentJobId),
+                                slot.evidence().stream().map(PracticeResult::getAgentJobId),
                                 slot.resolution().cleanWork().stream().map(Work::jobId)))
                         .collect(Collectors.toSet()));
         return page.stream()
@@ -324,7 +324,8 @@ public class InAppFeedbackService {
     }
 
     /** The notice left in a withdrawn card's place: its practice, and when it was withdrawn. */
-    private static InAppFeedbackDTO withdrawnCard(Feedback feedback, List<Observation> evidence, Instant withdrawnAt) {
+    private static InAppFeedbackDTO withdrawnCard(
+            Feedback feedback, List<PracticeResult> evidence, Instant withdrawnAt) {
         Practice practice = evidence.getFirst().getPractice();
         PracticeGroup group = practice.getGroup();
         return new InAppFeedbackDTO(
@@ -356,7 +357,7 @@ public class InAppFeedbackService {
 
     private static InAppFeedbackDTO toCard(Slot slot, Map<UUID, Target> targets) {
         Feedback feedback = slot.feedback();
-        List<Observation> evidence = slot.evidence();
+        List<PracticeResult> evidence = slot.evidence();
         WorkResolution resolution = slot.resolution();
         FeedbackClosure closure = slot.closure();
         Practice practice = evidence.getFirst().getPractice();
@@ -374,8 +375,8 @@ public class InAppFeedbackService {
                 practice.getWhyItMatters(),
                 practice.getWhatGoodLooksLike(),
                 evidence.stream()
-                        .map(observation ->
-                                InAppEvidenceDTO.from(observation, targets.get(observation.getAgentJobId())))
+                        .map(practiceResult ->
+                                InAppEvidenceDTO.from(practiceResult, targets.get(practiceResult.getAgentJobId())))
                         .toList(),
                 feedback.getCreatedAt(),
                 feedback.getDeliveredAt(),

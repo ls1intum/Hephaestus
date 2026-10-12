@@ -310,7 +310,8 @@ class FeedbackDeliveryService {
                             note.endLine(),
                             sanitized.isBlank() ? "" : commentFormatter.appendInlineFeedbackPrompt(sanitized, job),
                             note.deliveryKey(),
-                            note.contributors());
+                            note.contributors(),
+                            note.observations());
                 })
                 .toList();
         String marker = InlinePackageScope.automaticMarker(job.getId());
@@ -322,13 +323,15 @@ class FeedbackDeliveryService {
                     notes,
                     delivery.withheld(),
                     delivery.summaryContributors() == null ? null : List.of(),
-                    marker);
+                    marker,
+                    delivery.summaryObservations() == null ? null : List.of());
         return new DeliveryContent(
                 commentFormatter.format(sanitized, job),
                 notes,
                 delivery.withheld(),
                 delivery.summaryContributors(),
-                marker);
+                marker,
+                delivery.summaryObservations());
     }
 
     private static List<String> missingInlineKeys(DeliveryContent delivery, List<DeliveredSignal> signals) {

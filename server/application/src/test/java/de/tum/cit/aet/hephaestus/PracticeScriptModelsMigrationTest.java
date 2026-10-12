@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 import liquibase.Contexts;
+import liquibase.LabelExpression;
 import liquibase.Liquibase;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.Test;
 @Tag("database")
 class PracticeScriptModelsMigrationTest {
     private static final String CHANGELOG = "db/changelog/1791486276211_changelog.xml";
+    private static final int CHANGE_SETS_BEFORE_RESULT_CUTOVER = 22;
     private static final String RELEASED_PROJECTION_CHANGELOG = "db/changelog/1790892486246_changelog.xml";
     private static final String RELEASED_GUIDANCE_CHANGELOG = "db/changelog/1791488096611_changelog.xml";
     private static final List<String> NEW_PROTOCOLS = List.of("openai-decisions", "openai-embeddings", "cohere-rerank");
@@ -467,13 +469,21 @@ class PracticeScriptModelsMigrationTest {
         }
     }
 
-    /** Applies the released guidance changelog, then this one, as {@code master.xml} orders them. */
+    /**
+     * Applies the released guidance changelog, then this one up to the practice result cutover, as {@code master.xml}
+     * orders them. The cutover's change sets read the practice result tables this schema does not build;
+     * {@code PracticeResultCutoverMigrationTest} runs them from the released schema.
+     */
     private static void migrate(TestDatabase database) throws Exception {
         for (String changelog : List.of(RELEASED_GUIDANCE_CHANGELOG, CHANGELOG)) {
             var liquibaseDatabase = DatabaseFactory.getInstance()
                     .findCorrectDatabaseImplementation(new JdbcConnection(connect(database)));
             try (Liquibase liquibase = new Liquibase(changelog, new ClassLoaderResourceAccessor(), liquibaseDatabase)) {
-                liquibase.update(new Contexts());
+                if (changelog.equals(CHANGELOG)) {
+                    liquibase.update(CHANGE_SETS_BEFORE_RESULT_CUTOVER, new Contexts(), new LabelExpression());
+                } else {
+                    liquibase.update(new Contexts());
+                }
             }
         }
     }

@@ -41,8 +41,8 @@ import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.AutomatedReviewFence;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
@@ -910,8 +910,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                         mock(PracticeSignalOptions.class),
                         coverageService,
                         new AutomatedReviewFence(Map.of()),
-                        mock(ObservationRepository.class),
-                        mock(ObservationVisibilityPolicy.class),
+                        mock(PracticeResultRepository.class),
+                        mock(ResultVisibilityPolicy.class),
                         mock(ReviewedWorkChanges.class));
                 // One resolver for both, as in production: the ledger key and the gate must agree on which
                 // workspace owns the repository.

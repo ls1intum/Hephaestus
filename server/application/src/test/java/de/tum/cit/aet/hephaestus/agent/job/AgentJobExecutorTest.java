@@ -40,7 +40,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ReviewedWork;
 import de.tum.cit.aet.hephaestus.agent.context.ReviewedWorkFixtures;
 import de.tum.cit.aet.hephaestus.agent.gateway.WorkspaceBudgetExceededException;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.AnsweredPractice;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
@@ -288,7 +288,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         lenient().when(transactionTemplate.getTransactionManager()).thenReturn(transactionManager);
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
         lenient()
-                .when(workerJwtIssuer.issueForJobUntil(any(), anyLong(), anyInt(), any(), any()))
+                .when(workerJwtIssuer.issueForJobUntil(any(), anyLong(), anyInt(), any()))
                 .thenReturn("job-jwt");
 
         lenient()
@@ -315,11 +315,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldFailAQueuedReviewBeforeCaptureWhenItsObservationsWereAlreadyAdmitted() {
+    void shouldFailAQueuedReviewBeforeCaptureWhenItsResultsWereAlreadyAdmitted() {
         job.setRetryCount(1);
         job.setMetadata(JsonNodeFactory.instance
                 .objectNode()
-                .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted-digest"));
+                .put(ResultAdmissionService.DIGEST_METADATA_KEY, "admitted-digest"));
         int attempt = job.getRetryCount();
         when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
         when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -328,9 +328,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         assertThat(claimed).isFalse();
         assertThat(job.getStatus()).isEqualTo(AgentJobStatus.FAILED);
-        assertThat(job.getErrorMessage()).isEqualTo(ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION);
+        assertThat(job.getErrorMessage()).isEqualTo(ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
         assertThat(job.getRetryCount()).isEqualTo(attempt);
-        assertThat(ObservationAdmissionService.isAdmitted(job)).isTrue();
+        assertThat(ResultAdmissionService.isAdmitted(job)).isTrue();
         verify(sandboxManager, never()).execute(any());
         verify(llmBudgetService, never()).decide(anyLong());
     }
@@ -476,25 +476,16 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(jobRepository).save(captured.capture());
             assertThat(captured.getValue().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
             assertThat(captured.getValue().getStartedAt()).isNotNull();
+            // One credential per attempt: the practice programs' direct model calls share the review's token.
             ArgumentCaptor<Instant> reviewExpiry = ArgumentCaptor.forClass(Instant.class);
-            verify(workerJwtIssuer)
-                    .issueForJobUntil(
-                            eq(jobId), eq(99L), anyInt(), reviewExpiry.capture(), eq(WorkerJwtIssuer.LLM_PROXY_SCOPE));
-            ArgumentCaptor<Instant> practiceScriptExpiry = ArgumentCaptor.forClass(Instant.class);
-            verify(workerJwtIssuer)
-                    .issueForJobUntil(
-                            eq(jobId),
-                            eq(99L),
-                            anyInt(),
-                            practiceScriptExpiry.capture(),
-                            eq(WorkerJwtIssuer.LLM_PRACTICE_SCRIPT_SCOPE));
+            verify(workerJwtIssuer, times(1)).issueForJobUntil(eq(jobId), eq(99L), eq(2), reviewExpiry.capture());
+            verifyNoMoreInteractions(workerJwtIssuer);
             ArgumentCaptor<SandboxSpec> sandboxSpec = ArgumentCaptor.forClass(SandboxSpec.class);
             verify(sandboxManager).execute(sandboxSpec.capture());
             assertThat(sandboxSpec.getValue().attempt()).isEqualTo(2);
             long deadline = Long.parseLong(sandboxSpec.getValue().environment().get("SANDBOX_WORK_DEADLINE_MS"));
             assertThat(reviewExpiry.getValue())
                     .isEqualTo(Instant.ofEpochMilli(deadline).plus(SandboxLayout.RESULT_UPLOAD_GRACE));
-            assertThat(practiceScriptExpiry.getValue()).isEqualTo(reviewExpiry.getValue());
         }
 
         @Test
@@ -653,7 +644,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(sandboxManager).execute(any());
             ArgumentCaptor<PracticeAgentRequest> request = ArgumentCaptor.forClass(PracticeAgentRequest.class);
             verify(practiceAgent).buildSandboxSpec(request.capture());
-            assertThat(request.getValue().practiceScriptToken()).isNotNull();
+            assertThat(request.getValue().jobToken()).isEqualTo("job-jwt");
             assertThat(request.getValue().practiceScriptModels())
                     .as("the sandbox receives the models admitted at claim, not those frozen at submit")
                     .containsOnlyKeys(ModelKind.CHAT, ModelKind.DECISION);
@@ -935,7 +926,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             executor.processJob(jobId);
 
             // The adapter's prompt digest, and an inputs digest over the merged file set — written first, so an
-            // observation can always be tied to what produced it even when the sandbox then fails.
+            // result can always be tied to what produced it even when the sandbox then fails.
             ArgumentCaptor<AgentJobRepository.ProvenanceStamp> stamp =
                     ArgumentCaptor.forClass(AgentJobRepository.ProvenanceStamp.class);
             InOrder order = inOrder(jobRepository, sandboxManager);
@@ -1303,7 +1294,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                         .when(jobTelemetry)
                         .transition(any(), eq("agent.job.started"), any(), any(), any());
             } else if (stage.equals("credential")) {
-                when(workerJwtIssuer.issueForJobUntil(any(), anyLong(), anyInt(), any(), any()))
+                when(workerJwtIssuer.issueForJobUntil(any(), anyLong(), anyInt(), any()))
                         .thenThrow(new IllegalStateException(secret));
             } else if (stage.equals("spec")) {
                 when(practiceAgent.buildSandboxSpec(any())).thenThrow(new IllegalStateException(secret));
@@ -1465,7 +1456,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             AgentJob fresh = freshJob();
             fresh.setMetadata(objectMapper
                     .createObjectNode()
-                    .put(ObservationAdmissionService.DIGEST_METADATA_KEY, admitted ? "accepted" : ""));
+                    .put(ResultAdmissionService.DIGEST_METADATA_KEY, admitted ? "accepted" : ""));
             when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(Optional.of(fresh));
             when(jobRepository.findById(jobId)).thenReturn(Optional.of(fresh));
             when(jobRepository.transitionStatus(any(), any(), any(), any(), any()))
@@ -1499,7 +1490,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @ParameterizedTest
         @ValueSource(booleans = {false, true})
-        void incompleteCompositionPreservesAcceptedObservationsUsageAndPartialDelivery(boolean malformed) {
+        void incompleteCompositionPreservesAcceptedResultsUsageAndPartialDelivery(boolean malformed) {
             job.setConfigSnapshot(snapshot.withPriceSnapshot(pricedSnapshot()).toJson(objectMapper));
             stubClaimableJob();
             JobTypeHandler handler =
@@ -1512,7 +1503,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             when(practiceAgent.parseResult(any())).thenReturn(new AgentResult(true, Map.of("feedback", payload)));
             AgentJob fresh = freshJob();
             fresh.setMetadata(
-                    objectMapper.createObjectNode().put(ObservationAdmissionService.DIGEST_METADATA_KEY, "accepted"));
+                    objectMapper.createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "accepted"));
             when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(Optional.of(fresh));
             when(jobRepository.findById(jobId)).thenReturn(Optional.of(fresh));
             when(jobRepository.transitionStatus(any(), any(), any(), any(), any()))
@@ -1590,7 +1581,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             AgentJob fresh = freshJob();
             var admission = objectMapper
                     .createObjectNode()
-                    .put(ObservationAdmissionService.DIGEST_METADATA_KEY, admitted ? "accepted" : "");
+                    .put(ResultAdmissionService.DIGEST_METADATA_KEY, admitted ? "accepted" : "");
             fresh.setMetadata(admission);
             when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(Optional.of(fresh));
             when(jobRepository.findById(jobId)).thenReturn(Optional.of(fresh));
@@ -1694,7 +1685,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     .thenReturn(new AgentResult(false, Map.of("rawOutput", "accepted output")));
             AgentJob fresh = freshJob();
             fresh.setMetadata(
-                    objectMapper.createObjectNode().put(ObservationAdmissionService.DIGEST_METADATA_KEY, "accepted"));
+                    objectMapper.createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "accepted"));
             when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(Optional.of(fresh));
 
             executor.processJob(jobId);
@@ -2001,7 +1992,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                             eq(jobId), eq("unreachable-worker"), eq(AGENT_PROPS.maxRetries()), any(), any(), any()))
                     .thenReturn(1);
 
-            String transcript = "[pi-runner] FATAL: observation admission could not be sent: fetch failed";
+            String transcript = "[pi-runner] FATAL: result admission could not be sent: fetch failed";
             JobTypeHandler handler = setupFullExecution(new SandboxResult(
                     SandboxLayout.EXIT_SERVER_UNREACHABLE, Map.of(), transcript, false, Duration.ofMinutes(9)));
             AgentJob runningJob = freshJob();
@@ -2086,7 +2077,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("a review whose observations did reach the server is NOT run again (exit 75, digest on the row)")
+        @DisplayName("a review whose results did reach the server is NOT run again (exit 75, digest on the row)")
         void unreachableServerDoesNotRepeatAnAdmittedReview() {
             executor = new AgentJobExecutor(
                     AGENT_PROPS,
@@ -2125,11 +2116,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     "the answer never came back",
                     false,
                     Duration.ofMinutes(9)));
-            // The admission committed and only its answer was lost, so the observations are on record
+            // The admission committed and only its answer was lost, so the results are on record
             // and the same review would now be refused as a different payload.
             AgentJob admittedJob = freshJob();
             admittedJob.setMetadata(
-                    objectMapper.createObjectNode().put(ObservationAdmissionService.DIGEST_METADATA_KEY, "abc123"));
+                    objectMapper.createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "abc123"));
             when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(Optional.of(admittedJob));
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(admittedJob));
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -2211,7 +2202,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("an infra failure after the observations were admitted fails terminally instead of repeating")
+        @DisplayName("an infra failure after the results were admitted fails terminally instead of repeating")
         void infraFailureDoesNotRepeatAnAdmittedReview() {
             executor = new AgentJobExecutor(
                     AGENT_PROPS,
@@ -2246,7 +2237,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             AgentJob admittedJob = freshJob();
             admittedJob.setMetadata(
-                    objectMapper.createObjectNode().put(ObservationAdmissionService.DIGEST_METADATA_KEY, "abc123"));
+                    objectMapper.createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "abc123"));
             when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(Optional.of(admittedJob));
             when(jobRepository.transitionStatusOwnedBy(any(), any(), any(), any(), any(), any()))
                     .thenReturn(1);
@@ -2255,7 +2246,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.processJob(jobId);
 
-            // The observations are on record; a second attempt would submit a different payload against
+            // The results are on record; a second attempt would submit a different payload against
             // the digest this job already carries, and the admission refuses that.
             verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt(), any(), any(), any());
             verify(jobRepository)
@@ -3250,9 +3241,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
             job.setStatus(AgentJobStatus.RUNNING);
             job.setRetryCount(2);
             job.setExecutionStartedAt(Instant.now());
-            job.setMetadata(objectMapper
-                    .createObjectNode()
-                    .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted-digest"));
+            job.setMetadata(
+                    objectMapper.createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "admitted-digest"));
             var originalMetadata = job.getMetadata();
             var originalToken = job.getJobTokenHash();
             addToLocalRunningJobs(executor, jobId);
@@ -3264,7 +3254,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                             eq("draining-worker"),
                             eq(2),
                             any(),
-                            eq(ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION)))
+                            eq(ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION)))
                     .thenReturn(1);
             AtomicBoolean settled = new AtomicBoolean();
             doAnswer(inv -> {
@@ -3291,7 +3281,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                             eq("draining-worker"),
                             eq(2),
                             any(),
-                            eq(ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION));
+                            eq(ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION));
             verify(jobRepository, never()).transitionToCancelledOwnedBy(any(), any(), any(), any(), any(), any());
             verify(jobRepository, never()).transitionToCancelled(any(), any(), any(), any(), any());
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> usage =

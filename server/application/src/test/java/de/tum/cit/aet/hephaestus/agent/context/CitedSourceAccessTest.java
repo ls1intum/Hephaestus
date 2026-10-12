@@ -279,7 +279,9 @@ class CitedSourceAccessTest extends BaseUnitTest {
         var job = job();
         String path = "context/people/42/" + filename;
         UUID recordId = UUID.randomUUID();
-        byte[] bytes = ("{\"id\":\"" + recordId + "\",\"synced_at\":null}\n").getBytes(StandardCharsets.UTF_8);
+        // A staged result row names its result as practiceResultId; a feedback row names itself as id.
+        String key = filename.startsWith("observations") ? "practiceResultId" : "id";
+        byte[] bytes = ("{\"" + key + "\":\"" + recordId + "\",\"synced_at\":null}\n").getBytes(StandardCharsets.UTF_8);
         when(memberPolicy.allowsPerson(job, 42L)).thenReturn(true);
         when(preferences.forDeveloper(1L, 42L)).thenReturn(new MemberAiPreferences.Decision(false, null));
         var member = new WorkspaceMembership();
@@ -411,7 +413,7 @@ class CitedSourceAccessTest extends BaseUnitTest {
 
     /**
      * The golden comparison for history: a record of a developer's history is decided by authorizing the
-     * observation it names, whose own citations may name older history in turn. Checked in batches, one per link
+     * result it names, whose own citations may name older history in turn. Checked in batches, one per link
      * of the longest chain, every citation gets the answer it gets alone, where each record is checked on its own.
      */
     @Test
@@ -438,7 +440,7 @@ class CitedSourceAccessTest extends BaseUnitTest {
                 onRefused, List.of(history(refused)),
                 onHiddenRepository, List.of(repository(3L)));
         // The history source as it works: a record is permitted when its owner keeps it and each citation of the
-        // observation it names is permitted, checked with whatever checks the read has running.
+        // result it names is permitted, checked with whatever checks the read has running.
         Predicate<UUID> permitted = id -> !id.equals(refused)
                 && cites.getOrDefault(id, List.of()).stream()
                         .allMatch(citation -> access.checks(1L, purpose).permits(citation));
@@ -457,7 +459,7 @@ class CitedSourceAccessTest extends BaseUnitTest {
                         Mockito.eq(1L), Mockito.eq("observation"), Mockito.any(), Mockito.eq(purpose)))
                 .thenAnswer(call -> {
                     Collection<UUID> ids = call.getArgument(2);
-                    // The batch authorizes its observations together, as the evidence authorization does.
+                    // The batch authorizes its results together, as the evidence authorization does.
                     var checks = access.checks(1L, purpose);
                     checks.prepare(ids.stream()
                             .flatMap(id -> cites.getOrDefault(id, List.of()).stream())

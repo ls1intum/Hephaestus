@@ -91,12 +91,12 @@ class ExactPersonDataCopyRecorderTest {
 
     @Test
     void nestedProducersUpdateTheOuterReceiptBeforeWritingContent() {
-        var observations = new ArrayList<List<PersonCopyIdentity>>();
+        var practiceResults = new ArrayList<List<PersonCopyIdentity>>();
         try (var outer = recorder.begin()) {
-            outer.onChange(() -> observations.add(outer.identities()));
+            outer.onChange(() -> practiceResults.add(outer.identities()));
             try (var inner = recorder.begin()) {
                 recorder.recordIdentity(second);
-                assertThat(observations).containsExactly(List.of(second));
+                assertThat(practiceResults).containsExactly(List.of(second));
                 assertThat(inner.identities()).containsExactly(second);
                 recorder.recordRepository(7);
                 assertThat(outer.repositoryIds()).containsExactly(7L);

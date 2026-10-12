@@ -76,13 +76,13 @@ public class ProxyAccounting {
         return countedRefusal(budgetGate.isBlocked(routing), routing, FundingSource.capTag(routing.connectionScope()));
     }
 
-    public boolean refuseForPracticeScriptCap(ProxyRouting routing, ProxyRouting.BilledAttempt attempt) {
-        return countedRefusal(budgetGate.isPracticeScriptCapReached(attempt), routing, "practice_script_attempt");
+    public boolean refuseForDirectModelCap(ProxyRouting routing, ProxyRouting.BilledAttempt attempt) {
+        return countedRefusal(budgetGate.isDirectModelCapReached(attempt), routing, "practice_script_attempt");
     }
 
     /**
      * Counted by the cap that refused, because different people fix each one: an admin raises a monthly
-     * budget ({@link FundingSource#capTag}), and an operator raises the per-attempt practice script token or
+     * budget ({@link FundingSource#capTag}), and an operator raises the per-attempt direct model token or
      * search unit limit ({@code practice_script_attempt}).
      */
     private boolean countedRefusal(boolean refused, ProxyRouting routing, String cap) {

@@ -53,8 +53,8 @@ public class CapturedReviewedWorkChanges implements ReviewedWorkChanges {
 
     @Override
     public Set<UUID> materiallyChangedLinkedIssues(
-            long workspaceId, Collection<ObservationEvidence> observations, long pullRequestId) {
-        if (observations.isEmpty()) return Set.of();
+            long workspaceId, Collection<ResultEvidence> practiceResults, long pullRequestId) {
+        if (practiceResults.isEmpty()) return Set.of();
         var closing = pullRequests.findClosingIssuesById(pullRequestId);
         if (closing.isEmpty() || closing.stream().anyMatch(issue -> issue.getDeletedAt() != null)) return Set.of();
         Map<String, String> current = new HashMap<>();
@@ -64,12 +64,12 @@ public class CapturedReviewedWorkChanges implements ReviewedWorkChanges {
                 return Set.of();
             }
         }
-        var runIds = observations.stream().map(ObservationEvidence::runId).collect(Collectors.toSet());
+        var runIds = practiceResults.stream().map(ResultEvidence::runId).collect(Collectors.toSet());
         Map<UUID, AgentJobRepository.CapturedReviewedWorkRow> captures = new HashMap<>();
         jobs.findCapturedReviewedWork(workspaceId, runIds).forEach(row -> captures.put(row.getId(), row));
         Set<UUID> changed = new HashSet<>();
-        for (ObservationEvidence observation : observations) {
-            var row = captures.get(observation.runId());
+        for (ResultEvidence practiceResult : practiceResults) {
+            var row = captures.get(practiceResult.runId());
             if (row == null) continue;
             String stored = row.getReviewedWork();
             String version = row.getContractVersion();
@@ -79,7 +79,7 @@ public class CapturedReviewedWorkChanges implements ReviewedWorkChanges {
                 var contract = new SourceContractVersion(version);
                 // An admitted verdict keeps its producing attempt when worker recovery rotates the job counter.
                 var attempt =
-                        observation.citations().path(0).path("verification").path("attempt");
+                        practiceResult.citations().path(0).path("verification").path("attempt");
                 if (work == null
                         || !ArtifactKinds.PULL_REQUEST.value().equals(work.artifactKind())
                         || work.artifactId() != pullRequestId
@@ -90,17 +90,17 @@ public class CapturedReviewedWorkChanges implements ReviewedWorkChanges {
                         || attempt.asInt() < 0
                         || attempt.asInt() > row.getAttempt()
                         || !CitationVerification.isVerified(
-                                observation.runId(), attempt.asInt(), observation.citations())) {
+                                practiceResult.runId(), attempt.asInt(), practiceResult.citations())) {
                     continue;
                 }
-                for (var citation : observation.citations()) {
+                for (var citation : practiceResult.citations()) {
                     String digest = current.get(citation.path("artifactPath").asString());
                     if (LINKED.value().equals(citation.path("sourceKind").asString())
                             && digest != null
                             && !digest.equals(citation.path("verification")
                                     .path("artifactSha256")
                                     .asString())) {
-                        changed.add(observation.observationId());
+                        changed.add(practiceResult.practiceResultId());
                         break;
                     }
                 }

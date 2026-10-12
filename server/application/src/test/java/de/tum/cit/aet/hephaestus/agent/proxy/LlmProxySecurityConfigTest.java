@@ -122,7 +122,7 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
     void hidesTheSandboxCapabilitiesFromTheApplicationConnector() throws Exception {
         assertThat(answerTo("POST", "/internal/llm/responses", APPLICATION_PORT))
                 .isEqualTo(404);
-        assertThat(answerTo("POST", "/internal/llm/admit-observations", APPLICATION_PORT))
+        assertThat(answerTo("POST", "/internal/llm/admit-results", APPLICATION_PORT))
                 .isEqualTo(404);
         assertThat(answerTo("POST", "/internal/llm/complete-public-review", APPLICATION_PORT))
                 .isEqualTo(404);
@@ -176,9 +176,8 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         for (String path : List.of(
                 "/internal/llm/responses",
                 "/internal/llm/chat/completions",
-                "/internal/llm/admit-observations",
-                "/internal/llm/public-feedback-history",
-                "/internal/llm/complete-public-review")) {
+                "/internal/llm/admit-results",
+                "/internal/llm/public-feedback-history")) {
             MockHttpServletRequest request = request("POST", path, GATEWAY_PORT);
             request.setCookies(
                     new Cookie("__Host-HEPHAESTUS_AT", "current-attempt"), new Cookie("JSESSIONID", "current-attempt"));
@@ -241,23 +240,18 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
     }
 
     /**
-     * The practice script route exists only on the gateway, under the model-call bound, for its own scope. A
-     * review token refused there spends nothing from the practice script token's bucket.
+     * The practice programs run in the review's own process, so the job's one credential reaches their direct model
+     * route too. The route exists only on the gateway, under the model-call bound.
      */
     @Test
-    void servesThePracticeScriptRouteOnlyOnTheGatewayForAPracticeScriptToken() throws Exception {
+    void shouldServeThePracticeScriptRouteOnTheGatewayWhenTheJobTokenCallsIt() throws Exception {
         String path = "/internal/llm/practice-script/chat/chat/completions";
         AgentJob job = runningJobOnAttempt(1);
         when(jobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
-        when(jwtVerifier.verify("practice-script-token")).thenReturn(jobJwt(job, 1, "llm_practice_script"));
-        when(jwtVerifier.verify("review")).thenReturn(jobJwt(job, 1, "llm_proxy"));
+        when(jwtVerifier.verify("job-token")).thenReturn(jobJwt(job, 1));
 
-        MockHttpServletRequest review = request("POST", path, GATEWAY_PORT);
-        review.addHeader("Authorization", "Bearer review");
-        assertThat(answerTo(review)).isEqualTo(403);
-        assertThat(servedAs.get()).isNull();
         MockHttpServletRequest practiceScript = request("POST", path, GATEWAY_PORT);
-        practiceScript.addHeader("Authorization", "Bearer practice-script-token");
+        practiceScript.addHeader("Authorization", "Bearer job-token");
         assertThat(answerTo(practiceScript)).isEqualTo(200);
         assertThat(servedAs.get())
                 .isNotNull()
@@ -274,23 +268,39 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
     @CsvSource({
         "POST,/internal/llm/chat/completions",
         "POST,/internal/llm/responses",
-        "POST,/internal/llm/admit-observations",
+        "POST,/internal/llm/practice-script/chat/chat/completions",
+        "POST,/internal/llm/admit-results",
         "POST,/internal/llm/public-feedback-history",
         "GET,/internal/llm/runtime/{job}",
         "GET,/internal/llm/runtime/{job}/workspace",
         "GET,/internal/llm/runtime/{job}/frames",
         "POST,/internal/llm/runtime/{job}/result"
     })
-    void refusesAPracticeScriptTokenOnEveryOtherCapability(String method, String path) throws Exception {
+    void shouldServeEveryCapabilityWhenTheJobsOneTokenCallsIt(String method, String path) throws Exception {
+        AgentJob job = runningJobOnAttempt(1);
+        when(jobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+        when(jwtVerifier.verify("job-token")).thenReturn(jobJwt(job, 1));
+        MockHttpServletRequest request =
+                request(method, path.replace("{job}", job.getId().toString()), GATEWAY_PORT);
+        request.addHeader("Authorization", "Bearer job-token");
+
+        assertThat(answerTo(request)).isEqualTo(200);
+        assertThat(servedAs.get()).isNotNull();
+    }
+
+    /** The retired practice script scope names no capability: a token that carries only it reaches nothing. */
+    @Test
+    void shouldRefuseATokenWhenItCarriesOnlyTheRetiredPracticeScriptScope() throws Exception {
         AgentJob job = runningJobOnAttempt(1);
         when(jobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
         when(jwtVerifier.verify("practice-script-token")).thenReturn(jobJwt(job, 1, "llm_practice_script"));
         MockHttpServletRequest request =
-                request(method, path.replace("{job}", job.getId().toString()), GATEWAY_PORT);
+                request("POST", "/internal/llm/practice-script/chat/chat/completions", GATEWAY_PORT);
         request.addHeader("Authorization", "Bearer practice-script-token");
 
         assertThat(answerTo(request)).isEqualTo(403);
         assertThat(servedAs.get()).isNull();
+        assertThat(answerToTokenCall("practice-script-token")).isEqualTo(403);
     }
 
     @Test

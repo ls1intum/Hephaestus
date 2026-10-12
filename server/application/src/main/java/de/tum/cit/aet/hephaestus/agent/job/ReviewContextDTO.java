@@ -17,7 +17,7 @@ public record ReviewContextDTO(
         @NonNull
         @Schema(
                 description = "The work as this workspace mirrored it; its id and kind address the trace, "
-                        + "observations and feedback about it")
+                        + "results and feedback about it")
         ReviewedWorkRefDTO work,
 
         @NonNull
@@ -30,6 +30,6 @@ public record ReviewContextDTO(
         @NonNull
         @Schema(
                 description = "Whether the caller may read the review details behind this work — the runs, "
-                        + "observations and the delivery of each piece of feedback — which is a workspace "
+                        + "results and the delivery of each piece of feedback — which is a workspace "
                         + "admin's view")
         Boolean canInspectReviewDetails) {}

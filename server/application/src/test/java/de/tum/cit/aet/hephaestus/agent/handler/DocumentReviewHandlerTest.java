@@ -21,7 +21,6 @@ import de.tum.cit.aet.hephaestus.agent.context.providers.DocumentContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
@@ -32,9 +31,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryMan
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionService;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -85,7 +84,6 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
                                 PracticeRevisionService.class,
                                 invocation -> ((Practice) invocation.getArgument(0)).getCurrentRevision()),
                         mock(AnsweredPractices.class)),
-                new ReviewResultParser(objectMapper),
                 deliveryService);
     }
 
@@ -97,7 +95,7 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
                 42L,
                 PUBLISHED,
                 SignalRevision.ofContentDigest("Deployment runbook", "hash-a"),
-                ObservationOrigin.LIVE);
+                ResultOrigin.LIVE);
     }
 
     @Test
@@ -111,9 +109,8 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
     @Test
     void shouldDeliverOnlyPersistedVerdictsWithoutParsingRawOutputAgain() {
         var job = new AgentJob();
-        job.setMetadata(
-                objectMapper.createObjectNode().put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted"));
-        var output = objectMapper.createObjectNode().put("rawOutput", "not an observation payload");
+        job.setMetadata(objectMapper.createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "admitted"));
+        var output = objectMapper.createObjectNode().put("rawOutput", "not a result payload");
         output.putObject("feedback").put("admissionDigest", "admitted");
         job.setOutput(output);
         handler.deliver(job);
@@ -177,7 +174,7 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
                     42L,
                     PUBLISHED,
                     SignalRevision.ofTerminalState("archived"),
-                    ObservationOrigin.LIVE));
+                    ResultOrigin.LIVE));
 
             assertThat(submission.metadata().has("docs_collection_name")).isFalse();
         }
@@ -250,7 +247,7 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    class PrepareObservations {
+    class PrepareResults {
 
         private static final String OBSERVATION = """
             [{
@@ -264,26 +261,13 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
             """;
 
         @Test
-        void shouldRefuseRatherThanFailWhenNothingSubmittedIsAnObservation() {
-            var job = new AgentJob();
-            job.setId(UUID.randomUUID());
-
-            assertThatThrownBy(
-                            () -> handler.prepareObservations(job, objectMapper.readTree("[{\"practiceSlug\": \"\"}]")))
-                    .isInstanceOfSatisfying(
-                            ObservationsRefusedException.class,
-                            e -> assertThat(e.reasonCode()).isEqualTo("no_valid_observations"));
-            verifyNoInteractions(deliveryService);
-        }
-
-        @Test
         void shouldRecordThroughTheDeliveryServiceOnlyWhenAsked() {
             var job = new AgentJob();
             job.setId(UUID.randomUUID());
-            var admissible = mock(ReviewOutputService.PreparedObservations.class);
+            var admissible = mock(ReviewOutputService.PreparedResults.class);
             when(deliveryService.prepare(eq(job), any())).thenReturn(admissible);
 
-            var prepared = handler.prepareObservations(job, objectMapper.readTree(OBSERVATION));
+            var prepared = handler.prepareResults(job, objectMapper.readTree(OBSERVATION));
             verify(deliveryService, never()).publish(any(), any());
 
             prepared.record(job);

@@ -117,7 +117,7 @@ public class ReviewContractValidator {
                                     + "a kind that can be authored against and never executed is silence by declaration");
                 }
                 if (descriptor.roles().isEmpty()) {
-                    violations.add(kind + " is declared reviewable but names nobody to attribute an observation to");
+                    violations.add(kind + " is declared reviewable but names nobody to attribute a result to");
                 }
                 if (descriptor.lanes().isEmpty()) {
                     violations.add(kind + " is declared reviewable but declares no lane to deliver feedback on");

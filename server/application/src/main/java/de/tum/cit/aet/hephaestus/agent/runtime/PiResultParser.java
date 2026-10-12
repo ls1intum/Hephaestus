@@ -3,12 +3,14 @@ package de.tum.cit.aet.hephaestus.agent.runtime;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelPurpose;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelUseDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedReason;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptStopReason;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -85,7 +87,7 @@ public class PiResultParser {
         addRunnerDebug(output, sandboxResult.outputFiles().get("runner-debug.json"));
         addPracticeCoverage(output, sandboxResult.outputFiles().get("practice-coverage.json"));
         // Before the result-file branches below, which early-return: the composition stage's output is
-        // independent of whether the review's own observations parsed, and losing it because the observations
+        // independent of whether the review's own results parsed, and losing it because the results
         // were malformed would silently couple two things that must not be coupled.
         addComposedFeedback(output, sandboxResult.outputFiles().get(SandboxLayout.FEEDBACK_FILENAME));
 
@@ -93,7 +95,7 @@ public class PiResultParser {
         byte[] resultFile = sandboxResult.outputFiles().get("result.json");
         if (resultFile == null) {
             resultFile = buildResultFromReviewState(sandboxResult.outputFiles().get("review-state.json"));
-        } else if (observationsOf(resultFile, "result") == null) {
+        } else if (practiceResultsOf(resultFile, "result") == null) {
             resultFile = null;
         }
         if (resultFile == null) {
@@ -107,17 +109,17 @@ public class PiResultParser {
      * The runner writes its result files with {@code JSON.stringify}: one JSON object and nothing around it. Anything
      * else is refused, never repaired or extracted from text.
      */
-    private @Nullable JsonNode observationsOf(byte[] file, String stage) {
+    private @Nullable JsonNode practiceResultsOf(byte[] file, String stage) {
         try {
             JsonNode root = objectMapper
                     .readerFor(JsonNode.class)
                     .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                     .readValue(file);
-            JsonNode observations = root != null && root.isObject() ? root.get("observations") : null;
-            if (observations != null && observations.isArray()) {
-                return observations;
+            JsonNode practiceResults = root != null && root.isObject() ? root.get("results") : null;
+            if (practiceResults != null && practiceResults.isArray()) {
+                return practiceResults;
             }
-            recordFailure(stage, new IllegalArgumentException("no observations array"));
+            recordFailure(stage, new IllegalArgumentException("no results array"));
         } catch (JacksonException e) {
             recordFailure(stage, e);
         }
@@ -255,59 +257,108 @@ public class PiResultParser {
         if (reviewStateFile == null || reviewStateFile.length == 0) {
             return null;
         }
-        JsonNode observations = observationsOf(reviewStateFile, "review_state");
-        if (observations == null || observations.isEmpty()) {
+        JsonNode practiceResults = practiceResultsOf(reviewStateFile, "review_state");
+        if (practiceResults == null || practiceResults.isEmpty()) {
             return null;
         }
         Map<String, Object> assembled = new LinkedHashMap<>();
-        assembled.put("observations", observations);
+        assembled.put("schemaVersion", 2);
+        assembled.put("results", practiceResults);
         return objectMapper.writeValueAsBytes(assembled);
     }
 
     /**
-     * One staged practice script's run, as {@link SandboxLayout#PRACTICE_SCRIPT_REPORT_FILE} reported it.
+     * One admitted practice's program run, as {@link SandboxLayout#PRACTICE_SCRIPT_REPORT_FILE} reported it.
      *
-     * @param models the models the script declared; empty for a script that uses no model, and {@code null} when
-     *     they are not known because the script ended before it declared them or did not finish
-     * @param error the first line of the script's error, at most {@link #PRACTICE_SCRIPT_ERROR_MAX_LENGTH} characters;
-     *     {@code null} unless the script failed and the runner named the error
-     * @param durationMs how long the script ran; {@code null} when it did not run, did not finish, or the runner did not
-     *     say
+     * @param programDigest the SHA-256 of the staged script as the runner reported it; null for the built-in
+     * @param stopReason why the program stopped without a candidate; null exactly when it returned one, or did not
+     *     finish
+     * @param models the direct models the program declared; empty for the built-in and for a script that declares
+     *     none, and {@code null} when they are not known because the program did not finish
+     * @param calls the calls the program made, {@code {review, chat, decision, embedding, reranking}}; null when the
+     *     practice is not named by the report
+     * @param coverageReached the reads the program's host counted; null when not named by the report
+     * @param error the first line of the program's error, at most {@link #PRACTICE_SCRIPT_ERROR_MAX_LENGTH}
+     *     characters; {@code null} unless it failed and the runner named the error
+     * @param durationMs how long the program ran; {@code null} when it did not start or did not finish, or the runner
+     *     did not say
      */
     public record PracticeScriptRunReport(
             String practiceSlug,
             PracticeScriptRunStatus status,
-            int leads,
+            PracticeProgramKind programKind,
+            @Nullable String programDigest,
+            @Nullable PracticeScriptStopReason stopReason,
             @Nullable List<PracticeScriptModelUseDTO> models,
+            @Nullable Map<String, Integer> calls,
+            @Nullable Map<String, Integer> coverageReached,
             @Nullable String error,
             @Nullable Integer durationMs) {
         public PracticeScriptRunReport {
             models = models == null ? null : List.copyOf(models);
+            calls = calls == null ? null : Map.copyOf(calls);
+            coverageReached = coverageReached == null ? null : Map.copyOf(coverageReached);
         }
 
-        /** A staged script the report does not name: the runner lists every staged script, finished or not. */
-        static PracticeScriptRunReport notFinished(String practiceSlug) {
-            return new PracticeScriptRunReport(practiceSlug, PracticeScriptRunStatus.NOT_FINISHED, 0, null, null, null);
+        /** An admitted practice the report does not name: the runner lists every admitted practice, finished or not. */
+        static PracticeScriptRunReport notFinished(String practiceSlug, PracticeProgramKind programKind) {
+            return new PracticeScriptRunReport(
+                    practiceSlug,
+                    PracticeScriptRunStatus.NOT_FINISHED,
+                    programKind,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
         }
     }
+
+    /** The version of {@link SandboxLayout#PRACTICE_SCRIPT_REPORT_FILE} this parser reads. */
+    static final int PRACTICE_SCRIPT_REPORT_VERSION = 2;
 
     static final int PRACTICE_SCRIPT_REPORT_MAX_BYTES = 64 * 1024;
     static final int PRACTICE_SCRIPT_REPORT_MAX_ENTRIES = 256;
 
-    /** The longest error line that a practice script run keeps, in characters, as {@code practice-scripts.json} bounds it. */
+    /** The longest error line that a practice program run keeps, in characters, as {@code practice-scripts.json} bounds it. */
     public static final int PRACTICE_SCRIPT_ERROR_MAX_LENGTH = 500;
 
     private static final Pattern CONTROL = Pattern.compile("\\p{Cc}");
     private static final Pattern BLANK_START = Pattern.compile("^[\\p{Cc}\\p{Z}]+");
     private static final Pattern BLANK_END = Pattern.compile("[\\p{Cc}\\p{Z}]+\\z");
     private static final Pattern LINE_END = Pattern.compile("[\\r\\n]");
+    private static final Pattern DIGEST = Pattern.compile("[0-9a-f]{64}");
 
     private static final Map<String, PracticeScriptRunStatus> PRACTICE_SCRIPT_STATUSES = Map.of(
             "ok", PracticeScriptRunStatus.OK,
             "skipped", PracticeScriptRunStatus.SKIPPED,
-            "error", PracticeScriptRunStatus.FAILED,
-            "timeout", PracticeScriptRunStatus.TIMED_OUT,
-            "not-finished", PracticeScriptRunStatus.NOT_FINISHED);
+            "failed", PracticeScriptRunStatus.FAILED,
+            "not-reached", PracticeScriptRunStatus.NOT_REACHED);
+
+    private static final Map<String, PracticeProgramKind> PROGRAM_KINDS =
+            Map.of("builtin", PracticeProgramKind.BUILTIN, "custom", PracticeProgramKind.CUSTOM);
+
+    private static final Map<String, PracticeScriptStopReason> STOP_REASONS = Arrays.stream(
+                    PracticeScriptStopReason.values())
+            .collect(Collectors.toUnmodifiableMap(PracticeScriptStopReason::wire, reason -> reason));
+
+    /** The call counts of an entry, in their report order. */
+    public static final List<String> CALL_KINDS = List.of("review", "chat", "decision", "embedding", "reranking");
+
+    private static final List<String> COVERAGE_COUNTS = List.of("reads", "truncatedReads", "failedReads");
+
+    private static final Set<String> ENTRY_KEYS = Set.of(
+            "practiceSlug",
+            "program",
+            "models",
+            "status",
+            "stopReason",
+            "error",
+            "calls",
+            "coverageReached",
+            "durationMs");
 
     private static final Map<String, PracticeScriptNeed> PRACTICE_SCRIPT_NEEDS =
             Map.of("required", PracticeScriptNeed.REQUIRED, "optional", PracticeScriptNeed.OPTIONAL);
@@ -326,17 +377,19 @@ public class PiResultParser {
                     purpose -> AgentPurpose.valueOf(purpose.name()).kind().slot(), purpose -> purpose));
 
     /**
-     * The practice script runs of one attempt, one per staged script. An entry with a value outside the contract,
-     * a duplicate slug, or a slug the job did not stage is dropped and counted. A staged script that a whole
-     * report does not name did not finish. A truncated report says nothing about the scripts it does not name,
-     * so they get no run.
+     * The program runs of one attempt, one per admitted practice. An entry with a value outside the contract, a
+     * duplicate slug, or a slug the job did not admit is dropped and counted. An admitted practice that a whole
+     * report does not name did not finish. A truncated report says nothing about the practices it does not name, so
+     * they get no run.
      *
-     * <p>A missing or unreadable report yields no runs at all. It says nothing about any script, and recording
-     * "did not finish" for each would turn a lost file into a claim about the scripts.
+     * <p>A missing or unreadable report yields no runs at all. It says nothing about any program, and recording "did
+     * not finish" for each would turn a lost file into a claim about the programs. An invalid report never creates a
+     * verdict: it only explains execution.
      *
-     * @param staged the slugs of the practices whose practice script the job staged
+     * @param admitted the program kind of each admitted practice, by slug: custom when its revision holds a script
      */
-    public List<PracticeScriptRunReport> parsePracticeScriptReport(byte @Nullable [] reportFile, Set<String> staged) {
+    public List<PracticeScriptRunReport> parsePracticeScriptReport(
+            byte @Nullable [] reportFile, Map<String, PracticeProgramKind> admitted) {
         if (reportFile == null || reportFile.length == 0) {
             return List.of();
         }
@@ -356,28 +409,34 @@ public class PiResultParser {
         }
         JsonNode entries = root != null && root.isObject() ? root.get("practices") : null;
         JsonNode truncated = root != null && root.isObject() ? root.get("truncated") : null;
-        if (entries == null
+        JsonNode version = root != null && root.isObject() ? root.get("schemaVersion") : null;
+        if (version == null
+                || !version.isIntegralNumber()
+                || version.asInt() != PRACTICE_SCRIPT_REPORT_VERSION
+                || entries == null
                 || !entries.isArray()
                 || entries.size() > PRACTICE_SCRIPT_REPORT_MAX_ENTRIES
                 || truncated == null
                 || !truncated.isBoolean()) {
             recordFailure(
                     "practice_script_report",
-                    new IllegalArgumentException("no bounded practices array or truncation flag"));
+                    new IllegalArgumentException("no version 2, bounded practices array or truncation flag"));
             return List.of();
         }
         Set<String> named = new HashSet<>();
         Map<String, PracticeScriptRunReport> runs = new TreeMap<>();
         for (JsonNode entry : entries) {
-            String slug = entry.path("slug").isString() ? entry.path("slug").asString() : null;
-            if (slug == null || !staged.contains(slug)) {
-                recordFailure("practice_script_report", new IllegalArgumentException("entry for no staged script"));
+            String slug = entry.path("practiceSlug").isString()
+                    ? entry.path("practiceSlug").asString()
+                    : null;
+            if (slug == null || !admitted.containsKey(slug)) {
+                recordFailure("practice_script_report", new IllegalArgumentException("entry for no admitted practice"));
                 continue;
             }
             boolean first = named.add(slug);
-            PracticeScriptRunReport run = practiceScriptRun(slug, entry);
+            PracticeScriptRunReport run = practiceScriptRun(slug, entry, admitted.get(slug));
             if (run == null || !first) {
-                // The runner did name the script, so it gets no run rather than one the runner did not report.
+                // The runner did name the practice, so it gets no run rather than one the runner did not report.
                 recordFailure("practice_script_report", new IllegalArgumentException("invalid or duplicate entry"));
                 runs.remove(slug);
                 continue;
@@ -385,36 +444,64 @@ public class PiResultParser {
             runs.put(slug, run);
         }
         if (!truncated.asBoolean()) {
-            for (String slug : staged) {
-                if (!named.contains(slug)) runs.put(slug, PracticeScriptRunReport.notFinished(slug));
-            }
+            admitted.forEach((slug, kind) -> {
+                if (!named.contains(slug)) runs.put(slug, PracticeScriptRunReport.notFinished(slug, kind));
+            });
         }
         return List.copyOf(runs.values());
     }
 
-    private static @Nullable PracticeScriptRunReport practiceScriptRun(String slug, JsonNode entry) {
+    private static @Nullable PracticeScriptRunReport practiceScriptRun(
+            String slug, JsonNode entry, @Nullable PracticeProgramKind admittedKind) {
+        if (!entry.isObject() || !ENTRY_KEYS.containsAll(entry.propertyNames())) return null;
         PracticeScriptRunStatus status =
                 PRACTICE_SCRIPT_STATUSES.get(entry.path("status").asString(""));
-        Integer leads = count(entry.path("leads"));
-        JsonNode declared = entry.path("models");
-        List<PracticeScriptModelUseDTO> models = declared.isMissingNode() ? null : modelUses(declared);
-        if (status == null || leads == null || (!declared.isMissingNode() && models == null)) {
+        JsonNode program = entry.path("program");
+        PracticeProgramKind kind = PROGRAM_KINDS.get(program.path("kind").asString(""));
+        JsonNode digestNode = program.path("digest");
+        String digest =
+                digestNode.isString() && DIGEST.matcher(digestNode.asString()).matches() ? digestNode.asString() : null;
+        if (status == null
+                || kind == null
+                || kind != admittedKind
+                || !program.isObject()
+                || (kind == PracticeProgramKind.CUSTOM ? digest == null : !digestNode.isNull())) {
             return null;
         }
-        // A script that did not run found nothing, and a report that says otherwise is not believed.
-        boolean ran = status != PracticeScriptRunStatus.SKIPPED && status != PracticeScriptRunStatus.NOT_FINISHED;
-        if (!ran && leads != 0) {
+        JsonNode stop = entry.path("stopReason");
+        PracticeScriptStopReason stopReason = stop.isString() ? STOP_REASONS.get(stop.asString()) : null;
+        // A run that returned a candidate stopped for no reason; every other run names one.
+        if ((status == PracticeScriptRunStatus.OK) != stop.isNull() || (!stop.isNull() && stopReason == null)) {
             return null;
         }
-        // A script that did not finish declared nothing.
-        if (status == PracticeScriptRunStatus.NOT_FINISHED && models != null) {
+        List<PracticeScriptModelUseDTO> models = modelUses(entry.path("models"));
+        Map<String, Integer> calls = counts(entry.path("calls"), CALL_KINDS);
+        Map<String, Integer> coverage = counts(entry.path("coverageReached"), COVERAGE_COUNTS);
+        if (models == null || calls == null || coverage == null) {
+            return null;
+        }
+        // A program that did not start made no call and took no time.
+        boolean started = status != PracticeScriptRunStatus.NOT_REACHED;
+        if (!started && calls.values().stream().anyMatch(count -> count > 0)) {
             return null;
         }
         String error = status == PracticeScriptRunStatus.FAILED ? errorLine(entry.path("error")) : null;
-        // A script that did not run took no time. A duration only explains the run, so a missing or malformed one
-        // leaves the run without it.
-        Integer durationMs = ran ? count(entry.path("durationMs")) : null;
-        return new PracticeScriptRunReport(slug, status, leads, models, error, durationMs);
+        // A duration only explains the run, so a missing or malformed one leaves the run without it.
+        Integer durationMs = started ? count(entry.path("durationMs")) : null;
+        return new PracticeScriptRunReport(
+                slug, status, kind, digest, stopReason, models, calls, coverage, error, durationMs);
+    }
+
+    /** Each named count, as a non-negative int; null when one is missing or malformed, or another key is present. */
+    private static @Nullable Map<String, Integer> counts(JsonNode node, List<String> names) {
+        if (!node.isObject() || node.size() != names.size()) return null;
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (String name : names) {
+            Integer count = count(node.path(name));
+            if (count == null) return null;
+            counts.put(name, count);
+        }
+        return counts;
     }
 
     /**

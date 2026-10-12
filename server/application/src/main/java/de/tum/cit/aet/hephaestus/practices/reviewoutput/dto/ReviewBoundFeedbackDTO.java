@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.BoundFeedbackUnit;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository.BoundFeedbackUnit;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -11,11 +11,11 @@ import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "Feedback composed from an observation")
+@Schema(description = "Feedback composed from a result")
 public record ReviewBoundFeedbackDTO(
         @NonNull UUID feedbackId,
 
-        @NonNull @Schema(description = "Whether the observation led the feedback or reinforced it")
+        @NonNull @Schema(description = "Whether the result led the feedback or reinforced it")
         EvidenceRole role,
 
         @NonNull UUID agentJobId,

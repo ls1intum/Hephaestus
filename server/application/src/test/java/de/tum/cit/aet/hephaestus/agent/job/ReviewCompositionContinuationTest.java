@@ -13,8 +13,8 @@ import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.ReviewedWorkFixtures;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
@@ -74,7 +74,7 @@ class ReviewCompositionContinuationTest extends BaseUnitTest {
     private GitRepositoryManager git;
 
     @Mock
-    private ObservationAdmissionService admission;
+    private ResultAdmissionService admission;
 
     @Mock
     private AgentJobRepository jobs;
@@ -98,8 +98,8 @@ class ReviewCompositionContinuationTest extends BaseUnitTest {
         job.setJobType(AgentJobType.ISSUE_REVIEW);
         job.setArtifactKind(AgentJobService.artifactKindFor(AgentJobType.ISSUE_REVIEW));
         job.setMetadata(mapper.createObjectNode()
-                .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted-digest")
-                .put(ObservationAdmissionService.ATTEMPT_METADATA_KEY, 0));
+                .put(ResultAdmissionService.DIGEST_METADATA_KEY, "admitted-digest")
+                .put(ResultAdmissionService.ATTEMPT_METADATA_KEY, 0));
         job.setEvidenceSnapshot(mapper.createObjectNode().set("manifest", mapper.readTree(manifest)));
         String report = """
                 {"contractVersion":"1.2.0","catalogDigest":"%s","artifactKind":"issue",
@@ -166,8 +166,9 @@ class ReviewCompositionContinuationTest extends BaseUnitTest {
         verify(git, never()).readOriginalSnapshot(any(), any(), any());
     }
 
-    @Test
-    void shouldRefuseWhenAnAdmittedRepositoryQuoteIsNoLongerInTheMirror() {
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"result", "problem", "example", "open question"})
+    void shouldRefuseWhenAnAdmittedRepositoryQuoteIsNoLongerInTheMirror(String citedBy) {
         String head = "a".repeat(40);
         String cited = "b".repeat(40);
         Instant capturedAt = Instant.parse("2026-10-01T00:00:00Z");
@@ -200,12 +201,28 @@ class ReviewCompositionContinuationTest extends BaseUnitTest {
         job.setEvidenceSnapshot(
                 mapper.createObjectNode().set("manifest", mapper.valueToTree(withRepository.retained())));
         ((ObjectNode) Objects.requireNonNull(job.getMetadata())).put("repository_id", 3);
-        ObjectNode admitted = mapper.createObjectNode();
-        admitted.putArray("observations")
+        ObjectNode admitted = mapper.createObjectNode().put("schemaVersion", 2);
+        ObjectNode result = admitted.putArray("results")
                 .addObject()
-                .putArray("citations")
-                .addObject()
-                .put("sourceKind", "scm.repository.tree")
+                .put("practiceResultId", UUID.randomUUID().toString());
+        ObjectNode citation =
+                switch (citedBy) {
+                    case "result" -> result.putArray("citations").addObject();
+                    case "problem" ->
+                        result.putArray("observations")
+                                .addObject()
+                                .put("observationId", UUID.randomUUID().toString())
+                                .putArray("citations")
+                                .addObject();
+                    case "example" -> result.putObject("example").putObject("citation");
+                    default ->
+                        result.putObject("evidence")
+                                .putArray("undecidability")
+                                .addObject()
+                                .put("openQuestion", "Does the release notes page list this change?")
+                                .putObject("citation");
+                };
+        citation.put("sourceKind", "scm.repository.tree")
                 .put("artifactPath", SandboxLayout.REPO_MOUNT_RELATIVE + ".git/HEAD")
                 .put("revision", cited)
                 .putObject("verification")

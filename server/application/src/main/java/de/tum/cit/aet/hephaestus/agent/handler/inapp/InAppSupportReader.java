@@ -8,12 +8,12 @@ import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousInAppFeedback;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import java.time.Clock;
@@ -40,8 +40,8 @@ public class InAppSupportReader {
 
     private static final int MAX_EVIDENCE_PER_PRACTICE = 50;
 
-    private final ObservationRepository observationRepository;
-    private final ObservationVisibilityPolicy visibilityPolicy;
+    private final PracticeResultRepository practiceResultRepository;
+    private final ResultVisibilityPolicy visibilityPolicy;
     private final PreviousInAppFeedback previousInAppFeedback;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
     private final FeedbackRepository feedbackRepository;
@@ -49,14 +49,14 @@ public class InAppSupportReader {
     private final Clock clock;
 
     public InAppSupportReader(
-            ObservationRepository observationRepository,
-            ObservationVisibilityPolicy visibilityPolicy,
+            PracticeResultRepository practiceResultRepository,
+            ResultVisibilityPolicy visibilityPolicy,
             PreviousInAppFeedback previousInAppFeedback,
             PracticeFeedbackDeliveryPolicy deliveryPolicy,
             FeedbackRepository feedbackRepository,
             WorkspaceReviewDefaultsProvider workspaceDefaults,
             Clock clock) {
-        this.observationRepository = observationRepository;
+        this.practiceResultRepository = practiceResultRepository;
         this.visibilityPolicy = visibilityPolicy;
         this.previousInAppFeedback = previousInAppFeedback;
         this.deliveryPolicy = deliveryPolicy;
@@ -72,7 +72,7 @@ public class InAppSupportReader {
             @Nullable Instant lastSurfaced) {}
 
     public RoutingFacts routingFacts(
-            Long workspaceId, Long recipientUserId, String practiceSlug, List<Observation> evidence) {
+            Long workspaceId, Long recipientUserId, String practiceSlug, List<PracticeResult> evidence) {
         return new RoutingFacts(
                 effectiveTier(evidence, workspaceId),
                 subjectRole(evidence),
@@ -82,8 +82,8 @@ public class InAppSupportReader {
     }
 
     /** The previous card about the practice, if any, and the evidence a new card reads. */
-    public record Selection(Optional<PreviousInAppFeedback.Previous> previous, List<Observation> evidence) {
-        public List<Observation> supports() {
+    public record Selection(Optional<PreviousInAppFeedback.Previous> previous, List<PracticeResult> evidence) {
+        public List<PracticeResult> supports() {
             return InAppFeedbackRouter.problemsIn(evidence);
         }
     }
@@ -103,18 +103,18 @@ public class InAppSupportReader {
     /**
      * The support the private composition of an admitted run reads for IN_APP: per current NOT_MET practice, how
      * {@link InAppFeedbackRouter#routeEvidence} routes it now and, when it admits a card, the occurrences the card
-     * could cite. The recipient and the practices come from the admitted observations.
+     * could cite. The recipient and the practices come from the admitted results.
      */
-    public InAppSupportContext snapshot(AgentJob job, List<Observation> admitted) {
+    public InAppSupportContext snapshot(AgentJob job, List<PracticeResult> admitted) {
         Instant now = clock.instant();
-        List<Observation> negatives = admitted.stream()
-                .filter(observation -> observation.getOutcome() == Outcome.NOT_MET)
+        List<PracticeResult> negatives = admitted.stream()
+                .filter(practiceResult -> practiceResult.getOutcome() == Outcome.NOT_MET)
                 .toList();
         if (negatives.isEmpty()) {
             return InAppSupportContext.complete(now, List.of());
         }
         Set<Long> recipients =
-                negatives.stream().map(Observation::getAboutUserId).collect(Collectors.toSet());
+                negatives.stream().map(PracticeResult::getAboutUserId).collect(Collectors.toSet());
         if (recipients.size() != 1) {
             // The private composition addresses one developer; a support read for several is not this context.
             return InAppSupportContext.unavailable(now);
@@ -130,7 +130,7 @@ public class InAppSupportReader {
         }
         Long workspaceId = job.getWorkspace().getId();
         List<InAppSupportContext.PracticeSupport> practices = negatives.stream()
-                .map(observation -> observation.getPractice().getSlug())
+                .map(practiceResult -> practiceResult.getPractice().getSlug())
                 .distinct()
                 .sorted()
                 .map(slug -> practiceSupport(workspaceId, recipient, slug, now))
@@ -154,9 +154,9 @@ public class InAppSupportReader {
     }
 
     // Project autonomy to avoid depending on initialized entity associations.
-    private @Nullable PracticeAutonomy effectiveTier(List<Observation> evidence, Long workspaceId) {
+    private @Nullable PracticeAutonomy effectiveTier(List<PracticeResult> evidence, Long workspaceId) {
         List<UUID> ids = evidence.stream()
-                .map(Observation::getId)
+                .map(PracticeResult::getId)
                 .filter(Objects::nonNull)
                 .toList();
         if (ids.isEmpty()) {
@@ -164,7 +164,7 @@ public class InAppSupportReader {
         }
         PracticeAutonomy workspaceDefault =
                 workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
-        return observationRepository.findPracticeAutonomyFor(ids, workspaceId).stream()
+        return practiceResultRepository.findPracticeAutonomyFor(ids, workspaceId).stream()
                 .findFirst()
                 .map(row -> AutonomyResolver.resolvePractice(
                                 row.getPracticeAutonomy(), row.getGroupAutonomy(), workspaceDefault)
@@ -172,18 +172,18 @@ public class InAppSupportReader {
                 .orElse(null);
     }
 
-    private static ActorRole subjectRole(List<Observation> evidence) {
+    private static ActorRole subjectRole(List<PracticeResult> evidence) {
         return evidence.stream()
-                .map(Observation::getPractice)
+                .map(PracticeResult::getPractice)
                 .filter(Objects::nonNull)
                 .findFirst()
                 .map(Practice::getSubject)
                 .orElse(ActorRole.AUTHOR);
     }
 
-    private List<Observation> visibleEvidence(
+    private List<PracticeResult> visibleEvidence(
             Long workspaceId, Long recipientUserId, String practiceSlug, Instant since) {
-        List<Observation> candidates = observationRepository.findRecentForSubjectAndPractice(
+        List<PracticeResult> candidates = practiceResultRepository.findRecentForSubjectAndPractice(
                 workspaceId, recipientUserId, practiceSlug, since, PageRequest.of(0, MAX_EVIDENCE_PER_PRACTICE));
         if (candidates.isEmpty()) {
             return List.of();

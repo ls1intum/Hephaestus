@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ReviewPracticeOutcomesDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.SlippedPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewSubjectDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewObservationCountsDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewResultCountsDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
@@ -13,7 +13,7 @@ import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "A review run with observation and feedback outcome counts")
+@Schema(description = "A review run with result and feedback outcome counts")
 public record ReviewRunSummaryDTO(
         @NonNull UUID id,
         @NonNull AgentJobStatus status,
@@ -24,7 +24,7 @@ public record ReviewRunSummaryDTO(
 
         @NonNull ReviewRunTargetDTO target,
         @NonNull Instant createdAt,
-        @NonNull ReviewObservationCountsDTO observations,
+        @NonNull ReviewResultCountsDTO practiceResults,
         @NonNull ReviewFeedbackCountsDTO feedback,
 
         @Schema(
@@ -32,11 +32,11 @@ public record ReviewRunSummaryDTO(
                         + " BACKFILL while catching up on work that predates the connection; absent when the run"
                         + " records an origin this release does not know")
         @Nullable
-        ObservationOrigin origin,
+        ResultOrigin origin,
 
         @NonNull
         @Schema(
-                description = "The developers the run is about: everyone it recorded an observation about, or, before"
+                description = "The developers the run is about: everyone it recorded a result about, or, before"
                         + " it recorded any, the person its work names; empty when neither is known")
         List<ReviewSubjectDTO> developers,
 

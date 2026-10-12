@@ -1,20 +1,22 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.ValidatedObservation;
+import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.ValidatedResult;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.ObservationResolutionProjection;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository.ResultResolutionProjection;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -24,7 +26,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Holds back feedback about observations the developer disputed or called not applicable. */
+/** Holds back feedback about results the developer disputed or called not applicable. */
 @Component
 class FeedbackResponseSuppressionFilter {
 
@@ -33,71 +35,69 @@ class FeedbackResponseSuppressionFilter {
     private static final Set<FeedbackResolution> SUPPRESS_ACTIONS =
             Set.of(FeedbackResolution.DISPUTED, FeedbackResolution.NOT_APPLICABLE);
 
+    private final PracticeResultRepository practiceResultRepository;
     private final ObservationRepository observationRepository;
     private final ReactionRepository reactionRepository;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
 
     FeedbackResponseSuppressionFilter(
+            PracticeResultRepository practiceResultRepository,
             ObservationRepository observationRepository,
             ReactionRepository reactionRepository,
             FeedbackLedgerRecorder feedbackLedgerRecorder) {
+        this.practiceResultRepository = practiceResultRepository;
         this.observationRepository = observationRepository;
         this.reactionRepository = reactionRepository;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
     }
 
-    record SuppressionDecision(List<ValidatedObservation> deliverable, int suppressedCount) {}
+    record SuppressionDecision(List<ValidatedResult> deliverable, int suppressedCount) {}
 
     // Read-only tx: we run outside the handler's transaction and read scalar identity columns off the
-    // persisted observations. recordSuppressed writes in its own REQUIRES_NEW tx, so readOnly does not bind it.
+    // persisted results. recordSuppressed writes in its own REQUIRES_NEW tx, so readOnly does not bind it.
     @Transactional(readOnly = true)
-    public SuppressionDecision evaluate(AgentJob job, List<ValidatedObservation> scopedObservations) {
-        return evaluate(job, scopedObservations, false);
-    }
-
-    /**
-     * {@link #evaluate(AgentJob, List)} whose suppressed rows commit or roll back with the caller's transaction, as an
-     * accepted review on the work commits its whole outcome at once.
-     */
-    @Transactional(propagation = Propagation.MANDATORY)
-    public SuppressionDecision evaluateInCurrentTransaction(
-            AgentJob job, List<ValidatedObservation> scopedObservations) {
-        return evaluate(job, scopedObservations, true);
-    }
-
-    private SuppressionDecision evaluate(
-            AgentJob job, List<ValidatedObservation> scopedObservations, boolean inCurrentTransaction) {
+    public SuppressionDecision evaluate(AgentJob job, List<ValidatedResult> scopedResults) {
         long workspaceId = job.getWorkspace().getId();
-        List<Observation> persisted = observationRepository.findByAgentJobId(job.getId(), workspaceId);
+        List<PracticeResult> persisted = practiceResultRepository.findByAgentJobId(job.getId(), workspaceId);
         if (persisted.isEmpty()) {
-            return new SuppressionDecision(scopedObservations, 0);
+            return new SuppressionDecision(scopedResults, 0);
         }
 
-        Map<String, Observation> persistedByOccurrence = new HashMap<>();
-        for (Observation observation : persisted) {
-            persistedByOccurrence.put(observation.getOccurrenceKey(), observation);
+        Map<String, PracticeResult> persistedByOccurrence = new HashMap<>();
+        for (PracticeResult practiceResult : persisted) {
+            persistedByOccurrence.put(practiceResult.getOccurrenceKey(), practiceResult);
         }
-        String[] recurrenceKeys = persisted.stream()
-                .map(Observation::getRecurrenceKey)
-                .filter(Objects::nonNull)
+        // Recurrence is a property of each located problem: a result recurs where one of its problems does.
+        Map<UUID, Set<String>> recurrenceByResult = new HashMap<>();
+        for (Observation problem : observationRepository.findByPracticeResultIds(
+                workspaceId, persisted.stream().map(PracticeResult::getId).toList())) {
+            if (problem.getRecurrenceKey() != null) {
+                recurrenceByResult
+                        .computeIfAbsent(problem.getPracticeResultId(), id -> new HashSet<>())
+                        .add(problem.getRecurrenceKey());
+            }
+        }
+        String[] recurrenceKeys = recurrenceByResult.values().stream()
+                .flatMap(Set::stream)
                 .distinct()
                 .toArray(String[]::new);
-        List<ObservationResolutionProjection> answers = reactionRepository.findCurrentResolutions(
-                workspaceId, persisted.stream().map(Observation::getId).toList(), recurrenceKeys);
+        List<ResultResolutionProjection> answers = reactionRepository.findCurrentResolutions(
+                workspaceId, persisted.stream().map(PracticeResult::getId).toList(), recurrenceKeys);
         if (answers.isEmpty()) {
-            return new SuppressionDecision(scopedObservations, 0);
+            return new SuppressionDecision(scopedResults, 0);
         }
 
-        List<ValidatedObservation> deliverable = new ArrayList<>(scopedObservations.size());
+        List<ValidatedResult> deliverable = new ArrayList<>(scopedResults.size());
         int suppressed = 0;
         int suppressedIndex = 0;
-        for (ValidatedObservation vf : scopedObservations) {
-            Observation pf = persistedByOccurrence.get(vf.occurrenceKey());
+        for (ValidatedResult vf : scopedResults) {
+            PracticeResult pf = persistedByOccurrence.get(vf.occurrenceKey());
             if (pf == null) {
                 deliverable.add(vf);
                 continue;
             }
-            FeedbackResolution action = standingAnswer(pf, answers)
+            FeedbackResolution action = standingAnswer(
+                            pf, recurrenceByResult.getOrDefault(pf.getId(), Set.of()), answers)
                     .map(answer -> FeedbackResolution.valueOf(answer.getResolution()))
                     .orElse(null);
             if (action != null && SUPPRESS_ACTIONS.contains(action)) {
@@ -124,27 +124,28 @@ class FeedbackResponseSuppressionFilter {
                     job.getId(),
                     suppressed,
                     deliverable.size(),
-                    scopedObservations.size());
+                    scopedResults.size());
         }
         return new SuppressionDecision(deliverable, suppressed);
     }
 
-    /** The newest answer that speaks for {@code observation}: on its own feedback, or on the same claim earlier. */
-    private static Optional<ObservationResolutionProjection> standingAnswer(
-            Observation observation, List<ObservationResolutionProjection> answers) {
+    /** The newest answer that speaks for {@code practiceResult}: on its own feedback, or on the same claim earlier. */
+    private static Optional<ResultResolutionProjection> standingAnswer(
+            PracticeResult practiceResult, Set<String> recurrenceKeys, List<ResultResolutionProjection> answers) {
         return answers.stream()
-                .filter(answer -> answer.getObservationId().equals(observation.getId())
-                        || sameClaimInAnEarlierReview(observation, answer))
-                .max(Comparator.comparing(ObservationResolutionProjection::getRespondedAt));
+                .filter(answer -> answer.getPracticeResultId().equals(practiceResult.getId())
+                        || sameClaimInAnEarlierReview(practiceResult, recurrenceKeys, answer))
+                .max(Comparator.comparing(ResultResolutionProjection::getRespondedAt));
     }
 
-    private static boolean sameClaimInAnEarlierReview(Observation observation, ObservationResolutionProjection answer) {
-        UUID jobId = observation.getAgentJobId();
+    private static boolean sameClaimInAnEarlierReview(
+            PracticeResult practiceResult, Set<String> recurrenceKeys, ResultResolutionProjection answer) {
+        UUID jobId = practiceResult.getAgentJobId();
         return !answer.getAgentJobId().equals(jobId)
-                && observation.getRecurrenceKey() != null
-                && observation.getRecurrenceKey().equals(answer.getRecurrenceKey())
-                && observation.getOutcome().name().equals(answer.getOutcome())
-                && normalizeClaim(observation.getSummary()).equals(normalizeClaim(answer.getSummary()));
+                && answer.getRecurrenceKey() != null
+                && recurrenceKeys.contains(answer.getRecurrenceKey())
+                && practiceResult.getOutcome().name().equals(answer.getOutcome())
+                && normalizeClaim(practiceResult.getSummary()).equals(normalizeClaim(answer.getSummary()));
     }
 
     /** A location and outcome alone can describe different claims; carry a response only for the same statement. */

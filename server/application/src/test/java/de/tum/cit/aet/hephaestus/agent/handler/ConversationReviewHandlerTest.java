@@ -20,7 +20,6 @@ import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
@@ -89,7 +88,6 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
                                 PracticeRevisionService.class,
                                 invocation -> ((Practice) invocation.getArgument(0)).getCurrentRevision()),
                         mock(AnsweredPractices.class)),
-                new ReviewResultParser(objectMapper),
                 deliveryService,
                 eventPublisher,
                 transactionTemplate);
@@ -111,9 +109,8 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
     @Test
     void shouldDeliverOnlyPersistedVerdictsWithoutParsingRawOutputAgain() {
         var job = new AgentJob();
-        job.setMetadata(
-                objectMapper.createObjectNode().put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted"));
-        var output = objectMapper.createObjectNode().put("rawOutput", "not an observation payload");
+        job.setMetadata(objectMapper.createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "admitted"));
+        var output = objectMapper.createObjectNode().put("rawOutput", "not a result payload");
         output.putObject("feedback").put("admissionDigest", "admitted");
         job.setOutput(output);
         handler.deliver(job);
@@ -215,7 +212,7 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    class PrepareObservations {
+    class PrepareResults {
 
         private static final String OBSERVATION = """
             [{
@@ -229,26 +226,13 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             """;
 
         @Test
-        void shouldRefuseRatherThanFailWhenNothingSubmittedIsAnObservation() {
-            var job = new AgentJob();
-            job.setId(UUID.randomUUID());
-
-            assertThatThrownBy(
-                            () -> handler.prepareObservations(job, objectMapper.readTree("[{\"practiceSlug\": \"\"}]")))
-                    .isInstanceOfSatisfying(
-                            ObservationsRefusedException.class,
-                            e -> assertThat(e.reasonCode()).isEqualTo("no_valid_observations"));
-            verifyNoInteractions(deliveryService);
-        }
-
-        @Test
         void shouldRecordThroughTheDeliveryServiceOnlyWhenAsked() {
             var job = new AgentJob();
             job.setId(UUID.randomUUID());
-            var admissible = mock(ReviewOutputService.PreparedObservations.class);
+            var admissible = mock(ReviewOutputService.PreparedResults.class);
             when(deliveryService.prepare(eq(job), any())).thenReturn(admissible);
 
-            var prepared = handler.prepareObservations(job, objectMapper.readTree(OBSERVATION));
+            var prepared = handler.prepareResults(job, objectMapper.readTree(OBSERVATION));
             verify(deliveryService, never()).publish(any(), any());
 
             prepared.record(job);

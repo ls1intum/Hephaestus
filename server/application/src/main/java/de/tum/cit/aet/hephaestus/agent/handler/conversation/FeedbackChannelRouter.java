@@ -4,11 +4,11 @@ import de.tum.cit.aet.hephaestus.practices.PracticePreconditionClause;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomyPolicy;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Decides which of a cycle's observations are eligible for conversational delivery. An observation is
+ * Decides which of a cycle's results are eligible for conversational delivery. A result is
  * {@link ConversationRoutingDecision#ADMIT admitted} to the IN_CHAT channel iff ALL of: its provenance admits the
  * conversation channel, its practice autonomy admits the conversation channel, author-targeted, a
  * negative outcome, has no natural inline anchor, and is not already bound to a
@@ -36,76 +36,79 @@ import tools.jackson.databind.JsonNode;
 public class FeedbackChannelRouter {
 
     private final FeedbackRepository feedbackRepository;
-    private final ObservationRepository observationRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
     public FeedbackChannelRouter(
             FeedbackRepository feedbackRepository,
-            ObservationRepository observationRepository,
+            PracticeResultRepository practiceResultRepository,
             WorkspaceReviewDefaultsProvider workspaceDefaults) {
         this.feedbackRepository = feedbackRepository;
-        this.observationRepository = observationRepository;
+        this.practiceResultRepository = practiceResultRepository;
         this.workspaceDefaults = workspaceDefaults;
     }
 
-    public List<Observation> admit(List<Observation> observations, long workspaceId, RoutingContext context) {
-        Map<UUID, ConversationRoutingDecision> decisions = decide(observations, workspaceId, context);
-        return observations.stream()
-                .filter(observation -> decisions.get(observation.getId()) == ConversationRoutingDecision.ADMIT)
+    public List<PracticeResult> admit(List<PracticeResult> practiceResults, long workspaceId, RoutingContext context) {
+        Map<UUID, ConversationRoutingDecision> decisions = decide(practiceResults, workspaceId, context);
+        return practiceResults.stream()
+                .filter(practiceResult -> decisions.get(practiceResult.getId()) == ConversationRoutingDecision.ADMIT)
                 .toList();
     }
 
-    /** Each observation's routing decision, by its id, in the order given. */
+    /** Each result's routing decision, by its id, in the order given. */
     public Map<UUID, ConversationRoutingDecision> decide(
-            List<Observation> observations, long workspaceId, RoutingContext context) {
+            List<PracticeResult> practiceResults, long workspaceId, RoutingContext context) {
         WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(workspaceId);
         Map<UUID, PracticeAutonomy> autonomyByPracticeId =
-                autonomyByPracticeId(observations, workspaceId, defaults.defaultAutonomy());
+                autonomyByPracticeId(practiceResults, workspaceId, defaults.defaultAutonomy());
         Map<UUID, ConversationRoutingDecision> decisions = new LinkedHashMap<>();
-        for (Observation observation : observations) {
+        for (PracticeResult practiceResult : practiceResults) {
             decisions.put(
-                    observation.getId(),
-                    route(observation, autonomyByPracticeId.get(observation.getId()), workspaceId, context));
+                    practiceResult.getId(),
+                    route(practiceResult, autonomyByPracticeId.get(practiceResult.getId()), workspaceId, context));
         }
         return decisions;
     }
 
     public ConversationRoutingDecision route(
-            Observation observation, @Nullable PracticeAutonomy autonomy, long workspaceId, RoutingContext context) {
-        if (!PracticeAutonomyPolicy.delivers(observation.getOrigin(), autonomy, FeedbackChannel.IN_CHAT)) {
-            return observation.getOrigin().delivers(FeedbackChannel.IN_CHAT)
+            PracticeResult practiceResult,
+            @Nullable PracticeAutonomy autonomy,
+            long workspaceId,
+            RoutingContext context) {
+        if (!PracticeAutonomyPolicy.delivers(practiceResult.getOrigin(), autonomy, FeedbackChannel.IN_CHAT)) {
+            return practiceResult.getOrigin().delivers(FeedbackChannel.IN_CHAT)
                     ? ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL
                     : ConversationRoutingDecision.BACKFILL_QUIET;
         }
         if (context.recipientRole() != RecipientRole.AUTHOR) {
             return ConversationRoutingDecision.REVIEWER_DEFERRED;
         }
-        if (!observation.getOutcome().isDecided() || observation.getOutcome() != Outcome.NOT_MET) {
+        if (!practiceResult.getOutcome().isDecided() || practiceResult.getOutcome() != Outcome.NOT_MET) {
             return ConversationRoutingDecision.NOT_DELIVERABLE;
         }
-        if (hasNaturalInlineAnchor(observation)) {
+        if (hasNaturalInlineAnchor(practiceResult)) {
             return ConversationRoutingDecision.HAS_INLINE_ANCHOR;
         }
-        if (feedbackRepository.existsDeliveredInContextForObservation(
-                workspaceId, observation.getAboutUserId(), observation.getId())) {
+        if (feedbackRepository.existsDeliveredInContextForResult(
+                workspaceId, practiceResult.getAboutUserId(), practiceResult.getId())) {
             return ConversationRoutingDecision.ALREADY_DELIVERED_IN_CONTEXT;
         }
         return ConversationRoutingDecision.ADMIT;
     }
 
     private Map<UUID, PracticeAutonomy> autonomyByPracticeId(
-            List<Observation> observations, long workspaceId, PracticeAutonomy workspaceDefault) {
-        List<UUID> ids = observations.stream()
-                .map(Observation::getId)
+            List<PracticeResult> practiceResults, long workspaceId, PracticeAutonomy workspaceDefault) {
+        List<UUID> ids = practiceResults.stream()
+                .map(PracticeResult::getId)
                 .filter(Objects::nonNull)
                 .toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
         Map<UUID, PracticeAutonomy> autonomyByPracticeId = new HashMap<>();
-        for (var row : observationRepository.findPracticeAutonomyFor(ids, workspaceId)) {
+        for (var row : practiceResultRepository.findPracticeAutonomyFor(ids, workspaceId)) {
             autonomyByPracticeId.put(
-                    row.getObservationId(),
+                    row.getPracticeResultId(),
                     AutonomyResolver.resolvePractice(
                                     row.getPracticeAutonomy(), row.getGroupAutonomy(), workspaceDefault)
                             .autonomy());
@@ -113,11 +116,11 @@ public class FeedbackChannelRouter {
         return autonomyByPracticeId;
     }
 
-    private static boolean hasNaturalInlineAnchor(Observation observation) {
-        if (!ArtifactKinds.hasInlineLane(observation.getArtifactKind())) {
+    private static boolean hasNaturalInlineAnchor(PracticeResult practiceResult) {
+        if (!ArtifactKinds.hasInlineLane(practiceResult.getArtifactKind())) {
             return false;
         }
-        JsonNode evidence = observation.getEvidence();
+        JsonNode evidence = practiceResult.getEvidence();
         if (evidence == null) {
             return false;
         }

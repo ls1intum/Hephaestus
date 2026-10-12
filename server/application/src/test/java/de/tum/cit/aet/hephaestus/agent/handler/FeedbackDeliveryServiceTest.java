@@ -94,8 +94,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         var withheldOnly = new DeliveryContent(
                 null,
                 List.of(),
-                List.of(new ReviewResultParser.WithheldObservation(
-                        "occ-1", FeedbackSuppressionReason.COMPOSER_WITHHELD)),
+                List.of(new ReviewResultParser.WithheldResult("occ-1", FeedbackSuppressionReason.COMPOSER_WITHHELD)),
                 List.of());
 
         service.deliverFeedback(job, null);

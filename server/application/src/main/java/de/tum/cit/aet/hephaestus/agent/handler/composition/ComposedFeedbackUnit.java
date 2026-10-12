@@ -7,10 +7,11 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * One composition decision for one private lane: the developer's practice pages or the mentor conversation.
- * It references observations but carries no measurement verdict. What is said on the reviewed work itself is
+ * It references results but carries no measurement verdict. What is said on the reviewed work itself is
  * a {@link ComposedReview}, not a unit.
  *
- * @param basedOn ids of admitted observations from this run; at least one belongs to {@code practiceSlug}
+ * @param basedOn ids of admitted results from this run; at least one belongs to {@code practiceSlug}
+ * @param observations ids of the problems of those results that the unit names, each once
  * @param body the in-app words, read verbatim. Null on the conversation lane, where {@link #notes} carries notes
  *     to the mentor
  */
@@ -24,7 +25,8 @@ public record ComposedFeedbackUnit(
         @Nullable String title,
         @Nullable String body,
         @Nullable String nextStep,
-        @Nullable ConversationBrief notes) {
+        @Nullable ConversationBrief notes,
+        List<String> observations) {
     public static final int MAX_TITLE_LENGTH = 255;
 
     public static final int MAX_BODY_LENGTH = 8_000;
@@ -45,6 +47,33 @@ public record ComposedFeedbackUnit(
             throw new IllegalArgumentException("The reviewed work is addressed by a ComposedReview, not by a unit");
         }
         basedOn = List.copyOf(basedOn);
+        observations = List.copyOf(observations);
+    }
+
+    /** A unit that rests on its results as a whole, naming none of their problems. */
+    public ComposedFeedbackUnit(
+            FeedbackChannel channel,
+            String practiceSlug,
+            List<String> basedOn,
+            Action action,
+            @Nullable String supersedesThreadKey,
+            @Nullable WithholdReason withholdReason,
+            @Nullable String title,
+            @Nullable String body,
+            @Nullable String nextStep,
+            @Nullable ConversationBrief notes) {
+        this(
+                channel,
+                practiceSlug,
+                basedOn,
+                action,
+                supersedesThreadKey,
+                withholdReason,
+                title,
+                body,
+                nextStep,
+                notes,
+                List.of());
     }
 
     public enum Action {
@@ -62,7 +91,7 @@ public record ComposedFeedbackUnit(
     }
 
     /**
-     * Mentor context, not developer-facing prose. Authorized observation evidence is staged separately.
+     * Mentor context, not developer-facing prose. Authorized result evidence is staged separately.
      *
      * @param capability understanding or behaviour to support, not a prescribed question
      * @param inConversationSignal observable sign that the conversation helped

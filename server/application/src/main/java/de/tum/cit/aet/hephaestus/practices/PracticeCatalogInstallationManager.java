@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogLock;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeReleaseService;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -39,6 +40,8 @@ class PracticeCatalogInstallationManager {
     private final WorkspaceRepository workspaceRepository;
     private final TransactionOperations transactionOperations;
     private final Clock clock;
+    private final PracticeReleaseService releaseService;
+    private final CuratedPracticeReleaseService instanceReleases;
 
     PracticeCatalogInstallationManager(
             @Value("${hephaestus.practices.seed-default-catalog:true}") boolean enabled,
@@ -51,7 +54,9 @@ class PracticeCatalogInstallationManager {
             PracticeCatalogInstallationRepository installationRepository,
             WorkspaceRepository workspaceRepository,
             TransactionOperations transactionOperations,
-            Clock clock) {
+            Clock clock,
+            PracticeReleaseService releaseService,
+            CuratedPracticeReleaseService instanceReleases) {
         this.enabled = enabled;
         this.groupService = groupService;
         this.practiceService = practiceService;
@@ -63,6 +68,8 @@ class PracticeCatalogInstallationManager {
         this.workspaceRepository = workspaceRepository;
         this.transactionOperations = transactionOperations;
         this.clock = clock;
+        this.releaseService = releaseService;
+        this.instanceReleases = instanceReleases;
     }
 
     @EventListener(WorkspacesInitializedEvent.class)
@@ -77,6 +84,64 @@ class PracticeCatalogInstallationManager {
         } catch (RuntimeException exception) {
             log.error("Could not load workspaces for default practice catalog installation", exception);
         }
+        upgradePracticeScripts();
+    }
+
+    /**
+     * The one-shot practice program upgrade. Each copy of a bundled practice script that nobody changed takes the
+     * program the catalog now ships, first at the instance, then in each workspace not yet upgraded, one transaction
+     * per workspace; the workspace is then marked, so the step runs once. A copy that was changed keeps its script and
+     * its normal offer: a script of the retired leads contract then fails its practice at run time with a clear
+     * error, until an admin accepts the offer or rewrites it.
+     */
+    void upgradePracticeScripts() {
+        List<Long> pending;
+        try {
+            pending = installationRepository.findWorkspaceIdsAwaitingPracticeScriptUpgrade();
+        } catch (RuntimeException exception) {
+            log.error("Could not load workspaces for the practice script upgrade", exception);
+            return;
+        }
+        if (pending.isEmpty()) {
+            return;
+        }
+        try {
+            int adopted = instanceReleases.adoptShippedPracticeScripts();
+            if (adopted > 0) {
+                log.info("Moved {} unchanged instance practice scripts to the shipped programs", adopted);
+            }
+        } catch (RuntimeException exception) {
+            // Marked against the old instance copies, a workspace copy that follows one would never move.
+            log.error("Instance practice script upgrade failed; the workspaces wait for the next start", exception);
+            return;
+        }
+        for (Long workspaceId : pending) {
+            try {
+                transactionOperations.executeWithoutResult(ignored -> upgradePracticeScripts(workspaceId));
+            } catch (RuntimeException exception) {
+                log.error("Practice script upgrade failed: workspaceId={}", workspaceId, exception);
+            }
+        }
+    }
+
+    private void upgradePracticeScripts(Long workspaceId) {
+        PracticeCatalogInstallation installation =
+                installationRepository.findByWorkspaceIdForUpdate(workspaceId).orElse(null);
+        if (installation == null || installation.getPracticeScriptsUpgradedAt() != null) {
+            return;
+        }
+        int adopted = 0;
+        for (String slug : releaseService.proposedSlugs(workspaceId)) {
+            if (releaseService.adoptOfferedPracticeScript(workspaceId, slug)) adopted++;
+        }
+        installation.markPracticeScriptsUpgraded(clock.instant());
+        installationRepository.save(installation);
+        if (adopted > 0) {
+            log.info(
+                    "Moved {} unchanged practice scripts to the shipped programs: workspaceId={}",
+                    adopted,
+                    workspaceId);
+        }
     }
 
     @EventListener(WorkspaceCreatedEvent.class)
@@ -90,7 +155,10 @@ class PracticeCatalogInstallationManager {
             return;
         }
         Instant now = clock.instant();
-        installationRepository.save(new PracticeCatalogInstallation(workspaceId, now, now));
+        PracticeCatalogInstallation installation = new PracticeCatalogInstallation(workspaceId, now, now);
+        // Installed from the catalog as it ships now: nothing to upgrade.
+        installation.markPracticeScriptsUpgraded(now);
+        installationRepository.save(installation);
     }
 
     private void repairCatalogSafely(Workspace workspace) {
@@ -126,7 +194,12 @@ class PracticeCatalogInstallationManager {
             }
         }
         Instant now = clock.instant();
-        installationRepository.save(new PracticeCatalogInstallation(lockedWorkspace.getId(), now, now));
+        PracticeCatalogInstallation installation = new PracticeCatalogInstallation(lockedWorkspace.getId(), now, now);
+        // A repair can only seed what is missing; copies installed earlier are upgraded by upgradePracticeScripts.
+        if (seededPractices == catalog.installablePractices().size()) {
+            installation.markPracticeScriptsUpgraded(now);
+        }
+        installationRepository.save(installation);
         if (seededPractices > 0) {
             log.info(
                     "Seeded practice catalog: {} groups, {} practices into workspace {}",

@@ -21,8 +21,7 @@ public interface PiRunnerProfile {
      * all of these before the runner starts, and {@link #BASE_RUNTIME_FLAGS} grants exactly these, so
      * neither half can name a path the other does not.
      *
-     * <p>{@code PracticePiAdapter} builds the practice script invocation with a grant and a pre-creation of
-     * its own, outside this list.
+     * <p>A profile's {@link #setupCommands()} run after these exist and before Node starts.
      */
     List<String> WRITABLE_DIRECTORIES = List.of(
             // The SDK takes a lock directory beside settings.json and auth.json and keeps a models
@@ -30,7 +29,7 @@ public interface PiRunnerProfile {
             SandboxLayout.PI_AGENT_DIR,
             // The SDK writes one JSONL file per session, from the session's first message on.
             SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.SESSIONS_DIR,
-            // pi-runner.ts writes work/composition/observations.json, the admitted observations it
+            // pi-runner.ts writes work/composition/results.json, the admitted results it
             // composes feedback from, and work/notes/review.md, its record of what the review recorded.
             SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.WORK_PREFIX + "composition",
             SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.WORK_PREFIX + "notes",
@@ -53,7 +52,7 @@ public interface PiRunnerProfile {
     String runnerScript();
 
     /**
-     * Sibling ES-module files the runner imports relatively (e.g. {@code ./pi-observation-normalize.ts}).
+     * Sibling ES-module files the runner imports relatively (e.g. {@code ./pi-result-normalize.ts}).
      * Each is staged at the workspace root next to the runner so the import resolves. Empty by default.
      */
     default List<String> sidecarScripts() {
@@ -77,4 +76,13 @@ public interface PiRunnerProfile {
 
     /** {@code KEY=value} pairs scoped to the {@code node} invocation only — not image-wide ENV. */
     Map<String, String> additionalEnv();
+
+    /**
+     * Trusted shell commands that set up the workspace after {@link #WRITABLE_DIRECTORIES} exist and before Node
+     * starts, such as a link Node under {@code --permission} could not create. Emitted verbatim: each must be
+     * shell-safe and fixed, never built from job data. None by default.
+     */
+    default List<String> setupCommands() {
+        return List.of();
+    }
 }

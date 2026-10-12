@@ -43,7 +43,7 @@ public class PracticeProfileReviewRunController {
     @Operation(
             operationId = "listPracticeProfileReviewRuns",
             summary = "Every review run on the developer's own work, newest first",
-            description = "One row per run that recorded an observation about the calling developer, across"
+            description = "One row per run that recorded a result about the calling developer, across"
                     + " every practice group, with what that run found about them. Counts are narrowed to"
                     + " this developer: a run over shared work says nothing here about anybody else.")
     @ApiResponse(responseCode = "200", description = "Review runs returned")
@@ -74,7 +74,7 @@ public class PracticeProfileReviewRunController {
                     String kind,
             @Parameter(
                             description =
-                                    "Keep only runs whose newest observation about this developer came after this moment; the bound"
+                                    "Keep only runs whose newest result about this developer came after this moment; the bound"
                                             + " is exclusive")
                     @RequestParam(required = false)
                     @Nullable

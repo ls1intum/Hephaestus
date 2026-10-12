@@ -18,8 +18,8 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.PracticeProfileOverviewDTO;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
 import de.tum.cit.aet.hephaestus.testconfig.SqlReadMeasurement;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -484,14 +484,14 @@ class PracticeProfileOverviewIntegrationTest extends AbstractPracticeReviewInteg
     }
 
     /**
-     * The feedback row is written moments after the run's newest observation, so feedback the previous run
+     * The feedback row is written moments after the run's newest result, so feedback the previous run
      * composed would otherwise fall inside a window that opens on that run.
      */
     @Test
     @WithUser
     @DisplayName("new feedback is dated by the run that composed it, so the previous run's is not new in the window")
     void shouldDateNewFeedbackByItsRunWhenTheRowIsWrittenMomentsLater() {
-        // The previous run found the description thin on #21 and spoke about it moments after its observation.
+        // The previous run found the description thin on #21 and spoke about it moments after its result.
         // A different practice from the latest run's feedback, so a wrongly dated piece would survive the
         // per-practice dedupe and show up beside it rather than behind it.
         UUID previousRunsProblem =

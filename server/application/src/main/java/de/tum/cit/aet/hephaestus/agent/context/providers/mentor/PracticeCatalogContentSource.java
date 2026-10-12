@@ -9,9 +9,9 @@ import de.tum.cit.aet.hephaestus.practices.PracticeGuide;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVisual;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomyPolicy;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -97,7 +97,7 @@ public class PracticeCatalogContentSource implements ContentSource {
         WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(workspace);
         List<Practice> practices = practiceRepository.findByWorkspaceId(workspaceId).stream()
                 .filter(p -> PracticeAutonomyPolicy.delivers(
-                        ObservationOrigin.LIVE,
+                        ResultOrigin.LIVE,
                         AutonomyResolver.effectiveAutonomyOf(p, defaults.defaultAutonomy()),
                         FeedbackChannel.IN_CHAT))
                 .toList();

@@ -19,7 +19,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * What the adapter reads out of a run's own output: which lane's next step belongs to an observation, and
+ * What the adapter reads out of a run's own output: which lane's next step belongs to a result, and
  * that an id the output relays wrongly names nothing rather than failing the read.
  */
 class ReviewRunNarrativeLookupAdapterTest extends BaseUnitTest {
@@ -35,10 +35,10 @@ class ReviewRunNarrativeLookupAdapterTest extends BaseUnitTest {
     @Test
     @DisplayName(
             "takes the next step from the feedback written about the work, not from the one about the way of working")
-    void shouldIgnoreInAppNextStepsWhenAddressingAnObservation() {
-        UUID observationId = UUID.randomUUID();
+    void shouldIgnoreInAppNextStepsWhenAddressingAResult() {
+        UUID practiceResultId = UUID.randomUUID();
         ReviewRunNarrative narrative =
-                lookUp(output(observationId.toString(), """
+                lookUp(output(practiceResultId.toString(), """
                 {"channel":"IN_CONTEXT","action":"NEW","practiceSlug":"pr-description-quality",
                  "basedOn":["%s"],"title":"No testing notes",
                  "nextStep":"Add a Testing section that names what you ran.",
@@ -46,31 +46,32 @@ class ReviewRunNarrativeLookupAdapterTest extends BaseUnitTest {
                 {"channel":"IN_APP","action":"NEW","practiceSlug":"pr-description-quality",
                  "basedOn":["%s"],"title":"Testing notes keep going missing",
                  "nextStep":"Write down what you ran, every time."}
-                """.formatted(observationId, observationId)));
+                """.formatted(practiceResultId, practiceResultId)));
 
-        assertThat(narrative.nextStepByObservationId())
-                .containsExactly(Map.entry(observationId, "Add a Testing section that names what you ran."));
+        assertThat(narrative.nextStepByResultId())
+                .containsExactly(Map.entry(practiceResultId, "Add a Testing section that names what you ran."));
     }
 
     @Test
     void shouldRetainTheAuthoredNextStepAboutDeferredWork() {
-        UUID observationId = UUID.randomUUID();
+        UUID practiceResultId = UUID.randomUUID();
         String nextStep = "Split each requirement into the steps that produce it — e.g. drafting each section, "
                 + "gathering the real check names for the simulated-status distinction — so each step can be "
                 + "checked off and the deferred-review-request gap shows up as its own open line rather than "
                 + "one line in the Progress note.";
-        ReviewRunNarrative narrative = lookUp(output(observationId.toString(), """
+        ReviewRunNarrative narrative =
+                lookUp(output(practiceResultId.toString(), """
                 {"channel":"IN_CONTEXT","action":"NEW","practiceSlug":"pr-description-quality",
                  "basedOn":["%s"],"title":"The Done-when list tracks the page, not the work",
                  "nextStep":"%s","placement":{"kind":"ARTIFACT"}}
-                """.formatted(observationId, nextStep)));
+                """.formatted(practiceResultId, nextStep)));
 
-        assertThat(narrative.nextStepByObservationId()).containsExactly(Map.entry(observationId, nextStep));
+        assertThat(narrative.nextStepByResultId()).containsExactly(Map.entry(practiceResultId, nextStep));
     }
 
     @Test
-    @DisplayName("an observation the output names by something other than an id gets no next step")
-    void shouldAddressNoObservationWhenTheOutputNamesOneByANonId() {
+    @DisplayName("a result the output names by something other than an id gets no next step")
+    void shouldAddressNoResultWhenTheOutputNamesOneByANonId() {
         ReviewRunNarrative narrative = lookUp(output("obs-0", """
                 {"channel":"IN_CONTEXT","action":"NEW","practiceSlug":"pr-description-quality",
                  "basedOn":["obs-0"],"title":"No testing notes",
@@ -78,38 +79,58 @@ class ReviewRunNarrativeLookupAdapterTest extends BaseUnitTest {
                  "placement":{"kind":"ARTIFACT"}}
                 """));
 
-        assertThat(narrative.nextStepByObservationId()).isEmpty();
+        assertThat(narrative.nextStepByResultId()).isEmpty();
     }
 
     @Test
     void shouldTakeTheAnchoredLineNoteVerbatimWhenTheReviewIsWrittenWhole() {
         UUID anchored = UUID.randomUUID();
+        UUID problem = UUID.randomUUID();
         UUID summarized = UUID.randomUUID();
-        ReviewRunNarrative narrative =
-                lookUp(reviewOutput(anchored, summarized, """
-                {"summary":{"body":"Two parts of this pull request need a closer look.","basedOn":["%s","%s"]},
+        ReviewRunNarrative narrative = lookUp(reviewOutput(
+                anchored, problem, summarized, """
+                {"summary":{"body":"Two parts of this pull request need a closer look.",
+                            "basedOn":[{"practiceResultId":"%s"},{"practiceResultId":"%s"}]},
                  "inline":[{"body":"Rename `doWork` so the name says what it checks.\\n\\n    boolean hasOpenReview()",
-                            "basedOn":["%s"],"anchor":{"observationId":"%s","citationIndex":0}}]}
-                """.formatted(anchored, summarized, anchored, anchored)));
+                            "basedOn":[{"practiceResultId":"%s","observationId":"%s"}],
+                            "anchor":{"observationId":"%s","citationIndex":0}}]}
+                """.formatted(anchored, summarized, anchored, problem, problem)));
 
-        assertThat(narrative.nextStepByObservationId())
+        assertThat(narrative.nextStepByResultId())
                 .containsExactly(Map.entry(
                         anchored, "Rename `doWork` so the name says what it checks.\n\n    boolean hasOpenReview()"))
                 .doesNotContainKey(summarized);
     }
 
     @Test
-    void shouldGiveNoLineNoteNextStepWhenTheWrittenReviewBreaksItsContract() {
+    void shouldTakeTheAnchoredLineNoteVerbatimWhenAReviewWrittenBeforeProblemsAnchoredItOnTheResult() {
         UUID anchored = UUID.randomUUID();
         UUID summarized = UUID.randomUUID();
-        ReviewRunNarrative narrative =
-                lookUp(reviewOutput(anchored, summarized, """
-                {"inline":[{"body":"Rename `doWork` so the name says what it checks.",
-                            "basedOn":["%s"],"anchor":{"observationId":"%s","citationIndex":0}},
-                           {"body":"  ","basedOn":["%s"],"anchor":{"observationId":"%s","citationIndex":0}}]}
-                """.formatted(anchored, anchored, anchored, anchored)));
+        ReviewRunNarrative narrative = lookUp(
+                legacyReviewOutput(anchored, summarized, """
+                {"summary":{"body":"Two parts of this pull request need a closer look.","basedOn":["%s","%s"]},
+                 "inline":[{"body":"Rename `doWork` so the name says what it checks.",
+                            "basedOn":["%s"],"anchor":{"observationId":"%s","citationIndex":0}}]}
+                """.formatted(anchored, summarized, anchored, anchored)));
 
-        assertThat(narrative.nextStepByObservationId()).isEmpty();
+        assertThat(narrative.nextStepByResultId())
+                .containsExactly(Map.entry(anchored, "Rename `doWork` so the name says what it checks."));
+    }
+
+    @Test
+    void shouldGiveNoLineNoteNextStepWhenTheWrittenReviewBreaksItsContract() {
+        UUID anchored = UUID.randomUUID();
+        UUID problem = UUID.randomUUID();
+        UUID summarized = UUID.randomUUID();
+        String ref = "[{\"practiceResultId\":\"%s\",\"observationId\":\"%s\"}]".formatted(anchored, problem);
+        ReviewRunNarrative narrative =
+                lookUp(reviewOutput(anchored, problem, summarized, """
+                {"inline":[{"body":"Rename `doWork` so the name says what it checks.",
+                            "basedOn":%s,"anchor":{"observationId":"%s","citationIndex":0}},
+                           {"body":"  ","basedOn":%s,"anchor":{"observationId":"%s","citationIndex":0}}]}
+                """.formatted(ref, problem, ref, problem)));
+
+        assertThat(narrative.nextStepByResultId()).isEmpty();
     }
 
     private ReviewRunNarrative lookUp(JsonNode output) {
@@ -123,20 +144,38 @@ class ReviewRunNarrativeLookupAdapterTest extends BaseUnitTest {
         return Objects.requireNonNull(narratives.get(jobId));
     }
 
-    /** One composed output grounded in {@code observationId}, carrying the given units verbatim. */
-    private static JsonNode output(String observationId, String units) {
+    /**
+     * One output composed before results had problems, grounded in {@code practiceResultId}, carrying the given units
+     * verbatim: its staged list was flat and every reference named a result id.
+     */
+    private static JsonNode output(String practiceResultId, String units) {
         return OBJECT_MAPPER.readTree("""
                 {"feedback":{"observations":[{"id":"%s","practiceSlug":"pr-description-quality","outcome":"NOT_MET","anchorable":false,
                    "citations":[]}],
                   "units":[%s]}}
-                """.formatted(observationId, units));
+                """.formatted(practiceResultId, units));
     }
 
     /**
-     * One output written whole: {@code anchored} cites one placeable line, {@code summarized} cites none, and the
-     * review is carried verbatim.
+     * One output written whole: {@code anchored} has one problem, {@code problem}, citing one placeable line;
+     * {@code summarized} cites none; the review is carried verbatim.
      */
-    private static JsonNode reviewOutput(UUID anchored, UUID summarized, String review) {
+    private static JsonNode reviewOutput(UUID anchored, UUID problem, UUID summarized, String review) {
+        return OBJECT_MAPPER.readTree("""
+                {"feedback":{"contractVersion":2,
+                  "results":[
+                    {"practiceResultId":"%s","practiceSlug":"pr-description-quality","outcome":"NOT_MET",
+                     "observations":[{"observationId":"%s","anchorable":true,
+                       "citations":[{"path":"src/Review.java","side":"NEW","startLine":10,"endLine":12,"anchorable":true}]}]},
+                    {"practiceResultId":"%s","practiceSlug":"pr-description-quality","outcome":"NOT_MET",
+                     "observations":[]}],
+                  "units":[],
+                  "review":%s}}
+                """.formatted(anchored, problem, summarized, review));
+    }
+
+    /** {@link #reviewOutput} as a composition written before results had problems stored it. */
+    private static JsonNode legacyReviewOutput(UUID anchored, UUID summarized, String review) {
         return OBJECT_MAPPER.readTree("""
                 {"feedback":{"contractVersion":2,
                   "observations":[

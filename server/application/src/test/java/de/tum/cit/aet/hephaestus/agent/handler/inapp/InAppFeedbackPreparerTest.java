@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -18,10 +19,10 @@ import de.tum.cit.aet.hephaestus.agent.handler.FeedbackSupersession;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.UUID;
@@ -36,11 +37,10 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
     private static final int BASE = FeedbackLedgerRecorder.IN_APP_UNIT_ORDINAL_BASE;
 
     private final FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
-    private final FeedbackObservationRepository feedbackObservationRepository =
-            mock(FeedbackObservationRepository.class);
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository = mock(FeedbackEvidenceRepository.class);
     private final FeedbackSupersession supersession = mock(FeedbackSupersession.class);
     private final InAppFeedbackPreparer preparer =
-            new InAppFeedbackPreparer(feedbackRepository, feedbackObservationRepository, supersession);
+            new InAppFeedbackPreparer(feedbackRepository, feedbackEvidenceRepository, supersession);
 
     @Test
     void writesAnAdmittedMessageAsAPreparedInAppUnitCarryingItsBody() {
@@ -62,7 +62,7 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
     }
 
     /**
-     * The bug this test exists for: one job files observations against several people, and
+     * The bug this test exists for: one job files results against several people, and
      * {@code (agent_job_id, position)} is unique. A base fixed for the whole job would make the second
      * recipient's first unit collide with the first recipient's, and the idempotency guard would read
      * that collision as "already written" and drop the row without a word.
@@ -122,8 +122,14 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
     @Test
     void bindsEveryPieceOfEvidenceToTheUnitItStandsOn() {
         stubSave();
-        Observation first = Observation.builder().id(UUID.randomUUID()).build();
-        Observation second = Observation.builder().id(UUID.randomUUID()).build();
+        PracticeResult first = PracticeResult.builder()
+                .scopeKey("test-scope")
+                .id(UUID.randomUUID())
+                .build();
+        PracticeResult second = PracticeResult.builder()
+                .scopeKey("test-scope")
+                .id(UUID.randomUUID())
+                .build();
 
         preparer.prepare(
                 JOB_ID,
@@ -133,7 +139,7 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
                         message("ships-tests"), InAppRoutingDecision.ADMIT, List.of(first, second), null)),
                 BASE);
 
-        verify(feedbackObservationRepository, times(2)).insertIfAbsent(any(), any(), eq("PRIMARY"), anyInt());
+        verify(feedbackEvidenceRepository, times(2)).insertIfAbsent(any(), any(), isNull(), eq("PRIMARY"), anyInt());
     }
 
     /**

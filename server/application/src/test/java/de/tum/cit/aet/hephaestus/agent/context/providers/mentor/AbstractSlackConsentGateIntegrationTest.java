@@ -30,7 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Shared scaffold for the three {@code *ConsentGateIntegrationTest} classes ({@code ObservationHistory},
+ * Shared scaffold for the three {@code *ConsentGateIntegrationTest} classes ({@code ResultHistory},
  * {@code PreparedConversationFeedback}, {@code DeliveredFeedback}): each proves the same fail-closed
  * {@code consent_state = 'ACTIVE'} gate over a different content source, so each needs the same workspace +
  * recipient bootstrap and the same "one monitored channel + one thread on it, at a given consent state" seed.

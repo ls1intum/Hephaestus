@@ -13,7 +13,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import java.util.Collection;
 import java.util.HashMap;
@@ -38,7 +38,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * How the work a review captured relates to Hephaestus's stored copy of that work now, for observations the caller
+ * How the work a review captured relates to Hephaestus's stored copy of that work now, for results the caller
  * has already authorized. It compares with the mirror, never the provider, and only the fields it names — a match
  * says nothing about comments, checks, approvals, linked work or behaviour. The source the comparison reads must be
  * usable in conversation under the review's contract; anything it cannot establish is {@code UNKNOWN}, and neither
@@ -70,25 +70,25 @@ class ReviewedWorkCoverage {
     private final ObjectMapper objectMapper;
 
     /**
-     * One {@code reviewedWork} node per observation id; an observation not about a pull request or issue gets one too.
+     * One {@code reviewedWork} node per result id; a result not about a pull request or issue gets one too.
      * Its own snapshot, so every capture is compared with the stored work as it stood at one moment, whatever the
      * caller's transaction writes.
      */
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, isolation = Isolation.REPEATABLE_READ)
-    public Map<UUID, ObjectNode> of(long workspaceId, Collection<Observation> observations) {
+    public Map<UUID, ObjectNode> of(long workspaceId, Collection<PracticeResult> practiceResults) {
         Set<UUID> jobIds = new LinkedHashSet<>();
         Set<Long> pullRequestIds = new LinkedHashSet<>();
         Set<Long> issueIds = new LinkedHashSet<>();
-        for (Observation observation : observations) {
-            if (observation.getArtifactId() == null) continue;
-            if (ArtifactKinds.PULL_REQUEST.equals(observation.getArtifactKind())) {
-                pullRequestIds.add(observation.getArtifactId());
-            } else if (ArtifactKinds.ISSUE.equals(observation.getArtifactKind())) {
-                issueIds.add(observation.getArtifactId());
+        for (PracticeResult practiceResult : practiceResults) {
+            if (practiceResult.getArtifactId() == null) continue;
+            if (ArtifactKinds.PULL_REQUEST.equals(practiceResult.getArtifactKind())) {
+                pullRequestIds.add(practiceResult.getArtifactId());
+            } else if (ArtifactKinds.ISSUE.equals(practiceResult.getArtifactKind())) {
+                issueIds.add(practiceResult.getArtifactId());
             } else {
                 continue;
             }
-            jobIds.add(observation.getAgentJobId());
+            jobIds.add(practiceResult.getAgentJobId());
         }
         Map<UUID, ReviewedWorkRow> captures = jobIds.isEmpty()
                 ? Map.of()
@@ -106,19 +106,19 @@ class ReviewedWorkCoverage {
                 .orElse(Map.of());
 
         Map<UUID, ObjectNode> nodes = new HashMap<>();
-        for (Observation observation : observations) {
-            boolean pullRequest = ArtifactKinds.PULL_REQUEST.equals(observation.getArtifactKind());
-            Long artifactId = observation.getArtifactId();
+        for (PracticeResult practiceResult : practiceResults) {
+            boolean pullRequest = ArtifactKinds.PULL_REQUEST.equals(practiceResult.getArtifactKind());
+            Long artifactId = practiceResult.getArtifactId();
             StoredWork stored = artifactId == null ? null : (pullRequest ? pullRequests : issues).get(artifactId);
             nodes.put(
-                    observation.getId(),
-                    describe(observation, captures.get(observation.getAgentJobId()), stored, pullRequest));
+                    practiceResult.getId(),
+                    describe(practiceResult, captures.get(practiceResult.getAgentJobId()), stored, pullRequest));
         }
         return nodes;
     }
 
     private ObjectNode describe(
-            Observation observation,
+            PracticeResult practiceResult,
             @Nullable ReviewedWorkRow capture,
             @Nullable StoredWork stored,
             boolean pullRequest) {
@@ -127,8 +127,8 @@ class ReviewedWorkCoverage {
                 "producingReviewStatus",
                 capture == null ? "UNKNOWN" : capture.getStatus().name());
         ArrayNode checked = objectMapper.createArrayNode();
-        ArtifactKind kind = observation.getArtifactKind();
-        Long artifactId = observation.getArtifactId();
+        ArtifactKind kind = practiceResult.getArtifactKind();
+        Long artifactId = practiceResult.getArtifactId();
         CoreCoverage text = CoreCoverage.UNKNOWN;
         CoreCoverage head = CoreCoverage.UNKNOWN;
         if ((pullRequest || ArtifactKinds.ISSUE.equals(kind))

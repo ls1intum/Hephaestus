@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -19,7 +19,7 @@ public record IssueReviewSubmissionRequest(
         @Nullable String url,
         @Nullable Instant updatedAt,
         @Nullable SignalName triggerSignal,
-        @Nullable ObservationOrigin observationOrigin,
+        @Nullable ResultOrigin practiceResultOrigin,
         @Nullable Long actorUserId,
         @Nullable UUID reviewSnapshotId)
         implements JobSubmissionRequest {
@@ -39,9 +39,9 @@ public record IssueReviewSubmissionRequest(
         if (repositoryId <= 0) {
             throw new IllegalArgumentException("repositoryId must be positive, got " + repositoryId);
         }
-        if (observationOrigin == null) {
+        if (practiceResultOrigin == null) {
             // Same rule as a pull-request review: no signal behind it means a person asked.
-            observationOrigin = triggerSignal == null ? ObservationOrigin.MANUAL : ObservationOrigin.LIVE;
+            practiceResultOrigin = triggerSignal == null ? ResultOrigin.MANUAL : ResultOrigin.LIVE;
         }
     }
 
@@ -84,7 +84,7 @@ public record IssueReviewSubmissionRequest(
             @Nullable String url,
             @Nullable Instant updatedAt,
             @Nullable SignalName triggerSignal,
-            @Nullable ObservationOrigin observationOrigin) {
+            @Nullable ResultOrigin practiceResultOrigin) {
         this(
                 issueId,
                 issueNumber,
@@ -96,7 +96,7 @@ public record IssueReviewSubmissionRequest(
                 url,
                 updatedAt,
                 triggerSignal,
-                observationOrigin,
+                practiceResultOrigin,
                 null,
                 null);
     }

@@ -32,7 +32,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -126,7 +126,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private AgentJobRepository agentJobRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     private Organization savedOrg;
     private Repository savedRepo;
@@ -357,7 +357,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     /**
      * The webhook and the GraphQL sync must resolve the same issue review revision for the same GitLab issue:
-     * a sync that finds nothing new may not retire the observation the webhook edit was reviewed into, while
+     * a sync that finds nothing new may not retire the result the webhook edit was reviewed into, while
      * a sync that does bring a change still must.
      */
     @Nested
@@ -374,7 +374,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             Issue reviewed = currentIssue();
             String reviewedRevision = reviewRevision();
             assertThat(reviewed.getReviewSnapshotDigest()).isEqualTo(reviewedRevision);
-            UUID observationId = recordObservation(reviewed);
+            UUID practiceResultId = recordResult(reviewed);
             eventListener.clear();
 
             processor.processFromSync(sync(REVIEWED_BODY, List.of(FIXTURE_LABEL_NAME)), savedRepo, null);
@@ -382,8 +382,8 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class)).isEmpty();
             assertThat(reviewRevision()).isEqualTo(reviewedRevision);
             assertThat(currentIssue().getReviewSnapshotId()).isEqualTo(reviewed.getReviewSnapshotId());
-            assertThat(observationRepository
-                            .findById(observationId)
+            assertThat(practiceResultRepository
+                            .findById(practiceResultId)
                             .orElseThrow()
                             .getSupersededAt())
                     .isNull();
@@ -397,8 +397,8 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class)).hasSize(1);
             assertThat(currentIssue().getReviewSnapshotId()).isNotEqualTo(reviewed.getReviewSnapshotId());
-            assertThat(observationRepository
-                            .findById(observationId)
+            assertThat(practiceResultRepository
+                            .findById(practiceResultId)
                             .orElseThrow()
                             .getSupersededAt())
                     .isNotNull();
@@ -486,7 +486,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
                             .value()));
         }
 
-        private UUID recordObservation(Issue issue) {
+        private UUID recordResult(Issue issue) {
             Practice practice = new Practice();
             practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.ISSUE));
             practice.setWorkspace(savedWorkspace);
@@ -506,7 +506,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             job.setConfigSnapshot(objectMapper.valueToTree(Map.of("model", "test")));
             job = agentJobRepository.save(job);
             UUID id = UUID.randomUUID();
-            assertThat(observationRepository.insertIfAbsent(
+            assertThat(practiceResultRepository.insertIfAbsent(
                             id,
                             "issue-" + id,
                             job.getId(),
@@ -519,6 +519,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
                             "The work is not broken into trackable subtasks",
                             "NOT_MET",
                             "MAJOR",
+                            null,
+                            null,
+                            "test-scope",
                             null,
                             null,
                             null,

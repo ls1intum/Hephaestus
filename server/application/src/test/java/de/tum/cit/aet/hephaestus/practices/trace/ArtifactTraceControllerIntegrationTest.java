@@ -412,7 +412,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
             persistPractice("dormant", "Dormant practice", PracticeAutonomy.AUTOMATIC, ScmSignals.PULL_REQUEST_MERGED);
             AgentJob job = persistJob();
             recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.TRIGGERED, null, job.getId());
-            insertObservation(reviewed, job);
+            insertResult(reviewed, job);
 
             get(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
                     .expectStatus()
@@ -430,7 +430,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                     .isEqualTo(4)
                     .jsonPath("$.practices[?(@.practiceSlug=='reviewed')].outcome")
                     .isEqualTo("REVIEWED")
-                    .jsonPath("$.practices[?(@.practiceSlug=='reviewed')].observationCount")
+                    .jsonPath("$.practices[?(@.practiceSlug=='reviewed')].practiceResultCount")
                     .isEqualTo(1)
                     .jsonPath("$.practices[?(@.practiceSlug=='silenced')].outcome")
                     .isEqualTo("TURNED_OFF")
@@ -500,8 +500,8 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                     null,
                     newer.getId(),
                     READY_AT.plusSeconds(3600));
-            insertObservation(first, older);
-            deliverFeedback(newer, insertObservation(second, newer));
+            insertResult(first, older);
+            deliverFeedback(newer, insertResult(second, newer));
 
             get(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
                     .expectStatus()
@@ -527,13 +527,13 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                     .isEqualTo(2)
                     .jsonPath("$.practices[?(@.practiceSlug=='first')].outcome")
                     .isEqualTo("REVIEWED")
-                    .jsonPath("$.practices[?(@.practiceSlug=='first')].observationCount")
+                    .jsonPath("$.practices[?(@.practiceSlug=='first')].practiceResultCount")
                     .isEqualTo(1)
                     .jsonPath("$.practices[?(@.practiceSlug=='first')].reviewId")
                     .isEqualTo(older.getId().toString())
                     .jsonPath("$.practices[?(@.practiceSlug=='second')].outcome")
                     .isEqualTo("SKIPPED")
-                    .jsonPath("$.practices[?(@.practiceSlug=='second')].observationCount")
+                    .jsonPath("$.practices[?(@.practiceSlug=='second')].practiceResultCount")
                     .isEqualTo(0)
                     .jsonPath("$.practices[?(@.practiceSlug=='second')].deliveredCount")
                     .isEqualTo(0);
@@ -578,7 +578,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                     .isEqualTo(ready.getId().toString())
                     .jsonPath("$.practices[?(@.practiceSlug=='reused')].occasionedById")
                     .isEqualTo(pushed.getId().toString())
-                    .jsonPath("$.practices[?(@.practiceSlug=='reused')].observationCount")
+                    .jsonPath("$.practices[?(@.practiceSlug=='reused')].practiceResultCount")
                     .isEqualTo(0)
                     .jsonPath("$.practices[?(@.practiceSlug=='reused')].deliveredCount")
                     .isEqualTo(0)
@@ -590,13 +590,13 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                                     .doesNotContain("nothing to report")))
                     .jsonPath("$.practices[?(@.practiceSlug=='asked')].reviewId")
                     .isEqualTo(push.getId().toString())
-                    .jsonPath("$.practices[?(@.practiceSlug=='asked')].observationCount")
+                    .jsonPath("$.practices[?(@.practiceSlug=='asked')].practiceResultCount")
                     .isEqualTo(1);
         }
 
         /**
          * A push review every practice of which the Ready review had already answered. The admin naming it reads the
-         * reused answer and the Ready review behind it; across every review the Ready observation still counts.
+         * reused answer and the Ready review behind it; across every review the Ready result still counts.
          */
         @Test
         @WithMentorUser
@@ -623,7 +623,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                     .isEqualTo("REVIEWED")
                     .jsonPath("$.practices[?(@.practiceSlug=='reused')].reviewId")
                     .isEqualTo(ready.getId().toString())
-                    .jsonPath("$.practices[?(@.practiceSlug=='reused')].observationCount")
+                    .jsonPath("$.practices[?(@.practiceSlug=='reused')].practiceResultCount")
                     .isEqualTo(0);
             get(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
                     .expectStatus()
@@ -631,13 +631,13 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                     .expectBody()
                     .jsonPath("$.practices[?(@.practiceSlug=='reused')].reviewId")
                     .isEqualTo(ready.getId().toString())
-                    .jsonPath("$.practices[?(@.practiceSlug=='reused')].observationCount")
+                    .jsonPath("$.practices[?(@.practiceSlug=='reused')].practiceResultCount")
                     .isEqualTo(1);
         }
 
         /**
          * One review observed two developers on the same pull request. The member reads what it made of them
-         * alone: another developer's observations, delivered feedback and withheld reasons stay out of it.
+         * alone: another developer's results, delivered feedback and withheld reasons stay out of it.
          */
         @Test
         @WithUser
@@ -665,11 +665,11 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                     .expectBody()
                     .jsonPath("$.practices[?(@.practiceSlug=='shared')].outcome")
                     .isEqualTo("REVIEWED")
-                    .jsonPath("$.practices[?(@.practiceSlug=='shared')].observationCount")
+                    .jsonPath("$.practices[?(@.practiceSlug=='shared')].practiceResultCount")
                     .isEqualTo(1)
                     .jsonPath("$.practices[?(@.practiceSlug=='shared')].deliveredCount")
                     .isEqualTo(1)
-                    .jsonPath("$.practices[?(@.practiceSlug=='theirs')].observationCount")
+                    .jsonPath("$.practices[?(@.practiceSlug=='theirs')].practiceResultCount")
                     .isEqualTo(0)
                     .jsonPath("$.practices[?(@.practiceSlug=='theirs')].deliveredCount")
                     .isEqualTo(0)
@@ -698,7 +698,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                     .expectStatus()
                     .isOk()
                     .expectBody()
-                    .jsonPath("$.practices[?(@.practiceSlug=='shared')].observationCount")
+                    .jsonPath("$.practices[?(@.practiceSlug=='shared')].practiceResultCount")
                     .isEqualTo(2)
                     .jsonPath("$.practices[?(@.practiceSlug=='shared')].withheldReasons[0]")
                     .isEqualTo("RECIPIENT_OPTED_OUT");
@@ -982,7 +982,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
     }
 
     private void assertOwnTraceCounts(User developer, boolean ownEndpoint) {
-        // Historical reviews can have multiple observations per practice; access filters still apply to every row.
+        // Historical reviews can have multiple results per practice; access filters still apply to every row.
         Practice shared = persistPractice(workspace, null, "shared", "Shared practice", null);
         AgentJob job = persistPullRequestReview(workspace, (int) ARTIFACT_ID, ARTIFACT_ID, READY_AT);
         recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.TRIGGERED, null, job.getId());
@@ -1037,7 +1037,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.practices[?(@.practiceSlug=='shared')].observationCount")
+                .jsonPath("$.practices[?(@.practiceSlug=='shared')].practiceResultCount")
                 .isEqualTo(2)
                 .jsonPath("$.practices[?(@.practiceSlug=='shared')].decidedAt")
                 .isEqualTo(READY_AT.plusSeconds(30).toString())
@@ -1053,7 +1053,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.practices[?(@.practiceSlug=='shared')].observationCount")
+                .jsonPath("$.practices[?(@.practiceSlug=='shared')].practiceResultCount")
                 .isEqualTo(1)
                 .jsonPath("$.practices[?(@.practiceSlug=='shared')].decidedAt")
                 .isEqualTo(READY_AT.toString());
@@ -1062,7 +1062,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                     .expectStatus()
                     .isOk()
                     .expectBody()
-                    .jsonPath("$.practices[?(@.practiceSlug=='shared')].observationCount")
+                    .jsonPath("$.practices[?(@.practiceSlug=='shared')].practiceResultCount")
                     .isEqualTo(4)
                     .jsonPath("$.practices[?(@.practiceSlug=='shared')].decidedAt")
                     .isEqualTo(READY_AT.plusSeconds(60).toString());
@@ -1102,7 +1102,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
     }
 
     /**
-     * A review of the artifact, started by the occurrence at {@code readyAt}, that recorded one observation about
+     * A review of the artifact, started by the occurrence at {@code readyAt}, that recorded one result about
      * {@code developer} they may see.
      */
     private AgentJob reviewObserving(User developer, Instant readyAt) {
@@ -1259,15 +1259,15 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
         return signalRepository.save(row);
     }
 
-    private void deliverFeedback(AgentJob job, UUID observationId) {
-        feedback(job, 1, observationId, author, FeedbackDeliveryState.DELIVERED, null);
+    private void deliverFeedback(AgentJob job, UUID practiceResultId) {
+        feedback(job, 1, practiceResultId, author, FeedbackDeliveryState.DELIVERED, null);
     }
 
     /** One piece of feedback about and to {@code recipient}, at {@code position} in the review's own order. */
     private void feedback(
             AgentJob job,
             int position,
-            UUID observationId,
+            UUID practiceResultId,
             User recipient,
             FeedbackDeliveryState state,
             @Nullable FeedbackSuppressionReason reason) {
@@ -1285,12 +1285,12 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                 .createdAt(READY_AT)
                 .deliveredAt(state == FeedbackDeliveryState.DELIVERED ? READY_AT : null)
                 .build());
-        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, "PRIMARY", 0);
+        feedbackEvidenceRepository.insertIfAbsent(feedback.getId(), practiceResultId, null, "PRIMARY", 0);
     }
 
-    private UUID insertObservation(Practice practice, AgentJob job) {
+    private UUID insertResult(Practice practice, AgentJob job) {
         UUID id = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
+        practiceResultRepository.insertIfAbsent(
                 id,
                 "occurrence-" + id,
                 job.getId(),
@@ -1305,7 +1305,10 @@ class ArtifactTraceControllerIntegrationTest extends AbstractPracticeReviewInteg
                 null,
                 "{\"citations\":[]}",
                 "Because the diff says so",
-                "recurrence-1",
+                "test-scope",
+                null,
+                null,
+                null,
                 READY_AT,
                 "LIVE");
         return id;

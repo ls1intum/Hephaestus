@@ -26,6 +26,13 @@ public class PracticeCatalogInstallation {
     @Column(name = "provenance_linked_at")
     private @Nullable Instant provenanceLinkedAt;
 
+    /**
+     * When the server moved this workspace's unchanged copies of bundled practice scripts to the shipped program; null
+     * until it has. Set once, so a copy diverged later keeps its own program and its normal offer.
+     */
+    @Column(name = "practice_scripts_upgraded_at")
+    private @Nullable Instant practiceScriptsUpgradedAt;
+
     public PracticeCatalogInstallation(Long workspaceId, Instant installedAt, @Nullable Instant provenanceLinkedAt) {
         this.workspaceId = workspaceId;
         this.installedAt = installedAt;
@@ -34,5 +41,9 @@ public class PracticeCatalogInstallation {
 
     public void markProvenanceLinked(Instant now) {
         this.provenanceLinkedAt = now;
+    }
+
+    public void markPracticeScriptsUpgraded(Instant now) {
+        this.practiceScriptsUpgradedAt = now;
     }
 }

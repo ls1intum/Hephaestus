@@ -137,10 +137,10 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     void insertOnScopedTableIsAllowed() {
         // INSERTs cannot leak existing data across workspaces. The workspace_id (or FK
         // chain) is placed into the row by application code, not enforced by the inspector.
-        // Observation and reaction inserts emitted at Hibernate flush time are safe by construction
+        // Result and reaction inserts emitted at Hibernate flush time are safe by construction
         // and must not raise a TenancyViolationException.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        inspector.inspect("insert into observation (id, title, practice_id) values (?, ?, ?)");
+        inspector.inspect("insert into result (id, title, practice_id) values (?, ?, ?)");
         verifyNoInteractions(reporter, scopedTables);
     }
 
@@ -323,7 +323,7 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // correlation-free EXISTS guard, stays on the PK-only fast path — the projected result set is
         // still the one keyed row, so it is tenancy-safe by construction.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        inspector.inspect("select p1_0.id from practice p1_0 where p1_0.id=? and exists (select 1 from observation o)");
+        inspector.inspect("select p1_0.id from practice p1_0 where p1_0.id=? and exists (select 1 from result o)");
         verifyNoInteractions(reporter, scopedTables);
     }
 

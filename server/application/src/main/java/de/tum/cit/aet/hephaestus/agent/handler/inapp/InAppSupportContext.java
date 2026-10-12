@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.handler.inapp;
 
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ReviewedWorkKey;
+import de.tum.cit.aet.hephaestus.practices.result.ReviewedWorkKey;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -12,7 +12,7 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Per current NOT_MET practice, how the page routes a new IN_APP card at {@code readAt} and, when it admits one, the
- * occurrences the card may cite, as the page selects them. It is read after the observations are admitted and is not
+ * occurrences the card may cite, as the page selects them. It is read after the results are admitted and is not
  * part of the admission: a later read can differ, and the page decides again whether a card is written.
  *
  * @param refusal the recipient policy's reason, for {@link State#REFUSED}
@@ -32,9 +32,9 @@ public record InAppSupportContext(
     /** @param occurrences empty unless {@code decision} is {@link InAppRoutingDecision#ADMIT} */
     public record PracticeSupport(String practiceSlug, InAppRoutingDecision decision, List<Occurrence> occurrences) {}
 
-    /** One selected observation, with the native identity of the work it is about and what it recorded. */
+    /** One selected result, with the native identity of the work it is about and what it recorded. */
     public record Occurrence(
-            UUID observationId,
+            UUID practiceResultId,
             String artifactKind,
             long artifactId,
             String outcome,
@@ -45,20 +45,20 @@ public record InAppSupportContext(
             @Nullable Long practiceRevisionId,
             String observedAt) {
 
-        static Occurrence of(Observation observation) {
-            ReviewedWorkKey work = ReviewedWorkKey.of(observation);
-            PracticeRevision revision = observation.getPracticeRevision();
+        static Occurrence of(PracticeResult practiceResult) {
+            ReviewedWorkKey work = ReviewedWorkKey.of(practiceResult);
+            PracticeRevision revision = practiceResult.getPracticeRevision();
             return new Occurrence(
-                    observation.getId(),
+                    practiceResult.getId(),
                     work.kind().value(),
                     work.id(),
-                    observation.getOutcome().name(),
-                    observation.getOrigin().name(),
-                    observation.getSummary(),
-                    observation.getEvidenceRationale(),
-                    observation.getEvidence(),
+                    practiceResult.getOutcome().name(),
+                    practiceResult.getOrigin().name(),
+                    practiceResult.getSummary(),
+                    practiceResult.getEvidenceRationale(),
+                    practiceResult.getEvidence(),
                     revision == null ? null : revision.getId(),
-                    observation.getObservedAt().toString());
+                    practiceResult.getObservedAt().toString());
         }
     }
 

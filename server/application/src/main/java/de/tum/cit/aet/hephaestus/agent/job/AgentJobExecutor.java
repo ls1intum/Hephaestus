@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ReviewCoalescedException;
 import de.tum.cit.aet.hephaestus.agent.context.ReviewedWork;
 import de.tum.cit.aet.hephaestus.agent.gateway.WorkspaceBudgetExceededException;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.AnsweredPractice;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
@@ -347,7 +347,7 @@ public class AgentJobExecutor {
 
     /**
      * Settles this worker's jobs before stopping their containers. Unadmitted attempts may requeue;
-     * admitted attempts retain their observations and fail without repeating the review. The drain
+     * admitted attempts retain their results and fail without repeating the review. The drain
      * contract is in docs/admin/runtime-roles.mdx.
      *
      * @return {@code true} if every job this worker still owned was settled and every container stop
@@ -397,7 +397,7 @@ public class AgentJobExecutor {
                 ? jobRepository.findLlmUsageById(jobId).orElse(null)
                 : null;
         int updated = workerId != null ? requeueOrphanWithRotation(jobId, workerId, job.getRetryCount()) : 0;
-        // An attempt whose observations were admitted is never measured again: the requeue refused it. Its
+        // An attempt whose results were admitted is never measured again: the requeue refused it. Its
         // public writer continues from the original inputs if its admission kept them; otherwise it ends here.
         if (updated == 0 && workerId != null) {
             updated = continuing != null ? requeueForComposition(continuing, job, workerId) : 0;
@@ -408,7 +408,7 @@ public class AgentJobExecutor {
                     workerId,
                     job.getRetryCount(),
                     Instant.now(),
-                    ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION);
+                    ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
         }
         if (updated > 0) {
             if (job.getExecutionStartedAt() != null) {
@@ -824,7 +824,7 @@ public class AgentJobExecutor {
             }
         } catch (ReviewCoalescedException e) {
             // Recorded like a refusal, through the same fenced terminal write, but it is not one: the evidence was
-            // sufficient, and every answer this run would give stands as an earlier completed review's observation.
+            // sufficient, and every answer this run would give stands as an earlier completed review's result.
             try (PreparedJobInputs coalesced = e.preparedInputs()) {
                 persistRefusedEvidence(jobId, job.getRetryCount(), coalesced);
                 ObjectNode output = objectMapper.createObjectNode().put("outcome", ReviewRunOutcome.COALESCED.name());
@@ -860,7 +860,7 @@ public class AgentJobExecutor {
                     sandboxExecutionStarted ? null : PreparationFailure.of(preparationStage.get(), e));
         } finally {
             // Admission and delivery are done by now, so the attempt's evidence can be retired: deleted
-            // once its observations were admitted, kept for the cleanup grace otherwise.
+            // once its results were admitted, kept for the cleanup grace otherwise.
             if (stagedInputs != null) {
                 stagedInputs.close();
             }
@@ -932,7 +932,7 @@ public class AgentJobExecutor {
         AgentJob preparedJob = jobRepository.findByIdWithWorkspace(jobId).orElse(job);
         // A continuing writer captures nothing: it is staged from its admission's original inputs, and the job keeps
         // the evidence record that admission verified against.
-        boolean continuation = ObservationAdmissionService.isContinuation(preparedJob);
+        boolean continuation = ResultAdmissionService.isContinuation(preparedJob);
         ReviewCompositionContinuation continuing = compositionContinuation;
         if (continuation && continuing == null) {
             throw new JobPreparationException("The review cannot continue: this runtime cannot stage its writer");
@@ -948,20 +948,7 @@ public class AgentJobExecutor {
                     Instant.now().plusSeconds(snapshot.timeoutSeconds()).truncatedTo(ChronoUnit.SECONDS);
             Instant tokenExpiry = workDeadline.plus(SandboxLayout.RESULT_UPLOAD_GRACE);
             String jobToken = workerJwtIssuer.issueForJobUntil(
-                    jobId,
-                    job.getWorkspace().getId(),
-                    job.getRetryCount(),
-                    tokenExpiry,
-                    WorkerJwtIssuer.LLM_PROXY_SCOPE);
-            // A second credential, so the practice scripts never hold the review's capabilities.
-            String practiceScriptToken = job.getPurpose() == AgentPurpose.PRACTICE_REVIEW
-                    ? workerJwtIssuer.issueForJobUntil(
-                            jobId,
-                            job.getWorkspace().getId(),
-                            job.getRetryCount(),
-                            tokenExpiry,
-                            WorkerJwtIssuer.LLM_PRACTICE_SCRIPT_SCOPE)
-                    : null;
+                    jobId, job.getWorkspace().getId(), job.getRetryCount(), tokenExpiry);
             stage.set(PreparationFailure.Stage.SPEC);
             PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
                     snapshot.apiProtocol(),
@@ -971,8 +958,7 @@ public class AgentJobExecutor {
                     snapshot.reasoningEffort(),
                     jobToken,
                     snapshot.timeoutSeconds(),
-                    practiceScriptToken,
-                    practiceScriptToken == null ? Map.of() : snapshot.practiceScriptModels());
+                    job.getPurpose() == AgentPurpose.PRACTICE_REVIEW ? snapshot.practiceScriptModels() : Map.of());
 
             PracticeSandboxSpec agentSpec = practiceAgent.buildSandboxSpec(adapterRequest);
             SandboxSpec sandboxSpec = buildSandboxSpec(
@@ -1020,7 +1006,7 @@ public class AgentJobExecutor {
     }
 
     /**
-     * Deliberately not best-effort: an observation that cannot be tied to the inputs that produced it
+     * Deliberately not best-effort: a result that cannot be tied to the inputs that produced it
      * is unfixable evaluation data, so a failed write fails the run before any LLM cost accrues.
      */
     private void persistProvenanceDigests(
@@ -1121,7 +1107,7 @@ public class AgentJobExecutor {
         return snapshot;
     }
 
-    /** The pull request or issue a review job is about, the id its observations are recorded against. */
+    /** The pull request or issue a review job is about, the id its results are recorded against. */
     private static @Nullable Long reviewedArtifactId(AgentJob job) {
         String key =
                 switch (job.getJobType()) {
@@ -1301,15 +1287,15 @@ public class AgentJobExecutor {
     }
 
     /**
-     * Whether this job's observations reached the server after all — the admission committed and only
+     * Whether this job's results reached the server after all — the admission committed and only
      * its answer was lost. Repeating the review would submit a different payload against the digest the
      * job already carries, which the admission refuses, so an attempt that got this far is finished
      * even though its runner could not tell.
      */
-    private static boolean observationsAdmitted(AgentJob job) {
+    private static boolean practiceResultsAdmitted(AgentJob job) {
         JsonNode metadata = job.getMetadata();
         return metadata != null
-                && !metadata.path(ObservationAdmissionService.DIGEST_METADATA_KEY)
+                && !metadata.path(ResultAdmissionService.DIGEST_METADATA_KEY)
                         .asString("")
                         .isBlank();
     }
@@ -1333,14 +1319,14 @@ public class AgentJobExecutor {
         int currentRetryCount = job.getRetryCount();
         Integer updated = transactionTemplate.execute(status -> {
             // Under the same row lock the admission takes, so the two decisions serialize: a review
-            // whose observations reached the server is finished, whatever its sandbox went on to do.
+            // whose results reached the server is finished, whatever its sandbox went on to do.
             // Running it again would submit a different payload against the digest the job already
             // carries, which the admission refuses — a second attempt could only lose what the first
             // recorded.
             AgentJob locked =
                     jobRepository.findByIdWithWorkspaceForUpdate(jobId).orElse(null);
-            if (locked != null && observationsAdmitted(locked)) {
-                log.info("Not requeuing job {}: its observations already reached this server", jobId);
+            if (locked != null && practiceResultsAdmitted(locked)) {
+                log.info("Not requeuing job {}: its results already reached this server", jobId);
                 return 0;
             }
             AgentJobLlmUsage retryCounts =
@@ -1433,14 +1419,14 @@ public class AgentJobExecutor {
                 return new TerminalClaim(job, AgentJobStatus.CANCELLED);
             }
 
-            // Queued again after its observations were admitted: a new attempt would capture the work
+            // Queued again after its results were admitted: a new attempt would capture the work
             // anew, and its citations would not be the ones the admission verified. Its earlier attempt
             // was billed when it was requeued, and nothing has run since. Only a writer continuing from
             // the admission's kept inputs is claimed, under every check below.
-            if (ObservationAdmissionService.isAdmitted(job) && !ObservationAdmissionService.isContinuation(job)) {
+            if (ResultAdmissionService.isAdmitted(job) && !ResultAdmissionService.isContinuation(job)) {
                 job.setStatus(AgentJobStatus.FAILED);
                 job.setCompletedAt(Instant.now());
-                job.setErrorMessage(ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION);
+                job.setErrorMessage(ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
                 jobRepository.save(job);
                 return new TerminalClaim(job, AgentJobStatus.FAILED);
             }
@@ -1664,7 +1650,7 @@ public class AgentJobExecutor {
     }
 
     /**
-     * A failed runner can leave a local draft. Only observations already admitted by this server
+     * A failed runner can leave a local draft. Only results already admitted by this server
      * allow its remaining output to continue through delivery.
      */
     private AgentJobStatus determineTerminalStatus(SandboxResult sandboxResult, AgentResult agentResult, AgentJob job) {
@@ -1688,9 +1674,9 @@ public class AgentJobExecutor {
         }
         if (agentResult != null && agentResult.output() != null) {
             Object rawOutput = agentResult.output().get("rawOutput");
-            if (rawOutput instanceof String raw && !raw.isBlank() && observationsAdmitted(job)) {
+            if (rawOutput instanceof String raw && !raw.isBlank() && practiceResultsAdmitted(job)) {
                 log.info(
-                        "Agent exited with code {} after observation admission — continuing delivery",
+                        "Agent exited with code {} after result admission — continuing delivery",
                         sandboxResult.exitCode());
                 return AgentJobStatus.COMPLETED;
             }

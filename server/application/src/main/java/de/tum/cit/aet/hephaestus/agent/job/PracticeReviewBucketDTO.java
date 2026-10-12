@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "Practice reviews, observations and feedback in one time bucket of a range")
+@Schema(description = "Practice reviews, results and feedback in one time bucket of a range")
 public record PracticeReviewBucketDTO(
         @NonNull
         @Schema(
@@ -15,8 +15,8 @@ public record PracticeReviewBucketDTO(
         @NonNull @Schema(description = "Practice reviews created in the bucket within the range, in any status")
         Long reviews,
 
-        @NonNull @Schema(description = "Observations recorded in the bucket within the range")
-        Long observations,
+        @NonNull @Schema(description = "Results recorded in the bucket within the range")
+        Long practiceResults,
 
         @NonNull @Schema(description = "Feedback created in the bucket within the range, in any delivery state")
         Long feedback) {}

@@ -122,7 +122,7 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
                                 aboutUserId,
                                 key.signalName(),
                                 key.revision(),
-                                SignalOrigins.observationOriginOf(discoveredVia)),
+                                SignalOrigins.practiceResultOriginOf(discoveredVia)),
                         key,
                         run);
         }

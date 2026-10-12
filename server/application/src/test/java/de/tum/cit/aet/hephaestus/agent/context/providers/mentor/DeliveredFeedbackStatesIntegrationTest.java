@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.RecipientFeedbackRow;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
@@ -28,7 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackP
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -68,10 +68,10 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -170,7 +170,7 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
                 .body("someone-elses-note")
                 .createdAt(base.plusSeconds(nextPosition++))
                 .build());
-        feedbackObservationRepository.insertIfAbsent(othersNote.getId(), strength, EvidenceRole.PRIMARY.name(), 0);
+        feedbackEvidenceRepository.insertIfAbsent(othersNote.getId(), strength, null, EvidenceRole.PRIMARY.name(), 0);
         JsonNode withoutProposals = withoutPreparedAt(contribute());
 
         List<Feedback> proposals = List.of(
@@ -243,7 +243,7 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
                 FeedbackDeliveryState.DELIVERED,
                 "note-on-erased-evidence",
                 erased);
-        jdbcTemplate.update("DELETE FROM observation WHERE id = ?", erased);
+        jdbcTemplate.update("DELETE FROM practice_result WHERE id = ?", erased);
         long revokedThread = seedThread("C-revoked", "300.0", ConsentState.REVOKED);
         Feedback topic = save(
                 job,
@@ -287,7 +287,8 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
                 FeedbackDeliveryState.DELIVERED,
                 "issue-note",
                 linksIssue);
-        feedbackObservationRepository.insertIfAbsent(note.getId(), describesIssue, EvidenceRole.SUPPORTING.name(), 1);
+        feedbackEvidenceRepository.insertIfAbsent(
+                note.getId(), describesIssue, null, EvidenceRole.SUPPORTING.name(), 1);
         JsonNode before = objectMapper.readTree(contribute());
         assertThat(before.path("feedbackStates")
                         .path(0)
@@ -296,7 +297,7 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
                 .isEqualTo("CURRENT");
 
         jdbcTemplate.update(
-                "UPDATE observation SET superseded_at = now() WHERE id IN (?, ?)", linksIssue, describesIssue);
+                "UPDATE practice_result SET superseded_at = now() WHERE id IN (?, ?)", linksIssue, describesIssue);
         JsonNode after = objectMapper.readTree(contribute());
 
         assertThat(after.get("deliveredFeedback")).isEqualTo(before.get("deliveredFeedback"));
@@ -563,10 +564,10 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
     }
 
     private UUID observeStrength(ArtifactKind artifactKind, long artifactId) {
-        UUID observationId = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
-                observationId,
-                "observation-" + observationId,
+        UUID practiceResultId = UUID.randomUUID();
+        practiceResultRepository.insertIfAbsent(
+                practiceResultId,
+                "practiceResult-" + practiceResultId,
                 job.getId(),
                 workspace.getId(),
                 practice.getId(),
@@ -579,10 +580,13 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
                 null,
                 evidence(artifactKind),
                 null,
+                "test-scope",
+                null,
+                null,
                 null,
                 Instant.now(),
                 "LIVE");
-        return observationId;
+        return practiceResultId;
     }
 
     private Feedback save(
@@ -591,8 +595,8 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
             FeedbackChannel channel,
             FeedbackDeliveryState state,
             String body,
-            UUID observationId) {
-        return save(reviewJob, ArtifactKinds.PULL_REQUEST, mergeRequestId, channel, state, body, observationId);
+            UUID practiceResultId) {
+        return save(reviewJob, ArtifactKinds.PULL_REQUEST, mergeRequestId, channel, state, body, practiceResultId);
     }
 
     /** Each saved row is newer than the one before it. */
@@ -603,7 +607,7 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
             FeedbackChannel channel,
             FeedbackDeliveryState state,
             String body,
-            UUID observationId) {
+            UUID practiceResultId) {
         Instant createdAt = base.plusSeconds(nextPosition);
         Feedback feedback = feedbackRepository.save(Feedback.builder()
                 .agentJobId(reviewJob.getId())
@@ -620,7 +624,8 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
                 .createdAt(createdAt)
                 .deliveredAt(state == FeedbackDeliveryState.DELIVERED ? createdAt : null)
                 .build());
-        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
+        feedbackEvidenceRepository.insertIfAbsent(
+                feedback.getId(), practiceResultId, null, EvidenceRole.PRIMARY.name(), 0);
         return feedback;
     }
 
@@ -643,11 +648,11 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
     }
 
     /** The evidence now cites a source no purpose may use, so no surface may show it. */
-    private void withdrawEvidence(UUID observationId) {
+    private void withdrawEvidence(UUID practiceResultId) {
         jdbcTemplate.update(
-                "UPDATE observation SET evidence = CAST(? AS jsonb) WHERE id = ?",
+                "UPDATE practice_result SET evidence = CAST(? AS jsonb) WHERE id = ?",
                 citing("unapproved.source"),
-                observationId);
+                practiceResultId);
     }
 
     private static String evidence(ArtifactKind artifactKind) {

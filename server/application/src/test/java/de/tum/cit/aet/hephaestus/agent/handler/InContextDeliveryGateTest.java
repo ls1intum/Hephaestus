@@ -13,17 +13,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.ValidatedObservation;
+import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.ValidatedResult;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -35,7 +35,7 @@ import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The in-context delivery predicate: which observations are allowed to land on the artifact, and what is
+ * The in-context delivery predicate: which results are allowed to land on the artifact, and what is
  * written down about the ones that are not. Two rules apply — the practice's autonomy and the run's
  * provenance — and this holds both to their reasons.
  */
@@ -49,7 +49,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     private PracticeRepository practiceRepository;
 
     @Mock
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Mock
     private FeedbackLedgerRecorder feedbackLedgerRecorder;
@@ -57,7 +57,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     private InContextDeliveryGate gate() {
         return new InContextDeliveryGate(
                 practiceRepository,
-                observationRepository,
+                practiceResultRepository,
                 feedbackLedgerRecorder,
                 InContextDeliveryGateFixtures.workspaceDefaults(),
                 InContextDeliveryGateFixtures.workspacesAtTheDefaultJobRevision());
@@ -67,16 +67,16 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     void aJobAdmittedUnderAnOlderRolloutSaysNothingOnTheArtifact() {
         InContextDeliveryGate gate = new InContextDeliveryGate(
                 practiceRepository,
-                observationRepository,
+                practiceResultRepository,
                 feedbackLedgerRecorder,
                 InContextDeliveryGateFixtures.workspaceDefaults(),
                 InContextDeliveryGateFixtures.workspacesAtRevision(7L));
-        List<Observation> persisted = List.of(observation("occ-1"));
-        when(observationRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
+        List<PracticeResult> persisted = List.of(practiceResult("occ-1"));
+        when(practiceResultRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
 
-        assertThat(gate.admitInContext(job(), List.of(observation("loud", "occ-1"))))
+        assertThat(gate.admitInContext(job(), List.of(practiceResult("loud", "occ-1"))))
                 .isEmpty();
-        assertThat(gate.awaitingApproval(job(), List.of(observation("loud", "occ-1"))))
+        assertThat(gate.awaitingApproval(job(), List.of(practiceResult("loud", "occ-1"))))
                 .isEmpty();
         verify(feedbackLedgerRecorder)
                 .recordWithheld(any(), any(), eq(FeedbackSuppressionReason.STALE_ROLLOUT_REVISION), anyInt());
@@ -86,12 +86,12 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     void aWorkspaceThatNoLongerExistsProducesNoInContextFeedback() {
         InContextDeliveryGate gate = new InContextDeliveryGate(
                 practiceRepository,
-                observationRepository,
+                practiceResultRepository,
                 feedbackLedgerRecorder,
                 InContextDeliveryGateFixtures.workspaceDefaults(),
                 InContextDeliveryGateFixtures.noWorkspaces());
 
-        assertThat(gate.admitInContext(job(), List.of(observation("loud", "occ-1"))))
+        assertThat(gate.admitInContext(job(), List.of(practiceResult("loud", "occ-1"))))
                 .isEmpty();
     }
 
@@ -99,9 +99,9 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     void deliveringPracticesReachTheArtifact() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
                 .thenReturn(List.of(practice("loud", PracticeAutonomy.AUTOMATIC)));
-        ValidatedObservation observation = observation("loud", "occ-1");
+        ValidatedResult practiceResult = practiceResult("loud", "occ-1");
 
-        assertThat(gate().admitInContext(job(), List.of(observation))).containsExactly(observation);
+        assertThat(gate().admitInContext(job(), List.of(practiceResult))).containsExactly(practiceResult);
         verifyNoInteractions(feedbackLedgerRecorder);
     }
 
@@ -112,10 +112,10 @@ class InContextDeliveryGateTest extends BaseUnitTest {
                         practice("measured", PracticeAutonomy.HUMAN_APPROVAL),
                         practice("proposed", PracticeAutonomy.HUMAN_APPROVAL),
                         practice("loud", PracticeAutonomy.AUTOMATIC)));
-        ValidatedObservation measured = observation("measured", "occ-1");
-        ValidatedObservation proposed = observation("proposed", "occ-2");
-        ValidatedObservation loud = observation("loud", "occ-3");
-        List<ValidatedObservation> admitted = gate().admitInContext(job(), List.of(measured, proposed, loud));
+        ValidatedResult measured = practiceResult("measured", "occ-1");
+        ValidatedResult proposed = practiceResult("proposed", "occ-2");
+        ValidatedResult loud = practiceResult("loud", "occ-3");
+        List<ValidatedResult> admitted = gate().admitInContext(job(), List.of(measured, proposed, loud));
 
         assertThat(admitted).containsExactly(loud);
         assertThat(gate().awaitingApproval(job(), List.of(measured, proposed, loud)))
@@ -124,61 +124,61 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     }
 
     /**
-     * A slug the workspace catalogue does not contain was never persisted as an observation either, so
+     * A slug the workspace catalogue does not contain was never persisted as a result either, so
      * there is no autonomy to consult; withholding it would silently drop feedback on a lookup miss.
      */
     @Test
     void anUnknownPracticeSlugFailsClosed() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
                 .thenReturn(List.of(practice("known", PracticeAutonomy.HUMAN_APPROVAL)));
-        ValidatedObservation stranger = observation("not-in-the-catalogue", "occ-9");
+        ValidatedResult stranger = practiceResult("not-in-the-catalogue", "occ-9");
 
         assertThat(gate().admitInContext(job(), List.of(stranger))).isEmpty();
         verify(feedbackLedgerRecorder, never()).recordWithheld(any(), any(), any(), anyInt());
     }
 
     @Test
-    void aWithheldObservationThatWasNeverPersistedGetsNoLedgerRow() {
+    void aWithheldResultThatWasNeverPersistedGetsNoLedgerRow() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
                 .thenReturn(List.of(practice("measured", PracticeAutonomy.OFF)));
-        when(observationRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(List.of());
+        when(practiceResultRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(List.of());
 
-        assertThat(gate().admitInContext(job(), List.of(observation("measured", null))))
+        assertThat(gate().admitInContext(job(), List.of(practiceResult("measured", null))))
                 .isEmpty();
         verify(feedbackLedgerRecorder, never()).recordWithheld(any(), any(), any(), anyInt());
     }
 
-    /** A ledger failure is telemetry loss, never delivery loss: the surviving observations still go out. */
+    /** A ledger failure is telemetry loss, never delivery loss: the surviving results still go out. */
     @Test
-    void aLedgerFailureDoesNotStopTheObservationsThatSurvived() {
+    void aLedgerFailureDoesNotStopTheResultsThatSurvived() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
                 .thenReturn(List.of(
                         practice("measured", PracticeAutonomy.OFF), practice("loud", PracticeAutonomy.AUTOMATIC)));
-        List<Observation> persisted = List.of(observation("occ-1"));
-        when(observationRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
+        List<PracticeResult> persisted = List.of(practiceResult("occ-1"));
+        when(practiceResultRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
         doThrow(new IllegalStateException("ledger down"))
                 .when(feedbackLedgerRecorder)
                 .recordWithheld(any(), any(), any(), eq(0));
-        ValidatedObservation loud = observation("loud", "occ-2");
+        ValidatedResult loud = practiceResult("loud", "occ-2");
 
-        assertThat(gate().admitInContext(job(), List.of(observation("measured", "occ-1"), loud)))
+        assertThat(gate().admitInContext(job(), List.of(practiceResult("measured", "occ-1"), loud)))
                 .containsExactly(loud);
     }
 
     /**
-     * A campaign's observations never reach the artifact. Posting one would comment on a pull request merged
+     * A campaign's results never reach the artifact. Posting one would comment on a pull request merged
      * months ago and notify everyone still subscribed to it about work nobody can act on.
      */
     @Test
     void aBackfilledRunSaysNothingOnTheArtifactWhateverTheTierIs() {
-        List<Observation> persisted = List.of(observation("occ-1"), observation("occ-2"));
-        when(observationRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
-        ValidatedObservation loud = observation("loud", "occ-1");
-        ValidatedObservation alsoLoud = observation("also-loud", "occ-2");
+        List<PracticeResult> persisted = List.of(practiceResult("occ-1"), practiceResult("occ-2"));
+        when(practiceResultRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
+        ValidatedResult loud = practiceResult("loud", "occ-1");
+        ValidatedResult alsoLoud = practiceResult("also-loud", "occ-2");
 
         assertThat(gate().admitInContext(backfillJob(), List.of(loud, alsoLoud)))
                 .isEmpty();
-        // Never even asks for the autonomy states: no dial can make a retrospective observation actionable in place.
+        // Never even asks for the autonomy states: no dial can make a retrospective result actionable in place.
         verifyNoInteractions(practiceRepository);
         verify(feedbackLedgerRecorder, times(2))
                 .recordWithheld(any(), any(), eq(FeedbackSuppressionReason.BACKFILL_QUIET), anyInt());
@@ -186,13 +186,13 @@ class InContextDeliveryGateTest extends BaseUnitTest {
 
     /** The two withholding rules are separately answerable, which is why they are separately recorded. */
     @Test
-    void aAutonomyWithheldObservationIsRecordedUnderTheTierNotTheProvenance() {
+    void aAutonomyWithheldResultIsRecordedUnderTheTierNotTheProvenance() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
                 .thenReturn(List.of(practice("measured", PracticeAutonomy.OFF)));
-        List<Observation> persisted = List.of(observation("occ-1"));
-        when(observationRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
+        List<PracticeResult> persisted = List.of(practiceResult("occ-1"));
+        when(practiceResultRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
 
-        assertThat(gate().admitInContext(job(), List.of(observation("measured", "occ-1"))))
+        assertThat(gate().admitInContext(job(), List.of(practiceResult("measured", "occ-1"))))
                 .isEmpty();
         verify(feedbackLedgerRecorder)
                 .recordWithheld(any(), any(), eq(FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL), eq(0));
@@ -202,9 +202,9 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     void aJobWithoutAWorkspaceIsLeftAlone() {
         AgentJob job = new AgentJob();
         job.setId(JOB_ID);
-        ValidatedObservation observation = observation("anything", "occ-1");
+        ValidatedResult practiceResult = practiceResult("anything", "occ-1");
 
-        assertThat(gate().admitInContext(job, List.of(observation))).containsExactly(observation);
+        assertThat(gate().admitInContext(job, List.of(practiceResult))).containsExactly(practiceResult);
         verifyNoInteractions(practiceRepository);
     }
 
@@ -213,7 +213,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         AgentJob job = job();
         job.setMetadata(new ObjectMapper()
                 .createObjectNode()
-                .put(ReviewOutputService.ORIGIN_METADATA_KEY, ObservationOrigin.BACKFILL.name()));
+                .put(ReviewOutputService.ORIGIN_METADATA_KEY, ResultOrigin.BACKFILL.name()));
         return job;
     }
 
@@ -233,20 +233,20 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         return practice;
     }
 
-    private ValidatedObservation observation(String slug, @Nullable String occurrenceKey) {
-        return new ValidatedObservation(
+    private ValidatedResult practiceResult(String slug, @Nullable String occurrenceKey) {
+        return new ValidatedResult(
                 slug,
                 "title",
                 Outcome.NOT_MET,
                 Severity.MAJOR,
                 null,
                 "reasoning",
-                occurrenceKey == null ? null : new ObservationKeys(occurrenceKey, "rk-" + occurrenceKey));
+                occurrenceKey == null ? null : new ResultKeys(occurrenceKey));
     }
 
-    private Observation observation(@Nullable String occurrenceKey) {
-        Observation observation = mock(Observation.class);
-        lenient().when(observation.getOccurrenceKey()).thenReturn(occurrenceKey);
-        return observation;
+    private PracticeResult practiceResult(@Nullable String occurrenceKey) {
+        PracticeResult practiceResult = mock(PracticeResult.class);
+        lenient().when(practiceResult.getOccurrenceKey()).thenReturn(occurrenceKey);
+        return practiceResult;
     }
 }

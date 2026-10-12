@@ -55,7 +55,7 @@
             "agent::conversation-source",
             // SlackIngestService.eraseChannel completes the GDPR Art. 17 erasure of the
             // chat.conversation_thread-derived
-            // observations/feedback via the practices-owned ConversationFeedbackErasure port (one-way edge, no cycle).
+            // results/feedback via the practices-owned ConversationFeedbackErasure port (one-way edge, no cycle).
             "practices::spi",
         })
 @org.jspecify.annotations.NullMarked

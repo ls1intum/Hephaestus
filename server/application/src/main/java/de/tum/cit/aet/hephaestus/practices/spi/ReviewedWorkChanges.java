@@ -15,11 +15,11 @@ public interface ReviewedWorkChanges {
      */
     Set<UUID> materiallyChanged(long workspaceId, Collection<UUID> runIds, PullRequestRevision current);
 
-    /** The authorized observation ids whose verified closing-issue file differs from its current projection. */
+    /** The authorized result ids whose verified closing-issue file differs from its current projection. */
     Set<UUID> materiallyChangedLinkedIssues(
-            long workspaceId, Collection<ObservationEvidence> observations, long pullRequestId);
+            long workspaceId, Collection<ResultEvidence> practiceResults, long pullRequestId);
 
-    record ObservationEvidence(UUID observationId, UUID runId, JsonNode citations) {}
+    record ResultEvidence(UUID practiceResultId, UUID runId, JsonNode citations) {}
 
     boolean linkedCaptureCurrent(long workspaceId, UUID jobId, long pullRequestId, String signalRevision);
 

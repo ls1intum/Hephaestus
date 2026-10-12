@@ -41,7 +41,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Listens for PR and review domain events, records what was observed, and submits practice-aware
- * agent jobs for the observations that warrant one.
+ * agent jobs for the results that warrant one.
  *
  * <p>Uses {@code @Async @TransactionalEventListener(AFTER_COMMIT)} to avoid blocking the webhook
  * processing thread and to ensure entities are committed before we read them.
@@ -205,7 +205,7 @@ public class AgentJobEventListener {
     }
 
     /**
-     * Records the observation, then decides whether it warrants a review.
+     * Records the result, then decides whether it warrants a review.
      *
      * <p>The ledger settles the first question for everyone: whichever observer of an occurrence gets
      * there first is told to act, and the rest stop here. That is what makes deduplication outlast the

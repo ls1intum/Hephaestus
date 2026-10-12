@@ -53,7 +53,7 @@ public record ReviewFeedbackFilterParams(
         @RequestParam(required = false) @Positive @Nullable Long recipientUserId,
 
         @Parameter(
-                description = "Practices whose feedback to list (repeatable): feedback bound to an observation of any"
+                description = "Practices whose feedback to list (repeatable): feedback bound to a result of any"
                         + " of them, in any role")
         @RequestParam(required = false)
         @Nullable

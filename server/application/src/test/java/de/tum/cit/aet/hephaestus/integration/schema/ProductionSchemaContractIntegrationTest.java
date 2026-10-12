@@ -256,7 +256,7 @@ class ProductionSchemaContractIntegrationTest {
     }
 
     @Test
-    void observationForeignKeysPreserveTenantAndProvenance() {
+    void practiceResultForeignKeysPreserveTenantAndProvenance() {
         List<@Nullable String> foreignKeys = jdbcTemplate.queryForList("""
             SELECT DISTINCT rc.constraint_name || ':' || parent.table_name || ':' || rc.delete_rule
             FROM information_schema.referential_constraints rc
@@ -266,17 +266,17 @@ class ProductionSchemaContractIntegrationTest {
               ON parent.constraint_schema = rc.unique_constraint_schema
              AND parent.constraint_name = rc.unique_constraint_name
             WHERE rc.constraint_schema = current_schema()
-              AND child.table_name = 'observation'
+              AND child.table_name = 'practice_result'
             """, String.class);
         assertThat(foreignKeys)
                 .noneMatch(foreignKey -> foreignKey.endsWith(":CASCADE"))
                 .contains(
-                        "sfk_observation_workspace:workspace:NO ACTION",
-                        "fk_observation_practice:practice:NO ACTION",
-                        "fk_observation_practice_workspace:practice:NO ACTION",
-                        "fk_observation_revision:practice_revision:SET NULL");
+                        "sfk_practice_result_workspace:workspace:NO ACTION",
+                        "fk_practice_result_practice:practice:NO ACTION",
+                        "fk_practice_result_practice_workspace:practice:NO ACTION",
+                        "fk_practice_result_revision:practice_revision:SET NULL");
 
-        assertColumnRequired("observation", "workspace_id");
+        assertColumnRequired("practice_result", "workspace_id");
     }
 
     @Test
@@ -480,7 +480,7 @@ class ProductionSchemaContractIntegrationTest {
      */
     @ParameterizedTest(name = "{argumentSetName}")
     @MethodSource("restorationStates")
-    void observationCorrectionRecordsARestorationWhole(
+    void practiceResultCorrectionRecordsARestorationWhole(
             @Nullable Instant restoredAt,
             @Nullable Long restoredBy,
             @Nullable String restorationReason,
@@ -490,7 +490,7 @@ class ProductionSchemaContractIntegrationTest {
             connection.setAutoCommit(false);
             try (var statement = connection.createStatement();
                     var insert = connection.prepareStatement("""
-                            INSERT INTO observation_invalidation (id, workspace_id, observation_id, reason,
+                            INSERT INTO practice_result_invalidation (id, workspace_id, practice_result_id, reason,
                                 invalidated_by_account_id, invalidated_at, restoration_reason, restored_by_account_id,
                                 restored_at, provider_copy, provider_copy_retry_at)
                             VALUES (?, 1, ?, 'Wrong when made', 1, now(), ?, ?, ?, 'PENDING', now())
@@ -504,7 +504,7 @@ class ProductionSchemaContractIntegrationTest {
                 insert.executeUpdate();
                 return true;
             } catch (SQLException rejected) {
-                assertThat(rejected.getMessage()).contains("ck_observation_invalidation_restoration");
+                assertThat(rejected.getMessage()).contains("ck_practice_result_invalidation_restoration");
                 return false;
             } finally {
                 connection.rollback();

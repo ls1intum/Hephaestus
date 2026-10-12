@@ -23,12 +23,16 @@ import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class PracticeReleaseService {
+
+    private static final Logger log = LoggerFactory.getLogger(PracticeReleaseService.class);
 
     private final PracticeRepository practices;
     private final WorkspaceRepository workspaces;
@@ -107,6 +111,66 @@ public class PracticeReleaseService {
             workspace.getReviewSettings().incrementRolloutRevision();
         }
         return practice;
+    }
+
+    /**
+     * Moves an unchanged copy of a bundled practice script to the program the catalog now offers: when the practice's
+     * script is the one its adopted base holds and the offer holds another. Only the script changes, on the practice
+     * and in its adopted base; every other field, its pending offer, the adopted base source, a declined offer and
+     * the provenance fingerprint stay. A diverged copy is left as it is, with its normal offer. Appends a revision and
+     * records a system audit entry.
+     *
+     * @return whether the copy took the offered script
+     */
+    @Transactional
+    public boolean adoptOfferedPracticeScript(Long workspaceId, String slug) {
+        EffectiveCatalog catalog = instanceReleases.catalogForDecision();
+        Practice practice =
+                practices.findByWorkspaceIdAndSlug(workspaceId, slug).orElse(null);
+        PracticeReleaseProposalDTO proposal = practice == null ? null : proposal(practice, catalog);
+        if (practice == null
+                || proposal == null
+                || !Objects.equals(
+                        proposal.base().practiceScript(), proposal.current().practiceScript())
+                || Objects.equals(
+                        proposal.offered().practiceScript(), proposal.current().practiceScript())) {
+            return false;
+        }
+        String script = proposal.offered().practiceScript();
+        try {
+            validator.validate(proposal.current().withPracticeScript(script));
+        } catch (IllegalArgumentException invalid) {
+            // Thrown past this method, it would roll back every other copy of the workspace on each start.
+            log.warn(
+                    "Kept a practice script the shipped program cannot replace: workspaceId={} slug={} reason={}",
+                    workspaceId,
+                    slug,
+                    invalid.getMessage());
+            return false;
+        }
+        Integer oldRevision = revisions.currentRevisionNumber(practice);
+        PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(practice, oldRevision);
+        practice.setPracticeScript(script);
+        practice.setAdoptedBase(proposal.base().withPracticeScript(script));
+        practices.save(practice);
+        int revision = revisions.append(practice).getRevisionNumber();
+        audit.record(ConfigAuditEntry.updated(
+                ConfigAuditEntityType.PRACTICE_DEFINITION,
+                practice.getId(),
+                workspaceId,
+                before,
+                PracticeDefinitionSnapshot.of(practice, revision)));
+        return true;
+    }
+
+    /** The slugs of the workspace's practices that have a release proposal. */
+    @Transactional(readOnly = true)
+    public List<String> proposedSlugs(Long workspaceId) {
+        EffectiveCatalog catalog = catalogService.catalog();
+        return practices.findAllForCatalog(workspaceId).stream()
+                .filter(practice -> proposal(practice, catalog) != null)
+                .map(Practice::getSlug)
+                .toList();
     }
 
     @Transactional

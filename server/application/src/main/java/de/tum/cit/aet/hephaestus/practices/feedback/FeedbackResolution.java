@@ -7,9 +7,9 @@ import java.util.List;
 public enum FeedbackResolution {
     /** The recipient acted, or intends to act, on the guidance. */
     ADDRESSED,
-    /** The recipient rejects the observation with a reasoned explanation. */
+    /** The recipient rejects the result with a reasoned explanation. */
     DISPUTED,
-    /** The observation may be sound but does not apply in this context. */
+    /** The result may be sound but does not apply in this context. */
     NOT_APPLICABLE;
 
     private static final List<String> RESOLVING_NAMES = Arrays.stream(values())

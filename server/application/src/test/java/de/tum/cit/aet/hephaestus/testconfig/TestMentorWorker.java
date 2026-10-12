@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRunnerClient;
 import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerControlClient;
@@ -154,7 +155,8 @@ public final class TestMentorWorker implements AutoCloseable {
         public void send(JsonNode frame) {
             long id = frame.path("id").asLong();
             switch (frame.path("method").asString("")) {
-                case "hello" -> result(id, mapper.createObjectNode().put("protocolVersion", 1));
+                case "hello" ->
+                    result(id, mapper.createObjectNode().put("protocolVersion", MentorRunnerClient.PROTOCOL_VERSION));
                 case "open_thread" -> {
                     thread = frame.path("params").path("threadId").asString();
                     restoredSession = frame.path("params").path("session").asString("");
@@ -176,7 +178,7 @@ public final class TestMentorWorker implements AutoCloseable {
                             .put("method", "fetch_context");
                     callback.putObject("params")
                             .put("threadId", thread)
-                            .put("path", "inputs/context/observations_history.json");
+                            .put("path", "inputs/context/results_history.json");
                     push(callback);
                 }
                 case "close_thread", "abort" -> result(id, mapper.createObjectNode());

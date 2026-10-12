@@ -132,8 +132,13 @@ public class CitedSourceAccess {
                                         .put("channel", record.path("channel").asString())
                                         .put("message", record.path("ts").asString());
                             } else {
-                                entry.put("type", path.endsWith("observations.jsonl") ? "observation" : "feedback")
-                                        .put("id", record.path("id").asString())
+                                boolean result = path.endsWith("observations.jsonl");
+                                // A staged result row names its result as practiceResultId; a feedback row as id.
+                                entry.put("type", result ? "observation" : "feedback")
+                                        .put(
+                                                "id",
+                                                record.path(result ? "practiceResultId" : "id")
+                                                        .asString())
                                         .put("person", sourceNumber(path.split("/", -1)[2]));
                             }
                         }
@@ -197,7 +202,7 @@ public class CitedSourceAccess {
 
     /** Source answers for one workspace, purpose, reader, and thread. Never retain them across reads. */
     public Checks checks(long workspace, SourceUsePurpose purpose) {
-        // A history record is checked by authorizing the observations it names, which checks their citations in
+        // A history record is checked by authorizing the results it names, which checks their citations in
         // turn: those nested checks join the read that asked, so a source is still checked once per read.
         RecordChecks active = ACTIVE_CHECKS.get();
         if (active != null

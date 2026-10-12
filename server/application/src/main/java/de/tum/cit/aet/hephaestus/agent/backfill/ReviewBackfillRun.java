@@ -166,7 +166,7 @@ public class ReviewBackfillRun {
     private Integer passedCount = 0;
 
     /**
-     * Artifacts whose submission threw, with no ledger row, observation, or decision recorded anywhere.
+     * Artifacts whose submission threw, with no ledger row, result, or decision recorded anywhere.
      * Kept separate from {@link #passedCount}: folding it in would let {@code submitted + passed} reach
      * the estimate and report COMPLETED over a baseline with holes.
      */

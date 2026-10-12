@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Dev-only: pins practices to the revision a review would pin, so a local seed that writes observations directly
+ * Dev-only: pins practices to the revision a review would pin, so a local seed that writes results directly
  * cites a revision the server fingerprinted. The definition never changes.
  *
  * <pre>

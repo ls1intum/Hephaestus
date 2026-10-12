@@ -333,20 +333,20 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
             long workspaceId,
             int attempt,
             Supplier<T> read,
-            Function<T, Set<UUID>> observationIds,
+            Function<T, Set<UUID>> practiceResultIds,
             Function<T, Set<UUID>> feedbackIds) {
         try (var admission = fence.capture()) {
             T result = read.get();
-            var observations = observationIds.apply(result);
+            var practiceResults = practiceResultIds.apply(result);
             var feedback = feedbackIds.apply(result);
             var controls = admission.jdbc();
             var rows = new ArrayList<CopiedRow>();
-            if (!observations.isEmpty())
+            if (!practiceResults.isEmpty())
                 rows.addAll(controls.query(
-                        "SELECT agent_job_id,about_user_id,about_user_id FROM observation WHERE workspace_id=? AND id=ANY(?)",
+                        "SELECT agent_job_id,about_user_id,about_user_id FROM practice_result WHERE workspace_id=? AND id=ANY(?)",
                         COPIED_ROW_MAPPER,
                         workspaceId,
-                        new SqlArrayValue("uuid", observations.toArray())));
+                        new SqlArrayValue("uuid", practiceResults.toArray())));
             if (!feedback.isEmpty())
                 rows.addAll(controls.query(
                         "SELECT agent_job_id,recipient_user_id,about_user_id FROM feedback WHERE workspace_id=? AND id=ANY(?)",
@@ -371,10 +371,10 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
             var identities = new ArrayList<JsonNode>(dependencies.identities());
             direct.forEach(identity -> identities.add(mapper.valueToTree(identity)));
             // A row the read returned that this lookup no longer finds has no provenance to vouch for it.
-            boolean complete = dependencies.complete() && found == observations.size() + feedback.size();
+            boolean complete = dependencies.complete() && found == practiceResults.size() + feedback.size();
             if (!complete)
                 incomplete(Assessment.LATE_READ, dependencies.counts())
-                        .addKeyValue("evidence.missingRows", observations.size() + feedback.size() - found)
+                        .addKeyValue("evidence.missingRows", practiceResults.size() + feedback.size() - found)
                         .log(INCOMPLETE_ASSESSMENT);
             // One statement: concurrent unions serialize on the row, and a receipt only ever gains people.
             controls.update(

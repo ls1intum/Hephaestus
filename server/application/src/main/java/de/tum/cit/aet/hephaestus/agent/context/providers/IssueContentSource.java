@@ -30,12 +30,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -167,67 +170,12 @@ public class IssueContentSource implements EvidenceSource, ReviewContextBuilder 
         Map<SourceKind, SourceContentState> contentStates = new HashMap<>();
 
         if (selectedKinds.contains(CORE)) {
-            String repoFullName =
-                    issue.getRepository() != null ? issue.getRepository().getNameWithOwner() : "";
-            ObjectNode meta = objectMapper.createObjectNode();
-            meta.put("issue_number", issue.getNumber());
-            meta.put("title", issue.getTitle());
-            meta.put("body", issue.getBody() != null ? issue.getBody() : "");
-            meta.put("state", issue.getState() != null ? issue.getState().name() : "UNKNOWN");
-            meta.put(
-                    "state_reason",
-                    issue.getStateReason() != null ? issue.getStateReason().name() : null);
-            meta.put("html_url", issue.getHtmlUrl());
-            meta.put("repository_full_name", repoFullName);
-            // Keep the admitted repository identity; a moved mirror cannot supply its provider.
-            var admittedRepositoryId = metadata.get("repository_id");
-            if (admittedRepositoryId != null
-                    && admittedRepositoryId.isIntegralNumber()
-                    && admittedRepositoryId.asLong() > 0) {
-                meta.set("repository_id", admittedRepositoryId);
-                var repository = issue.getRepository();
-                if (repository != null
-                        && Objects.equals(repository.getId(), admittedRepositoryId.asLong())
-                        && repository.getProvider() != null) {
-                    meta.put("provider_id", repository.getProvider().getId());
-                }
-            }
-            meta.put("author", issue.getAuthor() != null ? issue.getAuthor().getLogin() : null);
-            meta.put("author_id", issue.getAuthor() != null ? issue.getAuthor().getNativeId() : null);
-            meta.put(
-                    "issue_type",
-                    issue.getIssueType() != null ? issue.getIssueType().getName() : null);
-            meta.put("is_locked", issue.isLocked());
-            meta.putNull("sub_issues_total");
-            meta.putNull("sub_issues_completed");
-            if (issue.getSubIssuesTotal() != null && issue.getSubIssuesCompleted() != null) {
-                meta.put("sub_issues_total", issue.getSubIssuesTotal());
-                meta.put("sub_issues_completed", issue.getSubIssuesCompleted());
-                meta.put("sub_issues_source", "provider");
-            } else if (issue.getId() != null) {
-                // A positive stored count witnesses children; zero does not prove a complete hierarchy.
-                IssueRepository.ChildRollup children =
-                        issueRepository.countChildrenByParentIssueId(issue.getId(), Issue.State.CLOSED);
-                if (children.getTotal() > 0) {
-                    meta.put("sub_issues_total", children.getTotal());
-                    meta.put("sub_issues_completed", children.getCompleted());
-                    meta.put("sub_issues_source", "children");
-                }
-            }
-            meta.put(
-                    "milestone",
-                    issue.getMilestone() != null ? issue.getMilestone().getTitle() : null);
-            meta.put(
-                    "closed_at",
-                    issue.getClosedAt() != null ? issue.getClosedAt().toString() : null);
-            ArrayNode labels = meta.putArray("labels");
-            issue.getLabels().stream().map(l -> l.getName()).sorted().forEach(labels::add);
-            ArrayNode assignees = meta.putArray("assignees");
-            issue.getAssignees().stream()
-                    .map(u -> u.getLogin())
-                    .filter(Objects::nonNull)
-                    .sorted()
-                    .forEach(assignees::add);
+            IssueRepository.ChildRollup children =
+                    (issue.getSubIssuesTotal() == null || issue.getSubIssuesCompleted() == null)
+                                    && issue.getId() != null
+                            ? issueRepository.countChildrenByParentIssueId(issue.getId(), Issue.State.CLOSED)
+                            : null;
+            ObjectNode meta = workRecord(issue, metadata, children);
             writeJson(files, "metadata.json", meta);
             // The description as written, for quoting; metadata.json carries it escaped, for programs.
             files.put(
@@ -293,5 +241,71 @@ public class IssueContentSource implements EvidenceSource, ReviewContextBuilder 
         } catch (Exception e) {
             throw new JobPreparationException("Failed to serialize " + name + ": " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * The issue's work record, {@code context/metadata.json}, as the practice runner reads it
+     * ({@code WORK_RECORDS["scm.issue"]} in {@code lib/contract.ts}). {@code children} is the stored sub-issue rollup,
+     * read only when the provider reported no count. Test harnesses that stage a review build their record here too.
+     */
+    public static ObjectNode workRecord(
+            Issue issue, JsonNode metadata, IssueRepository.@Nullable ChildRollup children) {
+        String repoFullName =
+                issue.getRepository() != null ? issue.getRepository().getNameWithOwner() : "";
+        ObjectNode meta = JsonNodeFactory.instance.objectNode();
+        meta.put("issue_number", issue.getNumber());
+        meta.put("title", issue.getTitle());
+        meta.put("body", issue.getBody() != null ? issue.getBody() : "");
+        meta.put("state", issue.getState() != null ? issue.getState().name() : "UNKNOWN");
+        meta.put(
+                "state_reason",
+                issue.getStateReason() != null ? issue.getStateReason().name() : null);
+        meta.put("html_url", issue.getHtmlUrl());
+        meta.put("repository_full_name", repoFullName);
+        // Keep the admitted repository identity; a moved mirror cannot supply its provider.
+        var admittedRepositoryId = metadata.get("repository_id");
+        if (admittedRepositoryId != null
+                && admittedRepositoryId.isIntegralNumber()
+                && admittedRepositoryId.asLong() > 0) {
+            meta.set("repository_id", admittedRepositoryId);
+            var repository = issue.getRepository();
+            if (repository != null
+                    && Objects.equals(repository.getId(), admittedRepositoryId.asLong())
+                    && repository.getProvider() != null) {
+                meta.put("provider_id", repository.getProvider().getId());
+            }
+        }
+        meta.put("author", issue.getAuthor() != null ? issue.getAuthor().getLogin() : null);
+        meta.put("author_id", issue.getAuthor() != null ? issue.getAuthor().getNativeId() : null);
+        meta.put(
+                "issue_type",
+                issue.getIssueType() != null ? issue.getIssueType().getName() : null);
+        meta.put("is_locked", issue.isLocked());
+        meta.putNull("sub_issues_total");
+        meta.putNull("sub_issues_completed");
+        if (issue.getSubIssuesTotal() != null && issue.getSubIssuesCompleted() != null) {
+            meta.put("sub_issues_total", issue.getSubIssuesTotal());
+            meta.put("sub_issues_completed", issue.getSubIssuesCompleted());
+            meta.put("sub_issues_source", "provider");
+        } else if (children != null) {
+            // A positive stored count witnesses children; zero does not prove a complete hierarchy.
+            if (children.getTotal() > 0) {
+                meta.put("sub_issues_total", children.getTotal());
+                meta.put("sub_issues_completed", children.getCompleted());
+                meta.put("sub_issues_source", "children");
+            }
+        }
+        meta.put(
+                "milestone", issue.getMilestone() != null ? issue.getMilestone().getTitle() : null);
+        meta.put("closed_at", issue.getClosedAt() != null ? issue.getClosedAt().toString() : null);
+        ArrayNode labels = meta.putArray("labels");
+        issue.getLabels().stream().map(l -> l.getName()).sorted().forEach(labels::add);
+        ArrayNode assignees = meta.putArray("assignees");
+        issue.getAssignees().stream()
+                .map(u -> u.getLogin())
+                .filter(Objects::nonNull)
+                .sorted()
+                .forEach(assignees::add);
+        return meta;
     }
 }

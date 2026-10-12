@@ -25,21 +25,21 @@ class PracticeScriptPurityTest extends BaseUnitTest {
     private static final Path PRACTICE_SCRIPT_DIR = resolveDir(
             "src/main/resources/practices/scripts", "server/application/src/main/resources/practices/scripts");
 
-    // Every observation outcome. A practice script produces leads, never observations, so it must launder none
+    // Every result outcome. A practice script produces leads, never results, so it must launder none
     // of these. The match is anchored on identifier characters so the reported token is accurate: a plain
     // substring check would report "MET" for a "NOT_MET" leak.
     private static final List<String> OBSERVATION_TOKENS =
             Arrays.stream(Outcome.values()).map(Outcome::name).toList();
 
     @Test
-    @DisplayName("no practice script emits an observation outcome outside its header comments")
-    void noScriptLaundersAnObservation() throws IOException {
+    @DisplayName("no practice script emits a result outcome outside its header comments")
+    void noScriptLaundersAResult() throws IOException {
         for (Path script : scripts()) {
             for (String line : Files.readAllLines(script, StandardCharsets.UTF_8)) {
                 String trimmed = line.strip();
-                // Header comments legitimately state the "facts not observations" contract — skip them.
+                // Header comments legitimately state the "facts not results" contract — skip them.
                 // Note: this exempts full-line comments only (lines starting with // * /*); a trailing inline
-                // comment is deliberately NOT exempt, so even a commented-out observation token in code is
+                // comment is deliberately NOT exempt, so even a commented-out result token in code is
                 // flagged — a conservative stance that keeps the firewall structural.
                 if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) {
                     continue;

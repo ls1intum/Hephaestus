@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A card taken off a developer's practice page because its words were wrong while its observations stay valid; the
+ * A card taken off a developer's practice page because its words were wrong while its results stay valid; the
  * feedback row itself never changes. Restoring completes this row rather than deleting it, and at most one per
  * feedback is open ({@code uk_feedback_withdrawal_active}).
  */

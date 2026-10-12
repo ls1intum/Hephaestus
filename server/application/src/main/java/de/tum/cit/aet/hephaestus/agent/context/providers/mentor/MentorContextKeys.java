@@ -15,7 +15,7 @@ public final class MentorContextKeys {
             UserContentSource.OUTPUT_KEY,
             WorkspaceContentSource.OUTPUT_KEY,
             PracticeCatalogContentSource.OUTPUT_KEY,
-            ObservationHistoryContentSource.OUTPUT_KEY,
+            ResultHistoryContentSource.OUTPUT_KEY,
             DeliveredFeedbackContentSource.OUTPUT_KEY,
             RecentAuthoredWorkContentSource.OUTPUT_KEY,
             MergeReadinessContentSource.OUTPUT_KEY,

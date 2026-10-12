@@ -74,7 +74,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
 
     @EntityGraph(attributePaths = {"group"})
     @Query("""
-        SELECT DISTINCT fo.observation.practice FROM FeedbackObservation fo
+        SELECT DISTINCT fo.practiceResult.practice FROM FeedbackEvidence fo
         WHERE fo.feedback.id = :feedbackId
           AND fo.feedback.workspaceId = :workspaceId
         """)
@@ -130,7 +130,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
         """)
     List<Practice> findAllForCatalog(@Param("workspaceId") Long workspaceId);
 
-    /** Deletes all practices for the workspace. Cascades to observation via ON DELETE CASCADE. */
+    /** Deletes all practices for the workspace. Cascades to result via ON DELETE CASCADE. */
     @Modifying
     @Transactional
     @Query("DELETE FROM Practice p WHERE p.workspace.id = :workspaceId")

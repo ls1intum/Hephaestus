@@ -261,7 +261,7 @@ public class SlackMessageService {
         }
     }
 
-    /** Finalize a stream, optionally attaching terminal blocks (observation chips / actions). */
+    /** Finalize a stream, optionally attaching terminal blocks (result chips / actions). */
     public void stopStream(long workspaceId, String channel, String ts, List<LayoutBlock> blocks) {
         if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channel, "silent_mode_engaged");

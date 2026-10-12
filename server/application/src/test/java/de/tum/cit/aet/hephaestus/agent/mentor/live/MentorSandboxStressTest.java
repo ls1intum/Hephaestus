@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor.live;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRunnerClient;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmCredentials;
@@ -665,8 +666,7 @@ class MentorSandboxStressTest {
                 true,
                 300,
                 new MentorRunnerProfile(),
-                Map.of(),
-                "");
+                Map.of());
         byte[] settingsBytes = factory.buildPiSettingsJson(spec.upstreamModelId());
 
         Path piHome = tmp.resolve(".pi-home");
@@ -825,8 +825,9 @@ class MentorSandboxStressTest {
         void helloOk(Duration timeout) {
             JsonNode resp = call("hello", MAPPER.createObjectNode(), timeout);
             int version = resp.path("result").path("protocolVersion").asInt(0);
-            if (version != 1) {
-                throw new IllegalStateException("expected protocolVersion=1, got " + version);
+            if (version != MentorRunnerClient.PROTOCOL_VERSION) {
+                throw new IllegalStateException(
+                        "expected protocolVersion=" + MentorRunnerClient.PROTOCOL_VERSION + ", got " + version);
             }
         }
 

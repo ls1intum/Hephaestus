@@ -84,6 +84,7 @@ public interface AgentJobPracticeScriptRunRepository
                         WHERE r.workspace_id = :workspaceId
                           AND r.practice_slug = p.slug
                           AND r.models IS NOT NULL
+                          AND r.program_kind = 'CUSTOM'
                         ORDER BY r.finished_at DESC, r.attempt DESC
                         LIMIT 1
                     ) run ON TRUE

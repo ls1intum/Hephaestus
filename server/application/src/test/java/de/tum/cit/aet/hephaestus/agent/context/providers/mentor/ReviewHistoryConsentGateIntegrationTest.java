@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -24,7 +24,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
@@ -43,13 +43,13 @@ class ReviewHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
     private ReviewHistoryContentSource historySource;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -83,15 +83,14 @@ class ReviewHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
     }
 
     @Test
-    @DisplayName("a paused channel's observations and feedback leave review history until the channel resumes")
+    @DisplayName("a paused channel's results and feedback leave review history until the channel resumes")
     void pausedConversationLeavesReviewHistoryUntilResumed() {
         long active = seedThread("C-active", "100.0", ConsentState.ACTIVE);
         long paused = seedThread("C-paused", "200.0", ConsentState.PAUSED);
         observe(ArtifactKinds.CONVERSATION_THREAD.value(), active, "Said in the active channel");
-        UUID pausedObservation =
-                observe(ArtifactKinds.CONVERSATION_THREAD.value(), paused, "Said in the paused channel");
+        UUID pausedResult = observe(ArtifactKinds.CONVERSATION_THREAD.value(), paused, "Said in the paused channel");
         observe(ArtifactKinds.PULL_REQUEST.value(), 4242L, "Seen on the pull request");
-        deliver(paused, pausedObservation, "Brief about the paused channel");
+        deliver(paused, pausedResult, "Brief about the paused channel");
         AgentJob review = newJob();
 
         String held = history(review);
@@ -112,12 +111,13 @@ class ReviewHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
     @DisplayName(
             "feedback published on the work and then replaced stays in history; one never published there does not")
     void shouldKeepReplacedFeedbackOnlyWhenItWasPublishedOnTheWork() {
-        UUID observation = observe(ArtifactKinds.PULL_REQUEST.value(), 4242L, "Seen on the pull request");
-        UUID published = replaced(observation, "Published then replaced", FeedbackChannel.IN_CONTEXT, true, "IC_kwDO1");
-        UUID unposted = replaced(observation, "Replaced before posting", FeedbackChannel.IN_CONTEXT, true, null);
-        UUID blank = replaced(observation, "Replaced with a blank receipt", FeedbackChannel.IN_CONTEXT, true, "  ");
-        UUID undelivered = replaced(observation, "Never delivered", FeedbackChannel.IN_CONTEXT, false, "IC_kwDO2");
-        UUID card = replaced(observation, "Replaced practice-page card", FeedbackChannel.IN_APP, true, "IC_kwDO3");
+        UUID practiceResult = observe(ArtifactKinds.PULL_REQUEST.value(), 4242L, "Seen on the pull request");
+        UUID published =
+                replaced(practiceResult, "Published then replaced", FeedbackChannel.IN_CONTEXT, true, "IC_kwDO1");
+        UUID unposted = replaced(practiceResult, "Replaced before posting", FeedbackChannel.IN_CONTEXT, true, null);
+        UUID blank = replaced(practiceResult, "Replaced with a blank receipt", FeedbackChannel.IN_CONTEXT, true, "  ");
+        UUID undelivered = replaced(practiceResult, "Never delivered", FeedbackChannel.IN_CONTEXT, false, "IC_kwDO2");
+        UUID card = replaced(practiceResult, "Replaced practice-page card", FeedbackChannel.IN_APP, true, "IC_kwDO3");
 
         assertThat(history(newJob()))
                 .contains("Published then replaced")
@@ -142,15 +142,15 @@ class ReviewHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
 
     @Test
     void shouldReadOnlyDeliveredPublicHistoryForTheRequestedWorkspaceRecipientAndWork() {
-        UUID observation = observe(ArtifactKinds.PULL_REQUEST.value(), 4242L, "Seen on the pull request");
-        UUID published = replaced(observation, "Published then replaced", FeedbackChannel.IN_CONTEXT, true, "IC_1");
-        UUID unposted = replaced(observation, "Never posted", FeedbackChannel.IN_CONTEXT, true, null);
-        UUID privateNote = replaced(observation, "Private card", FeedbackChannel.IN_APP, true, "IC_2");
-        UUID otherWork = replaced(observation, "Other work", FeedbackChannel.IN_CONTEXT, true, "IC_3");
-        UUID otherKind = replaced(observation, "Other kind", FeedbackChannel.IN_CONTEXT, true, "IC_4");
-        UUID prepared = replaced(observation, "Prepared only", FeedbackChannel.IN_CONTEXT, true, "IC_5");
+        UUID practiceResult = observe(ArtifactKinds.PULL_REQUEST.value(), 4242L, "Seen on the pull request");
+        UUID published = replaced(practiceResult, "Published then replaced", FeedbackChannel.IN_CONTEXT, true, "IC_1");
+        UUID unposted = replaced(practiceResult, "Never posted", FeedbackChannel.IN_CONTEXT, true, null);
+        UUID privateNote = replaced(practiceResult, "Private card", FeedbackChannel.IN_APP, true, "IC_2");
+        UUID otherWork = replaced(practiceResult, "Other work", FeedbackChannel.IN_CONTEXT, true, "IC_3");
+        UUID otherKind = replaced(practiceResult, "Other kind", FeedbackChannel.IN_CONTEXT, true, "IC_4");
+        UUID prepared = replaced(practiceResult, "Prepared only", FeedbackChannel.IN_CONTEXT, true, "IC_5");
         UUID deliveredUnknownTime =
-                replaced(observation, "Delivered at an unknown time", FeedbackChannel.IN_CONTEXT, false, null);
+                replaced(practiceResult, "Delivered at an unknown time", FeedbackChannel.IN_CONTEXT, false, null);
         jdbcTemplate.update("UPDATE feedback SET delivery_state = 'DELIVERED' WHERE id = ?", privateNote);
         jdbcTemplate.update("UPDATE feedback SET artifact_id = 4243 WHERE id = ?", otherWork);
         jdbcTemplate.update(
@@ -182,7 +182,7 @@ class ReviewHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
     }
 
     private UUID replaced(
-            UUID observationId,
+            UUID practiceResultId,
             String body,
             FeedbackChannel channel,
             boolean delivered,
@@ -202,7 +202,8 @@ class ReviewHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
                 .createdAt(Instant.now())
                 .deliveredAt(delivered ? Instant.now() : null)
                 .build());
-        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
+        feedbackEvidenceRepository.insertIfAbsent(
+                feedback.getId(), practiceResultId, null, EvidenceRole.PRIMARY.name(), 0);
         if (postedCommentRef != null) {
             placementRepository.save(FeedbackPlacement.builder()
                     .feedback(feedback)
@@ -227,7 +228,7 @@ class ReviewHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
     private UUID observe(String artifactKind, long artifactId, String summary) {
         AgentJob job = newJob();
         UUID id = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
+        practiceResultRepository.insertIfAbsent(
                 id,
                 "occ-" + id,
                 job.getId(),
@@ -242,13 +243,16 @@ class ReviewHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
                 "MAJOR",
                 evidence(artifactKind),
                 null,
+                "test-scope",
+                null,
+                null,
                 null,
                 Instant.now(),
                 "LIVE");
         return id;
     }
 
-    private void deliver(long threadId, UUID observationId, String body) {
+    private void deliver(long threadId, UUID practiceResultId, String body) {
         Feedback feedback = feedbackRepository.save(Feedback.builder()
                 .agentJobId(newJob().getId())
                 .workspaceId(workspace.getId())
@@ -264,7 +268,8 @@ class ReviewHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
                 .createdAt(Instant.now())
                 .deliveredAt(Instant.now())
                 .build());
-        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
+        feedbackEvidenceRepository.insertIfAbsent(
+                feedback.getId(), practiceResultId, null, EvidenceRole.PRIMARY.name(), 0);
     }
 
     private static String evidence(String artifactKind) {

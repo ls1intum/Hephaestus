@@ -187,6 +187,26 @@ public record PracticeDefinition(
                 guide);
     }
 
+    /** This definition with another practice script and every other field as it is. */
+    public PracticeDefinition withPracticeScript(@Nullable String script) {
+        return new PracticeDefinition(
+                name,
+                signals,
+                evidenceRequirements,
+                reviewWhen,
+                subject,
+                precondition,
+                criteria,
+                script,
+                automatedReviewPolicy,
+                whyItMatters,
+                whatGoodLooksLike,
+                groupSlug,
+                deliveryBehavior,
+                visual,
+                guide);
+    }
+
     public ArtifactKind artifactKind() {
         return signals.getFirst().artifactKind();
     }

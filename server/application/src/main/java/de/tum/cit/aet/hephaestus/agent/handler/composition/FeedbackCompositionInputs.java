@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.composition;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
 import java.util.Map;
@@ -34,20 +34,20 @@ public final class FeedbackCompositionInputs {
 
     private FeedbackCompositionInputs() {}
 
-    public static void stage(Map<String, byte[]> files, ObservationOrigin origin) {
+    public static void stage(Map<String, byte[]> files, ResultOrigin origin) {
         stage(files, origin, EVENT_REVIEW_CHANNELS, EnumSet.allOf(InContextPlacementKind.class));
     }
 
-    public static void stage(Map<String, byte[]> files, ObservationOrigin origin, Set<FeedbackChannel> channels) {
+    public static void stage(Map<String, byte[]> files, ResultOrigin origin, Set<FeedbackChannel> channels) {
         stage(files, origin, channels, EnumSet.allOf(InContextPlacementKind.class));
     }
 
     public static void stage(
             Map<String, byte[]> files,
-            ObservationOrigin origin,
+            ResultOrigin origin,
             Set<FeedbackChannel> channels,
             Set<InContextPlacementKind> inContextPlacements) {
-        if (origin == ObservationOrigin.BACKFILL || channels.isEmpty()) {
+        if (origin == ResultOrigin.BACKFILL || channels.isEmpty()) {
             return;
         }
         if (channels.contains(FeedbackChannel.IN_CONTEXT) && inContextPlacements.isEmpty()) {

@@ -11,26 +11,26 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.FeedbackClosure;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackEvidence;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.DeveloperReviewRunRow;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.FirstObservedRow;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeGroupStandingService;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService.StandingSnapshot;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService.StandingSnapshot.PracticeStanding;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.AddressedFeedbackProjection;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrend;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution.Work;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.HeldPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.OverviewWindowDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.PracticeProfileOverviewDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileChangeDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ReviewRunRefDTO;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeGroupStandingService;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository.DeveloperReviewRunRow;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository.FirstObservedRow;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.StandingSnapshot;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.StandingSnapshot.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository.AddressedFeedbackProjection;
+import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrend;
+import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution;
+import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution.Work;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup.ReviewRunFacts;
@@ -72,7 +72,7 @@ public class PracticeProfileOverviewService {
     private final PracticeStandingService practiceStandingService;
     private final PracticeGroupStandingService practiceGroupStandingService;
     private final PracticeGroupService practiceGroupService;
-    private final ObservationRepository observationRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final FeedbackRepository feedbackRepository;
     private final FeedbackWithdrawalRepository withdrawalRepository;
     private final InAppFeedbackEvidence feedbackEvidence;
@@ -94,7 +94,7 @@ public class PracticeProfileOverviewService {
         long developerId = currentDeveloperId.get();
 
         // The two newest runs; the previous one opens the window, so the window holds no run older than these.
-        List<DeveloperReviewRunRow> newestRuns = observationRepository
+        List<DeveloperReviewRunRow> newestRuns = practiceResultRepository
                 .findDeveloperReviewRuns(developerId, workspaceId, null, now, null, PageRequest.of(0, 2))
                 .getContent();
         DeveloperReviewRunRow latest = newestRuns.isEmpty() ? null : newestRuns.getFirst();
@@ -114,7 +114,7 @@ public class PracticeProfileOverviewService {
 
         Map<String, List<Work>> windowWorkByPractice = windowWorkByPractice(after, window);
         Map<String, Instant> firstObservedAt =
-                observationRepository.findFirstObservedAtByPractice(developerId, workspaceId).stream()
+                practiceResultRepository.findFirstObservedAtByPractice(developerId, workspaceId).stream()
                         .collect(Collectors.toMap(
                                 FirstObservedRow::getPracticeSlug, FirstObservedRow::getFirstObservedAt));
         FeedbackFacts feedback = readFeedback(workspaceId, developerId, now, window, windowRuns, before, after);
@@ -155,12 +155,12 @@ public class PracticeProfileOverviewService {
                 reviewedWork(windowRuns, targets));
     }
 
-    /** The work the window's observations were on, per practice: one entry per piece of work, newest first. */
+    /** The work the window's results were on, per practice: one entry per piece of work, newest first. */
     private static Map<String, List<Work>> windowWorkByPractice(StandingSnapshot after, OverviewWindow window) {
         Map<String, List<Work>> byPractice = new LinkedHashMap<>();
         after.practices().forEach((slug, practice) -> {
             List<Work> work = Work.newestFirst(practice.evidence().stream()
-                    .filter(observation -> window.contains(observation.getObservedAt()))
+                    .filter(practiceResult -> window.contains(practiceResult.getObservedAt()))
                     .map(Work::of));
             if (!work.isEmpty()) {
                 byPractice.put(slug, work);
@@ -180,7 +180,7 @@ public class PracticeProfileOverviewService {
     private record FeedbackFacts(
             List<Feedback> recent,
             Map<UUID, Instant> reviewedAtByRun,
-            Map<UUID, List<Observation>> evidenceByFeedback,
+            Map<UUID, List<PracticeResult>> evidenceByFeedback,
             Map<UUID, WorkResolution> resolutionByFeedback,
             Map<UUID, WorkResolution> resolutionBeforeByFeedback,
             Map<UUID, Instant> addressedAt,
@@ -190,7 +190,7 @@ public class PracticeProfileOverviewService {
             return Stream.of(
                             evidenceByFeedback.values().stream()
                                     .flatMap(List::stream)
-                                    .map(Observation::getAgentJobId),
+                                    .map(PracticeResult::getAgentJobId),
                             resolutionByFeedback.values().stream()
                                     .flatMap(resolution -> Stream.concat(
                                             resolution.cleanWork().stream(), resolution.problemWork().stream()))
@@ -232,7 +232,7 @@ public class PracticeProfileOverviewService {
                 .stream()
                 .filter(response -> recentIds.contains(response.getFeedbackId()))
                 .toList();
-        Map<UUID, List<Observation>> evidenceByFeedback = feedbackEvidence.visibleEvidence(workspaceId, recentIds);
+        Map<UUID, List<PracticeResult>> evidenceByFeedback = feedbackEvidence.visibleEvidence(workspaceId, recentIds);
         Map<UUID, Instant> practiceChangedAt = feedbackEvidence.practiceChangedAt(evidenceByFeedback);
         return new FeedbackFacts(
                 recent,
@@ -253,7 +253,7 @@ public class PracticeProfileOverviewService {
 
     /**
      * New, reset and resolved in-app feedback inside the window. New is what the window's runs composed, dated by
-     * its run rather than by its own timestamp, which is written moments after the run's newest observation and
+     * its run rather than by its own timestamp, which is written moments after the run's newest result and
      * can fall past the window's upper edge. Resolved is feedback whose {@link FeedbackClosure} falls inside the
      * window and is a resolution, by the work or by the developer, whichever run had said it; it is the closure
      * its card reports, since only feedback prepared inside the look-back is read
@@ -265,7 +265,7 @@ public class PracticeProfileOverviewService {
         List<ProfileChangeDTO> changes = new ArrayList<>();
         for (Feedback feedback : facts.recent()) {
             Instant preparedByRunAt = facts.reviewedAtByRun().get(feedback.getAgentJobId());
-            List<Observation> evidence = facts.evidenceByFeedback().get(feedback.getId());
+            List<PracticeResult> evidence = facts.evidenceByFeedback().get(feedback.getId());
             if (preparedByRunAt != null && evidence != null) {
                 changes.add(feedbackChange(
                         ProfileChangeDTO.Type.FEEDBACK_NEW,
@@ -305,7 +305,7 @@ public class PracticeProfileOverviewService {
         UUID feedbackId = feedback.getId();
         WorkResolution atTheEnd = facts.resolutionByFeedback().get(feedbackId);
         WorkResolution atTheStart = facts.resolutionBeforeByFeedback().get(feedbackId);
-        List<Observation> evidence = facts.evidenceByFeedback().get(feedbackId);
+        List<PracticeResult> evidence = facts.evidenceByFeedback().get(feedbackId);
         if (atTheEnd == null
                 || atTheStart == null
                 || evidence == null
@@ -337,7 +337,7 @@ public class PracticeProfileOverviewService {
     /** The resolution its card reports, when it falls inside the window. */
     private static @Nullable ProfileChangeDTO feedbackResolved(
             FeedbackFacts facts, UUID feedbackId, OverviewWindow window, Map<UUID, Target> targets) {
-        List<Observation> evidence = facts.evidenceByFeedback().get(feedbackId);
+        List<PracticeResult> evidence = facts.evidenceByFeedback().get(feedbackId);
         WorkResolution resolution = facts.resolutionByFeedback().getOrDefault(feedbackId, WorkResolution.NONE);
         FeedbackClosure closure = FeedbackClosure.of(
                 resolution.resolvedAt(),
@@ -374,7 +374,7 @@ public class PracticeProfileOverviewService {
             Instant at,
             UUID feedbackId,
             ProfileChangeDTO.@Nullable ResolvedBy resolvedBy,
-            List<Observation> evidence,
+            List<PracticeResult> evidence,
             Map<UUID, Target> targets) {
         return feedbackChange(
                 type,
@@ -412,8 +412,8 @@ public class PracticeProfileOverviewService {
                 work);
     }
 
-    private static Map<String, List<Observation>> liveRunsByPractice(StandingSnapshot snapshot) {
-        Map<String, List<Observation>> byPractice = new LinkedHashMap<>();
+    private static Map<String, List<PracticeResult>> liveRunsByPractice(StandingSnapshot snapshot) {
+        Map<String, List<PracticeResult>> byPractice = new LinkedHashMap<>();
         snapshot.practices().forEach((slug, practice) -> byPractice.put(slug, practice.liveRuns()));
         return byPractice;
     }

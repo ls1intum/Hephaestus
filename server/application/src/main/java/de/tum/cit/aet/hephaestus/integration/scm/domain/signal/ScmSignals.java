@@ -68,7 +68,7 @@ public final class ScmSignals {
      */
     public static final String ISSUE_DISCUSSION_FIELD = "discussion";
 
-    /** Fields used by issue review evidence; other mirror changes do not retire its observations. */
+    /** Fields used by issue review evidence; other mirror changes do not retire its results. */
     public static final Set<String> REVIEWABLE_ISSUE_FIELDS = Set.of(
             "title", "body", "state", "stateReason", "issueType", "milestone", "relationships", ISSUE_DISCUSSION_FIELD);
 

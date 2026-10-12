@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.util.EnumMap;
@@ -47,7 +47,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *
  * <h2>What the review is recorded as</h2>
  * <p>The command raises the kind's declared manual-request signal, and the run is filed as
- * {@link ObservationOrigin#MANUAL} — filing it as LIVE would mix a self-selected sample (people ask for
+ * {@link ResultOrigin#MANUAL} — filing it as LIVE would mix a self-selected sample (people ask for
  * reviews of work they were already unsure of) into the population the trend line is read from.
  */
 @Component

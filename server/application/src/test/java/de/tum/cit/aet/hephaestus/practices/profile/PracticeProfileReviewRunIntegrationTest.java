@@ -31,12 +31,12 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawal;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.InAppFeedbackBody;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -113,7 +113,7 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
     private WorkspaceMembershipRepository workspaceMemberships;
 
     @Autowired
-    private ObservationInvalidationRepository invalidationRepository;
+    private PracticeResultInvalidationRepository invalidationRepository;
 
     @Autowired
     private FeedbackWithdrawalRepository withdrawalRepository;
@@ -192,11 +192,11 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
         bind(theirs, colleaguesStrength);
     }
 
-    /** A run writes its observations partway through, so neither its start nor its end dates it. */
+    /** A run writes its results partway through, so neither its start nor its end dates it. */
     @Test
     @WithUser
-    @DisplayName("a run is dated by its newest observation about the developer, listed or opened")
-    void shouldDateARunByItsNewestObservationWhenItIsListedOrOpened() {
+    @DisplayName("a run is dated by its newest result about the developer, listed or opened")
+    void shouldDateARunByItsNewestResultWhenItIsListedOrOpened() {
         Instant finishedObservedAt = LATEST_RUN_AT.plusSeconds(600);
         AgentJob finished = persistPullRequestReview(workspace, 50, LATEST_RUN_AT.plusSeconds(900));
         finished.setStatus(AgentJobStatus.COMPLETED);
@@ -358,27 +358,27 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
 
     @Test
     @WithUser
-    @DisplayName("one run reads back with the observations it made about this developer and no others")
-    void shouldServeOnlyTheReadersOwnObservationsWhenOneRunIsOpened() {
+    @DisplayName("one run reads back with the results it made about this developer and no others")
+    void shouldServeOnlyTheReadersOwnResultsWhenOneRunIsOpened() {
         readRun(colleaguesRun.getId())
                 .jsonPath("$.run.reviewId")
                 .isEqualTo(colleaguesRun.getId().toString())
                 .jsonPath("$.run.reviewedWork.label")
                 .isEqualTo("#33")
-                .jsonPath("$.observations.length()")
+                .jsonPath("$.practiceResults.length()")
                 .isEqualTo(1)
-                .jsonPath("$.observations[0].practiceSlug")
+                .jsonPath("$.practiceResults[0].practiceSlug")
                 .isEqualTo("explain-changes");
     }
 
     /**
-     * The header counts and the list below it come from the same rows: an observation whose evidence the
-     * authorization withholds is in neither. Citing nothing is what makes an observation withheld.
+     * The header counts and the list below it come from the same rows: a result whose evidence the
+     * authorization withholds is in neither. Citing nothing is what makes a result withheld.
      */
     @Test
     @WithUser
-    @DisplayName("a run counts only the observations it lists when one of them is withheld")
-    void shouldCountOnlyTheObservationsItListsWhenOneIsWithheld() {
+    @DisplayName("a run counts only the results it lists when one of them is withheld")
+    void shouldCountOnlyTheResultsItListsWhenOneIsWithheld() {
         observe(
                 reviewableDiffSize,
                 colleaguesRun,
@@ -394,9 +394,9 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
                 .isEqualTo(1)
                 .jsonPath("$.run.practices.notMet")
                 .isEqualTo(0)
-                .jsonPath("$.observations.length()")
+                .jsonPath("$.practiceResults.length()")
                 .isEqualTo(1)
-                .jsonPath("$.observations[0].practiceSlug")
+                .jsonPath("$.practiceResults[0].practiceSlug")
                 .isEqualTo("explain-changes");
         readRuns()
                 .jsonPath("$.content[1].reviewId")
@@ -407,7 +407,7 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
 
     @Test
     @WithUser
-    @DisplayName("a run whose every observation about the developer is withheld is not on their list")
+    @DisplayName("a run whose every result about the developer is withheld is not on their list")
     void shouldLeaveOutARunWhenEverythingItObservedAboutTheReaderIsWithheld() {
         AgentJob withheld = persistPullRequestReview(workspace, 35, LATEST_RUN_AT.plusSeconds(600));
         observe(
@@ -467,8 +467,8 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
 
     @Test
     @WithUser
-    @DisplayName("an invalidated observation is listed in its run but neither counted nor named as slipped")
-    void shouldLeaveAnInvalidatedObservationOutOfTheCountsWhenAnAdminInvalidatedIt() {
+    @DisplayName("an invalidated result is listed in its run but neither counted nor named as slipped")
+    void shouldLeaveAnInvalidatedResultOutOfTheCountsWhenAnAdminInvalidatedIt() {
         UUID wrong = observe(
                 explainChanges,
                 latestRun,
@@ -477,8 +477,8 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
                 NOT_MET,
                 Severity.MAJOR,
                 LATEST_RUN_AT.minusSeconds(1));
-        invalidationRepository.save(new ObservationInvalidation(
-                observationRepository
+        invalidationRepository.save(new PracticeResultInvalidation(
+                practiceResultRepository
                         .findByIdAndWorkspaceId(wrong, workspace.getId())
                         .orElseThrow(),
                 1L,
@@ -494,7 +494,7 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
                 .isEqualTo(1)
                 .jsonPath("$.run.slippedPractices[0].practiceSlug")
                 .isEqualTo("reviewable-diff-size")
-                .jsonPath("$.observations[?(@.id=='" + wrong + "')].invalidationReason")
+                .jsonPath("$.practiceResults[?(@.id=='" + wrong + "')].invalidationReason")
                 .isEqualTo("Wrong when made");
     }
 
@@ -574,13 +574,13 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
                 .isEqualTo(2)
                 .jsonPath("$.run.slippedPractices[*].practiceSlug")
                 .isEqualTo(List.of("changed-since"))
-                .jsonPath("$.observations.length()")
+                .jsonPath("$.practiceResults.length()")
                 .isEqualTo(4)
-                .jsonPath("$.observations[?(@.id=='" + migratedMet + "')].outcome")
+                .jsonPath("$.practiceResults[?(@.id=='" + migratedMet + "')].outcome")
                 .isEqualTo("MET")
-                .jsonPath("$.observations[?(@.id=='" + migratedMet + "')].claimCurrentness")
+                .jsonPath("$.practiceResults[?(@.id=='" + migratedMet + "')].claimCurrentness")
                 .isEqualTo("UNVERIFIABLE")
-                .jsonPath("$.observations[?(@.id=='" + unfingerprinted + "')].outcome")
+                .jsonPath("$.practiceResults[?(@.id=='" + unfingerprinted + "')].outcome")
                 .isEqualTo("NOT_MET");
         readRuns()
                 .jsonPath("$.content[0].reviewId")

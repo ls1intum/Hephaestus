@@ -44,7 +44,6 @@ import io.micrometer.tracing.Tracer;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -69,6 +68,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -243,6 +243,30 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(authenticate(method, path, token).status()).isEqualTo(401);
     }
 
+    /**
+     * The practice programs run in the review's process, so the job's one token, scoped only to the proxy, reaches
+     * the review's model, every direct slot and admission.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "/internal/llm/chat/completions,job:{job}",
+        "/internal/llm/practice-script/decision/decisions,job:{job}:practice-script",
+        "/internal/llm/admit-results,job:{job}"
+    })
+    void shouldAuthenticateTheJobsOneTokenWhenItCallsAnyModelRouteOrAdmission(String path, String principal)
+            throws Exception {
+        AgentJob job = practiceScriptJob("https://models.example.com/v1");
+
+        AuthenticationResult result = authenticate("POST", path, tokenFor(job));
+
+        assertThat(result.status()).isEqualTo(200);
+        assertThat(routingOf(result).principalDescription())
+                .isEqualTo(principal.replace("{job}", job.getId().toString()));
+        assertThat(result.authentication().getAuthorities())
+                .extracting(GrantedAuthority::getAuthority)
+                .containsExactly("SCOPE_" + WorkerJwtIssuer.LLM_PROXY_SCOPE);
+    }
+
     /** Each op reaches the upstream path of its protocol, with the catalog model and credential. */
     @ParameterizedTest
     @CsvSource(
@@ -256,7 +280,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         + "{\"data\":[],\"usage\":{\"prompt_tokens\":12,\"total_tokens\":12}}|12|0",
                 "RERANKING|/internal/llm/practice-script/reranking/rerank|/v1/rerank|{\"results\":[]}|0|0"
             })
-    void shouldForwardEachPracticeScriptOpWithTheCatalogModelWhenThePracticeScriptTokenCallsIt(
+    void shouldForwardEachPracticeScriptOpWithTheCatalogModelWhenTheJobTokenCallsIt(
             ModelKind slot, String path, String upstreamPath, String reply, long input, long output) throws Exception {
         try (MockWebServer upstream = new MockWebServer()) {
             upstream.start();
@@ -290,7 +314,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
-    void shouldRefuseWithPaymentRequiredWhenTheAttemptsPracticeScriptTokensReachTheCap() throws Exception {
+    void shouldRefuseWithPaymentRequiredWhenTheAttemptsDirectModelTokensReachTheCap() throws Exception {
         try (MockWebServer upstream = new MockWebServer()) {
             upstream.start();
             upstream.enqueue(json("{\"data\":[],\"usage\":{\"prompt_tokens\":120}}"));
@@ -455,7 +479,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             LlmProxyService service, AgentJob job, String path, String practice, String body) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
         request.setRemoteAddr("127.0.0.1");
-        request.addHeader("Authorization", "Bearer " + practiceScriptTokenFor(job));
+        request.addHeader("Authorization", "Bearer " + tokenFor(job));
         HttpHeaders headers = new HttpHeaders();
         headers.set(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER, practice);
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -545,15 +569,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .addHeader("Content-Type", "application/json")
                 .body(body)
                 .build();
-    }
-
-    private String practiceScriptTokenFor(AgentJob job) {
-        return jwtIssuer.issueForJobUntil(
-                job.getId(),
-                workspace.getId(),
-                job.getRetryCount(),
-                Instant.now().plus(Duration.ofMinutes(5)),
-                WorkerJwtIssuer.LLM_PRACTICE_SCRIPT_SCOPE);
     }
 
     /** A running review whose four slots each point at their own catalog model behind {@code baseUrl}. */

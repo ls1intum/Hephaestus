@@ -523,7 +523,7 @@ public class MergeReadinessContentSource implements ContentSource {
     /**
      * What the provider was recorded saying about the current head's checks. GitLab reporting no pipeline or a skipped
      * one is not a failure, and says nothing about whether CI is configured. {@code NONE} is GitHub's empty rollup, and
-     * on GitLab a record stored before the two were told apart. An observation of another commit, or none, leaves the
+     * on GitLab a record stored before the two were told apart. A result of another commit, or none, leaves the
      * current head's checks not captured.
      */
     private static String checksObserved(PullRequest pr) {

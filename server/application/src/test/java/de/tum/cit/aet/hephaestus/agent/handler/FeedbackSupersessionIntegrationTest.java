@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
@@ -26,11 +26,11 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.FeedbackWithdrawalService;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -101,13 +101,13 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
-    private ObservationInvalidationRepository invalidationRepository;
+    private PracticeResultInvalidationRepository invalidationRepository;
 
     @Autowired
     private FeedbackPlacementRepository placementRepository;
@@ -486,8 +486,8 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
                 FeedbackDeliveryState.DELIVERED,
                 "second",
                 base.plusSeconds(10));
-        ObservationInvalidation invalidation = invalidationRepository.save(
-                new ObservationInvalidation(citedBy(latest), 1L, "Wrong when made", Instant.now()));
+        PracticeResultInvalidation invalidation = invalidationRepository.save(
+                new PracticeResultInvalidation(citedBy(latest), 1L, "Wrong when made", Instant.now()));
 
         assertThat(latestNote()).as("corrected on the work").isEmpty();
 
@@ -498,7 +498,7 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
                 .as("restored, but the posted copy is not settled back yet")
                 .isEmpty();
 
-        ObservationInvalidation restored =
+        PracticeResultInvalidation restored =
                 invalidationRepository.findById(invalidation.getId()).orElseThrow();
         assertThat(invalidationRepository.settleProviderCopy(
                         workspace.getId(), restored.getId(), restored.getRestoredAt(), "UPDATED"))
@@ -676,7 +676,7 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
                     assertThat(unit.getReplacesId()).isNull();
                 });
 
-        assertThat(feedbackObservationRepository.countForFeedback(workspace.getId(), earlier.getId()))
+        assertThat(feedbackEvidenceRepository.countForFeedback(workspace.getId(), earlier.getId()))
                 .isEqualTo(2);
         assertThat(placementRepository.findByFeedbackId(earlier.getId()))
                 .singleElement()
@@ -686,19 +686,19 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
                 .filteredOn(unit -> narrow.getId().equals(unit.getAgentJobId()))
                 .extracting(Feedback::getId)
                 .containsExactly(later.getId());
-        assertThat(feedbackObservationRepository.countForFeedback(workspace.getId(), later.getId()))
+        assertThat(feedbackEvidenceRepository.countForFeedback(workspace.getId(), later.getId()))
                 .isEqualTo(1);
         assertThat(placementRepository.findByFeedbackId(later.getId()))
                 .singleElement()
                 .satisfies(
                         placement -> assertThat(placement.getPostedCommentRef()).isEqualTo("comment-narrow"));
 
-        assertThat(feedbackObservationRepository.findLatestFeedbackByObservationIds(
+        assertThat(feedbackEvidenceRepository.findLatestFeedbackByResultIds(
                         workspace.getId(), RECIPIENT, List.of(tests, description, acknowledged), List.of("IN_CONTEXT")))
                 .extracting(
-                        FeedbackObservationRepository.ObservationFeedback::getObservationId,
-                        FeedbackObservationRepository.ObservationFeedback::getFeedbackId,
-                        FeedbackObservationRepository.ObservationFeedback::getBody)
+                        FeedbackEvidenceRepository.ResultFeedback::getPracticeResultId,
+                        FeedbackEvidenceRepository.ResultFeedback::getFeedbackId,
+                        FeedbackEvidenceRepository.ResultFeedback::getBody)
                 .containsExactlyInAnyOrder(
                         tuple(tests, earlier.getId(), "Add a test for the export, and say why it exists."),
                         tuple(description, earlier.getId(), "Add a test for the export, and say why it exists."),
@@ -715,12 +715,12 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
         return agentJobRepository.save(job);
     }
 
-    private static ReviewResultParser.DeliveryContent summary(String body, List<UUID> observations) {
+    private static ReviewResultParser.DeliveryContent summary(String body, List<UUID> practiceResults) {
         return new ReviewResultParser.DeliveryContent(
                 body,
                 List.of(),
                 List.of(),
-                observations.stream().map(id -> "reviewed-" + id).toList());
+                practiceResults.stream().map(id -> "reviewed-" + id).toList());
     }
 
     private Feedback deliveredUnitOf(AgentJob job) {
@@ -729,7 +729,7 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
                 .orElseThrow();
     }
 
-    /** One observation {@code job} recorded about the recipient on {@link #WORK}, under a practice of its own. */
+    /** One result {@code job} recorded about the recipient on {@link #WORK}, under a practice of its own. */
     private UUID observedBy(AgentJob job, String outcome, @Nullable String severity) {
         Practice practice = new Practice();
         practice.setWorkspace(workspace);
@@ -740,7 +740,7 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
         PracticeTestEvidence.configure(practice, ScmSignals.ISSUE_OPENED);
         practice = practiceRepository.saveAndFlush(practice);
         UUID id = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
+        practiceResultRepository.insertIfAbsent(
                 id,
                 "reviewed-" + id,
                 job.getId(),
@@ -750,9 +750,12 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
                 ArtifactKinds.ISSUE.value(),
                 WORK,
                 RECIPIENT,
-                "Observation " + id,
+                "Result " + id,
                 outcome,
                 severity,
+                null,
+                null,
+                "test-scope",
                 null,
                 null,
                 null,
@@ -825,8 +828,8 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
                         null)));
     }
 
-    /** One observation behind {@code feedbackId}, as delivery binds what a note was written from. */
-    private Observation citedBy(UUID feedbackId) {
+    /** One result behind {@code feedbackId}, as delivery binds what a note was written from. */
+    private PracticeResult citedBy(UUID feedbackId) {
         Practice practice = new Practice();
         practice.setWorkspace(workspace);
         practice.setSlug("cited-" + SLUG_SEQUENCE.incrementAndGet());
@@ -841,7 +844,7 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
         job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         job = agentJobRepository.save(job);
         UUID id = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
+        practiceResultRepository.insertIfAbsent(
                 id,
                 "cited-" + id,
                 job.getId(),
@@ -856,11 +859,14 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
                 "MAJOR",
                 null,
                 null,
+                "test-scope",
+                null,
+                null,
                 null,
                 Instant.now(),
                 "LIVE");
-        feedbackObservationRepository.insertIfAbsent(feedbackId, id, EvidenceRole.PRIMARY.name(), 0);
-        return observationRepository
+        feedbackEvidenceRepository.insertIfAbsent(feedbackId, id, null, EvidenceRole.PRIMARY.name(), 0);
+        return practiceResultRepository
                 .findByIdAndWorkspaceId(id, workspace.getId())
                 .orElseThrow();
     }

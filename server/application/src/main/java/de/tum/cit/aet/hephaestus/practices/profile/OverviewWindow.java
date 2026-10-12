@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.profile;
 
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
 import java.time.Duration;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;

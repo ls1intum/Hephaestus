@@ -75,6 +75,39 @@ public class CuratedPracticeReleaseService {
         return catalog.recordPractice(slug, before);
     }
 
+    /**
+     * The instance hop of the one-shot practice program upgrade: each instance copy whose practice script is the one
+     * its adopted base holds, while the bundled catalog now ships another, takes the shipped script. A copy whose
+     * script was changed here keeps it, and keeps its normal offer. Every other field and every other pending offer
+     * stays as it is.
+     *
+     * @return how many instance copies took the shipped script
+     */
+    @Transactional
+    public int adoptShippedPracticeScripts() {
+        lock.acquire();
+        int adopted = 0;
+        for (CuratedPracticeOverride override : overrides.findAll()) {
+            PracticeDefinition current = override.definition();
+            PracticeDefinition base = override.getAdoptedBase();
+            if (current == null || base == null) continue;
+            CatalogEntry<PracticeDefinition> before =
+                    catalog.catalog().practice(override.getSlug()).orElse(null);
+            if (before == null) continue;
+            PracticeDefinition shipped = before.shipped();
+            if (shipped == null
+                    || !Objects.equals(base.practiceScript(), current.practiceScript())
+                    || Objects.equals(shipped.practiceScript(), current.practiceScript())) {
+                continue;
+            }
+            override.adoptShippedPracticeScript(shipped, clock.instant());
+            overrides.save(override);
+            catalog.recordPractice(override.getSlug(), before);
+            adopted++;
+        }
+        return adopted;
+    }
+
     private PracticeReleaseProposalDTO requireProposal(CatalogEntry<PracticeDefinition> entry) {
         CuratedPracticeOverride override = overrides.findBySlug(entry.slug()).orElse(null);
         PracticeDefinition shipped = entry.shipped();

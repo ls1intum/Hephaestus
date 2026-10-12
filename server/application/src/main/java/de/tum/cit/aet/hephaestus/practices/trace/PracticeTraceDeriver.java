@@ -21,7 +21,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Derives one trace outcome per practice. Historical observations outrank current configuration, and
+ * Derives one trace outcome per practice. Historical results outrank current configuration, and
  * recorded run decisions outrank inferred state.
  */
 final class PracticeTraceDeriver {
@@ -74,8 +74,8 @@ final class PracticeTraceDeriver {
                 .toList();
         SignalOccurrence latest = matched.isEmpty() ? null : matched.getFirst();
 
-        if (output.observations() > 0) {
-            // Attribute observations to the occurrence that started their review, not a newer matching signal.
+        if (output.practiceResults() > 0) {
+            // Attribute results to the occurrence that started their review, not a newer matching signal.
             SignalOccurrence occasion = matched.stream()
                     .filter(occurrence -> Objects.equals(occurrence.reviewId(), output.latestReviewId()))
                     .findFirst()
@@ -294,7 +294,7 @@ final class PracticeTraceDeriver {
             return entry(
                     practice,
                     PracticeTraceOutcome.NOT_ASSESSABLE,
-                    "The review could not read the evidence it needed, so it recorded no observations.",
+                    "The review could not read the evidence it needed, so it recorded no results.",
                     occurrence,
                     review.decidedAt(),
                     occurrence.reviewId(),
@@ -353,7 +353,7 @@ final class PracticeTraceDeriver {
                 occasion == null ? null : occasion.id(),
                 decidedAt,
                 reviewId,
-                output.observations(),
+                output.practiceResults(),
                 output.delivered(),
                 output.withheldReasons(),
                 null);

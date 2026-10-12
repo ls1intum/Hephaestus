@@ -1,0 +1,121 @@
+package de.tum.cit.aet.hephaestus.practices.result.trend;
+
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
+import de.tum.cit.aet.hephaestus.practices.result.LatestRun;
+import de.tum.cit.aet.hephaestus.practices.result.ReviewedWorkKey;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+/** Converts raw results into opportunity-indexed, non-overlapping comparison bundles. */
+final class OpportunityBundler {
+
+    private OpportunityBundler() {}
+
+    static Bundles bundle(List<PracticeResult> practiceResults, Instant cutoff, int bundleSize) {
+        List<EvidenceOpportunity> all = opportunities(practiceResults, cutoff);
+        List<EvidenceOpportunity> decided =
+                all.stream().filter(EvidenceOpportunity::decided).toList();
+        List<EvidenceOpportunity> current =
+                tagged(decided.stream().limit(bundleSize).toList(), TrendBundle.CURRENT);
+        List<EvidenceOpportunity> previous =
+                tagged(decided.stream().skip(bundleSize).limit(bundleSize).toList(), TrendBundle.PREVIOUS);
+        Map<ReviewedWorkKey, TrendBundle> bundleByArtifact = new LinkedHashMap<>();
+        current.forEach(opportunity -> bundleByArtifact.put(opportunity.key(), TrendBundle.CURRENT));
+        previous.forEach(opportunity -> bundleByArtifact.put(opportunity.key(), TrendBundle.PREVIOUS));
+        List<EvidenceOpportunity> trail = all.stream()
+                .map(opportunity ->
+                        opportunity.withBundle(bundleByArtifact.getOrDefault(opportunity.key(), TrendBundle.OLDER)))
+                .sorted(Comparator.comparing(EvidenceOpportunity::occurredAt))
+                .toList();
+        return new Bundles(current, previous, trail);
+    }
+
+    /**
+     * One opportunity per piece of reviewed work observed at or after {@code cutoff}, read off its latest live run,
+     * newest first. Which runs count is {@link LatestRun#perLiveClaim}'s rule.
+     */
+    static List<EvidenceOpportunity> opportunities(List<PracticeResult> practiceResults, Instant cutoff) {
+        return opportunities(practiceResults, cutoff, false);
+    }
+
+    /** {@link #opportunities} over one origin class: the live runs, or the requested and backfilled ones. */
+    static List<EvidenceOpportunity> opportunities(
+            List<PracticeResult> practiceResults, Instant cutoff, boolean selfSelected) {
+        Map<ReviewedWorkKey, List<PracticeResult>> byArtifact = new LinkedHashMap<>();
+        practiceResults.stream()
+                .filter(practiceResult -> (practiceResult.getOrigin() != ResultOrigin.LIVE) == selfSelected)
+                .filter(practiceResult -> !practiceResult.getObservedAt().isBefore(cutoff))
+                .forEach(practiceResult -> byArtifact
+                        .computeIfAbsent(ReviewedWorkKey.of(practiceResult), ignored -> new ArrayList<>())
+                        .add(practiceResult));
+        return byArtifact.entrySet().stream()
+                .map(entry -> latestRunOpportunity(entry.getKey(), entry.getValue()))
+                .sorted(Comparator.comparing(EvidenceOpportunity::occurredAt)
+                        .thenComparing(opportunity -> opportunity.artifactKind().value())
+                        .thenComparingLong(EvidenceOpportunity::artifactId)
+                        .reversed())
+                .toList();
+    }
+
+    private static EvidenceOpportunity latestRunOpportunity(
+            ReviewedWorkKey artifact, List<PracticeResult> practiceResults) {
+        UUID latestJob = LatestRun.of(practiceResults);
+        List<PracticeResult> latest = practiceResults.stream()
+                .filter(row -> latestJob.equals(row.getAgentJobId()))
+                .toList();
+        OutcomeVector outcomes = latest.stream()
+                .map(row -> OutcomeVector.of(row.getOutcome()))
+                .reduce(OutcomeVector.EMPTY, OutcomeVector::plus);
+        Instant occurredAt = latest.stream()
+                .map(PracticeResult::getObservedAt)
+                .max(Instant::compareTo)
+                .orElseThrow();
+        return new EvidenceOpportunity(
+                artifact.kind(), artifact.id(), latestJob, occurredAt, outcomes, TrendBundle.OLDER);
+    }
+
+    /**
+     * Keeps the newest opportunities that still SAID something, plus whatever fell between them.
+     *
+     * <p>The cap bounds what a sparkline has to draw, so it counts the opportunities a reader can see a
+     * verdict in. Counting rows instead would let a stretch of work that offered this practice no opportunity
+     * push real evidence out of the window — and the standing reads its window off this same list, so that
+     * would quietly shrink the sample a standing rests on rather than merely shortening a chart.
+     */
+    static List<EvidenceOpportunity> cappedTrail(List<EvidenceOpportunity> trail, int bundleSize) {
+        int cap = 2 * bundleSize + 4;
+        int decided = 0;
+        for (int index = trail.size() - 1; index >= 0; index--) {
+            if (trail.get(index).decided()) {
+                decided++;
+            }
+            if (decided == cap) {
+                return trail.subList(index, trail.size());
+            }
+        }
+        return trail;
+    }
+
+    private static List<EvidenceOpportunity> tagged(List<EvidenceOpportunity> opportunities, TrendBundle bundle) {
+        return opportunities.stream()
+                .map(opportunity -> opportunity.withBundle(bundle))
+                .toList();
+    }
+
+    record Bundles(
+            List<EvidenceOpportunity> current, List<EvidenceOpportunity> previous, List<EvidenceOpportunity> trail) {
+        /**
+         * How many more decided opportunities a comparison needs. The previous bundle fills only once the current
+         * one is full, so what the current bundle lacks counts before what the previous one lacks.
+         */
+        int opportunitiesUntilComparable(int bundleSize, int minimumBundleSize) {
+            return Math.max(0, bundleSize - current.size()) + Math.max(0, minimumBundleSize - previous.size());
+        }
+    }
+}

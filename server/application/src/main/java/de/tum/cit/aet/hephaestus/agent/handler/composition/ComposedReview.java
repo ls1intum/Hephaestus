@@ -24,7 +24,8 @@ public record ComposedReview(@Nullable Summary summary, List<InlineNote> inline,
         withheld = List.copyOf(withheld);
     }
 
-    public Set<String> decidedObservationIds() {
+    /** The results some part of the review decided about: said in the summary or a line note, or withheld. */
+    public Set<String> decidedResultIds() {
         Set<String> ids = new HashSet<>();
         if (summary != null) ids.addAll(summary.basedOn());
         inline.forEach(note -> ids.addAll(note.basedOn()));
@@ -36,26 +37,54 @@ public record ComposedReview(@Nullable Summary summary, List<InlineNote> inline,
         return new ComposedReview(null, List.of(), List.of());
     }
 
-    public record Summary(String body, List<String> basedOn) {
-        public Summary {
-            body = text(body, MAX_SUMMARY_LENGTH);
-            basedOn = support(basedOn);
-        }
-    }
-
-    /** The anchor is resolved from a supporting observation's citation, never model-authored coordinates. */
-    public record InlineNote(String body, List<String> basedOn, ResolvedAnchor anchor) {
-        public InlineNote {
-            body = text(body, MAX_INLINE_LENGTH);
-            Objects.requireNonNull(anchor, "anchor");
-            basedOn = support(basedOn);
-            if (!basedOn.contains(anchor.observationId())) {
-                throw new IllegalArgumentException("A line note's anchor must be one of the observations it rests on");
+    /**
+     * One piece of evidence a composed text rests on: a practice result, and optionally one of its problems. On the
+     * wire, {@code {practiceResultId, observationId?}}; the problem must belong to that result.
+     */
+    public record EvidenceRef(
+            String practiceResultId, @Nullable String observationId) {
+        public EvidenceRef {
+            Objects.requireNonNull(practiceResultId, "practiceResultId");
+            if (practiceResultId.isBlank() || (observationId != null && observationId.isBlank())) {
+                throw new IllegalArgumentException("An evidence reference names its result, and its problem if any");
             }
         }
     }
 
-    /** Observations the composer decided not to raise on the work, with its reason. */
+    /**
+     * @param basedOn the results the summary rests on, each once
+     * @param observations the problems of those results it names, each once
+     */
+    public record Summary(String body, List<String> basedOn, List<String> observations) {
+        public Summary {
+            body = text(body, MAX_SUMMARY_LENGTH);
+            basedOn = support(basedOn);
+            observations = distinct(observations);
+        }
+
+        public Summary(String body, List<String> basedOn) {
+            this(body, basedOn, List.of());
+        }
+    }
+
+    /**
+     * The anchor is resolved from a cited problem's citation, never model-authored coordinates.
+     *
+     * @param observations the problems the note names; the anchored problem is one of them
+     */
+    public record InlineNote(String body, List<String> basedOn, List<String> observations, ResolvedAnchor anchor) {
+        public InlineNote {
+            body = text(body, MAX_INLINE_LENGTH);
+            Objects.requireNonNull(anchor, "anchor");
+            basedOn = support(basedOn);
+            observations = distinct(observations);
+            if (!basedOn.contains(anchor.practiceResultId()) || !observations.contains(anchor.observationId())) {
+                throw new IllegalArgumentException("A line note's anchor must be one of the problems it rests on");
+            }
+        }
+    }
+
+    /** Results the composer decided not to raise on the work, with its reason. */
     public record Withheld(List<String> basedOn, ComposedFeedbackUnit.WithholdReason reason) {
         public Withheld {
             Objects.requireNonNull(reason, "reason");
@@ -72,19 +101,26 @@ public record ComposedReview(@Nullable Summary summary, List<InlineNote> inline,
         return body;
     }
 
-    /** What a part rests on: at least one observation id, each named once, none blank. */
+    /** What a part rests on: at least one result id, each named once, none blank. */
     private static List<String> support(List<String> basedOn) {
-        List<String> ids = List.copyOf(basedOn);
-        if (ids.isEmpty()
-                || ids.stream().anyMatch(String::isBlank)
-                || ids.stream().distinct().count() != ids.size()) {
-            throw new IllegalArgumentException("A composed part rests on a non-empty list of distinct observation ids");
+        List<String> ids = distinct(basedOn);
+        if (ids.isEmpty()) {
+            throw new IllegalArgumentException("A composed part rests on a non-empty list of distinct result ids");
         }
         return ids;
     }
 
-    /** A line resolved from one observation citation. */
+    private static List<String> distinct(List<String> ids) {
+        List<String> copy = List.copyOf(ids);
+        if (copy.stream().anyMatch(String::isBlank) || copy.stream().distinct().count() != copy.size()) {
+            throw new IllegalArgumentException("A composed part names each piece of evidence once");
+        }
+        return copy;
+    }
+
+    /** A line resolved from one citation of one problem. */
     public record ResolvedAnchor(
+            String practiceResultId,
             String observationId,
             int citationIndex,
             String path,
@@ -92,6 +128,7 @@ public record ComposedReview(@Nullable Summary summary, List<InlineNote> inline,
             int startLine,
             @Nullable Integer endLine) {
         public ResolvedAnchor {
+            Objects.requireNonNull(practiceResultId, "practiceResultId");
             Objects.requireNonNull(observationId, "observationId");
             Objects.requireNonNull(path, "path");
         }

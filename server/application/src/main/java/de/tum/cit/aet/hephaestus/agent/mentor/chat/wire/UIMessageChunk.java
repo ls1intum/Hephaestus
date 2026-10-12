@@ -36,7 +36,8 @@ import tools.jackson.databind.JsonNode;
     @JsonSubTypes.Type(value = UIMessageChunk.ToolOutputError.class, name = "tool-output-error"),
     @JsonSubTypes.Type(value = UIMessageChunk.TurnError.class, name = "error"),
     @JsonSubTypes.Type(value = UIMessageChunk.DataMentorStatus.class, name = "data-mentor-status"),
-    @JsonSubTypes.Type(value = UIMessageChunk.DataObservation.class, name = "data-observation"),
+    @JsonSubTypes.Type(value = UIMessageChunk.DataResult.class, name = "data-result"),
+    @JsonSubTypes.Type(value = UIMessageChunk.DataResultObservation.class, name = "data-result-observation"),
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public sealed interface UIMessageChunk {
@@ -232,49 +233,110 @@ public sealed interface UIMessageChunk {
     }
 
     /**
-     * Hephaestus-specific data part emitted when Pi calls the {@code link_observation} custom tool: the feedback
-     * the mentor wrote about one observation, shown to the developer as part of the reply. Permanent (NOT
-     * transient), and the only place those words live — they are not Pi assistant text, so they never enter the
-     * streamed-text verification. Each link gets its own {@code id}, because the AI SDK merges a data part into an
-     * earlier one with the same type and id.
+     * Hephaestus-specific data part emitted when Pi calls the {@code link_result} custom tool: the feedback the mentor
+     * wrote about one practice result, shown to the developer as part of the reply. Permanent (NOT transient), and the
+     * only place those words live — they are not Pi assistant text, so they never enter the streamed-text
+     * verification. Each link gets its own {@code id}, because the AI SDK merges a data part into an earlier one with
+     * the same type and id.
      */
-    record DataObservation(
+    record DataResult(
             @JsonProperty("id") UUID id,
-            @JsonProperty("data") DataObservationPayload data) implements UIMessageChunk {
-        public static final String PART_TYPE = "data-observation";
+            @JsonProperty("data") DataResultPayload data) implements UIMessageChunk {
+        public static final String PART_TYPE = "data-result";
 
-        public DataObservation {
+        public DataResult {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(data, "data");
         }
 
-        public record DataObservationPayload(UUID observationId, String text) {}
+        public record DataResultPayload(UUID practiceResultId, String text) {}
 
-        public static DataObservation of(UUID observationId, String text) {
-            return new DataObservation(UUID.randomUUID(), new DataObservationPayload(observationId, text));
+        public static DataResult of(UUID practiceResultId, String text) {
+            return new DataResult(UUID.randomUUID(), new DataResultPayload(practiceResultId, text));
+        }
+    }
+
+    /**
+     * Hephaestus-specific data part emitted when Pi calls the {@code link_observation} custom tool: the feedback the
+     * mentor wrote about one located problem, with the result it belongs to. Permanent, like {@link DataResult}.
+     */
+    record DataResultObservation(
+            @JsonProperty("id") UUID id,
+            @JsonProperty("data") DataResultObservationPayload data) implements UIMessageChunk {
+        public static final String PART_TYPE = "data-result-observation";
+
+        public DataResultObservation {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(data, "data");
         }
 
+        public record DataResultObservationPayload(UUID practiceResultId, UUID observationId, String text) {}
+
+        public static DataResultObservation of(UUID practiceResultId, UUID observationId, String text) {
+            return new DataResultObservation(
+                    UUID.randomUUID(), new DataResultObservationPayload(practiceResultId, observationId, text));
+        }
+    }
+
+    /**
+     * The stored link parts of a reply, read by what they name. A {@link #LEGACY_PART_TYPE} part was written before
+     * results had problems: its {@code observationId} is a practice result id, and is never read as a problem.
+     */
+    final class LinkParts {
+
+        /** The part type of a link stored before protocol 2; its {@code data.observationId} names a result. */
+        public static final String LEGACY_PART_TYPE = "data-observation";
+
+        private LinkParts() {}
+
         /**
-         * The observations a stored reply showed the developer feedback about, in order: its data-observation
-         * parts that carry text. A part stored before links carried text showed nothing, so it names none.
+         * The results a stored reply showed the developer feedback about, in order: one per link part that carries
+         * text, its problem's result for a problem link. A part stored before links carried text showed nothing, so
+         * it names none.
          */
-        public static List<UUID> shownObservationIds(@Nullable JsonNode parts) {
+        public static List<UUID> shownResultIds(@Nullable JsonNode parts) {
             List<UUID> shown = new ArrayList<>();
             if (parts == null || !parts.isArray()) {
                 return shown;
             }
             for (JsonNode part : parts) {
-                JsonNode data = part.path("data");
-                if (PART_TYPE.equals(part.path("type").asString(""))
-                        && !data.path("text").asString("").isBlank()) {
-                    try {
-                        shown.add(UUID.fromString(data.path("observationId").asString("")));
-                    } catch (IllegalArgumentException unreadable) {
-                        // Not a link this server wrote; it settles nothing.
-                    }
+                UUID result = resultOf(part);
+                if (result != null
+                        && !part.path("data").path("text").asString("").isBlank()) {
+                    shown.add(result);
                 }
             }
             return shown;
+        }
+
+        /** The result a stored link part names, or null for any other part. */
+        public static @Nullable UUID resultOf(JsonNode part) {
+            String type = part.path("type").asString("");
+            JsonNode data = part.path("data");
+            String id;
+            if (DataResult.PART_TYPE.equals(type) || DataResultObservation.PART_TYPE.equals(type)) {
+                id = data.path("practiceResultId").asString("");
+            } else if (LEGACY_PART_TYPE.equals(type)) {
+                id = data.path("observationId").asString("");
+            } else {
+                return null;
+            }
+            try {
+                return UUID.fromString(id);
+            } catch (IllegalArgumentException unreadable) {
+                // Not a link this server wrote; it settles nothing.
+                return null;
+            }
+        }
+
+        /** The problem a stored link part names: only a {@link DataResultObservation} names one. */
+        public static @Nullable UUID observationOf(JsonNode part) {
+            if (!DataResultObservation.PART_TYPE.equals(part.path("type").asString(""))) return null;
+            try {
+                return UUID.fromString(part.path("data").path("observationId").asString(""));
+            } catch (IllegalArgumentException unreadable) {
+                return null;
+            }
         }
     }
 }

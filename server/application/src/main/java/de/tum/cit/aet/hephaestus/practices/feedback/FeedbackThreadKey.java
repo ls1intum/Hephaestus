@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
  * <p><strong>Identity is the destination, NOT the content.</strong> The unit is keyed by <em>where it is
  * delivered</em>: the artifact {@code (artifact_kind, artifact_id)}, the {@code recipient}, and the
  * {@code surface}. Two reviews of the same PR deliver the same in-context summary unit to the same author →
- * same continuity key → the second supersedes the first. The observations it references are the changing
+ * same continuity key → the second supersedes the first. The results it references are the changing
  * <em>content</em>, recorded separately, so the unit's identity is stable even as its body churns between
  * reviews.
  *

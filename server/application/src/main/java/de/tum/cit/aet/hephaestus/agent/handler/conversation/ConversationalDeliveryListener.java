@@ -9,9 +9,9 @@ import de.tum.cit.aet.hephaestus.config.FeedbackLaneExecutor;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +28,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * Drives the conversational-feedback router + preparer off {@link PracticeFeedbackPreparationRequestedEvent}. Runs
  * {@code @Async @TransactionalEventListener(AFTER_COMMIT)} so it never blocks the delivery path and reads the
- * cycle's observations only after they are committed, in its own {@code REQUIRES_NEW} transaction. A failure
+ * cycle's results only after they are committed, in its own {@code REQUIRES_NEW} transaction. A failure
  * here is logged, never propagated: the feedback the developer already received is unaffected.
  *
  * <p>Late rather than lost. The event is delivered once and a submission to a saturated executor is
@@ -42,7 +42,7 @@ public class ConversationalDeliveryListener {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationalDeliveryListener.class);
 
-    private final ObservationRepository observationRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final FeedbackChannelRouter router;
     private final ConversationalFeedbackPreparer preparer;
     private final OutboundEgressGuard egressGuard;
@@ -51,14 +51,14 @@ public class ConversationalDeliveryListener {
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
 
     public ConversationalDeliveryListener(
-            ObservationRepository observationRepository,
+            PracticeResultRepository practiceResultRepository,
             FeedbackChannelRouter router,
             ConversationalFeedbackPreparer preparer,
             OutboundEgressGuard egressGuard,
             AgentJobRepository agentJobRepository,
             FeedbackCompositionResultParser resultParser,
             PracticeFeedbackDeliveryPolicy deliveryPolicy) {
-        this.observationRepository = observationRepository;
+        this.practiceResultRepository = practiceResultRepository;
         this.router = router;
         this.preparer = preparer;
         this.egressGuard = egressGuard;
@@ -98,7 +98,7 @@ public class ConversationalDeliveryListener {
         return prepare(agentJobId, agentJobId, workspaceId);
     }
 
-    /** Prepare source observations using a separate composition job's output. */
+    /** Prepare source results using a separate composition job's output. */
     public int prepare(UUID sourceJobId, UUID compositionJobId, Long workspaceId) {
         int prepared = route(sourceJobId, compositionJobId, workspaceId);
         agentJobRepository.markInChatPrepared(compositionJobId, Instant.now());
@@ -110,27 +110,27 @@ public class ConversationalDeliveryListener {
         if (sourceJob == null || !composes(sourceJob)) {
             return 0;
         }
-        List<Observation> observations = observationRepository.findByAgentJobId(agentJobId, workspaceId);
-        if (observations.isEmpty()) {
+        List<PracticeResult> practiceResults = practiceResultRepository.findByAgentJobId(agentJobId, workspaceId);
+        if (practiceResults.isEmpty()) {
             return 0;
         }
-        List<Observation> admitted = router.admit(observations, workspaceId, RoutingContext.author());
+        List<PracticeResult> admitted = router.admit(practiceResults, workspaceId, RoutingContext.author());
         return preparer.prepare(outputJobId, workspaceId, admitted, composedMoves(outputJobId));
     }
 
     /**
-     * How this lane would route a run's admitted NOT_MET observations now, through the same permission and router
+     * How this lane would route a run's admitted NOT_MET results now, through the same permission and router
      * preparation uses, for the one person they are about. Read before composition; {@link #prepare} decides.
      */
-    public ConversationEligibility eligibility(AgentJob job, List<Observation> admitted) {
+    public ConversationEligibility eligibility(AgentJob job, List<PracticeResult> admitted) {
         Instant now = Instant.now();
-        List<Observation> negatives = admitted.stream()
-                .filter(observation -> observation.getOutcome() == Outcome.NOT_MET)
+        List<PracticeResult> negatives = admitted.stream()
+                .filter(practiceResult -> practiceResult.getOutcome() == Outcome.NOT_MET)
                 .toList();
         if (negatives.isEmpty()) {
             return ConversationEligibility.complete(now, Map.of());
         }
-        if (negatives.stream().map(Observation::getAboutUserId).distinct().count() != 1) {
+        if (negatives.stream().map(PracticeResult::getAboutUserId).distinct().count() != 1) {
             return ConversationEligibility.unavailable(now);
         }
         if (!composes(job)) {

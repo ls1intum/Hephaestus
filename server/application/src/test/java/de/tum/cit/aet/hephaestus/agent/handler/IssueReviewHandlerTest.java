@@ -23,7 +23,6 @@ import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionIn
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
@@ -34,10 +33,10 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRevisionService;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -102,16 +101,15 @@ class IssueReviewHandlerTest extends BaseUnitTest {
                                 PracticeRevisionService.class,
                                 invocation -> ((Practice) invocation.getArgument(0)).getCurrentRevision()),
                         mock(AnsweredPractices.class)),
-                new ReviewResultParser(objectMapper),
                 new FeedbackCompositionResultParser(),
                 deliveryService,
                 InContextDeliveryGateFixtures.gate(
-                        practiceRepository, mock(ObservationRepository.class), feedbackLedgerRecorder),
+                        practiceRepository, mock(PracticeResultRepository.class), feedbackLedgerRecorder),
                 feedbackLedgerRecorder,
                 mock(PracticeFeedbackDeliveryPolicy.class),
                 mock(PracticeFeedbackCommentFormatter.class),
                 feedbackResponseSuppressionFilter,
-                mock(ObservationRepository.class),
+                mock(PracticeResultRepository.class),
                 dispatchService,
                 mock(FeedbackDeliveryService.class),
                 mock(PublicReviewEligibility.class));
@@ -197,11 +195,10 @@ class IssueReviewHandlerTest extends BaseUnitTest {
     class JobType {
 
         @Test
-        void shouldFinishWithoutComposingFeedbackWhenObservationsWereRefused() {
+        void shouldFinishWithoutComposingFeedbackWhenResultsWereRefused() {
             var refused = new AgentJob();
             var metadata = objectMapper.createObjectNode();
-            metadata.putObject(ObservationAdmissionService.REFUSAL_METADATA_KEY)
-                    .put("reasonCode", "no_valid_observations");
+            metadata.putObject(ResultAdmissionService.REFUSAL_METADATA_KEY).put("reasonCode", "no_valid_observations");
             refused.setMetadata(metadata);
             assertThatCode(() -> handler.deliver(refused)).doesNotThrowAnyException();
             verifyNoInteractions(dispatchService, feedbackLedgerRecorder, deliveryService);
@@ -227,7 +224,7 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             FeedbackCompositionInputs.stage(
                     files,
-                    ObservationOrigin.LIVE,
+                    ResultOrigin.LIVE,
                     IssueReviewHandler.ISSUE_REVIEW_CHANNELS,
                     EnumSet.of(FeedbackCompositionInputs.InContextPlacementKind.ARTIFACT));
 
@@ -263,7 +260,7 @@ class IssueReviewHandlerTest extends BaseUnitTest {
                     request.url(),
                     request.updatedAt(),
                     request.triggerSignal(),
-                    request.observationOrigin(),
+                    request.practiceResultOrigin(),
                     456L,
                     snapshot);
 
@@ -307,7 +304,7 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
     /** Resolves every workspace to the unset defaults — HUMAN_APPROVAL autonomy, reach on the work. */
     @Nested
-    class PrepareObservations {
+    class PrepareResults {
 
         private static final String OBSERVATION = """
             [{
@@ -321,29 +318,16 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             """;
 
         @Test
-        void shouldRefuseRatherThanFailWhenNothingSubmittedIsAnObservation() {
-            var job = new AgentJob();
-            job.setId(UUID.randomUUID());
-
-            assertThatThrownBy(
-                            () -> handler.prepareObservations(job, objectMapper.readTree("[{\"practiceSlug\": \"\"}]")))
-                    .isInstanceOfSatisfying(
-                            ObservationsRefusedException.class,
-                            e -> assertThat(e.reasonCode()).isEqualTo("no_valid_observations"));
-            verifyNoInteractions(deliveryService);
-        }
-
-        @Test
         void shouldRecordThroughTheDeliveryServiceOnlyWhenAsked() {
             var job = new AgentJob();
             job.setId(UUID.randomUUID());
             var snapshot = EvidenceSnapshotFixtures.snapshot(objectMapper, ArtifactKinds.ISSUE.value());
             EvidenceSnapshotFixtures.admittedPractice(snapshot, "explains-why", 1);
             job.setEvidenceSnapshot(snapshot);
-            var admissible = mock(ReviewOutputService.PreparedObservations.class);
+            var admissible = mock(ReviewOutputService.PreparedResults.class);
             when(deliveryService.prepare(eq(job), any())).thenReturn(admissible);
 
-            var prepared = handler.prepareObservations(job, objectMapper.readTree(OBSERVATION));
+            var prepared = handler.prepareResults(job, objectMapper.readTree(OBSERVATION));
             verify(deliveryService, never()).publish(any(), any());
 
             prepared.record(job);

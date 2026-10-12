@@ -14,7 +14,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * No production class, field or method is named with a word the product vocabulary retired for an observation, so
+ * No production class, field or method is named with a word the product vocabulary retired for a result, so
  * the code cannot keep a concept alive that the copy and the API no longer have.
  */
 class PracticeVocabularyArchitectureTest extends HephaestusArchitectureTest {
@@ -23,24 +23,24 @@ class PracticeVocabularyArchitectureTest extends HephaestusArchitectureTest {
             Pattern.compile("finding|detection", Pattern.CASE_INSENSITIVE);
 
     @Test
-    void identifiersDoNotUseTheRetiredObservationWords() {
+    void identifiersDoNotUseTheRetiredResultWords() {
         // The generated GitLab client keeps the schema's own words (SecurityFinding, SecretDetection).
         classes()
                 .that()
                 .resideOutsideOfPackage(GENERATED_GRAPHQL_PACKAGE)
-                .should(notBeNamedWithARetiredObservationWord())
+                .should(notBeNamedWithARetiredResultWord())
                 .because("docs/contributor/practice-feedback-language.md retires finding and detection for an "
-                        + "observation, in Java as everywhere else")
+                        + "result, in Java as everywhere else")
                 .check(classes);
     }
 
-    private static ArchCondition<JavaClass> notBeNamedWithARetiredObservationWord() {
+    private static ArchCondition<JavaClass> notBeNamedWithARetiredResultWord() {
         return new ArchCondition<>("not name the class, a field or a method with finding or detection") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
                 if (RETIRED_OBSERVATION_WORDS.matcher(javaClass.getSimpleName()).find()) {
                     events.add(SimpleConditionEvent.violated(
-                            javaClass, javaClass.getName() + " is named with a retired observation word"));
+                            javaClass, javaClass.getName() + " is named with a retired result word"));
                 }
                 Stream.<JavaMember>concat(javaClass.getFields().stream(), javaClass.getMethods().stream())
                         .filter(member -> !member.getModifiers().contains(JavaModifier.SYNTHETIC))
@@ -48,7 +48,7 @@ class PracticeVocabularyArchitectureTest extends HephaestusArchitectureTest {
                                 .matcher(member.getName())
                                 .find())
                         .forEach(member -> events.add(SimpleConditionEvent.violated(
-                                member, member.getFullName() + " is named with a retired observation word")));
+                                member, member.getFullName() + " is named with a retired result word")));
             }
         };
     }

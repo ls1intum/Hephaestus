@@ -27,15 +27,15 @@ import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer.PreparedReview;
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewOutputService.PreparedObservations;
+import de.tum.cit.aet.hephaestus.agent.handler.ReviewOutputService.PreparedResults;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.AnsweredPractice;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ResultsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
@@ -59,16 +59,20 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.practices.review.GeneratedPathReviewDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -109,19 +113,21 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     private FeedbackDeliveryService feedbackService;
 
     @Mock
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Mock
     private AnsweredPractices answeredPractices;
 
     private static final Long WORKSPACE_ID = 99L;
 
-    private ReviewResultParser resultParser;
     private TaskEnvelopeWriter taskEnvelopeWriter;
     private PullRequestReviewHandler handler;
 
     @Mock
     private PublicReviewEligibility publicEligibility;
+
+    /** The problems each persisted result was recorded with, by result id, as admission stored them. */
+    private final Map<UUID, List<Observation>> problems = new HashMap<>();
 
     @Test
     void shouldPreservePreparationFailureWhenCaptureAbortFails() {
@@ -157,11 +163,17 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(publicEligibility.publicObservationIds(any(), any())).thenAnswer(invocation -> {
-            Collection<Observation> rows = invocation.getArgument(1);
-            return rows.stream().map(Observation::getId).collect(Collectors.toSet());
+        lenient().when(publicEligibility.publicResultIds(any(), any())).thenAnswer(invocation -> {
+            Collection<PracticeResult> rows = invocation.getArgument(1);
+            return rows.stream().map(PracticeResult::getId).collect(Collectors.toSet());
         });
-        resultParser = new ReviewResultParser(objectMapper);
+        lenient().when(deliveryService.recorded(any(), any())).thenAnswer(invocation -> {
+            List<PracticeResult> rows = invocation.getArgument(1);
+            return rows.stream()
+                    .map(row ->
+                            ReviewResultParser.ValidatedResult.of(row, problems.getOrDefault(row.getId(), List.of())))
+                    .toList();
+        });
         taskEnvelopeWriter = new TaskEnvelopeWriter(objectMapper);
         var practiceCatalogInjector = new PracticeCatalogInjector(
                 objectMapper,
@@ -180,28 +192,29 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                                 PracticeRevisionService.class,
                                 invocation -> ((Practice) invocation.getArgument(0)).getCurrentRevision()),
                         answeredPractices),
-                resultParser,
                 new FeedbackCompositionResultParser(),
                 deliveryService,
                 feedbackService,
                 new FeedbackResponseSuppressionFilter(
+                        mock(PracticeResultRepository.class),
                         mock(ObservationRepository.class),
                         mock(ReactionRepository.class),
                         mock(FeedbackLedgerRecorder.class)),
                 InContextDeliveryGateFixtures.gate(
-                        practiceRepository, mock(ObservationRepository.class), mock(FeedbackLedgerRecorder.class)),
-                observationRepository,
+                        practiceRepository, mock(PracticeResultRepository.class), mock(FeedbackLedgerRecorder.class)),
+                practiceResultRepository,
                 publicEligibility);
     }
 
     @Test
-    void shouldFinishWithoutComposingFeedbackWhenObservationsWereRefused() {
+    void shouldFinishWithoutComposingFeedbackWhenResultsWereRefused() {
         var refused = new AgentJob();
         var metadata = objectMapper.createObjectNode();
-        metadata.putObject(ObservationAdmissionService.REFUSAL_METADATA_KEY).put("reasonCode", "no_valid_observations");
+        metadata.putObject(ResultAdmissionService.REFUSAL_METADATA_KEY)
+                .put("reasonCode", ReviewOutputService.NO_ADMISSIBLE_RESULTS);
         refused.setMetadata(metadata);
         assertThatCode(() -> handler.deliver(refused)).doesNotThrowAnyException();
-        verifyNoInteractions(feedbackService, observationRepository, deliveryService);
+        verifyNoInteractions(feedbackService, practiceResultRepository, deliveryService);
     }
 
     @Test
@@ -271,15 +284,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         ObjectNode diff = EvidenceSnapshotFixtures.availableSource(
                 snapshot, "scm.pull-request.diff", "a".repeat(40) + ":" + "b".repeat(40));
         EvidenceSnapshotFixtures.artifact(snapshot, diff, PullRequestContentSource.CHANGE_FILE, CHANGE_SHA);
-        return snapshot;
-    }
-
-    /** The same admission, over a review whose change could not be captured. */
-    private ObjectNode admittedPracticeSnapshotWithoutChange() {
-        ObjectNode snapshot = admittedPracticeSnapshot();
-        for (JsonNode source : snapshot.withObject("manifest").withArray("sources")) {
-            EvidenceSnapshotFixtures.unavailable(snapshot, (ObjectNode) source);
-        }
         return snapshot;
     }
 
@@ -418,7 +422,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     null);
             var request =
                     new PullRequestReviewSubmissionRequest(data, "feature", "a".repeat(40), "main", "b".repeat(40));
-            JsonNode value = handler.createSubmission(request).metadata().path(Observation.CURRENT_WORK_METADATA_KEY);
+            JsonNode value =
+                    handler.createSubmission(request).metadata().path(PracticeResult.CURRENT_WORK_METADATA_KEY);
             assertThat(value.isBoolean()).isTrue();
             assertThat(value.asBoolean()).isEqualTo(current);
         }
@@ -556,7 +561,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             assertThat(files).containsKey("task.json");
             JsonNode envelope = objectMapper.readTree(files.get("task.json"));
-            assertThat(envelope.get("schemaVersion").asInt()).isEqualTo(4);
+            assertThat(envelope.get("schemaVersion").asInt()).isEqualTo(5);
             assertThat(envelope.get("workspaceId").asLong()).isEqualTo(WORKSPACE_ID);
             JsonNode task = envelope;
             assertThat(task.has("kind")).isFalse();
@@ -691,63 +696,59 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     @Nested
     class Deliver {
 
-        private AgentJob jobWithOutput(String rawOutputJson) {
-            var job = new AgentJob();
-            job.setId(UUID.randomUUID());
-            job.setEvidenceSnapshot(admittedPracticeSnapshot());
-            ObjectNode output = objectMapper.createObjectNode();
-            output.put("rawOutput", rawOutputJson);
-            job.setOutput(output);
-            return job;
-        }
-
-        private void admit(AgentJob job, String rawOutputJson) {
-            handler.prepareObservations(
-                            job, objectMapper.readTree(rawOutputJson).path("observations"))
-                    .record(job);
-        }
-
-        private Observation persisted(AgentJob job, Practice practice, String summary, Severity severity) {
-            var observation = mock(Observation.class);
-            lenient().when(observation.getPractice()).thenReturn(practice);
+        private PracticeResult persisted(AgentJob job, Practice practice, String summary, Severity severity) {
+            var practiceResult = mock(PracticeResult.class);
+            lenient().when(practiceResult.getPractice()).thenReturn(practice);
             lenient()
-                    .when(observation.getEvidence())
-                    .thenReturn(AdmittedObservationFixtures.evidence(job.getId(), "scm.pull-request.core"));
+                    .when(practiceResult.getEvidence())
+                    .thenReturn(AdmittedResultFixtures.evidence(job.getId(), "scm.pull-request.core"));
 
-            lenient().when(observation.getSummary()).thenReturn(summary);
-            lenient().when(observation.getOutcome()).thenReturn(Outcome.NOT_MET);
-            lenient().when(observation.getSeverity()).thenReturn(severity);
-            lenient().when(observation.getEvidenceRationale()).thenReturn("Reasoning for " + practice.getSlug() + ".");
-            lenient().when(observation.getId()).thenReturn(UUID.randomUUID());
-            lenient().when(observation.getOccurrenceKey()).thenReturn("occ-" + practice.getSlug());
-            lenient().when(observation.getRecurrenceKey()).thenReturn("rk-" + practice.getSlug());
-            return observation;
+            lenient().when(practiceResult.getSummary()).thenReturn(summary);
+            lenient().when(practiceResult.getOutcome()).thenReturn(Outcome.NOT_MET);
+            lenient().when(practiceResult.getSeverity()).thenReturn(severity);
+            lenient()
+                    .when(practiceResult.getEvidenceRationale())
+                    .thenReturn("Reasoning for " + practice.getSlug() + ".");
+            lenient().when(practiceResult.getId()).thenReturn(UUID.randomUUID());
+            lenient().when(practiceResult.getOccurrenceKey()).thenReturn("occ-" + practice.getSlug());
+            return practiceResult;
+        }
+
+        /** The handler checks nothing itself: admission reads the candidates, and records them once fenced. */
+        @Test
+        void shouldHandTheSubmittedResultsToAdmissionUnchangedWhenARunSubmits() {
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+            JsonNode results = objectMapper.readTree("""
+                [{"practiceSlug": "avoids-insecure-defaults-and-over-broad-permissions",
+                  "candidate": {"outcome": "MET", "summary": "Defaults stay closed",
+                    "explanation": "The new endpoint keeps the default deny rule.", "citations": []}}]
+                """);
+            PreparedResults prepared = mock(PreparedResults.class);
+            when(deliveryService.prepare(job, results)).thenReturn(prepared);
+
+            handler.prepareResults(job, results).record(job);
+
+            verify(deliveryService).publish(job, prepared);
+            verifyNoInteractions(feedbackService, practiceResultRepository);
         }
 
         @Test
-        void shouldAdmitDesirableBehaviorWithinSecurityPractice() {
-            String rawOutput = """
-                {"observations": [{
-                  "practiceSlug": "avoids-insecure-defaults-and-over-broad-permissions",
-                  "summary": "The harmful behaviour is good",
-                  "outcome": "MET", "severity": null,
-                  "evidenceRationale": "Original evidence rationale",
-                  "evidence": {}
-                }]}
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
+        void shouldRecordNothingWhenAdmissionRefusesTheSubmission() {
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+            JsonNode results = objectMapper.createArrayNode();
+            var refusal = new ResultsRefusedException(ReviewOutputService.NO_ADMISSIBLE_RESULTS, "No result");
+            when(deliveryService.prepare(job, results)).thenThrow(refusal);
 
-            when(deliveryService.prepare(eq(job), any())).thenReturn(mock(PreparedObservations.class));
-            admit(job, rawOutput);
-            verify(deliveryService).prepare(eq(job), any());
-            verifyNoInteractions(feedbackService, observationRepository);
+            assertThatThrownBy(() -> handler.prepareResults(job, results)).isSameAs(refusal);
+
+            verify(deliveryService, never()).publish(any(), any());
         }
 
         @Test
         void shouldHoldAutomaticFeedbackInsideTheReviewPackageWhenAnyPracticeNeedsApproval() {
             String lead = "The retry path is covered now, but the description never says why it changed.";
             ObjectNode metadata = sampleJobMetadata();
-            metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, "digest-1");
+            metadata.put(ResultAdmissionService.DIGEST_METADATA_KEY, "digest-1");
             AgentJob job = jobWithMetadata(metadata);
             ObjectNode output = objectMapper.createObjectNode();
             ObjectNode feedback = output.putObject("feedback");
@@ -762,7 +763,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // Built before the stubbing call: persisted() stubs, and Mockito rejects a stub nested in when().
             var gated = persisted(job, approvalGated, "Unhandled error path", Severity.MAJOR);
             var auto = persisted(job, automatic, "No rationale sentence", Severity.MINOR);
-            when(observationRepository.findByAgentJobId(
+            when(practiceResultRepository.findByAgentJobId(
                             job.getId(), job.getWorkspace().getId()))
                     .thenReturn(List.of(gated, auto));
 
@@ -779,7 +780,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void shouldSendTheAutomaticProblemAloneAndKeepAnApprovalGatedWithholdBesideIt() {
             ObjectNode metadata = sampleJobMetadata();
-            metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, "digest-1");
+            metadata.put(ResultAdmissionService.DIGEST_METADATA_KEY, "digest-1");
             AgentJob job = jobWithMetadata(metadata);
             ObjectNode output = objectMapper.createObjectNode();
             output.putObject("feedback").put("admissionDigest", "digest-1");
@@ -791,7 +792,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(approvalGated, automatic));
             var gated = persisted(job, approvalGated, "Unhandled error path", Severity.MAJOR);
             var auto = persisted(job, automatic, "No rationale sentence", Severity.MINOR);
-            when(observationRepository.findByAgentJobId(
+            when(practiceResultRepository.findByAgentJobId(
                             job.getId(), job.getWorkspace().getId()))
                     .thenReturn(List.of(gated, auto));
             composed(job, List.of(gated, auto), noteCiting(auto), withholding(gated));
@@ -807,12 +808,12 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     .doesNotContain("can wait");
             assertThat(content.getValue().contributors()).containsExactly("occ-describe-what-and-why");
             assertThat(content.getValue().withheld())
-                    .extracting(ReviewResultParser.WithheldObservation::occurrenceKey)
+                    .extracting(ReviewResultParser.WithheldResult::occurrenceKey)
                     .containsExactly("occ-error-handling");
         }
 
         @Test
-        void shouldProposeANoteWhoseUnitCitesAnObservationOfAPracticeNeedingApproval() {
+        void shouldProposeANoteWhoseUnitCitesAResultOfAPracticeNeedingApproval() {
             AgentJob job = composedJob();
             Practice gatedPractice = createPractice("error-handling", "Error Handling", "criteria");
             gatedPractice.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
@@ -820,9 +821,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(gatedPractice, automatic));
             var auto = persisted(job, automatic, "No rationale sentence", Severity.MINOR);
             var gated = persisted(job, gatedPractice, "Errors reach the caller", Severity.MINOR);
-            lenient().when(gated.getSeverity()).thenReturn(null);
-            lenient().when(gated.getOutcome()).thenReturn(Outcome.MET);
-            when(observationRepository.findByAgentJobId(
+            when(practiceResultRepository.findByAgentJobId(
                             job.getId(), job.getWorkspace().getId()))
                     .thenReturn(List.of(auto, gated));
             composed(job, List.of(auto, gated), noteCiting(auto, gated));
@@ -837,7 +836,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldSendAutomaticallyWhenTheOnlyObservationNeedingApprovalIsAnUncitedAbstention() {
+        void shouldSendAutomaticallyWhenTheOnlyResultNeedingApprovalIsAnUncitedAbstention() {
             AgentJob job = composedJob();
             Practice gatedPractice = createPractice("error-handling", "Error Handling", "criteria");
             gatedPractice.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
@@ -848,7 +847,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             lenient().when(abstention.getSeverity()).thenReturn(null);
             lenient().when(abstention.getOutcome()).thenReturn(Outcome.NOT_APPLICABLE);
 
-            when(observationRepository.findByAgentJobId(
+            when(practiceResultRepository.findByAgentJobId(
                             job.getId(), job.getWorkspace().getId()))
                     .thenReturn(List.of(auto, abstention));
             composed(job, List.of(auto, abstention), noteCiting(auto));
@@ -865,7 +864,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         /** A job past admission whose composition output is filled in by {@link #composed}. */
         private AgentJob composedJob() {
             ObjectNode metadata = sampleJobMetadata();
-            metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, "digest-1");
+            metadata.put(ResultAdmissionService.DIGEST_METADATA_KEY, "digest-1");
             AgentJob job = jobWithMetadata(metadata);
             ObjectNode output = objectMapper.createObjectNode();
             output.putObject("feedback").put("admissionDigest", "digest-1");
@@ -873,19 +872,39 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             return job;
         }
 
-        /** Stages the admitted observations under their persisted ids, as admission hands them to the runner. */
-        private void composed(AgentJob job, List<Observation> admitted, String... reviewParts) {
+        /**
+         * Stages the admitted results under their persisted ids, each with its problems, as admission hands them to
+         * the runner.
+         */
+        private void composed(AgentJob job, List<PracticeResult> admitted, String... reviewParts) {
             ObjectNode feedback =
                     (ObjectNode) Objects.requireNonNull(job.getOutput()).get("feedback");
             feedback.put("contractVersion", 2);
-            var staged = feedback.putArray("observations");
-            for (var observation : admitted) {
-                staged.addObject()
-                        .put("id", String.valueOf(observation.getId()))
-                        .put("practiceSlug", observation.getPractice().getSlug())
-                        .put("outcome", observation.getOutcome().name())
-                        .put("anchorable", false)
-                        .putArray("citations");
+            var staged = feedback.putArray("results");
+            for (var practiceResult : admitted) {
+                ObjectNode entry = staged.addObject()
+                        .put("practiceResultId", String.valueOf(practiceResult.getId()))
+                        .put("practiceSlug", practiceResult.getPractice().getSlug())
+                        .put("outcome", practiceResult.getOutcome().name())
+                        .put("anchorable", false);
+                var children = entry.putArray("observations");
+                for (Observation problem : problems.getOrDefault(practiceResult.getId(), List.of())) {
+                    ObjectNode child = children.addObject()
+                            .put("observationId", problem.getId().toString());
+                    var citations = child.putArray("citations");
+                    int index = 0;
+                    for (JsonNode citation : problem.getCitations()) {
+                        citations
+                                .addObject()
+                                .put("index", index++)
+                                .put("path", citation.path("path").asString())
+                                .put("side", citation.path("side").asString())
+                                .put("startLine", citation.path("startLine").asInt())
+                                .put("endLine", citation.path("endLine").asInt())
+                                .put("anchorable", true);
+                    }
+                    child.put("anchorable", true);
+                }
             }
             var review = feedback.putObject("review");
             for (String part : reviewParts) {
@@ -893,22 +912,69 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             }
         }
 
-        private static String withholding(Observation observation) {
+        private static String withholding(PracticeResult practiceResult) {
             return """
-                    {"withheld":[{"basedOn":["%s"],"reason":"ALREADY_SAID"}]}
-                    """.formatted(observation.getId());
+                    {"withheld":[{"basedOn":[{"practiceResultId":"%s"}],"reason":"ALREADY_SAID"}]}
+                    """.formatted(practiceResult.getId());
         }
 
-        private String summary(String body, Observation... cited) {
+        private String summary(String body, PracticeResult... cited) {
             var review = objectMapper.createObjectNode();
             var summary = review.putObject("summary").put("body", body);
             var basedOn = summary.putArray("basedOn");
-            for (Observation observation : cited)
-                basedOn.add(observation.getId().toString());
+            for (PracticeResult practiceResult : cited)
+                basedOn.addObject()
+                        .put("practiceResultId", practiceResult.getId().toString());
             return objectMapper.writeValueAsString(review);
         }
 
-        private String noteCiting(Observation... cited) {
+        /** A line note anchored on one citation of one problem, resting on that problem of its result. */
+        private String lineNote(String body, PracticeResult cited, Observation problem, int citationIndex) {
+            var review = objectMapper.createObjectNode();
+            var note = review.putArray("inline").addObject().put("body", body);
+            note.putArray("basedOn")
+                    .addObject()
+                    .put("practiceResultId", cited.getId().toString())
+                    .put("observationId", problem.getId().toString());
+            note.putObject("anchor")
+                    .put("observationId", problem.getId().toString())
+                    .put("citationIndex", citationIndex);
+            return objectMapper.writeValueAsString(review);
+        }
+
+        /**
+         * A problem of {@code result} whose one citation admission verified at its exact line on the new side of the
+         * captured change, the only citation a line note may stand on.
+         */
+        private Observation problemOf(PracticeResult result, int position, String path, int line) {
+            var citations = objectMapper.createArrayNode();
+            citations
+                    .addObject()
+                    .put("sourceKind", "scm.pull-request.diff")
+                    .put("artifactPath", "context/change.json")
+                    .put("path", path)
+                    .put("side", "NEW")
+                    .put("startLine", line)
+                    .put("endLine", line)
+                    .put("quote", "        } catch (TimeoutException ignored) {}")
+                    .putObject("verification")
+                    .put("status", "VERIFIED")
+                    .put("scope", "EXACT_LOCATION");
+            Observation problem = Observation.builder()
+                    .id(UUID.randomUUID())
+                    .workspaceId(WORKSPACE_ID)
+                    .practiceResultId(result.getId())
+                    .position(position)
+                    .severity(Severity.MAJOR)
+                    .summary("Timeout during export is caught and ignored")
+                    .explanation("The added catch block discards the TimeoutException.")
+                    .citations(citations)
+                    .build();
+            problems.computeIfAbsent(result.getId(), id -> new ArrayList<>()).add(problem);
+            return problem;
+        }
+
+        private String noteCiting(PracticeResult... cited) {
             return summary(
                     "No rationale sentence explains the change. Say why the change is needed, using one sentence of motivation.",
                     cited);
@@ -917,7 +983,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         /** A job past admission, carrying the coverage ledger its run wrote. */
         private AgentJob jobAwaitingDelivery(int eligible, int evaluated) {
             ObjectNode metadata = sampleJobMetadata();
-            metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, "digest-1");
+            metadata.put(ResultAdmissionService.DIGEST_METADATA_KEY, "digest-1");
             AgentJob job = jobWithMetadata(metadata);
             ObjectNode output = objectMapper.createObjectNode();
             output.putObject("feedback").put("admissionDigest", "digest-1");
@@ -928,25 +994,24 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             return job;
         }
 
-        private Observation observed(AgentJob job, Practice practice, Outcome outcome) {
+        private PracticeResult observed(AgentJob job, Practice practice, Outcome outcome) {
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practice));
-            var observation = mock(Observation.class);
-            lenient().when(observation.getPractice()).thenReturn(practice);
+            var practiceResult = mock(PracticeResult.class);
+            lenient().when(practiceResult.getPractice()).thenReturn(practice);
             lenient()
-                    .when(observation.getEvidence())
-                    .thenReturn(AdmittedObservationFixtures.evidence(job.getId(), "scm.pull-request.core"));
+                    .when(practiceResult.getEvidence())
+                    .thenReturn(AdmittedResultFixtures.evidence(job.getId(), "scm.pull-request.core"));
 
-            lenient().when(observation.getSummary()).thenReturn("What the review saw");
-            lenient().when(observation.getOutcome()).thenReturn(outcome);
-            lenient().when(observation.getSeverity()).thenReturn(outcome == Outcome.NOT_MET ? Severity.MAJOR : null);
-            lenient().when(observation.getEvidenceRationale()).thenReturn("The evidence warrants it.");
-            lenient().when(observation.getId()).thenReturn(UUID.randomUUID());
-            lenient().when(observation.getOccurrenceKey()).thenReturn("occ-" + practice.getSlug());
-            lenient().when(observation.getRecurrenceKey()).thenReturn("rk-" + practice.getSlug());
-            when(observationRepository.findByAgentJobId(
+            lenient().when(practiceResult.getSummary()).thenReturn("What the review saw");
+            lenient().when(practiceResult.getOutcome()).thenReturn(outcome);
+            lenient().when(practiceResult.getSeverity()).thenReturn(outcome == Outcome.NOT_MET ? Severity.MAJOR : null);
+            lenient().when(practiceResult.getEvidenceRationale()).thenReturn("The evidence warrants it.");
+            lenient().when(practiceResult.getId()).thenReturn(UUID.randomUUID());
+            lenient().when(practiceResult.getOccurrenceKey()).thenReturn("occ-" + practice.getSlug());
+            when(practiceResultRepository.findByAgentJobId(
                             job.getId(), job.getWorkspace().getId()))
-                    .thenReturn(List.of(observation));
-            return observation;
+                    .thenReturn(List.of(practiceResult));
+            return practiceResult;
         }
 
         @Test
@@ -974,16 +1039,45 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldPostABoundedPositiveObservationWithoutManufacturingAnAllClear() {
+        void shouldPlaceALineNoteOnTheVerifiedCitationWhenItAnchorsAProblemOfItsResult() {
+            AgentJob job = composedJob();
+            Practice practice = createPractice("error-handling", "Error Handling", "criteria");
+            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practice));
+            var result = persisted(job, practice, "Two added catch blocks drop export failures", Severity.MAJOR);
+            when(practiceResultRepository.findByAgentJobId(job.getId(), WORKSPACE_ID))
+                    .thenReturn(List.of(result));
+            Observation problem = problemOf(result, 1, "src/InvoiceExporter.java", 88);
+            composed(
+                    job,
+                    List.of(result),
+                    lineNote("Log the timeout with the invoice id and rethrow it.", result, problem, 0));
+
+            handler.deliver(job);
+
+            var content = ArgumentCaptor.forClass(ReviewResultParser.DeliveryContent.class);
+            verify(feedbackService).deliverFeedback(eq(job), content.capture(), eq(Set.of("error-handling")));
+            assertThat(content.getValue().diffNotes()).singleElement().satisfies(note -> {
+                assertThat(note.filePath()).isEqualTo("src/InvoiceExporter.java");
+                assertThat(note.startLine()).isEqualTo(88);
+                assertThat(note.deliveryKey()).isEqualTo("observation:occ-error-handling:1:0");
+                assertThat(note.contributors()).containsExactly("occ-error-handling");
+                assertThat(note.observations()).containsExactly(problem.getId().toString());
+            });
+        }
+
+        @Test
+        void shouldPostNothingOnTheWorkWhenTheOnlyDecidedResultIsMet() {
             AgentJob job = jobAwaitingDelivery(2, 2);
             var strength = observed(
                     job, createPractice("pr-description-quality", "PR Description Quality", "criteria"), Outcome.MET);
-            String body = "The description names the reason for the change.";
-            composed(job, List.of(strength), summary(body, strength));
+            composed(job, List.of(strength), summary("The description names the reason for the change.", strength));
+
             handler.deliver(job);
+
+            // A MET result is never acknowledged on the work, so a run of MET results owes no review there.
             var content = ArgumentCaptor.forClass(ReviewResultParser.DeliveryContent.class);
             verify(feedbackService).deliverFeedback(eq(job), content.capture(), any());
-            assertThat(content.getValue().mrNote()).isEqualTo(body);
+            assertThat(content.getValue()).as("nothing goes out on the work").isNull();
         }
 
         @Test
@@ -994,111 +1088,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThatThrownBy(() -> handler.deliver(job)).isInstanceOf(RuntimeException.class);
 
             verifyNoInteractions(feedbackService);
-        }
-
-        @Test
-        void throwsWhenNoValidObservations() {
-            AgentJob job = jobWithOutput("{\"observations\":[]}");
-            assertThatThrownBy(() -> admit(job, "{\"observations\":[]}"))
-                    .isInstanceOfSatisfying(
-                            ObservationsRefusedException.class,
-                            e -> assertThat(e.reasonCode()).isEqualTo("no_valid_observations"))
-                    .hasMessageContaining("No valid observations");
-        }
-
-        @Test
-        @SuppressWarnings("unchecked")
-        void shouldPreserveSubmittedCriticalSeverityWhenAdmittingASecret() {
-            String rawOutput = """
-                {
-                  "observations": [{
-                    "practiceSlug": "avoids-insecure-defaults-and-over-broad-permissions",
-                    "summary": "Hard-coded credential",
-                    "outcome": "NOT_MET",
-                    "severity": "CRITICAL",
-                    "evidenceRationale": "A live API key is committed.",
-                    "evidence": { "citations": [{ "path": "Sources/Config.swift", "startLine": 3 }] }
-                  }]
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-            ArgumentCaptor<List<ReviewResultParser.ValidatedObservation>> captor = ArgumentCaptor.forClass(List.class);
-            when(deliveryService.prepare(eq(job), captor.capture())).thenReturn(mock(PreparedObservations.class));
-
-            admit(job, rawOutput);
-
-            List<ReviewResultParser.ValidatedObservation> delivered = captor.getValue();
-            var secret = delivered.stream()
-                    .filter(f -> "avoids-insecure-defaults-and-over-broad-permissions".equals(f.practiceSlug()))
-                    .findFirst()
-                    .orElseThrow();
-            assertThat(secret.severity()).isEqualTo(Severity.CRITICAL);
-        }
-
-        private static final String NOTHING_DECIDED = """
-            {
-              "observations": [{
-                "practiceSlug": "pr-description-quality",
-                "summary": "Not applicable here",
-                "outcome": "NOT_APPLICABLE", "severity": null,
-                "evidenceRationale": "The practice has no subject in this change.",
-                "evidence": { "citations": [], "inapplicability": { "reason": "No relevant subject exists." } }
-              }]
-            }
-            """;
-
-        @Test
-        void admitsWhenNothingWasDecidedAndNoChangeWasCaptured() {
-            AgentJob job = jobWithMetadata(sampleJobMetadata());
-            job.setEvidenceSnapshot(admittedPracticeSnapshotWithoutChange());
-            ObjectNode output = objectMapper.createObjectNode();
-            output.put("rawOutput", NOTHING_DECIDED);
-            job.setOutput(output);
-            when(deliveryService.prepare(eq(job), any())).thenReturn(mock(PreparedObservations.class));
-
-            admit(job, NOTHING_DECIDED);
-
-            verify(deliveryService).prepare(eq(job), any());
-        }
-
-        @Test
-        @SuppressWarnings("unchecked")
-        void admitsWhenNothingDecidedButAnObservationQuotesTheDiff() {
-            String rawOutput = """
-                {
-                  "observations": [{
-                    "practiceSlug": "pr-description-quality",
-                    "summary": "Not applicable here",
-                    "outcome": "NOT_APPLICABLE", "severity": null,
-                    "evidenceRationale": "The practice has no subject in this change.",
-                    "evidence": {
-                      "citations": [{
-                        "sourceKind": "scm.pull-request.diff",
-                        "artifactPath": "context/change.json",
-                        "path": "Sources/Auth.swift",
-                        "side": "NEW",
-                        "startLine": 1,
-                        "endLine": 1,
-                        "quote": "+changed"
-                      }],
-                      "inapplicability": { "reason": "No relevant subject exists." }
-                    }
-                  }]
-                }
-                """;
-            AgentJob job = jobWithMetadata(sampleJobMetadata());
-            ObjectNode output = objectMapper.createObjectNode();
-            output.put("rawOutput", rawOutput);
-            job.setOutput(output);
-            ArgumentCaptor<List<ReviewResultParser.ValidatedObservation>> captor = ArgumentCaptor.forClass(List.class);
-            when(deliveryService.prepare(eq(job), captor.capture())).thenReturn(mock(PreparedObservations.class));
-
-            admit(job, rawOutput);
-
-            assertThat(captor.getValue()).singleElement().satisfies(observation -> {
-                assertThat(observation.practiceSlug()).isEqualTo("pr-description-quality");
-                assertThat(observation.outcome()).isEqualTo(Outcome.NOT_APPLICABLE);
-            });
         }
     }
 }

@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,8 +16,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>This contributor deletes, in dependency order:
  * <ul>
- *   <li>Feedback (CASCADE cleans feedback_observation/placement/reaction/withdrawal)</li>
- *   <li>Observations (via native query through practice.workspace_id)</li>
+ *   <li>Feedback (CASCADE cleans feedback_evidence/placement/reaction/withdrawal)</li>
+ *   <li>Results (via native query through practice.workspace_id)</li>
  *   <li>Practice definitions for the workspace</li>
  *   <li>Practice groups (unreferenced once practices are gone)</li>
  * </ul>
@@ -30,7 +30,7 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
     private final DeliveryPolicyEvaluationRepository evaluationRepository;
     private final FeedbackDispatchRepository dispatchRepository;
     private final FeedbackRepository feedbackRepository;
-    private final ObservationRepository observationRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final PracticeRepository practiceRepository;
     private final PracticeGroupRepository practiceGroupRepository;
 
@@ -38,13 +38,13 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
             DeliveryPolicyEvaluationRepository evaluationRepository,
             FeedbackDispatchRepository dispatchRepository,
             FeedbackRepository feedbackRepository,
-            ObservationRepository observationRepository,
+            PracticeResultRepository practiceResultRepository,
             PracticeRepository practiceRepository,
             PracticeGroupRepository practiceGroupRepository) {
         this.evaluationRepository = evaluationRepository;
         this.dispatchRepository = dispatchRepository;
         this.feedbackRepository = feedbackRepository;
-        this.observationRepository = observationRepository;
+        this.practiceResultRepository = practiceResultRepository;
         this.practiceRepository = practiceRepository;
         this.practiceGroupRepository = practiceGroupRepository;
     }
@@ -53,12 +53,12 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
     public void deleteWorkspaceData(Long workspaceId) {
         evaluationRepository.deleteAllByWorkspaceId(workspaceId);
         dispatchRepository.deleteAllByWorkspaceId(workspaceId);
-        // Delete feedback first (CASCADE cleans feedback_observation/placement/reaction/withdrawal). The purge is a
+        // Delete feedback first (CASCADE cleans feedback_evidence/placement/reaction/withdrawal). The purge is a
         // soft-delete, so the RESTRICT FK on feedback never fires — these rows must be removed explicitly.
         feedbackRepository.deleteAllByWorkspaceId(workspaceId);
-        // Delete observations explicitly (defense-in-depth; CASCADE would also handle this).
-        observationRepository.deleteAllByPracticeWorkspaceId(workspaceId);
-        // Delete practice definitions (CASCADE cleans up any remaining observations); this also clears the
+        // Delete results explicitly (defense-in-depth; CASCADE would also handle this).
+        practiceResultRepository.deleteAllByPracticeWorkspaceId(workspaceId);
+        // Delete practice definitions (CASCADE cleans up any remaining results); this also clears the
         // practice → practice_group references, so groups can be removed next.
         practiceRepository.deleteAllByWorkspaceId(workspaceId);
         // Delete practice groups (unreferenced once practices are gone).

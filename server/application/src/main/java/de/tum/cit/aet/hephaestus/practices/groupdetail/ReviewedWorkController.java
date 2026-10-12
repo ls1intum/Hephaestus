@@ -45,7 +45,7 @@ public class ReviewedWorkController {
     @Operation(
             operationId = "listReviewedWorkReviewRuns",
             summary = "List the current developer's review runs of one piece of work",
-            description = "Complete review runs newest first, every practice group together, with each observation's"
+            description = "Complete review runs newest first, every practice group together, with each result's"
                     + " feedback response.")
     @ApiResponse(responseCode = "200", description = "Paginated review runs returned")
     @ApiResponse(

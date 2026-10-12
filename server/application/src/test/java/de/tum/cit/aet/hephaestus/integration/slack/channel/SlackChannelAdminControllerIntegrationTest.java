@@ -21,10 +21,10 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -79,13 +79,13 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
     private SlackThreadRepository threadRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -198,9 +198,9 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         // Raw content: one message + one thread aggregate.
         messageRepository.insertIfAbsent(workspace.getId(), "T1", "C1", "100.1", null, "U1", null, "hello");
         long threadId = seedThread(workspace.getId(), "C1", "100.1");
-        // Derived chat.conversation_thread observation + feedback anchored to the thread id.
+        // Derived chat.conversation_thread result + feedback anchored to the thread id.
         SlackConversationTestSupport.BoundConversation conv = seedBoundConversation(threadId);
-        UUID observationId = conv.observationId();
+        UUID practiceResultId = conv.practiceResultId();
         UUID feedbackId = conv.feedbackId();
 
         patchConsent("C1", ConsentState.REVOKED, null).expectStatus().isOk().expectBody(Void.class);
@@ -211,9 +211,9 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspace.getId(), "C1", "100.1"))
                 .isFalse();
         assertThat(threadRepository.findById(threadId)).isEmpty();
-        // … derived feedback + observation gone.
+        // … derived feedback + result gone.
         assertThat(feedbackRepository.findById(feedbackId)).isEmpty();
-        assertThat(observationRepository.findById(observationId)).isEmpty();
+        assertThat(practiceResultRepository.findById(practiceResultId)).isEmpty();
 
         // … but the immutable accountability record of the erasure itself survives: the ACTIVE → REVOKED audit row is
         // NOT swept with the content (a future broad-purge that added slack_channel_consent_event to the erase set
@@ -338,9 +338,9 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         Practice practice = SlackConversationTestSupport.newPractice(practiceRepository, workspace, "chan-practice");
         AgentJob job = SlackConversationTestSupport.newConversationReviewJob(agentJobRepository, workspace);
         return SlackConversationTestSupport.seedBoundConversation(
-                observationRepository,
+                practiceResultRepository,
                 feedbackRepository,
-                feedbackObservationRepository,
+                feedbackEvidenceRepository,
                 workspace.getId(),
                 job.getId(),
                 practice.getId(),

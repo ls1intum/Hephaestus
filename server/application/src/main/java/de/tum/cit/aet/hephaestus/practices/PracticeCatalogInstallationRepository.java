@@ -22,6 +22,14 @@ public interface PracticeCatalogInstallationRepository extends Repository<Practi
         """)
     List<Long> findWorkspaceIdsAwaitingProvenanceLink();
 
+    @Query("""
+        SELECT i.workspaceId
+        FROM PracticeCatalogInstallation i
+        WHERE i.practiceScriptsUpgradedAt IS NULL
+        ORDER BY i.workspaceId
+        """)
+    List<Long> findWorkspaceIdsAwaitingPracticeScriptUpgrade();
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM PracticeCatalogInstallation i WHERE i.workspaceId = :workspaceId")
     Optional<PracticeCatalogInstallation> findByWorkspaceIdForUpdate(Long workspaceId);

@@ -23,12 +23,14 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.DocumentArtif
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.IssueArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.PullRequestArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedReason;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptStopReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
@@ -38,11 +40,12 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -93,8 +96,9 @@ class PracticeScriptContractSyncTest extends BaseUnitTest {
     }
 
     /**
-     * The server drops a report entry with a status it does not know. Every status that the runner records for a
-     * script that ended must reach its own {@link PracticeScriptRunStatus}; only "did not finish" has no runner status.
+     * The server drops a report entry with a status it does not know. Every status that the runner records for an
+     * admitted practice must reach its own {@link PracticeScriptRunStatus}; only "did not finish" has no runner
+     * status.
      */
     @Test
     void shouldReadEveryStatusThePracticeScriptRunnerRecords() throws IOException {
@@ -103,15 +107,21 @@ class PracticeScriptContractSyncTest extends BaseUnitTest {
                 "RUN_STATUSES = [");
         SimpleMeterRegistry meters = new SimpleMeterRegistry();
         List<String> entries = statuses.stream()
-                .map(status -> "{\"slug\":\"script-" + status + "\",\"status\":\"" + status + "\",\"leads\":0}")
+                .map(status -> """
+                        {"practiceSlug":"practice-%s","program":{"kind":"builtin","digest":null},"models":[],\
+                        "status":"%s","stopReason":%s,\
+                        "calls":{"review":0,"chat":0,"decision":0,"embedding":0,"reranking":0},\
+                        "coverageReached":{"reads":0,"truncatedReads":0,"failedReads":0},"durationMs":null}""".formatted(status, status, status.equals("ok") ? "null" : "\"deadline\""))
                 .toList();
-        Set<String> staged = statuses.stream().map(status -> "script-" + status).collect(Collectors.toSet());
+        Map<String, PracticeProgramKind> admitted = statuses.stream()
+                .collect(Collectors.toMap(status -> "practice-" + status, status -> PracticeProgramKind.BUILTIN));
 
         List<PracticeScriptRunStatus> read = new PiResultParser(new ObjectMapper(), meters)
                         .parsePracticeScriptReport(
-                                ("{\"practices\":[" + String.join(",", entries) + "],\"truncated\":false}")
+                                ("{\"schemaVersion\":2,\"truncated\":false,\"practices\":[" + String.join(",", entries)
+                                                + "]}")
                                         .getBytes(StandardCharsets.UTF_8),
-                                staged)
+                                admitted)
                         .stream()
                         .map(PiResultParser.PracticeScriptRunReport::status)
                         .toList();
@@ -122,6 +132,24 @@ class PracticeScriptContractSyncTest extends BaseUnitTest {
         assertThat(read)
                 .containsExactlyInAnyOrderElementsOf(Arrays.stream(PracticeScriptRunStatus.values())
                         .filter(status -> status != PracticeScriptRunStatus.NOT_FINISHED)
+                        .toList());
+    }
+
+    /** The server drops a report entry with a stop reason or program kind it does not know, so the lists must match. */
+    @Test
+    void shouldKnowEveryStopReasonAndProgramKindThePracticeScriptRunnerReports() throws IOException {
+        String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
+
+        assertThat(Stream.concat(
+                                quotedIn(contract, "REASONS = [").stream(),
+                                quotedIn(contract, "STOP_REASONS = [").stream())
+                        .toList())
+                .containsExactlyElementsOf(Arrays.stream(PracticeScriptStopReason.values())
+                        .map(PracticeScriptStopReason::wire)
+                        .toList());
+        assertThat(quotedIn(contract, "PROGRAM_KINDS = ["))
+                .containsExactlyElementsOf(Arrays.stream(PracticeProgramKind.values())
+                        .map(kind -> kind.name().toLowerCase(Locale.ROOT))
                         .toList());
     }
 
@@ -143,7 +171,6 @@ class PracticeScriptContractSyncTest extends BaseUnitTest {
                 null,
                 "job-token",
                 600,
-                "practice-script-token",
                 Map.of(
                         ModelKind.CHAT, model("openai-responses", "gpt-chat", null),
                         ModelKind.DECISION, model("openai-completions", "qwen-decider", ReasoningEffort.HIGH),
@@ -155,17 +182,6 @@ class PracticeScriptContractSyncTest extends BaseUnitTest {
         assertThat(mapper.readTree(written))
                 .isEqualTo(mapper.readTree(Files.readString(
                         resolveRepoFile("docker/agents/practice-scripts/test/practice-script-models.json"))));
-    }
-
-    @Test
-    void shouldPassThePracticeScriptTokenToThePracticeScriptRunner() throws IOException {
-        String token = PracticePiAdapter.PRACTICE_SCRIPT_TOKEN_ENV;
-
-        assertThat(Files.readString(
-                        resolveRepoFile("server/application/src/main/resources/agent/pi-practice-scripts.sh")))
-                .contains(token + "=\"${" + token);
-        assertThat(Files.readString(resolveRepoFile("docker/agents/practice-scripts/runner.ts")))
-                .contains("process.env." + token);
     }
 
     /**
@@ -222,7 +238,7 @@ class PracticeScriptContractSyncTest extends BaseUnitTest {
     void shouldStageOnlyOriginsOutcomesSeveritiesAndRolesThePracticeScriptRunnerAccepts() throws IOException {
         String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
 
-        assertThat(quotedIn(contract, "ORIGINS = [")).containsExactlyElementsOf(names(ObservationOrigin.values()));
+        assertThat(quotedIn(contract, "ORIGINS = [")).containsExactlyElementsOf(names(ResultOrigin.values()));
         assertThat(quotedIn(contract, "OUTCOMES = [")).containsExactlyElementsOf(names(Outcome.values()));
         assertThat(quotedIn(contract, "SEVERITIES = [")).containsExactlyElementsOf(names(Severity.values()));
         // A review is never about an assignee, so no practice script reads that role.
@@ -233,19 +249,16 @@ class PracticeScriptContractSyncTest extends BaseUnitTest {
                         .toList());
     }
 
-    /** The launcher stages each script with the files the server writes beside it, and the runner reads them there. */
+    /** The server stages each practice's inputs beside its slug, and the host reads them there. */
     @Test
-    void shouldStageTheCauseAndPreviousClaimWhereTheRunnerReadsThem() throws IOException {
+    void shouldStageTheCauseAndPreviousClaimWhereTheHostReadsThem() throws IOException {
         String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
-        String launcher =
-                Files.readString(resolveRepoFile("server/application/src/main/resources/agent/pi-practice-scripts.ts"));
+        String host = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/script-inputs.ts"));
 
         assertThat(contract)
                 .contains("CAUSE_FILE_SUFFIX = \"" + SandboxLayout.PRACTICE_SCRIPT_CAUSE_SUFFIX + "\"")
                 .contains("PREVIOUS_FILE_SUFFIX = \"" + SandboxLayout.PRACTICE_SCRIPT_PREVIOUS_SUFFIX + "\"");
-        assertThat(launcher)
-                .contains("\"" + SandboxLayout.PRACTICE_SCRIPT_CAUSE_SUFFIX + "\"")
-                .contains("\"" + SandboxLayout.PRACTICE_SCRIPT_PREVIOUS_SUFFIX + "\"");
+        assertThat(host).contains("`${slug}${CAUSE_FILE_SUFFIX}`").contains("`${slug}${PREVIOUS_FILE_SUFFIX}`");
     }
 
     private static List<String> names(Enum<?>[] values) {

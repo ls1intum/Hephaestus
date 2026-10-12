@@ -61,8 +61,8 @@ public record ReviewFeedbackDetailDTO(
         @Nullable
         String body,
 
-        @NonNull @Schema(description = "Source observations in render order")
-        List<ReviewBoundObservationDTO> observations,
+        @NonNull @Schema(description = "Source results in render order")
+        List<ReviewBoundResultDTO> practiceResults,
 
         @NonNull @Schema(description = "Recorded placements; empty when none")
         List<ReviewPlacementDTO> placements,
@@ -101,7 +101,7 @@ public record ReviewFeedbackDetailDTO(
             @Nullable ReviewedWorkRefDTO reviewedWork,
             @Nullable ReviewSubjectDTO recipient,
             @Nullable ReviewSubjectDTO subject,
-            List<ReviewBoundObservationDTO> observations,
+            List<ReviewBoundResultDTO> practiceResults,
             List<ReviewPlacementDTO> placements,
             List<ReviewFeedbackDispatchDTO> dispatches,
             @Nullable FeedbackApprovalDTO approval,
@@ -124,7 +124,7 @@ public record ReviewFeedbackDetailDTO(
                 feedback.getCreatedAt(),
                 feedback.getDeliveredAt(),
                 bodyVisible ? feedback.getBody() : null,
-                observations,
+                practiceResults,
                 placements,
                 dispatches,
                 feedback.getReviewedRevision(),

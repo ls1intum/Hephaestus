@@ -592,8 +592,7 @@ class DockerInteractiveSandboxLiveTest {
                 true,
                 120,
                 new MentorRunnerProfile(),
-                Map.of(),
-                "");
+                Map.of());
         PiRuntimeFactory.PiPlan plan = factory.build(planSpec);
 
         Map<String, String> env = new HashMap<>(plan.environment());

@@ -74,7 +74,7 @@ public class ReplaceableReviewCoverage {
         if (laterFacts == null
                 || queuedFacts == null
                 || queued.getStatus() != AgentJobStatus.QUEUED
-                || ObservationAdmissionService.isAdmitted(queued)
+                || ResultAdmissionService.isAdmitted(queued)
                 || !Objects.equals(
                         later.getWorkspace().getId(), queued.getWorkspace().getId())
                 || !automaticAuthorReview(later)

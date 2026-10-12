@@ -84,8 +84,8 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
             @Param("loadedAttempts") int loadedAttempts);
 
     /**
-     * Whether dispatch {@code d} cites observation {@code o}, the one rule every read below shares. An approved
-     * package cites the observations bound to its feedback. An automatic package cites those its persisted package
+     * Whether dispatch {@code d} cites result {@code o}, the one rule every read below shares. An approved
+     * package cites the results bound to its feedback. An automatic package cites those its persisted package
      * names as contributors, or its whole run if it was persisted before contributors were recorded. Once
      * projection has cleared a sent or withheld package, the ledger it wrote first answers instead: the delivered
      * unit (position 0) and the withheld remainder (position 5000) bind exactly what the package was written from.
@@ -93,14 +93,14 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
     String CITES = """
         (CASE
             WHEN d.feedback_id IS NOT NULL THEN EXISTS (
-                SELECT 1 FROM feedback_observation fo
-                WHERE fo.feedback_id = d.feedback_id AND fo.observation_id = o.id)
+                SELECT 1 FROM feedback_evidence fo
+                WHERE fo.feedback_id = d.feedback_id AND fo.practice_result_id = o.id)
             WHEN o.agent_job_id <> d.agent_job_id THEN FALSE
             WHEN d.projected_at IS NOT NULL AND d.state IN ('SENT', 'SUPPRESSED') THEN EXISTS (
                 SELECT 1 FROM feedback f
-                JOIN feedback_observation fo ON fo.feedback_id = f.id
+                JOIN feedback_evidence fo ON fo.feedback_id = f.id
                 WHERE f.workspace_id = d.workspace_id AND f.agent_job_id = d.agent_job_id
-                  AND f.channel = 'IN_CONTEXT' AND f.position IN (0, 5000) AND fo.observation_id = o.id)
+                  AND f.channel = 'IN_CONTEXT' AND f.position IN (0, 5000) AND fo.practice_result_id = o.id)
             WHEN jsonb_typeof(d.package_content -> 'summaryContributors') = 'array' THEN
                 (d.package_content -> 'summaryContributors') @> jsonb_build_array(o.occurrence_key)
                 OR EXISTS (
@@ -121,39 +121,40 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         """;
 
     /**
-     * Share-locks the observations this dispatch cites. A correction holds its observation {@code FOR UPDATE} while
+     * Share-locks the results this dispatch cites. A correction holds its result {@code FOR UPDATE} while
      * it checks for a delivery in progress, so an attempt admitted here either sees that correction or is seen by it.
      */
     @Query(value = """
-        SELECT o.id FROM observation o
+        SELECT o.id FROM practice_result o
         JOIN feedback_dispatch d ON d.id = :dispatchId AND d.workspace_id = o.workspace_id
         WHERE o.workspace_id = :workspaceId AND
         """ + CITES + """
         FOR SHARE OF o
         """, nativeQuery = true)
-    List<UUID> lockCitedObservations(@Param("workspaceId") Long workspaceId, @Param("dispatchId") UUID dispatchId);
+    List<UUID> lockCitedResults(@Param("workspaceId") Long workspaceId, @Param("dispatchId") UUID dispatchId);
 
-    /** Whether a delivery citing this observation holds a live claim, so it may be talking to the provider now. */
+    /** Whether a delivery citing this result holds a live claim, so it may be talking to the provider now. */
     @Query(value = """
         SELECT EXISTS (
             SELECT 1 FROM feedback_dispatch d
-            JOIN observation o ON o.id = :observationId AND o.workspace_id = d.workspace_id
+            JOIN practice_result o ON o.id = :practiceResultId AND o.workspace_id = d.workspace_id
             WHERE d.workspace_id = :workspaceId AND d.state = 'CLAIMED' AND d.lease_expires_at > CURRENT_TIMESTAMP
               AND
         """ + CITES + """
         )
         """, nativeQuery = true)
-    boolean existsInFlightCiting(@Param("workspaceId") Long workspaceId, @Param("observationId") UUID observationId);
+    boolean existsInFlightCiting(
+            @Param("workspaceId") Long workspaceId, @Param("practiceResultId") UUID practiceResultId);
 
     /**
-     * Whether a dispatch citing this observation ended withheld or failed without accounting for a write an earlier
+     * Whether a dispatch citing this result ended withheld or failed without accounting for a write an earlier
      * attempt may have begun. Invalidation and public-subject refusals reconcile those first; other retained
      * suppression reasons do not establish that their earlier writes were accounted for.
      */
     @Query(value = """
         SELECT EXISTS (
             SELECT 1 FROM feedback_dispatch d
-            JOIN observation o ON o.id = :observationId AND o.workspace_id = d.workspace_id
+            JOIN practice_result o ON o.id = :practiceResultId AND o.workspace_id = d.workspace_id
             WHERE d.workspace_id = :workspaceId AND d.state IN ('SUPPRESSED', 'FAILED')
               AND COALESCE(d.suppression_reason, '') NOT IN ('OBSERVATION_INVALIDATED', 'PUBLIC_SUBJECT_INELIGIBLE')
               AND (d.write_started OR
@@ -163,12 +164,13 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         """ + CITES + """
         )
         """, nativeQuery = true)
-    boolean existsUnconfirmedCiting(@Param("workspaceId") Long workspaceId, @Param("observationId") UUID observationId);
+    boolean existsUnconfirmedCiting(
+            @Param("workspaceId") Long workspaceId, @Param("practiceResultId") UUID practiceResultId);
 
-    /** When the earliest still-unsettled dispatch citing this observation began a write it has not confirmed. */
+    /** When the earliest still-unsettled dispatch citing this result began a write it has not confirmed. */
     @Query(value = """
         SELECT MIN(COALESCE(d.write_started_at, d.created_at)) FROM feedback_dispatch d
-        JOIN observation o ON o.id = :observationId AND o.workspace_id = d.workspace_id
+        JOIN practice_result o ON o.id = :practiceResultId AND o.workspace_id = d.workspace_id
         WHERE d.workspace_id = :workspaceId AND d.projected_at IS NULL
           AND (d.write_started OR
         """ + INLINE_WRITE_MAY_HAVE_STARTED + """
@@ -177,19 +179,20 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         """ + CITES, nativeQuery = true)
     @Nullable
     Instant findUnconfirmedWriteSince(
-            @Param("workspaceId") Long workspaceId, @Param("observationId") UUID observationId);
+            @Param("workspaceId") Long workspaceId, @Param("practiceResultId") UUID practiceResultId);
 
-    /** Whether a dispatch citing this observation is still unsettled, so what it posted is not yet in the ledger. */
+    /** Whether a dispatch citing this result is still unsettled, so what it posted is not yet in the ledger. */
     @Query(value = """
         SELECT EXISTS (
             SELECT 1 FROM feedback_dispatch d
-            JOIN observation o ON o.id = :observationId AND o.workspace_id = d.workspace_id
+            JOIN practice_result o ON o.id = :practiceResultId AND o.workspace_id = d.workspace_id
             WHERE d.workspace_id = :workspaceId AND d.projected_at IS NULL
               AND
         """ + CITES + """
         )
         """, nativeQuery = true)
-    boolean existsUnsettledCiting(@Param("workspaceId") Long workspaceId, @Param("observationId") UUID observationId);
+    boolean existsUnsettledCiting(
+            @Param("workspaceId") Long workspaceId, @Param("practiceResultId") UUID practiceResultId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """

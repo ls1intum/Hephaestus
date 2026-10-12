@@ -31,7 +31,7 @@ class PracticeReviewHttpSurfaceTest extends HephaestusArchitectureTest {
                         && !(method.isAnnotatedWith(PutMapping.class)
                                 && method.getName().equals("decideFeedbackProposal"))
                         && !(method.isAnnotatedWith(PatchMapping.class)
-                                && (method.getName().equals("updateObservationValidity")
+                                && (method.getName().equals("updateResultValidity")
                                         || method.getName().equals("updateFeedbackWithdrawal"))))
                 .map(method -> method.getFullName())
                 .sorted()

@@ -50,8 +50,8 @@ class OrchestratorPromptWorkspaceTest extends BaseUnitTest {
             Set.of(SandboxLayout.REPO_MOUNT_RELATIVE, SandboxLayout.PRACTICES_PREFIX, "context/docs/");
 
     @Test
-    @DisplayName("the prompt states the observation contract the runtime and the server enforce")
-    void promptStatesTheObservationContract() throws IOException {
+    @DisplayName("the prompt states the result contract the runtime and the server enforce")
+    void promptStatesTheResultContract() throws IOException {
         assertThat(resolvedDocumentedPrompt())
                 .contains("| MET |", "| NOT_MET |", "| NOT_APPLICABLE |", "| UNDETERMINED |")
                 .contains("`evidence.inapplicability`", "`evidence.search`", "`evidence.undecidability`");

@@ -14,7 +14,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** JSON contract fixture shared with the TypeScript runner tests. */
 class TaskEnvelopeFixtureTest extends BaseUnitTest {
 
-    private static final String FIXTURE_PATH = "task-fixtures/v4/practice-review.json";
+    private static final String FIXTURE_PATH = "task-fixtures/v5/practice-review.json";
 
     @Test
     void matchesFixture() throws IOException {
@@ -26,7 +26,7 @@ class TaskEnvelopeFixtureTest extends BaseUnitTest {
                 99L,
                 new Task(
                         "Review merge request #42 in owner/repo. Read the context files, "
-                                + "then persist every justified observation via the report_observation tool. "
+                                + "then persist every justified result via the submit_result tool. "
                                 + "Follow .pi/AGENTS.md for the schema and rules.",
                         42,
                         "owner/repo"));

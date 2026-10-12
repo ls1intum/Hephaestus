@@ -48,8 +48,8 @@ class PracticePreconditionEvaluatorTest extends BaseUnitTest {
     private final PracticePreconditionEvaluator evaluator = new PracticePreconditionEvaluator(mapper);
 
     @Nested
-    @DisplayName("A subject may never hide an observation")
-    class NeverHidesAnObservation {
+    @DisplayName("A subject may never hide a result")
+    class NeverHidesAResult {
 
         /**
          * The rule stated as a test. Every other case in this class is one way of reaching it: unless the

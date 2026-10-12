@@ -11,12 +11,12 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.Map;
@@ -114,12 +114,12 @@ public final class SlackConversationTestSupport {
     private static final ObjectMapper OM = new ObjectMapper();
 
     /** Result of {@link #seedBoundConversation}: the ids of the two rows it inserted, for later erasure assertions. */
-    public record BoundConversation(UUID observationId, UUID feedbackId) {}
+    public record BoundConversation(UUID practiceResultId, UUID feedbackId) {}
 
     /**
      * Saves a CONVERSATION-channel {@link Practice} + {@link AgentJob} owned by the given workspace. Shared by the
      * consent-lifecycle E2E, opt-out erasure, and channel-admin controller integration tests, which each seed exactly
-     * this fixture pair before deriving observation/feedback rows from it.
+     * this fixture pair before deriving result/feedback rows from it.
      */
     public static AgentJob newConversationReviewJob(AgentJobRepository agentJobRepository, Workspace workspace) {
         AgentJob job = new AgentJob();
@@ -151,23 +151,23 @@ public final class SlackConversationTestSupport {
     }
 
     /**
-     * Inserts a derived chat.conversation_thread {@link de.tum.cit.aet.hephaestus.practices.observation.Observation} +
+     * Inserts a derived chat.conversation_thread {@link de.tum.cit.aet.hephaestus.practices.result.PracticeResult} +
      * {@link Feedback} pair about {@code aboutUserId}, anchored to {@code threadId} — the shape the Slack consent
      * erasure paths (person opt-out, channel revoke) must sweep.
      */
     public static BoundConversation seedBoundConversation(
-            ObservationRepository observationRepository,
+            PracticeResultRepository practiceResultRepository,
             FeedbackRepository feedbackRepository,
-            FeedbackObservationRepository feedbackObservationRepository,
+            FeedbackEvidenceRepository feedbackEvidenceRepository,
             long workspaceId,
             UUID jobId,
             long practiceId,
             long threadId,
             long aboutUserId) {
-        UUID observationId = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
-                observationId,
-                "occ-" + observationId,
+        UUID practiceResultId = UUID.randomUUID();
+        practiceResultRepository.insertIfAbsent(
+                practiceResultId,
+                "occ-" + practiceResultId,
                 jobId,
                 workspaceId,
                 practiceId,
@@ -175,9 +175,12 @@ public final class SlackConversationTestSupport {
                 ArtifactKinds.CONVERSATION_THREAD.value(),
                 threadId,
                 aboutUserId,
-                "Observation title",
+                "Result title",
                 "MET",
                 "MAJOR",
+                null,
+                null,
+                "test-scope",
                 null,
                 null,
                 null,
@@ -196,7 +199,8 @@ public final class SlackConversationTestSupport {
                 .source(FeedbackSource.AGENT)
                 .createdAt(Instant.now())
                 .build());
-        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
-        return new BoundConversation(observationId, feedback.getId());
+        feedbackEvidenceRepository.insertIfAbsent(
+                feedback.getId(), practiceResultId, null, EvidenceRole.PRIMARY.name(), 0);
+        return new BoundConversation(practiceResultId, feedback.getId());
     }
 }

@@ -19,16 +19,16 @@ import de.tum.cit.aet.hephaestus.practices.feedback.ConversationBriefBody;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -56,22 +56,21 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     private static final String SELF_CHECK = "They name a check they could run before pushing.";
 
     private final FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
-    private final FeedbackObservationRepository feedbackObservationRepository =
-            mock(FeedbackObservationRepository.class);
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository = mock(FeedbackEvidenceRepository.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final OutboundEgressGuard egressGuard = mock(OutboundEgressGuard.class);
 
-    private final ObservationRepository observationRepository = mock(ObservationRepository.class);
+    private final PracticeResultRepository practiceResultRepository = mock(PracticeResultRepository.class);
     private final FeedbackSupersession supersession = mock(FeedbackSupersession.class);
 
     private final ConversationalFeedbackPreparer preparer = new ConversationalFeedbackPreparer(
             feedbackRepository,
-            feedbackObservationRepository,
-            observationRepository,
+            feedbackEvidenceRepository,
+            practiceResultRepository,
             supersession,
             eventPublisher,
             egressGuard);
-    private final Map<UUID, String> practiceSlugByObservation = new HashMap<>();
+    private final Map<UUID, String> practiceSlugByResult = new HashMap<>();
 
     @BeforeEach
     void deliveryIsAllowedAndNothingIsPreparedYet() {
@@ -80,24 +79,26 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
                 .when(supersession.supersede(anyLong(), anyLong(), any(), any()))
                 .thenReturn(FeedbackSupersession.Outcome.standalone());
         lenient().when(feedbackRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        lenient().when(observationRepository.practiceSlugsFor(any(), anyLong())).thenAnswer(invocation -> {
-            Collection<UUID> ids = invocation.getArgument(0);
-            List<ObservationRepository.ObservationPracticeSlug> rows = new ArrayList<>();
-            for (UUID id : ids) {
-                String slug = practiceSlugByObservation.get(id);
-                if (slug != null) {
-                    rows.add(new StubPracticeSlug(id, slug));
-                }
-            }
-            return rows;
-        });
+        lenient()
+                .when(practiceResultRepository.practiceSlugsFor(any(), anyLong()))
+                .thenAnswer(invocation -> {
+                    Collection<UUID> ids = invocation.getArgument(0);
+                    List<PracticeResultRepository.ResultPracticeSlug> rows = new ArrayList<>();
+                    for (UUID id : ids) {
+                        String slug = practiceSlugByResult.get(id);
+                        if (slug != null) {
+                            rows.add(new StubPracticeSlug(id, slug));
+                        }
+                    }
+                    return rows;
+                });
     }
 
-    private record StubPracticeSlug(UUID observationId, String practiceSlug)
-            implements ObservationRepository.ObservationPracticeSlug {
+    private record StubPracticeSlug(UUID practiceResultId, String practiceSlug)
+            implements PracticeResultRepository.ResultPracticeSlug {
         @Override
-        public UUID getObservationId() {
-            return observationId;
+        public UUID getPracticeResultId() {
+            return practiceResultId;
         }
 
         @Override
@@ -108,9 +109,9 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void carriesTheMove() {
-        Observation observation = problem(ALICE, TESTS, Severity.MAJOR);
+        PracticeResult practiceResult = problem(ALICE, TESTS, Severity.MAJOR);
 
-        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(observation), List.of(move(TESTS)));
+        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(practiceResult), List.of(move(TESTS)));
 
         assertThat(prepared).isEqualTo(1);
         Feedback unit = saved().getFirst();
@@ -127,8 +128,8 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void composedMovesDriveSelection() {
-        Observation loud = problem(ALICE, SIZE, Severity.CRITICAL);
-        Observation quiet = problem(ALICE, TESTS, Severity.MINOR);
+        PracticeResult loud = problem(ALICE, SIZE, Severity.CRITICAL);
+        PracticeResult quiet = problem(ALICE, TESTS, Severity.MINOR);
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(loud, quiet), List.of(move(TESTS)));
 
@@ -141,7 +142,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void collapsesLociOfOnePractice() {
-        List<Observation> admitted = List.of(
+        List<PracticeResult> admitted = List.of(
                 problem(ALICE, TESTS, Severity.MAJOR),
                 problem(ALICE, TESTS, Severity.MAJOR),
                 problem(BOB, TESTS, Severity.MAJOR));
@@ -163,7 +164,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void capsAtThreePerRecipient() {
-        List<Observation> admitted = List.of(
+        List<PracticeResult> admitted = List.of(
                 problem(ALICE, "p-one", Severity.CRITICAL),
                 problem(ALICE, "p-two", Severity.MAJOR),
                 problem(ALICE, "p-three", Severity.MAJOR),
@@ -184,7 +185,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void raisedRowsCarryThePracticeThread() {
-        List<Observation> admitted = List.of(
+        List<PracticeResult> admitted = List.of(
                 problem(ALICE, "p-one", Severity.CRITICAL),
                 problem(ALICE, "p-two", Severity.MAJOR),
                 problem(ALICE, "p-three", Severity.MAJOR),
@@ -299,7 +300,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     @Test
     void reRunIsIdempotent() {
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(true);
-        List<Observation> admitted =
+        List<PracticeResult> admitted =
                 List.of(problem(ALICE, TESTS, Severity.MAJOR), problem(ALICE, SIZE, Severity.MINOR));
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, List.of(move(TESTS), move(SIZE)));
@@ -311,7 +312,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void ordinalsIgnoreComposition() {
-        List<Observation> admitted =
+        List<PracticeResult> admitted =
                 List.of(problem(ALICE, SIZE, Severity.CRITICAL), problem(ALICE, TESTS, Severity.MINOR));
 
         preparer.prepare(UUID.randomUUID(), WS, admitted, List.of(move(TESTS)));
@@ -334,7 +335,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void withholdIsNotSilence() {
-        List<Observation> admitted =
+        List<PracticeResult> admitted =
                 List.of(problem(ALICE, TESTS, Severity.MAJOR), problem(ALICE, SIZE, Severity.CRITICAL));
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, List.of(withhold(TESTS)));
@@ -345,7 +346,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void doesNotFallBackToTheRanking() {
-        List<Observation> admitted =
+        List<PracticeResult> admitted =
                 List.of(problem(ALICE, TESTS, Severity.MINOR), problem(ALICE, SIZE, Severity.CRITICAL));
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, List.of());
@@ -422,19 +423,19 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
                 null);
     }
 
-    private Observation problem(long about, @Nullable String practiceSlug, Severity severity) {
-        Observation observation = mock(Observation.class);
+    private PracticeResult problem(long about, @Nullable String practiceSlug, Severity severity) {
+        PracticeResult practiceResult = mock(PracticeResult.class);
         UUID id = UUID.randomUUID();
-        lenient().when(observation.getId()).thenReturn(id);
-        lenient().when(observation.getOutcome()).thenReturn(Outcome.MET);
-        lenient().when(observation.getSeverity()).thenReturn(severity);
-        lenient().when(observation.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
-        lenient().when(observation.getArtifactId()).thenReturn(100L);
-        lenient().when(observation.getAboutUserId()).thenReturn(about);
-        lenient().when(observation.getOrigin()).thenReturn(ObservationOrigin.LIVE);
+        lenient().when(practiceResult.getId()).thenReturn(id);
+        lenient().when(practiceResult.getOutcome()).thenReturn(Outcome.MET);
+        lenient().when(practiceResult.getSeverity()).thenReturn(severity);
+        lenient().when(practiceResult.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
+        lenient().when(practiceResult.getArtifactId()).thenReturn(100L);
+        lenient().when(practiceResult.getAboutUserId()).thenReturn(about);
+        lenient().when(practiceResult.getOrigin()).thenReturn(ResultOrigin.LIVE);
         if (practiceSlug != null) {
-            practiceSlugByObservation.put(id, practiceSlug);
+            practiceSlugByResult.put(id, practiceSlug);
         }
-        return observation;
+        return practiceResult;
     }
 }

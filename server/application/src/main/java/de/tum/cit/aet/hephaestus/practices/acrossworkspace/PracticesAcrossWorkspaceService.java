@@ -12,12 +12,12 @@ import de.tum.cit.aet.hephaestus.practices.dto.PracticeGroupStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackService;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeGroupStandingService;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService.StandingSnapshot;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService.WorkspaceStandings;
-import de.tum.cit.aet.hephaestus.practices.observation.ReviewedWorkKey;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeGroupStandingService;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.StandingSnapshot;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.WorkspaceStandings;
+import de.tum.cit.aet.hephaestus.practices.result.ReviewedWorkKey;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
@@ -37,7 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Composes Practices across the workspace from one scan of the workspace's observations per read, classified by the
+ * Composes Practices across the workspace from one scan of the workspace's results per read, classified by the
  * same standing and group standing rules the practice profile uses, then counted by {@link WorkspaceSplits}.
  * The splits and the open feedback read the current standing, so the reader's marker is the standing their profile
  * shows; only the tiles read a window. Aggregating in SQL instead would put a second copy of the standing rules

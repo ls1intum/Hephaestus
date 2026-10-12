@@ -118,14 +118,14 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         """;
 
     /**
-     * Feedback {@code f} joined to each observation {@code o} of its workspace it is bound to, in any role: the one
+     * Feedback {@code f} joined to each result {@code o} of its workspace it is bound to, in any role: the one
      * definition of which practices a piece of feedback belongs to, shared by the per-practice counts and the practice
      * filter of the operator feedback list so that a practice's count and its filtered list agree.
      */
     String WITH_BOUND_OBSERVATIONS = """
             FROM feedback f
-            JOIN feedback_observation fo ON fo.feedback_id = f.id
-            JOIN observation o ON o.id = fo.observation_id AND o.workspace_id = f.workspace_id
+            JOIN feedback_evidence fo ON fo.feedback_id = f.id
+            JOIN practice_result o ON o.id = fo.practice_result_id AND o.workspace_id = f.workspace_id
         """;
 
     /** Feedback created in {@code [from, to)}, the window the operator feedback list filters by. */
@@ -164,9 +164,9 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
             @Param("starts") Long[] starts);
 
     /**
-     * Feedback created in {@code [from, to)} by the practice of any observation it is bound to, in any role. One
-     * piece of feedback fusing several observations of a practice has a join row for each, so the derived table
-     * keeps one row per practice and piece of feedback; fusing observations of two practices, it counts for both.
+     * Feedback created in {@code [from, to)} by the practice of any result it is bound to, in any role. One
+     * piece of feedback fusing several results of a practice has a join row for each, so the derived table
+     * keeps one row per practice and piece of feedback; fusing results of two practices, it counts for both.
      */
     @Query(
             value = "SELECT f.practice_id AS \"practiceId\"," + STATE_COUNTS + """
@@ -183,16 +183,16 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     List<PracticeFeedbackCounts> summarizeFeedbackByPractice(
             @Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
 
-    /** Feedback bound to each of these observations, in any role; an observation without feedback has no row. */
-    @Query(value = "SELECT fo.observation_id AS \"observationId\"," + STATE_COUNTS + """
-        FROM feedback_observation fo
+    /** Feedback bound to each of these results, in any role; a result without feedback has no row. */
+    @Query(value = "SELECT fo.practice_result_id AS \"practiceResultId\"," + STATE_COUNTS + """
+        FROM feedback_evidence fo
         JOIN feedback f ON f.id = fo.feedback_id
-        WHERE fo.observation_id IN :observationIds
+        WHERE fo.practice_result_id IN :practiceResultIds
           AND f.workspace_id = :workspaceId
-        GROUP BY fo.observation_id
+        GROUP BY fo.practice_result_id
         """, nativeQuery = true)
-    List<ObservationFeedbackCounts> summarizeFeedbackByObservation(
-            @Param("workspaceId") Long workspaceId, @Param("observationIds") Collection<UUID> observationIds);
+    List<ResultFeedbackCounts> summarizeFeedbackByResult(
+            @Param("workspaceId") Long workspaceId, @Param("practiceResultIds") Collection<UUID> practiceResultIds);
 
     /** How many pieces of feedback each run delivered to one developer and has not withdrawn. */
     @Query(value = """
@@ -255,15 +255,15 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         Long getPracticeId();
     }
 
-    interface ObservationFeedbackCounts extends FeedbackStateCounts {
-        UUID getObservationId();
+    interface ResultFeedbackCounts extends FeedbackStateCounts {
+        UUID getPracticeResultId();
     }
 
     /**
      * The words of the summary last posted on a piece of work for one person, while they are still what the provider
      * shows. "Last" is the order in which confirmed summary placements were recorded, since an approved note can be
      * created long before it is posted; a summary still standing may have had line notes fail beside it. There are no
-     * words to compare when that summary no longer stands, or while any observation it cites is invalidated or
+     * words to compare when that summary no longer stands, or while any result it cites is invalidated or
      * restored without its posted copy settled back, because a correction edits the posted copy and keeps the stored
      * body. An older summary is never used instead.
      */
@@ -284,9 +284,9 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
           AND f.delivery_state IN ('DELIVERED', 'PARTIALLY_DELIVERED', 'PARTIALLY_FAILED')
           AND f.body IS NOT NULL
           AND NOT EXISTS (
-                SELECT 1 FROM feedback_observation fo
-                JOIN observation_invalidation oi
-                  ON oi.observation_id = fo.observation_id AND oi.workspace_id = f.workspace_id
+                SELECT 1 FROM feedback_evidence fo
+                JOIN practice_result_invalidation oi
+                  ON oi.practice_result_id = fo.practice_result_id AND oi.workspace_id = f.workspace_id
                 WHERE fo.feedback_id = f.id
                   AND (oi.restored_at IS NULL OR oi.provider_copy NOT IN ('UPDATED', 'NONE')))
         """, nativeQuery = true)
@@ -510,7 +510,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     boolean isDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
     /**
-     * The practice each of these units is about, read off its headline observation.
+     * The practice each of these units is about, read off its headline result.
      *
      * <p>Staged onto {@code prepared.json} so a composer choosing to replace a queued message can tell
      * <em>which practice</em> each queued message is about. Without it the thread keys on that file are
@@ -518,14 +518,14 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * body is composed at the turn, there is not even a body to guess from.
      *
      * <p>Both sides of the join carry {@code workspaceId}: the unit's own scalar and the practice behind
-     * the observation. One predicate is the tenancy boundary for one table, and this query spans two.
+     * the result. One predicate is the tenancy boundary for one table, and this query spans two.
      */
     @Query("""
-        SELECT fo.feedback.id AS feedbackId, fo.observation.practice.slug AS practiceSlug
-        FROM FeedbackObservation fo
+        SELECT fo.feedback.id AS feedbackId, fo.practiceResult.practice.slug AS practiceSlug
+        FROM FeedbackEvidence fo
         WHERE fo.feedback.id IN :feedbackIds
           AND fo.feedback.workspaceId = :workspaceId
-          AND fo.observation.practice.workspace.id = :workspaceId
+          AND fo.practiceResult.practice.workspace.id = :workspaceId
           AND fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
           AND fo.ordinal = 0
         """)
@@ -548,7 +548,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
     // Each erasure method below hard-deletes feedback for one workspace + artifact-kind scope. DB
-    // ON DELETE CASCADE clears feedback_observation/feedback_placement/feedback_reaction; the predicates keep
+    // ON DELETE CASCADE clears feedback_evidence/feedback_placement/feedback_reaction; the predicates keep
     // every other tenant's and kind's rows untouched. Bulk JPQL delete, since the @Immutable entity forbids
     // an ORM remove.
 
@@ -678,7 +678,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
             @Param("id") UUID id, @Param("workspaceId") Long workspaceId, @Param("reason") String reason);
 
     /**
-     * Stops every piece of feedback citing this observation that has not reached anyone yet, as a whole: a
+     * Stops every piece of feedback citing this result that has not reached anyone yet, as a whole: a
      * proposal awaiting approval, prepared feedback, and the undispatched rest of a partially delivered package.
      * Delivered feedback keeps its state, because it was delivered.
      *
@@ -694,13 +694,13 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
           AND (f.delivery_state IN ('AWAITING_APPROVAL', 'PREPARED')
                OR (f.delivery_state = 'PARTIALLY_DELIVERED' AND f.suppression_reason IS NULL))
           AND EXISTS (
-              SELECT 1 FROM feedback_observation fo
-              WHERE fo.feedback_id = f.id AND fo.observation_id = :observationId
+              SELECT 1 FROM feedback_evidence fo
+              WHERE fo.feedback_id = f.id AND fo.practice_result_id = :practiceResultId
           )
         """, nativeQuery = true)
     int suppressUndeliveredCiting(
             @Param("workspaceId") Long workspaceId,
-            @Param("observationId") UUID observationId,
+            @Param("practiceResultId") UUID practiceResultId,
             @Param("reason") String reason);
 
     /**
@@ -720,21 +720,21 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
             @Param("workspaceId") Long workspaceId, @Param("recipientUserId") Long recipientUserId, Pageable pageable);
 
     /**
-     * Whether this exact observation was already delivered in context to the recipient.
+     * Whether this exact result was already delivered in context to the recipient.
      */
     @Query("""
-        SELECT (COUNT(f) > 0) FROM Feedback f, FeedbackObservation fo
+        SELECT (COUNT(f) > 0) FROM Feedback f, FeedbackEvidence fo
         WHERE fo.feedback = f
-          AND fo.observation.id = :observationId
+          AND fo.practiceResult.id = :practiceResultId
           AND f.workspaceId = :workspaceId
           AND f.recipientUserId = :recipientUserId
           AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CONTEXT
           AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
         """)
-    boolean existsDeliveredInContextForObservation(
+    boolean existsDeliveredInContextForResult(
             @Param("workspaceId") Long workspaceId,
             @Param("recipientUserId") Long recipientUserId,
-            @Param("observationId") UUID observationId);
+            @Param("practiceResultId") UUID practiceResultId);
 
     /** Distinct workspaces holding at least one PREPARED conversational unit (TTL sweep enumeration). */
     @Query("""
@@ -788,7 +788,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         END)""";
 
     /**
-     * Keeps feedback bound to an observation of a practice asked for, by {@link #WITH_BOUND_OBSERVATIONS}. The
+     * Keeps feedback bound to a result of a practice asked for, by {@link #WITH_BOUND_OBSERVATIONS}. The
      * subquery's own {@code f} shadows the outer one.
      */
     String PRACTICE_FILTER = "AND (CAST(:#{#f.practiceSlugArray()} AS text[]) IS NULL OR f.id IN (SELECT f.id"
@@ -837,7 +837,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * make that statement false.
      *
      * <p>Operators still see that the unit exists, its channel, its state, its suppression reason, its
-     * recipient and how many observations fed it — everything needed to audit whether the pipeline
+     * recipient and how many results fed it — everything needed to audit whether the pipeline
      * behaved. They do not see what it said. Withheld in the projection rather than in a mapper so a
      * second caller cannot forget, and mirrored in {@code ReviewFeedbackQueryService#get} for the detail
      * route. This is the reversible direction: opening it up later is a decision somebody can take;
@@ -868,10 +868,10 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
                     + " (f.channel NOT IN ('IN_APP', 'IN_CHAT') AND f.body IS NOT NULL AND length(f.body) > "
                     + BODY_PREVIEW_LENGTH
                     + ") AS \"bodyTruncated\","
-                    + " (SELECT count(*) FROM feedback_observation fo"
-                    + " JOIN observation o ON o.id = fo.observation_id"
+                    + " (SELECT count(*) FROM feedback_evidence fo"
+                    + " JOIN practice_result o ON o.id = fo.practice_result_id"
                     + " JOIN practice p ON p.id = o.practice_id"
-                    + " WHERE fo.feedback_id = f.id AND p.workspace_id = f.workspace_id) AS \"observationCount\""
+                    + " WHERE fo.feedback_id = f.id AND p.workspace_id = f.workspace_id) AS \"practiceResultCount\""
                     + " FROM feedback f WHERE f.workspace_id = :workspaceId"
                     + OPERATOR_PREDICATES
                     + " ORDER BY CASE WHEN :oldestFirst THEN f.created_at END ASC,"
@@ -925,7 +925,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
         Boolean getBodyTruncated();
 
-        Long getObservationCount();
+        Long getPracticeResultCount();
     }
 
     /** The {@link FeedbackLocation} of one piece of feedback, by {@link #LOCATION}; empty when it is not here. */
@@ -985,14 +985,14 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * How much of what was measured on one artifact actually reached a person, by practice, by the run
      * that composed it and by its recipient; a piece of feedback has one run and one recipient, so summing the
      * groups counts it once.
-     * {@code COUNT(DISTINCT f.id)} because one piece of feedback routinely fuses several observations of the
+     * {@code COUNT(DISTINCT f.id)} because one piece of feedback routinely fuses several results of the
      * same practice; counting join rows would multiply it.
      */
     @Query("""
         SELECT o.practice.id AS practiceId, f.agentJobId AS reviewId, f.recipientUserId AS recipientUserId,
                f.deliveryState AS deliveryState, f.suppressionReason AS suppressionReason,
                COUNT(DISTINCT f.id) AS units
-        FROM FeedbackObservation fo JOIN fo.feedback f JOIN fo.observation o
+        FROM FeedbackEvidence fo JOIN fo.feedback f JOIN fo.practiceResult o
         WHERE f.workspaceId = :workspaceId
           AND o.artifactKind = :artifactKind
           AND o.artifactId = :artifactId
@@ -1070,10 +1070,10 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      */
     @Query("SELECT f FROM Feedback f WHERE " + READABLE_IN_APP + """
           AND EXISTS (
-              SELECT 1 FROM FeedbackObservation fo
+              SELECT 1 FROM FeedbackEvidence fo
               WHERE fo.feedback = f
-                AND fo.observation.practice.slug = :practiceSlug
-                AND fo.observation.practice.workspace.id = :workspaceId
+                AND fo.practiceResult.practice.slug = :practiceSlug
+                AND fo.practiceResult.practice.workspace.id = :workspaceId
           )
         ORDER BY f.createdAt DESC, f.id DESC
         """)
@@ -1150,10 +1150,10 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * that was written and then superseded still said it.
      */
     @Query("""
-        SELECT MAX(f.createdAt) FROM Feedback f, FeedbackObservation fo
+        SELECT MAX(f.createdAt) FROM Feedback f, FeedbackEvidence fo
         WHERE fo.feedback = f
-          AND fo.observation.practice.slug = :practiceSlug
-          AND fo.observation.practice.workspace.id = :workspaceId
+          AND fo.practiceResult.practice.slug = :practiceSlug
+          AND fo.practiceResult.practice.workspace.id = :workspaceId
           AND f.workspaceId = :workspaceId
           AND f.recipientUserId = :recipientUserId
           AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_APP

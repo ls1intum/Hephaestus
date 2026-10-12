@@ -24,7 +24,7 @@ import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MergeReadinessContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ObservationHistoryContentSource;
+import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ResultHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ReviewAttemptsContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
@@ -65,6 +65,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiChoice;
@@ -132,7 +134,8 @@ class MentorChatServiceTest extends BaseUnitTest {
     private static final long WORKSPACE_ID = 1L;
     private static final long USER_ID = 99L;
     private static final UUID THREAD_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-    private static final UUID OBSERVATION_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final UUID PRACTICE_RESULT_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final UUID PROBLEM_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
 
     /** The disconnect index follows the orchestrator preamble and translator start frames. */
     private static final int PREAMBLE_SEND_COUNT = 4;
@@ -235,8 +238,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         service = serviceWithExecutor(turnExec, runnerTimeouts);
         sandbox.onSend = frame -> {
             if ("hello".equals(frame.path("method").asString())) {
-                sandbox.push(jsonRpcResult(
-                        frame.path("id").asLong(), mapper.createObjectNode().put("protocolVersion", 1)));
+                sandbox.push(jsonRpcResult(frame.path("id").asLong(), helloResult()));
             } else if ("open_thread".equals(frame.path("method").asString())) {
                 Objects.requireNonNull(timeoutTask.get()).run();
             }
@@ -289,13 +291,16 @@ class MentorChatServiceTest extends BaseUnitTest {
     MergeReadinessContentSource mergeReadiness;
 
     @Mock
-    ObservationHistoryContentSource observationHistory;
+    ResultHistoryContentSource practiceResultHistory;
 
     @Mock
     ReviewAttemptsContentSource reviewAttempts;
 
     @Mock
     ConversationalDeliveryReconciler conversationalDeliveryReconciler;
+
+    @Mock
+    ObservationRepository observationRepository;
 
     private MentorTurnLock turnLock;
     private PiEventToUiChunkTranslator translator;
@@ -428,9 +433,10 @@ class MentorChatServiceTest extends BaseUnitTest {
                 personSuppression,
                 (workspaceId, developerId) -> aiDecision,
                 mergeReadiness,
-                observationHistory,
+                practiceResultHistory,
                 reviewAttempts,
-                conversationalDeliveryReconciler);
+                conversationalDeliveryReconciler,
+                observationRepository);
     }
 
     @Test
@@ -677,16 +683,17 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Test
     void shouldInterruptInsteadOfFinalisingWhenAStreamedDeltaWasLost() {
-        when(conversationalDeliveryReconciler.admits(WORKSPACE_ID, USER_ID, OBSERVATION_ID))
+        when(conversationalDeliveryReconciler.admits(WORKSPACE_ID, USER_ID, PRACTICE_RESULT_ID))
                 .thenReturn(true);
         scheduleResponses(sandbox, prompt -> {
             sandbox.push(assistantStart());
             // ". The C" never arrived; Pi's final message still carries it.
             sandbox.push(textDelta("it"));
-            sandbox.push(linkObservationCallback("lo-1", OBSERVATION_ID));
+            sandbox.push(linkResultCallback("lr-1", PRACTICE_RESULT_ID));
             sandbox.push(event(
-                    "link_observation",
-                    n -> n.put("observationId", OBSERVATION_ID.toString()).put("text", "Name the trade-off.")));
+                    "link_result",
+                    n -> n.put("practiceResultId", PRACTICE_RESULT_ID.toString())
+                            .put("text", "Name the trade-off.")));
             sandbox.push(textDelta("loses #1"));
             sandbox.push(assistantEnd("it. The Closes #1"));
             sandbox.push(event("turn_end", n -> {}));
@@ -702,7 +709,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         var interrupted = ArgumentCaptor.forClass(TranslatorState.class);
         verify(persistence).interrupt(any(), interrupted.capture(), any());
         assertThat(interrupted.getValue().partsSnapshot().toString())
-                .contains("it. The Closes #1", OBSERVATION_ID.toString())
+                .contains("it. The Closes #1", PRACTICE_RESULT_ID.toString())
                 .doesNotContain("itloses #1");
         assertThat(closedUnderSandboxLock)
                 .as("the runner is discarded before another turn can take it")
@@ -1196,7 +1203,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             sandbox.push(assistantStart());
             sandbox.push(textDelta("Hel"));
             // Valid JSON, but an event with no type: whatever it carried for this turn is gone.
-            ObjectNode broken = event("link_observation", n -> {});
+            ObjectNode broken = event("link_result", n -> {});
             ((ObjectNode) broken.path("params").path("event")).remove("type");
             sandbox.push(broken);
             sandbox.push(textDelta("lo"));
@@ -1265,10 +1272,11 @@ class MentorChatServiceTest extends BaseUnitTest {
         ObjectNode inspected = mapper.createObjectNode();
         inspected.putArray("pullRequests").addObject().put("number", 6);
         when(mergeReadiness.inspect(WORKSPACE_ID, USER_ID, 42L)).thenReturn(inspected);
-        UUID observationId = UUID.fromString("0b7e1c9a-3f5d-4a8e-9c21-6d4f8e2a1b3c");
-        ObjectNode observation = mapper.createObjectNode();
-        observation.putObject("observation").put("id", observationId.toString());
-        when(observationHistory.inspect(WORKSPACE_ID, USER_ID, observationId)).thenReturn(observation);
+        UUID practiceResultId = UUID.fromString("0b7e1c9a-3f5d-4a8e-9c21-6d4f8e2a1b3c");
+        ObjectNode practiceResult = mapper.createObjectNode();
+        practiceResult.putObject("result").put("practiceResultId", practiceResultId.toString());
+        when(practiceResultHistory.inspect(WORKSPACE_ID, USER_ID, practiceResultId))
+                .thenReturn(practiceResult);
         ObjectNode attempts = mapper.createObjectNode();
         attempts.putObject("work").put("number", 21);
         when(reviewAttempts.inspect(
@@ -1279,8 +1287,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             String method = frame.path("method").asString("");
             long id = frame.path("id").asLong(0);
             switch (method) {
-                case "hello" ->
-                    sandbox.push(jsonRpcResult(id, mapper.createObjectNode().put("protocolVersion", 1)));
+                case "hello" -> sandbox.push(jsonRpcResult(id, helloResult()));
                 case "open_thread" -> sandbox.push(jsonRpcResult(id, mapper.createObjectNode()));
                 case "prompt" -> {
                     sandbox.push(fetchContextCallback("fc-bad", "recent_authored_work.json"));
@@ -1288,11 +1295,11 @@ class MentorChatServiceTest extends BaseUnitTest {
                     sandbox.push(fetchContextCallback("fc-mr", "inputs/context/merge_readiness/42.json"));
                     sandbox.push(fetchContextCallback("fc-escape", "inputs/context/merge_readiness/../user.json"));
                     sandbox.push(fetchContextCallback(
-                            "fc-observation", "inputs/context/observations_history/" + observationId + ".json"));
+                            "fc-result", "inputs/context/results_history/" + practiceResultId + ".json"));
                     sandbox.push(fetchContextCallback(
                             "fc-uppercase",
-                            "inputs/context/observations_history/"
-                                    + observationId.toString().toUpperCase(Locale.ROOT)
+                            "inputs/context/results_history/"
+                                    + practiceResultId.toString().toUpperCase(Locale.ROOT)
                                     + ".json"));
                     sandbox.push(fetchContextCallback("fc-attempts", "inputs/context/review_attempts/issue/21.json"));
                     sandbox.push(fetchContextCallback("fc-attempts-guess", "inputs/context/review_attempts/21.json"));
@@ -1332,13 +1339,13 @@ class MentorChatServiceTest extends BaseUnitTest {
                         .path("message")
                         .asString())
                 .contains("fetch_context path not allowed");
-        assertThat(sandbox.sentFrameWithId("fc-observation")
+        assertThat(sandbox.sentFrameWithId("fc-result")
                         .path("result")
                         .path("content")
-                        .path("observation")
-                        .path("id")
+                        .path("result")
+                        .path("practiceResultId")
                         .asString())
-                .isEqualTo(observationId.toString());
+                .isEqualTo(practiceResultId.toString());
         assertThat(sandbox.sentFrameWithId("fc-uppercase")
                         .path("error")
                         .path("message")
@@ -1361,15 +1368,16 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     void shouldRefuseALinkBeforeAnythingIsShownAndShowAndStoreOnlyTheOneTheServerAdmits() {
         UUID invented = UUID.fromString("3ec24178-667e-4735-b818-681684324c6f");
-        when(conversationalDeliveryReconciler.admits(WORKSPACE_ID, USER_ID, OBSERVATION_ID))
+        when(conversationalDeliveryReconciler.admits(WORKSPACE_ID, USER_ID, PRACTICE_RESULT_ID))
                 .thenReturn(true);
         scheduleResponses(sandbox, prompt -> {
             sandbox.push(assistantStart());
-            sandbox.push(linkObservationCallback("lo-invented", invented));
-            sandbox.push(linkObservationCallback("lo-owned", OBSERVATION_ID));
+            sandbox.push(linkResultCallback("lo-invented", invented));
+            sandbox.push(linkResultCallback("lo-owned", PRACTICE_RESULT_ID));
             sandbox.push(event(
-                    "link_observation",
-                    n -> n.put("observationId", OBSERVATION_ID.toString()).put("text", "Name the trade-off.")));
+                    "link_result",
+                    n -> n.put("practiceResultId", PRACTICE_RESULT_ID.toString())
+                            .put("text", "Name the trade-off.")));
             sandbox.push(textDelta("What made you choose it?"));
             sandbox.push(assistantEnd("What made you choose it?"));
             sandbox.push(event("turn_end", n -> {}));
@@ -1386,17 +1394,99 @@ class MentorChatServiceTest extends BaseUnitTest {
                 .isEqualTo(MentorRunnerClient.LINK_REFUSED);
         assertThat(sandbox.sentFrameWithId("lo-owned")
                         .path("result")
-                        .path("observationId")
+                        .path("practiceResultId")
                         .asString())
-                .isEqualTo(OBSERVATION_ID.toString());
+                .isEqualTo(PRACTICE_RESULT_ID.toString());
         assertThat(String.join("", emitter.rawData))
-                .contains(OBSERVATION_ID.toString())
+                .contains(PRACTICE_RESULT_ID.toString())
                 .doesNotContain(invented.toString());
         var completed = ArgumentCaptor.forClass(TranslatorState.class);
         verify(persistence).complete(any(), completed.capture(), any(UIMessageChunk.Finish.class));
-        assertThat(UIMessageChunk.DataObservation.shownObservationIds(
-                        completed.getValue().partsSnapshot()))
-                .containsExactly(OBSERVATION_ID);
+        assertThat(UIMessageChunk.LinkParts.shownResultIds(completed.getValue().partsSnapshot()))
+                .containsExactly(PRACTICE_RESULT_ID);
+        assertThat(completed.getValue().partsSnapshot())
+                .extracting(p -> p.path("type").asString())
+                .contains("data-result");
+    }
+
+    @Test
+    void shouldAdmitAProblemLinkByItsResultAndStoreItUnderThatResult() {
+        Observation problem = Observation.builder()
+                .id(PROBLEM_ID)
+                .workspaceId(WORKSPACE_ID)
+                .practiceResultId(PRACTICE_RESULT_ID)
+                .build();
+        UUID foreignProblem = UUID.fromString("4f1d2c3b-5a6e-4f70-8a91-b2c3d4e5f607");
+        when(observationRepository.findAllByIds(WORKSPACE_ID, List.of(PROBLEM_ID)))
+                .thenReturn(List.of(problem));
+        when(observationRepository.findAllByIds(WORKSPACE_ID, List.of(foreignProblem)))
+                .thenReturn(List.of());
+        when(conversationalDeliveryReconciler.admits(WORKSPACE_ID, USER_ID, PRACTICE_RESULT_ID))
+                .thenReturn(true);
+        scheduleResponses(sandbox, prompt -> {
+            sandbox.push(assistantStart());
+            sandbox.push(linkObservationCallback("lo-foreign", foreignProblem));
+            sandbox.push(linkObservationCallback("lo-owned", PROBLEM_ID));
+            sandbox.push(event(
+                    "link_observation",
+                    n -> n.put("observationId", PROBLEM_ID.toString()).put("text", "Log it before the retry.")));
+            sandbox.push(textDelta("What made you choose it?"));
+            sandbox.push(assistantEnd("What made you choose it?"));
+            sandbox.push(event("turn_end", n -> {}));
+            sandbox.push(event("agent_end", n -> n.putArray("messages")));
+            sandbox.push(jsonRpcResult(prompt.path("id").asLong(), mapper.createObjectNode()));
+        });
+
+        runTurnSync();
+
+        assertThat(sandbox.sentFrameWithId("lo-foreign")
+                        .path("error")
+                        .path("message")
+                        .asString())
+                .isEqualTo(MentorRunnerClient.LINK_REFUSED);
+        assertThat(sandbox.sentFrameWithId("lo-owned")
+                        .path("result")
+                        .path("observationId")
+                        .asString())
+                .isEqualTo(PROBLEM_ID.toString());
+        // A problem nobody can resolve to a result is refused before the result's admission is asked.
+        verify(conversationalDeliveryReconciler, times(1)).admits(anyLong(), anyLong(), any());
+        assertThat(emitter.recordedTypes()).contains("data-result-observation", "finish");
+        var completed = ArgumentCaptor.forClass(TranslatorState.class);
+        verify(persistence).complete(any(), completed.capture(), any(UIMessageChunk.Finish.class));
+        JsonNode stored = completed
+                .getValue()
+                .partsSnapshot()
+                .valueStream()
+                .filter(p -> "data-result-observation".equals(p.path("type").asString()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(stored.path("data").path("practiceResultId").asString()).isEqualTo(PRACTICE_RESULT_ID.toString());
+        assertThat(stored.path("data").path("observationId").asString()).isEqualTo(PROBLEM_ID.toString());
+        assertThat(UIMessageChunk.LinkParts.shownResultIds(completed.getValue().partsSnapshot()))
+                .containsExactly(PRACTICE_RESULT_ID);
+    }
+
+    @Test
+    void shouldFailTheTurnWhenTheRunnerShowsALinkTheServerNeverAdmitted() {
+        scheduleResponses(sandbox, prompt -> {
+            sandbox.push(assistantStart());
+            sandbox.push(event(
+                    "link_result",
+                    n -> n.put("practiceResultId", PRACTICE_RESULT_ID.toString())
+                            .put("text", "Name the trade-off.")));
+            sandbox.push(textDelta("What made you choose it?"));
+            sandbox.push(assistantEnd("What made you choose it?"));
+            sandbox.push(event("turn_end", n -> {}));
+            sandbox.push(event("agent_end", n -> n.putArray("messages")));
+            sandbox.push(jsonRpcResult(prompt.path("id").asLong(), mapper.createObjectNode()));
+        });
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).contains("error").doesNotContain("finish", "data-result");
+        verify(persistence, never()).complete(any(), any(), any());
+        assertThat(String.join("", emitter.rawData)).doesNotContain("Name the trade-off.");
     }
 
     @Test
@@ -1627,9 +1717,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             String method = frame.path("method").asString("");
             long id = frame.path("id").asLong(0);
             switch (method) {
-                case "hello" ->
-                    staleSessionSandbox.push(
-                            jsonRpcResult(id, mapper.createObjectNode().put("protocolVersion", 1)));
+                case "hello" -> staleSessionSandbox.push(jsonRpcResult(id, helloResult()));
                 case "open_thread" -> staleSessionSandbox.push(jsonRpcError(id, -32002, "session restore failed"));
                 default -> {
                     /* ignore */
@@ -1982,8 +2070,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             String method = frame.path("method").asString("");
             long id = frame.path("id").asLong(0);
             switch (method) {
-                case "hello" ->
-                    sb.push(jsonRpcResult(id, mapper.createObjectNode().put("protocolVersion", 1)));
+                case "hello" -> sb.push(jsonRpcResult(id, helloResult()));
                 case "open_thread" -> sb.push(jsonRpcResult(id, mapper.createObjectNode()));
                 case "prompt" -> {
                     // Pi emits events before acknowledging the prompt.
@@ -2019,8 +2106,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             String method = frame.path("method").asString("");
             long id = frame.path("id").asLong(0);
             switch (method) {
-                case "hello" ->
-                    sb.push(jsonRpcResult(id, mapper.createObjectNode().put("protocolVersion", 1)));
+                case "hello" -> sb.push(jsonRpcResult(id, helloResult()));
                 case "prompt" -> onPrompt.accept(frame);
                 case "open_thread", "abort", "close_thread" -> sb.push(jsonRpcResult(id, mapper.createObjectNode()));
                 default -> {
@@ -2057,8 +2143,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             String method = frame.path("method").asString("");
             long id = frame.path("id").asLong(0);
             switch (method) {
-                case "hello" ->
-                    sb.push(jsonRpcResult(id, mapper.createObjectNode().put("protocolVersion", 1)));
+                case "hello" -> sb.push(jsonRpcResult(id, helloResult()));
                 case "open_thread" -> sb.push(jsonRpcResult(id, mapper.createObjectNode()));
                 case "prompt" -> {
                     ObjectNode error = mapper.createObjectNode();
@@ -2107,12 +2192,25 @@ class MentorChatServiceTest extends BaseUnitTest {
         return frame;
     }
 
+    /** The runner's answer to hello: the protocol this server speaks. */
+    private ObjectNode helloResult() {
+        return mapper.createObjectNode().put("protocolVersion", MentorRunnerClient.PROTOCOL_VERSION);
+    }
+
+    private ObjectNode linkResultCallback(String id, UUID practiceResultId) {
+        return linkCallback(id, "link_result", "practiceResultId", practiceResultId);
+    }
+
     private ObjectNode linkObservationCallback(String id, UUID observationId) {
+        return linkCallback(id, "link_observation", "observationId", observationId);
+    }
+
+    private ObjectNode linkCallback(String id, String method, String idKey, UUID linkedId) {
         ObjectNode frame = mapper.createObjectNode();
         frame.put("jsonrpc", "2.0");
         frame.put("id", id);
-        frame.put("method", "link_observation");
-        frame.putObject("params").put("threadId", THREAD_ID.toString()).put("observationId", observationId.toString());
+        frame.put("method", method);
+        frame.putObject("params").put("threadId", THREAD_ID.toString()).put(idKey, linkedId.toString());
         return frame;
     }
 

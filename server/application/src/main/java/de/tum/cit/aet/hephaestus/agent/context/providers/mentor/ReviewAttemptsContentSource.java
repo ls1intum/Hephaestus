@@ -35,7 +35,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises {@code inputs/context/review_attempts.json}: the newest retained practice reviews of the pull requests
  * and issues the developer authored, and on demand those of one such work. It is Hephaestus's record that a review was
- * submitted and where its retained run stands — queued or running, completed or failed — not an observation, evidence,
+ * submitted and where its retained run stands — queued or running, completed or failed — not a result, evidence,
  * outcome or feedback delivery, so it carries no captured content, and a review whose capture or execution failed is
  * listed like any other. One {@code reviewId} is one retained run in its latest state, not each container attempt.
  *

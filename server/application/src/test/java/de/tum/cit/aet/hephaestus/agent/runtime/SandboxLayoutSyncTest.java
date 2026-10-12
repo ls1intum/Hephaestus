@@ -58,10 +58,9 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
 
     @Test
     void shouldReadThePracticeScriptModelsFileTheServerWrites() throws IOException {
-        assertThat(Files.readString(resolveResource("agent/pi-practice-scripts.ts")))
-                .as(
-                        "pi-practice-scripts.ts pins PRACTICE_SCRIPT_MODELS_FILE to SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE")
-                .contains("PRACTICE_SCRIPT_MODELS_FILE = \"" + SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE + "\"");
+        assertThat(Files.readString(resolveResource("agent/pi-runner.ts")))
+                .as("pi-runner.ts reads SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE at the workspace root")
+                .contains("PRACTICE_SCRIPT_MODELS_PATH = `${CWD}/" + SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE + "`;");
     }
 
     /** The server refuses a report past these bounds whole, so the runner must stay within them. */
@@ -77,6 +76,15 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
                         "PRACTICE_SCRIPT_REPORT_MAX_PRACTICES = " + PiResultParser.PRACTICE_SCRIPT_REPORT_MAX_ENTRIES
                                 + ";",
                         "PRACTICE_SCRIPT_ERROR_MAX_CHARS = " + PiResultParser.PRACTICE_SCRIPT_ERROR_MAX_LENGTH + ";");
+    }
+
+    /** The parser records no run from a report of another version, so the runner must write the one it reads. */
+    @Test
+    void shouldWriteTheExecutionReportVersionTheServerReads() throws IOException {
+        Path contract = Path.of("../../docker/agents/practice-scripts/lib/contract.ts");
+        assertThat(Files.readString(
+                        Files.exists(contract) ? contract : Path.of("docker/agents/practice-scripts/lib/contract.ts")))
+                .contains("EXECUTION_REPORT_SCHEMA_VERSION = " + PiResultParser.PRACTICE_SCRIPT_REPORT_VERSION + ";");
     }
 
     @Test

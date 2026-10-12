@@ -5,7 +5,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.handler.AdmittedObservationFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalFeedbackPreparer;
@@ -27,16 +27,16 @@ import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
@@ -67,13 +67,13 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     private ConversationalFeedbackPreparer preparer;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
     private AccountPreferencesQuery accountPreferencesQuery;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -154,13 +154,13 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         long revokedThreadId = seedThread("C-revoked", "300.0", ConsentState.REVOKED);
 
         AgentJob job = conversationJob(activeThreadId);
-        Observation activeObs = saveConversationObservation(job, "occ-active", activeThreadId);
-        saveConversationObservation(job, "occ-paused", pausedThreadId);
-        saveConversationObservation(job, "occ-revoked", revokedThreadId);
+        PracticeResult activeObs = saveConversationResult(job, "occ-active", activeThreadId);
+        saveConversationResult(job, "occ-paused", pausedThreadId);
+        saveConversationResult(job, "occ-revoked", revokedThreadId);
         preparer.prepare(
                 job.getId(), workspace.getId(), List.of(activeObs), List.of(conversationUnit(List.of(activeObs))));
 
-        assertThat(feedbackObservationRepository.findPreparedConversationFactsForRecipient(
+        assertThat(feedbackEvidenceRepository.findPreparedConversationFactsForRecipient(
                         workspace.getId(), recipient.getId(), PageRequest.of(0, 10)))
                 .hasSize(1);
 
@@ -170,7 +170,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
 
         JsonNode arr = root.get("preparedConversationFeedback");
         assertThat(arr).hasSize(1);
-        assertThat(arr.get(0).get("observationId").asString())
+        assertThat(arr.get(0).get("practiceResultId").asString())
                 .isEqualTo(activeObs.getId().toString());
         assertThat(arr.get(0).get("artifactKind").asString()).isEqualTo("chat.conversation_thread");
         assertThat(arr.get(0).get("artifactId").asLong()).isEqualTo(activeThreadId);
@@ -178,7 +178,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     }
 
     @Test
-    @DisplayName("Slack consent does not suppress an otherwise-authorized pull-request observation")
+    @DisplayName("Slack consent does not suppress an otherwise-authorized pull-request result")
     void nonSlackArtifactFactAlwaysSurfaces() {
         PracticeTestEvidence.configure(practice, ArtifactKinds.PULL_REQUEST);
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
@@ -187,20 +187,20 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         practice = practiceRepository.saveAndFlush(practice);
 
         AgentJob job = pullRequestJob();
-        Observation prObs = savePullRequestObservation(job, "occ-pr", pullRequest.getId());
+        PracticeResult prObs = savePullRequestResult(job, "occ-pr", pullRequest.getId());
         prepareFor(job);
 
         JsonNode root = contribute();
         JsonNode arr = root.get("preparedConversationFeedback");
         assertThat(arr).hasSize(1);
-        assertThat(arr.get(0).get("observationId").asString())
+        assertThat(arr.get(0).get("practiceResultId").asString())
                 .isEqualTo(prObs.getId().toString());
         assertThat(arr.get(0).get("artifactKind").asString()).isEqualTo("scm.pull_request");
 
         pullRequest.setDeletedAt(Instant.now());
         pullRequestRepository.saveAndFlush(pullRequest);
         assertThat(contribute().get("preparedConversationFeedback")).isEmpty();
-        assertThat(feedbackObservationRepository.findPreparedConversationFactsForRecipient(
+        assertThat(feedbackEvidenceRepository.findPreparedConversationFactsForRecipient(
                         workspace.getId(), recipient.getId(), PageRequest.of(0, 10)))
                 .isEmpty();
     }
@@ -214,7 +214,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     void aLinkAdmittedWhileItsChannelWasActiveSettlesNothingAfterTheChannelIsPaused() {
         long threadId = seedThread("C-linked", "100.0", ConsentState.ACTIVE);
         AgentJob job = conversationJob(threadId);
-        Observation linked = saveConversationObservation(job, "occ-linked", threadId);
+        PracticeResult linked = saveConversationResult(job, "occ-linked", threadId);
         preparer.prepare(job.getId(), workspace.getId(), List.of(linked), List.of(conversationUnit(List.of(linked))));
         long workspaceId = workspace.getId();
         long recipientId = recipient.getId();
@@ -263,9 +263,10 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         practice.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(practice, 2)));
         practice = practiceRepository.saveAndFlush(practice);
         AgentJob review = pullRequestJob();
-        Observation observation = savePullRequestObservation(review, "occ-reviewed", pullRequest.getId());
+        PracticeResult practiceResult = savePullRequestResult(review, "occ-reviewed", pullRequest.getId());
         AgentJob composer = pullRequestJob();
-        List<Observation> admitted = router.admit(List.of(observation), workspace.getId(), RoutingContext.author());
+        List<PracticeResult> admitted =
+                router.admit(List.of(practiceResult), workspace.getId(), RoutingContext.author());
         preparer.prepare(composer.getId(), workspace.getId(), admitted, List.of(conversationUnit(admitted)));
 
         JsonNode item = contribute().get("preparedConversationFeedback").get(0);
@@ -279,14 +280,17 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     void aPreparedFactIsWithheldWhenWorkspaceDeliveryPauses() {
         long threadId = seedThread("C-active", "100.0", ConsentState.ACTIVE);
         AgentJob job = conversationJob(threadId);
-        Observation observation = saveConversationObservation(job, "occ-paused", threadId);
+        PracticeResult practiceResult = saveConversationResult(job, "occ-paused", threadId);
         preparer.prepare(
-                job.getId(), workspace.getId(), List.of(observation), List.of(conversationUnit(List.of(observation))));
+                job.getId(),
+                workspace.getId(),
+                List.of(practiceResult),
+                List.of(conversationUnit(List.of(practiceResult))));
         workspace.getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
         workspaceRepository.saveAndFlush(workspace);
 
         assertThat(contribute().get("preparedConversationFeedback")).isEmpty();
-        assertThat(feedbackObservationRepository.findPreparedConversationFactsForRecipient(
+        assertThat(feedbackEvidenceRepository.findPreparedConversationFactsForRecipient(
                         workspace.getId(), recipient.getId(), PageRequest.of(0, 10)))
                 .isEmpty();
     }
@@ -295,12 +299,12 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     void shouldApplyPeopleCoverageWithoutRevivingSuppressedConversationFeedback() {
         long threadId = seedThread("C-active", "100.0", ConsentState.ACTIVE);
         AgentJob job = conversationJob(threadId);
-        Observation observation = saveConversationObservation(job, "occ-outside-coverage", threadId);
+        PracticeResult practiceResult = saveConversationResult(job, "occ-outside-coverage", threadId);
         prepareFor(job);
         JsonNode covered = contribute().get("preparedConversationFeedback");
         assertThat(covered).hasSize(1);
-        assertThat(covered.get(0).get("observationId").asString())
-                .isEqualTo(observation.getId().toString());
+        assertThat(covered.get(0).get("practiceResultId").asString())
+                .isEqualTo(practiceResult.getId().toString());
         workspace.getReviewSettings().setRepositoryCoverageMode(ReviewRepositoryMode.SELECTED);
         workspaceRepository.saveAndFlush(workspace);
 
@@ -315,12 +319,12 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
 
         assertThat(contribute().get("preparedConversationFeedback")).isEmpty();
         AgentJob resumedJob = conversationJob(threadId);
-        Observation resumed = saveConversationObservation(resumedJob, "occ-restored-coverage", threadId);
+        PracticeResult resumed = saveConversationResult(resumedJob, "occ-restored-coverage", threadId);
         prepareFor(resumedJob);
 
         JsonNode restored = contribute().get("preparedConversationFeedback");
         assertThat(restored).hasSize(1);
-        assertThat(restored.get(0).get("observationId").asString())
+        assertThat(restored.get(0).get("practiceResultId").asString())
                 .isEqualTo(resumed.getId().toString());
     }
 
@@ -328,7 +332,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     void aPreparedFactIsWithheldWhenItsPracticeTurnsOff() {
         long threadId = seedThread("C-active", "100.0", ConsentState.ACTIVE);
         AgentJob job = conversationJob(threadId);
-        saveConversationObservation(job, "occ-practice-off", threadId);
+        saveConversationResult(job, "occ-practice-off", threadId);
         prepareFor(job);
         assertThat(contribute().get("preparedConversationFeedback")).hasSize(1);
         practice.setAutonomy(PracticeAutonomy.OFF);
@@ -353,9 +357,9 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         practice = practiceRepository.saveAndFlush(practice);
 
         AgentJob job = pullRequestJob();
-        savePullRequestObservation(job, "occ-composed", pullRequest.getId());
-        List<Observation> admitted = router.admit(
-                observationRepository.findByAgentJobId(
+        savePullRequestResult(job, "occ-composed", pullRequest.getId());
+        List<PracticeResult> admitted = router.admit(
+                practiceResultRepository.findByAgentJobId(
                         job.getId(), job.getWorkspace().getId()),
                 workspace.getId(),
                 RoutingContext.author());
@@ -397,7 +401,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
 
         // The same surface, prepared with nothing composed: no notes key at all, on that item alone.
         AgentJob uncomposed = pullRequestJob(persistPullRequest(4343L, 18));
-        savePullRequestObservation(uncomposed, "occ-uncomposed", pullRequest.getId());
+        savePullRequestResult(uncomposed, "occ-uncomposed", pullRequest.getId());
         preparer.prepare(uncomposed.getId(), workspace.getId(), List.of(), List.of());
 
         JsonNode both = contribute().get("preparedConversationFeedback");
@@ -451,11 +455,11 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         return pullRequestRepository.saveAndFlush(created);
     }
 
-    private ComposedFeedbackUnit conversationUnit(List<Observation> observations) {
+    private ComposedFeedbackUnit conversationUnit(List<PracticeResult> practiceResults) {
         return new ComposedFeedbackUnit(
                 FeedbackChannel.IN_CHAT,
                 practice.getSlug(),
-                observations.stream().map(o -> o.getId().toString()).toList(),
+                practiceResults.stream().map(o -> o.getId().toString()).toList(),
                 ComposedFeedbackUnit.Action.NEW,
                 null,
                 null,
@@ -465,7 +469,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
                 new ComposedFeedbackUnit.ConversationBrief(
                         "The practice recurred.",
                         "Recognize the decision point.",
-                        "The observations show the same pattern.",
+                        "The results show the same pattern.",
                         "They can explain the decision in their own words.",
                         null));
     }
@@ -478,23 +482,23 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     }
 
     private void prepareFor(AgentJob job) {
-        List<Observation> observations = observationRepository.findByAgentJobId(
+        List<PracticeResult> practiceResults = practiceResultRepository.findByAgentJobId(
                 job.getId(), job.getWorkspace().getId());
-        List<Observation> admitted = router.admit(observations, workspace.getId(), RoutingContext.author());
+        List<PracticeResult> admitted = router.admit(practiceResults, workspace.getId(), RoutingContext.author());
         preparer.prepare(job.getId(), workspace.getId(), admitted, List.of(conversationUnit(admitted)));
     }
 
-    private Observation saveConversationObservation(AgentJob job, String occurrenceKey, long threadId) {
-        return saveObservation(job, occurrenceKey, "chat.conversation_thread", threadId);
+    private PracticeResult saveConversationResult(AgentJob job, String occurrenceKey, long threadId) {
+        return saveResult(job, occurrenceKey, "chat.conversation_thread", threadId);
     }
 
-    private Observation savePullRequestObservation(AgentJob job, String occurrenceKey, long pullRequestId) {
-        return saveObservation(job, occurrenceKey, "scm.pull_request", pullRequestId);
+    private PracticeResult savePullRequestResult(AgentJob job, String occurrenceKey, long pullRequestId) {
+        return saveResult(job, occurrenceKey, "scm.pull_request", pullRequestId);
     }
 
-    private Observation saveObservation(AgentJob job, String occurrenceKey, String artifactKind, long artifactId) {
+    private PracticeResult saveResult(AgentJob job, String occurrenceKey, String artifactKind, long artifactId) {
         UUID id = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
+        practiceResultRepository.insertIfAbsent(
                 id,
                 occurrenceKey,
                 job.getId(),
@@ -504,17 +508,17 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
                 artifactKind,
                 artifactId,
                 recipient.getId(),
-                "Observation title",
+                "Result title",
                 "NOT_MET",
                 "MAJOR",
                 (artifactKind.equals("chat.conversation_thread")
-                                ? AdmittedObservationFixtures.evidence(
+                                ? AdmittedResultFixtures.evidence(
                                         job.getId(),
                                         "slack.conversation.thread",
                                         "inputs/context/thread.json",
                                         "Slack thread",
                                         "example")
-                                : AdmittedObservationFixtures.evidence(
+                                : AdmittedResultFixtures.evidence(
                                         job.getId(),
                                         "scm.pull-request.core",
                                         "inputs/context/pull-request.json",
@@ -522,9 +526,12 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
                                         "example"))
                         .toString(),
                 null,
+                "test-scope",
+                null,
+                null,
                 null,
                 Instant.now(),
                 "LIVE");
-        return observationRepository.findById(id).orElseThrow();
+        return practiceResultRepository.findById(id).orElseThrow();
     }
 }

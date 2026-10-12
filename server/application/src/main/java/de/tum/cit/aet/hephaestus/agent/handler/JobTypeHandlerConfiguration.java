@@ -14,8 +14,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionService;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import java.util.List;
 import org.springframework.context.ApplicationEventPublisher;
@@ -49,11 +50,6 @@ public class JobTypeHandlerConfiguration {
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
         this.feedbackResponseSuppressionFilter = feedbackResponseSuppressionFilter;
-    }
-
-    @Bean
-    ReviewResultParser reviewResultParser() {
-        return new ReviewResultParser(objectMapper);
     }
 
     @Bean
@@ -91,8 +87,9 @@ public class JobTypeHandlerConfiguration {
     PracticeCatalogInjector practiceCatalogInjector(
             PracticeRepository practiceRepository,
             WorkspaceReviewDefaultsProvider workspaceDefaults,
+            PracticeResultRepository practiceResultRepository,
             ObservationRepository observationRepository,
-            ObservationVisibilityPolicy observationVisibility,
+            ResultVisibilityPolicy practiceResultVisibility,
             ConversationSourceLiveness conversationLiveness,
             AgentJobRepository agentJobRepository,
             ReviewTargetQuery reviewTargets,
@@ -103,8 +100,9 @@ public class JobTypeHandlerConfiguration {
                 workspaceDefaults,
                 new PracticeScriptInputs(
                         objectMapper,
+                        practiceResultRepository,
                         observationRepository,
-                        observationVisibility,
+                        practiceResultVisibility,
                         conversationLiveness,
                         agentJobRepository,
                         reviewTargets,
@@ -131,30 +129,27 @@ public class JobTypeHandlerConfiguration {
     @Bean
     PullRequestReviewHandler pullRequestReviewHandler(
             PracticeReviewPreparation preparation,
-            ReviewResultParser resultParser,
             FeedbackCompositionResultParser compositionResultParser,
             ReviewOutputService deliveryService,
             FeedbackDeliveryService feedbackService,
             InContextDeliveryGate inContextDeliveryGate,
-            ObservationRepository observationRepository,
+            PracticeResultRepository practiceResultRepository,
             PublicReviewEligibility publicReviewEligibility) {
         return new PullRequestReviewHandler(
                 objectMapper,
                 preparation,
-                resultParser,
                 compositionResultParser,
                 deliveryService,
                 feedbackService,
                 feedbackResponseSuppressionFilter,
                 inContextDeliveryGate,
-                observationRepository,
+                practiceResultRepository,
                 publicReviewEligibility);
     }
 
     @Bean
     IssueReviewHandler issueReviewHandler(
             PracticeReviewPreparation preparation,
-            ReviewResultParser resultParser,
             FeedbackCompositionResultParser compositionResultParser,
             ReviewOutputService deliveryService,
             InContextDeliveryGate inContextDeliveryGate,
@@ -162,14 +157,13 @@ public class JobTypeHandlerConfiguration {
             PracticeFeedbackDeliveryPolicy deliveryPolicy,
             PracticeFeedbackCommentFormatter commentFormatter,
             FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter,
-            ObservationRepository observationRepository,
+            PracticeResultRepository practiceResultRepository,
             PracticeFeedbackDispatchService dispatchService,
             FeedbackDeliveryService feedbackDeliveryService,
             PublicReviewEligibility publicReviewEligibility) {
         return new IssueReviewHandler(
                 objectMapper,
                 preparation,
-                resultParser,
                 compositionResultParser,
                 deliveryService,
                 inContextDeliveryGate,
@@ -177,7 +171,7 @@ public class JobTypeHandlerConfiguration {
                 deliveryPolicy,
                 commentFormatter,
                 feedbackResponseSuppressionFilter,
-                observationRepository,
+                practiceResultRepository,
                 dispatchService,
                 feedbackDeliveryService,
                 publicReviewEligibility);
@@ -186,20 +180,16 @@ public class JobTypeHandlerConfiguration {
     @Bean
     JobTypeHandler conversationReviewHandler(
             PracticeReviewPreparation preparation,
-            ReviewResultParser resultParser,
             ReviewOutputService deliveryService,
             ApplicationEventPublisher eventPublisher,
             TransactionTemplate transactionTemplate) {
         return new ConversationReviewHandler(
-                objectMapper, preparation, resultParser, deliveryService, eventPublisher, transactionTemplate);
+                objectMapper, preparation, deliveryService, eventPublisher, transactionTemplate);
     }
 
     @Bean
-    JobTypeHandler documentReviewHandler(
-            PracticeReviewPreparation preparation,
-            ReviewResultParser resultParser,
-            ReviewOutputService deliveryService) {
-        return new DocumentReviewHandler(objectMapper, preparation, resultParser, deliveryService);
+    JobTypeHandler documentReviewHandler(PracticeReviewPreparation preparation, ReviewOutputService deliveryService) {
+        return new DocumentReviewHandler(objectMapper, preparation, deliveryService);
     }
 
     @Bean

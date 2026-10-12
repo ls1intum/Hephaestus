@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
 public record ProfileReviewRunDTO(
         @NonNull UUID reviewId,
 
-        @NonNull @Schema(description = "When the review recorded its newest observation about this developer")
+        @NonNull @Schema(description = "When the review recorded its newest result about this developer")
         Instant reviewedAt,
 
         @NonNull @Schema(description = "The piece of work the run reviewed")

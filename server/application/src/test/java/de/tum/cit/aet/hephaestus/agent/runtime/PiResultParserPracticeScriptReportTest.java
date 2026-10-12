@@ -6,34 +6,49 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser.PracticeScriptRunReport;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelPurpose;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelUseDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedReason;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptStopReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
 
-    private static final Set<String> STAGED = Set.of("comment-quality", "error-handling");
+    private static final Map<String, PracticeProgramKind> ADMITTED =
+            Map.of("comment-quality", PracticeProgramKind.BUILTIN, "error-handling", PracticeProgramKind.CUSTOM);
+
+    private static final String DIGEST = "0123456789abcdef".repeat(4);
+
+    private static final String ERROR_PLACEHOLDER = "\"@@error@@\"";
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private PiResultParser parser;
     private SimpleMeterRegistry meterRegistry;
@@ -45,7 +60,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     }
 
     private List<PracticeScriptRunReport> parse(String report) {
-        return parser.parsePracticeScriptReport(report.getBytes(UTF_8), STAGED);
+        return parser.parsePracticeScriptReport(report.getBytes(UTF_8), ADMITTED);
     }
 
     private double failures() {
@@ -55,113 +70,205 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     }
 
     private static String report(String... entries) {
-        return "{\"practices\":[" + String.join(",", entries) + "],\"truncated\":false}";
+        return report(false, entries);
     }
 
-    private static String withoutModels(String slug, String status, int leads) {
-        return """
-                {"slug":"%s","status":"%s","leads":%d,"models":[]}""".formatted(slug, status, leads);
+    private static String report(boolean truncated, String... entries) {
+        return "{\"schemaVersion\":2,\"truncated\":" + truncated + ",\"practices\":[" + String.join(",", entries)
+                + "]}";
     }
 
     /**
-     * {@code pi-practice-scripts-report.spec.ts} writes this file from results of every status, slot, need and reason. A
-     * status word or a field name that the writer and this parser spell differently fails one of the two tests.
+     * An entry inside the contract for a practice of {@link #ADMITTED}: its admitted program, no models, no calls and
+     * no reads. A practice that is not admitted gets the built-in program.
      */
+    private static ObjectNode entry(String slug, String status, @Nullable String stopReason) {
+        ObjectNode entry = MAPPER.createObjectNode();
+        entry.put("practiceSlug", slug);
+        ObjectNode program = entry.putObject("program");
+        if (ADMITTED.get(slug) == PracticeProgramKind.CUSTOM) {
+            program.put("kind", "custom");
+            program.put("digest", DIGEST);
+        } else {
+            program.put("kind", "builtin");
+            program.putNull("digest");
+        }
+        entry.putArray("models");
+        entry.put("status", status);
+        if (stopReason == null) {
+            entry.putNull("stopReason");
+        } else {
+            entry.put("stopReason", stopReason);
+        }
+        ObjectNode calls = entry.putObject("calls");
+        PiResultParser.CALL_KINDS.forEach(kind -> calls.put(kind, 0));
+        ObjectNode coverage = entry.putObject("coverageReached");
+        Stream.of("reads", "truncatedReads", "failedReads").forEach(count -> coverage.put(count, 0));
+        if ("not-reached".equals(status)) {
+            entry.putNull("durationMs");
+        } else {
+            entry.put("durationMs", 10);
+        }
+        return entry;
+    }
+
+    private static PracticeScriptRunReport run(List<PracticeScriptRunReport> runs, String slug) {
+        return runs.stream()
+                .filter(run -> run.practiceSlug().equals(slug))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private static String ok(String slug) {
+        return entry(slug, "ok", null).toString();
+    }
+
+    /** A failed entry whose error is written with every character outside printable ASCII escaped. */
+    private static String failedWithError(String slug, String error) {
+        return entry(slug, "failed", "error")
+                .put("error", "@@error@@")
+                .toString()
+                .replace(ERROR_PLACEHOLDER, asciiJson(error));
+    }
+
+    /** A JSON string with every character outside printable ASCII escaped, so an unpaired surrogate survives. */
+    private static String asciiJson(String text) {
+        return text.chars()
+                .mapToObj(c ->
+                        c >= ' ' && c <= '~' && c != '"' && c != '\\' ? Character.toString(c) : "\\u%04x".formatted(c))
+                .collect(Collectors.joining("", "\"", "\""));
+    }
+
+    /** The shared fixture that {@code lib/contract.test.ts} reads too: seven admitted practices of every status. */
     @Test
-    void shouldReadEveryStatusAndFieldWhenTheReportWriterWritesThem() throws IOException {
+    void shouldReadEveryAdmittedPracticeWhenTheSharedExecutionReportIsParsed() throws IOException {
         byte[] fixture;
-        try (InputStream in = getClass().getResourceAsStream("/agent/practice-scripts-report.json")) {
-            fixture = Objects.requireNonNull(in, "agent/practice-scripts-report.json")
+        try (InputStream in = getClass().getResourceAsStream("/practice-results/execution-report.json")) {
+            fixture = Objects.requireNonNull(in, "practice-results/execution-report.json")
                     .readAllBytes();
         }
-        Set<String> staged = Set.of("broken", "decides", "needs-a-model", "never-ran", "scans", "slow");
+        Map<String, PracticeProgramKind> admitted = Map.of(
+                "avoids-insecure-defaults-and-over-broad-permissions", PracticeProgramKind.CUSTOM,
+                "commit-subjects-explain-each-change", PracticeProgramKind.BUILTIN,
+                "handles-errors-instead-of-swallowing-them", PracticeProgramKind.CUSTOM,
+                "leaves-the-code-clean-with-intent-revealing-comments", PracticeProgramKind.BUILTIN,
+                "makes-ui-accessible-by-default", PracticeProgramKind.CUSTOM,
+                "ships-tests-with-the-change", PracticeProgramKind.CUSTOM,
+                "validates-and-escapes-untrusted-input", PracticeProgramKind.BUILTIN);
 
-        List<PracticeScriptRunReport> runs = parser.parsePracticeScriptReport(fixture, staged);
+        List<PracticeScriptRunReport> runs = parser.parsePracticeScriptReport(fixture, admitted);
 
         assertThat(failures()).isZero();
         assertThat(runs)
-                .extracting(PracticeScriptRunReport::practiceSlug)
-                .containsExactlyElementsOf(staged.stream().sorted().toList());
-        assertThat(runs).extracting(PracticeScriptRunReport::status).containsOnly(PracticeScriptRunStatus.values());
-        assertThat(runs)
-                .filteredOn(run -> run.models() == null)
-                .extracting(PracticeScriptRunReport::practiceSlug)
-                .containsExactly("never-ran", "slow");
-        assertThat(runs)
-                .filteredOn(run -> run.durationMs() == null)
-                .extracting(PracticeScriptRunReport::practiceSlug)
-                .containsExactly("needs-a-model", "never-ran");
-        List<PracticeScriptModelUseDTO> uses = runs.stream()
-                .flatMap(run -> run.models() == null ? Stream.empty() : run.models().stream())
-                .toList();
-        assertThat(uses).extracting(PracticeScriptModelUseDTO::purpose).contains(PracticeScriptModelPurpose.values());
-        assertThat(uses).extracting(PracticeScriptModelUseDTO::need).contains(PracticeScriptNeed.values());
-        assertThat(uses).extracting(PracticeScriptModelUseDTO::bound).contains(true, false);
-        assertThat(uses.stream().flatMap(use -> use.notRated().stream()))
-                .extracting(PracticeScriptNotRatedDTO::reason)
-                .contains(PracticeScriptNotRatedReason.values());
-    }
-
-    @Test
-    void shouldReadEachModelWithItsPurposeNeedAndReasonsNotRatedWhenTheScriptDeclaredThem() {
-        String decision = """
-                {"slug":"comment-quality","status":"ok","leads":3,"models":[
-                   {"slot":"decision","need":"required","bound":true,"notRated":{"too-large":2,"deadline":5,"budget":0}},
-                   {"slot":"chat","need":"optional","bound":true,"notRated":{}}]}""";
-
-        List<PracticeScriptRunReport> runs = parse(report(decision, withoutModels("error-handling", "ok", 7)));
-
-        assertThat(runs)
+                .extracting(
+                        PracticeScriptRunReport::practiceSlug,
+                        PracticeScriptRunReport::status,
+                        PracticeScriptRunReport::programKind,
+                        PracticeScriptRunReport::stopReason)
                 .containsExactly(
-                        new PracticeScriptRunReport(
-                                "comment-quality",
+                        tuple(
+                                "avoids-insecure-defaults-and-over-broad-permissions",
+                                PracticeScriptRunStatus.SKIPPED,
+                                PracticeProgramKind.CUSTOM,
+                                PracticeScriptStopReason.UNAVAILABLE),
+                        tuple(
+                                "commit-subjects-explain-each-change",
+                                PracticeScriptRunStatus.NOT_REACHED,
+                                PracticeProgramKind.BUILTIN,
+                                PracticeScriptStopReason.DEADLINE),
+                        tuple(
+                                "handles-errors-instead-of-swallowing-them",
                                 PracticeScriptRunStatus.OK,
-                                3,
-                                List.of(
-                                        new PracticeScriptModelUseDTO(
-                                                PracticeScriptModelPurpose.PRACTICE_DECISION,
-                                                PracticeScriptNeed.REQUIRED,
-                                                true,
-                                                // In the declared order of the reasons; a zero count is left out.
-                                                List.of(
-                                                        new PracticeScriptNotRatedDTO(
-                                                                PracticeScriptNotRatedReason.DEADLINE, 5),
-                                                        new PracticeScriptNotRatedDTO(
-                                                                PracticeScriptNotRatedReason.TOO_LARGE, 2))),
-                                        new PracticeScriptModelUseDTO(
-                                                PracticeScriptModelPurpose.PRACTICE_REVIEW,
-                                                PracticeScriptNeed.OPTIONAL,
-                                                true,
-                                                List.of())),
-                                null,
+                                PracticeProgramKind.CUSTOM,
                                 null),
-                        new PracticeScriptRunReport(
-                                "error-handling", PracticeScriptRunStatus.OK, 7, List.of(), null, null));
-        assertThat(failures()).isZero();
+                        tuple(
+                                "leaves-the-code-clean-with-intent-revealing-comments",
+                                PracticeScriptRunStatus.OK,
+                                PracticeProgramKind.BUILTIN,
+                                null),
+                        tuple(
+                                "makes-ui-accessible-by-default",
+                                PracticeScriptRunStatus.OK,
+                                PracticeProgramKind.CUSTOM,
+                                null),
+                        tuple(
+                                "ships-tests-with-the-change",
+                                PracticeScriptRunStatus.FAILED,
+                                PracticeProgramKind.CUSTOM,
+                                PracticeScriptStopReason.INVALID_PROGRAM),
+                        tuple(
+                                "validates-and-escapes-untrusted-input",
+                                PracticeScriptRunStatus.OK,
+                                PracticeProgramKind.BUILTIN,
+                                null));
+        assertThat(runs)
+                .extracting(PracticeScriptRunReport::status)
+                .doesNotContain(PracticeScriptRunStatus.NOT_FINISHED);
+        PracticeScriptRunReport custom = run(runs, "handles-errors-instead-of-swallowing-them");
+        assertThat(custom.programDigest())
+                .isEqualTo("b71c3e9a5d2f8046c1e7a9b3d5f2e8c6a4b1d7f3e9c2a5b8d0f6e1c4a7b3d9e2");
+        assertThat(custom.calls())
+                .isEqualTo(Map.of("review", 1, "chat", 0, "decision", 0, "embedding", 0, "reranking", 0));
+        assertThat(custom.coverageReached()).isEqualTo(Map.of("reads", 9, "truncatedReads", 1, "failedReads", 0));
+        assertThat(custom.durationMs()).isEqualTo(61234);
+        assertThat(run(runs, "leaves-the-code-clean-with-intent-revealing-comments")
+                        .programDigest())
+                .isNull();
+        assertThat(run(runs, "commit-subjects-explain-each-change").durationMs())
+                .isNull();
+        assertThat(run(runs, "avoids-insecure-defaults-and-over-broad-permissions")
+                        .models())
+                .containsExactly(new PracticeScriptModelUseDTO(
+                        PracticeScriptModelPurpose.PRACTICE_DECISION, PracticeScriptNeed.REQUIRED, false, List.of()));
+        assertThat(run(runs, "ships-tests-with-the-change").error())
+                .startsWith("This practice script uses the retired leads contract (meta.version).");
     }
 
-    /** "Uses no model" is a claim about the script, so a script that ended before it declared its models never makes it. */
     @Test
-    void shouldLeaveTheModelsUnknownWhenTheScriptEndedBeforeItDeclaredThem() {
-        List<PracticeScriptRunReport> runs = parse(report("""
-                {"slug":"comment-quality","status":"timeout","leads":0}""", withoutModels("error-handling", "error", 0)));
+    void shouldReadEachModelWithItsPurposeNeedAndReasonsNotRatedWhenTheProgramDeclaredThem() {
+        ObjectNode decision = entry("comment-quality", "ok", null);
+        decision.set("models", MAPPER.readTree("""
+                [{"slot":"decision","need":"required","bound":true,"notRated":{"too-large":2,"deadline":5,"budget":0}},
+                 {"slot":"chat","need":"optional","bound":true,"notRated":{}}]"""));
+
+        List<PracticeScriptRunReport> runs = parse(report(decision.toString(), ok("error-handling")));
 
         assertThat(runs)
+                .extracting(PracticeScriptRunReport::models)
                 .containsExactly(
-                        new PracticeScriptRunReport(
-                                "comment-quality", PracticeScriptRunStatus.TIMED_OUT, 0, null, null, null),
-                        new PracticeScriptRunReport(
-                                "error-handling", PracticeScriptRunStatus.FAILED, 0, List.of(), null, null));
+                        List.of(
+                                new PracticeScriptModelUseDTO(
+                                        PracticeScriptModelPurpose.PRACTICE_DECISION,
+                                        PracticeScriptNeed.REQUIRED,
+                                        true,
+                                        // In the declared order of the reasons; a zero count is left out.
+                                        List.of(
+                                                new PracticeScriptNotRatedDTO(PracticeScriptNotRatedReason.DEADLINE, 5),
+                                                new PracticeScriptNotRatedDTO(
+                                                        PracticeScriptNotRatedReason.TOO_LARGE, 2))),
+                                new PracticeScriptModelUseDTO(
+                                        PracticeScriptModelPurpose.PRACTICE_REVIEW,
+                                        PracticeScriptNeed.OPTIONAL,
+                                        true,
+                                        List.of())),
+                        List.of());
+        assertThat(runs)
+                .extracting(
+                        PracticeScriptRunReport::programKind,
+                        PracticeScriptRunReport::programDigest,
+                        PracticeScriptRunReport::durationMs)
+                .containsExactly(
+                        tuple(PracticeProgramKind.BUILTIN, null, 10), tuple(PracticeProgramKind.CUSTOM, DIGEST, 10));
         assertThat(failures()).isZero();
     }
 
     @Test
-    void shouldKeepTheFirstLineOfAFailedScriptsErrorCutToItsLimit() {
+    void shouldKeepTheFirstLineOfAFailedProgramsErrorCutToItsLimit() {
         // Characters outside the BMP count once each, as PostgreSQL counts them.
-        String longLine = "TypeError: " + "\uD83D\uDE42".repeat(PiResultParser.PRACTICE_SCRIPT_ERROR_MAX_LENGTH);
-        List<PracticeScriptRunReport> runs = parse(report("""
-                {"slug":"comment-quality","status":"error","leads":0,"error":"%s\\n    at decide (script.ts:4:9)"}""".formatted(longLine), """
-                {"slug":"error-handling","status":"error","leads":0,"error":"Cannot read properties of undefined"}"""));
+        String longLine = "TypeError: " + "🙂".repeat(PiResultParser.PRACTICE_SCRIPT_ERROR_MAX_LENGTH);
+        List<PracticeScriptRunReport> runs = parse(report(
+                failedWithError("comment-quality", longLine + "\n    at decide (script.ts:4:9)"),
+                failedWithError("error-handling", "Cannot read properties of undefined")));
 
         assertThat(runs)
                 .extracting(PracticeScriptRunReport::error)
@@ -173,8 +280,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     }
 
     /**
-     * {@code pi-practice-scripts-report.spec.ts} reads the same cases, so the writer and this parser keep one rule for the
-     * error line.
+     * The report writer reads the same cases, so the writer and this parser keep one rule for the error line.
      */
     @Test
     void shouldKeepTheErrorLineThatTheReportWriterKeepsWhenBothReadTheSameError() throws IOException {
@@ -188,14 +294,13 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
                 .mapToObj(index -> "case-%02d".formatted(index))
                 .toList();
         String report = report(IntStream.range(0, cases.size())
-                .mapToObj(index -> """
-                        {"slug":"%s","status":"error","leads":0,"error":%s}""".formatted(
-                                slugs.get(index),
-                                asciiJson(cases.get(index).path("error").asString())))
+                .mapToObj(index -> failedWithError(
+                        slugs.get(index), cases.get(index).path("error").asString()))
                 .toArray(String[]::new));
 
-        List<PracticeScriptRunReport> runs =
-                parser.parsePracticeScriptReport(report.getBytes(UTF_8), Set.copyOf(slugs));
+        List<PracticeScriptRunReport> runs = parser.parsePracticeScriptReport(
+                report.getBytes(UTF_8),
+                slugs.stream().collect(Collectors.toMap(slug -> slug, slug -> PracticeProgramKind.BUILTIN)));
 
         assertThat(runs)
                 .extracting(PracticeScriptRunReport::practiceSlug, PracticeScriptRunReport::error)
@@ -209,23 +314,15 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
         assertThat(failures()).isZero();
     }
 
-    /** A JSON string with every character outside printable ASCII escaped, so an unpaired surrogate survives. */
-    private static String asciiJson(String text) {
-        return text.chars()
-                .mapToObj(c ->
-                        c >= ' ' && c <= '~' && c != '"' && c != '\\' ? Character.toString(c) : "\\u%04x".formatted(c))
-                .collect(Collectors.joining("", "\"", "\""));
-    }
-
     /**
      * The run is written in the attempt's terminal transaction, so a value that PostgreSQL refuses would fail the
      * whole review. A control character becomes a space; a line with an unpaired surrogate is left out.
      */
     @Test
     void shouldKeepOnlyTextPostgresqlCanStoreWhenTheErrorHoldsANulOrAnUnpairedSurrogate() {
-        List<PracticeScriptRunReport> runs = parse(report("""
-                {"slug":"comment-quality","status":"error","leads":0,"error":"a\\u0000b\\tc"}""", """
-                {"slug":"error-handling","status":"error","leads":0,"error":"bad \\uD800 thing"}"""));
+        List<PracticeScriptRunReport> runs = parse(report(
+                failedWithError("comment-quality", "a\u0000b\tc"),
+                failedWithError("error-handling", "bad \uD800 thing")));
 
         assertThat(runs)
                 .extracting(PracticeScriptRunReport::status, PracticeScriptRunReport::error)
@@ -235,19 +332,19 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldKeepHowLongAScriptRanWhenTheRunnerSaysAndLeaveItOutOtherwise() {
-        List<PracticeScriptRunReport> runs = parse(report("""
-                {"slug":"comment-quality","status":"ok","leads":0,"models":[],"durationMs":4200}""", """
-                {"slug":"error-handling","status":"skipped","leads":0,"models":[],"durationMs":-1}"""));
+    void shouldKeepHowLongAProgramRanWhenTheRunnerSaysAndLeaveItOutOtherwise() {
+        List<PracticeScriptRunReport> runs = parse(report(
+                entry("comment-quality", "ok", null).put("durationMs", 4200).toString(),
+                entry("error-handling", "skipped", "unavailable")
+                        .put("durationMs", -1)
+                        .toString()));
 
         assertThat(runs).extracting(PracticeScriptRunReport::durationMs).containsExactly(4200, null);
-        // A script that did not run took no time, whatever the runner wrote.
-        assertThat(parse(report("""
-                        {"slug":"comment-quality","status":"skipped","leads":0,"models":[],"durationMs":40}""")))
-                .extracting(PracticeScriptRunReport::durationMs)
-                .containsOnlyNulls();
-        assertThat(parse(report("""
-                        {"slug":"comment-quality","status":"not-finished","leads":0,"durationMs":5}""")))
+        // A program that did not start took no time, whatever the runner wrote.
+        assertThat(parse(report(entry("comment-quality", "not-reached", "deadline")
+                        .put("durationMs", 40)
+                        .toString())))
+                .filteredOn(run -> run.practiceSlug().equals("comment-quality"))
                 .extracting(PracticeScriptRunReport::durationMs)
                 .containsOnlyNulls();
         assertThat(failures()).isZero();
@@ -255,10 +352,11 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
 
     /** The error only explains a failure, so a run that did not fail never carries one. */
     @ParameterizedTest
-    @ValueSource(strings = {"ok", "timeout", "skipped"})
-    void shouldLeaveTheErrorOutWhenTheScriptDidNotFail(String status) {
-        String entry = """
-                {"slug":"comment-quality","status":"%s","leads":0,"error":"Something broke"}""".formatted(status);
+    @CsvSource({"ok,", "skipped,unavailable", "not-reached,deadline"})
+    void shouldLeaveTheErrorOutWhenTheProgramDidNotFail(String status, @Nullable String stopReason) {
+        String entry = entry("comment-quality", status, stopReason)
+                .put("error", "Something broke")
+                .toString();
 
         assertThat(parse(report(entry)).getFirst().error()).isNull();
     }
@@ -266,8 +364,12 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     @ParameterizedTest
     @ValueSource(strings = {"\"\"", "\"  \"", "42", "{}", "null"})
     void shouldKeepAFailedRunWithoutAnErrorWhenTheErrorIsNotOneLineOfText(String error) {
-        List<PracticeScriptRunReport> runs = parse(report("""
-                {"slug":"comment-quality","status":"error","leads":0,"error":%s}""".formatted(error)));
+        String entry = entry("comment-quality", "failed", "error")
+                .put("error", "@@error@@")
+                .toString()
+                .replace(ERROR_PLACEHOLDER, error);
+
+        List<PracticeScriptRunReport> runs = parse(report(entry));
 
         assertThat(runs.getFirst().status()).isEqualTo(PracticeScriptRunStatus.FAILED);
         assertThat(runs.getFirst().error()).isNull();
@@ -275,23 +377,34 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"ok,OK", "skipped,SKIPPED", "error,FAILED", "timeout,TIMED_OUT", "not-finished,NOT_FINISHED"})
-    void shouldMapEachRunnerStatusWhenTheReportNamesIt(String wire, PracticeScriptRunStatus status) {
-        assertThat(parse(report("""
-                        {"slug":"comment-quality","status":"%s","leads":0}""".formatted(wire))))
+    @CsvSource({"ok,,OK", "skipped,unavailable,SKIPPED", "failed,error,FAILED", "not-reached,deadline,NOT_REACHED"})
+    void shouldMapEachRunnerStatusWhenTheReportNamesIt(
+            String wire, @Nullable String stopReason, PracticeScriptRunStatus status) {
+        assertThat(parse(report(entry("comment-quality", wire, stopReason).toString())))
                 .extracting(PracticeScriptRunReport::practiceSlug, PracticeScriptRunReport::status)
                 .contains(tuple("comment-quality", status));
         assertThat(failures()).isZero();
     }
 
-    @Test
-    void shouldMapEachModelSlotToThePurposeThatServesItWhenTheScriptDeclaredIt() {
-        String entry = """
-                {"slug":"comment-quality","status":"skipped","leads":0,"models":[
-                  {"slot":"embedding","need":"optional","bound":false,"notRated":{"unavailable":4}},
-                  {"slot":"reranking","need":"required","bound":false,"notRated":{}}]}""";
+    @ParameterizedTest
+    @EnumSource(PracticeScriptStopReason.class)
+    void shouldMapEachStopReasonWhenAFailedRunNamesIt(PracticeScriptStopReason stopReason) {
+        assertThat(parse(report(
+                        entry("comment-quality", "failed", stopReason.wire()).toString())))
+                .extracting(PracticeScriptRunReport::practiceSlug, PracticeScriptRunReport::stopReason)
+                .contains(tuple("comment-quality", stopReason));
+        assertThat(failures()).isZero();
+    }
 
-        assertThat(Objects.requireNonNull(parse(report(entry)).getFirst().models()))
+    @Test
+    void shouldMapEachModelSlotToThePurposeThatServesItWhenTheProgramDeclaredIt() {
+        ObjectNode entry = entry("comment-quality", "skipped", "unavailable");
+        entry.set("models", MAPPER.readTree("""
+                [{"slot":"embedding","need":"optional","bound":false,"notRated":{"unavailable":4}},
+                 {"slot":"reranking","need":"required","bound":false,"notRated":{}}]"""));
+
+        assertThat(Objects.requireNonNull(
+                        parse(report(entry.toString())).getFirst().models()))
                 .extracting(PracticeScriptModelUseDTO::purpose, PracticeScriptModelUseDTO::bound)
                 .containsExactly(
                         tuple(PracticeScriptModelPurpose.PRACTICE_EMBEDDING, false),
@@ -312,71 +425,127 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRecordAStagedScriptAsNotFinishedWhenAWholeReportDoesNotNameIt() {
-        List<PracticeScriptRunReport> runs = parse(report(withoutModels("comment-quality", "ok", 2)));
+    void shouldRecordAnAdmittedPracticeAsNotFinishedWhenAWholeReportDoesNotNameIt() {
+        List<PracticeScriptRunReport> runs = parse(report(ok("comment-quality")));
 
         assertThat(runs)
                 .contains(new PracticeScriptRunReport(
-                        "error-handling", PracticeScriptRunStatus.NOT_FINISHED, 0, null, null, null));
+                        "error-handling",
+                        PracticeScriptRunStatus.NOT_FINISHED,
+                        PracticeProgramKind.CUSTOM,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null));
         assertThat(failures()).isZero();
     }
 
-    /** A truncated report left scripts out for its size, not because they did not finish. */
+    /** A truncated report left practices out for its size, not because they did not finish. */
     @Test
-    void shouldRecordNoRunForAStagedScriptWhenATruncatedReportDoesNotNameIt() {
-        List<PracticeScriptRunReport> runs =
-                parse("{\"practices\":[" + withoutModels("comment-quality", "ok", 2) + "],\"truncated\":true}");
+    void shouldRecordNoRunForAnAdmittedPracticeWhenATruncatedReportDoesNotNameIt() {
+        List<PracticeScriptRunReport> runs = parse(report(true, ok("comment-quality")));
 
         assertThat(runs).extracting(PracticeScriptRunReport::practiceSlug).containsExactly("comment-quality");
         assertThat(failures()).isZero();
     }
 
     @Test
-    void shouldDropAnEntryWhenTheJobDidNotStageItsScript() {
+    void shouldDropAnEntryWhenTheJobDidNotAdmitItsPractice() {
         List<PracticeScriptRunReport> runs =
-                parse(report(withoutModels("comment-quality", "ok", 2), withoutModels("not-admitted", "ok", 9)));
+                parse(report(ok("comment-quality"), ok("error-handling"), ok("not-admitted")));
 
         assertThat(runs).extracting(PracticeScriptRunReport::practiceSlug).doesNotContain("not-admitted");
         assertThat(failures()).isEqualTo(1d);
     }
 
+    /** Each case puts one entry for {@code comment-quality}, a built-in practice, outside the contract. */
+    static Stream<Consumer<ObjectNode>> entriesOutsideTheContract() {
+        return Stream.<Consumer<ObjectNode>>of(
+                entry -> entry.put("status", "crashed"),
+                // The program kind the runner ran is not the one the job admitted.
+                entry -> entry.set("program", MAPPER.readTree("{\"kind\":\"custom\",\"digest\":\"" + DIGEST + "\"}")),
+                entry -> entry.set("program", MAPPER.readTree("{\"kind\":\"builtin\",\"digest\":\"" + DIGEST + "\"}")),
+                entry -> entry.set("program", MAPPER.readTree("{\"kind\":\"script\",\"digest\":null}")),
+                entry -> entry.remove("program"),
+                // Ok exactly when the program stopped for no reason.
+                entry -> entry.put("stopReason", "error"),
+                entry -> entry.put("status", "failed"),
+                entry -> entry.put("status", "failed").put("stopReason", "bored"),
+                // A program that did not start made no call.
+                entry -> entry.put("status", "not-reached")
+                        .put("stopReason", "deadline")
+                        .set(
+                                "calls",
+                                MAPPER.readTree(
+                                        "{\"review\":1,\"chat\":0,\"decision\":0,\"embedding\":0,\"reranking\":0}")),
+                entry -> entry.remove("calls"),
+                entry -> entry.set(
+                        "calls",
+                        MAPPER.readTree("{\"review\":-1,\"chat\":0,\"decision\":0,\"embedding\":0,\"reranking\":0}")),
+                entry -> entry.set(
+                        "calls",
+                        MAPPER.readTree(
+                                "{\"review\":0,\"chat\":0,\"decision\":0,\"embedding\":0,\"reranking\":0,\"vision\":0}")),
+                entry -> entry.remove("coverageReached"),
+                entry -> entry.set(
+                        "coverageReached", MAPPER.readTree("{\"reads\":\"2\",\"truncatedReads\":0,\"failedReads\":0}")),
+                entry -> entry.remove("models"),
+                entry -> entry.set("models", MAPPER.readTree("{}")),
+                entry -> entry.putNull("models"),
+                entry -> entry.set(
+                        "models",
+                        MAPPER.readTree(
+                                "[{\"slot\":\"vision\",\"need\":\"required\",\"bound\":true,\"notRated\":{}}]")),
+                entry -> entry.set(
+                        "models",
+                        MAPPER.readTree(
+                                "[{\"slot\":\"decision\",\"need\":\"nice-to-have\",\"bound\":true,\"notRated\":{}}]")),
+                entry -> entry.set(
+                        "models",
+                        MAPPER.readTree(
+                                "[{\"slot\":\"decision\",\"need\":\"required\",\"bound\":\"yes\",\"notRated\":{}}]")),
+                entry -> entry.set(
+                        "models",
+                        MAPPER.readTree(
+                                "[{\"slot\":\"decision\",\"need\":\"required\",\"bound\":true,\"notRated\":{\"bored\":1}}]")),
+                entry -> entry.set(
+                        "models",
+                        MAPPER.readTree("[{\"slot\":\"decision\",\"need\":\"required\",\"bound\":true,\"notRated\":{}},"
+                                + "{\"slot\":\"decision\",\"need\":\"optional\",\"bound\":true,\"notRated\":{}}]")),
+                // The retired leads report.
+                entry -> entry.put("leads", 2));
+    }
+
     @ParameterizedTest
-    @ValueSource(
-            strings = {
-                "{\"slug\":\"comment-quality\",\"status\":\"crashed\",\"leads\":0,\"models\":[]}",
-                "{\"slug\":\"comment-quality\",\"status\":\"ok\",\"leads\":-1,\"models\":[]}",
-                "{\"slug\":\"comment-quality\",\"status\":\"ok\",\"leads\":\"2\",\"models\":[]}",
-                "{\"slug\":\"comment-quality\",\"status\":\"ok\",\"models\":[]}",
-                "{\"slug\":\"comment-quality\",\"status\":\"ok\",\"leads\":2,\"models\":{}}",
-                "{\"slug\":\"comment-quality\",\"status\":\"ok\",\"leads\":2,\"models\":null}",
-                "{\"slug\":\"comment-quality\",\"status\":\"ok\",\"leads\":2,\"models\":["
-                        + "{\"slot\":\"vision\",\"need\":\"required\",\"bound\":true,\"notRated\":{}}]}",
-                "{\"slug\":\"comment-quality\",\"status\":\"ok\",\"leads\":2,\"models\":["
-                        + "{\"slot\":\"decision\",\"need\":\"nice-to-have\",\"bound\":true,\"notRated\":{}}]}",
-                "{\"slug\":\"comment-quality\",\"status\":\"ok\",\"leads\":2,\"models\":["
-                        + "{\"slot\":\"decision\",\"need\":\"required\",\"bound\":\"yes\",\"notRated\":{}}]}",
-                "{\"slug\":\"comment-quality\",\"status\":\"ok\",\"leads\":2,\"models\":["
-                        + "{\"slot\":\"decision\",\"need\":\"required\",\"bound\":true,\"notRated\":{\"bored\":1}}]}",
-                "{\"slug\":\"comment-quality\",\"status\":\"ok\",\"leads\":2,\"models\":["
-                        + "{\"slot\":\"decision\",\"need\":\"required\",\"bound\":true,\"notRated\":{}},"
-                        + "{\"slot\":\"decision\",\"need\":\"optional\",\"bound\":true,\"notRated\":{}}]}",
-                "{\"slug\":\"comment-quality\",\"status\":\"skipped\",\"leads\":3,\"models\":[]}",
-                "{\"slug\":\"comment-quality\",\"status\":\"not-finished\",\"leads\":1}",
-                "{\"slug\":\"comment-quality\",\"status\":\"not-finished\",\"leads\":0,\"models\":[]}"
-            })
-    void shouldDropAnEntryWithoutClaimingTheScriptDidNotFinishWhenItIsOutsideTheContract(String entry) {
-        List<PracticeScriptRunReport> runs = parse(report(entry, withoutModels("error-handling", "ok", 1)));
+    @MethodSource("entriesOutsideTheContract")
+    void shouldDropAnEntryWithoutClaimingTheProgramDidNotFinishWhenItIsOutsideTheContract(Consumer<ObjectNode> defect) {
+        ObjectNode entry = entry("comment-quality", "ok", null);
+        defect.accept(entry);
+
+        List<PracticeScriptRunReport> runs = parse(report(entry.toString(), ok("error-handling")));
 
         assertThat(runs).extracting(PracticeScriptRunReport::practiceSlug).containsExactly("error-handling");
         assertThat(failures()).isEqualTo(1d);
     }
 
     @Test
+    void shouldDropTheEntryWhenACustomProgramNamesNoDigest() {
+        ObjectNode entry = entry("error-handling", "ok", null);
+        entry.set("program", MAPPER.readTree("{\"kind\":\"custom\",\"digest\":null}"));
+
+        List<PracticeScriptRunReport> runs = parse(report(ok("comment-quality"), entry.toString()));
+
+        assertThat(runs).extracting(PracticeScriptRunReport::practiceSlug).containsExactly("comment-quality");
+        assertThat(failures()).isEqualTo(1d);
+    }
+
+    @Test
     void shouldDropEveryEntryOfASlugWhenTheReportNamesItTwice() {
-        List<PracticeScriptRunReport> runs = parse(report(
-                withoutModels("comment-quality", "ok", 1),
-                withoutModels("comment-quality", "error", 0),
-                withoutModels("error-handling", "ok", 1)));
+        List<PracticeScriptRunReport> runs =
+                parse(report(ok("comment-quality"), failedWithError("comment-quality", "boom"), ok("error-handling")));
 
         assertThat(runs).extracting(PracticeScriptRunReport::practiceSlug).containsExactly("error-handling");
     }
@@ -385,51 +554,59 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     @ValueSource(
             strings = {
                 "not json",
-                "{\"practices\":[],\"truncated\":false} trailing",
-                "{\"practices\":{},\"truncated\":false}",
-                "{\"practices\":[]}",
-                "{\"practices\":[],\"truncated\":\"no\"}",
+                "{\"schemaVersion\":2,\"practices\":[],\"truncated\":false} trailing",
+                "{\"schemaVersion\":2,\"practices\":{},\"truncated\":false}",
+                "{\"schemaVersion\":2,\"practices\":[]}",
+                "{\"schemaVersion\":2,\"practices\":[],\"truncated\":\"no\"}",
+                "{\"practices\":[],\"truncated\":false}",
+                "{\"schemaVersion\":1,\"practices\":[],\"truncated\":false}",
+                "{\"schemaVersion\":\"2\",\"practices\":[],\"truncated\":false}",
                 "[]",
                 "{}"
             })
-    void shouldRecordNothingWhenTheReportCannotBeRead(String report) {
+    void shouldRecordNothingWhenTheReportIsInvalid(String report) {
         assertThat(parse(report)).isEmpty();
         assertThat(failures()).isEqualTo(1d);
     }
 
     @Test
     void shouldRecordNothingWhenThereIsNoReport() {
-        assertThat(parser.parsePracticeScriptReport(null, STAGED)).isEmpty();
-        assertThat(parser.parsePracticeScriptReport(new byte[0], STAGED)).isEmpty();
+        assertThat(parser.parsePracticeScriptReport(null, ADMITTED)).isEmpty();
+        assertThat(parser.parsePracticeScriptReport(new byte[0], ADMITTED)).isEmpty();
         assertThat(failures()).isZero();
     }
 
     @Test
     void shouldRefuseTheReportWhenItIsLargerThanItsLimit() {
-        String entries = report(withoutModels("comment-quality", "ok", 1));
+        String entries = report(ok("comment-quality"));
         String atLimit = entries + " ".repeat(PiResultParser.PRACTICE_SCRIPT_REPORT_MAX_BYTES - entries.length());
 
-        assertThat(parse(atLimit)).hasSize(STAGED.size());
+        assertThat(parse(atLimit)).hasSize(ADMITTED.size());
         assertThat(parse(atLimit + " ")).isEmpty();
         assertThat(failures()).isEqualTo(1d);
     }
 
     @Test
     void shouldRefuseTheReportWhenItHasMoreEntriesThanItsLimit() {
-        Set<String> staged = IntStream.rangeClosed(0, PiResultParser.PRACTICE_SCRIPT_REPORT_MAX_ENTRIES)
-                .mapToObj(i -> "practice-" + i)
-                .collect(Collectors.toSet());
-        String atLimit = report(staged.stream()
+        Map<String, PracticeProgramKind> admitted = IntStream.rangeClosed(
+                        0, PiResultParser.PRACTICE_SCRIPT_REPORT_MAX_ENTRIES)
+                .mapToObj(i -> "p-" + i)
+                .collect(Collectors.toMap(slug -> slug, slug -> PracticeProgramKind.BUILTIN));
+        // Short entries, so that the entry limit and not the size limit refuses the larger report.
+        Function<String, String> shortEntry = slug -> """
+                {"practiceSlug":"%s","program":{"kind":"builtin","digest":null},"models":[],"status":"ok",\
+                "stopReason":null,"calls":{"review":0,"chat":0,"decision":0,"embedding":0,"reranking":0},\
+                "coverageReached":{"reads":0,"truncatedReads":0,"failedReads":0}}""".formatted(slug);
+        String atLimit = report(admitted.keySet().stream()
                 .sorted()
                 .limit(PiResultParser.PRACTICE_SCRIPT_REPORT_MAX_ENTRIES)
-                .map(slug -> withoutModels(slug, "ok", 0))
+                .map(shortEntry)
                 .toArray(String[]::new));
-        String overLimit =
-                report(staged.stream().map(slug -> withoutModels(slug, "ok", 0)).toArray(String[]::new));
+        String overLimit = report(admitted.keySet().stream().map(shortEntry).toArray(String[]::new));
 
-        assertThat(parser.parsePracticeScriptReport(atLimit.getBytes(UTF_8), staged))
-                .hasSize(staged.size());
-        assertThat(parser.parsePracticeScriptReport(overLimit.getBytes(UTF_8), staged))
+        assertThat(parser.parsePracticeScriptReport(atLimit.getBytes(UTF_8), admitted))
+                .hasSize(admitted.size());
+        assertThat(parser.parsePracticeScriptReport(overLimit.getBytes(UTF_8), admitted))
                 .isEmpty();
     }
 }

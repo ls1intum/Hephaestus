@@ -38,7 +38,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("productfeedback.ProductFeedbackEmailIntegrationTest", "email-capture"),
             assignment("productfeedback.SurveyEmailInvitationIntegrationTest", "email-capture"),
             assignment("notification.email.EmailAdminControllerIntegrationTest", "email-capture"),
-            assignment("agent.handler.ObservationAdmissionConcurrencyIntegrationTest", "admission-race"),
+            assignment("agent.handler.ResultAdmissionConcurrencyIntegrationTest", "admission-race"),
             assignment("agent.job.PullRequestRepairRecheckIntegrationTest", "admission-race"),
             assignment("agent.job.DeferredIssueEventIntegrationTest", "issue-event-transaction"),
             assignment("agent.job.ClosedIssueDiscussionIntegrationTest", "issue-event-transaction"),
@@ -85,7 +85,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "shared configured sender identity and captured SMTP boundary for durable delivery and HTTP authorization"),
             Map.entry(
                     "admission-race",
-                    "real proxied observation admission with a held verification and bounded database lock waits"),
+                    "real proxied result admission with a held verification and bounded database lock waits"),
             Map.entry(
                     "issue-event-transaction",
                     "real transactional event listeners, issue snapshots and comments with controlled workspace resolution"),

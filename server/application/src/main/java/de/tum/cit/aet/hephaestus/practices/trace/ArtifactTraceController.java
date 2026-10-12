@@ -42,7 +42,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * <p>The list of recorded work is the workspace's, so it is an admin's. One work's trace is also a member's
  * when they name a review that observed them on it, which is how their practice profile opens it; any other
  * review, or none, answers 404, the same answer a review that does not exist gets, so a member cannot learn
- * which work or reviews exist from it. A member's trace counts only the observations about them and the
+ * which work or reviews exist from it. A member's trace counts only the results about them and the
  * feedback addressed to them, since a review may have observed several people on the same work. In a user view
  * the viewed member's rule applies.
  */
@@ -97,7 +97,7 @@ public class ArtifactTraceController {
             description = "Every practice the workspace runs against this kind of work appears, including the ones "
                     + "that did nothing, each with the recorded reason. Name a review and every answer is that "
                     + "review's own. A workspace admin may read any work, with or without a review; anyone else "
-                    + "must name a review that observed them on this work, and reads only the observations about "
+                    + "must name a review that observed them on this work, and reads only the results about "
                     + "them and the feedback addressed to them. 404 means nothing about this artifact "
                     + "was ever recorded here, the named review never ran on it, or the caller may not read it.",
             operationId = "getArtifactTrace")
@@ -139,7 +139,7 @@ public class ArtifactTraceController {
     @PreAuthorize("@workspaceSecure.isMember()")
     @Operation(
             summary = "Explain a named review of the calling developer's own work",
-            description = "Counts only observations about the caller and feedback addressed to them, including "
+            description = "Counts only results about the caller and feedback addressed to them, including "
                     + "when the caller is a workspace admin. The named review must have observed them on this work. "
                     + "An inaccessible review answers the same 404 as an absent one.",
             operationId = "getOwnArtifactTrace")

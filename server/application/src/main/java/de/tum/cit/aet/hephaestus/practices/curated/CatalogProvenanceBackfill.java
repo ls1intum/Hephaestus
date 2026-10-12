@@ -169,7 +169,7 @@ public class CatalogProvenanceBackfill {
 
     /**
      * Switches off every copy whose catalogue entry withdrew automated review, with an audited reason, so each
-     * surface that shows autonomy agrees with the runtime fence; definitions, revisions and observations stay.
+     * surface that shows autonomy agrees with the runtime fence; definitions, revisions and results stay.
      *
      * @return how many withdrawn copies are still not switched off
      */

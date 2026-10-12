@@ -38,6 +38,7 @@ public class PiEventToUiChunkTranslator {
             case "tool_execution_end" -> handleToolEnd();
             case "turn_end" -> handleTurnEnd(state);
             case "agent_end" -> handleAgentEnd(piEvent, state);
+            case "link_result" -> handleLinkResult(piEvent, state);
             case "link_observation" -> handleLinkObservation(piEvent, state);
             case "pi_error" -> handleError(piEvent, state);
             case "turn_watchdog_fired" -> handleWatchdogFired(state);
@@ -422,28 +423,47 @@ public class PiEventToUiChunkTranslator {
         };
     }
 
-    private List<UIMessageChunk> handleLinkObservation(JsonNode event, TranslatorState state) {
-        // Runner emits camelCase `observationId` and `text` (pi-mentor-runner.ts defineLinkObservationTool).
+    private List<UIMessageChunk> handleLinkResult(JsonNode event, TranslatorState state) {
+        // Runner emits camelCase `practiceResultId` and `text` (pi-mentor-runner.ts, its link_result tool).
         // A link that cannot be read is feedback this turn would silently lose or show empty, so it fails the turn.
-        String observationIdStr = optionalString(event, "observationId");
+        UUID practiceResultId = uuid(optionalString(event, "practiceResultId"));
         String text = optionalString(event, "text");
-        @Nullable UUID observationId = null;
-        try {
-            observationId = observationIdStr == null ? null : UUID.fromString(observationIdStr);
-        } catch (IllegalArgumentException e) {
-            // Falls through to the failure below.
-        }
-        if (observationId == null || text == null || text.isBlank()) {
-            return failTurn(state, "a link_observation without a readable observationId and text");
+        if (practiceResultId == null || text == null || text.isBlank()) {
+            return failTurn(state, "a link_result without a readable practiceResultId and text");
         }
         // The runner emits a link only after the server admitted it, once per admission, so any other is a runner that
         // broke the protocol.
-        if (!state.consumeLinkAdmission(observationId)) {
+        if (!state.consumeLinkAdmission(practiceResultId)) {
+            return failTurn(state, "a link_result the server did not admit");
+        }
+        UIMessageChunk.DataResult link = UIMessageChunk.DataResult.of(practiceResultId, text);
+        state.recordDataResult(link);
+        return List.of(link);
+    }
+
+    private List<UIMessageChunk> handleLinkObservation(JsonNode event, TranslatorState state) {
+        // Runner emits camelCase `observationId` and `text` (pi-mentor-runner.ts, its link_observation tool).
+        UUID observationId = uuid(optionalString(event, "observationId"));
+        String text = optionalString(event, "text");
+        if (observationId == null || text == null || text.isBlank()) {
+            return failTurn(state, "a link_observation without a readable observationId and text");
+        }
+        UUID practiceResultId = state.resultOfLinkedObservation(observationId);
+        if (practiceResultId == null || !state.consumeObservationLinkAdmission(observationId)) {
             return failTurn(state, "a link_observation the server did not admit");
         }
-        UIMessageChunk.DataObservation observation = UIMessageChunk.DataObservation.of(observationId, text);
-        state.recordDataObservation(observation);
-        return List.of(observation);
+        UIMessageChunk.DataResultObservation link =
+                UIMessageChunk.DataResultObservation.of(practiceResultId, observationId, text);
+        state.recordDataResultObservation(link);
+        return List.of(link);
+    }
+
+    private static @Nullable UUID uuid(@Nullable String value) {
+        try {
+            return value == null ? null : UUID.fromString(value);
+        } catch (IllegalArgumentException unreadable) {
+            return null;
+        }
     }
 
     private List<UIMessageChunk> handleError(JsonNode event, TranslatorState state) {

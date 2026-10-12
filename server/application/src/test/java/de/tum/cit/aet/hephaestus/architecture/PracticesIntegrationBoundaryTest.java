@@ -51,8 +51,8 @@ class PracticesIntegrationBoundaryTest extends HephaestusArchitectureTest {
      * do not read its silence as proof that none exists.
      */
     private static final Set<String> FROZEN_VIOLATIONS = Set.of(
-            "de.tum.cit.aet.hephaestus.practices.observation.ObservationService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",
-            "de.tum.cit.aet.hephaestus.practices.observation.ObservationService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
+            "de.tum.cit.aet.hephaestus.practices.result.PracticeResultService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",
+            "de.tum.cit.aet.hephaestus.practices.result.PracticeResultService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
             "de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",
             "de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
             "de.tum.cit.aet.hephaestus.practices.review.ReviewGate -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue",

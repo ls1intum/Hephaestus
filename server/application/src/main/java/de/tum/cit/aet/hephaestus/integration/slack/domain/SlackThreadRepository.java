@@ -62,7 +62,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
 
     /**
      * The ids of every thread aggregate on one channel — collected on channel erasure so the derived
-     * {@code chat.conversation_thread} observations/feedback (keyed by these {@code slack_thread} ids as
+     * {@code chat.conversation_thread} results/feedback (keyed by these {@code slack_thread} ids as
      * {@code artifact_id}) can be hard-deleted through the practices erasure port before the aggregates themselves
      * are dropped.
      */

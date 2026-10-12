@@ -7,11 +7,11 @@ import de.tum.cit.aet.hephaestus.core.time.TimeRange;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.BucketFeedbackCounts;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.PracticeFeedbackCounts;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PracticeObservationCounts;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository.PracticeResultCounts;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewPracticeGroupDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewObservationCountsDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewResultCountsDTO;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.EnumMap;
@@ -26,9 +26,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * How practice reviews went in a time range: reviews by {@code created_at}, observations by {@code observed_at} and
+ * How practice reviews went in a time range: reviews by {@code created_at}, results by {@code observed_at} and
  * feedback by {@code created_at}, the columns the admin lists filter by. Every total therefore matches the list
- * filtered to the same range and value, and each practice's observation and feedback counts match the list
+ * filtered to the same range and value, and each practice's result and feedback counts match the list
  * filtered to the same range, practice and value.
  */
 @Service
@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 class PracticeReviewOverviewService {
 
     private final AgentJobRepository agentJobRepository;
-    private final ObservationRepository observationRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final FeedbackRepository feedbackRepository;
 
     /**
@@ -60,7 +60,7 @@ class PracticeReviewOverviewService {
         TimeRange range = buckets.range();
         int size = buckets.starts().size();
         long[] reviewsByBucket = new long[size];
-        long[] observationsByBucket = new long[size];
+        long[] practiceResultsByBucket = new long[size];
         long[] feedbackByBucket = new long[size];
         Map<AgentJobStatus, Long> reviews = new EnumMap<>(AgentJobStatus.class);
         ReviewFeedbackCountsDTO feedback = ReviewFeedbackCountsDTO.empty();
@@ -72,8 +72,8 @@ class PracticeReviewOverviewService {
                 reviews.merge(row.getStatus(), row.getCount(), Long::sum);
             }
             for (var row :
-                    observationRepository.countObservationsByBucket(workspaceId, range.from(), range.to(), starts)) {
-                observationsByBucket[row.getBucket() - 1] += row.getCount();
+                    practiceResultRepository.countResultsByBucket(workspaceId, range.from(), range.to(), starts)) {
+                practiceResultsByBucket[row.getBucket() - 1] += row.getCount();
             }
             for (BucketFeedbackCounts row :
                     feedbackRepository.summarizeFeedbackByBucket(workspaceId, range.from(), range.to(), starts)) {
@@ -85,15 +85,15 @@ class PracticeReviewOverviewService {
         Map<Long, PracticeFeedbackCounts> practiceFeedback =
                 feedbackRepository.summarizeFeedbackByPractice(workspaceId, range.from(), range.to()).stream()
                         .collect(Collectors.toMap(PracticeFeedbackCounts::getPracticeId, Function.identity()));
-        List<PracticeObservationCounts> practiceObservations = observationRepository.summarizeObservationsByPractice(
+        List<PracticeResultCounts> practiceResults = practiceResultRepository.summarizeResultsByPractice(
                 workspaceId, range.from(), range.to(), practiceFeedback.keySet().toArray(Long[]::new));
-        List<PracticeReviewCountsDTO> practices = practiceObservations.stream()
+        List<PracticeReviewCountsDTO> practices = practiceResults.stream()
                 .map(row -> new PracticeReviewCountsDTO(
                         row.getPracticeSlug(),
                         row.getPracticeName(),
                         ReviewPracticeGroupDTO.from(
                                 row.getGroupSlug(), row.getGroupName(), row.getGroupIcon(), row.getGroupColor()),
-                        ReviewObservationCountsDTO.from(row),
+                        ReviewResultCountsDTO.from(row),
                         row.getInvalidated(),
                         ReviewFeedbackCountsDTO.from(practiceFeedback.get(row.getPracticeId()))))
                 .toList();
@@ -104,17 +104,17 @@ class PracticeReviewOverviewService {
                 buckets.size(),
                 ReviewRunCountsDTO.from(reviews),
                 practices.stream()
-                        .map(PracticeReviewCountsDTO::observations)
-                        .reduce(ReviewObservationCountsDTO.empty(), ReviewObservationCountsDTO::plus),
+                        .map(PracticeReviewCountsDTO::practiceResults)
+                        .reduce(ReviewResultCountsDTO.empty(), ReviewResultCountsDTO::plus),
                 practices.stream()
-                        .mapToLong(PracticeReviewCountsDTO::observationsInvalidated)
+                        .mapToLong(PracticeReviewCountsDTO::practiceResultsInvalidated)
                         .sum(),
                 feedback,
                 IntStream.range(0, size)
                         .mapToObj(i -> new PracticeReviewBucketDTO(
                                 buckets.starts().get(i),
                                 reviewsByBucket[i],
-                                observationsByBucket[i],
+                                practiceResultsByBucket[i],
                                 feedbackByBucket[i]))
                         .toList(),
                 practices);

@@ -14,11 +14,11 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedJobInputsFixtures;
+import de.tum.cit.aet.hephaestus.agent.context.ReviewedWork;
 import de.tum.cit.aet.hephaestus.agent.context.providers.PullRequestContentSource;
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ResultsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
@@ -46,9 +46,12 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationFingerprint;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.AdmittedReviewJobFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.GitTestFixtures;
@@ -62,6 +65,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -69,7 +73,6 @@ import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -80,15 +83,17 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Integration test for {@link ReviewOutputService} exercising real PostgreSQL
- * for idempotent observation persistence, evidence admission and outcome classification.
+ * for idempotent result persistence, evidence admission and outcome classification.
  *
  * <p>No mocks required — this service layer does not call external APIs. It resolves practice
- * slugs against the DB and persists observations via {@code ObservationRepository.insertIfAbsent()}.
+ * slugs against the DB and persists results via {@code PracticeResultRepository.insertIfAbsent()}.
  * The reviewed change is quoted from a real checkout staged in the attempt folder, the way the
  * repository-tree source stages one, so the quote is verified through JGit rather than a double.
  */
@@ -100,7 +105,10 @@ class ReviewOutputServiceIntegrationTest extends BaseIntegrationTest {
     private ReviewOutputService deliveryService;
 
     @Autowired
-    private ObservationAdmissionService admission;
+    private ResultAdmissionService admission;
+
+    @Autowired
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private ObservationRepository observationRepository;
@@ -369,64 +377,140 @@ class ReviewOutputServiceIntegrationTest extends BaseIntegrationTest {
         return practiceRepository.saveAndFlush(p);
     }
 
-    private ValidatedObservation observation(String slug, @Nullable Outcome outcome) {
-        return new ValidatedObservation(
-                slug,
-                "Test: " + slug,
-                outcome == null ? Outcome.NOT_APPLICABLE : outcome,
-                outcome == Outcome.NOT_MET ? Severity.MINOR : null,
-                evidence(outcome),
-                null);
-    }
+    // --- Candidates as the runner submits them -------------------------------------------------------------------
 
-    private static ObjectNode evidence(@Nullable Outcome outcome) {
-        ObjectNode evidence = OBJECT_MAPPER.createObjectNode();
-        evidence.putArray("citations")
-                .addObject()
+    /** A quote of the change at {@code src/Auth.java}. */
+    private static ObjectNode change(String side, int line, String quote) {
+        return OBJECT_MAPPER
+                .createObjectNode()
                 .put("sourceKind", "scm.pull-request.diff")
                 .put("artifactPath", PullRequestContentSource.CHANGE_FILE)
                 .put("path", "src/Auth.java")
-                .put("side", "NEW")
-                .put("startLine", 10)
-                .put("endLine", 10)
-                .put("quote", "insecure();");
-        // This absence claim records the scope of its search.
-        if (outcome == Outcome.NOT_MET) {
-            ObjectNode search = evidence.putObject("search");
-            search.putArray("consulted").add("scm.pull-request.diff");
-            search.put("lookedFor", "a described rationale for the change");
-            search.put("boundary", "the diff of this pull request only");
-        }
-        return evidence;
+                .put("side", side)
+                .put("startLine", line)
+                .put("endLine", line)
+                .put("quote", quote);
     }
 
-    private ReviewOutputService.RecordedObservations publishVerified(
-            AgentJob job, List<ReviewResultParser.ValidatedObservation> submitted) {
-        return deliveryService.publish(job, deliveryService.prepare(job, submitted));
+    /** Line 10 at the head, which the change added. */
+    private static ObjectNode insecure() {
+        return change("NEW", 10, "insecure();");
+    }
+
+    private static ObjectNode hostCoverage() {
+        return OBJECT_MAPPER
+                .createObjectNode()
+                .put("source", "host")
+                .put("reads", 1)
+                .put("truncatedReads", 0)
+                .put("failedReads", 0)
+                .put("complete", true);
+    }
+
+    private static ObjectNode search(String boundary) {
+        ObjectNode search = OBJECT_MAPPER.createObjectNode();
+        search.putArray("consulted").add("scm.pull-request.diff");
+        search.put("lookedFor", "a described rationale for the change");
+        search.put("boundary", boundary);
+        return search;
+    }
+
+    private static ObjectNode candidate(Outcome outcome, String slug, ObjectNode... citations) {
+        ObjectNode candidate = OBJECT_MAPPER.createObjectNode();
+        candidate.put("outcome", outcome.name());
+        candidate.put("summary", "Test: " + slug);
+        candidate.put("explanation", "The captured diff is the scope of this result.");
+        ArrayNode cited = candidate.putArray("citations");
+        Arrays.stream(citations).forEach(cited::add);
+        candidate.putObject("evidence");
+        candidate.set("coverage", hostCoverage());
+        return candidate;
+    }
+
+    private static ObjectNode met(String slug) {
+        return met(slug, insecure());
+    }
+
+    private static ObjectNode met(String slug, ObjectNode citation) {
+        return candidate(Outcome.MET, slug, citation);
+    }
+
+    /** A NOT_MET whose problems carry its citations, with a recorded search of the change. */
+    private static ObjectNode notMet(String slug, ObjectNode... problems) {
+        ObjectNode candidate = candidate(Outcome.NOT_MET, slug);
+        ArrayNode listed = candidate.putArray("problems");
+        Arrays.stream(problems).forEach(listed::add);
+        candidate.withObject("evidence").set("search", search("the diff of this pull request only"));
+        return candidate;
+    }
+
+    private static ObjectNode notMet(String slug) {
+        return notMet(slug, problem(Severity.MINOR, insecure()));
+    }
+
+    private static ObjectNode problem(Severity severity, ObjectNode citation) {
+        ObjectNode problem = OBJECT_MAPPER.createObjectNode();
+        problem.put("severity", severity.name());
+        problem.put("summary", "Authorization check removed");
+        problem.put("explanation", "The change replaces the admin check with a call that allows every caller.");
+        problem.putArray("citations").add(citation);
+        problem.putObject("basis")
+                .put("type", "introduced")
+                .put("head", 0)
+                .put("explanation", "The pull request adds this line on the new side of the change.");
+        return problem;
+    }
+
+    private static ObjectNode entry(String slug, ObjectNode candidate) {
+        ObjectNode entry = OBJECT_MAPPER.createObjectNode();
+        entry.put("practiceSlug", slug);
+        entry.set("candidate", candidate);
+        return entry;
+    }
+
+    /** The admission body's {@code results}. */
+    private static ArrayNode results(ObjectNode... entries) {
+        ArrayNode results = OBJECT_MAPPER.createArrayNode();
+        Arrays.stream(entries).forEach(results::add);
+        return results;
+    }
+
+    private ReviewOutputService.RecordedResults publishVerified(AgentJob job, JsonNode results) {
+        return deliveryService.publish(job, deliveryService.prepare(job, results));
+    }
+
+    private List<PracticeResult> recordedRows() {
+        return practiceResultRepository.findByAgentJobId(agentJob.getId(), workspace.getId());
+    }
+
+    private List<Observation> problemsOf(PracticeResult result) {
+        return observationRepository.findByPracticeResultIds(workspace.getId(), List.of(result.getId()));
     }
 
     @Nested
     class EndToEnd {
 
         @Test
-        void validObservationsPersistedToDb() {
-            var observations = List.of(
-                    observation("pr-description-quality", Outcome.MET), observation("error-handling", Outcome.NOT_MET));
-
-            var result = publishVerified(agentJob, observations);
+        void validResultsPersistedToDb() {
+            var result = publishVerified(
+                    agentJob,
+                    results(
+                            entry("error-handling", notMet("error-handling")),
+                            entry("pr-description-quality", met("pr-description-quality"))));
 
             assertThat(result.inserted()).isEqualTo(2);
-
-            List<Observation> persisted = observationRepository.findAll();
-            assertThat(persisted).hasSize(2);
+            List<PracticeResult> persisted = recordedRows();
             assertThat(persisted)
-                    .extracting(Observation::getOutcome)
+                    .extracting(PracticeResult::getOutcome)
                     .containsExactlyInAnyOrder(Outcome.MET, Outcome.NOT_MET);
+            assertThat(persisted)
+                    .allSatisfy(
+                            row -> assertThat(problemsOf(row)).hasSize(row.getOutcome() == Outcome.NOT_MET ? 1 : 0));
         }
 
         @Test
-        void shouldKeepPublishedObservationsVerifiedAfterCapturedBytesAreDeleted() throws Exception {
-            publishVerified(agentJob, List.of(observation("error-handling", Outcome.NOT_MET)));
+        void shouldKeepPublishedResultsVerifiedAfterCapturedBytesAreDeleted() throws Exception {
+            publishVerified(agentJob, results(entry("error-handling", notMet("error-handling"))));
             String sha = Objects.requireNonNull(agentJob.getEvidenceSnapshot())
                     .at("/manifest/sources/0/artifacts/0/sha256")
                     .asString();
@@ -442,18 +526,14 @@ class ReviewOutputServiceIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("a quote of the change is read from the captured checkout at the side's revision")
         void shouldVerifyEachSideOfTheChangeAgainstTheCapturedCheckout() {
-            var atHead = observation("pr-description-quality", Outcome.MET);
-            var atBase = observation("error-handling", Outcome.MET);
-            ((ObjectNode) Objects.requireNonNull(atBase.evidence())
-                            .withArray("citations")
-                            .get(0))
-                    .put("side", "OLD")
-                    .put("quote", "requireAdmin();");
+            var atHead = met("pr-description-quality");
+            var atBase = met("error-handling", change("OLD", 10, "requireAdmin();"));
 
-            var result = publishVerified(agentJob, List.of(atHead, atBase));
+            var result = publishVerified(
+                    agentJob, results(entry("error-handling", atBase), entry("pr-description-quality", atHead)));
 
             assertThat(result.inserted()).isEqualTo(2);
-            assertThat(observationRepository.findAll())
+            assertThat(recordedRows())
                     .extracting(persisted -> Objects.requireNonNull(persisted.getEvidence())
                             .at("/citations/0/revision")
                             .asString())
@@ -464,110 +544,219 @@ class ReviewOutputServiceIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("a quote the checkout does not hold at the cited side is withheld, and the sound claim delivered")
         void shouldWithholdAQuoteTheCheckoutDoesNotHold() {
-            var sound = observation("pr-description-quality", Outcome.MET);
-            var wrongSide = observation("error-handling", Outcome.MET);
-            ((ObjectNode) Objects.requireNonNull(wrongSide.evidence())
-                            .withArray("citations")
-                            .get(0))
-                    .put("side", "OLD");
+            var wrongSide = met("error-handling", change("OLD", 10, "insecure();"));
 
-            var result = publishVerified(agentJob, List.of(sound, wrongSide));
+            var result = publishVerified(
+                    agentJob,
+                    results(
+                            entry("error-handling", wrongSide),
+                            entry("pr-description-quality", met("pr-description-quality"))));
 
             assertThat(result.inserted()).isEqualTo(1);
-            assertThat(observationRepository.findAll())
+            assertThat(recordedRows())
                     .extracting(persisted -> persisted.getPractice().getSlug())
                     .containsExactly("pr-description-quality");
         }
 
         @Test
-        @DisplayName("returned delivered observations align exactly with the persisted recurrence_key set")
-        void returnedFingerprintsMatchPersistedRecurrenceKeys() {
-            var observations = List.of(
-                    observation("pr-description-quality", Outcome.MET), observation("error-handling", Outcome.NOT_MET));
+        void shouldStoreTheResultAndOneObservationPerProblemWhenANegativeIsAdmitted() {
+            ((ObjectNode) Objects.requireNonNull(agentJob.getEvidenceSnapshot()))
+                    .putObject(ReviewedWork.SNAPSHOT_KEY)
+                    .put("head", headSha);
+            agentJob = agentJobRepository.save(agentJob);
+            ObjectNode first = problem(Severity.MAJOR, change("NEW", 9, "// context"));
+            first.put("key", "allows-every-caller");
+            first.put("nextStep", "Restore the admin check.");
+            ObjectNode negative = notMet("error-handling", first, problem(Severity.MINOR, insecure()));
+            negative.withArray("citations").add(insecure());
+            negative.putObject("example")
+                    .put("note", "The file header states its purpose.")
+                    .set("citation", change("NEW", 1, "// context"));
+            ObjectNode coverage = negative.putObject("coverage")
+                    .put("source", "claimed")
+                    .put("selected", 2)
+                    .put("checked", 1)
+                    .put("total", 2)
+                    .put("complete", false);
+            coverage.putArray("omitted")
+                    .addObject()
+                    .put("what", "changed files beyond the selection")
+                    .put("count", 1)
+                    .put("reason", "selection");
 
-            var result = publishVerified(agentJob, observations);
+            var result = publishVerified(agentJob, results(entry("error-handling", negative)));
 
-            assertThat(result.recorded().stream().map(o -> o.recurrenceKey()).toList())
-                    .as("one stable key returned per delivered observation")
-                    .hasSize(2)
-                    .allMatch(k -> k != null && k.matches("[0-9a-f]{64}"));
+            PracticeResult row = recordedRows().getFirst();
+            assertThat(row.getOutcome()).isEqualTo(Outcome.NOT_MET);
+            assertThat(row.getSeverity())
+                    .as("no declared severity stores the worst problem's")
+                    .isEqualTo(Severity.MAJOR);
+            assertThat(row.getEvidenceRationale()).isEqualTo("The captured diff is the scope of this result.");
+            assertThat(row.getScopeKey()).isEqualTo("scm.pull_request:" + prId + ":AUTHOR");
+            assertThat(row.getCoverage()).isEqualTo(coverage);
+            JsonNode evidence = Objects.requireNonNull(row.getEvidence());
+            assertThat(evidence.path("citations"))
+                    .as("the result's own citation, then each problem's that is not already listed")
+                    .extracting(citation -> citation.path("startLine").asInt())
+                    .containsExactly(10, 9);
+            assertThat(evidence.path("search").path("boundary").asString())
+                    .isEqualTo("the diff of this pull request only");
+            JsonNode example = Objects.requireNonNull(row.getExample());
+            assertThat(example.path("note").asString()).isEqualTo("The file header states its purpose.");
+            assertThat(example.path("citation")
+                            .path("verification")
+                            .path("status")
+                            .asString())
+                    .isEqualTo("VERIFIED");
 
-            List<String> persistedKeys = observationRepository.findAll().stream()
-                    .map(Observation::getRecurrenceKey)
-                    .toList();
-            assertThat(persistedKeys)
-                    .as("every returned fingerprint is persisted as a recurrence_key, and vice versa")
-                    .containsExactlyInAnyOrderElementsOf(result.recorded().stream()
-                            .map(o -> o.recurrenceKey())
-                            .toList());
+            PracticeRevision revision = practiceRepository
+                    .findByWorkspaceIdAndSlug(workspace.getId(), "error-handling")
+                    .orElseThrow()
+                    .getCurrentRevision();
+            JsonNode provenance = Objects.requireNonNull(row.getProvenance());
+            assertThat(provenance.path("jobId").asString())
+                    .isEqualTo(agentJob.getId().toString());
+            assertThat(provenance.path("attempt").asInt(-1)).isZero();
+            assertThat(provenance.path("practiceRevisionId").asLong()).isEqualTo(revision.getId());
+            assertThat(provenance.path("program").path("kind").asString()).isEqualTo("builtin");
+            assertThat(provenance.path("program").path("digest").isNull()).isTrue();
+            assertThat(provenance.path("capturedRevision").asString()).isEqualTo(headSha);
+            assertThat(provenance.path("executionRun").path("practiceSlug").asString())
+                    .isEqualTo("error-handling");
+
+            List<Observation> problems = problemsOf(row);
+            assertThat(problems).extracting(Observation::getPosition).containsExactly(0, 1);
+            assertThat(problems).extracting(Observation::getSeverity).containsExactly(Severity.MAJOR, Severity.MINOR);
+            assertThat(problems)
+                    .extracting(Observation::getObservationKey)
+                    .containsExactly("allows-every-caller", null);
+            assertThat(problems).extracting(Observation::getNextStep).containsExactly("Restore the admin check.", null);
+            assertThat(problems)
+                    .extracting(problem ->
+                            problem.getCitations().path(0).path("startLine").asInt())
+                    .containsExactly(9, 10);
+            String recurrenceKey = ObservationFingerprint.compute(
+                    "error-handling", "scm.pull_request", prId, developer.getId(), "src/Auth.java");
+            assertThat(problems).allSatisfy(problem -> {
+                assertThat(problem.getRecurrenceKey()).isEqualTo(recurrenceKey);
+                assertThat(Objects.requireNonNull(problem.getBasis())
+                                .path("type")
+                                .asString())
+                        .isEqualTo("introduced");
+                assertThat(problem.getCitations()
+                                .path(0)
+                                .path("verification")
+                                .path("status")
+                                .asString())
+                        .isEqualTo("VERIFIED");
+            });
+            assertThat(result.recorded().getFirst().practiceResultId()).isEqualTo(row.getId());
+            assertThat(result.recorded().getFirst().problems())
+                    .extracting(ReviewResultParser.ValidatedProblem::observationId)
+                    .containsExactlyElementsOf(
+                            problems.stream().map(Observation::getId).toList());
+            assertThatCode(() -> deliveryService.requirePublished(agentJob)).doesNotThrowAnyException();
         }
 
         @Test
-        void reorderedExactRetryKeepsOneFinalObservationPerPractice() {
-            var description = observation("pr-description-quality", Outcome.MET);
-            var errors = observation("error-handling", Outcome.NOT_MET);
-            var first = publishVerified(agentJob, List.of(description, errors));
+        @DisplayName("each recorded problem carries the recurrence key its stored row carries")
+        void returnedRecurrenceKeysMatchPersistedObservations() {
+            var result = publishVerified(
+                    agentJob,
+                    results(
+                            entry("error-handling", notMet("error-handling")),
+                            entry("pr-description-quality", met("pr-description-quality"))));
 
-            var retry = publishVerified(agentJob, List.of(errors, description));
+            List<String> returned = result.recorded().stream()
+                    .flatMap(recorded -> recorded.problems().stream())
+                    .map(ReviewResultParser.ValidatedProblem::recurrenceKey)
+                    .toList();
+            assertThat(returned).hasSize(1).allMatch(key -> key != null && key.matches("[0-9a-f]{64}"));
+            assertThat(recordedRows().stream()
+                            .flatMap(row -> problemsOf(row).stream())
+                            .map(Observation::getRecurrenceKey)
+                            .toList())
+                    .containsExactlyInAnyOrderElementsOf(returned);
+        }
+
+        @Test
+        void reorderedExactRetryKeepsOneFinalResultPerPractice() {
+            var description = entry("pr-description-quality", met("pr-description-quality"));
+            var errors = entry("error-handling", notMet("error-handling"));
+            var first = publishVerified(agentJob, results(description, errors));
+
+            var retry = publishVerified(agentJob, results(errors.deepCopy(), description.deepCopy()));
 
             assertThat(first.inserted()).isEqualTo(2);
             assertThat(retry.inserted()).isZero();
             assertThat(retry.discardedDuplicate()).isEqualTo(2);
-            assertThat(observationRepository.findByAgentJobId(agentJob.getId(), workspace.getId()))
-                    .hasSize(2);
+            assertThat(recordedRows()).hasSize(2);
+            assertThat(recordedRows().stream()
+                            .mapToInt(row -> problemsOf(row).size())
+                            .sum())
+                    .as("a duplicate writes no second set of problems")
+                    .isEqualTo(1);
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {"summary", "outcome", "severity", "evidence", "rationale"})
+        @ValueSource(strings = {"summary", "outcome", "severity", "evidence", "rationale", "problem"})
         void changedRetryIsRejectedWithoutChangingTheRecordedClaim(String field) {
-            var original = observation("error-handling", Outcome.NOT_MET);
-            publishVerified(agentJob, List.of(original));
-            var changedEvidence = Objects.requireNonNull(original.evidence()).deepCopy();
-            if (field.equals("evidence")) {
-                ((ObjectNode) changedEvidence.path("search")).put("boundary", "changed claim scope");
-            }
-            if (field.equals("outcome")) ((ObjectNode) changedEvidence).remove("search");
-            var changed = new ValidatedObservation(
-                    original.practiceSlug(),
-                    field.equals("summary") ? "Changed summary" : original.summary(),
-                    field.equals("outcome") ? Outcome.MET : original.outcome(),
-                    field.equals("outcome") ? null : field.equals("severity") ? Severity.MAJOR : original.severity(),
-                    changedEvidence,
-                    field.equals("rationale") ? "Changed rationale" : original.evidenceRationale());
+            ObjectNode original = notMet("error-handling");
+            publishVerified(agentJob, results(entry("error-handling", original)));
+            ObjectNode changed =
+                    switch (field) {
+                        case "summary" -> original.deepCopy().put("summary", "Changed summary");
+                        case "outcome" -> met("error-handling");
+                        case "severity" -> original.deepCopy().put("severity", "MAJOR");
+                        case "evidence" -> {
+                            ObjectNode copy = original.deepCopy();
+                            copy.withObject("evidence").set("search", search("changed claim scope"));
+                            yield copy;
+                        }
+                        case "rationale" -> original.deepCopy().put("explanation", "Changed rationale");
+                        case "problem" -> {
+                            ObjectNode copy = original.deepCopy();
+                            ((ObjectNode) copy.withArray("problems").get(0)).put("summary", "A different problem");
+                            yield copy;
+                        }
+                        default -> throw new IllegalArgumentException(field);
+                    };
 
             assertThatThrownBy(() -> publishVerified(
-                            agentJob, List.of(observation("pr-description-quality", Outcome.MET), changed)))
+                            agentJob,
+                            results(
+                                    entry("error-handling", changed),
+                                    entry("pr-description-quality", met("pr-description-quality")))))
                     .isInstanceOf(JobDeliveryException.class)
                     .hasMessageContaining("cannot be changed by retry");
-            var rows = observationRepository.findByAgentJobId(agentJob.getId(), workspace.getId());
-            assertThat(rows).singleElement().satisfies(row -> {
-                assertThat(row.getSummary()).isEqualTo(original.summary());
-                assertThat(row.getOutcome()).isEqualTo(original.outcome());
-                assertThat(row.getSeverity()).isEqualTo(original.severity());
-                assertThat(row.getEvidenceRationale()).isEqualTo(original.evidenceRationale());
+            assertThat(recordedRows()).singleElement().satisfies(row -> {
+                assertThat(row.getSummary()).isEqualTo("Test: error-handling");
+                assertThat(row.getOutcome()).isEqualTo(Outcome.NOT_MET);
+                assertThat(row.getSeverity()).isEqualTo(Severity.MINOR);
+                assertThat(row.getEvidenceRationale()).isEqualTo("The captured diff is the scope of this result.");
+                assertThat(problemsOf(row))
+                        .singleElement()
+                        .satisfies(
+                                problem -> assertThat(problem.getSummary()).isEqualTo("Authorization check removed"));
             });
         }
 
         @Test
         @DisplayName("re-delivering same job creates no duplicates")
         void idempotentRedelivery() {
-            var observations = List.of(observation("pr-description-quality", Outcome.MET));
+            var submitted = results(entry("pr-description-quality", met("pr-description-quality")));
 
-            var first = publishVerified(agentJob, observations);
+            var first = publishVerified(agentJob, submitted);
             var admittedEvidence =
                     Objects.requireNonNull(first.recorded().getFirst().evidence());
-            var storedEvidence = observationRepository
-                    .findByAgentJobId(agentJob.getId(), workspace.getId())
-                    .getFirst()
-                    .getEvidence();
-            assertThat(storedEvidence)
+            assertThat(recordedRows().getFirst().getEvidence())
                     .isEqualTo(OBJECT_MAPPER.readTree(OBJECT_MAPPER.writeValueAsString(admittedEvidence)));
-            var second = publishVerified(agentJob, observations);
+            var second = publishVerified(agentJob, submitted);
 
             assertThat(first.inserted()).isEqualTo(1);
             assertThat(second.inserted()).isZero();
             assertThat(second.discardedDuplicate()).isEqualTo(1);
-            assertThat(observationRepository.findAll()).hasSize(1);
+            assertThat(recordedRows()).hasSize(1);
         }
     }
 
@@ -576,14 +765,16 @@ class ReviewOutputServiceIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void unknownSlugsFailDelivery() {
-            var observations = List.of(
-                    observation("pr-description-quality", Outcome.MET),
-                    observation("nonexistent-practice", Outcome.MET));
+            var submitted = results(
+                    entry("nonexistent-practice", met("nonexistent-practice")),
+                    entry("pr-description-quality", met("pr-description-quality")));
 
-            assertThatThrownBy(() -> publishVerified(agentJob, observations))
-                    .isInstanceOf(JobDeliveryException.class)
+            assertThatThrownBy(() -> publishVerified(agentJob, submitted))
+                    .isInstanceOfSatisfying(
+                            ResultsRefusedException.class,
+                            refused -> assertThat(refused.reasonCode()).isEqualTo("practice_not_admitted"))
                     .hasMessageContaining("not admitted");
-            assertThat(observationRepository.findAll()).isEmpty();
+            assertThat(recordedRows()).isEmpty();
         }
     }
 
@@ -591,24 +782,22 @@ class ReviewOutputServiceIntegrationTest extends BaseIntegrationTest {
     class RevisionPinning {
 
         @Test
-        @DisplayName("persisted observation pins the practice's current definition revision")
-        void observationPinsCurrentRevision() {
+        @DisplayName("persisted result pins the practice's current definition revision")
+        void practiceResultPinsCurrentRevision() {
             Practice practice = practiceRepository
                     .findByWorkspaceIdAndSlug(workspace.getId(), "pr-description-quality")
                     .orElseThrow();
             PracticeRevision revision = practice.getCurrentRevision();
 
-            var observations = List.of(observation("pr-description-quality", Outcome.MET));
-
-            var result = publishVerified(agentJob, observations);
+            var result =
+                    publishVerified(agentJob, results(entry("pr-description-quality", met("pr-description-quality"))));
 
             assertThat(result.inserted()).isEqualTo(1);
-
-            List<Observation> persisted = observationRepository.findAll();
-            assertThat(persisted).hasSize(1);
-            Observation only = persisted.get(0);
-            assertThat(only.getPracticeRevision()).isNotNull();
-            assertThat(only.getPracticeRevision().getId()).isEqualTo(revision.getId());
+            assertThat(recordedRows()).singleElement().satisfies(only -> {
+                assertThat(only.getPracticeRevision()).isNotNull();
+                assertThat(Objects.requireNonNull(only.getPracticeRevision()).getId())
+                        .isEqualTo(revision.getId());
+            });
         }
     }
 
@@ -616,67 +805,63 @@ class ReviewOutputServiceIntegrationTest extends BaseIntegrationTest {
     class OneResultPerPractice {
 
         @Test
-        void shouldRefuseOpposingResultsBeforeAnyObservationIsRecorded() {
-            var submitted = OBJECT_MAPPER.createArrayNode();
-            for (Outcome outcome : List.of(Outcome.MET, Outcome.NOT_MET)) {
-                var observation = submitted.addObject();
-                observation.put("practiceSlug", "pr-description-quality");
-                observation.put("summary", "Test: pr-description-quality");
-                observation.put("outcome", outcome.name());
-                observation.put("severity", outcome == Outcome.NOT_MET ? "MINOR" : null);
-                observation.put("evidenceRationale", "The captured diff is the scope of this observation.");
-                observation.set("evidence", evidence(outcome));
-            }
+        void shouldRefuseOpposingResultsBeforeAnyResultIsRecorded() {
+            ObjectNode submitted = OBJECT_MAPPER.createObjectNode();
+            submitted.put("schemaVersion", 2);
+            submitted.set(
+                    "results",
+                    results(
+                            entry("pr-description-quality", met("pr-description-quality")),
+                            entry("pr-description-quality", notMet("pr-description-quality"))));
 
             agentJob.setStatus(AgentJobStatus.RUNNING);
             agentJob = agentJobRepository.saveAndFlush(agentJob);
-            var identity = new ObservationAdmissionService.AdmissionIdentity(
+            var identity = new ResultAdmissionService.AdmissionIdentity(
                     Objects.requireNonNull(agentJob.getId()),
                     Objects.requireNonNull(workspace.getId()),
                     agentJob.getRetryCount(),
                     "test-worker");
             assertThatThrownBy(() -> admission.admit(identity, submitted))
                     .isInstanceOfSatisfying(
-                            ObservationsRefusedException.class,
-                            refusal -> assertThat(refusal.reasonCode()).isEqualTo("ambiguous_practice_observations"));
+                            ResultsRefusedException.class,
+                            refusal -> assertThat(refusal.reasonCode()).isEqualTo("ambiguous_practice_results"));
             var storedJob = agentJobRepository.findById(identity.jobId()).orElseThrow();
             assertThat(Objects.requireNonNull(storedJob.getMetadata())
-                            .path(ObservationAdmissionService.REFUSAL_METADATA_KEY)
+                            .path(ResultAdmissionService.REFUSAL_METADATA_KEY)
                             .path("reasonCode")
                             .asString())
-                    .isEqualTo("ambiguous_practice_observations");
-            assertThat(ObservationAdmissionService.isAdmitted(storedJob)).isFalse();
-            assertThat(observationRepository.findByAgentJobId(
-                            Objects.requireNonNull(agentJob.getId()), Objects.requireNonNull(workspace.getId())))
-                    .isEmpty();
+                    .isEqualTo("ambiguous_practice_results");
+            assertThat(ResultAdmissionService.isAdmitted(storedJob)).isFalse();
+            assertThat(recordedRows()).isEmpty();
         }
     }
 
     @Test
-    void shouldRefuseAnEmptyReviewWithoutPersistingObservations() {
-        assertThatThrownBy(() -> publishVerified(agentJob, List.of())).isInstanceOf(ObservationsRefusedException.class);
-        assertThat(observationRepository.findAll())
-                .filteredOn(Observation::getAgentJobId, agentJob.getId())
-                .isEmpty();
+    void shouldRefuseAnEmptyReviewWithoutPersistingResults() {
+        assertThatThrownBy(() -> publishVerified(agentJob, results()))
+                .isInstanceOfSatisfying(
+                        ResultsRefusedException.class,
+                        refused -> assertThat(refused.reasonCode()).isEqualTo("no_admissible_results"));
+        assertThat(recordedRows()).isEmpty();
     }
 
     @Nested
-    class NonNegativeObservations {
+    class NonNegativeResults {
 
         @Test
         void shouldPersistMetOutcomesWithoutSeverity() {
-            var observations = List.of(
-                    observation("pr-description-quality", Outcome.MET), observation("error-handling", Outcome.MET));
-
-            var result = publishVerified(agentJob, observations);
+            var result = publishVerified(
+                    agentJob,
+                    results(
+                            entry("error-handling", met("error-handling")),
+                            entry("pr-description-quality", met("pr-description-quality"))));
 
             assertThat(result.inserted()).isEqualTo(2);
-
-            List<Observation> persisted = observationRepository.findAll();
-            assertThat(persisted).hasSize(2);
-            assertThat(persisted)
-                    .extracting(Observation::getOutcome)
-                    .containsExactlyInAnyOrder(Outcome.MET, Outcome.MET);
+            assertThat(recordedRows()).hasSize(2).allSatisfy(row -> {
+                assertThat(row.getOutcome()).isEqualTo(Outcome.MET);
+                assertThat(row.getSeverity()).isNull();
+                assertThat(problemsOf(row)).isEmpty();
+            });
         }
     }
 
@@ -690,9 +875,8 @@ class ReviewOutputServiceIntegrationTest extends BaseIntegrationTest {
             agentJob.setMetadata(metadata);
             agentJob = agentJobRepository.save(agentJob);
 
-            var observations = List.of(observation("pr-description-quality", Outcome.MET));
-
-            assertThatThrownBy(() -> publishVerified(agentJob, observations))
+            assertThatThrownBy(() -> publishVerified(
+                            agentJob, results(entry("pr-description-quality", met("pr-description-quality")))))
                     .isInstanceOf(JobDeliveryException.class)
                     .hasMessageContaining("Pull request not found");
         }

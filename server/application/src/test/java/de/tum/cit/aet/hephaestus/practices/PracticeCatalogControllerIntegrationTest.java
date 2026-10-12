@@ -3243,7 +3243,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(revisions.get(0).getGuide()).isNull();
             assertThat(revisions.get(1).getVisual()).isEqualTo(guidanceVisual("Two boxes side by side"));
             assertThat(revisions.get(1).getGuide()).isEqualTo(guidanceGuide("How to do it"));
-            // Guidance is never a review rule, so earlier observations stay current.
+            // Guidance is never a review rule, so earlier results stay current.
             assertThat(revisions.get(1).getReviewRuleFingerprint())
                     .isEqualTo(revisions.get(0).getReviewRuleFingerprint());
         }

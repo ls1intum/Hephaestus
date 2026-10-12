@@ -14,10 +14,10 @@ x-practice-review-env:
   # The work one practice is owed in a review turn: model calls and output tokens.
   PRACTICE_REVIEW_PRACTICE_MODEL_CALLS: ${PRACTICE_REVIEW_PRACTICE_MODEL_CALLS:-12}
   PRACTICE_REVIEW_PRACTICE_OUTPUT_TOKENS: ${PRACTICE_REVIEW_PRACTICE_OUTPUT_TOKENS:-16000}
-  # The tokens that the practice scripts of one review attempt may spend on all their models.
-  PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT: ${PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT:-200000}
-  # The search units that their reranking calls may bill, for providers that bill search units.
-  PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_SEARCH_UNITS_PER_ATTEMPT: ${PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_SEARCH_UNITS_PER_ATTEMPT:-1000}
+  # The tokens that the direct model calls of one review attempt's practice programs may spend.
+  PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT: ${PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT:-200000}
+  # The search units that their direct reranking calls may bill, for providers that bill search units.
+  PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT: ${PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT:-1000}
   # Spend guardrails for reviewing past work. A campaign is priced before it runs; these bound what
   # an administrator can confirm in one.
   PRACTICE_REVIEW_BACKFILL_MAX_WINDOW: ${PRACTICE_REVIEW_BACKFILL_MAX_WINDOW:-400d}

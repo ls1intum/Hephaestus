@@ -189,7 +189,7 @@ class CapturedReviewedWorkChangesTest extends BaseUnitTest {
 
     @Test
     void shouldDeliverAgainstTheSameIdentityAfterAdmissionRetiresTheManifestArtifacts() {
-        // The shape AgentJobRepository.discardRetiredArtifactInventory leaves once observations are admitted:
+        // The shape AgentJobRepository.discardRetiredArtifactInventory leaves once results are admitted:
         // the folder's artifacts and refusals and every source's artifacts emptied, each source's state and facts kept.
         ObjectNode retired = mapper.valueToTree(ReviewedWorkFixtures.pullRequestManifest(Instant.EPOCH, "Body", HEAD));
         retired.putArray("artifacts");

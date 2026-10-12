@@ -271,7 +271,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     void agentEndMessagesAreTheAuthoritativeTurnTotal() throws Exception {
         translator.translate(fixture("message_end_assistant.json"), state);
         // The terminal event contains the complete assistant-message set for the turn, so it
-        // replaces streaming observations rather than double-counting them.
+        // replaces streaming results rather than double-counting them.
         ObjectNode event = mapper.createObjectNode();
         event.put("type", "agent_end");
         event.putArray("messages")
@@ -352,32 +352,60 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("TextEnd");
     }
 
-    /** The observation {@code runner_link_observation.json} links. */
-    private static final UUID FIXTURE_LINK = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+    /** The result {@code runner_link_result.json} links. */
+    private static final UUID FIXTURE_RESULT = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+
+    /** The problem {@code runner_link_observation.json} links. */
+    private static final UUID FIXTURE_OBSERVATION = UUID.fromString("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
 
     @Test
-    void linkObservation_camelCase_emitsDataObservation() throws Exception {
-        state.admitLink(FIXTURE_LINK);
-        JsonNode event = fixture("runner_link_observation.json");
+    void shouldShowAndStoreADataResultWhenAnAdmittedResultIsLinked() throws Exception {
+        state.admitLink(FIXTURE_RESULT);
 
-        List<UIMessageChunk> out = translator.translate(event, state);
+        List<UIMessageChunk> out = translator.translate(fixture("runner_link_result.json"), state);
 
         assertThat(out).hasSize(1);
-        UIMessageChunk.DataObservation df = (UIMessageChunk.DataObservation) out.get(0);
-        assertThat(df.data().observationId()).isEqualTo(FIXTURE_LINK);
-        assertThat(df.data().text()).startsWith("Your description names the decision");
+        UIMessageChunk.DataResult link = (UIMessageChunk.DataResult) out.get(0);
+        assertThat(link.data().practiceResultId()).isEqualTo(FIXTURE_RESULT);
+        assertThat(link.data().text()).startsWith("Your description names the decision");
         JsonNode stored = state.partsSnapshot().get(0);
-        assertThat(stored.path("id").asString()).isEqualTo(df.id().toString());
+        assertThat(stored.path("type").asString()).isEqualTo("data-result");
+        assertThat(stored.path("id").asString()).isEqualTo(link.id().toString());
+        assertThat(stored.path("data").path("practiceResultId").asString()).isEqualTo(FIXTURE_RESULT.toString());
         assertThat(stored.path("data").path("text").asString())
-                .isEqualTo(df.data().text());
+                .isEqualTo(link.data().text());
+        assertThat(UIMessageChunk.LinkParts.shownResultIds(state.partsSnapshot()))
+                .containsExactly(FIXTURE_RESULT);
+    }
+
+    @Test
+    void shouldShowAndStoreADataResultObservationNamingItsResultWhenAnAdmittedProblemIsLinked() throws Exception {
+        state.admitObservationLink(FIXTURE_OBSERVATION, FIXTURE_RESULT);
+
+        List<UIMessageChunk> out = translator.translate(fixture("runner_link_observation.json"), state);
+
+        assertThat(out).hasSize(1);
+        UIMessageChunk.DataResultObservation link = (UIMessageChunk.DataResultObservation) out.get(0);
+        assertThat(link.data().practiceResultId()).isEqualTo(FIXTURE_RESULT);
+        assertThat(link.data().observationId()).isEqualTo(FIXTURE_OBSERVATION);
+        assertThat(link.data().text()).startsWith("The retry on line 42");
+        JsonNode stored = state.partsSnapshot().get(0);
+        assertThat(stored.path("type").asString()).isEqualTo("data-result-observation");
+        assertThat(stored.path("id").asString()).isEqualTo(link.id().toString());
+        assertThat(stored.path("data").path("practiceResultId").asString()).isEqualTo(FIXTURE_RESULT.toString());
+        assertThat(stored.path("data").path("observationId").asString()).isEqualTo(FIXTURE_OBSERVATION.toString());
+        assertThat(stored.path("data").path("text").asString())
+                .isEqualTo(link.data().text());
+        assertThat(UIMessageChunk.LinkParts.resultOf(stored)).isEqualTo(FIXTURE_RESULT);
+        assertThat(UIMessageChunk.LinkParts.observationOf(stored)).isEqualTo(FIXTURE_OBSERVATION);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"{}", "{\"text\":\"   \"}", "{\"text\":7}"})
-    void shouldFailTheTurnWhenALinkCarriesNoFeedbackText(String extra) throws Exception {
+    void shouldFailTheTurnWhenAResultLinkCarriesNoFeedbackText(String extra) throws Exception {
         ObjectNode link = (ObjectNode) mapper.readTree(extra);
-        link.put("type", "link_observation")
-                .put("observationId", UUID.randomUUID().toString());
+        link.put("type", "link_result").put("practiceResultId", FIXTURE_RESULT.toString());
+        state.admitLink(FIXTURE_RESULT);
 
         assertThat(translator.translate(link, state))
                 .extracting(c -> c.getClass().getSimpleName())
@@ -385,43 +413,70 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(state.partsSnapshot()).isEmpty();
     }
 
-    @Test
-    void shouldFailTheTurnWithoutShowingOrStoringALinkTheServerDidNotAdmit() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"text\":\"   \"}", "{\"text\":7}"})
+    void shouldFailTheTurnWhenAProblemLinkCarriesNoFeedbackText(String extra) throws Exception {
+        ObjectNode link = (ObjectNode) mapper.readTree(extra);
+        link.put("type", "link_observation").put("observationId", FIXTURE_OBSERVATION.toString());
+        state.admitObservationLink(FIXTURE_OBSERVATION, FIXTURE_RESULT);
+
+        assertThat(translator.translate(link, state))
+                .extracting(c -> c.getClass().getSimpleName())
+                .containsExactly("TurnError");
+        assertThat(state.partsSnapshot()).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"runner_link_result.json", "runner_link_observation.json"})
+    void shouldFailTheTurnWithoutShowingOrStoringALinkWhenTheServerDidNotAdmitIt(String event) throws Exception {
         streamMessage("Let me look at your pull request.");
 
-        assertThat(translator.translate(fixture("runner_link_observation.json"), state))
+        assertThat(translator.translate(fixture(event), state))
                 .extracting(c -> c.getClass().getSimpleName())
                 .containsExactly("TurnError");
         assertThat(state.partsSnapshot())
                 .extracting(p -> p.get("type").asString())
-                .doesNotContain("data-observation");
+                .doesNotContain("data-result", "data-result-observation");
+    }
+
+    @Test
+    void shouldFailTheTurnWhenAProblemIsLinkedUnderAResultAdmissionOnly() throws Exception {
+        // A result's admission does not admit its problems: each link names what the server checked.
+        state.admitLink(FIXTURE_RESULT);
+
+        assertThat(translator.translate(fixture("runner_link_observation.json"), state))
+                .extracting(c -> c.getClass().getSimpleName())
+                .containsExactly("TurnError");
+        assertThat(state.partsSnapshot()).isEmpty();
     }
 
     @Test
     void shouldShowOneLinkPerAdmissionAndFailTheTurnOnAReplayedOne() throws Exception {
-        state.admitLink(FIXTURE_LINK);
-        state.admitLink(FIXTURE_LINK);
+        state.admitLink(FIXTURE_RESULT);
+        state.admitLink(FIXTURE_RESULT);
         streamMessage("Let me look at your pull request.");
 
-        assertThat(translator.translate(fixture("runner_link_observation.json"), state))
+        assertThat(translator.translate(fixture("runner_link_result.json"), state))
                 .extracting(c -> c.getClass().getSimpleName())
-                .containsExactly("DataObservation");
-        assertThat(translator.translate(fixture("runner_link_observation.json"), state))
+                .containsExactly("DataResult");
+        assertThat(translator.translate(fixture("runner_link_result.json"), state))
                 .extracting(c -> c.getClass().getSimpleName())
-                .containsExactly("DataObservation");
-        assertThat(translator.translate(fixture("runner_link_observation.json"), state))
+                .containsExactly("DataResult");
+        assertThat(translator.translate(fixture("runner_link_result.json"), state))
                 .extracting(c -> c.getClass().getSimpleName())
                 .containsExactly("TurnError");
         assertThat(state.partsSnapshot())
                 .extracting(p -> p.get("type").asString())
-                .filteredOn("data-observation"::equals)
+                .filteredOn("data-result"::equals)
                 .hasSize(2);
     }
 
     @Test
     void shouldFinishWhenFeedbackIsShownBetweenVerifiedMessages() throws Exception {
-        state.admitLink(FIXTURE_LINK);
+        state.admitLink(FIXTURE_RESULT);
+        state.admitObservationLink(FIXTURE_OBSERVATION, FIXTURE_RESULT);
         streamMessage("Let me look at your pull request.");
+        translator.translate(fixture("runner_link_result.json"), state);
         translator.translate(fixture("runner_link_observation.json"), state);
         streamMessage("What made you choose that approach?");
 
@@ -431,14 +486,14 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("Finish");
         assertThat(state.partsSnapshot())
                 .extracting(p -> p.get("type").asString())
-                .containsExactly("step-start", "text", "data-observation", "step-start", "text");
+                .containsExactly("step-start", "text", "data-result", "data-result-observation", "step-start", "text");
     }
 
     @Test
     void shouldStillFailWhenShownFeedbackSitsBesideALostMessage() throws Exception {
-        state.admitLink(FIXTURE_LINK);
+        state.admitLink(FIXTURE_RESULT);
         streamMessage("Let me look at your pull request.");
-        translator.translate(fixture("runner_link_observation.json"), state);
+        translator.translate(fixture("runner_link_result.json"), state);
 
         List<UIMessageChunk> out = translator.translate(
                 agentEnd("Let me look at your pull request.", "What made you choose that approach?"), state);
@@ -510,9 +565,9 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         translator.translate(fixture("message_start_assistant.json"), state);
         streamDeltas("See ");
 
-        // A renamed link_observation must not disappear while the reply still finishes.
+        // A renamed link_result must not disappear while the reply still finishes.
         List<UIMessageChunk> out = translator.translate(
-                mapper.readTree("{\"type\":\"link_observations\",\"observationId\":\"" + UUID.randomUUID() + "\"}"),
+                mapper.readTree("{\"type\":\"link_results\",\"practiceResultId\":\"" + UUID.randomUUID() + "\"}"),
                 state);
 
         assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("TextEnd", "TurnError");
@@ -711,15 +766,15 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldKeepALinkedObservationWhenReplacingTextWithALostDelta() throws Exception {
+    void shouldKeepALinkedResultWhenReplacingTextWithALostDelta() throws Exception {
         translator.translate(fixture("message_start_assistant.json"), state);
         streamDeltas("a");
-        UUID observationId = UUID.randomUUID();
-        state.admitLink(observationId);
+        UUID practiceResultId = UUID.randomUUID();
+        state.admitLink(practiceResultId);
         translator.translate(
                 mapper.createObjectNode()
-                        .put("type", "link_observation")
-                        .put("observationId", observationId.toString())
+                        .put("type", "link_result")
+                        .put("practiceResultId", practiceResultId.toString())
                         .put("text", "Name the trade-off."),
                 state);
         // "b" never arrived.
@@ -730,8 +785,9 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         JsonNode parts = state.partsSnapshot();
         assertThat(parts)
                 .extracting(p -> p.get("type").asString())
-                .containsExactly("step-start", "data-observation", "text");
-        assertThat(parts.get(1).path("data").path("observationId").asString()).isEqualTo(observationId.toString());
+                .containsExactly("step-start", "data-result", "text");
+        assertThat(parts.get(1).path("data").path("practiceResultId").asString())
+                .isEqualTo(practiceResultId.toString());
         assertThat(parts.get(2).get("text").asString()).isEqualTo("ab");
     }
 
@@ -865,21 +921,21 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldFailWhenALinkedObservationCannotBeRead() throws Exception {
+    void shouldFailWhenALinkedResultCannotBeRead() throws Exception {
         translator.translate(fixture("message_start_assistant.json"), state);
         streamDeltas("See this");
 
         List<UIMessageChunk> out = translator.translate(
                 mapper.createObjectNode()
-                        .put("type", "link_observation")
-                        .put("observationId", "not-a-uuid")
+                        .put("type", "link_result")
+                        .put("practiceResultId", "not-a-uuid")
                         .put("text", "Name the trade-off."),
                 state);
 
         assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("TextEnd", "TurnError");
         assertThat(state.partsSnapshot())
                 .extracting(p -> p.get("type").asString())
-                .doesNotContain("data-observation");
+                .doesNotContain("data-result");
     }
 
     private JsonNode agentEnd(String... texts) {

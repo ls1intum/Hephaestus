@@ -12,13 +12,14 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.scm.ReviewTargetQuery;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultCitations;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import java.util.Collection;
 import java.util.List;
@@ -33,10 +34,10 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Which observations may support feedback on the reviewed work itself. Public feedback speaks only about the work's
- * author: an observation qualifies when the practice revision it was assessed under is about the author (or the author
+ * Which results may support feedback on the reviewed work itself. Public feedback speaks only about the work's
+ * author: a result qualifies when the practice revision it was assessed under is about the author (or the author
  * as merger), it is about the mirrored author of this exact work, and its recorded provenance names only captured,
- * public sources. A reviewer observation stays private, even when the reviewer wrote the work. An unknown author,
+ * public sources. A reviewer result stays private, even when the reviewer wrote the work. An unknown author,
  * revision or role qualifies nothing. The same set governs model input, the owed review and final admission; removing
  * citations cannot remove claims derived from them.
  */
@@ -57,42 +58,42 @@ public class PublicReviewEligibility {
             .map(SourceKind::value)
             .collect(Collectors.toUnmodifiableSet());
 
-    /** The evidence branches that list what an observation consulted. */
+    /** The evidence branches that list what a result consulted. */
     private static final Set<String> CONSULTING_BRANCHES = Set.of("search", "inapplicability", "undecidability");
 
     private final ReviewTargetQuery reviewTargets;
     private final RepositoryToMonitorRepository monitoredRepositories;
 
-    private final ObservationRepository observations;
+    private final PracticeResultRepository practiceResults;
     private final FeedbackRepository feedback;
-    private final FeedbackObservationRepository feedbackObservations;
+    private final FeedbackEvidenceRepository feedbackResults;
 
     PublicReviewEligibility(
             ReviewTargetQuery reviewTargets,
             RepositoryToMonitorRepository monitoredRepositories,
-            ObservationRepository observations,
+            PracticeResultRepository practiceResults,
             FeedbackRepository feedback,
-            FeedbackObservationRepository feedbackObservations) {
+            FeedbackEvidenceRepository feedbackResults) {
         this.reviewTargets = reviewTargets;
         this.monitoredRepositories = monitoredRepositories;
-        this.observations = observations;
+        this.practiceResults = practiceResults;
         this.feedback = feedback;
-        this.feedbackObservations = feedbackObservations;
+        this.feedbackResults = feedbackResults;
     }
 
-    /** The ids of the observations that may support what the reviewed work is told. */
-    public Set<UUID> publicObservationIds(AgentJob job, Collection<Observation> observations) {
+    /** The ids of the results that may support what the reviewed work is told. */
+    public Set<UUID> publicResultIds(AgentJob job, Collection<PracticeResult> practiceResults) {
         Long author = artifactAuthor(job);
         if (author == null) return Set.of();
-        return publicObservationIds(job, observations, author);
+        return publicResultIds(job, practiceResults, author);
     }
 
-    private Set<UUID> publicObservationIds(AgentJob job, Collection<Observation> observations, long author) {
-        return observations.stream()
-                .filter(observation -> belongsToWork(job, observation)
-                        && isAboutAuthor(job, observation, author)
-                        && admitsProvenance(observation.getEvidence()))
-                .map(Observation::getId)
+    private Set<UUID> publicResultIds(AgentJob job, Collection<PracticeResult> practiceResults, long author) {
+        return practiceResults.stream()
+                .filter(practiceResult -> belongsToWork(job, practiceResult)
+                        && isAboutAuthor(job, practiceResult, author)
+                        && admitsProvenance(practiceResult))
+                .map(PracticeResult::getId)
                 .collect(Collectors.toUnmodifiableSet());
     }
 
@@ -106,7 +107,7 @@ public class PublicReviewEligibility {
                 || job.getWorkspace() == null
                 || job.getWorkspace().getId() == null) return false;
         long workspace = job.getWorkspace().getId();
-        List<Observation> support;
+        List<PracticeResult> support;
         if (feedbackId != null) {
             var stored = feedback.findByIdAndWorkspaceId(feedbackId, workspace).orElse(null);
             if (stored == null
@@ -122,36 +123,36 @@ public class PublicReviewEligibility {
                                                     ? "pull_request_id"
                                                     : "issue_id")
                                     .asLong())) return false;
-            support = feedbackObservations.findForVisibility(workspace, Set.of(feedbackId)).stream()
-                    .map(FeedbackObservationRepository.FeedbackObservationVisibility::getObservation)
+            support = feedbackResults.findForVisibility(workspace, Set.of(feedbackId)).stream()
+                    .map(FeedbackEvidenceRepository.FeedbackResultVisibility::getPracticeResult)
                     .toList();
             if (citedIds != null
-                    && !citedIds.equals(support.stream().map(Observation::getId).collect(Collectors.toSet())))
-                return false;
+                    && !citedIds.equals(
+                            support.stream().map(PracticeResult::getId).collect(Collectors.toSet()))) return false;
         } else if (citedIds != null) {
             if (citedIds.isEmpty()) return false;
-            support = observations.findAllByIdInAndWorkspaceId(citedIds, workspace);
+            support = practiceResults.findAllByIdInAndWorkspaceId(citedIds, workspace);
             if (support.size() != citedIds.size()) return false;
         } else {
-            support = observations.findByAgentJobId(job.getId(), workspace).stream()
-                    .filter(observation ->
-                            practiceSlugs.contains(observation.getPractice().getSlug()))
+            support = practiceResults.findByAgentJobId(job.getId(), workspace).stream()
+                    .filter(practiceResult ->
+                            practiceSlugs.contains(practiceResult.getPractice().getSlug()))
                     .toList();
         }
         if (support.isEmpty()) return false;
-        Set<UUID> eligible = publicObservationIds(job, support, author);
+        Set<UUID> eligible = publicResultIds(job, support, author);
         return support.stream()
-                        .allMatch(observation -> eligible.contains(observation.getId())
-                                && (observation.getOutcome() == Outcome.MET
-                                        || observation.getOutcome() == Outcome.NOT_MET))
+                        .allMatch(practiceResult -> eligible.contains(practiceResult.getId())
+                                && (practiceResult.getOutcome() == Outcome.MET
+                                        || practiceResult.getOutcome() == Outcome.NOT_MET))
                 && practiceSlugs.stream()
                         .allMatch(slug -> support.stream()
-                                .anyMatch(observation ->
-                                        slug.equals(observation.getPractice().getSlug())));
+                                .anyMatch(practiceResult ->
+                                        slug.equals(practiceResult.getPractice().getSlug())));
     }
 
     /** Public history remains about the author of its original work, under its recorded practice revisions. */
-    public boolean permitsPublicHistory(Feedback stored, Collection<Observation> support) {
+    public boolean permitsPublicHistory(Feedback stored, Collection<PracticeResult> support) {
         if (stored.getChannel() != FeedbackChannel.IN_CONTEXT || stored.getArtifactId() == null || support.isEmpty())
             return false;
         Optional<ReviewTargetQuery.Target> target = ArtifactKinds.PULL_REQUEST.equals(stored.getArtifactKind())
@@ -167,17 +168,17 @@ public class PublicReviewEligibility {
                         stored.getWorkspaceId(), work.repositoryFullName())
                 || !Objects.equals(stored.getAboutUserId(), work.authorId())
                 || !Objects.equals(stored.getRecipientUserId(), work.authorId())) return false;
-        return support.stream().allMatch(observation -> {
-            PracticeRevision revision = observation.getPracticeRevision();
+        return support.stream().allMatch(practiceResult -> {
+            PracticeRevision revision = practiceResult.getPracticeRevision();
             ActorRole role = revision == null ? null : revision.getSubject();
-            return (observation.getOutcome() == Outcome.MET || observation.getOutcome() == Outcome.NOT_MET)
+            return (practiceResult.getOutcome() == Outcome.MET || practiceResult.getOutcome() == Outcome.NOT_MET)
                     && (role == ActorRole.AUTHOR || role == ActorRole.MERGER)
-                    && Objects.equals(observation.getAgentJobId(), stored.getAgentJobId())
-                    && Objects.equals(observation.getWorkspaceId(), stored.getWorkspaceId())
-                    && Objects.equals(observation.getArtifactKind(), stored.getArtifactKind())
-                    && Objects.equals(observation.getArtifactId(), stored.getArtifactId())
-                    && Objects.equals(observation.getAboutUserId(), work.authorId())
-                    && admitsProvenance(observation.getEvidence());
+                    && Objects.equals(practiceResult.getAgentJobId(), stored.getAgentJobId())
+                    && Objects.equals(practiceResult.getWorkspaceId(), stored.getWorkspaceId())
+                    && Objects.equals(practiceResult.getArtifactKind(), stored.getArtifactKind())
+                    && Objects.equals(practiceResult.getArtifactId(), stored.getArtifactId())
+                    && Objects.equals(practiceResult.getAboutUserId(), work.authorId())
+                    && admitsProvenance(practiceResult);
         });
     }
 
@@ -217,35 +218,39 @@ public class PublicReviewEligibility {
         return role.isMissingNode() || ActorRole.AUTHOR.name().equals(role.asString(""));
     }
 
-    private static boolean belongsToWork(AgentJob job, Observation observation) {
+    private static boolean belongsToWork(AgentJob job, PracticeResult practiceResult) {
         JsonNode metadata = job.getMetadata();
-        if (metadata == null || job.getWorkspace() == null || observation.getId() == null) return false;
+        if (metadata == null || job.getWorkspace() == null || practiceResult.getId() == null) return false;
         String key = ArtifactKinds.PULL_REQUEST.equals(job.getArtifactKind()) ? "pull_request_id" : "issue_id";
-        return Objects.equals(observation.getAgentJobId(), job.getId())
+        return Objects.equals(practiceResult.getAgentJobId(), job.getId())
                 && Objects.equals(
-                        observation.getWorkspaceId(), job.getWorkspace().getId())
-                && Objects.equals(observation.getArtifactKind(), job.getArtifactKind())
+                        practiceResult.getWorkspaceId(), job.getWorkspace().getId())
+                && Objects.equals(practiceResult.getArtifactKind(), job.getArtifactKind())
                 && metadata.path(key).isIntegralNumber()
                 && Objects.equals(
-                        observation.getArtifactId(), metadata.path(key).asLong());
+                        practiceResult.getArtifactId(), metadata.path(key).asLong());
     }
 
-    private static boolean isAboutAuthor(AgentJob job, Observation observation, long author) {
-        PracticeRevision revision = observation.getPracticeRevision();
+    private static boolean isAboutAuthor(AgentJob job, PracticeResult practiceResult, long author) {
+        PracticeRevision revision = practiceResult.getPracticeRevision();
         ActorRole subject = revision == null ? null : revision.getSubject();
         return (subject == ActorRole.AUTHOR
                         || (subject == ActorRole.MERGER
                                 && PracticeCatalogInjector.subjectNameable(ActorRole.MERGER, job.getMetadata())))
-                && Long.valueOf(author).equals(observation.getAboutUserId());
+                && Long.valueOf(author).equals(practiceResult.getAboutUserId());
     }
 
-    /** Whether the observation's recorded provenance names only captured, public sources. */
-    static boolean admitsProvenance(@Nullable JsonNode evidence) {
+    /**
+     * Whether the result's recorded provenance names only captured, public sources: every place it cites, its
+     * problems', its example's and its open questions' included, and every source its warrants consulted.
+     */
+    static boolean admitsProvenance(PracticeResult practiceResult) {
+        JsonNode evidence = practiceResult.getEvidence();
         if (evidence == null || !evidence.isObject()) {
             return false;
         }
         boolean namesASource = false;
-        for (JsonNode citation : evidence.path("citations")) {
+        for (JsonNode citation : ResultCitations.all(practiceResult)) {
             if (!CAPTURED_WORK.contains(citation.path("sourceKind").asString(""))) {
                 return false;
             }

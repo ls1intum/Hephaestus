@@ -166,7 +166,7 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewInteg
                         null));
         Practice practice = persistPractice(workspace, null, "lrz-practice", "LRZ practice", null);
         AgentJob run = persistPullRequestReview(workspace, 3, NOW.minus(Duration.ofDays(1)));
-        UUID observation =
+        UUID practiceResult =
                 observe(practice, run, 3L, selfHostedActor, NOT_MET, Severity.MAJOR, NOW.minus(Duration.ofDays(1)));
         Feedback feedback = persistInAppFeedback(
                 run,
@@ -175,7 +175,7 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewInteg
                 FeedbackDeliveryState.DELIVERED,
                 InAppFeedbackBody.render("A way of working", "What recurs.", "One thing to try."),
                 NOW.minus(Duration.ofDays(1)));
-        bind(feedback, observation);
+        bind(feedback, practiceResult);
 
         String token = "mock-jwt-user-sub-" + account.getId();
         read(token, "/workspaces/actor-lrz/members/me")

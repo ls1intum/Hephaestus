@@ -20,7 +20,6 @@ import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvide
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -280,18 +279,18 @@ class PracticeCatalogInjector {
 
         files.put(SandboxLayout.ANALYSIS_PRACTICES_PREFIX + ".gitkeep", new byte[0]);
 
-        List<Practice> withScript = new ArrayList<>();
+        // Every admitted practice runs one program: its own script, or the built-in review when it holds none.
+        int practiceScriptCount = 0;
         for (Practice p : practices) {
             String script = p.getPracticeScript();
             if (script != null && !script.isBlank()) {
                 files.put(
-                        SandboxLayout.PRACTICE_SCRIPT_PREFIX + "practices/" + p.getSlug() + ".ts",
+                        SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + p.getSlug() + ".ts",
                         script.getBytes(StandardCharsets.UTF_8));
-                withScript.add(p);
+                practiceScriptCount++;
             }
         }
-        files.putAll(practiceScriptInputs.stage(job, focus, withScript));
-        int practiceScriptCount = withScript.size();
+        files.putAll(practiceScriptInputs.stage(job, focus, practices));
 
         log.info(
                 "Injected practice catalog: {} {} practices ({} with a practice script), workspaceId={}, jobId={}",

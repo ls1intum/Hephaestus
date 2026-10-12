@@ -37,7 +37,7 @@ public enum FeedbackSuppressionReason {
     APPROVAL_NO_LONGER_ELIGIBLE,
     PRACTICE_REQUIRES_APPROVAL,
     BACKFILL_QUIET,
-    /** A workspace admin invalidated an observation this feedback cites. */
+    /** A workspace admin invalidated a result this feedback cites. */
     OBSERVATION_INVALIDATED,
     /**
      * The current head, title or description is known to differ from the authorized capture an automatic package

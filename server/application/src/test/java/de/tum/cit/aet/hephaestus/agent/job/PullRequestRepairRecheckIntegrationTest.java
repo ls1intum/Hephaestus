@@ -38,19 +38,19 @@ import de.tum.cit.aet.hephaestus.agent.handler.CitationVerification;
 import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.LinkedRepairFollowupRequest;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewHandler;
 import de.tum.cit.aet.hephaestus.agent.handler.ReplaceableReviewCoverage;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.ReviewOutputService;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppSupportReader;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.AnsweredPractice;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedObservations;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedResults;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ResultsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
@@ -119,15 +119,16 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.LatestRun;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.LatestRun;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewGate;
@@ -255,7 +256,10 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
     private JobEvidenceFiles evidenceFiles;
 
     @Autowired
-    private ObservationAdmissionService admissionService;
+    private ResultAdmissionService admissionService;
+
+    @Autowired
+    private ObservationRepository observations;
 
     @Autowired
     private PullRequestReviewHandler admissionHandler;
@@ -288,7 +292,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
     private PracticeReviewProperties reviewProperties;
 
     @Autowired
-    private ObservationInvalidationRepository invalidationRepository;
+    private PracticeResultInvalidationRepository invalidationRepository;
 
     @Autowired
     private TransactionTemplate transactions;
@@ -487,7 +491,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
             pullRequestRepository.saveAndFlush(managed);
         });
         AgentJob merged = admittedLinkedReview(pr, linked);
-        UUID olderNegative = observationRepository
+        UUID olderNegative = practiceResultRepository
                 .findByAgentJobId(merged.getId(), workspace.getId())
                 .getFirst()
                 .getId();
@@ -498,10 +502,24 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                 persistInAppFeedback(merged, developer, 1, FeedbackDeliveryState.DELIVERED, "Recorded history", NOW);
         bind(deliveredCard, olderNegative);
         AgentJob laterNegativeRun = admittedLinkedReview(pr, linked);
-        Observation admittedNegative = observationRepository
+        PracticeResult admittedNegative = practiceResultRepository
                 .findByAgentJobId(laterNegativeRun.getId(), workspace.getId())
                 .getFirst();
         UUID currentNegative = admittedNegative.getId();
+        // Admission stores the located problem as a child of the result, citing the unchecked criterion.
+        assertThat(observations.findByPracticeResultIds(workspace.getId(), List.of(currentNegative)))
+                .singleElement()
+                .satisfies(problem -> {
+                    assertThat(problem.getSeverity()).isEqualTo(Severity.MINOR);
+                    assertThat(problem.getCitations().path(0).path("quote").asString())
+                            .isEqualTo("- [ ] Confirm repair");
+                    assertThat(problem.getCitations()
+                                    .path(0)
+                                    .path("verification")
+                                    .path("status")
+                                    .asString())
+                            .isEqualTo("VERIFIED");
+                });
         // Historical reviews could record multiple results for a practice; repairs must retire all of them.
         UUID secondCurrentNegative = observe(
                 linked,
@@ -514,11 +532,11 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                 Severity.MINOR,
                 admittedNegative.getObservedAt(),
                 Objects.requireNonNull(admittedNegative.getEvidence()).toString(),
-                admittedNegative.getRecurrenceKey());
+                null);
         laterNegativeRun.setRetryCount(1);
         laterNegativeRun = agentJobRepository.saveAndFlush(laterNegativeRun);
-        List<Observation> admitted =
-                observationRepository.findByAgentJobId(laterNegativeRun.getId(), workspace.getId());
+        List<PracticeResult> admitted =
+                practiceResultRepository.findByAgentJobId(laterNegativeRun.getId(), workspace.getId());
 
         for (AgentJob baseline : List.of(merged, laterNegativeRun)) {
             JsonNode manifest = agentJobRepository
@@ -655,12 +673,12 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                         ScmEventPayload.IssueData.from(changed), Set.of("body"), liveContext());
                 issueListener.onIssueUpdated(newerEvent);
             });
-            assertThatThrownBy(() -> admissionService.admit(stale.identity(), stale.observations()))
-                    .isInstanceOf(ObservationsRefusedException.class)
-                    .satisfies(error -> assertThat(((ObservationsRefusedException) error).reasonCode())
+            assertThatThrownBy(() -> admissionService.admit(stale.identity(), stale.practiceResults()))
+                    .isInstanceOf(ResultsRefusedException.class)
+                    .satisfies(error -> assertThat(((ResultsRefusedException) error).reasonCode())
                             .isEqualTo("linked_issue_capture_stale"));
         }
-        assertThat(observationRepository.findByAgentJobId(recheck.getId(), workspace.getId()))
+        assertThat(practiceResultRepository.findByAgentJobId(recheck.getId(), workspace.getId()))
                 .isEmpty();
         assertThat(feedbackRepository.findById(oldBrief.getId()).orElseThrow().getDeliveryState())
                 .isEqualTo(FeedbackDeliveryState.PREPARED);
@@ -674,24 +692,30 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         AgentJob fresh = jobOf(rowOf(newerKey));
         assertThat(recheckedOf(fresh)).isEqualTo("[\"closing-issue-criteria\"]");
         try (LinkedAttempt current = captureLinkedAttempt(fresh, linked, "- [x] Confirm repair and test twice")) {
-            admissionService.admit(current.identity(), current.observations());
+            admissionService.admit(current.identity(), current.practiceResults());
         }
-        List<Observation> positive = observationRepository.findByAgentJobId(fresh.getId(), workspace.getId());
+        List<PracticeResult> positive = practiceResultRepository.findByAgentJobId(fresh.getId(), workspace.getId());
         Long linkedId = linked.getId();
         assertThat(positive).singleElement().satisfies(row -> {
             assertThat(row.getPractice().getId()).isEqualTo(linkedId);
             assertThat(row.getOutcome()).isEqualTo(Outcome.MET);
         });
-        assertThat(observationRepository.findById(olderNegative)).isPresent();
-        assertThat(observationRepository.findById(currentNegative)).isPresent();
-        assertThat(observationRepository.findById(currentNegative).orElseThrow().getSupersededAt())
+        assertThat(practiceResultRepository.findById(olderNegative)).isPresent();
+        assertThat(practiceResultRepository.findById(currentNegative)).isPresent();
+        assertThat(practiceResultRepository
+                        .findById(currentNegative)
+                        .orElseThrow()
+                        .getSupersededAt())
                 .isNotNull();
-        assertThat(observationRepository
+        assertThat(practiceResultRepository
                         .findById(secondCurrentNegative)
                         .orElseThrow()
                         .getSupersededAt())
                 .isNotNull();
-        assertThat(observationRepository.findById(olderNegative).orElseThrow().getSupersededAt())
+        assertThat(practiceResultRepository
+                        .findById(olderNegative)
+                        .orElseThrow()
+                        .getSupersededAt())
                 .isNull();
         assertThat(feedbackRepository
                         .findById(currentBrief.getId())
@@ -701,7 +725,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         assertThat(standing(pr)).containsExactly(positive.getFirst().getId());
         assertThat(feedbackRepository.findById(oldBrief.getId()).orElseThrow().getDeliveryState())
                 .isEqualTo(FeedbackDeliveryState.SUPERSEDED);
-        assertThat(feedbackObservationRepository.findPreparedConversationFeedbackIdsForNegativeClaim(
+        assertThat(feedbackEvidenceRepository.findPreparedConversationFeedbackIdsForNegativeClaim(
                         workspace.getId(), developer.getId(), linked.getId(), ArtifactKinds.PULL_REQUEST, pr.getId()))
                 .isEmpty();
         assertThat(feedbackRepository
@@ -717,21 +741,22 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         feedback.put(
                 "admissionDigest",
                 Objects.requireNonNull(fresh.getMetadata())
-                        .path(ObservationAdmissionService.DIGEST_METADATA_KEY)
+                        .path(ResultAdmissionService.DIGEST_METADATA_KEY)
                         .asString());
-        feedback.putArray("observations")
+        feedback.putArray("results")
                 .addObject()
-                .put("id", positive.getFirst().getId().toString())
+                .put("practiceResultId", positive.getFirst().getId().toString())
                 .put("practiceSlug", linked.getSlug())
                 .put("outcome", positive.getFirst().getOutcome().name())
                 .put("anchorable", false)
-                .putArray("citations");
+                .putArray("observations");
         feedback.putArray("units");
         ObjectNode review = feedback.putObject("review");
         review.putObject("summary")
                 .put("body", "Every criterion of the linked issue is now checked off in the change.")
                 .putArray("basedOn")
-                .add(positive.getFirst().getId().toString());
+                .addObject()
+                .put("practiceResultId", positive.getFirst().getId().toString());
         review.putArray("inline");
         review.putArray("withheld");
         fresh.setOutput(output);
@@ -1208,23 +1233,21 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                             .orElseThrow()
                     + 1;
             assertThat(lines.get(line - 1)).contains(expectedBody);
-            var observations = MAPPER.createArrayNode();
-            var result = observations.addObject();
-            result.put("practiceSlug", linked.getSlug())
-                    .put("summary", "Linked criteria are complete")
-                    .put("outcome", "MET")
-                    .put("evidenceRationale", "The captured linked issue shows the completed acceptance criterion.")
-                    .putNull("severity");
-            result.putObject("evidence")
-                    .putArray("citations")
-                    .addObject()
+            ObjectNode citation = MAPPER.createObjectNode()
                     .put("sourceKind", "scm.linked-work-items")
                     .put("path", path)
                     .put("artifactPath", path)
                     .put("startLine", line)
                     .put("endLine", line)
                     .put("quote", expectedBody);
-            return new LinkedAttempt(job, inputs, observations);
+            ObjectNode candidate = MAPPER.createObjectNode()
+                    .put("outcome", "MET")
+                    .put("summary", "Linked criteria are complete")
+                    .put("explanation", "The captured linked issue shows the completed acceptance criterion.");
+            candidate.putArray("citations").add(citation);
+            candidate.putObject("evidence");
+            candidate.set("coverage", completeCoverage());
+            return new LinkedAttempt(job, inputs, admissionRequest(linked.getSlug(), candidate), citation);
         } catch (Exception | Error failure) {
             if (inputs != null) inputs.close();
             throw failure;
@@ -1233,10 +1256,14 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         }
     }
 
-    private record LinkedAttempt(AgentJob job, PreparedJobInputs inputs, JsonNode observations)
+    /**
+     * One captured attempt: {@code practiceResults} is the admission request body, and {@code criterion} the citation
+     * of the captured linked-issue line it rests on.
+     */
+    private record LinkedAttempt(AgentJob job, PreparedJobInputs inputs, JsonNode practiceResults, ObjectNode criterion)
             implements AutoCloseable {
-        ObservationAdmissionService.AdmissionIdentity identity() {
-            return new ObservationAdmissionService.AdmissionIdentity(
+        ResultAdmissionService.AdmissionIdentity identity() {
+            return new ResultAdmissionService.AdmissionIdentity(
                     job.getId(), job.getWorkspace().getId(), 0, "test-worker");
         }
 
@@ -1316,24 +1343,63 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
 
     private AgentJob admittedLinkedReview(PullRequest pr, Practice linked) throws Exception {
         try (LinkedAttempt capture = captureLinkedAttempt(linkedReviewJob(pr), linked, "- [ ] Confirm repair")) {
-            var observations = MAPPER.createArrayNode();
-            var result = (ObjectNode) capture.observations().get(0).deepCopy();
-            result.put("summary", "Linked criteria need confirmation")
+            ObjectNode candidate = MAPPER.createObjectNode()
                     .put("outcome", "NOT_MET")
+                    .put("summary", "Linked criteria need confirmation")
+                    .put("explanation", "The captured criterion remains unchecked.")
+                    .put("severity", "MINOR");
+            candidate.putArray("citations");
+            ObjectNode problem = candidate
+                    .putArray("problems")
+                    .addObject()
                     .put("severity", "MINOR")
-                    .put("evidenceRationale", "The captured criterion remains unchecked.");
-            var search = ((ObjectNode) result.path("evidence")).putObject("search");
+                    .put("summary", "The repair is not confirmed")
+                    .put("explanation", "The closing issue still lists its acceptance criterion as unchecked.");
+            problem.putArray("citations").add(capture.criterion().deepCopy());
+            problem.putObject("basis")
+                    .put("type", "duty")
+                    .put("criterionQuote", linked.getCriteria())
+                    .put("event", 0)
+                    .put("explanation", "The practice asks that the closing issue's criteria are met.");
+            var search = candidate.putObject("evidence").putObject("search");
             search.putArray("consulted").add("scm.linked-work-items");
             search.put("lookedFor", "confirmation of the acceptance criterion");
             search.put("boundary", "the captured closing issue #18");
-            observations.add(result);
-            admissionService.admit(capture.identity(), observations);
+            candidate.set("coverage", completeCoverage());
+            admissionService.admit(capture.identity(), admissionRequest(linked.getSlug(), candidate));
             AgentJob completed =
                     agentJobRepository.findById(capture.job().getId()).orElseThrow();
             completed.setStatus(AgentJobStatus.COMPLETED);
             completed.setCompletedAt(Instant.now());
             return agentJobRepository.saveAndFlush(completed);
         }
+    }
+
+    /** The body a runner posts to admission: one candidate per practice, sorted by practice. */
+    private static ObjectNode admissionRequest(String practiceSlug, ObjectNode candidate) {
+        ObjectNode request = MAPPER.createObjectNode().put("schemaVersion", 2);
+        request.putArray("results")
+                .addObject()
+                .put("practiceSlug", practiceSlug)
+                .set("candidate", candidate);
+        return request;
+    }
+
+    /** An admission request a test's own handler answers, so it lists no candidate. */
+    private static ObjectNode emptyAdmissionRequest() {
+        ObjectNode request = MAPPER.createObjectNode().put("schemaVersion", 2);
+        request.putArray("results");
+        return request;
+    }
+
+    /** Every captured source read whole. */
+    private static ObjectNode completeCoverage() {
+        return MAPPER.createObjectNode()
+                .put("source", "host")
+                .put("reads", 1)
+                .put("truncatedReads", 0)
+                .put("failedReads", 0)
+                .put("complete", true);
     }
 
     @ParameterizedTest
@@ -1548,7 +1614,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         observe(obsolete, opened, pr.getId(), developer, Outcome.NOT_MET, Severity.MINOR, NOW);
         UUID supersededId = observe(superseded, opened, pr.getId(), developer, Outcome.NOT_MET, Severity.MINOR, NOW);
         jdbcTemplate.update(
-                "UPDATE observation SET superseded_at = ? WHERE id = ?",
+                "UPDATE practice_result SET superseded_at = ? WHERE id = ?",
                 Timestamp.from(NOW.plusSeconds(90)),
                 supersededId);
         obsolete.setCriteria("Changed review criteria");
@@ -1559,8 +1625,8 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         AgentJob ready = capturedReview(workspace, pr.getNumber(), pr.getId(), NOW.plusSeconds(60));
         observe(answered, ready, pr.getId(), developer, Outcome.MET, null, NOW.plusSeconds(60));
         observe(abstained, ready, pr.getId(), developer, Outcome.NOT_APPLICABLE, null, NOW.plusSeconds(60));
-        invalidationRepository.save(new ObservationInvalidation(
-                observationRepository.findById(invalid).orElseThrow(), 1L, "Wrong when made", NOW.plusSeconds(90)));
+        invalidationRepository.save(new PracticeResultInvalidation(
+                practiceResultRepository.findById(invalid).orElseThrow(), 1L, "Wrong when made", NOW.plusSeconds(90)));
 
         pr.setBody("A material description repair");
         assertThat(rechecked(revision(pr))).containsExactly("states-how-to-verify-the-change");
@@ -1687,7 +1753,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                 "unknown retained identity",
                 "newer failed run",
                 "changed practice revision",
-                "invalidated observation",
+                "invalidated result",
                 "failed Ready review"
             })
     void shouldAskAgainWhatTheReadyReviewDidNotProveAnswered(String gap) {
@@ -1733,10 +1799,10 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                 tests.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(tests, 3)));
                 tests = practiceRepository.saveAndFlush(tests);
             }
-            case "invalidated observation" ->
+            case "invalidated result" ->
                 standing(pr)
-                        .forEach(id -> invalidationRepository.save(new ObservationInvalidation(
-                                observationRepository.findById(id).orElseThrow(),
+                        .forEach(id -> invalidationRepository.save(new PracticeResultInvalidation(
+                                practiceResultRepository.findById(id).orElseThrow(),
                                 1L,
                                 "Wrong when made",
                                 NOW.plusSeconds(90))));
@@ -1786,7 +1852,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    void shouldLeaveTheEarlierObservationStandingWhenTheRepairCaptureFails(boolean gitLab) {
+    void shouldLeaveTheEarlierResultStandingWhenTheRepairCaptureFails(boolean gitLab) {
         provider(gitLab);
         Practice describe = practice("describe-what-and-why", ScmSignals.PULL_REQUEST_OPENED);
         PullRequest pr = pullRequest(false, HEAD, "Adds the thing");
@@ -1848,7 +1914,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                         + "the review inputs could not be prepared.");
         assertThat(failed.getEvidenceSnapshot()).isNull();
         assertThat(failed.getDeliveryStatus()).isNotEqualTo(DeliveryStatus.DELIVERED);
-        assertThat(observationRepository.findByAgentJobId(repair.getId(), workspace.getId()))
+        assertThat(practiceResultRepository.findByAgentJobId(repair.getId(), workspace.getId()))
                 .isEmpty();
         assertThat(standing(pr)).containsExactly(negative);
         verify(handler).prepareInputs(any());
@@ -2103,10 +2169,10 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
     }
 
     private List<UUID> standing(PullRequest pr) {
-        return LatestRun.perClaim(observationRepository.findStandingForWork(
+        return LatestRun.perClaim(practiceResultRepository.findStandingForWork(
                         workspace.getId(), ScmSignals.PULL_REQUEST, pr.getId(), developer.getId()))
                 .stream()
-                .map(Observation::getId)
+                .map(PracticeResult::getId)
                 .toList();
     }
 
@@ -2196,8 +2262,8 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         assertThat(superseded.getLlmTotalCalls()).isEqualTo(older.getLlmTotalCalls());
         assertThat(superseded.getLlmTotalInputTokens()).isEqualTo(older.getLlmTotalInputTokens());
         assertThat(superseded.getLlmTotalOutputTokens()).isEqualTo(older.getLlmTotalOutputTokens());
-        assertThat(ObservationAdmissionService.isAdmitted(superseded)).isFalse();
-        assertThat(observationRepository.findByAgentJobId(superseded.getId(), workspace.getId()))
+        assertThat(ResultAdmissionService.isAdmitted(superseded)).isFalse();
+        assertThat(practiceResultRepository.findByAgentJobId(superseded.getId(), workspace.getId()))
                 .isEmpty();
         assertThat(rowOf(olderKey).getState()).isEqualTo(SignalState.TRIGGERED);
         assertThat(job(newer).getStatus()).isEqualTo(AgentJobStatus.QUEUED);
@@ -2272,16 +2338,16 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         doAnswer(invocation -> {
                     prepared.countDown();
                     awaitUninterruptibly(mirrorHeld);
-                    return (PreparedObservations) admitted -> {};
+                    return (PreparedResults) admitted -> {};
                 })
                 .when(admissionHandler)
-                .prepareObservations(
+                .prepareResults(
                         ArgumentMatchers.argThat(candidate -> candidate.getId().equals(newest.getId())), any());
         try (ExecutorService threads = Executors.newVirtualThreadPerTaskExecutor()) {
             Future<?> publishing = threads.submit(() -> admissionService.admit(
-                    new ObservationAdmissionService.AdmissionIdentity(
+                    new ResultAdmissionService.AdmissionIdentity(
                             newest.getId(), workspace.getId(), 0, "admission-lock-worker"),
-                    MAPPER.createArrayNode()));
+                    emptyAdmissionRequest()));
             awaitUninterruptibly(prepared);
             Future<?> replacing = threads.submit(() -> transactions.executeWithoutResult(status -> {
                 assertThat(pullRequestRepository.lockById(pr.getId())).isPresent();
@@ -2299,7 +2365,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         } finally {
             mirrorHeld.countDown();
         }
-        assertThat(ObservationAdmissionService.isAdmitted(job(newest))).isTrue();
+        assertThat(ResultAdmissionService.isAdmitted(job(newest))).isTrue();
         assertThat(job(newest).getStatus()).isEqualTo(AgentJobStatus.RUNNING);
     }
 
@@ -2320,17 +2386,17 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         doAnswer(invocation -> {
                     prepared.countDown();
                     awaitUninterruptibly(changed);
-                    return (PreparedObservations) admitted -> published.set(true);
+                    return (PreparedResults) admitted -> published.set(true);
                 })
                 .when(admissionHandler)
-                .prepareObservations(
+                .prepareResults(
                         ArgumentMatchers.argThat(candidate -> candidate.getId().equals(newest.getId())), any());
         try (ExecutorService threads = Executors.newVirtualThreadPerTaskExecutor()) {
             Future<?> publishing = threads.submit(() -> assertThatThrownBy(() -> admissionService.admit(
-                            new ObservationAdmissionService.AdmissionIdentity(
+                            new ResultAdmissionService.AdmissionIdentity(
                                     newest.getId(), workspace.getId(), 0, "target-race-worker"),
-                            MAPPER.createArrayNode()))
-                    .isInstanceOf(ObservationAdmissionService.StaleAttemptException.class));
+                            emptyAdmissionRequest()))
+                    .isInstanceOf(ResultAdmissionService.StaleAttemptException.class));
             awaitUninterruptibly(prepared);
             transactions.executeWithoutResult(status -> {
                 AgentJob current = agentJobRepository
@@ -2348,7 +2414,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
             changed.countDown();
         }
         assertThat(published).isFalse();
-        assertThat(ObservationAdmissionService.isAdmitted(job(newest))).isFalse();
+        assertThat(ResultAdmissionService.isAdmitted(job(newest))).isFalse();
     }
 
     @ParameterizedTest

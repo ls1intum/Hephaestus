@@ -22,7 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
@@ -88,14 +88,14 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
                         request.capture(),
                         any(SignalKey.class),
                         any());
-        assertThat(request.getValue().observationOrigin()).isEqualTo(ObservationOrigin.BACKFILL);
+        assertThat(request.getValue().practiceResultOrigin()).isEqualTo(ResultOrigin.BACKFILL);
     }
 
     /**
      * The same two stamps, taken from the run instead of written here.
      *
      * <p>A sweep's window is bounded to the recent past, so it measures the population events measure and
-     * its observations belong in the live trend line.
+     * its results belong in the live trend line.
      */
     @Test
     void aScheduledSweepIsStampedAsASweepAndMeasuredAsLiveWork() {
@@ -113,7 +113,7 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
         ArgumentCaptor<PullRequestReviewSubmissionRequest> request =
                 ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
         verify(agentJobService).submit(eq(WORKSPACE_ID), any(), request.capture(), any(SignalKey.class), any());
-        assertThat(request.getValue().observationOrigin()).isEqualTo(ObservationOrigin.LIVE);
+        assertThat(request.getValue().practiceResultOrigin()).isEqualTo(ResultOrigin.LIVE);
     }
 
     /**

@@ -4,9 +4,8 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
-import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletionService;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
@@ -39,7 +38,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Stages a writer that continues an admitted review from its admission's original inputs: the records and whole
- * standards the lost writer had, the original commits from the local mirror, and the admitted observations. It
+ * standards the lost writer had, the original commits from the local mirror, and the admitted results. It
  * captures nothing and assesses nothing; the runner reads {@link #CONTINUATION_PATH} and only composes the review
  * on the work. Every refusal happens here, before any model runs.
  */
@@ -57,7 +56,7 @@ public class ReviewCompositionContinuation {
     private final JobEvidenceFiles evidenceFiles;
     private final AgentJobRepository jobs;
     private final GitRepositoryManager git;
-    private final ObservationAdmissionService admission;
+    private final ResultAdmissionService admission;
     private final PracticeFeedbackDeliveryPolicy policy;
     private final JsonMapper mapper = new JsonMapper();
 
@@ -65,7 +64,7 @@ public class ReviewCompositionContinuation {
             ReviewCompositionBasisRepository bases,
             JobEvidenceFiles evidenceFiles,
             GitRepositoryManager git,
-            ObservationAdmissionService admission,
+            ResultAdmissionService admission,
             AgentJobRepository jobs,
             PracticeFeedbackDeliveryPolicy policy) {
         this.bases = bases;
@@ -163,12 +162,12 @@ public class ReviewCompositionContinuation {
      */
     private Map<String, byte[]> originalFiles(AgentJob job, ReviewCompositionBasis basis) {
         String digest = Objects.requireNonNull(job.getMetadata())
-                .path(ObservationAdmissionService.DIGEST_METADATA_KEY)
+                .path(ResultAdmissionService.DIGEST_METADATA_KEY)
                 .asString("");
         if (basis.getBasisVersion() != ReviewCompositionBasis.VERSION
                 || !basis.getExpiresAt().isAfter(Instant.now())
                 || !basis.getAdmissionDigest().equals(digest)
-                || basis.getAdmissionAttempt() != ObservationAdmissionService.citationAttempt(job)) {
+                || basis.getAdmissionAttempt() != ResultAdmissionService.citationAttempt(job)) {
             throw unavailable("its original inputs no longer belong to its admission");
         }
         var files = new TreeMap<String, byte[]>();
@@ -227,8 +226,17 @@ public class ReviewCompositionContinuation {
         String range = identity(manifest, DIFF);
         if (range != null) commits.addAll(List.of(range.split(":", -1)));
         // A repository quote can name any commit the original checkout held, not only the change's endpoints.
-        for (JsonNode observation : admitted.path("observations")) {
-            for (JsonNode citation : observation.path("citations")) {
+        for (JsonNode practiceResult : admitted.path("results")) {
+            List<JsonNode> cited = new ArrayList<>();
+            practiceResult.path("citations").forEach(cited::add);
+            for (JsonNode problem : practiceResult.path("observations")) {
+                problem.path("citations").forEach(cited::add);
+            }
+            cited.add(practiceResult.path("example").path("citation"));
+            for (JsonNode question : practiceResult.path("evidence").path("undecidability")) {
+                cited.add(question.path("citation"));
+            }
+            for (JsonNode citation : cited) {
                 if (REPOSITORY_TREE.equals(citation.path("sourceKind").asString())
                         && (GIT_DIRECTORY + "HEAD")
                                 .equals(citation.path("artifactPath").asString())

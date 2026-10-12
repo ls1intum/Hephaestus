@@ -9,13 +9,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.CitedSourceAccess;
-import de.tum.cit.aet.hephaestus.agent.handler.AdmittedObservationFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
@@ -128,7 +128,7 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
      * {@link Optional} and a batch that mapped a missing key to anything but "denied" would only fail here.
      */
     @Test
-    void batchedAuthorizationDecidesEveryObservationTheWayTheSingleRowFormDoes() {
+    void batchedAuthorizationDecidesEveryResultTheWayTheSingleRowFormDoes() {
         AgentJobRepository jobs = mock(AgentJobRepository.class);
         ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
         EvidenceDeliveryAuthorization authorization = new EvidenceDeliveryAuthorization(
@@ -140,11 +140,11 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
                                 ? (CitedSourceAccess.Checks) citation -> true
                                 : Mockito.RETURNS_DEFAULTS.answer(call)));
 
-        Observation permittedSource = observation("scm.pull-request.diff");
-        Observation deniedSource = observation("hephaestus.observation-history");
-        Observation runMissing = observation("scm.pull-request.diff");
-        Observation snapshotless = observation("scm.pull-request.diff");
-        List<Observation> observations = List.of(permittedSource, deniedSource, runMissing, snapshotless);
+        PracticeResult permittedSource = practiceResult("scm.pull-request.diff");
+        PracticeResult deniedSource = practiceResult("hephaestus.observation-history");
+        PracticeResult runMissing = practiceResult("scm.pull-request.diff");
+        PracticeResult snapshotless = practiceResult("scm.pull-request.diff");
+        List<PracticeResult> practiceResults = List.of(permittedSource, deniedSource, runMissing, snapshotless);
 
         when(jobs.findEvidenceContractVersions(eq(7L), any()))
                 .thenReturn(List.of(
@@ -167,27 +167,28 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
                         SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .thenReturn(false);
 
-        Set<UUID> batched = authorization.permitsAll(7L, observations, SourceUsePurpose.CONVERSATIONAL_MENTORING);
+        Set<UUID> batched = authorization.permitsAll(7L, practiceResults, SourceUsePurpose.CONVERSATIONAL_MENTORING);
 
         assertThat(batched).containsExactly(permittedSource.getId());
-        for (Observation observation : observations) {
-            assertThat(batched.contains(observation.getId()))
-                    .as("batched verdict for job %s", observation.getAgentJobId())
-                    .isEqualTo(authorization.permits(7L, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING));
+        for (PracticeResult practiceResult : practiceResults) {
+            assertThat(batched.contains(practiceResult.getId()))
+                    .as("batched verdict for job %s", practiceResult.getAgentJobId())
+                    .isEqualTo(authorization.permits(7L, practiceResult, SourceUsePurpose.CONVERSATIONAL_MENTORING));
         }
         verify(jobs).findEvidenceContractVersions(eq(7L), any());
     }
 
     /**
-     * An observation never persisted has no id to hand back, so membership cannot say "permitted" for
+     * A result never persisted has no id to hand back, so membership cannot say "permitted" for
      * it; denying is the safe direction, matching every read surface's own assumption that it authorizes
      * rows it loaded.
      */
     @Test
-    void deniesAnObservationThatWasNeverPersisted() {
+    void deniesAResultThatWasNeverPersisted() {
         AgentJobRepository jobs = mock(AgentJobRepository.class);
         ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
-        Observation transientObservation = Observation.builder()
+        PracticeResult transientResult = PracticeResult.builder()
+                .scopeKey("test-scope")
                 .agentJobId(UUID.randomUUID())
                 .evidence(MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"))
                 .build();
@@ -200,7 +201,7 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
                                         call -> call.getMethod().getName().equals("checks")
                                                 ? (CitedSourceAccess.Checks) citation -> true
                                                 : Mockito.RETURNS_DEFAULTS.answer(call)))
-                        .permitsAll(7L, List.of(transientObservation), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                        .permitsAll(7L, List.of(transientResult), SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .isEmpty();
         verifyNoInteractions(jobs);
     }
@@ -209,8 +210,8 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
     void shouldRequireVerifiedCitationsOnlyForNewDelivery() {
         AgentJobRepository jobs = mock(AgentJobRepository.class);
         ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
-        var observation = observation("scm.pull-request.diff");
-        UUID jobId = observation.getAgentJobId();
+        var practiceResult = practiceResult("scm.pull-request.diff");
+        UUID jobId = practiceResult.getAgentJobId();
         when(jobs.findEvidenceContractVersions(eq(7L), any())).thenReturn(List.of(new ContractRow(jobId, "1.3.0")));
         when(catalogs.isSourceUsePermitted(any(), any(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
                 .thenReturn(true);
@@ -222,23 +223,25 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
                         call -> call.getMethod().getName().equals("checks")
                                 ? (CitedSourceAccess.Checks) citation -> true
                                 : Mockito.RETURNS_DEFAULTS.answer(call)));
-        assertThat(authorization.permitsAll(7L, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .containsExactly(observation.getId());
+        assertThat(authorization.permitsAll(7L, List.of(practiceResult), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .containsExactly(practiceResult.getId());
         assertThat(authorization.permitsForNewDelivery(
-                        7L, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                        7L, List.of(practiceResult), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isEmpty();
-        Observation verified = Observation.builder()
-                .id(observation.getId())
+        PracticeResult verified = PracticeResult.builder()
+                .scopeKey("test-scope")
+                .id(practiceResult.getId())
                 .agentJobId(jobId)
-                .evidence(AdmittedObservationFixtures.evidence(jobId, "scm.pull-request.diff"))
+                .evidence(AdmittedResultFixtures.evidence(jobId, "scm.pull-request.diff"))
                 .build();
         assertThat(authorization.permitsForNewDelivery(
                         7L, List.of(verified), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .containsExactly(verified.getId());
     }
 
-    private static Observation observation(String sourceKind) {
-        return Observation.builder()
+    private static PracticeResult practiceResult(String sourceKind) {
+        return PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .agentJobId(UUID.randomUUID())
                 .evidence(MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"" + sourceKind + "\"}]}"))

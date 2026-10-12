@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.groupdetail;
 
 import de.tum.cit.aet.hephaestus.practices.groupdetail.dto.PracticeGroupReviewRunsPageDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.PracticeGroupTrendDTO;
+import de.tum.cit.aet.hephaestus.practices.result.trend.dto.PracticeGroupTrendDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,7 +51,7 @@ public class PracticeGroupDetailController {
     @Operation(
             operationId = "listPracticeGroupReviewRuns",
             summary = "List complete review runs for a practice group",
-            description = "Returns complete review runs newest first, including visible undecided observations.")
+            description = "Returns complete review runs newest first, including visible undecided results.")
     @ApiResponse(responseCode = "200", description = "Paginated review runs returned")
     @ApiResponse(
             responseCode = "400",

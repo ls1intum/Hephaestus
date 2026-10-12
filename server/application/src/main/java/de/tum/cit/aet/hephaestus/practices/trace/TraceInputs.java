@@ -48,7 +48,7 @@ final class TraceInputs {
 
     /** What one practice produced on this artifact, across every run of it. */
     record PracticeOutput(
-            int observations,
+            int practiceResults,
             int delivered,
             List<FeedbackSuppressionReason> withheldReasons,
             @Nullable UUID latestReviewId,

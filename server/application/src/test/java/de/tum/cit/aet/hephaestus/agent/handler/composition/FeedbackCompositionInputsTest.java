@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
@@ -21,7 +21,7 @@ class FeedbackCompositionInputsTest extends BaseUnitTest {
 
     @Test
     void anEventReviewOpensEveryLaneWithItsOwnCap() {
-        JsonNode request = stage(ObservationOrigin.LIVE, FeedbackCompositionInputs.EVENT_REVIEW_CHANNELS);
+        JsonNode request = stage(ResultOrigin.LIVE, FeedbackCompositionInputs.EVENT_REVIEW_CHANNELS);
 
         assertThat(request.get("enabled").asBoolean()).isTrue();
         for (FeedbackChannel channel : FeedbackChannel.values()) {
@@ -34,7 +34,7 @@ class FeedbackCompositionInputsTest extends BaseUnitTest {
 
     @Test
     void aLaneThisOccasionCannotReachIsNamedAndDisabledRatherThanOmitted() {
-        JsonNode channels = stage(ObservationOrigin.LIVE, EnumSet.of(FeedbackChannel.IN_APP, FeedbackChannel.IN_CHAT))
+        JsonNode channels = stage(ResultOrigin.LIVE, EnumSet.of(FeedbackChannel.IN_APP, FeedbackChannel.IN_CHAT))
                 .get("channels");
 
         assertThat(channels.get(FeedbackChannel.IN_CONTEXT.name())).isNotNull();
@@ -49,7 +49,7 @@ class FeedbackCompositionInputsTest extends BaseUnitTest {
     @Test
     void aBackfillSweepStagesNothingAtAll() {
         Map<String, byte[]> files = new LinkedHashMap<>();
-        FeedbackCompositionInputs.stage(files, ObservationOrigin.BACKFILL);
+        FeedbackCompositionInputs.stage(files, ResultOrigin.BACKFILL);
 
         assertThat(files).doesNotContainKey(SandboxLayout.FEEDBACK_COMPOSITION_PATH);
     }
@@ -57,12 +57,12 @@ class FeedbackCompositionInputsTest extends BaseUnitTest {
     @Test
     void anOccasionThatCanReachNoLaneStagesNothingAtAll() {
         Map<String, byte[]> files = new LinkedHashMap<>();
-        FeedbackCompositionInputs.stage(files, ObservationOrigin.LIVE, Set.of());
+        FeedbackCompositionInputs.stage(files, ResultOrigin.LIVE, Set.of());
 
         assertThat(files).doesNotContainKey(SandboxLayout.FEEDBACK_COMPOSITION_PATH);
     }
 
-    private JsonNode stage(ObservationOrigin origin, Set<FeedbackChannel> channels) {
+    private JsonNode stage(ResultOrigin origin, Set<FeedbackChannel> channels) {
         Map<String, byte[]> files = new LinkedHashMap<>();
         FeedbackCompositionInputs.stage(files, origin, channels);
         byte[] staged = files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH);

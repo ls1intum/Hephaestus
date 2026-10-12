@@ -139,7 +139,7 @@ public class PracticeGroupController {
             summary = "Set how much autonomy the system has over one group",
             description = "Applies to every practice in the group that holds no autonomy of its own; practices that "
                     + "set their own are left alone. OFF stops their reviews entirely. HUMAN_APPROVAL runs them and records "
-                    + "every observation, holds feedback on the work for an authorized reviewer, and still writes the "
+                    + "every result, holds feedback on the work for an authorized reviewer, and still writes the "
                     + "developer's practice pages and the mentor, which are read on request. AUTOMATIC sends feedback on "
                     + "the work without asking. Send a null autonomy to clear the group's own setting so it follows the "
                     + "workspace default.")

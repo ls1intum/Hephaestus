@@ -43,6 +43,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 @Component
@@ -154,7 +155,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
             ensureRepositoryAvailable(new RepositoryKey(job.getWorkspace().getId(), repositoryId));
         }
         if (selectedKinds.contains(CORE)) {
-            ObjectNode staged = buildPullRequestMetadata(pullRequest, metadata, job.getCreatedAt());
+            ObjectNode staged = workRecord(pullRequest, metadata, job.getCreatedAt());
             storeMetadata(files, staged);
             // The words the job was admitted with. A body known to be absent stages an empty description; a body the
             // job does not carry as text stays unknown, so no description is staged rather than the current one.
@@ -261,9 +262,14 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
             "title",
             "body");
 
-    private ObjectNode buildPullRequestMetadata(
-            PullRequest pullRequest, JsonNode jobMetadata, @Nullable Instant admittedAt) {
-        ObjectNode result = objectMapper.createObjectNode();
+    /**
+     * The pull request's work record, {@code context/metadata.json}, as the practice runner reads it
+     * ({@code WORK_RECORDS["scm.pull_request"]} in {@code lib/contract.ts}): the words the job was admitted with and the
+     * status the mirror last synced. Test harnesses that stage a review build their record here too, so that one shape
+     * reaches the runner.
+     */
+    public static ObjectNode workRecord(PullRequest pullRequest, JsonNode jobMetadata, @Nullable Instant admittedAt) {
+        ObjectNode result = JsonNodeFactory.instance.objectNode();
         // Which time each part describes. Admission is when the job was accepted, not when the provider event
         // happened; the mirror sync time dates the status fields only. No status is reconstructed for admission.
         ObjectNode basis = result.putObject("basis");

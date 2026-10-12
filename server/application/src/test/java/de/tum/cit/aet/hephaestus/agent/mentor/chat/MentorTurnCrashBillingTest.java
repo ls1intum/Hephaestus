@@ -173,7 +173,7 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("nothingToBillFrom")
     @DisplayName("a turn nobody observed is booked as a one-call, zero-token unverifiable event")
-    void aTurnWithNoObservationsAtAllStaysUnverifiable(String observation, Optional<MentorTurnLlmUsage> row) {
+    void aTurnWithNoResultsAtAllStaysUnverifiable(String practiceResult, Optional<MentorTurnLlmUsage> row) {
         when(chatMessageRepository.findLlmUsageById(assistantId)).thenReturn(row);
 
         persistence.interrupt(cookie(), startedTurnWithNoRunnerReport(), new IllegalStateException("runner died"));

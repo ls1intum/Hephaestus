@@ -15,13 +15,14 @@ import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.FeedbackWithdrawalService;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.Reaction;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -47,7 +48,7 @@ import tools.jackson.databind.ObjectMapper;
 class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final String RECURRENCE_KEY = "ck-integration-observation";
+    private static final String RECURRENCE_KEY = "ck-integration-result";
     private static final String FEEDBACK_URI = "/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response";
     private static final String RESOLUTION_COUNTS_URI =
             "/workspaces/{workspaceSlug}/practices/feedback/resolution-counts";
@@ -59,6 +60,9 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
     private PracticeRepository practiceRepository;
 
     @Autowired
+    private PracticeResultRepository practiceResultRepository;
+
+    @Autowired
     private ObservationRepository observationRepository;
 
     @Autowired
@@ -68,7 +72,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
     private ReactionRepository reactionRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -80,7 +84,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
     private User adminUser;
     private AgentJob agentJob;
     private Feedback feedbackUnit;
-    private UUID observationId;
+    private UUID practiceResultId;
 
     @BeforeEach
     void setUpTestData() {
@@ -104,9 +108,9 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);
 
-        Observation observation = Observation.builder()
+        PracticeResult practiceResult = PracticeResult.builder()
+                .scopeKey("test-scope")
                 .occurrenceKey("test-key-" + UUID.randomUUID())
-                .recurrenceKey(RECURRENCE_KEY)
                 .agentJobId(agentJob.getId())
                 .workspaceId(workspace.getId())
                 .practice(practice)
@@ -118,8 +122,9 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .severity(Severity.MAJOR)
                 .observedAt(Instant.now())
                 .build();
-        observation = observationRepository.save(observation);
-        observationId = observation.getId();
+        practiceResult = practiceResultRepository.save(practiceResult);
+        practiceResultId = practiceResult.getId();
+        insertProblem(practiceResultId, "MAJOR");
 
         feedbackUnit = feedbackRepository.save(Feedback.builder()
                 .agentJobId(agentJob.getId())
@@ -136,8 +141,8 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .deliveredAt(Instant.now())
                 .build());
 
-        feedbackObservationRepository.insertIfAbsent(
-                feedbackUnit.getId(), observation.getId(), EvidenceRole.PRIMARY.name(), 0);
+        feedbackEvidenceRepository.insertIfAbsent(
+                feedbackUnit.getId(), practiceResult.getId(), null, EvidenceRole.PRIMARY.name(), 0);
     }
 
     @Nested
@@ -225,7 +230,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
-        void resolutionLookupUsesTheFeedbackObservationBinding() {
+        void resolutionLookupUsesTheFeedbackResultBinding() {
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Incorrect");
 
             webTestClient
@@ -239,10 +244,62 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                     .isOk()
                     .expectBody(Void.class);
 
-            Observation original = observationRepository.findById(observationId).orElseThrow();
-            Observation sibling = observationRepository.save(Observation.builder()
+            PracticeResult sibling = saveSibling();
+            var resolutions = reactionRepository.findCurrentResolutions(
+                    workspace.getId(), List.of(practiceResultId, sibling.getId()), new String[] {RECURRENCE_KEY});
+            assertThat(feedbackRepository.existsDeliveredInContextForResult(
+                            workspace.getId(), adminUser.getId(), practiceResultId))
+                    .isTrue();
+            assertThat(feedbackRepository.existsDeliveredInContextForResult(
+                            workspace.getId(), adminUser.getId(), sibling.getId()))
+                    .isFalse();
+            assertThat(resolutions).singleElement().satisfies(resolution -> {
+                assertThat(resolution.getPracticeResultId()).isEqualTo(practiceResultId);
+                assertThat(resolution.getRecurrenceKey()).isEqualTo(RECURRENCE_KEY);
+                assertThat(resolution.getResolution()).isEqualTo(FeedbackResolution.DISPUTED.name());
+            });
+        }
+
+        /**
+         * A later review's problem carries an earlier answer through the recurrence key of the earlier result's
+         * problem: the row names the earlier result and that problem's key, never a key on the result itself.
+         */
+        @Test
+        @WithAdminUser
+        void shouldFindTheEarlierAnswerWhenOnlyAProblemSharesTheRecurrenceKey() {
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Incorrect");
+            webTestClient
+                    .put()
+                    .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(Void.class);
+            PracticeResult later = saveSibling();
+
+            var byKey = reactionRepository.findCurrentResolutions(
+                    workspace.getId(), List.of(later.getId()), new String[] {RECURRENCE_KEY});
+            var byOtherKey = reactionRepository.findCurrentResolutions(
+                    workspace.getId(), List.of(later.getId()), new String[] {"ck-unrelated-place"});
+
+            assertThat(byKey).singleElement().satisfies(resolution -> {
+                assertThat(resolution.getPracticeResultId()).isEqualTo(practiceResultId);
+                assertThat(resolution.getRecurrenceKey()).isEqualTo(RECURRENCE_KEY);
+                assertThat(resolution.getResolution()).isEqualTo(FeedbackResolution.DISPUTED.name());
+            });
+            assertThat(byOtherKey).isEmpty();
+        }
+
+        /** A different behaviour at the same place: another result of the same job whose problem shares the key. */
+        private PracticeResult saveSibling() {
+            PracticeResult original =
+                    practiceResultRepository.findById(practiceResultId).orElseThrow();
+            PracticeResult sibling = practiceResultRepository.save(PracticeResult.builder()
+                    .scopeKey("test-scope")
                     .occurrenceKey("sibling-" + UUID.randomUUID())
-                    .recurrenceKey(RECURRENCE_KEY)
                     .agentJobId(original.getAgentJobId())
                     .workspaceId(workspace.getId())
                     .practice(original.getPractice())
@@ -254,18 +311,8 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                     .severity(Severity.MINOR)
                     .observedAt(Instant.now())
                     .build());
-            var resolutions = reactionRepository.findCurrentResolutions(
-                    workspace.getId(), List.of(observationId, sibling.getId()), new String[] {RECURRENCE_KEY});
-            assertThat(feedbackRepository.existsDeliveredInContextForObservation(
-                            workspace.getId(), adminUser.getId(), observationId))
-                    .isTrue();
-            assertThat(feedbackRepository.existsDeliveredInContextForObservation(
-                            workspace.getId(), adminUser.getId(), sibling.getId()))
-                    .isFalse();
-            assertThat(resolutions).singleElement().satisfies(resolution -> {
-                assertThat(resolution.getObservationId()).isEqualTo(observationId);
-                assertThat(resolution.getResolution()).isEqualTo(FeedbackResolution.DISPUTED.name());
-            });
+            insertProblem(sibling.getId(), "MINOR");
+            return sibling;
         }
 
         @Test
@@ -739,7 +786,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                     .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                     .headers(TestAuthUtils.withCurrentUser())
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Wrong observation"))
+                    .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Wrong result"))
                     .exchange()
                     .expectStatus()
                     .isOk()
@@ -815,5 +862,22 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             assertThat(response).isNotNull();
             assertThat(response.addressed()).isEqualTo(2);
         }
+    }
+
+    /** One problem of the result at the place {@link #RECURRENCE_KEY} names. */
+    private void insertProblem(UUID resultId, String severity) {
+        observationRepository.insert(
+                UUID.randomUUID(),
+                workspace.getId(),
+                resultId,
+                0,
+                null,
+                severity,
+                "Missing error handling",
+                "The call can fail and nothing handles it.",
+                "[]",
+                null,
+                null,
+                RECURRENCE_KEY);
     }
 }

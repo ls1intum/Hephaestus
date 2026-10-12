@@ -20,9 +20,9 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.ArtifactF
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.ArtifactObservationRow;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository.ArtifactResultRow;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.DormantBinding;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeSignalCoverage;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
@@ -75,8 +75,8 @@ class ArtifactTraceQueryService {
     private final PracticeRepository practices;
     private final PracticeSignalCoverage coverage;
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
-    private final ObservationRepository observations;
-    private final ObservationVisibilityPolicy visibility;
+    private final PracticeResultRepository practiceResults;
+    private final ResultVisibilityPolicy visibility;
     private final FeedbackRepository feedback;
     private final ReviewOutcomeLookup reviews;
     private final ArtifactCatalog artifacts;
@@ -85,11 +85,11 @@ class ArtifactTraceQueryService {
 
     /**
      * The trace of one piece of work, across every review of it or as the named review answered it. Naming a
-     * review narrows the occurrences offered to the deriver and the observations and feedback counted; the
+     * review narrows the occurrences offered to the deriver and the results and feedback counted; the
      * occurrence ledger is listed whole either way. A review that neither carried an occurrence of this work
      * nor observed it answers 404.
      *
-     * @param developerId narrows the observations and feedback counted to the ones about and addressed to this
+     * @param developerId narrows the results and feedback counted to the ones about and addressed to this
      *                    developer; {@code null} counts everyone's. A review that observed several people must
      *                    not tell one of them what it made of the others.
      */
@@ -104,7 +104,7 @@ class ArtifactTraceQueryService {
         if (recorded.isEmpty()) {
             throw new EntityNotFoundException("Reviewed work", artifactId);
         }
-        List<ArtifactObservationRow> observed = observations.findForArtifact(workspaceId, artifactKind, artifactId);
+        List<ArtifactResultRow> observed = practiceResults.findForArtifact(workspaceId, artifactKind, artifactId);
         if (reviewId != null
                 && recorded.stream().noneMatch(signal -> reviewId.equals(signal.getJobId()))
                 && observed.stream().noneMatch(row -> reviewId.equals(row.getReviewId()))) {
@@ -140,7 +140,7 @@ class ArtifactTraceQueryService {
                         workspaceId,
                         artifactKind,
                         artifactId,
-                        visibleObservations(workspaceId, artifactKind, artifactId, observed, reviewId, developerId),
+                        visibleResults(workspaceId, artifactKind, artifactId, observed, reviewId, developerId),
                         reviewId,
                         developerId));
 
@@ -252,38 +252,39 @@ class ArtifactTraceQueryService {
         return new PracticeSignalDTO(signal, artifacts.signalDisplayName(signal));
     }
 
-    private record CountedObservation(
-            Long practiceId, @Nullable UUID reviewId, Instant observedAt) {}
+    private record CountedResult(Long practiceId, @Nullable UUID reviewId, Instant observedAt) {}
 
-    private List<CountedObservation> visibleObservations(
+    private List<CountedResult> visibleResults(
             Long workspaceId,
             ArtifactKind artifactKind,
             Long artifactId,
-            List<ArtifactObservationRow> observed,
+            List<ArtifactResultRow> observed,
             @Nullable UUID reviewId,
             @Nullable Long developerId) {
         if (developerId == null) {
             return observed.stream()
-                    .map(row -> new CountedObservation(row.getPracticeId(), row.getReviewId(), row.getObservedAt()))
+                    .map(row -> new CountedResult(row.getPracticeId(), row.getReviewId(), row.getObservedAt()))
                     .toList();
         }
         Set<UUID> runIds = observed.stream()
                 .filter(row -> developerId.equals(row.getAboutUserId())
                         && (reviewId == null || reviewId.equals(row.getReviewId())))
-                .map(ArtifactObservationRow::getReviewId)
+                .map(ArtifactResultRow::getReviewId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         if (runIds.isEmpty()) return List.of();
-        var candidates = observations.findDeveloperReviewRunObservations(runIds, developerId, workspaceId).stream()
-                .filter(observation -> artifactKind.equals(observation.getArtifactKind())
-                        && artifactId.equals(observation.getArtifactId()))
+        var candidates = practiceResults.findDeveloperReviewRunResults(runIds, developerId, workspaceId).stream()
+                .filter(practiceResult -> artifactKind.equals(practiceResult.getArtifactKind())
+                        && artifactId.equals(practiceResult.getArtifactId()))
                 .toList();
         Set<UUID> permitted =
                 visibility.permitsHistory(workspaceId, candidates, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
         return candidates.stream()
-                .filter(observation -> permitted.contains(observation.getId()))
-                .map(observation -> new CountedObservation(
-                        observation.getPractice().getId(), observation.getAgentJobId(), observation.getObservedAt()))
+                .filter(practiceResult -> permitted.contains(practiceResult.getId()))
+                .map(practiceResult -> new CountedResult(
+                        practiceResult.getPractice().getId(),
+                        practiceResult.getAgentJobId(),
+                        practiceResult.getObservedAt()))
                 .toList();
     }
 
@@ -295,13 +296,13 @@ class ArtifactTraceQueryService {
             Long workspaceId,
             ArtifactKind artifactKind,
             Long artifactId,
-            List<CountedObservation> observed,
+            List<CountedResult> observed,
             @Nullable UUID reviewId,
             @Nullable Long developerId) {
         Map<Long, Integer> counts = new HashMap<>();
         Map<Long, UUID> latestReview = new HashMap<>();
         Map<Long, Instant> latestObserved = new HashMap<>();
-        for (CountedObservation row : observed) {
+        for (CountedResult row : observed) {
             if (reviewId != null && !reviewId.equals(row.reviewId())) {
                 continue;
             }

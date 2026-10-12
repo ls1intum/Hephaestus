@@ -173,7 +173,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
                 .execute(any(Runnable.class));
         var metrics = new SimpleMeterRegistry();
         var issuer = mock(WorkerJwtIssuer.class);
-        when(issuer.issueForJobUntil(any(), anyLong(), anyInt(), any(), any())).thenReturn("test-job-token");
+        when(issuer.issueForJobUntil(any(), anyLong(), anyInt(), any())).thenReturn("test-job-token");
         executor = new AgentJobExecutor(
                 properties,
                 jobs,
@@ -410,8 +410,8 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("a completed attempt records what each staged practice script did, as the runner reported it")
-    void shouldRecordEachStagedScriptsRunWhenTheAttemptCompletes() {
+    @DisplayName("a completed attempt records what each admitted practice's program did, as the runner reported it")
+    void shouldRecordEachAdmittedPracticesRunWhenTheAttemptCompletes() {
         Practice decides = practice("comment-quality", "decide()");
         Practice scans = practice("error-handling", "scan()");
         AgentJob job = queued();
@@ -426,9 +426,12 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
                                     .getId());
         }
         byte[] report = """
-                {"practices":[{"slug":"comment-quality","status":"ok","leads":3,
-                  "models":[{"slot":"decision","need":"required","bound":true,"notRated":{"deadline":2}}]}],
-                 "truncated":false}""".getBytes(StandardCharsets.UTF_8);
+                {"schemaVersion":2,"truncated":false,"practices":[{"practiceSlug":"comment-quality",
+                  "program":{"kind":"custom","digest":"%s"},
+                  "models":[{"slot":"decision","need":"required","bound":true,"notRated":{"deadline":2}}],
+                  "status":"ok","stopReason":null,
+                  "calls":{"review":1,"chat":0,"decision":3,"embedding":0,"reranking":0},
+                  "coverageReached":{"reads":2,"truncatedReads":0,"failedReads":0},"durationMs":40}]}""".formatted("ab".repeat(32)).getBytes(StandardCharsets.UTF_8);
         when(runner.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
         when(sandbox.execute(any())).thenAnswer(invocation -> {
             // The practices the attempt admitted, as its preparation records them before the sandbox runs.
@@ -447,7 +450,8 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         executor.processJob(job.getId());
 
         var runs = jdbc.queryForList(
-                "SELECT practice_slug, attempt, status, leads, practice_revision_id, CAST(models AS text) AS models "
+                "SELECT practice_slug, attempt, status, program_kind, program_digest, stop_reason, practice_revision_id, "
+                        + "CAST(models AS text) AS models, CAST(calls AS text) AS calls "
                         + "FROM agent_job_practice_script_run WHERE job_id = ? ORDER BY practice_slug",
                 job.getId());
         assertThat(runs).hasSize(2);
@@ -455,16 +459,21 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
                 .containsEntry("practice_slug", "comment-quality")
                 .containsEntry("attempt", 0)
                 .containsEntry("status", "OK")
-                .containsEntry("leads", 3)
+                .containsEntry("program_kind", "CUSTOM")
+                .containsEntry("program_digest", "ab".repeat(32))
+                .containsEntry("stop_reason", null)
                 .containsEntry(
                         "practice_revision_id",
                         Objects.requireNonNull(decides.getCurrentRevision()).getId());
         assertThat(mapper.readTree(String.valueOf(runs.get(0).get("models")))).isEqualTo(mapper.readTree("""
                         [{"purpose":"PRACTICE_DECISION","need":"REQUIRED","bound":true,
                           "notRated":[{"reason":"DEADLINE","count":2}]}]"""));
+        assertThat(mapper.readTree(String.valueOf(runs.get(0).get("calls")))).isEqualTo(mapper.readTree("""
+                        {"review":1,"chat":0,"decision":3,"embedding":0,"reranking":0}"""));
         assertThat(runs.get(1))
                 .containsEntry("practice_slug", "error-handling")
                 .containsEntry("status", "NOT_FINISHED")
+                .containsEntry("program_kind", "CUSTOM")
                 .containsEntry("models", null);
     }
 

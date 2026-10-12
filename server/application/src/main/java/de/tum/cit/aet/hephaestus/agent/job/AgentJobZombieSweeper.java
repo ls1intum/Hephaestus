@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository.StuckDeliveryRow;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
@@ -227,7 +227,7 @@ public class AgentJobZombieSweeper {
     /**
      * Under the row lock the admission takes, so the two decisions serialize. Only the attempt the sweep
      * found is touched: a row another claim has taken since, or that has ended, is left as it is. An
-     * attempt whose observations were admitted is never measured again, at or below the retry cap.
+     * attempt whose results were admitted is never measured again, at or below the retry cap.
      */
     private OrphanRecovery recoverOrphan(OrphanedJobRef orphan) {
         ReviewCompositionContinuation continuing = compositionContinuation;
@@ -259,7 +259,7 @@ public class AgentJobZombieSweeper {
                 return OrphanRecovery.REQUEUED;
             }
         }
-        boolean admitted = ObservationAdmissionService.isAdmitted(job);
+        boolean admitted = ResultAdmissionService.isAdmitted(job);
         // A lost admitted attempt continues as a writer only when its admission kept the original inputs.
         if (admitted && continuing != null) {
             Instant now = Instant.now();
@@ -288,7 +288,7 @@ public class AgentJobZombieSweeper {
                         orphan.getWorkerId(),
                         orphan.getRetryCount(),
                         Instant.now(),
-                        ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION)
+                        ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION)
                 : jobRepository.transitionStatusOwnedBy(
                         orphan.getJobId(),
                         AgentJobStatus.FAILED,

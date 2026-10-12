@@ -118,12 +118,16 @@ erDiagram
         VARCHAR(500) error
         INTEGER duration_ms
         TIMESTAMPTZ finished_at "NOT NULL"
-        INTEGER leads "NOT NULL"
         JSONB models
         BIGINT practice_revision_id FK
         VARCHAR(16) status "NOT NULL"
         UUID job_id PK,FK
         BIGINT workspace_id FK "NOT NULL"
+        VARCHAR(16) program_kind "NOT NULL"
+        VARCHAR(64) program_digest
+        VARCHAR(24) stop_reason
+        JSONB calls
+        JSONB coverage_reached
     }
 
     AgentJobPracticeScriptUsage {
@@ -543,11 +547,14 @@ erDiagram
         TEXT delivered_external_url
     }
 
-    FeedbackObservation {
-        UUID feedback_id PK,FK
-        UUID observation_id PK,FK
+    FeedbackEvidence {
+        UUID feedback_id FK,UK "NOT NULL"
+        UUID practice_result_id FK,UK "NOT NULL"
         VARCHAR(16) role "NOT NULL"
         INTEGER ordinal "NOT NULL"
+        UUID id PK
+        BIGINT workspace_id FK "NOT NULL"
+        UUID observation_id FK,UK
     }
 
     FeedbackPlacement {
@@ -933,41 +940,6 @@ erDiagram
         BIGINT actor_account_id FK
     }
 
-    Observation {
-        UUID id PK,UK
-        VARCHAR(255) occurrence_key UK "NOT NULL"
-        UUID agent_job_id FK "NOT NULL"
-        BIGINT practice_id FK "NOT NULL"
-        VARCHAR(64) artifact_kind "NOT NULL"
-        BIGINT artifact_id "NOT NULL"
-        BIGINT about_user_id FK "NOT NULL"
-        VARCHAR(255) summary "NOT NULL"
-        VARCHAR(16) severity
-        JSONB evidence
-        TEXT evidence_rationale
-        TIMESTAMPTZ observed_at "NOT NULL"
-        VARCHAR(64) recurrence_key
-        BIGINT practice_revision_id FK
-        VARCHAR(16) origin "NOT NULL"
-        BIGINT workspace_id FK,UK "NOT NULL"
-        TIMESTAMPTZ superseded_at
-        VARCHAR(16) outcome "NOT NULL"
-    }
-
-    ObservationInvalidation {
-        UUID id PK
-        TIMESTAMPTZ invalidated_at "NOT NULL"
-        BIGINT invalidated_by_account_id FK
-        UUID observation_id FK "NOT NULL"
-        VARCHAR(16) provider_copy "NOT NULL"
-        TIMESTAMPTZ provider_copy_retry_at "NOT NULL"
-        VARCHAR(500) reason "NOT NULL"
-        VARCHAR(500) restoration_reason
-        TIMESTAMPTZ restored_at
-        BIGINT restored_by_account_id FK
-        BIGINT workspace_id FK "NOT NULL"
-    }
-
     Organization {
         BIGINT id PK
         TIMESTAMPTZ created_at
@@ -1115,6 +1087,7 @@ erDiagram
         BIGINT workspace_id PK,FK
         TIMESTAMPTZ installed_at "NOT NULL"
         TIMESTAMPTZ provenance_linked_at
+        TIMESTAMPTZ practice_scripts_upgraded_at
     }
 
     PracticeGroup {
@@ -1132,6 +1105,59 @@ erDiagram
         VARCHAR(64) source_curated_slug
         VARCHAR(64) source_curated_fingerprint
         VARCHAR(16) autonomy
+    }
+
+    PracticeObservation {
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        UUID practice_result_id FK,UK "NOT NULL"
+        INTEGER position UK "NOT NULL"
+        VARCHAR(64) observation_key UK
+        VARCHAR(16) severity "NOT NULL"
+        VARCHAR(255) summary "NOT NULL"
+        TEXT explanation "NOT NULL"
+        JSONB citations "NOT NULL"
+        JSONB basis
+        TEXT next_step
+        VARCHAR(64) recurrence_key
+    }
+
+    PracticeResult {
+        UUID id PK,UK
+        VARCHAR(255) occurrence_key UK "NOT NULL"
+        UUID agent_job_id FK "NOT NULL"
+        BIGINT practice_id FK "NOT NULL"
+        VARCHAR(64) artifact_kind "NOT NULL"
+        BIGINT artifact_id "NOT NULL"
+        BIGINT about_user_id FK "NOT NULL"
+        VARCHAR(255) summary "NOT NULL"
+        VARCHAR(16) severity
+        JSONB evidence
+        TEXT evidence_rationale
+        TIMESTAMPTZ observed_at "NOT NULL"
+        BIGINT practice_revision_id FK
+        VARCHAR(16) origin "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
+        TIMESTAMPTZ superseded_at
+        VARCHAR(16) outcome "NOT NULL"
+        VARCHAR(255) scope_key "NOT NULL"
+        JSONB example
+        JSONB coverage
+        JSONB provenance
+    }
+
+    PracticeResultInvalidation {
+        UUID id PK
+        TIMESTAMPTZ invalidated_at "NOT NULL"
+        BIGINT invalidated_by_account_id FK
+        UUID practice_result_id FK "NOT NULL"
+        VARCHAR(16) provider_copy "NOT NULL"
+        TIMESTAMPTZ provider_copy_retry_at "NOT NULL"
+        VARCHAR(500) reason "NOT NULL"
+        VARCHAR(500) restoration_reason
+        TIMESTAMPTZ restored_at
+        BIGINT restored_by_account_id FK
+        BIGINT workspace_id FK "NOT NULL"
     }
 
     PracticeReviewPersonTarget {
@@ -1971,15 +1997,6 @@ erDiagram
     User ||--o{ Milestone : created_by
     Account ||--o{ NotificationSubscription : has
     Account ||--o{ OauthStateNonce : has
-    Practice ||--o{ Observation : practice_id
-    Practice ||--o{ Observation : practice_id
-    PracticeRevision ||--o{ Observation : has
-    AgentJob ||--o{ Observation : has
-    User ||--o{ Observation : has
-    Workspace ||--o{ Observation : has
-    Observation ||--o{ ObservationInvalidation : has
-    Account ||--o{ ObservationInvalidation : invalidated_by_account_id
-    Account ||--o{ ObservationInvalidation : restored_by_account_id
     IdentityProvider ||--o{ Organization : references
     Connection ||--o{ OutlineCollection : has
     Workspace ||--o{ OutlineCollection : has
@@ -1993,6 +2010,16 @@ erDiagram
     PracticeGroup ||--o{ Practice : has
     Workspace ||--o{ Practice : has
     Workspace ||--o{ PracticeGroup : has
+    PracticeResult ||--o{ PracticeObservation : has
+    Practice ||--o{ PracticeResult : practice_id
+    Practice ||--o{ PracticeResult : practice_id
+    PracticeRevision ||--o{ PracticeResult : has
+    AgentJob ||--o{ PracticeResult : has
+    User ||--o{ PracticeResult : has
+    Workspace ||--o{ PracticeResult : has
+    PracticeResult ||--o{ PracticeResultInvalidation : has
+    Account ||--o{ PracticeResultInvalidation : invalidated_by_account_id
+    Account ||--o{ PracticeResultInvalidation : restored_by_account_id
     Practice ||--o{ PracticeRevision : has
     Account ||--o{ ProductFeedback : account_id
     Account ||--o{ ProductFeedback : resolved_by_account_id
@@ -2075,8 +2102,12 @@ erDiagram
     Workspace }o--o{ ConnectionActivity : has
     Discussion }o--o{ DiscussionLabel : labeled
     Label }o--o{ DiscussionLabel : labeled
-    Feedback }o--o{ FeedbackObservation : has
-    Observation }o--o{ FeedbackObservation : has
+    Feedback }o--o{ FeedbackEvidence : has
+    PracticeResult }o--o{ FeedbackEvidence : practice_result_id
+    Feedback }o--o{ FeedbackEvidence : references
+    PracticeObservation }o--o{ FeedbackEvidence : has
+    PracticeResult }o--o{ FeedbackEvidence : practice_result_id
+    Workspace }o--o{ FeedbackEvidence : has
     User }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueBlocking : blocked_issue_id

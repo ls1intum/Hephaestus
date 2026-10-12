@@ -137,7 +137,7 @@ public class SlackConversationNudgeService {
         return cooldowns.asMap().putIfAbsent(recipient, now) == null;
     }
 
-    /** Count-only copy — deliberately no observation details, no severity, no artifact references. */
+    /** Count-only copy — deliberately no result details, no severity, no artifact references. */
     static String message(int unitCount) {
         return unitCount == 1
                 ? "You have 1 piece of feedback to explore. Reply here to go through it."

@@ -6,12 +6,12 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
 import de.tum.cit.aet.hephaestus.practices.feedback.InAppFeedbackBody;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>{@code PREPARED} on write and {@code DELIVERED} on the recipient's first read (the compare-and-set
  * in {@code FeedbackRepository#markInAppDelivered}). We own this surface, so "delivered" can be an
- * observation instead of an assumption.
+ * result instead of an assumption.
  *
  * <p>One open card per practice, not a pile. A newer card about a practice replaces the card still open about
  * it, queued or already read: the page is a list of practices to work on, and the newer card is the live
@@ -53,15 +53,15 @@ public class InAppFeedbackPreparer {
     public static final int TOP_N_PER_RECIPIENT = 2;
 
     private final FeedbackRepository feedbackRepository;
-    private final FeedbackObservationRepository feedbackObservationRepository;
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
     private final FeedbackSupersession supersession;
 
     public InAppFeedbackPreparer(
             FeedbackRepository feedbackRepository,
-            FeedbackObservationRepository feedbackObservationRepository,
+            FeedbackEvidenceRepository feedbackEvidenceRepository,
             FeedbackSupersession supersession) {
         this.feedbackRepository = feedbackRepository;
-        this.feedbackObservationRepository = feedbackObservationRepository;
+        this.feedbackEvidenceRepository = feedbackEvidenceRepository;
         this.supersession = supersession;
     }
 
@@ -77,7 +77,7 @@ public class InAppFeedbackPreparer {
     public record RoutedMessage(
             ComposedInAppMessage message,
             InAppRoutingDecision decision,
-            List<Observation> evidence,
+            List<PracticeResult> evidence,
             @Nullable UUID replaces) {}
 
     /**
@@ -90,7 +90,7 @@ public class InAppFeedbackPreparer {
      * @param routed      the cycle's messages for this recipient, in the order they should be offered
      * @param positionBase the first ordinal this recipient's slice of the band may use. Passed in rather
      *     than derived here because {@code (agent_job_id, position)} is unique and one job can file
-     *     observations against several people: a base fixed at {@link FeedbackLedgerRecorder#IN_APP_UNIT_ORDINAL_BASE}
+     *     results against several people: a base fixed at {@link FeedbackLedgerRecorder#IN_APP_UNIT_ORDINAL_BASE}
      *     would make the second recipient's first unit collide with the first recipient's, and the
      *     idempotency guard would read that collision as "already written" and drop the row silently.
      * @return the number of units newly prepared this call (0 on a pure re-run)
@@ -148,7 +148,7 @@ public class InAppFeedbackPreparer {
                     .workspaceId(workspaceId)
                     // Unanchored on purpose: the message is about a way of working across several pieces of work,
                     // so naming one of them as "the" artifact would misdescribe what it is evidenced by.
-                    // The bound observations carry the artifacts, which is where the evidence belongs.
+                    // The bound results carry the artifacts, which is where the evidence belongs.
                     .recipientUserId(recipientUserId)
                     .aboutUserId(recipientUserId)
                     .channel(FeedbackChannel.IN_APP)
@@ -165,12 +165,12 @@ public class InAppFeedbackPreparer {
                     .createdAt(now)
                     .build());
             int ordinal = 0;
-            for (Observation observation : routedMessage.evidence()) {
-                if (observation.getId() == null) {
+            for (PracticeResult practiceResult : routedMessage.evidence()) {
+                if (practiceResult.getId() == null) {
                     continue;
                 }
-                feedbackObservationRepository.insertIfAbsent(
-                        unit.getId(), observation.getId(), EvidenceRole.PRIMARY.name(), ordinal++);
+                feedbackEvidenceRepository.insertIfAbsent(
+                        unit.getId(), practiceResult.getId(), null, EvidenceRole.PRIMARY.name(), ordinal++);
             }
             prepared++;
         }

@@ -311,9 +311,9 @@ public class WorkspaceFolderRenderer implements EvidenceSource {
                 });
             }
             boolean profiles = allowed.contains(INVENTORY);
-            boolean observations = allowed.contains(new SourceKind("hephaestus.observation-history"));
+            boolean practiceResults = allowed.contains(new SourceKind("hephaestus.observation-history"));
             boolean feedback = allowed.contains(new SourceKind("hephaestus.feedback-history"));
-            if (profiles || observations || feedback) {
+            if (profiles || practiceResults || feedback) {
                 for (var membership : memberships.findByWorkspace_Id(workspace)) {
                     if (membership.isHidden()) continue;
                     var person = membership.getUser();
@@ -336,9 +336,9 @@ public class WorkspaceFolderRenderer implements EvidenceSource {
                                         .put("login", person.getLogin())
                                         .put("name", person.getName())
                                         .putNull("synced_at"));
-                    if (observations) text(root, files, prefix + "observations.jsonl", "");
+                    if (practiceResults) text(root, files, prefix + "observations.jsonl", "");
                     if (feedback) text(root, files, prefix + "feedback.jsonl", "");
-                    if (observations || feedback)
+                    if (practiceResults || feedback)
                         history.renderPersonHistory(
                                 workspace,
                                 person.getId(),

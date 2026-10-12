@@ -60,9 +60,9 @@ public final class SandboxLayout {
     public static final String FEEDBACK_FILENAME = "feedback.json";
 
     /**
-     * Filename of the practice script report, collected from {@link #OUTPUT_PATH}: one entry per staged practice script
-     * script with its status, leads, and models. The runner writes it before it deletes
-     * {@link #PRACTICE_SCRIPT_OUT_PREFIX}, which is never collected.
+     * Filename of the execution report, collected from {@link #OUTPUT_PATH}: one entry per admitted practice with the
+     * program it ran, its status and stop reason, the direct models it declared, its calls and the reads it reached.
+     * It holds no candidate.
      */
     public static final String PRACTICE_SCRIPT_REPORT_FILE = "practice-scripts.json";
 
@@ -95,20 +95,29 @@ public final class SandboxLayout {
      */
     public static final String WORK_PREFIX = "work/";
 
-    /** Workspace-relative prefix for per-practice scripts injected from the database. */
+    /** Workspace-relative prefix of the practice programs' region. */
     public static final String PRACTICE_SCRIPT_PREFIX = WORK_PREFIX + "practice-scripts/";
 
     /**
-     * Beside each staged script {@code <slug>.ts}: {@code <slug>.cause.json}, why the practice is in this review,
-     * and {@code <slug>.previous.json}, its previous claim on this work or {@code null}. The practice script runner's
-     * {@code lib/contract.ts} owns their shape.
+     * Workspace-relative prefix of the per-practice inputs: for every admitted practice {@code <slug>.cause.json}, why
+     * it is in this review and the scope it judges, and {@code <slug>.previous.json}, its previous claim on this work
+     * or {@code null}; {@code <slug>.ts} only for a practice that holds its own script. {@code lib/contract.ts} owns
+     * their shape.
      */
+    public static final String PRACTICE_SCRIPT_PRACTICES_PREFIX = PRACTICE_SCRIPT_PREFIX + "practices/";
+
+    /**
+     * Workspace-relative path of the link to the practice toolkit, which the practice runner profile creates in
+     * trusted setup before the runner starts. The programs import {@code ../lib/…} through it.
+     */
+    public static final String PRACTICE_SCRIPT_LIBRARY_LINK = PRACTICE_SCRIPT_PREFIX + "lib";
+
+    /** Absolute image path of the practice toolkit that {@link #PRACTICE_SCRIPT_LIBRARY_LINK} names. */
+    public static final String PRACTICE_SCRIPT_LIBRARY_TARGET = "/opt/practice-scripts/lib";
+
     public static final String PRACTICE_SCRIPT_CAUSE_SUFFIX = ".cause.json";
 
     public static final String PRACTICE_SCRIPT_PREVIOUS_SUFFIX = ".previous.json";
-
-    /** Workspace-relative prefix for runtime practice script output (logs, structured hints). */
-    public static final String PRACTICE_SCRIPT_OUT_PREFIX = WORK_PREFIX + "practice-scripts-out/";
 
     /** Workspace-relative prefix for analysis markers ({@link #ANALYSIS_PRACTICES_PREFIX} is a child). */
     public static final String ANALYSIS_PREFIX = WORK_PREFIX + "analysis/";
@@ -137,10 +146,7 @@ public final class SandboxLayout {
 
     public static final String NODE_PACKAGE_JSON_FILENAME = "package.json";
 
-    /**
-     * Workspace-relative filename of the models that the practice scripts may call, by slot. It holds
-     * no credential: the practice script stage alone receives {@code $PRACTICE_SCRIPT_PROXY_TOKEN}.
-     */
+    /** Workspace-relative filename of the direct models that the practice programs may call, by slot. */
     public static final String PRACTICE_SCRIPT_MODELS_FILE = "practice-script-models.json";
 
     /** Workspace-relative filename of the shared provider-registration ES module both runners import. */
@@ -189,7 +195,7 @@ public final class SandboxLayout {
     public static final String RUNTIME_CONTRACT_LABEL = "hephaestus.agent.runtime-contract";
 
     /** Runtime contract required by the staged runners. */
-    public static final int RUNTIME_CONTRACT_VERSION = 4;
+    public static final int RUNTIME_CONTRACT_VERSION = 5;
 
     /** Node major required by the staged runners. */
     public static final int NODE_MAJOR = 24;

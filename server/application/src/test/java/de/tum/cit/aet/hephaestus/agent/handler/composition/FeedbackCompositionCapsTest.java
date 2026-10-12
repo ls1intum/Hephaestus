@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -22,7 +22,7 @@ class FeedbackCompositionCapsTest extends BaseUnitTest {
     @BeforeEach
     void stageAnEventReview() {
         Map<String, byte[]> files = new LinkedHashMap<>();
-        FeedbackCompositionInputs.stage(files, ObservationOrigin.LIVE);
+        FeedbackCompositionInputs.stage(files, ResultOrigin.LIVE);
         request = objectMapper.readTree(
                 new String(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH), StandardCharsets.UTF_8));
     }

@@ -6,17 +6,17 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
 import de.tum.cit.aet.hephaestus.practices.feedback.InAppFeedbackBody;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.Reaction;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -45,15 +45,15 @@ import org.springframework.web.server.ResponseStatusException;
 public class DevInAppFeedbackService {
 
     private final FeedbackRepository feedbackRepository;
-    private final FeedbackObservationRepository feedbackObservationRepository;
-    private final ObservationRepository observationRepository;
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final ReactionRepository reactionRepository;
 
     /**
      * One card as the developer's page would hold it.
      *
      * @param agentJobId the review whose cycle prepared the card
-     * @param evidence the problem observations the card stands on, in the order the card cites them; each must
+     * @param evidence the problem results the card stands on, in the order the card cites them; each must
      *     be about the recipient and on the card's practice
      * @param deliveredAt when the recipient first opened it; {@code null} for a card still unread
      * @param response the recipient's answer; only on a card they opened
@@ -87,11 +87,11 @@ public class DevInAppFeedbackService {
      */
     @Transactional
     public List<UUID> write(Long workspaceId, List<Card> cards) {
-        Map<UUID, Observation> evidence = observationRepository
+        Map<UUID, PracticeResult> evidence = practiceResultRepository
                 .findAllByIdInAndWorkspaceId(
                         cards.stream().flatMap(card -> card.evidence().stream()).toList(), workspaceId)
                 .stream()
-                .collect(Collectors.toMap(Observation::getId, Function.identity()));
+                .collect(Collectors.toMap(PracticeResult::getId, Function.identity()));
         // Every card is checked before any is written, so a refused request leaves nothing behind.
         for (Card card : cards) {
             check(card, evidence);
@@ -120,9 +120,9 @@ public class DevInAppFeedbackService {
                     .deliveredAt(card.deliveredAt())
                     .build());
             int ordinal = 0;
-            for (UUID observationId : card.evidence()) {
-                feedbackObservationRepository.insertIfAbsent(
-                        feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), ordinal++);
+            for (UUID practiceResultId : card.evidence()) {
+                feedbackEvidenceRepository.insertIfAbsent(
+                        feedback.getId(), practiceResultId, null, EvidenceRole.PRIMARY.name(), ordinal++);
             }
             Response response = card.response();
             if (response != null) {
@@ -141,18 +141,18 @@ public class DevInAppFeedbackService {
     }
 
     /** A card the page could not have: evidence from elsewhere, or an answer to a card nobody opened. */
-    private static void check(Card card, Map<UUID, Observation> evidence) {
+    private static void check(Card card, Map<UUID, PracticeResult> evidence) {
         if (card.evidence().isEmpty()) {
-            throw invalid(card, "cites no observation");
+            throw invalid(card, "cites no result");
         }
-        for (UUID observationId : card.evidence()) {
-            Observation observation = evidence.get(observationId);
-            if (observation == null) {
-                throw invalid(card, "cites observation " + observationId + ", which is not in this workspace");
+        for (UUID practiceResultId : card.evidence()) {
+            PracticeResult practiceResult = evidence.get(practiceResultId);
+            if (practiceResult == null) {
+                throw invalid(card, "cites result " + practiceResultId + ", which is not in this workspace");
             }
-            if (!card.recipientUserId().equals(observation.getAboutUserId())
-                    || !card.practiceSlug().equals(observation.getPractice().getSlug())) {
-                throw invalid(card, "cites observation " + observationId + ", which is about other work");
+            if (!card.recipientUserId().equals(practiceResult.getAboutUserId())
+                    || !card.practiceSlug().equals(practiceResult.getPractice().getSlug())) {
+                throw invalid(card, "cites result " + practiceResultId + ", which is about other work");
             }
         }
         if (card.response() != null && card.deliveredAt() == null) {

@@ -121,7 +121,7 @@ public class Issue extends BaseGitServiceEntity {
      * <p>Written by the {@code RECONCILIATION} deletion sweep (which set-differences the full
      * upstream number set against the local rows) and by the {@code issues.transferred} webhook.
      * A tombstone rather than a row deletion because {@code feedback.artifact_id},
-     * {@code observation.artifact_id} (NOT NULL) and {@code activity_event.target_id} point at
+     * {@code practice_result.artifact_id} (NOT NULL) and {@code activity_event.target_id} point at
      * this row by bare id with no foreign key — a hard delete would orphan them silently rather
      * than fail loudly. Keeping the row keeps those lookups resolvable.
      *

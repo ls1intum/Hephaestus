@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxResultListener;
 import de.tum.cit.aet.hephaestus.agent.gateway.WorkspaceBudgetExceededException;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
@@ -389,12 +389,12 @@ public class JobEvidenceFiles implements SandboxResultListener {
     }
 
     /** Admission has committed; recheck ownership before removing the verified bytes. */
-    public void discardAdmittedAttempt(ObservationAdmissionService.AdmissionIdentity identity) {
+    public void discardAdmittedAttempt(ResultAdmissionService.AdmissionIdentity identity) {
         try {
             var recorded = jobs.findByIdAndWorkspaceId(identity.jobId(), identity.workspaceId());
             if (recorded.isEmpty()) return;
             AgentJob job = recorded.get();
-            if (!ObservationAdmissionService.isAdmitted(job)
+            if (!ResultAdmissionService.isAdmitted(job)
                     || job.getRetryCount() != identity.attempt()
                     || !identity.workerId().equals(job.getWorkerId())) return;
             // Removed now under the runtime's shared lease, or a new exclusive one. A sweep or an erasure that
@@ -419,7 +419,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
      * folder; a context record the manifest does not list with these exact bytes, or any unreadable file, leaves
      * nothing to retain rather than a part.
      */
-    public Optional<Map<String, byte[]>> originalPublicInputs(ObservationAdmissionService.AdmissionIdentity identity) {
+    public Optional<Map<String, byte[]>> originalPublicInputs(ResultAdmissionService.AdmissionIdentity identity) {
         Path root = directory(identity.workspaceId(), identity.jobId(), identity.attempt(), identity.workerId());
         try {
             var files = new TreeMap<String, byte[]>();
@@ -480,7 +480,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
     }
 
     /** See {@link EvidenceFolderPersonDataCatalog#completeReceipt}. */
-    public Optional<UUID> completeReceipt(ObservationAdmissionService.AdmissionIdentity identity) {
+    public Optional<UUID> completeReceipt(ResultAdmissionService.AdmissionIdentity identity) {
         return personCopies.completeReceipt(identity.jobId(), identity.workspaceId(), identity.attempt());
     }
 
@@ -495,7 +495,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
     }
 
     /** See {@link EvidenceFolderPersonDataCatalog#holdVouchingReceipt}. */
-    public boolean holdVouchingReceipt(ObservationAdmissionService.AdmissionIdentity identity, UUID copyId) {
+    public boolean holdVouchingReceipt(ResultAdmissionService.AdmissionIdentity identity, UUID copyId) {
         return personCopies.holdVouchingReceipt(copyId, identity.jobId(), identity.workspaceId(), identity.attempt());
     }
 
@@ -505,17 +505,17 @@ public class JobEvidenceFiles implements SandboxResultListener {
     }
 
     /** The exact rows a read during runtime returned, by the tables that own them. */
-    public record LateCopies(Set<UUID> observationIds, Set<UUID> feedbackIds) {}
+    public record LateCopies(Set<UUID> practiceResultIds, Set<UUID> feedbackIds) {}
 
     /** See {@link EvidenceFolderPersonDataCatalog#indexLateRead}. */
     public <T> T indexLateRead(
-            ObservationAdmissionService.AdmissionIdentity identity, Supplier<T> read, Function<T, LateCopies> copies) {
+            ResultAdmissionService.AdmissionIdentity identity, Supplier<T> read, Function<T, LateCopies> copies) {
         return personCopies.indexLateRead(
                 identity.jobId(),
                 identity.workspaceId(),
                 identity.attempt(),
                 read,
-                result -> copies.apply(result).observationIds(),
+                result -> copies.apply(result).practiceResultIds(),
                 result -> copies.apply(result).feedbackIds());
     }
 
@@ -826,7 +826,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
     }
 
     private static boolean admitted(AgentJob job) {
-        return ObservationAdmissionService.isAdmitted(job);
+        return ResultAdmissionService.isAdmitted(job);
     }
 
     private Path markEnded(Path root) throws IOException {
@@ -898,8 +898,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 "ls",
                 "bash",
                 "codemode",
-                "read_practice",
-                "report_observation",
+                "submit_result",
                 "report_feedback",
                 "report_review",
                 "other");

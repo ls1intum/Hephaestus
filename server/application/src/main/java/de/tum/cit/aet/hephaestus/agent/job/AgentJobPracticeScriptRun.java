@@ -1,7 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramPath;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptStopReason;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
@@ -19,6 +22,7 @@ import jakarta.persistence.Table;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -33,10 +37,12 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
- * What one practice's script did in one attempt, as the runner's report said. The terminal write
- * of the attempt is the only writer, under the attempt's ownership fence, so a requeued attempt has no rows.
+ * What one admitted practice's program did in one attempt, as the runner's execution report said: the built-in
+ * review or the practice's own script. The terminal write of the attempt is the only writer, under the attempt's
+ * ownership fence, so a requeued attempt has no rows.
  *
- * <p>It holds no tokens or calls: a runner's count is never spend, and the LLM ledger owns spend.
+ * <p>It holds no tokens and no candidate: a runner's count is never spend, the LLM ledger owns spend, and the admitted
+ * result owns the verdict. Its call counts say which way the program went, never what it cost.
  */
 @Entity
 @Table(
@@ -81,8 +87,34 @@ public class AgentJobPracticeScriptRun {
     @Column(name = "status", nullable = false, length = 16)
     private PracticeScriptRunStatus status;
 
-    @Column(name = "leads", nullable = false)
-    private int leads;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "program_kind", nullable = false, length = 16)
+    private PracticeProgramKind programKind;
+
+    /**
+     * The SHA-256 of the staged script, as the runner reported it; null for the built-in. The admitted result's
+     * provenance holds the digest the server computed, and this one only cross-checks it.
+     */
+    @Column(name = "program_digest", length = 64)
+    private @Nullable String programDigest;
+
+    /** Why the program stopped without a candidate; null exactly when it returned one or did not report. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "stop_reason", length = 24)
+    private @Nullable PracticeScriptStopReason stopReason;
+
+    /**
+     * Calls the program made, {@code {review, chat, decision, embedding, reranking}}; null when the practice is not
+     * named by the report.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "calls", columnDefinition = "jsonb")
+    private @Nullable JsonNode calls;
+
+    /** The reads the program's host counted, {@code {reads, truncatedReads, failedReads}}; null when not reported. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "coverage_reached", columnDefinition = "jsonb")
+    private @Nullable JsonNode coverageReached;
 
     /**
      * The models the script declared, each as a {@link StoredModelUse}; an empty array for a script that uses no
@@ -112,7 +144,11 @@ public class AgentJobPracticeScriptRun {
             String practiceSlug,
             @Nullable Long practiceRevisionId,
             PracticeScriptRunStatus status,
-            int leads,
+            PracticeProgramKind programKind,
+            @Nullable String programDigest,
+            @Nullable PracticeScriptStopReason stopReason,
+            @Nullable JsonNode calls,
+            @Nullable JsonNode coverageReached,
             @Nullable JsonNode models,
             Instant finishedAt,
             @Nullable String error,
@@ -122,7 +158,11 @@ public class AgentJobPracticeScriptRun {
         this.workspace = job.getWorkspace();
         this.practiceRevisionId = practiceRevisionId;
         this.status = status;
-        this.leads = leads;
+        this.programKind = programKind;
+        this.programDigest = programDigest;
+        this.stopReason = stopReason;
+        this.calls = calls;
+        this.coverageReached = coverageReached;
         this.models = models;
         this.finishedAt = finishedAt;
         this.error = error;
@@ -131,6 +171,24 @@ public class AgentJobPracticeScriptRun {
 
     public String practiceSlug() {
         return id.getPracticeSlug();
+    }
+
+    /**
+     * How the program reached its result, from the calls it made: null when it did not run (skipped, not reached or
+     * not finished) or the report gave no calls.
+     */
+    public @Nullable PracticeProgramPath path() {
+        if (calls == null
+                || status == PracticeScriptRunStatus.SKIPPED
+                || status == PracticeScriptRunStatus.NOT_REACHED
+                || status == PracticeScriptRunStatus.NOT_FINISHED) {
+            return null;
+        }
+        int direct = 0;
+        for (String kind : List.of("chat", "decision", "embedding", "reranking")) {
+            direct += calls.path(kind).asInt(0);
+        }
+        return PracticeProgramPath.of(calls.path("review").asInt(0), direct);
     }
 
     public int attempt() {

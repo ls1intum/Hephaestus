@@ -11,7 +11,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.IssueObservationSuperseder;
+import de.tum.cit.aet.hephaestus.agent.job.IssueResultSuperseder;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewMemberAiPolicy;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
@@ -71,7 +71,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * A review of an issue captured closed reaches that issue while it stays closed under the reviewed snapshot. The
- * snapshot is the one the mirror's own owner records: each change goes through {@link IssueObservationSuperseder} and
+ * snapshot is the one the mirror's own owner records: each change goes through {@link IssueResultSuperseder} and
  * the issue row's compare-and-set, so reopening, closing again, editing and undoing the edit each leave the old review
  * behind. The settings, coverage and consent facts the snapshot does not decide are fixed to pass.
  */
@@ -82,7 +82,7 @@ class CapturedClosedIssueDeliveryIntegrationTest extends BaseIntegrationTest {
     private static final Set<String> PRACTICES = Set.of("closure-record");
 
     @Autowired
-    private IssueObservationSuperseder superseder;
+    private IssueResultSuperseder superseder;
 
     @Autowired
     private IssueRepository issues;

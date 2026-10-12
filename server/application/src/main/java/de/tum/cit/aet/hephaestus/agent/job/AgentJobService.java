@@ -29,8 +29,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision.Run;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
@@ -142,7 +142,7 @@ public class AgentJobService {
      * called inside the caller's open session/transaction and the resulting request submitted OUTSIDE it
      * via {@link #submitPrepared}. Null when the branch refs needed to clone/diff are absent.
      *
-     * <p>The origin is {@link ObservationOrigin#MANUAL} on both of these builders and not negotiable: the
+     * <p>The origin is {@link ResultOrigin#MANUAL} on both of these builders and not negotiable: the
      * only caller is the dev trigger, and the submission request's default — LIVE whenever a trigger
      * signal is present — would otherwise fold a hand-picked replay into the population the behavioural
      * trend line is drawn from.
@@ -160,7 +160,7 @@ public class AgentJobService {
                 pr.getBaseRefName(),
                 pr.getBaseRefOid(),
                 triggerSignal,
-                ObservationOrigin.MANUAL);
+                ResultOrigin.MANUAL);
     }
 
     /** Issue-shaped companion to {@link #buildReviewRequest}, with the same session requirement. */
@@ -181,7 +181,7 @@ public class AgentJobService {
                 issue.getHtmlUrl(),
                 issue.getUpdatedAt(),
                 triggerSignal,
-                ObservationOrigin.MANUAL,
+                ResultOrigin.MANUAL,
                 null,
                 issue.getReviewSnapshotId());
     }
@@ -502,7 +502,7 @@ public class AgentJobService {
 
     /**
      * The artifact a job of this type is about. The single mapping for both the job row and the
-     * observations filed against it — a second one drifts, and the same artifact ends up with two names.
+     * results filed against it — a second one drifts, and the same artifact ends up with two names.
      */
     public static ArtifactKind artifactKindFor(AgentJobType jobType) {
         return switch (jobType) {

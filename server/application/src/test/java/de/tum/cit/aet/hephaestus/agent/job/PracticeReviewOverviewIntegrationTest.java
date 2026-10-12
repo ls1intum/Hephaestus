@@ -14,16 +14,16 @@ import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewPracticeGroupDTO;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -65,16 +65,16 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
     private PracticeGroupRepository groupRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
-    private ObservationInvalidationRepository invalidationRepository;
+    private PracticeResultInvalidationRepository invalidationRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -107,7 +107,7 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     @WithAdminUser
-    void shouldCountReviewsObservationsAndFeedbackInTheRangeWhenSeededAroundIt() {
+    void shouldCountReviewsResultsAndFeedbackInTheRangeWhenSeededAroundIt() {
         PracticeGroup group = persistGroup(workspace, "collaboration", "Collaboration");
         Practice described = persistPractice(workspace, group, "pr-description", "PR description");
         Practice tested = persistPractice(workspace, null, "tests", "Tests");
@@ -139,11 +139,11 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
                 "NOT_MET");
 
         invalidate(problem);
-        ObservationInvalidation restored = invalidate(strength);
+        PracticeResultInvalidation restored = invalidate(strength);
         restored.restore(1L, "It was right after all", Instant.parse("2026-03-12T00:00:00Z"));
         invalidationRepository.save(restored);
 
-        // One piece of feedback fusing two observations of one practice counts once for it; one bound to two
+        // One piece of feedback fusing two results of one practice counts once for it; one bound to two
         // practices counts once for each.
         UUID proposed =
                 persistFeedback(workspace, review, "2026-03-10T03:00:00Z", FeedbackDeliveryState.AWAITING_APPROVAL);
@@ -168,9 +168,9 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
         assertThat(overview.bucket()).isEqualTo(TimeBucketSize.DAY);
         assertThat(nonZero(overview.reviews()))
                 .isEqualTo(Map.of("queued", 1L, "running", 1L, "completed", 1L, "failed", 1L));
-        assertThat(nonZero(overview.observations()))
+        assertThat(nonZero(overview.practiceResults()))
                 .isEqualTo(Map.of("met", 1L, "notMet", 1L, "notApplicable", 1L, "undetermined", 1L));
-        assertThat(overview.observationsInvalidated()).isEqualTo(1L);
+        assertThat(overview.practiceResultsInvalidated()).isEqualTo(1L);
         assertThat(nonZero(overview.feedback()))
                 .isEqualTo(Map.of(
                         "awaitingApproval",
@@ -189,7 +189,7 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
                 .extracting(
                         PracticeReviewBucketDTO::start,
                         PracticeReviewBucketDTO::reviews,
-                        PracticeReviewBucketDTO::observations,
+                        PracticeReviewBucketDTO::practiceResults,
                         PracticeReviewBucketDTO::feedback)
                 .containsExactly(
                         tuple(Instant.parse("2026-03-10T00:00:00Z"), 2L, 1L, 1L),
@@ -197,24 +197,24 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
                         tuple(Instant.parse("2026-03-12T00:00:00Z"), 1L, 1L, 2L));
 
         assertThat(overview.practices())
-                .as("the most observed first; a practice with feedback on an older observation still has a row")
+                .as("the most observed first; a practice with feedback on an older result still has a row")
                 .extracting(PracticeReviewCountsDTO::practiceSlug)
                 .containsExactly("pr-description", "tests", "older");
         PracticeReviewCountsDTO describedCounts = overview.practices().get(0);
         assertThat(describedCounts.group())
                 .isEqualTo(new ReviewPracticeGroupDTO("collaboration", "Collaboration", null, null));
-        assertThat(nonZero(describedCounts.observations()))
+        assertThat(nonZero(describedCounts.practiceResults()))
                 .isEqualTo(Map.of("met", 1L, "notMet", 1L, "notApplicable", 1L));
-        assertThat(describedCounts.observationsInvalidated()).isEqualTo(1L);
+        assertThat(describedCounts.practiceResultsInvalidated()).isEqualTo(1L);
         assertThat(nonZero(describedCounts.feedback()))
                 .isEqualTo(Map.of("awaitingApproval", 1L, "partiallyDelivered", 1L, "delivered", 1L));
         PracticeReviewCountsDTO testedCounts = overview.practices().get(1);
         assertThat(testedCounts.group()).isNull();
-        assertThat(nonZero(testedCounts.observations())).isEqualTo(Map.of("undetermined", 1L));
-        assertThat(testedCounts.observationsInvalidated()).isZero();
+        assertThat(nonZero(testedCounts.practiceResults())).isEqualTo(Map.of("undetermined", 1L));
+        assertThat(testedCounts.practiceResultsInvalidated()).isZero();
         assertThat(nonZero(testedCounts.feedback())).isEqualTo(Map.of("delivered", 1L));
         PracticeReviewCountsDTO olderCounts = overview.practices().get(2);
-        assertThat(nonZero(olderCounts.observations())).isEmpty();
+        assertThat(nonZero(olderCounts.practiceResults())).isEmpty();
         assertThat(nonZero(olderCounts.feedback())).isEqualTo(Map.of("prepared", 1L));
     }
 
@@ -361,7 +361,7 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
     /** A recorded result for this practice. */
     private UUID observe(AgentJob job, Practice practice, String observedAt, String outcome) {
         UUID id = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
+        practiceResultRepository.insertIfAbsent(
                 id,
                 "overview-" + id,
                 job.getId(),
@@ -376,16 +376,19 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
                 "NOT_MET".equals(outcome) ? "MINOR" : null,
                 "{}",
                 "Reasoning",
-                "overview-" + id,
+                "test-scope",
+                null,
+                null,
+                null,
                 Instant.parse(observedAt),
                 "LIVE");
         return id;
     }
 
-    private ObservationInvalidation invalidate(UUID observationId) {
-        return invalidationRepository.save(new ObservationInvalidation(
-                observationRepository
-                        .findByIdAndWorkspaceId(observationId, workspace.getId())
+    private PracticeResultInvalidation invalidate(UUID practiceResultId) {
+        return invalidationRepository.save(new PracticeResultInvalidation(
+                practiceResultRepository
+                        .findByIdAndWorkspaceId(practiceResultId, workspace.getId())
                         .orElseThrow(),
                 1L,
                 "Wrong when made",
@@ -413,7 +416,7 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
                 .getId();
     }
 
-    private void bind(UUID feedbackId, UUID observationId) {
-        feedbackObservationRepository.insertIfAbsent(feedbackId, observationId, "PRIMARY", 0);
+    private void bind(UUID feedbackId, UUID practiceResultId) {
+        feedbackEvidenceRepository.insertIfAbsent(feedbackId, practiceResultId, null, "PRIMARY", 0);
     }
 }

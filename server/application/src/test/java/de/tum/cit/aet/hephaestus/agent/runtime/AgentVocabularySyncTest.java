@@ -24,20 +24,21 @@ import org.junit.jupiter.api.Test;
 
 class AgentVocabularySyncTest extends BaseUnitTest {
 
-    private static final Path NORMALIZER = resolveResource("agent/pi-observation-normalize.ts");
+    private static final Path CONTRACT = resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts");
+    private static final Path NORMALIZER = resolveResource("agent/pi-result-normalize.ts");
     private static final Path RUNNER = resolveResource("agent/pi-runner.ts");
     private static final Path ORCHESTRATOR = resolveResource("agent/pi-orchestrator.md");
 
     @Test
     void severityVocabularyMatches() throws IOException {
-        assertThat(jsArray("SEVERITY_VALUES"))
-                .as("SEVERITY_VALUES in pi-observation-normalize.ts vs Severity.values()")
+        assertThat(jsArray("SEVERITIES"))
+                .as("SEVERITIES in lib/contract.ts vs Severity.values()")
                 .containsExactlyInAnyOrderElementsOf(names(Severity.values()));
     }
 
     @Test
     void shouldUseTheSameOutcomeVocabularyInRuntimeAndAdmission() throws IOException {
-        assertThat(jsArray("OUTCOME_VALUES")).containsExactlyInAnyOrderElementsOf(names(Outcome.values()));
+        assertThat(jsArray("OUTCOMES")).containsExactlyInAnyOrderElementsOf(names(Outcome.values()));
         assertThat(Files.readString(RUNNER, StandardCharsets.UTF_8))
                 .contains("outcome:", "severity:")
                 .doesNotContain("assessmentStatus:", "presence:", "assessment:");
@@ -45,13 +46,16 @@ class AgentVocabularySyncTest extends BaseUnitTest {
 
     @Test
     void shouldBoundSummariesAlikeInRunnerAndAdmission() throws IOException {
-        Matcher matcher = Pattern.compile("export const MAX_SUMMARY_CHARS = (\\d+);")
-                .matcher(Files.readString(NORMALIZER, StandardCharsets.UTF_8));
+        assertThat(Files.readString(NORMALIZER, StandardCharsets.UTF_8))
+                .as("pi-result-normalize.ts bounds summaries by CANDIDATE_LIMITS.summaryChars")
+                .contains("MAX_SUMMARY_CHARS: number = CANDIDATE_LIMITS.summaryChars;");
+        Matcher matcher =
+                Pattern.compile("\\bsummaryChars: (\\d+),").matcher(Files.readString(CONTRACT, StandardCharsets.UTF_8));
         assertThat(matcher.find())
-                .as("MAX_SUMMARY_CHARS is declared in pi-observation-normalize.ts")
+                .as("CANDIDATE_LIMITS.summaryChars is declared in lib/contract.ts")
                 .isTrue();
         assertThat(Integer.parseInt(matcher.group(1)))
-                .as("MAX_SUMMARY_CHARS vs ReviewResultParser.MAX_SUMMARY_LENGTH")
+                .as("CANDIDATE_LIMITS.summaryChars vs ReviewResultParser.MAX_SUMMARY_LENGTH")
                 .isEqualTo(ReviewResultParser.MAX_SUMMARY_LENGTH);
     }
 
@@ -88,7 +92,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
         String body = Files.readString(RUNNER, StandardCharsets.UTF_8);
 
         assertThat(body)
-                .contains("if (measurementClosed)")
+                .contains("if (measurementClosed")
                 .contains("measurementClosed = true")
                 .contains("if (!compositionAdmitted)")
                 .contains("compositionAdmitted = true");
@@ -126,12 +130,12 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     }
 
     private static Set<String> jsArray(String constantName) throws IOException {
-        String body = Files.readString(NORMALIZER, StandardCharsets.UTF_8);
+        String body = Files.readString(CONTRACT, StandardCharsets.UTF_8);
         Matcher matcher = Pattern.compile(
                         "export const " + Pattern.quote(constantName) + "\\s*=\\s*\\[(.*?)]", Pattern.DOTALL)
                 .matcher(body);
         assertThat(matcher.find())
-                .as("%s is declared in pi-observation-normalize.ts", constantName)
+                .as("%s is declared in lib/contract.ts", constantName)
                 .isTrue();
         Set<String> values = quotedStrings(matcher.group(1));
         assertThat(values).as("%s is not empty", constantName).isNotEmpty();
@@ -145,6 +149,11 @@ class AgentVocabularySyncTest extends BaseUnitTest {
             values.add(matcher.group(1));
         }
         return values;
+    }
+
+    private static Path resolveRepoFile(String relativePath) {
+        Path candidate = Path.of("..", "..").resolve(relativePath);
+        return Files.exists(candidate) ? candidate : Path.of(relativePath);
     }
 
     private static Path resolveResource(String relativePath) {

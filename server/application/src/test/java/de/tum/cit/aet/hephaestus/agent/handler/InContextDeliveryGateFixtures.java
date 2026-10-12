@@ -6,7 +6,7 @@ import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -18,9 +18,9 @@ final class InContextDeliveryGateFixtures {
     private InContextDeliveryGateFixtures() {}
 
     static InContextDeliveryGate gate(
-            PracticeRepository practices, ObservationRepository observations, FeedbackLedgerRecorder ledger) {
+            PracticeRepository practices, PracticeResultRepository practiceResults, FeedbackLedgerRecorder ledger) {
         return new InContextDeliveryGate(
-                practices, observations, ledger, workspaceDefaults(), workspacesAtTheDefaultJobRevision());
+                practices, practiceResults, ledger, workspaceDefaults(), workspacesAtTheDefaultJobRevision());
     }
 
     static WorkspaceReviewDefaultsProvider workspaceDefaults() {

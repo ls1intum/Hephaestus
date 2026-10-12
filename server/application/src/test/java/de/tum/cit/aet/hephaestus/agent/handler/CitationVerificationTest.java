@@ -72,8 +72,8 @@ class CitationVerificationTest extends BaseUnitTest {
         CitationVerification.record(citation, job, "a".repeat(64), CitationVerification.quoteDigest("exact quote"));
         job.setMetadata(new JsonMapper()
                 .createObjectNode()
-                .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "b".repeat(64))
-                .put(ObservationAdmissionService.ATTEMPT_METADATA_KEY, 0));
+                .put(ResultAdmissionService.DIGEST_METADATA_KEY, "b".repeat(64))
+                .put(ResultAdmissionService.ATTEMPT_METADATA_KEY, 0));
 
         job.setRetryCount(1);
         assertThatCode(() -> CitationVerification.requireVerified(job, evidence))

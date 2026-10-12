@@ -297,7 +297,7 @@ public class PracticeCatalogController {
     @PatchMapping("/{practiceSlug}/autonomy")
     @Operation(
             summary = "Set how much autonomy the system has over one practice",
-            description = "OFF stops the review entirely. HUMAN_APPROVAL runs it and records every observation, holds "
+            description = "OFF stops the review entirely. HUMAN_APPROVAL runs it and records every result, holds "
                     + "feedback on the work for an authorized reviewer, and still writes the developer's practice pages "
                     + "and the mentor, which are read on request. AUTOMATIC sends feedback on the work without asking, as "
                     + "far as this workspace's reach allows. Send a null autonomy to clear the practice's own setting so "

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.StandingDisputeRow;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository.StandingDisputeRow;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;

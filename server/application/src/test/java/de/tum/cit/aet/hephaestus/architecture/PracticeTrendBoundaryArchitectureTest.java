@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 /** Keeps the Bayesian implementation behind the one public trend-producing service. */
 class PracticeTrendBoundaryArchitectureTest extends HephaestusArchitectureTest {
 
-    private static final String TREND_PACKAGE = "de.tum.cit.aet.hephaestus.practices.observation.trend..";
+    private static final String TREND_PACKAGE = "de.tum.cit.aet.hephaestus.practices.result.trend..";
 
     @Test
     void trendInternalsMustOnlyBeAccessedInsideTheirPackage() {

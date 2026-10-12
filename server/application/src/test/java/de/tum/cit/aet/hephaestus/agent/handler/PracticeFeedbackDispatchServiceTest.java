@@ -41,9 +41,9 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.ProposedPlacement;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -111,7 +111,7 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
     private DiffNotePoster diffNotePoster;
 
     @Mock
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Mock
     private PersonDataCopyFence personCopies;
@@ -145,8 +145,8 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
                 feedbackRepository,
                 diffNotePoster,
                 stateMachine,
-                mock(ObservationInvalidationRepository.class),
-                new RepeatedSummaryCheck(observationRepository, feedbackRepository),
+                mock(PracticeResultInvalidationRepository.class),
+                new RepeatedSummaryCheck(practiceResultRepository, feedbackRepository),
                 new PracticeFeedbackPersonDataAdmission(personCopies, personSuppression));
         lenient()
                 .when(channel.formatPullRequestSubjectId(anyString(), anyInt()))
@@ -457,14 +457,17 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
 
     /** The last note delivered on this review's work to its developer, as the ledger stored it. */
     private void givenLastDeliveredNote(String storedBody) {
-        Observation observation = Observation.builder()
+        PracticeResult practiceResult = PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .agentJobId(job.getId())
                 .aboutUserId(11L)
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
                 .artifactId(42L)
                 .build();
-        lenient().when(observationRepository.findByAgentJobId(job.getId(), 7L)).thenReturn(List.of(observation));
+        lenient()
+                .when(practiceResultRepository.findByAgentJobId(job.getId(), 7L))
+                .thenReturn(List.of(practiceResult));
         lenient()
                 .when(feedbackRepository.findLatestDeliveredNote(7L, 11L, "scm.pull_request", 42L))
                 .thenReturn(Optional.of(storedBody));

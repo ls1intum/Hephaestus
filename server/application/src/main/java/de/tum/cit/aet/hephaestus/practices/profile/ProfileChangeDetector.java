@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.profile;
 
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeGroupStandingDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendDirection;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution.Work;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileChangeDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.result.trend.TrendDirection;
+import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution.Work;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup.Target;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkLabels;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkRefDTO;
@@ -37,7 +37,7 @@ final class ProfileChangeDetector {
      * @param groupsBefore the group standings as of the lower edge
      * @param groupsAfter the group standings as of the upper edge
      * @param windowWorkByPractice the work reviewed inside the window, per practice slug, newest first
-     * @param firstObservedAt when each practice first recorded an observation about the developer
+     * @param firstObservedAt when each practice first recorded a result about the developer
      * @param targets the runs behind the window's work, for naming it
      */
     static List<ProfileChangeDTO> detect(

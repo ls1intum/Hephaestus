@@ -14,13 +14,13 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,10 +43,10 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -147,10 +147,10 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
 
     private Feedback saveDelivered(ArtifactKind artifactKind, long artifactId, FeedbackChannel channel, String body) {
         Instant now = Instant.now();
-        UUID observationId = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
-                observationId,
-                "observation-" + nextPosition,
+        UUID practiceResultId = UUID.randomUUID();
+        practiceResultRepository.insertIfAbsent(
+                practiceResultId,
+                "practiceResult-" + nextPosition,
                 job.getId(),
                 job.getWorkspace().getId(),
                 practice.getId(),
@@ -158,10 +158,13 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
                 artifactKind.value(),
                 artifactId,
                 recipient.getId(),
-                "Observation title",
+                "Result title",
                 "NOT_MET",
                 "MAJOR",
                 evidence(artifactKind),
+                null,
+                "test-scope",
+                null,
                 null,
                 null,
                 now,
@@ -181,7 +184,8 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
                 .createdAt(now)
                 .deliveredAt(now)
                 .build());
-        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
+        feedbackEvidenceRepository.insertIfAbsent(
+                feedback.getId(), practiceResultId, null, EvidenceRole.PRIMARY.name(), 0);
         return feedback;
     }
 

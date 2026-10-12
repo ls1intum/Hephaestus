@@ -15,9 +15,8 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedObservations;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedResults;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
@@ -27,10 +26,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,35 +58,32 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     private final JsonMapper objectMapper;
     private final PracticeReviewPreparation preparation;
-    private final ReviewResultParser resultParser;
     private final FeedbackCompositionResultParser compositionResultParser;
     private final ReviewOutputService deliveryService;
     private final FeedbackDeliveryService feedbackService;
     private final FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter;
     private final InContextDeliveryGate inContextDeliveryGate;
-    private final ObservationRepository observationRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final PublicReviewEligibility publicReviewEligibility;
 
     PullRequestReviewHandler(
             JsonMapper objectMapper,
             PracticeReviewPreparation preparation,
-            ReviewResultParser resultParser,
             FeedbackCompositionResultParser compositionResultParser,
             ReviewOutputService deliveryService,
             FeedbackDeliveryService feedbackService,
             FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter,
             InContextDeliveryGate inContextDeliveryGate,
-            ObservationRepository observationRepository,
+            PracticeResultRepository practiceResultRepository,
             PublicReviewEligibility publicReviewEligibility) {
         this.objectMapper = objectMapper;
         this.preparation = preparation;
-        this.resultParser = resultParser;
         this.compositionResultParser = compositionResultParser;
         this.deliveryService = deliveryService;
         this.feedbackService = feedbackService;
         this.feedbackResponseSuppressionFilter = feedbackResponseSuppressionFilter;
         this.inContextDeliveryGate = inContextDeliveryGate;
-        this.observationRepository = observationRepository;
+        this.practiceResultRepository = practiceResultRepository;
         this.publicReviewEligibility = publicReviewEligibility;
     }
 
@@ -110,7 +106,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put(
                 ReviewOutputService.ORIGIN_METADATA_KEY,
-                Objects.requireNonNull(submissionRequest.observationOrigin()).name());
+                Objects.requireNonNull(submissionRequest.practiceResultOrigin()).name());
         if (followup != null) {
             metadata.put(
                     LinkedRepairFollowupRequest.PREDECESSOR_JOB,
@@ -133,9 +129,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         metadata.put("title", pullRequestData.title());
         metadata.put("body", pullRequestData.body());
         // Whether the work was still open when this review was admitted, from the event that admitted it and
-        // never read again: only such a review may stand over an older one of the same work (Observation.occasionAt).
+        // never read again: only such a review may stand over an older one of the same work (Result.occasionAt).
         metadata.put(
-                Observation.CURRENT_WORK_METADATA_KEY,
+                PracticeResult.CURRENT_WORK_METADATA_KEY,
                 pullRequestData.state() == Issue.State.OPEN && !pullRequestData.isMerged());
         // Who this author-run is about and who merged: a MERGER practice is reviewed only when they are
         // the same person (PracticeCatalogInjector.attributable), so the two ids travel with the job.
@@ -206,7 +202,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 new ContextRequest.PracticeReviewRequest(job),
                 () -> buildTaskEnvelope(job, metadata),
                 files -> {
-                    // Compose feedback after observations are final. Backfills omit composition.
+                    // Compose feedback after results are final. Backfills omit composition.
                     FeedbackCompositionInputs.stage(files, ReviewOutputService.originOf(metadata));
                 });
 
@@ -237,7 +233,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         String prompt = "Review merge request #" + pullRequestNumber
                 + " in "
                 + repoName
-                + ". Read the context files, then persist every justified observation via the report_observation tool. "
+                + ". Read the context files, then persist every justified result via the submit_result tool. "
                 + "Follow "
                 + SandboxLayout.ORCHESTRATOR_PATH
                 + " for the schema and rules.";
@@ -247,36 +243,30 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     @Override
     public void deliver(AgentJob job) {
-        if (ObservationAdmissionService.observationsWereRefused(job)) return;
-        ObservationAdmissionService.requireMatchingCompositionDigest(job);
+        if (ResultAdmissionService.practiceResultsWereRefused(job)) return;
+        ResultAdmissionService.requireMatchingCompositionDigest(job);
         deliverAdmitted(job);
     }
 
     private void deliverAdmitted(AgentJob job) {
-        List<Observation> persisted = observationRepository.findByAgentJobId(
+        List<PracticeResult> persisted = practiceResultRepository.findByAgentJobId(
                 job.getId(), job.getWorkspace().getId());
-        List<ReviewResultParser.ValidatedObservation> scopedObservations = persisted.stream()
-                .map(observation -> {
-                    CitationVerification.requireVerified(job, observation.getEvidence());
-                    return validated(observation);
-                })
-                .toList();
-        if (scopedObservations.isEmpty()) throw new JobDeliveryException("Admitted observation set is empty");
+        List<ReviewResultParser.ValidatedResult> scopedResults = deliveryService.recorded(job, persisted);
+        deliveryService.requirePublished(job);
+        if (scopedResults.isEmpty()) throw new JobDeliveryException("Admitted result set is empty");
         feedbackService.requestPrivatePreparation(job);
         if (feedbackService.recoverAutomaticPackageIfPresent(job)) return;
-        if (settledWhileRunning(feedbackService, job)) return;
-        Set<UUID> publicIds = publicReviewEligibility.publicObservationIds(job, persisted);
+        Set<UUID> publicIds = publicReviewEligibility.publicResultIds(job, persisted);
         ComposedReview review = reviewToDeliver(
                 compositionResultParser, job, persisted, publicIds, FeedbackCompositionInputs.EVENT_REVIEW_CHANNELS);
-        List<ReviewResultParser.ValidatedObservation> eligible = feedbackResponseSuppressionFilter
-                .evaluate(job, scopedObservations)
-                .deliverable();
-        List<ReviewResultParser.ValidatedObservation> proposals = inContextDeliveryGate.awaitingApproval(job, eligible);
-        List<ReviewResultParser.ValidatedObservation> loudEnough = inContextDeliveryGate.admitInContext(job, eligible);
+        List<ReviewResultParser.ValidatedResult> eligible =
+                feedbackResponseSuppressionFilter.evaluate(job, scopedResults).deliverable();
+        List<ReviewResultParser.ValidatedResult> proposals = inContextDeliveryGate.awaitingApproval(job, eligible);
+        List<ReviewResultParser.ValidatedResult> loudEnough = inContextDeliveryGate.admitInContext(job, eligible);
         switch (AdmittedDelivery.decide(
                 review,
                 ArtifactKinds.PULL_REQUEST,
-                scopedObservations,
+                scopedResults,
                 subjectsOf(persisted, publicIds),
                 proposals,
                 loudEnough)) {
@@ -288,17 +278,23 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     /**
      * The review to deliver on the work. A run owes one unless it is a backfill, its staged channels leave the work
-     * out, or no observation both decided something and may appear on the work ({@code publicIds}, so a run about a
-     * reviewer owes none); these are read from the run itself, never from settings that can change after it. An owed review that is missing, malformed, or written under an
+     * out, or no NOT_MET result may appear on the work ({@code publicIds}, so a run about a reviewer owes none;
+     * a MET result is never acknowledged there); these are read from the run itself, never from settings that can change after it. An owed review that is missing, malformed, or written under an
      * earlier fragment contract fails delivery without a claim about the work; a valid empty review is silence.
      */
     static ComposedReview reviewToDeliver(
             FeedbackCompositionResultParser parser,
             AgentJob job,
-            List<Observation> persisted,
+            List<PracticeResult> persisted,
             Set<UUID> publicIds,
             Set<FeedbackChannel> stagedChannels) {
-        if (!reviewOwed(job, persisted, publicIds, stagedChannels)) return ComposedReview.empty();
+        // A backfill stages no composition (FeedbackCompositionInputs), so it never owes a review.
+        boolean reviewOwed = ReviewOutputService.originOf(job.getMetadata()) != ResultOrigin.BACKFILL
+                && stagedChannels.contains(FeedbackChannel.IN_CONTEXT)
+                && persisted.stream()
+                        .anyMatch(practiceResult -> practiceResult.getOutcome() == Outcome.NOT_MET
+                                && publicIds.contains(practiceResult.getId()));
+        if (!reviewOwed) return ComposedReview.empty();
         if (!parser.writtenWhole(job.getOutput())) {
             throw new JobDeliveryException(
                     "The review on the work was composed before it was written whole; it is not delivered. jobId="
@@ -310,95 +306,33 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                     "The review on the work was owed and not written as its contract requires; nothing is delivered. jobId="
                             + job.getId());
         }
-        if (leavesUndecided(review, persisted, publicIds)) {
+        Set<String> decided = review.decidedResultIds();
+        if (persisted.stream()
+                .anyMatch(practiceResult -> practiceResult.getOutcome() == Outcome.NOT_MET
+                        && publicIds.contains(practiceResult.getId())
+                        && !decided.contains(practiceResult.getId().toString()))) {
             throw new JobDeliveryException(
-                    "Public feedback composition left an eligible observation undecided; jobId=" + job.getId());
+                    "Public feedback composition left an eligible result undecided; jobId=" + job.getId());
         }
         return review;
     }
 
-    /** Whether the run owes a review on the work; {@link #reviewToDeliver} names the cases that owe none. */
-    static boolean reviewOwed(
-            AgentJob job, List<Observation> persisted, Set<UUID> publicIds, Set<FeedbackChannel> stagedChannels) {
-        // A backfill stages no composition (FeedbackCompositionInputs), so it never owes a review.
-        return ReviewOutputService.originOf(job.getMetadata()) != ObservationOrigin.BACKFILL
-                && stagedChannels.contains(FeedbackChannel.IN_CONTEXT)
-                && persisted.stream()
-                        .anyMatch(observation ->
-                                observation.getOutcome().isDecided() && publicIds.contains(observation.getId()));
-    }
-
-    /** Whether a publicly eligible problem is neither said nor explicitly withheld by the review. */
-    static boolean leavesUndecided(ComposedReview review, List<Observation> persisted, Set<UUID> publicIds) {
-        Set<String> decided = review.decidedObservationIds();
-        return persisted.stream()
-                .anyMatch(observation -> observation.getOutcome() == Outcome.NOT_MET
-                        && publicIds.contains(observation.getId())
-                        && !decided.contains(observation.getId().toString()));
-    }
-
-    /**
-     * Whether the review on the work was settled while the job ran: accepted, so its outcome went on its way with
-     * that acceptance and is neither decided again nor posted from the terminal output, or refused, so the terminal
-     * output carries no other way onto the work.
-     */
-    static boolean settledWhileRunning(FeedbackDeliveryService feedbackService, AgentJob job) {
-        if (feedbackService.publicReviewAccepted(job)) return true;
-        if (PublicReviewCompletionService.wasRefused(job)) {
-            throw new JobDeliveryException(
-                    "The review on the work was refused when it was submitted; it is not delivered. jobId="
-                            + job.getId());
-        }
-        return false;
-    }
-
-    /** The author each publicly eligible observation is about, by its persisted id. */
-    static Map<UUID, Long> subjectsOf(List<Observation> persisted, Set<UUID> publicIds) {
+    /** The author each publicly eligible result is about, by its persisted id. */
+    static Map<UUID, Long> subjectsOf(List<PracticeResult> persisted, Set<UUID> publicIds) {
         Map<UUID, Long> subjects = new HashMap<>();
-        for (Observation observation : persisted) {
-            if (publicIds.contains(observation.getId())) {
-                subjects.put(observation.getId(), observation.getAboutUserId());
+        for (PracticeResult practiceResult : persisted) {
+            if (publicIds.contains(practiceResult.getId())) {
+                subjects.put(practiceResult.getId(), practiceResult.getAboutUserId());
             }
         }
         return subjects;
     }
 
-    static ReviewResultParser.ValidatedObservation validated(Observation observation) {
-        return new ReviewResultParser.ValidatedObservation(
-                observation.getPractice().getSlug(),
-                observation.getSummary(),
-                observation.getOutcome(),
-                observation.getSeverity(),
-                observation.getEvidence(),
-                observation.getEvidenceRationale(),
-                new ObservationKeys(
-                        observation.getOccurrenceKey(), observation.getRecurrenceKey(), observation.getId()),
-                observation.getPracticeRevision() == null
-                        ? observation.getPractice().getDeliveryBehavior()
-                        : observation.getPracticeRevision().getDeliveryBehavior());
-    }
-
     @Override
-    public PreparedObservations prepareObservations(AgentJob job, JsonNode observations) {
-        var parsed = resultParser.parseObservations(observations);
-        if (!parsed.discarded().isEmpty()) {
-            log.info(
-                    "Discarded {} observations during parsing: jobId={}, reasons={}",
-                    parsed.discarded().size(),
-                    job.getId(),
-                    parsed.discarded());
-        }
-        if (parsed.validObservations().isEmpty()) {
-            throw new ObservationsRefusedException(
-                    "no_valid_observations",
-                    "No valid observations in agent output: jobId=" + job.getId()
-                            + ", discarded="
-                            + parsed.discarded().size());
-        }
-
-        // Admission decides, against the job's pinned practice revisions, whether an undecided review owed
-        // the captured change a reading.
-        var admissible = deliveryService.prepare(job, ReviewResultParser.validateCoherence(parsed.validObservations()));
+    public PreparedResults prepareResults(AgentJob job, JsonNode results) {
+        // Admission decides, against the job's pinned practice revisions, whether an undecided review owed the
+        // captured change a reading.
+        var admissible = deliveryService.prepare(job, results);
         return admitted -> deliveryService.publish(admitted, admissible);
     }
 

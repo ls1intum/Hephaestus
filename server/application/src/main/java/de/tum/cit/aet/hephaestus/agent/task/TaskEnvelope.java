@@ -18,7 +18,7 @@ public record TaskEnvelope(
         String compositionRequest,
         String preparedFeedback,
         String practiceScripts) {
-    public static final int SCHEMA_VERSION = 4;
+    public static final int SCHEMA_VERSION = 5;
 
     public TaskEnvelope {
         Objects.requireNonNull(jobId, "jobId");

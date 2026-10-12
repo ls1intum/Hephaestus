@@ -77,7 +77,7 @@ import org.springframework.data.web.PagedModel;
         tags = {
             @Tag(
                     name = "Practice reviews",
-                    description = "Workspace-admin access to review runs, observations, and feedback delivery history"),
+                    description = "Workspace-admin access to review runs, results, and feedback delivery history"),
             @Tag(
                     name = "Practice review trace",
                     description =

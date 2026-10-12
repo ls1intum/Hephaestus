@@ -16,11 +16,11 @@ import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -53,10 +53,10 @@ class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -131,10 +131,10 @@ class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
         job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         job = agentJobRepository.save(job);
 
-        UUID observationId = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
-                observationId,
-                "occ-" + observationId,
+        UUID practiceResultId = UUID.randomUUID();
+        practiceResultRepository.insertIfAbsent(
+                practiceResultId,
+                "occ-" + practiceResultId,
                 job.getId(),
                 job.getWorkspace().getId(),
                 practice.getId(),
@@ -142,11 +142,14 @@ class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
                 "scm.pull_request",
                 42L,
                 recipient.getId(),
-                "Observation title",
+                "Result title",
                 "NOT_MET",
                 "MAJOR",
                 null,
                 "reasoning",
+                "test-scope",
+                null,
+                null,
                 null,
                 createdAt,
                 "LIVE");
@@ -163,6 +166,6 @@ class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
                 .source(FeedbackSource.AGENT)
                 .createdAt(createdAt)
                 .build());
-        feedbackObservationRepository.insertIfAbsent(unit.getId(), observationId, "PRIMARY", 0);
+        feedbackEvidenceRepository.insertIfAbsent(unit.getId(), practiceResultId, null, "PRIMARY", 0);
     }
 }

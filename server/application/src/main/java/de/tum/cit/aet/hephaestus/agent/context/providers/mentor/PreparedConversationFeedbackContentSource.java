@@ -10,14 +10,14 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.ConversationBriefBody;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.PreparedConversationFact;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository.PreparedConversationFact;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -41,30 +41,30 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
     private static final int MAX_PREPARED = 3;
     private static final int MAX_CANDIDATES = 12;
 
-    private final FeedbackObservationRepository feedbackObservationRepository;
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
     private final ConversationConsentGate consentGate;
     private final ObjectMapper objectMapper;
-    private final ObservationRepository observationRepository;
-    private final ObservationVisibilityPolicy visibilityPolicy;
+    private final PracticeResultRepository practiceResultRepository;
+    private final ResultVisibilityPolicy visibilityPolicy;
     private final AgentJobRepository agentJobRepository;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
     private final FeedbackRepository feedbackRepository;
     private final ReviewedWorkCoverage reviewedWorkCoverage;
 
     public PreparedConversationFeedbackContentSource(
-            FeedbackObservationRepository feedbackObservationRepository,
+            FeedbackEvidenceRepository feedbackEvidenceRepository,
             ConversationConsentGate consentGate,
             ObjectMapper objectMapper,
-            ObservationRepository observationRepository,
-            ObservationVisibilityPolicy visibilityPolicy,
+            PracticeResultRepository practiceResultRepository,
+            ResultVisibilityPolicy visibilityPolicy,
             AgentJobRepository agentJobRepository,
             PracticeFeedbackDeliveryPolicy deliveryPolicy,
             FeedbackRepository feedbackRepository,
             ReviewedWorkCoverage reviewedWorkCoverage) {
-        this.feedbackObservationRepository = feedbackObservationRepository;
+        this.feedbackEvidenceRepository = feedbackEvidenceRepository;
         this.consentGate = consentGate;
         this.objectMapper = objectMapper;
-        this.observationRepository = observationRepository;
+        this.practiceResultRepository = practiceResultRepository;
         this.visibilityPolicy = visibilityPolicy;
         this.agentJobRepository = agentJobRepository;
         this.deliveryPolicy = deliveryPolicy;
@@ -87,17 +87,16 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
         long workspaceId = req.workspaceId();
-        List<PreparedConversationFact> prepared =
-                feedbackObservationRepository.findPreparedConversationFactsForRecipient(
-                        workspaceId, req.developerId(), PageRequest.of(0, MAX_CANDIDATES));
+        List<PreparedConversationFact> prepared = feedbackEvidenceRepository.findPreparedConversationFactsForRecipient(
+                workspaceId, req.developerId(), PageRequest.of(0, MAX_CANDIDATES));
 
         Set<Long> activeThreadIds = consentGate.activeThreadIds(workspaceId, conversationThreadIds(prepared));
-        Map<UUID, Observation> observations = observationsById(workspaceId, prepared);
+        Map<UUID, PracticeResult> practiceResults = practiceResultsById(workspaceId, prepared);
         Set<UUID> visible = visibilityPolicy.permitsForNewDelivery(
-                workspaceId, observations.values(), SourceUsePurpose.CONVERSATIONAL_MENTORING);
+                workspaceId, practiceResults.values(), SourceUsePurpose.CONVERSATIONAL_MENTORING);
         Map<UUID, ObjectNode> reviewedWork = reviewedWorkCoverage.of(
                 workspaceId,
-                observations.values().stream()
+                practiceResults.values().stream()
                         .filter(o -> visible.contains(o.getId()))
                         .toList());
 
@@ -108,7 +107,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         ArrayNode arr = root.putArray("preparedConversationFeedback");
         for (PreparedConversationFact fact : prepared) {
             if (arr.size() >= MAX_PREPARED) break;
-            if (!visible.contains(fact.getObservationId())) {
+            if (!visible.contains(fact.getPracticeResultId())) {
                 continue;
             }
             if (ArtifactKinds.CONVERSATION_THREAD.equals(fact.getArtifactKind())
@@ -136,7 +135,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
                 continue;
             }
             ObjectNode node = arr.addObject();
-            node.put("observationId", fact.getObservationId().toString());
+            node.put("practiceResultId", fact.getPracticeResultId().toString());
             node.put("practiceSlug", fact.getPracticeSlug());
             node.put("practiceName", fact.getPracticeName());
             node.put("summary", fact.getSummary());
@@ -155,16 +154,16 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             if (fact.getPreparedAt() != null) {
                 node.put("preparedAt", fact.getPreparedAt().toString());
             }
-            Observation observation = observations.get(fact.getObservationId());
-            if (observation != null) {
-                // The review behind the observation, not the job that composed this feedback.
-                node.put("reviewId", observation.getAgentJobId().toString());
+            PracticeResult practiceResult = practiceResults.get(fact.getPracticeResultId());
+            if (practiceResult != null) {
+                // The review behind the result, not the job that composed this feedback.
+                node.put("reviewId", practiceResult.getAgentJobId().toString());
 
-                node.put("outcome", observation.getOutcome().name());
-                if (observation.getEvidence() != null) {
-                    node.set("evidence", observation.getEvidence());
+                node.put("outcome", practiceResult.getOutcome().name());
+                if (practiceResult.getEvidence() != null) {
+                    node.set("evidence", practiceResult.getEvidence());
                 }
-                ObjectNode work = reviewedWork.get(observation.getId());
+                ObjectNode work = reviewedWork.get(practiceResult.getId());
                 if (work != null) {
                     node.set("reviewedWork", work);
                 }
@@ -195,18 +194,18 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         }
     }
 
-    private Map<UUID, Observation> observationsById(long workspaceId, List<PreparedConversationFact> facts) {
+    private Map<UUID, PracticeResult> practiceResultsById(long workspaceId, List<PreparedConversationFact> facts) {
         Set<UUID> ids = new LinkedHashSet<>();
         for (PreparedConversationFact fact : facts) {
-            ids.add(fact.getObservationId());
+            ids.add(fact.getPracticeResultId());
         }
         if (ids.isEmpty()) {
             return Map.of();
         }
-        List<Observation> rows = observationRepository.findAllByIdInAndWorkspaceId(ids, workspaceId);
-        Map<UUID, Observation> byId = new HashMap<>(rows.size());
-        for (Observation observation : rows) {
-            byId.put(observation.getId(), observation);
+        List<PracticeResult> rows = practiceResultRepository.findAllByIdInAndWorkspaceId(ids, workspaceId);
+        Map<UUID, PracticeResult> byId = new HashMap<>(rows.size());
+        for (PracticeResult practiceResult : rows) {
+            byId.put(practiceResult.getId(), practiceResult);
         }
         return byId;
     }

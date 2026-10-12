@@ -45,7 +45,7 @@ class FeedbackDispatchStateMachineTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldKeepDifferentObservationDeliveriesSeparateAtIdenticalCoordinates() {
+    void shouldKeepDifferentResultDeliveriesSeparateAtIdenticalCoordinates() {
         var anchor = FeedbackAnchor.DiffAnchor.singleLine("Same.java", 10);
         var first = new DeliveredSignal("observation:first", anchor, Disposition.POSTED, "1", null);
         var second = new DeliveredSignal("observation:second", anchor, Disposition.FAILED, null, null);

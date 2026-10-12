@@ -12,14 +12,14 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
 import de.tum.cit.aet.hephaestus.practices.feedback.InAppFeedbackBody;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.Reaction;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -42,7 +42,7 @@ import org.springframework.http.MediaType;
 class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewIntegrationTest {
 
     @Autowired
-    private ObservationInvalidationRepository invalidationRepository;
+    private PracticeResultInvalidationRepository invalidationRepository;
 
     private static final String RESPONSE = "/workspaces/{slug}/practices/feedback/{feedbackId}/response";
 
@@ -76,7 +76,7 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
                 FeedbackDeliveryState.PREPARED,
                 "You keep shipping untested changes",
                 "Across your last three pull requests the tests did not move with the code.");
-        bind(feedback, persistObservation(practice, job, developer, 101L));
+        bind(feedback, persistResult(practice, job, developer, 101L));
 
         readInAppPage(workspace)
                 .jsonPath("$.length()")
@@ -117,7 +117,7 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
     void shouldNotReturnFeedbackWhenItIsPreparedForSomebodyElse() {
         Feedback theirs = persistInAppCard(
                 job, teammate, 7000, FeedbackDeliveryState.PREPARED, "Their way of working", "Not about the caller.");
-        bind(theirs, persistObservation(practice, job, teammate, 202L));
+        bind(theirs, persistResult(practice, job, teammate, 202L));
 
         readInAppPage(workspace).jsonPath("$.length()").isEqualTo(0);
 
@@ -160,7 +160,7 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
                 FeedbackDeliveryState.PREPARED,
                 "You keep shipping untested changes",
                 "Across your last three pull requests the tests did not move with the code.");
-        bind(feedback, persistObservation(practice, job, developer, 101L));
+        bind(feedback, persistResult(practice, job, developer, 101L));
 
         readInAppPage(workspace).jsonPath("$[0].readAt").doesNotExist();
 
@@ -181,7 +181,7 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
     void administratorViewDoesNotDeliverTheViewedDevelopersFeedback() {
         Feedback unit = persistInAppCard(
                 job, developer, 7000, FeedbackDeliveryState.PREPARED, "A practice headline", "A practice body");
-        bind(unit, persistObservation(practice, job, developer, 101L));
+        bind(unit, persistResult(practice, job, developer, 101L));
 
         readAsUserView(IN_APP, workspace, developer).jsonPath("$.length()").isEqualTo(1);
 
@@ -206,15 +206,15 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
                 FeedbackDeliveryState.DELIVERED,
                 "You keep shipping untested changes",
                 "Across your last three pull requests the tests did not move with the code.");
-        bind(answered, persistObservation(practice, job, developer, 101L));
+        bind(answered, persistResult(practice, job, developer, 101L));
         Practice other = persistPractice(workspace, null, "small-pull-requests", "Small Pull Requests", null);
         Feedback unanswered = persistInAppCard(
                 job, developer, 7001, FeedbackDeliveryState.PREPARED, "Pull requests grow", "They do.");
-        bind(unanswered, persistObservation(other, job, developer, 102L));
+        bind(unanswered, persistResult(other, job, developer, 102L));
         Feedback withdrawn =
                 persistInAppCard(job, developer, 7002, FeedbackDeliveryState.PREPARED, "Commits say what", "Not why.");
         Practice third = persistPractice(workspace, null, "commit-messages", "Commit Messages", null);
-        bind(withdrawn, persistObservation(third, job, developer, 103L));
+        bind(withdrawn, persistResult(third, job, developer, 103L));
         Instant earlier = NOW.minusSeconds(120);
         reactionRepository.save(Reaction.builder()
                 .feedback(answered)
@@ -285,7 +285,7 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
                 FeedbackDeliveryState.DELIVERED,
                 "You keep shipping untested changes",
                 "Across your last three pull requests the tests did not move with the code.");
-        bind(feedback, persistObservation(practice, job, developer, 101L));
+        bind(feedback, persistResult(practice, job, developer, 101L));
 
         FeedbackResponseDTO addressed = writeResponse(
                 feedback,
@@ -341,7 +341,7 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
                 FeedbackDeliveryState.PREPARED,
                 "You keep shipping untested changes",
                 "Across your last three pull requests the tests did not move with the code.");
-        bind(feedback, persistObservation(practice, job, developer, 101L));
+        bind(feedback, persistResult(practice, job, developer, 101L));
 
         // The measurement stays pinned to revision 1; revision 2 changes the rules, so its claim is stale.
         Instant beforeTheRuleChange = Instant.now();
@@ -409,8 +409,8 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
 
     @Test
     @WithUser
-    @DisplayName("a card citing an invalidated observation is hidden whole, and its delivery record stays")
-    void shouldHideTheWholeCardWhenAnyObservationItCitesWasInvalidated() {
+    @DisplayName("a card citing an invalidated result is hidden whole, and its delivery record stays")
+    void shouldHideTheWholeCardWhenAnyResultItCitesWasInvalidated() {
         Feedback feedback = persistInAppCard(
                 job,
                 developer,
@@ -418,11 +418,11 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
                 FeedbackDeliveryState.DELIVERED,
                 "You keep shipping untested changes",
                 "Across your last three pull requests the tests did not move with the code.");
-        UUID wrong = persistObservation(practice, job, developer, 101L);
+        UUID wrong = persistResult(practice, job, developer, 101L);
         bind(feedback, wrong);
-        bind(feedback, persistObservation(practice, job, developer, 102L));
-        invalidationRepository.save(new ObservationInvalidation(
-                observationRepository
+        bind(feedback, persistResult(practice, job, developer, 102L));
+        invalidationRepository.save(new PracticeResultInvalidation(
+                practiceResultRepository
                         .findByIdAndWorkspaceId(wrong, workspace.getId())
                         .orElseThrow(),
                 1L,
@@ -454,7 +454,7 @@ class InAppFeedbackControllerIntegrationTest extends AbstractPracticeReviewInteg
         return Objects.requireNonNull(written);
     }
 
-    private UUID persistObservation(Practice about, AgentJob agentJob, User subject, long artifactId) {
+    private UUID persistResult(Practice about, AgentJob agentJob, User subject, long artifactId) {
         return observe(about, agentJob, artifactId, subject, Outcome.NOT_MET, Severity.MAJOR, Instant.now());
     }
 

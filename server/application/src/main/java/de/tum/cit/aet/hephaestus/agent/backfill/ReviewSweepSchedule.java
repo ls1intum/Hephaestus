@@ -32,7 +32,7 @@ import org.jspecify.annotations.Nullable;
  * A standing instruction to look at a workspace's recent work again on a cadence, whether or not anything
  * announced it. Every other way into the review path needs something to happen first, so without a
  * schedule an artifact nothing ever signalled is indistinguishable from one that was offered and
- * declined — both have no ledger row and no observation.
+ * declined — both have no ledger row and no result.
  *
  * <p><strong>A schedule says when, not whose.</strong> Do not add a repository or author list here:
  * {@code WorkspaceReviewScope.repositories} already defines the compute scope, and

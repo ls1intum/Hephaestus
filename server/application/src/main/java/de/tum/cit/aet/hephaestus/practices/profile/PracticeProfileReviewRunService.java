@@ -5,19 +5,19 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.DeliveredFeedbackCount;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.DeveloperReviewRunRow;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationService;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
-import de.tum.cit.aet.hephaestus.practices.observation.RunPracticeOutcomes;
-import de.tum.cit.aet.hephaestus.practices.observation.VisibleRunPage;
-import de.tum.cit.aet.hephaestus.practices.observation.VisibleRunPage.VisibleRun;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewRunDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewRunDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewRunsPageDTO;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository.DeveloperReviewRunRow;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultService;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.VisibleRunPage;
+import de.tum.cit.aet.hephaestus.practices.result.VisibleRunPage.VisibleRun;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeResultDetailDTO;
+import de.tum.cit.aet.hephaestus.practices.result.RunPracticeOutcomes;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestStandingLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestStandingLookup.ReviewedWorkId;
@@ -40,7 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The developer's own review runs across every practice group: one row per run that recorded an observation
+ * The developer's own review runs across every practice group: one row per run that recorded a result
  * about them, newest first, narrowed to what it found about them.
  */
 @Service
@@ -48,10 +48,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class PracticeProfileReviewRunService {
 
     private final CurrentDeveloperLookup currentDeveloperLookup;
-    private final ObservationRepository observationRepository;
-    private final ObservationInvalidationRepository invalidationRepository;
-    private final ObservationService observationService;
-    private final ObservationVisibilityPolicy visibilityPolicy;
+    private final PracticeResultRepository practiceResultRepository;
+    private final PracticeResultInvalidationRepository invalidationRepository;
+    private final PracticeResultService practiceResultService;
+    private final ResultVisibilityPolicy visibilityPolicy;
     private final FeedbackRepository feedbackRepository;
     private final ReviewRunLookup reviewRunLookup;
     private final ReviewRunNarrativeLookup reviewRunNarrativeLookup;
@@ -72,11 +72,11 @@ public class PracticeProfileReviewRunService {
         String kind = artifactKind == null ? null : artifactKind.value();
         VisibleRunPage page = VisibleRunPage.collect(
                 pageable,
-                candidates -> observationRepository.findDeveloperReviewRuns(
+                candidates -> practiceResultRepository.findDeveloperReviewRuns(
                         developer, workspaceId, since, null, kind, candidates),
                 rows -> visibleByRun(
                         workspaceId,
-                        observationRepository.findDeveloperReviewRunObservations(
+                        practiceResultRepository.findDeveloperReviewRunResults(
                                 rows.stream()
                                         .map(DeveloperReviewRunRow::getJobId)
                                         .toList(),
@@ -101,15 +101,15 @@ public class PracticeProfileReviewRunService {
         long workspaceId = workspaceContext.id();
         long developer = currentDeveloperLookup.currentDeveloperId().orElseThrow(() -> gone(reviewId));
         VisibleRun visible = visibleRun(workspaceId, developer, reviewId).orElseThrow(() -> gone(reviewId));
-        List<Observation> observations = visible.observations();
+        List<PracticeResult> practiceResults = visible.practiceResults();
         Map<UUID, ReviewRunFacts> facts = reviewRunLookup.findFacts(workspaceId, List.of(reviewId));
         ProfileReviewRunDTO run =
                 toRuns(workspaceId, developer, List.of(visible), facts).getFirst();
-        List<ObservationDetailDTO> details = observationService.toDetails(
+        List<PracticeResultDetailDTO> details = practiceResultService.toDetails(
                 workspaceId,
                 developer,
-                observations,
-                observations.stream().map(Observation::getId).collect(Collectors.toSet()),
+                practiceResults,
+                practiceResults.stream().map(PracticeResult::getId).collect(Collectors.toSet()),
                 facts.entrySet().stream()
                         .collect(Collectors.toUnmodifiableMap(
                                 Map.Entry::getKey, entry -> entry.getValue().target())),
@@ -127,38 +127,38 @@ public class PracticeProfileReviewRunService {
         return currentDeveloperLookup
                 .currentDeveloperId()
                 .filter(developer -> visibleRun(workspaceId, developer, reviewId)
-                        .filter(run -> run.observations().stream()
-                                .anyMatch(observation -> artifactKind.equals(observation.getArtifactKind())
-                                        && observation.getArtifactId() == artifactId))
+                        .filter(run -> run.practiceResults().stream()
+                                .anyMatch(practiceResult -> artifactKind.equals(practiceResult.getArtifactKind())
+                                        && practiceResult.getArtifactId() == artifactId))
                         .isPresent());
     }
 
     /** The run as the developer may see it, or empty when nothing it recorded about them is theirs to read. */
     private Optional<VisibleRun> visibleRun(long workspaceId, long developer, UUID reviewId) {
-        List<Observation> found =
-                observationRepository.findDeveloperReviewRunObservations(List.of(reviewId), developer, workspaceId);
-        List<Observation> observations = visibleByRun(workspaceId, found).getOrDefault(reviewId, List.of());
-        if (observations.isEmpty()) {
+        List<PracticeResult> found =
+                practiceResultRepository.findDeveloperReviewRunResults(List.of(reviewId), developer, workspaceId);
+        List<PracticeResult> practiceResults = visibleByRun(workspaceId, found).getOrDefault(reviewId, List.of());
+        if (practiceResults.isEmpty()) {
             return Optional.empty();
         }
         // Dated by the newest of the rows the list's date aggregates, so the run carries one date on both.
-        return Optional.of(new VisibleRun(reviewId, found.getFirst().getObservedAt(), observations));
+        return Optional.of(new VisibleRun(reviewId, found.getFirst().getObservedAt(), practiceResults));
     }
 
     private static EntityNotFoundException gone(UUID reviewId) {
         return new EntityNotFoundException("ReviewRun", reviewId.toString());
     }
 
-    /** The observations the developer may see, by run, in the order found. A run with nothing left has no key. */
-    private Map<UUID, List<Observation>> visibleByRun(long workspaceId, List<Observation> found) {
+    /** The results the developer may see, by run, in the order found. A run with nothing left has no key. */
+    private Map<UUID, List<PracticeResult>> visibleByRun(long workspaceId, List<PracticeResult> found) {
         Set<UUID> visible =
                 visibilityPolicy.permitsHistory(workspaceId, found, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
         return found.stream()
                 .filter(row -> visible.contains(row.getId()))
-                .collect(Collectors.groupingBy(Observation::getAgentJobId));
+                .collect(Collectors.groupingBy(PracticeResult::getAgentJobId));
     }
 
-    /** The rows for these runs, in their order; each run's observations are non-empty and newest first. */
+    /** The rows for these runs, in their order; each run's results are non-empty and newest first. */
     private List<ProfileReviewRunDTO> toRuns(
             long workspaceId, long developerId, List<VisibleRun> runs, Map<UUID, ReviewRunFacts> facts) {
         if (runs.isEmpty()) {
@@ -167,21 +167,21 @@ public class PracticeProfileReviewRunService {
         List<UUID> jobIds = runs.stream().map(VisibleRun::reviewId).toList();
         Map<UUID, Long> delivered = feedbackRepository.countDeliveredByRun(workspaceId, developerId, jobIds).stream()
                 .collect(Collectors.toMap(DeliveredFeedbackCount::getJobId, DeliveredFeedbackCount::getDelivered));
-        Set<UUID> invalidated = invalidationRepository.findActiveObservationIds(
+        Set<UUID> invalidated = invalidationRepository.findActiveResultIds(
                 workspaceId,
                 runs.stream()
-                        .flatMap(run -> run.observations().stream())
-                        .map(Observation::getId)
+                        .flatMap(run -> run.practiceResults().stream())
+                        .map(PracticeResult::getId)
                         .toList());
         Set<ReviewedWorkId> mayRequest = reviewRequestStandingLookup.mayRequest(
                 workspaceId,
-                runs.stream().map(run -> work(run.observations().getFirst())).toList());
+                runs.stream().map(run -> work(run.practiceResults().getFirst())).toList());
         return runs.stream()
                 .map(visible -> {
                     UUID jobId = visible.reviewId();
-                    Observation newest = visible.observations().getFirst();
-                    RunPracticeOutcomes outcomes = RunPracticeOutcomes.of(visible.observations().stream()
-                            .filter(observation -> !invalidated.contains(observation.getId()))
+                    PracticeResult newest = visible.practiceResults().getFirst();
+                    RunPracticeOutcomes outcomes = RunPracticeOutcomes.of(visible.practiceResults().stream()
+                            .filter(practiceResult -> !invalidated.contains(practiceResult.getId()))
                             .toList());
                     ReviewRunFacts run = facts.get(jobId);
                     return new ProfileReviewRunDTO(
@@ -203,7 +203,7 @@ public class PracticeProfileReviewRunService {
                 .toList();
     }
 
-    private static ReviewedWorkId work(Observation observation) {
-        return new ReviewedWorkId(observation.getArtifactKind(), observation.getArtifactId());
+    private static ReviewedWorkId work(PracticeResult practiceResult) {
+        return new ReviewedWorkId(practiceResult.getArtifactKind(), practiceResult.getArtifactId());
     }
 }

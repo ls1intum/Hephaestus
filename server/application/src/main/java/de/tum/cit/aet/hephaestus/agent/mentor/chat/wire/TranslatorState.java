@@ -49,9 +49,15 @@ public final class TranslatorState {
 
     /**
      * Links the server admitted this turn and the runner has not emitted yet, one per admission: a link to any other
-     * observation, or a second one an admission did not cover, is never shown or stored.
+     * result, or a second one an admission did not cover, is never shown or stored.
      */
     private final Map<UUID, Integer> admittedLinks = new HashMap<>();
+
+    /** Problem links the server admitted this turn and the runner has not emitted yet, one per admission. */
+    private final Map<UUID, Integer> admittedObservationLinks = new HashMap<>();
+
+    /** The result of each problem whose link was admitted. */
+    private final Map<UUID, UUID> observationResults = new HashMap<>();
 
     /** Index in {@link #partsAccumulator} where the unverified assistant message's parts begin. */
     private int messagePartsStart;
@@ -288,32 +294,68 @@ public final class TranslatorState {
         return part;
     }
 
-    public synchronized void admitLink(UUID observationId) {
-        admittedLinks.merge(observationId, 1, Integer::sum);
+    /** Admits one link to a result, which the server checked. */
+    public synchronized void admitLink(UUID practiceResultId) {
+        admittedLinks.merge(practiceResultId, 1, Integer::sum);
     }
 
-    /** Spends one admission of a link to {@code observationId}; false when none is left. */
-    public synchronized boolean consumeLinkAdmission(UUID observationId) {
-        Integer left = admittedLinks.get(observationId);
+    /**
+     * Admits one link to a problem and remembers the result it belongs to, which its part names beside it. Kept apart
+     * from result links, so a link of one kind never spends an admission of the other.
+     */
+    public synchronized void admitObservationLink(UUID observationId, UUID practiceResultId) {
+        admittedObservationLinks.merge(observationId, 1, Integer::sum);
+        observationResults.put(observationId, practiceResultId);
+    }
+
+    /** The result of a problem whose link was admitted, or null. */
+    public synchronized @Nullable UUID resultOfLinkedObservation(UUID observationId) {
+        return observationResults.get(observationId);
+    }
+
+    /** Spends one admission of a link to the result {@code practiceResultId}; false when none is left. */
+    public synchronized boolean consumeLinkAdmission(UUID practiceResultId) {
+        return consume(admittedLinks, practiceResultId);
+    }
+
+    /** Spends one admission of a link to the problem {@code observationId}; false when none is left. */
+    public synchronized boolean consumeObservationLinkAdmission(UUID observationId) {
+        return consume(admittedObservationLinks, observationId);
+    }
+
+    private static boolean consume(Map<UUID, Integer> admitted, UUID id) {
+        Integer left = admitted.get(id);
         if (left == null) {
             return false;
         }
         if (left == 1) {
-            admittedLinks.remove(observationId);
+            admitted.remove(id);
         } else {
-            admittedLinks.put(observationId, left - 1);
+            admitted.put(id, left - 1);
         }
         return true;
     }
 
-    /** Stores the part exactly as {@code observation} went on the wire, so the reloaded reply matches the live one. */
-    public synchronized void recordDataObservation(UIMessageChunk.DataObservation observation) {
+    /** Stores the part exactly as {@code link} went on the wire, so the reloaded reply matches the live one. */
+    public synchronized void recordDataResult(UIMessageChunk.DataResult link) {
         ObjectNode part = nodes.objectNode();
-        part.put("type", UIMessageChunk.DataObservation.PART_TYPE);
-        part.put("id", observation.id().toString());
+        part.put("type", UIMessageChunk.DataResult.PART_TYPE);
+        part.put("id", link.id().toString());
         part.putObject("data")
-                .put("observationId", observation.data().observationId().toString())
-                .put("text", observation.data().text());
+                .put("practiceResultId", link.data().practiceResultId().toString())
+                .put("text", link.data().text());
+        partsAccumulator.add(part);
+    }
+
+    /** Stores the part exactly as {@code link} went on the wire, so the reloaded reply matches the live one. */
+    public synchronized void recordDataResultObservation(UIMessageChunk.DataResultObservation link) {
+        ObjectNode part = nodes.objectNode();
+        part.put("type", UIMessageChunk.DataResultObservation.PART_TYPE);
+        part.put("id", link.id().toString());
+        part.putObject("data")
+                .put("practiceResultId", link.data().practiceResultId().toString())
+                .put("observationId", link.data().observationId().toString())
+                .put("text", link.data().text());
         partsAccumulator.add(part);
     }
 

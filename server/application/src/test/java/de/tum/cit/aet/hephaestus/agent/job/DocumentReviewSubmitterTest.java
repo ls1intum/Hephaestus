@@ -23,7 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRevision;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
@@ -131,7 +131,7 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
         assertThat(request.getValue().signal()).isEqualTo(PUBLISHED);
         assertThat(request.getValue().revision()).isEqualTo(KEY.revision());
         assertThat(request.getValue().collectionName()).isEqualTo("Engineering");
-        assertThat(request.getValue().observationOrigin()).isEqualTo(ObservationOrigin.LIVE);
+        assertThat(request.getValue().practiceResultOrigin()).isEqualTo(ResultOrigin.LIVE);
         verifyNoInteractions(signalRecorder);
     }
 
@@ -166,7 +166,7 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
                         request.capture(),
                         any(),
                         any(GateDecision.Run.class));
-        assertThat(request.getValue().observationOrigin()).isEqualTo(ObservationOrigin.BACKFILL);
+        assertThat(request.getValue().practiceResultOrigin()).isEqualTo(ResultOrigin.BACKFILL);
     }
 
     @Test

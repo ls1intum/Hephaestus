@@ -16,13 +16,11 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
             "pi-task-paths.ts",
             "pi-tool-arguments.ts",
             "pi-change.ts",
-            "pi-practice-scripts.ts",
-            "pi-practice-scripts.sh",
             "pi-practice-scripts-report.ts",
             "pi-error-text.ts",
             "pi-model-failure.ts",
             "pi-text.ts",
-            "pi-observation-normalize.ts",
+            "pi-result-normalize.ts",
             "pi-practice-coverage.ts",
             "pi-review-brief.ts",
             "pi-folder-index.ts",
@@ -65,5 +63,18 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
     @Override
     public Map<String, String> additionalEnv() {
         return Map.of();
+    }
+
+    /**
+     * The practice programs import the toolkit as {@code ../lib/…} beside their staged sources, and the runner as
+     * {@code ./work/practice-scripts/lib/…}. The toolkit ships in the image; the link that names it is made here,
+     * before Node starts, because the runner's first import resolves through it.
+     */
+    @Override
+    public List<String> setupCommands() {
+        return List.of(
+                "mkdir -p " + SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.PRACTICE_SCRIPT_PREFIX,
+                "ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_TARGET + " " + SandboxLayout.WORKSPACE_ROOT + "/"
+                        + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK);
     }
 }

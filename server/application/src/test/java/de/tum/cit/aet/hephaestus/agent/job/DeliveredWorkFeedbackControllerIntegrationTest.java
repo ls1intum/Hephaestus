@@ -33,7 +33,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -43,7 +43,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
@@ -118,10 +118,10 @@ class DeliveredWorkFeedbackControllerIntegrationTest extends AbstractWorkspaceIn
     private PracticeRepository practices;
 
     @Autowired
-    private ObservationRepository observations;
+    private PracticeResultRepository practiceResults;
 
     @Autowired
-    private FeedbackObservationRepository bindings;
+    private FeedbackEvidenceRepository bindings;
 
     @Autowired
     private ObjectMapper mapper;
@@ -613,10 +613,10 @@ class DeliveredWorkFeedbackControllerIntegrationTest extends AbstractWorkspaceIn
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         PracticeTestEvidence.configure(practice, ScmSignals.PULL_REQUEST_OPENED);
         practice = practices.save(practice);
-        UUID observation = UUID.randomUUID();
-        observations.insertIfAbsent(
-                observation,
-                "own-feedback-observation",
+        UUID practiceResult = UUID.randomUUID();
+        practiceResults.insertIfAbsent(
+                practiceResult,
+                "own-feedback-result",
                 job.getId(),
                 workspace.getId(),
                 practice.getId(),
@@ -624,14 +624,17 @@ class DeliveredWorkFeedbackControllerIntegrationTest extends AbstractWorkspaceIn
                 "scm.pull_request",
                 work.getId(),
                 recipient.getId(),
-                "An observation",
+                "A result",
                 "NOT_MET",
                 "MAJOR",
+                null,
+                null,
+                "test-scope",
                 null,
                 null,
                 null,
                 Instant.now(),
                 "LIVE");
-        bindings.insertIfAbsent(parent.getId(), observation, "PRIMARY", 0);
+        bindings.insertIfAbsent(parent.getId(), practiceResult, null, "PRIMARY", 0);
     }
 }

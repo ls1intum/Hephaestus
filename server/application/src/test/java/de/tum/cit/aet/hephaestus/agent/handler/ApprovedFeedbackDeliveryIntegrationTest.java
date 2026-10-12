@@ -368,8 +368,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
                 Outcome.NOT_MET,
                 Severity.MINOR,
                 Instant.now().minusSeconds(60),
-                AdmittedObservationFixtures.evidence(prior.getId(), "scm.issue.core")
-                        .toString(),
+                AdmittedResultFixtures.evidence(prior.getId(), "scm.issue.core").toString(),
                 null);
         ObjectNode feedback =
                 (ObjectNode) Objects.requireNonNull(issue.job().getOutput()).path("feedback");
@@ -381,7 +380,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
                 .put("title", "Explain the rationale")
                 .put("body", "Two issues omit the rationale for the requested change.")
                 .put("nextStep", "Name the reason for the next requested change.");
-        card.putArray("basedOn").add(issue.gap().toString());
+        card.putArray("basedOn").addObject().put("practiceResultId", issue.gap().toString());
         agentJobRepository.saveAndFlush(issue.job());
         issue.host().threads().failLookups(true);
 
@@ -393,7 +392,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
                         issue.job().getId()))
                 .containsExactly(Map.of("recipient_user_id", developer.getId(), "delivery_state", "PREPARED"));
         assertThat(jdbcTemplate.queryForList(
-                        "SELECT fo.observation_id FROM feedback_observation fo JOIN feedback f ON f.id = fo.feedback_id WHERE f.agent_job_id = ? AND f.channel = 'IN_APP'",
+                        "SELECT fo.practice_result_id FROM feedback_evidence fo JOIN feedback f ON f.id = fo.feedback_id WHERE f.agent_job_id = ? AND f.channel = 'IN_APP'",
                         UUID.class,
                         issue.job().getId()))
                 .containsExactlyInAnyOrder(issue.gap(), earlier);
@@ -404,7 +403,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
         practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
         practiceRepository.saveAndFlush(practice);
         AgentJob job = reviewedPullRequest(HEAD);
-        UUID observation = observe(
+        UUID practiceResult = observe(
                 practice,
                 job,
                 ArtifactKinds.PULL_REQUEST.value(),
@@ -414,10 +413,10 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
                 Outcome.NOT_MET,
                 Severity.MINOR,
                 Instant.now(),
-                AdmittedObservationFixtures.evidence(job.getId(), "scm.pull-request.core")
+                AdmittedResultFixtures.evidence(job.getId(), "scm.pull-request.core")
                         .toString(),
                 null);
-        composePrivateReview(job, observation);
+        composePrivateReview(job, practiceResult);
         gitlab.threads().failLookups(true);
 
         assertPrivatePreparationBeforeUncertainDelivery(job, gitlab.threads(), ScriptedGitLabNotes.mergeRequest(1));
@@ -449,7 +448,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
         AgentJob job = reviewIssue(onGitLab());
         job.setStatus(AgentJobStatus.COMPLETED);
         ((ObjectNode) Objects.requireNonNull(job.getMetadata()))
-                .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "quiet");
+                .put(ResultAdmissionService.DIGEST_METADATA_KEY, "quiet");
         ObjectNode output = objectMapper.createObjectNode();
         output.putObject("feedback").put("admissionDigest", "quiet").put("contractVersion", 2);
         job.setOutput(output);
@@ -468,7 +467,12 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
         IssueReview issue = reviewBesideTriage(Outcome.NOT_APPLICABLE);
         compose(issue, issue.gap());
         addPrivateBrief(issue.job(), issue.gap());
-        jdbcTemplate.update("UPDATE observation SET evidence = '{}'::jsonb WHERE id = ?", issue.gap());
+        jdbcTemplate.update("UPDATE practice_result SET evidence = '{}'::jsonb WHERE id = ?", issue.gap());
+        jdbcTemplate.update("""
+                UPDATE practice_observation
+                SET citations = (SELECT jsonb_agg(c - 'verification') FROM jsonb_array_elements(citations) c)
+                WHERE practice_result_id = ? AND jsonb_array_length(citations) > 0
+                """, issue.gap());
 
         assertThatThrownBy(() ->
                         handlerRegistry.getHandler(AgentJobType.ISSUE_REVIEW).deliver(issue.job()))
@@ -552,30 +556,31 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
         assertThat(prepared.getInChatPreparedAt()).isNotNull();
     }
 
-    private void composePrivateReview(AgentJob job, UUID observation) {
+    private void composePrivateReview(AgentJob job, UUID practiceResult) {
         ((ObjectNode) Objects.requireNonNull(job.getMetadata()))
-                .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "private-digest");
+                .put(ResultAdmissionService.DIGEST_METADATA_KEY, "private-digest");
         ObjectNode output = objectMapper.createObjectNode();
         ObjectNode feedback = output.putObject("feedback")
                 .put("admissionDigest", "private-digest")
                 .put("contractVersion", 2);
-        feedback.putArray("observations")
+        feedback.putArray("results")
                 .addObject()
-                .put("id", observation.toString())
+                .put("practiceResultId", practiceResult.toString())
                 .put("practiceSlug", practice.getSlug())
                 .put("outcome", "NOT_MET")
                 .put("anchorable", false)
-                .putArray("citations");
+                .putArray("observations");
         feedback.putObject("review")
                 .putObject("summary")
                 .put("body", NOTE)
                 .putArray("basedOn")
-                .add(observation.toString());
+                .addObject()
+                .put("practiceResultId", practiceResult.toString());
         job.setOutput(output);
-        addPrivateBrief(job, observation);
+        addPrivateBrief(job, practiceResult);
     }
 
-    private void addPrivateBrief(AgentJob job, UUID observation) {
+    private void addPrivateBrief(AgentJob job, UUID practiceResult) {
         job.setStatus(AgentJobStatus.COMPLETED);
         ObjectNode feedback =
                 (ObjectNode) Objects.requireNonNull(job.getOutput()).path("feedback");
@@ -585,7 +590,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
                 .put("practiceSlug", practice.getSlug())
                 .put("action", "NEW")
                 .put("title", "Explain the migration");
-        unit.putArray("basedOn").add(observation.toString());
+        unit.putArray("basedOn").addObject().put("practiceResultId", practiceResult.toString());
         unit.putObject("notes")
                 .put("situation", "The rationale is missing.")
                 .put("capability", "Explain the migration decision.")
@@ -680,8 +685,9 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
     }
 
     @Test
-    void shouldProposeAnIssueNoteWhoseUnitCitesAnObservationOfAPracticeNeedingApproval() {
-        IssueReview issue = reviewBesideTriage(Outcome.MET);
+    void shouldProposeAnIssueNoteWhoseUnitCitesAResultOfAPracticeNeedingApproval() {
+        // A MET result is never acknowledged on the work, so the gated result the note cites is a problem too.
+        IssueReview issue = reviewBesideTriage(Outcome.NOT_MET);
         compose(issue, issue.gap(), issue.triage());
 
         handlerRegistry.getHandler(AgentJobType.ISSUE_REVIEW).deliver(issue.job());
@@ -708,7 +714,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
         AgentJob review = reviewIssue(host);
         long issueId =
                 Objects.requireNonNull(review.getMetadata()).path("issue_id").asLong();
-        String evidence = AdmittedObservationFixtures.evidence(review.getId(), "scm.issue.core")
+        String evidence = AdmittedResultFixtures.evidence(review.getId(), "scm.issue.core")
                 .toString();
         UUID gap = observe(
                 practice,
@@ -728,41 +734,41 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
                 ArtifactKinds.ISSUE.value(),
                 issueId,
                 host.author(),
-                "Labels and an owner are set",
+                triageKind == Outcome.NOT_MET ? "No owner is set" : "Labels and an owner are set",
                 triageKind,
-                null,
+                triageKind == Outcome.NOT_MET ? Severity.MINOR : null,
                 Instant.now(),
                 evidence,
                 null);
         return new IssueReview(review, host, gap, triaged, triageKind);
     }
 
-    /** The composer's output for the review: both observations staged by id, one note of the problem's practice. */
+    /** The composer's output for the review: both results staged by id, one note of the problem's practice. */
     private void compose(IssueReview issue, UUID... basedOn) {
         AgentJob review = issue.job();
         ((ObjectNode) Objects.requireNonNull(review.getMetadata()))
-                .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "digest-7");
+                .put(ResultAdmissionService.DIGEST_METADATA_KEY, "digest-7");
         ObjectNode feedback = objectMapper.createObjectNode().putObject("feedback");
         feedback.put("admissionDigest", "digest-7").put("contractVersion", 2);
-        var staged = feedback.putArray("observations");
+        var staged = feedback.putArray("results");
         staged.addObject()
-                .put("id", issue.gap().toString())
+                .put("practiceResultId", issue.gap().toString())
                 .put("practiceSlug", practice.getSlug())
                 .put("outcome", "NOT_MET")
                 .put("anchorable", false)
-                .putArray("citations");
+                .putArray("observations");
         staged.addObject()
-                .put("id", issue.triage().toString())
+                .put("practiceResultId", issue.triage().toString())
                 .put("practiceSlug", "triage-labels-owner")
                 .put("outcome", issue.triageOutcome().name())
                 .put("anchorable", false)
-                .putArray("citations");
+                .putArray("observations");
         ObjectNode summary = feedback.putObject("review").putObject("summary");
         summary.put(
                 "body",
                 "Split the three deliverables into subtasks. Open one subtask per deliverable and link them here.");
         var cited = summary.putArray("basedOn");
-        for (UUID id : basedOn) cited.add(id.toString());
+        for (UUID id : basedOn) cited.addObject().put("practiceResultId", id.toString());
         ObjectNode output = objectMapper.createObjectNode();
         output.set("feedback", feedback);
         review.setOutput(output);
@@ -771,7 +777,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
 
     private List<@Nullable UUID> linkedTo(AgentJob review) {
         return jdbcTemplate.queryForList("""
-                SELECT fo.observation_id FROM feedback_observation fo
+                SELECT fo.practice_result_id FROM feedback_evidence fo
                 JOIN feedback f ON f.id = fo.feedback_id WHERE f.agent_job_id = ?
                 """, UUID.class, review.getId());
     }
@@ -831,8 +837,8 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
     /** Records the proposal a review of the merge request at {@code reviewedCommit} leaves for approval. */
     private Feedback propose(String reviewedCommit) {
         AgentJob review = reviewedPullRequest(reviewedCommit);
-        UUID observation = observe(practice, review, mergeRequestId, developer, Outcome.MET, null, Instant.now());
-        return recordProposal(review, observation);
+        UUID practiceResult = observe(practice, review, mergeRequestId, developer, Outcome.MET, null, Instant.now());
+        return recordProposal(review, practiceResult);
     }
 
     private AgentJob reviewedPullRequest(String reviewedCommit) {
@@ -897,7 +903,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
 
     private Feedback proposeOnIssue(IssueHost host) {
         AgentJob review = reviewIssue(host);
-        UUID observation = observe(
+        UUID practiceResult = observe(
                 practice,
                 review,
                 ArtifactKinds.ISSUE.value(),
@@ -909,7 +915,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
                 Instant.now(),
                 DIFF_EVIDENCE_JSON,
                 null);
-        return recordProposal(review, observation);
+        return recordProposal(review, practiceResult);
     }
 
     private AgentJob reviewIssue(IssueHost host) {
@@ -976,9 +982,9 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
         return agentJobRepository.save(job);
     }
 
-    private Feedback recordProposal(AgentJob review, UUID observation) {
+    private Feedback recordProposal(AgentJob review, UUID practiceResult) {
         ledgerRecorder.recordProposal(
-                review, new DeliveryContent(NOTE, List.of(), List.of(), List.of("occ-" + observation)));
+                review, new DeliveryContent(NOTE, List.of(), List.of(), List.of("occ-" + practiceResult)));
 
         UUID proposalId = Objects.requireNonNull(jdbcTemplate.queryForObject(
                 "SELECT id FROM feedback WHERE agent_job_id = ? AND workspace_id = ? AND channel = 'IN_CONTEXT'",

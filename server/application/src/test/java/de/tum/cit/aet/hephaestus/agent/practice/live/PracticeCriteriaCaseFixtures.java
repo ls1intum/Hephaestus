@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.practice.live;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,6 +30,9 @@ final class PracticeCriteriaCaseFixtures {
     static final String CHANGE_VIEW_PREFIX = "work/change/";
 
     static final String COMMITS = "context/commits.json";
+
+    /** The title of the work in a case that does not state one. */
+    static final String DEFAULT_TITLE = "Add the change shown in the captured files";
 
     static final String COMMENTS = "context/comments.json";
 
@@ -125,21 +129,24 @@ final class PracticeCriteriaCaseFixtures {
         fixtureCommand(workspace, "git", "-C", repo.toString(), "commit", "--allow-empty", "-m", "Add captured files");
         String head = fixtureCommand(workspace, "git", "-C", repo.toString(), "rev-parse", "HEAD")
                 .trim();
+        // As the capture stages a checkout: the head detached, and the refs the container may see, none here.
+        fixtureCommand(workspace, "git", "-C", repo.toString(), "checkout", "-q", "--detach", head);
+        Files.writeString(repo.resolve(".git/" + GitRepositoryManager.CAPTURED_REFS), "");
         Files.write(
                 workspace.resolve("context/change.json"),
                 MAPPER.writeValueAsBytes(Map.of("base_sha", base, "head_sha", head)));
-        var metadata = (ObjectNode)
-                MAPPER.readTree(FIXTURE_DIR.resolve("metadata.json").toFile());
-        metadata.put("title", "Add the change shown in the captured files");
-        metadata.put("commit_sha", head);
-        metadata.put("body", Files.readString(workspace.resolve("context/description.md")));
+        // The content source's own record of the work; a case states only the fields it is about.
+        String description = Files.readString(workspace.resolve("context/description.md"));
+        ObjectNode metadata = issue
+                ? LiveWorkRecords.issue(DEFAULT_TITLE, description)
+                : LiveWorkRecords.pullRequest(head, DEFAULT_TITLE, description, 1);
         if (scenario.path("files").has("context/metadata.json")) {
             // The scenario's own fields win; the defaults only fill the fields it leaves out.
             MAPPER.readTree(scenario.path("files").path("context/metadata.json").asString())
                     .properties()
                     .forEach(field -> metadata.set(field.getKey(), field.getValue()));
         }
-        Files.write(workspace.resolve("context/metadata.json"), MAPPER.writeValueAsBytes(metadata));
+        Files.write(workspace.resolve("context/metadata.json"), LiveWorkRecords.staged(metadata));
 
         JsonNode catalogue = MAPPER.readTree(
                 Path.of("src/main/resources/practices/default-catalog.json").toFile());
@@ -193,12 +200,12 @@ final class PracticeCriteriaCaseFixtures {
                                 + "context/docs/ and work/change/diff.patch. The checkout is "
                                 + SandboxLayout.REPO_MOUNT_RELATIVE + ". "
                                 + "Read inputs/practices/index.json and each listed practice. "
-                                + "Record one justified outcome for each listed practice with report_observation. "
+                                + "Submit one justified result for each listed practice. "
                                 + "Follow " + SandboxLayout.ORCHESTRATOR_PATH + ".",
                         1,
                         "test/fixture"));
         Files.write(workspace.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME), MAPPER.writeValueAsBytes(envelope));
-        fixtureCommand(workspace, "node", "pi-change.ts", workspace.toString());
+        deriveChangeView(workspace);
         JsonNode files = MAPPER.readTree(
                         workspace.resolve(CHANGE_VIEW_PREFIX + "files.json").toFile())
                 .path("files");
@@ -232,6 +239,8 @@ final class PracticeCriteriaCaseFixtures {
             artifacts.putIfAbsent(file, contextKinds.getOrDefault(file, coreKind));
         }
         artifacts.putIfAbsent("context/change.json", "scm.pull-request.diff");
+        // Admission verifies every quote of code against the captured checkout, which these witnesses name.
+        LiveRunnerWorkspace.CHECKOUT_WITNESSES.forEach(witness -> artifacts.put(witness, "scm.repository.tree"));
         if (commitsCaptured) {
             artifacts.putIfAbsent(COMMITS, CONTEXT_KINDS.get(COMMITS));
         }
@@ -250,6 +259,25 @@ final class PracticeCriteriaCaseFixtures {
         artifacts.forEach((path, kind) ->
                 registered.addObject().put("kind", kind).putObject("artifact").put("path", path));
         Files.write(workspace.resolve(SandboxLayout.MANIFEST_PATH), MAPPER.writeValueAsBytes(manifest));
+    }
+
+    /**
+     * The change view that the runner derives at its start ({@code writeChangeView} in {@code pi-change.ts}), derived
+     * here as well, because the staged sources are checked against it before any runner starts. Needs
+     * {@code pi-change.ts} beside the workspace's other files.
+     */
+    static void deriveChangeView(Path workspace) throws IOException, InterruptedException {
+        String context = SandboxLayout.CONTEXT_PREFIX.replaceFirst("/$", "");
+        String repository = SandboxLayout.REPO_MOUNT_RELATIVE.replaceFirst("/$", "");
+        fixtureCommand(
+                workspace,
+                "node",
+                "--input-type=module",
+                "-e",
+                "import { readChange, readDescription, writeChangeView } from './pi-change.ts';"
+                        + " const change = readChange('" + context + "');"
+                        + " if (change !== null) writeChangeView('.', '" + repository + "', change,"
+                        + " readDescription('" + context + "'));");
     }
 
     static String fixtureCommand(Path workspace, String... command) throws IOException, InterruptedException {

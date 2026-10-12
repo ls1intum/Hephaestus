@@ -31,7 +31,7 @@ class IssueDiscussionBridgeTest extends BaseUnitTest {
     void shouldReadTheDiscussionOnceAfterAllSyncCommentsAreWritten(Issue.State state) {
         LockedIssueRow row = mock(LockedIssueRow.class);
         IssueEvidenceRevision revisions = mock(IssueEvidenceRevision.class);
-        IssueObservationSuperseder superseder = mock(IssueObservationSuperseder.class);
+        IssueResultSuperseder superseder = mock(IssueResultSuperseder.class);
         IssueAgentJobEventListener listener = mock(IssueAgentJobEventListener.class);
         StaticListableBeanFactory beans = new StaticListableBeanFactory();
         beans.addBean("listener", listener);

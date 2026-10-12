@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
 public record ReviewRunRefDTO(
         @NonNull UUID reviewId,
 
-        @NonNull @Schema(description = "When the review recorded its newest observation about this developer")
+        @NonNull @Schema(description = "When the review recorded its newest result about this developer")
         Instant at,
 
         @NonNull @Schema(description = "The piece of work the run reviewed")

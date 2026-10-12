@@ -71,7 +71,10 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // Full provider-lifecycle orchestrators with broad ConnectionService usage —
                     // splitting them further scatters related logic without reducing coupling.
                     "GitLabWorkspaceInitializationService",
-                    "WorkspaceRepositoryMonitorService");
+                    "WorkspaceRepositoryMonitorService",
+                    // Admits one submission in one transaction and answers it with the stored results and their
+                    // problems, the composition basis and the in-app and conversation routing it decided.
+                    "ResultAdmissionService");
 
             ArchRule rule = classes()
                     .that()
@@ -145,7 +148,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "CommitRepository.updateEnrichmentMetadata",
                     "DiscussionCategoryRepository.upsertCategory",
                     "DiscussionRepository.upsertCore",
-                    "ObservationRepository.insertIfAbsent",
+                    "PracticeResultRepository.insertIfAbsent",
+                    "ObservationRepository.insert",
                     // Native INSERT ... ON CONFLICT DO NOTHING for an ingested Slack message; each column
                     // (workspace/team/channel/ts/thread_ts/author/member/text) is a distinct @Param.
                     "SlackMessageRepository.insertIfAbsent",
@@ -161,15 +165,15 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "ArtifactSignalRepository.findSignalledArtifacts",
                     // Atomic JPQL terminal transition; Spring Data query parameters must remain individually bound.
                     "SyncJobRepository.completeActiveJob",
-                    // Developer observation feed: every optional facet needs its own @Param for the
+                    // Developer result feed: every optional facet needs its own @Param for the
                     // (:hasX = FALSE OR col IN (:xs)) empty-list guard — an IN () is invalid SQL, and Spring Data
                     // cannot bind a parameter object's components to named placeholders.
-                    "ObservationRepository.findByAboutUserAndWorkspace",
-                    "ObservationRepository.findByAboutUserAndWorkspaceSeverityFirst",
+                    "PracticeResultRepository.findByAboutUserAndWorkspace",
+                    "PracticeResultRepository.findByAboutUserAndWorkspaceSeverityFirst",
                     // Review-run pagination at the run grain: same per-facet @Param binding, plus the
                     // native run projection whose GROUP BY cannot be expressed through a derived query.
-                    "ObservationRepository.findPracticeGroupReviewRuns",
-                    "ObservationRepository.findPracticeGroupReviewRunObservations");
+                    "PracticeResultRepository.findPracticeGroupReviewRuns",
+                    "PracticeResultRepository.findPracticeGroupReviewRunResults");
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams =
                     new ArchCondition<>("have methods with at most " + MAX_METHOD_PARAMETERS + " parameters") {
@@ -474,8 +478,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // the review offer where nothing could run one
                     "SecurityConfig", // InstalledClientRegistry is server-role only; the CORS configuration
                     // it contributes origins to is built on every runtime role
-                    "ObservationAdmissionService", // The post-commit IN_APP support read is auxiliary; admission
-                    // must survive an unavailable reader without losing the committed observations.
+                    "ResultAdmissionService", // The post-commit IN_APP support read is auxiliary; admission
+                    // must survive an unavailable reader without losing the committed results.
                     "InstanceLlmSettingsService" // LlmSettingsAudit's sole impl is @ConditionalOnServerRole, but this
                     // service is also consumed by the ungated Workspace{Llm}Service pair
                     // (BYO gate check) which load on every runtime role

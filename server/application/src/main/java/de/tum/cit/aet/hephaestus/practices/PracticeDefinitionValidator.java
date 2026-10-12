@@ -79,7 +79,7 @@ public final class PracticeDefinitionValidator {
         }
         Set<ActorRole> roles = signalOptions.rolesFor(artifactKind);
         // An occasion may only be about a relation this kind of work can actually identify a person
-        // in. Attributing a result to a role the artifact cannot resolve leaves an observation about
+        // in. Attributing a result to a role the artifact cannot resolve leaves a result about
         // nobody — or, worse, one filed against whichever person the kind happens to name.
         if (!roles.contains(definition.subject())) {
             throw new IllegalArgumentException("This kind of work does not record “" + roleLabel(definition.subject())

@@ -25,19 +25,19 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -77,13 +77,13 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     private FeedbackRepository feedbackRepository;
 
     @Mock
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Mock
     private FeedbackPlacementRepository feedbackPlacementRepository;
 
     @Mock
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -99,7 +99,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     private FeedbackSupersession supersession;
 
     @Mock
-    private ObservationVisibilityPolicy visibilityPolicy;
+    private ResultVisibilityPolicy visibilityPolicy;
 
     @Mock
     private ConversationConsentGate consentGate;
@@ -112,34 +112,37 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     private WorkspaceReviewDefaultsProvider workspaceReviewDefaults;
 
     /**
-     * Unless a case says otherwise, every linked id resolves to a readable, authorized observation. Both
+     * Unless a case says otherwise, every linked id resolves to a readable, authorized result. Both
      * defaults answer <em>from the argument</em> rather than with a fixed row: the reconciler keys its batch
-     * by each observation's own id, so a stub that handed back an unrelated row would hide a mis-keyed
-     * lookup — the batch would look like it worked while admitting the wrong observation.
+     * by each result's own id, so a stub that handed back an unrelated row would hide a mis-keyed
+     * lookup — the batch would look like it worked while admitting the wrong result.
      */
     @BeforeEach
     void authorizeEvidenceDelivery() {
         lenient()
-                .when(observationRepository.findAllByIdInAndWorkspaceId(any(), anyLong()))
+                .when(practiceResultRepository.findAllByIdInAndWorkspaceId(any(), anyLong()))
                 .thenAnswer(invocation -> {
                     Collection<UUID> ids = invocation.getArgument(0);
                     // Real instances, not mocks: building a mock inside an Answer would stub one mock from
                     // inside another's invocation, which is how Mockito's ongoing-stubbing state gets corrupted.
                     return ids.stream()
-                            .map(id -> Observation.builder().id(id).build())
+                            .map(id -> PracticeResult.builder()
+                                    .scopeKey("test-scope")
+                                    .id(id)
+                                    .build())
                             .toList();
                 });
         lenient()
                 .when(visibilityPolicy.permitsForNewDelivery(
                         anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
                 .thenAnswer(invocation -> {
-                    Collection<Observation> observations = invocation.getArgument(1);
-                    return observations.stream().map(Observation::getId).collect(Collectors.toSet());
+                    Collection<PracticeResult> practiceResults = invocation.getArgument(1);
+                    return practiceResults.stream().map(PracticeResult::getId).collect(Collectors.toSet());
                 });
     }
 
     private FeedbackChannelRouter router() {
-        return new FeedbackChannelRouter(feedbackRepository, observationRepository, workspaceReviewDefaults);
+        return new FeedbackChannelRouter(feedbackRepository, practiceResultRepository, workspaceReviewDefaults);
     }
 
     private ConversationalFeedbackPreparer preparer() {
@@ -148,8 +151,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         return new ConversationalFeedbackPreparer(
                 feedbackRepository,
-                feedbackObservationRepository,
-                observationRepository,
+                feedbackEvidenceRepository,
+                practiceResultRepository,
                 supersession,
                 eventPublisher,
                 egressGuard);
@@ -158,32 +161,32 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     private ConversationalDeliveryReconciler reconciler() {
         return new ConversationalDeliveryReconciler(
                 feedbackRepository,
-                feedbackObservationRepository,
+                feedbackEvidenceRepository,
                 feedbackPlacementRepository,
-                observationRepository,
+                practiceResultRepository,
                 visibilityPolicy,
                 consentGate);
     }
 
     @Test
-    void admitsALinkOnlyToAnObservationAboutTheRecipientThatThePolicyStillPermits() {
+    void admitsALinkOnlyToAResultAboutTheRecipientThatThePolicyStillPermits() {
         UUID owned = UUID.randomUUID();
         UUID foreign = UUID.randomUUID();
         UUID withdrawn = UUID.randomUUID();
-        Observation aboutSomeoneElse = problem(null, null, foreign);
+        PracticeResult aboutSomeoneElse = problem(null, foreign);
         when(aboutSomeoneElse.getAboutUserId()).thenReturn(RECIPIENT + 1);
-        Map<UUID, Observation> stored = Map.of(
-                owned, problem(null, null, owned),
+        Map<UUID, PracticeResult> stored = Map.of(
+                owned, problem(null, owned),
                 foreign, aboutSomeoneElse,
-                withdrawn, problem(null, null, withdrawn));
+                withdrawn, problem(null, withdrawn));
         doAnswer(invocation -> invocation.<Collection<UUID>>getArgument(0).stream()
                         .map(stored::get)
                         .filter(Objects::nonNull)
                         .toList())
-                .when(observationRepository)
+                .when(practiceResultRepository)
                 .findAllByIdInAndWorkspaceId(any(), anyLong());
-        doAnswer(invocation -> invocation.<Collection<Observation>>getArgument(1).stream()
-                        .map(Observation::getId)
+        doAnswer(invocation -> invocation.<Collection<PracticeResult>>getArgument(1).stream()
+                        .map(PracticeResult::getId)
                         .filter(id -> !id.equals(withdrawn))
                         .collect(Collectors.toSet()))
                 .when(visibilityPolicy)
@@ -191,7 +194,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
         assertThat(reconciler().admits(WS, RECIPIENT, owned)).isTrue();
         assertThat(reconciler().admits(WS, RECIPIENT, UUID.randomUUID()))
-                .as("no such observation")
+                .as("no such result")
                 .isFalse();
         assertThat(reconciler().admits(WS, RECIPIENT, foreign))
                 .as("about another developer")
@@ -202,18 +205,20 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     @Test
-    void admitsALinkToAConversationObservationOnlyWhileItsConversationIsConsentedTo() {
-        UUID observationId = UUID.randomUUID();
-        Observation fromConversation = problem(null, null, observationId);
+    void admitsALinkToAConversationResultOnlyWhileItsConversationIsConsentedTo() {
+        UUID practiceResultId = UUID.randomUUID();
+        PracticeResult fromConversation = problem(null, practiceResultId);
         when(fromConversation.getArtifactKind()).thenReturn(ArtifactKinds.CONVERSATION_THREAD);
         when(fromConversation.getArtifactId()).thenReturn(55L);
-        doReturn(List.of(fromConversation)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
+        doReturn(List.of(fromConversation))
+                .when(practiceResultRepository)
+                .findAllByIdInAndWorkspaceId(any(), anyLong());
 
         when(consentGate.activeThreadIds(WS, List.of(55L))).thenReturn(Set.of());
-        assertThat(reconciler().admits(WS, RECIPIENT, observationId)).isFalse();
+        assertThat(reconciler().admits(WS, RECIPIENT, practiceResultId)).isFalse();
 
         when(consentGate.activeThreadIds(WS, List.of(55L))).thenReturn(Set.of(55L));
-        assertThat(reconciler().admits(WS, RECIPIENT, observationId)).isTrue();
+        assertThat(reconciler().admits(WS, RECIPIENT, practiceResultId)).isTrue();
     }
 
     /**
@@ -226,9 +231,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         AgentJob job = job();
         ObjectNode onTheDiff = MAPPER.createObjectNode();
         onTheDiff.putArray("citations").addObject().put("sourceKind", "scm.pull-request.diff");
-        Observation anchored = problem(onTheDiff, null);
-        Observation unanchored = problem(null, null);
-        Observation strength = strength();
+        PracticeResult anchored = problem(onTheDiff);
+        PracticeResult unanchored = problem(null);
+        PracticeResult strength = strength();
         automatic(anchored, unanchored);
         when(egressGuard.deliveryAllowed(any())).thenReturn(true);
         when(policy.allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).thenReturn(true);
@@ -237,12 +242,11 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
                 listener(policy).eligibility(job, List.of(anchored, strength, unanchored));
 
         assertThat(eligibility.state()).isEqualTo(ConversationEligibility.State.COMPLETE);
-        assertThat(eligibility.observations())
+        assertThat(eligibility.results())
                 .containsExactly(
-                        new ConversationEligibility.ObservationRoute(
+                        new ConversationEligibility.ResultRoute(
                                 anchored.getId(), ConversationRoutingDecision.HAS_INLINE_ANCHOR),
-                        new ConversationEligibility.ObservationRoute(
-                                unanchored.getId(), ConversationRoutingDecision.ADMIT));
+                        new ConversationEligibility.ResultRoute(unanchored.getId(), ConversationRoutingDecision.ADMIT));
         assertThat(router().admit(List.of(anchored, strength, unanchored), WS, RoutingContext.author()))
                 .containsExactly(unanchored);
     }
@@ -251,14 +255,14 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void eligibilityIsRefusedOnlyByThePermissionAndUnknownWhenTheProblemsConcernSeveralPeople() {
         PracticeFeedbackDeliveryPolicy policy = mock(PracticeFeedbackDeliveryPolicy.class);
         AgentJob job = job();
-        Observation mine = problem(null, null);
-        Observation someoneElses = problem(null, null);
+        PracticeResult mine = problem(null);
+        PracticeResult someoneElses = problem(null);
         when(someoneElses.getAboutUserId()).thenReturn(RECIPIENT + 1);
 
         assertThat(listener(policy).eligibility(job, List.of(mine, someoneElses)))
                 .satisfies(read -> {
                     assertThat(read.state()).isEqualTo(ConversationEligibility.State.UNAVAILABLE);
-                    assertThat(read.observations()).isEmpty();
+                    assertThat(read.results()).isEmpty();
                 });
         verify(policy, never()).allowsComposition(any(), any());
 
@@ -266,13 +270,13 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         when(policy.allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).thenReturn(false);
         assertThat(listener(policy).eligibility(job, List.of(mine))).satisfies(read -> {
             assertThat(read.state()).isEqualTo(ConversationEligibility.State.REFUSED);
-            assertThat(read.observations()).isEmpty();
+            assertThat(read.results()).isEmpty();
         });
     }
 
     private ConversationalDeliveryListener listener(PracticeFeedbackDeliveryPolicy policy) {
         return new ConversationalDeliveryListener(
-                observationRepository,
+                practiceResultRepository,
                 router(),
                 preparer(),
                 egressGuard,
@@ -290,19 +294,19 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         return job;
     }
 
-    private void automatic(Observation... observations) {
+    private void automatic(PracticeResult... practiceResults) {
         when(workspaceReviewDefaults.forWorkspace(WS))
                 .thenReturn(new WorkspaceReviewDefaults(PracticeAutonomy.AUTOMATIC));
-        List<ObservationRepository.ObservationPracticeAutonomy> rows = new ArrayList<>();
-        for (Observation observation : observations) {
-            UUID observationId = observation.getId();
-            ObservationRepository.ObservationPracticeAutonomy row =
-                    mock(ObservationRepository.ObservationPracticeAutonomy.class);
-            when(row.getObservationId()).thenReturn(observationId);
+        List<PracticeResultRepository.ResultPracticeAutonomy> rows = new ArrayList<>();
+        for (PracticeResult practiceResult : practiceResults) {
+            UUID practiceResultId = practiceResult.getId();
+            PracticeResultRepository.ResultPracticeAutonomy row =
+                    mock(PracticeResultRepository.ResultPracticeAutonomy.class);
+            when(row.getPracticeResultId()).thenReturn(practiceResultId);
             when(row.getPracticeAutonomy()).thenReturn(PracticeAutonomy.AUTOMATIC);
             rows.add(row);
         }
-        when(observationRepository.findPracticeAutonomyFor(any(), eq(WS))).thenReturn(rows);
+        when(practiceResultRepository.findPracticeAutonomyFor(any(), eq(WS))).thenReturn(rows);
     }
 
     @Test
@@ -310,7 +314,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         ConversationalFeedbackPreparer preparer = preparer();
         when(egressGuard.deliveryAllowed(any())).thenReturn(false);
 
-        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null, "rk-silent")), List.of());
+        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null)), List.of());
 
         assertThat(prepared).isZero();
         verify(feedbackRepository, never()).save(any());
@@ -339,18 +343,18 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
     @ParameterizedTest
     @MethodSource("routerCases")
-    void routerMapsObservationToDecision(ObsKind kind, boolean reviewer, ConversationRoutingDecision expected) {
+    void routerMapsResultToDecision(ObsKind kind, boolean reviewer, ConversationRoutingDecision expected) {
         RoutingContext ctx = reviewer ? RoutingContext.reviewer() : RoutingContext.author();
-        Observation obs =
+        PracticeResult obs =
                 switch (kind) {
-                    case PROBLEM_NO_ANCHOR -> problem(null, null);
+                    case PROBLEM_NO_ANCHOR -> problem(null);
                     case PROBLEM_FILE_ANCHOR -> {
                         ObjectNode evidence = MAPPER.createObjectNode();
                         evidence.putArray("citations")
                                 .addObject()
                                 .put("sourceKind", "scm.pull-request.diff")
                                 .put("path", "src/Main.java");
-                        yield problem(evidence, null);
+                        yield problem(evidence);
                     }
                     case PROBLEM_NON_DIFF_LOCATION -> {
                         ObjectNode evidence = MAPPER.createObjectNode();
@@ -358,14 +362,13 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
                                 .addObject()
                                 .put("sourceKind", "scm.pull-request.core")
                                 .put("path", "pull-request.json");
-                        yield problem(evidence, null);
+                        yield problem(evidence);
                     }
                     case STRENGTH -> strength();
                     case NOT_APPLICABLE -> notApplicable();
                     case ALREADY_DELIVERED -> {
-                        Observation delivered = problem(null, "rk-1");
-                        when(feedbackRepository.existsDeliveredInContextForObservation(
-                                        WS, RECIPIENT, delivered.getId()))
+                        PracticeResult delivered = problem(null);
+                        when(feedbackRepository.existsDeliveredInContextForResult(WS, RECIPIENT, delivered.getId()))
                                 .thenReturn(true);
                         yield delivered;
                     }
@@ -375,12 +378,12 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldAdmitDifferentObservationWhenItsLocationWasAlreadyDelivered() {
-        Observation delivered = problem(null, "shared-location");
-        Observation otherBehavior = problem(null, "shared-location");
-        when(feedbackRepository.existsDeliveredInContextForObservation(WS, RECIPIENT, delivered.getId()))
+    void shouldAdmitDifferentResultWhenItsLocationWasAlreadyDelivered() {
+        PracticeResult delivered = problem(null);
+        PracticeResult otherBehavior = problem(null);
+        when(feedbackRepository.existsDeliveredInContextForResult(WS, RECIPIENT, delivered.getId()))
                 .thenReturn(true);
-        when(feedbackRepository.existsDeliveredInContextForObservation(WS, RECIPIENT, otherBehavior.getId()))
+        when(feedbackRepository.existsDeliveredInContextForResult(WS, RECIPIENT, otherBehavior.getId()))
                 .thenReturn(false);
         assertThat(router().route(delivered, PracticeAutonomy.AUTOMATIC, WS, RoutingContext.author()))
                 .isEqualTo(ConversationRoutingDecision.ALREADY_DELIVERED_IN_CONTEXT);
@@ -394,9 +397,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
      * no per-practice dial can undo it.
      */
     @Test
-    void aBackfilledObservationIsNeverRaisedInAMentorTurn() {
-        Observation obs = problem(null, null);
-        lenient().when(obs.getOrigin()).thenReturn(ObservationOrigin.BACKFILL);
+    void aBackfilledResultIsNeverRaisedInAMentorTurn() {
+        PracticeResult obs = problem(null);
+        lenient().when(obs.getOrigin()).thenReturn(ResultOrigin.BACKFILL);
 
         assertThat(router().route(obs, PracticeAutonomy.AUTOMATIC, WS, RoutingContext.author()))
                 .isEqualTo(ConversationRoutingDecision.BACKFILL_QUIET);
@@ -405,9 +408,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @Test
     void preparerDoesNotInventBriefsWhenCompositionIsMissing() {
         UUID job = UUID.randomUUID();
-        List<Observation> admitted = new ArrayList<>();
+        List<PracticeResult> admitted = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            admitted.add(problem(null, null)); // single recipient, capped at 3
+            admitted.add(problem(null)); // single recipient, capped at 3
         }
 
         int prepared = preparer().prepare(job, WS, admitted, List.of());
@@ -422,7 +425,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         // Every (job, position) already exists → pure idempotent re-run, nothing newly prepared.
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(true);
 
-        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null, null)), List.of());
+        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null)), List.of());
 
         assertThat(prepared).isZero();
         // any(Object.class), not any(): binds the publishEvent(Object) overload the record actually dispatches to.
@@ -436,7 +439,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         UUID c = UUID.randomUUID();
         UUID fidA = UUID.randomUUID();
         UUID msg = UUID.randomUUID();
-        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a))
+        when(feedbackEvidenceRepository.findPreparedConversationFeedbackIdsByResult(WS, RECIPIENT, a))
                 .thenReturn(List.of(fidA));
         when(feedbackRepository.markConversationDelivered(eq(fidA), any())).thenReturn(1);
         when(feedbackRepository.getReferenceById(fidA)).thenReturn(mock(Feedback.class));
@@ -446,8 +449,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         assertThat(flips).isEqualTo(1);
         verify(feedbackRepository, times(1)).markConversationDelivered(eq(fidA), any());
         // one-per-turn cap: b/c are never even looked up after the first winning flip.
-        verify(feedbackObservationRepository, never())
-                .findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, b);
+        verify(feedbackEvidenceRepository, never()).findPreparedConversationFeedbackIdsByResult(WS, RECIPIENT, b);
         ArgumentCaptor<FeedbackPlacement> placement = ArgumentCaptor.forClass(FeedbackPlacement.class);
         verify(feedbackPlacementRepository, times(1)).save(placement.capture());
         assertThat(placement.getValue().getPlacementType()).isEqualTo(PlacementType.CONVERSATION_TURN);
@@ -458,7 +460,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void reconcilerReRunIsNoOpWhenAlreadyDelivered() {
         UUID a = UUID.randomUUID();
         UUID fidA = UUID.randomUUID();
-        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a))
+        when(feedbackEvidenceRepository.findPreparedConversationFeedbackIdsByResult(WS, RECIPIENT, a))
                 .thenReturn(List.of(fidA));
         when(feedbackRepository.markConversationDelivered(eq(fidA), any())).thenReturn(0);
 
@@ -470,19 +472,18 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
     @Test
     void reconcilerWithholdsPreparedFeedbackAfterAuthorizationWithdrawal() {
-        UUID observationId = UUID.randomUUID();
+        UUID practiceResultId = UUID.randomUUID();
         UUID feedbackId = UUID.randomUUID();
-        Observation observation = problem(null, null, observationId);
-        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
-                        WS, RECIPIENT, observationId))
+        PracticeResult practiceResult = problem(null, practiceResultId);
+        when(feedbackEvidenceRepository.findPreparedConversationFeedbackIdsByResult(WS, RECIPIENT, practiceResultId))
                 .thenReturn(List.of(feedbackId));
-        doReturn(List.of(observation)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
+        doReturn(List.of(practiceResult)).when(practiceResultRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
         // Withheld = absent from the permitted set. Nothing else in the batch says so.
         doReturn(Set.of())
                 .when(visibilityPolicy)
                 .permitsForNewDelivery(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING));
 
-        int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(observationId));
+        int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(practiceResultId));
 
         assertThat(flips).isZero();
         verify(feedbackRepository, never()).markConversationDelivered(any(), any());
@@ -496,19 +497,18 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
      * PREPARED, the same unit is still settled — by the TTL sweep, with a reason of its own.
      */
     @Test
-    void silentModeSuppressesNothingWhenTheLinkedObservationIsRefused() {
-        UUID observationId = UUID.randomUUID();
+    void silentModeSuppressesNothingWhenTheLinkedResultIsRefused() {
+        UUID practiceResultId = UUID.randomUUID();
         UUID feedbackId = UUID.randomUUID();
-        Observation observation = problem(null, null, observationId);
-        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
-                        WS, RECIPIENT, observationId))
+        PracticeResult practiceResult = problem(null, practiceResultId);
+        when(feedbackEvidenceRepository.findPreparedConversationFeedbackIdsByResult(WS, RECIPIENT, practiceResultId))
                 .thenReturn(List.of(feedbackId));
-        doReturn(List.of(observation)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
+        doReturn(List.of(practiceResult)).when(practiceResultRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
         doReturn(Set.of())
                 .when(visibilityPolicy)
                 .permitsForNewDelivery(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING));
 
-        int suppressed = reconciler().suppressForSilentMode(WS, RECIPIENT, List.of(observationId));
+        int suppressed = reconciler().suppressForSilentMode(WS, RECIPIENT, List.of(practiceResultId));
 
         assertThat(suppressed).isZero();
         verify(feedbackRepository, never()).markConversationSuppressedBySilentMode(any());
@@ -516,15 +516,14 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
     @Test
     void silentModeSuppressesOnePreparedUnitWithoutPlacement() {
-        UUID observationId = UUID.randomUUID();
+        UUID practiceResultId = UUID.randomUUID();
         UUID feedbackId = UUID.randomUUID();
-        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
-                        WS, RECIPIENT, observationId))
+        when(feedbackEvidenceRepository.findPreparedConversationFeedbackIdsByResult(WS, RECIPIENT, practiceResultId))
                 .thenReturn(List.of(feedbackId));
         when(feedbackRepository.markConversationSuppressedBySilentMode(feedbackId))
                 .thenReturn(1);
 
-        int suppressed = reconciler().suppressForSilentMode(WS, RECIPIENT, List.of(observationId));
+        int suppressed = reconciler().suppressForSilentMode(WS, RECIPIENT, List.of(practiceResultId));
 
         assertThat(suppressed).isEqualTo(1);
         verify(feedbackRepository).markConversationSuppressedBySilentMode(feedbackId);
@@ -534,15 +533,15 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
     @Test
     void reconcilerSkipsFlip_whenLocusWasSinceDeliveredInContext() {
-        // A PREPARED unit seeded by a FAILED direct delivery: if this exact observation was delivered
+        // A PREPARED unit seeded by a FAILED direct delivery: if this exact result was delivered
         // in-context, the flip must be skipped (no double-delivery) — the stale unit ages out.
         UUID a = UUID.randomUUID();
         UUID fidA = UUID.randomUUID();
-        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a))
+        when(feedbackEvidenceRepository.findPreparedConversationFeedbackIdsByResult(WS, RECIPIENT, a))
                 .thenReturn(List.of(fidA));
-        Observation obs = problem(null, "rk-delivered", a);
-        doReturn(List.of(obs)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
-        when(feedbackRepository.existsDeliveredInContextForObservation(WS, RECIPIENT, a))
+        PracticeResult obs = problem(null, a);
+        doReturn(List.of(obs)).when(practiceResultRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
+        when(feedbackRepository.existsDeliveredInContextForResult(WS, RECIPIENT, a))
                 .thenReturn(true);
 
         int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(a));
@@ -552,14 +551,14 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     @Test
-    void reconcilerStillFlips_whenLocusHasKeyButWasNotDeliveredInContext() {
+    void reconcilerStillFlips_whenLocusWasNotDeliveredInContext() {
         UUID a = UUID.randomUUID();
         UUID fidA = UUID.randomUUID();
-        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a))
+        when(feedbackEvidenceRepository.findPreparedConversationFeedbackIdsByResult(WS, RECIPIENT, a))
                 .thenReturn(List.of(fidA));
-        Observation obs = problem(null, "rk-fresh", a);
-        doReturn(List.of(obs)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
-        when(feedbackRepository.existsDeliveredInContextForObservation(WS, RECIPIENT, a))
+        PracticeResult obs = problem(null, a);
+        doReturn(List.of(obs)).when(practiceResultRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
+        when(feedbackRepository.existsDeliveredInContextForResult(WS, RECIPIENT, a))
                 .thenReturn(false);
         when(feedbackRepository.markConversationDelivered(eq(fidA), any())).thenReturn(1);
         when(feedbackRepository.getReferenceById(fidA)).thenReturn(mock(Feedback.class));
@@ -573,9 +572,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @ParameterizedTest
     @MethodSource("autonomyRoutingCases")
     void routerAppliesAutonomyBeforeAnythingElse(PracticeAutonomy autonomy, ConversationRoutingDecision expected) {
-        Observation observation = problem(null, null);
+        PracticeResult practiceResult = problem(null);
 
-        assertThat(router().route(observation, autonomy, WS, RoutingContext.author()))
+        assertThat(router().route(practiceResult, autonomy, WS, RoutingContext.author()))
                 .isEqualTo(expected);
     }
 
@@ -589,28 +588,28 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
     @Test
     void autonomyIsAppliedBeforeReviewerDeferral() {
-        Observation observation = problem(null, null);
+        PracticeResult practiceResult = problem(null);
 
-        assertThat(router().route(observation, PracticeAutonomy.OFF, WS, RoutingContext.reviewer()))
+        assertThat(router().route(practiceResult, PracticeAutonomy.OFF, WS, RoutingContext.reviewer()))
                 .isEqualTo(ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
-        assertThat(router().route(observation, PracticeAutonomy.HUMAN_APPROVAL, WS, RoutingContext.reviewer()))
+        assertThat(router().route(practiceResult, PracticeAutonomy.HUMAN_APPROVAL, WS, RoutingContext.reviewer()))
                 .isEqualTo(ConversationRoutingDecision.REVIEWER_DEFERRED);
     }
 
     @Test
     void anUnresolvedAutonomyFailsClosed() {
-        Observation observation = problem(null, null);
+        PracticeResult practiceResult = problem(null);
 
-        assertThat(router().route(observation, null, WS, RoutingContext.author()))
+        assertThat(router().route(practiceResult, null, WS, RoutingContext.author()))
                 .isEqualTo(ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
     }
 
-    private Observation problem(@Nullable ObjectNode evidence, @Nullable String recurrenceKey) {
-        return problem(evidence, recurrenceKey, UUID.randomUUID());
+    private PracticeResult problem(@Nullable ObjectNode evidence) {
+        return problem(evidence, UUID.randomUUID());
     }
 
-    private Observation problem(@Nullable ObjectNode evidence, @Nullable String recurrenceKey, UUID id) {
-        Observation o = mock(Observation.class);
+    private PracticeResult problem(@Nullable ObjectNode evidence, UUID id) {
+        PracticeResult o = mock(PracticeResult.class);
 
         lenient().when(o.getId()).thenReturn(id);
         lenient().when(o.getOutcome()).thenReturn(Outcome.NOT_MET);
@@ -619,31 +618,30 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         lenient().when(o.getArtifactId()).thenReturn(100L);
         lenient().when(o.getAboutUserId()).thenReturn(RECIPIENT);
         lenient().when(o.getEvidence()).thenReturn(evidence);
-        lenient().when(o.getRecurrenceKey()).thenReturn(recurrenceKey);
-        lenient().when(o.getOrigin()).thenReturn(ObservationOrigin.LIVE);
+        lenient().when(o.getOrigin()).thenReturn(ResultOrigin.LIVE);
         return o;
     }
 
-    private Observation strength() {
-        Observation o = mock(Observation.class);
+    private PracticeResult strength() {
+        PracticeResult o = mock(PracticeResult.class);
 
         lenient().when(o.getId()).thenReturn(UUID.randomUUID());
         lenient().when(o.getOutcome()).thenReturn(Outcome.MET);
         lenient().when(o.getAboutUserId()).thenReturn(RECIPIENT);
         lenient().when(o.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
-        lenient().when(o.getOrigin()).thenReturn(ObservationOrigin.LIVE);
+        lenient().when(o.getOrigin()).thenReturn(ResultOrigin.LIVE);
         return o;
     }
 
-    private Observation notApplicable() {
-        Observation o = mock(Observation.class);
+    private PracticeResult notApplicable() {
+        PracticeResult o = mock(PracticeResult.class);
 
         lenient().when(o.getId()).thenReturn(UUID.randomUUID());
         lenient().when(o.getOutcome()).thenReturn(Outcome.NOT_APPLICABLE);
 
         lenient().when(o.getAboutUserId()).thenReturn(RECIPIENT);
         lenient().when(o.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
-        lenient().when(o.getOrigin()).thenReturn(ObservationOrigin.LIVE);
+        lenient().when(o.getOrigin()).thenReturn(ResultOrigin.LIVE);
         return o;
     }
 }

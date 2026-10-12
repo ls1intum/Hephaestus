@@ -50,12 +50,12 @@ interface DeliveredWorkFeedbackRepository extends Repository<Feedback, UUID> {
     }
 
     @Query("""
-        SELECT DISTINCT fo.feedback.id AS feedbackId, fo.observation.practice.slug AS slug, fo.observation.practice.name AS name
-        FROM FeedbackObservation fo
-        WHERE fo.feedback.workspaceId = :workspaceId AND fo.observation.workspaceId = :workspaceId
+        SELECT DISTINCT fo.feedback.id AS feedbackId, fo.practiceResult.practice.slug AS slug, fo.practiceResult.practice.name AS name
+        FROM FeedbackEvidence fo
+        WHERE fo.feedback.workspaceId = :workspaceId AND fo.practiceResult.workspaceId = :workspaceId
           AND fo.feedback.id IN :feedbackIds
           AND fo.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
-        ORDER BY fo.observation.practice.slug
+        ORDER BY fo.practiceResult.practice.slug
         """)
     List<PracticeRow> findPractices(
             @Param("workspaceId") long workspaceId, @Param("feedbackIds") Collection<UUID> feedbackIds);

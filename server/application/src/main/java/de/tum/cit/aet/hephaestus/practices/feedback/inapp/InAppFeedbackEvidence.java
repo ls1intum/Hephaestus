@@ -6,16 +6,16 @@ import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.FeedbackObservationVisibility;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository.FeedbackResultVisibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.LatestRun;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution;
+import de.tum.cit.aet.hephaestus.practices.result.LatestRun;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,57 +41,57 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class InAppFeedbackEvidence {
 
-    private final FeedbackObservationRepository feedbackObservationRepository;
-    private final ObservationRepository observationRepository;
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final PracticeRevisionRepository practiceRevisionRepository;
-    private final ObservationVisibilityPolicy visibilityPolicy;
-    private final ObservationInvalidationRepository invalidations;
+    private final ResultVisibilityPolicy visibilityPolicy;
+    private final PracticeResultInvalidationRepository invalidations;
 
     /**
-     * The observations behind these pieces of feedback that may still be shown, per piece, newest first.
+     * The results behind these pieces of feedback that may still be shown, per piece, newest first.
      * Feedback absent from the result has no evidence left to show and is not on the developer's page either.
      *
      * <p>The gate runs again although composition ran it, because the composed body is frozen and the gate
      * is not. Evidence whose source may no longer be cited, or whose rules cannot be verified at all, hides
      * the card; evidence measured by rules the practice has since changed stays, and
-     * {@link #practiceChangedAt} closes the card instead. A card citing an invalidated observation is hidden
+     * {@link #practiceChangedAt} closes the card instead. A card citing an invalidated result is hidden
      * whole, since its frozen prose may rest on the false claim.
      */
-    public Map<UUID, List<Observation>> visibleEvidence(Long workspaceId, Collection<UUID> feedbackIds) {
+    public Map<UUID, List<PracticeResult>> visibleEvidence(Long workspaceId, Collection<UUID> feedbackIds) {
         if (feedbackIds.isEmpty()) {
             return Map.of();
         }
-        List<FeedbackObservationVisibility> rows =
-                feedbackObservationRepository.findForVisibility(workspaceId, List.copyOf(feedbackIds));
-        List<Observation> observations =
-                rows.stream().map(FeedbackObservationVisibility::getObservation).toList();
-        Set<UUID> authorized =
-                visibilityPolicy.permitsShown(workspaceId, observations, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-        Set<UUID> invalidated = observations.isEmpty()
+        List<FeedbackResultVisibility> rows =
+                feedbackEvidenceRepository.findForVisibility(workspaceId, List.copyOf(feedbackIds));
+        List<PracticeResult> practiceResults =
+                rows.stream().map(FeedbackResultVisibility::getPracticeResult).toList();
+        Set<UUID> authorized = visibilityPolicy.permitsShown(
+                workspaceId, practiceResults, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+        Set<UUID> invalidated = practiceResults.isEmpty()
                 ? Set.of()
-                : invalidations.findActiveObservationIds(
+                : invalidations.findActiveResultIds(
                         workspaceId,
-                        observations.stream().map(Observation::getId).toList());
+                        practiceResults.stream().map(PracticeResult::getId).toList());
         Set<UUID> hidden = rows.stream()
-                .filter(row -> invalidated.contains(row.getObservation().getId()))
-                .map(FeedbackObservationVisibility::getFeedbackId)
+                .filter(row -> invalidated.contains(row.getPracticeResult().getId()))
+                .map(FeedbackResultVisibility::getFeedbackId)
                 .collect(Collectors.toSet());
-        Map<UUID, List<Observation>> byFeedback = new LinkedHashMap<>();
-        for (FeedbackObservationVisibility row : rows) {
+        Map<UUID, List<PracticeResult>> byFeedback = new LinkedHashMap<>();
+        for (FeedbackResultVisibility row : rows) {
             if (hidden.contains(row.getFeedbackId())) {
                 continue;
             }
-            Observation observation = row.getObservation();
-            if (observation.getId() != null && authorized.contains(observation.getId())) {
+            PracticeResult practiceResult = row.getPracticeResult();
+            if (practiceResult.getId() != null && authorized.contains(practiceResult.getId())) {
                 byFeedback
                         .computeIfAbsent(row.getFeedbackId(), ignored -> new ArrayList<>())
-                        .add(observation);
+                        .add(practiceResult);
             }
         }
         // Newest occurrence first: the evidence reads as "this is still happening", which the oldest-first
         // order would invert.
-        Comparator<Observation> newestFirst =
-                Comparator.comparing(Observation::getObservedAt, Comparator.reverseOrder());
+        Comparator<PracticeResult> newestFirst =
+                Comparator.comparing(PracticeResult::getObservedAt, Comparator.reverseOrder());
         byFeedback.values().forEach(list -> list.sort(newestFirst));
         return byFeedback;
     }
@@ -105,11 +105,11 @@ public class InAppFeedbackEvidence {
      * why-it-matters or a group moves without touching a rule. The developer is shown this instant as the
      * date the card closed, so it has to be the date the rules moved.
      *
-     * <p>The history is asked once per revision the evidence was measured against, however many observations
+     * <p>The history is asked once per revision the evidence was measured against, however many results
      * and however many cards were measured against it: a page of cards about one practice is one query, not
-     * one per observation on it.
+     * one per result on it.
      */
-    public Map<UUID, Instant> practiceChangedAt(Map<UUID, List<Observation>> evidenceByFeedback) {
+    public Map<UUID, Instant> practiceChangedAt(Map<UUID, List<PracticeResult>> evidenceByFeedback) {
         Map<MeasuredBy, Optional<Instant>> rulesChangedAt = new HashMap<>();
         Map<UUID, Instant> changedAt = new LinkedHashMap<>();
         evidenceByFeedback.forEach((feedbackId, evidence) -> {
@@ -121,26 +121,26 @@ public class InAppFeedbackEvidence {
         return changedAt;
     }
 
-    /** The revision one observation was measured against: what the moment the rules moved depends on. */
+    /** The revision one result was measured against: what the moment the rules moved depends on. */
     private record MeasuredBy(Long practiceId, int revisionNumber) {}
 
     private @Nullable Instant practiceChangedAt(
-            List<Observation> evidence, Map<MeasuredBy, Optional<Instant>> rulesChangedAt) {
+            List<PracticeResult> evidence, Map<MeasuredBy, Optional<Instant>> rulesChangedAt) {
         return evidence.stream()
-                .filter(observation -> currentness(observation) == ReviewClaimCurrentness.STALE)
-                .map(observation -> rulesChangedAt(observation, rulesChangedAt))
+                .filter(practiceResult -> currentness(practiceResult) == ReviewClaimCurrentness.STALE)
+                .map(practiceResult -> rulesChangedAt(practiceResult, rulesChangedAt))
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
     }
 
     private @Nullable Instant rulesChangedAt(
-            Observation observation, Map<MeasuredBy, Optional<Instant>> rulesChangedAt) {
-        PracticeRevision measuredBy = observation.getPracticeRevision();
+            PracticeResult practiceResult, Map<MeasuredBy, Optional<Instant>> rulesChangedAt) {
+        PracticeRevision measuredBy = practiceResult.getPracticeRevision();
         if (measuredBy != null && measuredBy.getReviewRuleFingerprint() != null) {
             String fingerprint = measuredBy.getReviewRuleFingerprint();
             Optional<Instant> changed = rulesChangedAt.computeIfAbsent(
-                    new MeasuredBy(observation.getPractice().getId(), measuredBy.getRevisionNumber()),
+                    new MeasuredBy(practiceResult.getPractice().getId(), measuredBy.getRevisionNumber()),
                     key -> practiceRevisionRepository
                             .findFirstByPracticeIdAndRevisionNumberGreaterThanAndReviewRuleFingerprintNotOrderByRevisionNumberAsc(
                                     key.practiceId(), key.revisionNumber(), fingerprint)
@@ -152,7 +152,7 @@ public class InAppFeedbackEvidence {
         // Nothing in the history names the moment: evidence from before revisions carried a fingerprint, or a
         // staleness the fingerprints alone do not explain. The practice's current revision is then the only
         // instant we can stand behind.
-        PracticeRevision current = observation.getPractice().getCurrentRevision();
+        PracticeRevision current = practiceResult.getPractice().getCurrentRevision();
         return current == null ? null : current.getCreatedAt();
     }
 
@@ -168,8 +168,8 @@ public class InAppFeedbackEvidence {
                 : null;
     }
 
-    private static ReviewClaimCurrentness currentness(Observation observation) {
-        return ReviewClaimCurrentness.of(observation.getPracticeRevision(), observation.getPractice());
+    private static ReviewClaimCurrentness currentness(PracticeResult practiceResult) {
+        return ReviewClaimCurrentness.of(practiceResult.getPracticeRevision(), practiceResult.getPractice());
     }
 
     /**
@@ -206,7 +206,7 @@ public class InAppFeedbackEvidence {
      *
      * <p>Read the way the practice standing reads its window: the same query, the same visibility gate, then
      * each claim narrowed to its newest live run ({@link LatestRun#perLiveClaim}), so that the card and the practice
-     * profile's summary resolve a piece of feedback off the same observations. Work that may not be shown may
+     * profile's summary resolve a piece of feedback off the same results. Work that may not be shown may
      * not resolve anything either.
      *
      * <p>Each piece is read against its own recipient's work, all recipients in one query. Reading from the oldest
@@ -219,7 +219,7 @@ public class InAppFeedbackEvidence {
     public Map<UUID, WorkResolution> workResolutions(
             Long workspaceId,
             Collection<Feedback> feedback,
-            Map<UUID, List<Observation>> evidenceByFeedback,
+            Map<UUID, List<PracticeResult>> evidenceByFeedback,
             Map<UUID, Instant> practiceChangedAt,
             Instant now) {
         List<Feedback> withEvidence = feedback.stream()
@@ -232,13 +232,13 @@ public class InAppFeedbackEvidence {
         }
         Map<Long, List<Feedback>> byRecipient =
                 withEvidence.stream().collect(Collectors.groupingBy(Feedback::getRecipientUserId));
-        List<Observation> later = observationRepository.findByWorkspaceBetween(
+        List<PracticeResult> later = practiceResultRepository.findByWorkspaceBetween(
                 workspaceId, byRecipient.keySet(), oldestPreparedAt.get(), now);
         Set<UUID> visible =
                 visibilityPolicy.permitsAll(workspaceId, later, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-        Map<Long, List<Observation>> laterByRecipient = later.stream()
-                .filter(observation -> visible.contains(observation.getId()))
-                .collect(Collectors.groupingBy(Observation::getAboutUserId));
+        Map<Long, List<PracticeResult>> laterByRecipient = later.stream()
+                .filter(practiceResult -> visible.contains(practiceResult.getId()))
+                .collect(Collectors.groupingBy(PracticeResult::getAboutUserId));
         Map<UUID, WorkResolution> resolutions = new LinkedHashMap<>();
         byRecipient.forEach((recipient, pieces) -> resolutions.putAll(workResolutionsFrom(
                 pieces,
@@ -246,12 +246,12 @@ public class InAppFeedbackEvidence {
                 practiceChangedAt,
                 LatestRun.perLiveClaim(laterByRecipient.getOrDefault(recipient, List.of())).stream()
                         .collect(Collectors.groupingBy(
-                                observation -> observation.getPractice().getSlug())))));
+                                practiceResult -> practiceResult.getPractice().getSlug())))));
         return resolutions;
     }
 
     /**
-     * {@link #workResolutions} over observations the caller already holds, per practice slug, each claim at its
+     * {@link #workResolutions} over results the caller already holds, per practice slug, each claim at its
      * newest live run. Each practice's work is bundled once, however many cards are about it.
      *
      * <p>Feedback closed because its practice changed is absent, as feedback without evidence is: the work
@@ -259,13 +259,13 @@ public class InAppFeedbackEvidence {
      */
     public static Map<UUID, WorkResolution> workResolutionsFrom(
             Collection<Feedback> feedback,
-            Map<UUID, List<Observation>> evidenceByFeedback,
+            Map<UUID, List<PracticeResult>> evidenceByFeedback,
             Map<UUID, Instant> practiceChangedAt,
-            Map<String, List<Observation>> observationsByPractice) {
+            Map<String, List<PracticeResult>> practiceResultsByPractice) {
         Map<String, WorkResolution.Opportunities> opportunitiesByPractice = new LinkedHashMap<>();
         Map<UUID, WorkResolution> resolutions = new LinkedHashMap<>();
         for (Feedback piece : feedback) {
-            List<Observation> evidence = evidenceByFeedback.get(piece.getId());
+            List<PracticeResult> evidence = evidenceByFeedback.get(piece.getId());
             if (evidence == null || practiceChangedAt.containsKey(piece.getId())) {
                 continue;
             }
@@ -273,7 +273,7 @@ public class InAppFeedbackEvidence {
             WorkResolution.Opportunities opportunities = opportunitiesByPractice.computeIfAbsent(
                     practiceSlug,
                     slug -> WorkResolution.Opportunities.of(
-                            observationsByPractice.getOrDefault(slug, List.of()), Instant.EPOCH));
+                            practiceResultsByPractice.getOrDefault(slug, List.of()), Instant.EPOCH));
             resolutions.put(piece.getId(), opportunities.resolve(piece.getCreatedAt()));
         }
         return resolutions;

@@ -18,9 +18,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Note: Code health analysis is in the separate <b>practices</b> module:
  * <ul>
- *   <li><b>practices.model</b> - Practice and Observation entities</li>
+ *   <li><b>practices.model</b> - Practice and Result entities</li>
  *   <li><b>practices.spi</b> - Service provider interfaces (UserRoleChecker)</li>
- *   <li><b>practices.observation</b> - Observations and their API</li>
+ *   <li><b>practices.result</b> - Results and their API</li>
  *   <li><b>practices.review</b> - Review and delivery gate decisions</li>
  * </ul>
  *
@@ -65,7 +65,7 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                     .should()
                     .dependOnClassesThat()
                     .resideInAPackage("..practices..")
-                    .because("Activity counts what people did; it never reads practice feedback or observations");
+                    .because("Activity counts what people did; it never reads practice feedback or results");
             rule.check(classes);
         }
 
@@ -115,7 +115,7 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                     .orShould()
                     .haveSimpleName("PracticeGroupController")
                     .orShould()
-                    .haveSimpleName("ObservationController")
+                    .haveSimpleName("PracticeResultController")
                     .orShould()
                     .haveSimpleName("FeedbackResponseController")
                     .orShould()
@@ -149,7 +149,7 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                     .orShould()
                     .haveSimpleName("DevPracticeRevisionController")
                     .because(
-                            "Only PracticeCatalogController, PracticeReleaseController, PracticeGroupController, ObservationController, "
+                            "Only PracticeCatalogController, PracticeReleaseController, PracticeGroupController, PracticeResultController, "
                                     + "FeedbackResponseController, PracticeReviewSettingsController, PracticeReviewOutputController, "
                                     + "CuratedCatalogAdminController, CuratedPracticeCatalogController, CatalogAdoptionController, "
                                     + "ArtifactTraceController, InAppFeedbackController, PracticeGroupDetailController, "

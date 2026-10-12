@@ -13,7 +13,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.DeliveredFeedbackContentSource;
-import de.tum.cit.aet.hephaestus.agent.handler.AdmittedObservationFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackSupersession;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
@@ -32,7 +32,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.InAppFeedbackBody;
@@ -41,7 +41,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.inapp.dto.InAppFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -91,7 +91,7 @@ class InAppFeedbackLifecycleIntegrationTest extends AbstractPracticeReviewIntegr
     private static final Instant FIRST_PREPARED_AT = NOW.minus(Duration.ofDays(20));
 
     @Autowired
-    private ObservationVisibilityPolicy visibilityPolicy;
+    private ResultVisibilityPolicy visibilityPolicy;
 
     @Autowired
     private WorkspaceReviewDefaultsProvider workspaceDefaults;
@@ -157,11 +157,11 @@ class InAppFeedbackLifecycleIntegrationTest extends AbstractPracticeReviewIntegr
                 .thenReturn(new PracticeFeedbackDeliveryPolicy.DeliveryDecision(true, null));
         inAppLane = new InAppCompositionListener(
                 agentJobRepository,
-                observationRepository,
+                practiceResultRepository,
                 new StaticListableBeanFactory(Map.of(
                                 "supportReader",
                                 new InAppSupportReader(
-                                        observationRepository,
+                                        practiceResultRepository,
                                         visibilityPolicy,
                                         previousInAppFeedback,
                                         openGate,
@@ -311,8 +311,8 @@ class InAppFeedbackLifecycleIntegrationTest extends AbstractPracticeReviewIntegr
                 admittedEvidence(run));
         run.setOutput(OBJECT_MAPPER.readTree("""
                 {"feedback":{
-                  "observations":[{"id":"%s","practiceSlug":"%s"}],
-                  "units":[{"channel":"IN_APP","action":"NEW","practiceSlug":"%s","basedOn":["%s"],
+                  "results":[{"practiceResultId":"%s","practiceSlug":"%s","outcome":"NOT_MET"}],
+                  "units":[{"channel":"IN_APP","action":"NEW","practiceSlug":"%s","basedOn":[{"practiceResultId":"%s"}],
                    "title":"Merged before anyone else approved",
                    "body":"Two of your pull requests were merged with no approval from another person.",
                    "nextStep":"Wait for a reviewer's approval before you merge."}]}}
@@ -328,12 +328,12 @@ class InAppFeedbackLifecycleIntegrationTest extends AbstractPracticeReviewIntegr
         assertThat(card.getRecipientUserId()).isEqualTo(developer.getId());
         assertThat(card.getAboutUserId()).isEqualTo(developer.getId());
         assertThat(card.getDeliveryState()).isEqualTo(FeedbackDeliveryState.PREPARED);
-        List<FeedbackObservationRepository.BoundObservation> bound =
-                feedbackObservationRepository.findBoundObservations(workspace.getId(), card.getId());
+        List<FeedbackEvidenceRepository.BoundResult> bound =
+                feedbackEvidenceRepository.findBoundResults(workspace.getId(), card.getId());
         assertThat(bound)
                 .extracting(
-                        FeedbackObservationRepository.BoundObservation::getObservationId,
-                        FeedbackObservationRepository.BoundObservation::getRole)
+                        FeedbackEvidenceRepository.BoundResult::getPracticeResultId,
+                        FeedbackEvidenceRepository.BoundResult::getRole)
                 .containsExactlyInAnyOrder(tuple(current, EvidenceRole.PRIMARY), tuple(earlier, EvidenceRole.PRIMARY));
     }
 
@@ -425,8 +425,8 @@ class InAppFeedbackLifecycleIntegrationTest extends AbstractPracticeReviewIntegr
     }
 
     /**
-     * The words were wrong while the observation behind them is valid. The card becomes a notice, the mentor keeps
-     * the record without the words, the observation still counts, and the newer card neither replaces the
+     * The words were wrong while the result behind them is valid. The card becomes a notice, the mentor keeps
+     * the record without the words, the result still counts, and the newer card neither replaces the
      * withdrawn one nor cites the work before it.
      */
     @Test
@@ -757,8 +757,8 @@ class InAppFeedbackLifecycleIntegrationTest extends AbstractPracticeReviewIntegr
                 admittedEvidence(run));
         run.setOutput(OBJECT_MAPPER.readTree("""
                 {"feedback":{
-                  "observations":[{"id":"%s","practiceSlug":"%s"}],
-                  "units":[{"channel":"IN_APP","action":"NEW","practiceSlug":"%s","basedOn":["%s"],
+                  "results":[{"practiceResultId":"%s","practiceSlug":"%s","outcome":"NOT_MET"}],
+                  "units":[{"channel":"IN_APP","action":"NEW","practiceSlug":"%s","basedOn":[{"practiceResultId":"%s"}],
                    "title":"Your diffs are still growing",
                    "body":"Two more pull requests went past the size that reviews well.",
                    "nextStep":"Split the next one."}]}}
@@ -780,16 +780,16 @@ class InAppFeedbackLifecycleIntegrationTest extends AbstractPracticeReviewIntegr
         return observe(practice, run, number, developer, NOT_MET, Severity.MAJOR, at, admittedEvidence(run));
     }
 
-    /** The observations the card was written from, as its rows bind them. */
+    /** The results the card was written from, as its rows bind them. */
     private List<UUID> cited(Feedback feedback) {
-        return feedbackObservationRepository.findBoundObservations(workspace.getId(), feedback.getId()).stream()
-                .map(FeedbackObservationRepository.BoundObservation::getObservationId)
+        return feedbackEvidenceRepository.findBoundResults(workspace.getId(), feedback.getId()).stream()
+                .map(FeedbackEvidenceRepository.BoundResult::getPracticeResultId)
                 .toList();
     }
 
     /** Evidence a new card may cite: the citation carries the verdict admission records for the run. */
     private static String admittedEvidence(AgentJob run) {
-        return AdmittedObservationFixtures.evidence(
+        return AdmittedResultFixtures.evidence(
                         run.getId(), "scm.pull-request.diff", "context/diff.patch", "src/Main.java", "example")
                 .toString();
     }

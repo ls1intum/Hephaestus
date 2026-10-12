@@ -184,7 +184,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("repository_id", 123L);
 
-        // "No unresolved threads" is an observation about the author; a missing key is a broken job.
+        // "No unresolved threads" is a result about the author; a missing key is a broken job.
         assertThatThrownBy(() -> provider.contribute(request(metadata), new HashMap<>()))
                 .isInstanceOf(EvidenceCollectionException.class)
                 .hasMessage("Review-thread collection has no pull_request_id");
@@ -256,7 +256,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         assertThat(decisions.get(0).get("submittedAt").asString()).isEqualTo("2025-06-01T10:00:00Z");
         assertThat(decisions.get(1).get("state").asString()).isEqualTo("APPROVED");
         assertThat(decisions.get(1).get("submittedAt").asString()).isEqualTo("2025-06-01T12:00:00Z");
-        // ELT contract: this connector must NOT pre-compute the supersession observation — no derived aggregate,
+        // ELT contract: this connector must NOT pre-compute the supersession result — no derived aggregate,
         // no per-row "effective"/"superseded" flag. Raw rows only; the agent judges.
         assertThat(out.has("changesRequestedUnaddressed")).isFalse();
         assertThat(decisions.get(0).has("superseded")).isFalse();
@@ -267,7 +267,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         // The repository returns decisions newest-first (ORDER BY submittedAt DESC, id DESC). With more
         // than MAX_DECISIONS rows, the consumer's truncation keeps the NEWEST — so a final superseding APPROVE
         // must survive, not be dropped behind older CHANGES_REQUESTED (which would fabricate a false
-        // "merged past unresolved request-changes" observation).
+        // "merged past unresolved request-changes" result).
         List<PullRequestReview> newestFirst = new ArrayList<>();
         // The latest decision: an APPROVE at the most recent timestamp.
         newestFirst.add(review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-30T23:59:00Z")));

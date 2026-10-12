@@ -15,7 +15,7 @@ import tools.jackson.databind.JsonNode;
  * <ol>
  *   <li>{@link #createSubmission} — event listener extracts metadata + idempotency key</li>
  *   <li>{@link #prepareInputs} — populate workspace files (including {@code task.json}) before container start</li>
- *   <li>{@link #prepareObservations} — verify what the run submits, while it waits for the answer</li>
+ *   <li>{@link #prepareResults} — verify what the run submits, while it waits for the answer</li>
  *   <li>{@link #deliver} — post-execution result delivery</li>
  * </ol>
  */
@@ -49,17 +49,17 @@ public interface JobTypeHandler {
     PreparedJobInputs prepareInputs(AgentJob job);
 
     /**
-     * Verify the observations a run submitted against the evidence captured for {@code job}, and hand
+     * Verify the results a run submitted against the evidence captured for {@code job}, and hand
      * back what to record once the admission fence confirms the attempt still owns the job.
      *
      * <p>Runs outside any transaction and may take as long as verifying the citations needs; the
      * admission service lets one preparation run per attempt at a time.
      *
-     * @param observations the submitted observations array, unvalidated
-     * @throws ObservationsRefusedException when the submission does not support a claim about the work
+     * @param practiceResults the submitted results array, unvalidated
+     * @throws ResultsRefusedException when the submission does not support a claim about the work
      * @throws JobDeliveryException when the submission is inadmissible for a reason that will not change
      */
-    PreparedObservations prepareObservations(AgentJob job, JsonNode observations);
+    PreparedResults prepareResults(AgentJob job, JsonNode practiceResults);
 
     /**
      * Deliver results after successful execution.

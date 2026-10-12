@@ -136,7 +136,7 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
                         new LlmPriceSnapshot(
                                 FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)));
         when(contextBuilder.build(any()))
-                .thenReturn(Map.of("inputs/context/observations_history.json", "[]".getBytes(StandardCharsets.UTF_8)));
+                .thenReturn(Map.of("inputs/context/results_history.json", "[]".getBytes(StandardCharsets.UTF_8)));
         doAnswer(invocation -> {
                     service.start(invocation.getArgument(0), invocation.getArgument(1));
                     return null;

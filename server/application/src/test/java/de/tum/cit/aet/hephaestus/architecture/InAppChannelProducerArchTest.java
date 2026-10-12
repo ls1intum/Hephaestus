@@ -5,7 +5,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import com.tngtech.archunit.lang.ArchRule;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.repository.Repository;
 
@@ -32,7 +32,7 @@ class InAppChannelProducerArchTest extends HephaestusArchitectureTest {
                 .and()
                 .haveNameNotMatching(FeedbackChannel.class.getName() + "(\\$.*)?")
                 .and()
-                .haveNameNotMatching(ObservationOrigin.class.getName() + "(\\$.*)?")
+                .haveNameNotMatching(ResultOrigin.class.getName() + "(\\$.*)?")
                 .and()
                 .haveNameNotMatching(OPERATOR_WITHHOLDER + "(\\$.*)?")
                 .and()

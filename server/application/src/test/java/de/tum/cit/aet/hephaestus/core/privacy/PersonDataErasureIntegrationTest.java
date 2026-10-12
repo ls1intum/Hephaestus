@@ -57,17 +57,17 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -129,7 +129,7 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
     private MentorChatService mentor;
 
     @Autowired
-    private ObservationInvalidationRepository invalidations;
+    private PracticeResultInvalidationRepository invalidations;
 
     @Autowired
     private PersonDataRegistry registry;
@@ -192,13 +192,13 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
     private AgentJobRepository agentJobRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
     private FeedbackPlacementRepository feedbackPlacementRepository;
@@ -543,9 +543,9 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
             otherFolders.add(captureMountedEvidence(worker, recorder, otherDerived.getLast(), other));
         }
         for (var derived : targetDerived) {
-            invalidations.saveAndFlush(new ObservationInvalidation(
-                    observationRepository
-                            .findById(derived.observationIds().getFirst())
+            invalidations.saveAndFlush(new PracticeResultInvalidation(
+                    practiceResultRepository
+                            .findById(derived.practiceResultIds().getFirst())
                             .orElseThrow(),
                     Objects.requireNonNull(administrator.getId()),
                     "Correction before access request",
@@ -600,8 +600,8 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("un-deliver runbook");
         assertThat(personData.get(requestId).request().getState()).isEqualTo(PersonDataRequest.State.PREVIEW);
-        assertThat(counts.get("observation")).isEqualTo(4L);
-        assertThat(counts.get("observation_invalidation")).isEqualTo(2L);
+        assertThat(counts.get("practice_result")).isEqualTo(4L);
+        assertThat(counts.get("practice_result_invalidation")).isEqualTo(2L);
         assertThat(counts.get("config_audit_event_membership_subject")).isEqualTo(2L);
         assertThat(counts.get("chat_thread")).isEqualTo(2L);
         assertThat(counts.get("chat_message_feedback_copy")).isEqualTo(2L);
@@ -904,7 +904,7 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
         var scope = mapper.readValue(Objects.requireNonNull(preview.request().getScopeJson()), PersonScope.class);
         assertThat(scope.derivedJobIds()).containsExactlyInAnyOrderElementsOf(copiedJobs);
         var export = personData.export(requestId);
-        assertThat(export.path("stores").path("observation")).isEmpty();
+        assertThat(export.path("stores").path("practice_result")).isEmpty();
         assertThat(export.path("stores").path("feedback")).isEmpty();
         assertThat(export.path("stores").path("feedback_placement")).isEmpty();
         assertThat(export.path("stores").path("chat_message_feedback_copy")).isEmpty();
@@ -945,7 +945,7 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
                             Integer.class,
                             derived.jobId()))
                     .isZero();
-            assertThat(observationRepository.findAllById(derived.observationIds()))
+            assertThat(practiceResultRepository.findAllById(derived.practiceResultIds()))
                     .hasSize(2);
             assertThat(feedbackRepository.findById(derived.preparedId())).isPresent();
             assertThat(feedbackRepository.findById(derived.deliveredId())).isPresent();
@@ -1113,7 +1113,7 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private record DerivedConversation(
-            List<UUID> observationIds,
+            List<UUID> practiceResultIds,
             UUID preparedId,
             UUID deliveredId,
             UUID messageId,
@@ -1187,11 +1187,11 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
                 "unrelated-profile-canary")));
         job = agentJobRepository.save(job);
 
-        List<UUID> observationIds = List.of(UUID.randomUUID(), UUID.randomUUID());
-        for (UUID observationId : observationIds) {
-            observationRepository.insertIfAbsent(
-                    observationId,
-                    "occ-" + observationId,
+        List<UUID> practiceResultIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        for (UUID practiceResultId : practiceResultIds) {
+            practiceResultRepository.insertIfAbsent(
+                    practiceResultId,
+                    "occ-" + practiceResultId,
                     job.getId(),
                     job.getWorkspace().getId(),
                     practice.getId(),
@@ -1199,9 +1199,12 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
                     ArtifactKinds.CONVERSATION_THREAD.value(),
                     threadId,
                     owner.getId(),
-                    "Observation title",
+                    "Result title",
                     "NOT_MET",
                     "MAJOR",
+                    null,
+                    null,
+                    "test-scope",
                     null,
                     null,
                     null,
@@ -1222,8 +1225,8 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
                 .source(FeedbackSource.AGENT)
                 .createdAt(Instant.now())
                 .build());
-        feedbackObservationRepository.insertIfAbsent(
-                prepared.getId(), observationIds.get(0), EvidenceRole.PRIMARY.name(), 0);
+        feedbackEvidenceRepository.insertIfAbsent(
+                prepared.getId(), practiceResultIds.get(0), null, EvidenceRole.PRIMARY.name(), 0);
         Feedback delivered = feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(workspace.getId())
@@ -1239,8 +1242,8 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
                 .createdAt(Instant.now())
                 .deliveredAt(Instant.now())
                 .build());
-        feedbackObservationRepository.insertIfAbsent(
-                delivered.getId(), observationIds.get(1), EvidenceRole.PRIMARY.name(), 0);
+        feedbackEvidenceRepository.insertIfAbsent(
+                delivered.getId(), practiceResultIds.get(1), null, EvidenceRole.PRIMARY.name(), 0);
         feedbackPlacementRepository.save(FeedbackPlacement.builder()
                 .feedback(delivered)
                 .placementType(PlacementType.CONVERSATION_TURN)
@@ -1262,8 +1265,8 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
                 .createdAt(Instant.now())
                 .deliveredAt(Instant.now())
                 .build());
-        feedbackObservationRepository.insertIfAbsent(
-                posted.getId(), observationIds.getFirst(), EvidenceRole.PRIMARY.name(), 0);
+        feedbackEvidenceRepository.insertIfAbsent(
+                posted.getId(), practiceResultIds.getFirst(), null, EvidenceRole.PRIMARY.name(), 0);
         feedbackPlacementRepository.save(FeedbackPlacement.builder()
                 .feedback(posted)
                 .placementType(PlacementType.SUMMARY)
@@ -1273,6 +1276,11 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
                 .createdAt(Instant.now())
                 .build());
         return new DerivedConversation(
-                observationIds, prepared.getId(), delivered.getId(), message.getId(), job.getId(), workspace.getId());
+                practiceResultIds,
+                prepared.getId(),
+                delivered.getId(),
+                message.getId(),
+                job.getId(),
+                workspace.getId());
     }
 }

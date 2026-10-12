@@ -19,15 +19,15 @@ import de.tum.cit.aet.hephaestus.integration.scm.ReviewTargetQuery;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -58,7 +58,7 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     private static final long REPOSITORY_ID = 3L;
     private static final String REPOSITORY = "team/app";
     private static final int NUMBER = 12;
-    /** Internal {@code User.id} values, the identity the mirrored work and every observation carry. */
+    /** Internal {@code User.id} values, the identity the mirrored work and every result carry. */
     private static final long AUTHOR_ID = 101L;
 
     private static final long REVIEWER_ID = 202L;
@@ -72,13 +72,13 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     private RepositoryToMonitorRepository monitoredRepositories;
 
     @Mock
-    private ObservationRepository observations;
+    private PracticeResultRepository practiceResults;
 
     @Mock
     private FeedbackRepository feedback;
 
     @Mock
-    private FeedbackObservationRepository feedbackObservations;
+    private FeedbackEvidenceRepository feedbackResults;
 
     private PublicReviewEligibility eligibility;
     private AgentJob job;
@@ -86,7 +86,7 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         eligibility = new PublicReviewEligibility(
-                reviewTargets, monitoredRepositories, observations, feedback, feedbackObservations);
+                reviewTargets, monitoredRepositories, practiceResults, feedback, feedbackResults);
         job = job(ArtifactKinds.PULL_REQUEST, pullRequestMetadata());
         lenient().when(reviewTargets.findPullRequest(PULL_REQUEST_ID)).thenReturn(Optional.of(target(AUTHOR_ID)));
         lenient().when(reviewTargets.findIssue(ISSUE_ID)).thenReturn(Optional.of(target(AUTHOR_ID)));
@@ -96,52 +96,52 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldAdmitAnAuthorObservationAboutTheMirroredAuthorWhenItsSourcesArePublic() {
-        Observation diff = authorObservation().build();
-        Observation engagement = authorObservation()
+    void shouldAdmitAnAuthorResultAboutTheMirroredAuthorWhenItsSourcesArePublic() {
+        PracticeResult diff = authorResult().build();
+        PracticeResult engagement = authorResult()
                 .evidence(citing(ReviewThreadContentSource.KIND.value()))
                 .build();
 
-        assertThat(eligibility.publicObservationIds(job, List.of(diff, engagement)))
+        assertThat(eligibility.publicResultIds(job, List.of(diff, engagement)))
                 .containsExactlyInAnyOrder(diff.getId(), engagement.getId());
     }
 
     @Test
-    void shouldAdmitAnIssueAuthorObservationWhenTheIssueIsMirroredUnderTheJob() {
+    void shouldAdmitAnIssueAuthorResultWhenTheIssueIsMirroredUnderTheJob() {
         job = job(ArtifactKinds.ISSUE, issueMetadata());
-        Observation onIssue = authorObservation()
+        PracticeResult onIssue = authorResult()
                 .artifactKind(ArtifactKinds.ISSUE)
                 .artifactId(ISSUE_ID)
                 .practiceRevision(revision(ActorRole.AUTHOR, ArtifactKinds.ISSUE))
                 .build();
 
-        assertThat(eligibility.publicObservationIds(job, List.of(onIssue))).containsExactly(onIssue.getId());
+        assertThat(eligibility.publicResultIds(job, List.of(onIssue))).containsExactly(onIssue.getId());
     }
 
     @Test
-    void shouldAdmitAMergerObservationOnlyWhenTheAuthorMergedTheWork() {
-        Observation merger = authorObservation()
+    void shouldAdmitAMergerResultOnlyWhenTheAuthorMergedTheWork() {
+        PracticeResult merger = authorResult()
                 .practiceRevision(revision(ActorRole.MERGER, ArtifactKinds.PULL_REQUEST))
                 .build();
 
         job.setMetadata(pullRequestMetadata().put("author_id", AUTHOR_ID).put("merged_by_id", AUTHOR_ID));
-        assertThat(eligibility.publicObservationIds(job, List.of(merger))).containsExactly(merger.getId());
+        assertThat(eligibility.publicResultIds(job, List.of(merger))).containsExactly(merger.getId());
 
         job.setMetadata(pullRequestMetadata().put("author_id", AUTHOR_ID).put("merged_by_id", REVIEWER_ID));
-        assertThat(eligibility.publicObservationIds(job, List.of(merger))).isEmpty();
+        assertThat(eligibility.publicResultIds(job, List.of(merger))).isEmpty();
     }
 
     @Test
-    void shouldKeepAReviewerObservationPrivateWhenTheReviewerAlsoWroteTheWork() {
-        Observation aboutReviewer = authorObservation()
+    void shouldKeepAReviewerResultPrivateWhenTheReviewerAlsoWroteTheWork() {
+        PracticeResult aboutReviewer = authorResult()
                 .practiceRevision(revision(ActorRole.REVIEWER, ArtifactKinds.PULL_REQUEST))
                 .aboutUserId(REVIEWER_ID)
                 .build();
-        Observation selfReview = authorObservation()
+        PracticeResult selfReview = authorResult()
                 .practiceRevision(revision(ActorRole.REVIEWER, ArtifactKinds.PULL_REQUEST))
                 .build();
 
-        assertThat(eligibility.publicObservationIds(job, List.of(aboutReviewer, selfReview)))
+        assertThat(eligibility.publicResultIds(job, List.of(aboutReviewer, selfReview)))
                 .isEmpty();
     }
 
@@ -149,8 +149,7 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     void shouldAdmitNothingWhenTheJobIsAboutAReviewerEvenIfTheReviewerWroteTheWork() {
         job.setMetadata(pullRequestMetadata().put("subject_role", "REVIEWER").put("about_user_id", AUTHOR_ID));
 
-        assertThat(eligibility.publicObservationIds(
-                        job, List.of(authorObservation().build())))
+        assertThat(eligibility.publicResultIds(job, List.of(authorResult().build())))
                 .isEmpty();
     }
 
@@ -159,8 +158,7 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     void shouldAdmitNothingWhenTheJobNamesAnyRoleOtherThanAuthor(String role) {
         job.setMetadata(pullRequestMetadata().put("subject_role", role));
 
-        assertThat(eligibility.publicObservationIds(
-                        job, List.of(authorObservation().build())))
+        assertThat(eligibility.publicResultIds(job, List.of(authorResult().build())))
                 .isEmpty();
     }
 
@@ -168,21 +166,20 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     void shouldAdmitNothingWhenTheJobRoleIsExplicitlyNull() {
         job.setMetadata(pullRequestMetadata().putNull("subject_role"));
 
-        assertThat(eligibility.publicObservationIds(
-                        job, List.of(authorObservation().build())))
+        assertThat(eligibility.publicResultIds(job, List.of(authorResult().build())))
                 .isEmpty();
     }
 
     @Test
     void shouldTreatAJobWithoutARoleAsAnAuthorJobWhenItWasRecordedBeforeRolesExisted() {
-        Observation legacy = authorObservation().build();
-        assertThat(eligibility.publicObservationIds(job, List.of(legacy))).containsExactly(legacy.getId());
+        PracticeResult legacy = authorResult().build();
+        assertThat(eligibility.publicResultIds(job, List.of(legacy))).containsExactly(legacy.getId());
 
         job.setMetadata(pullRequestMetadata().put("subject_role", "AUTHOR"));
-        assertThat(eligibility.publicObservationIds(job, List.of(legacy))).containsExactly(legacy.getId());
+        assertThat(eligibility.publicResultIds(job, List.of(legacy))).containsExactly(legacy.getId());
     }
 
-    static Stream<Arguments> observationsOutsideTheAuthorsPublicRecord() {
+    static Stream<Arguments> practiceResultsOutsideTheAuthorsPublicRecord() {
         return Stream.of(
                 outside("about somebody else", b -> b.aboutUserId(REVIEWER_ID)),
                 outside("without its original revision", b -> b.practiceRevision(null)),
@@ -195,19 +192,22 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
                 outside("on another kind of work", b -> b.artifactKind(ArtifactKinds.ISSUE)),
                 outside("citing private history", b -> b.evidence(citing(PRIVATE_HISTORY))),
                 outside("having consulted private history", b -> b.evidence(consulting(PRIVATE_HISTORY))),
+                outside("showing an example from private history", b -> b.example(exampleCiting(PRIVATE_HISTORY))),
+                outside(
+                        "asking an open question located in private history",
+                        b -> b.evidence(questionCiting(PRIVATE_HISTORY))),
                 outside("without recorded provenance", b -> b.evidence(null)),
                 outside("naming no source", b -> b.evidence(JsonNodeFactory.instance.objectNode())));
     }
 
     @ParameterizedTest
-    @MethodSource("observationsOutsideTheAuthorsPublicRecord")
-    void shouldKeepAnObservationPrivateWhenItIsOutsideTheAuthorsPublicRecord(
-            UnaryOperator<Observation.ObservationBuilder> change) {
-        Observation outside = change.apply(authorObservation()).build();
-        Observation inside = authorObservation().build();
+    @MethodSource("practiceResultsOutsideTheAuthorsPublicRecord")
+    void shouldKeepAResultPrivateWhenItIsOutsideTheAuthorsPublicRecord(
+            UnaryOperator<PracticeResult.PracticeResultBuilder> change) {
+        PracticeResult outside = change.apply(authorResult()).build();
+        PracticeResult inside = authorResult().build();
 
-        assertThat(eligibility.publicObservationIds(job, List.of(outside, inside)))
-                .containsExactly(inside.getId());
+        assertThat(eligibility.publicResultIds(job, List.of(outside, inside))).containsExactly(inside.getId());
     }
 
     static Stream<Arguments> unresolvedAuthors() {
@@ -240,8 +240,7 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
                 .when(monitoredRepositories.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, REPOSITORY))
                 .thenReturn(monitored);
 
-        assertThat(eligibility.publicObservationIds(
-                        job, List.of(authorObservation().build())))
+        assertThat(eligibility.publicResultIds(job, List.of(authorResult().build())))
                 .isEmpty();
     }
 
@@ -249,15 +248,14 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     void shouldAdmitNothingWhenTheJobDoesNotNameItsWork() {
         job.setMetadata(pullRequestMetadata().without("pull_request_id"));
 
-        assertThat(eligibility.publicObservationIds(
-                        job, List.of(authorObservation().build())))
+        assertThat(eligibility.publicResultIds(job, List.of(authorResult().build())))
                 .isEmpty();
         verify(reviewTargets, never()).findPullRequest(PULL_REQUEST_ID);
     }
 
     @Test
     void shouldPermitAPersistedPackageWhenEverySupportIsAboutTheAuthor() {
-        Observation support = authorObservation().build();
+        PracticeResult support = authorResult().build();
         Feedback stored = storedFeedback().build();
         stubStoredPackage(stored, support);
 
@@ -283,7 +281,7 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
 
         assertThat(eligibility.permitsDelivery(job, stored.getId(), List.of(SLUG), null))
                 .isFalse();
-        verify(feedbackObservations, never()).findForVisibility(any(), anyCollection());
+        verify(feedbackResults, never()).findForVisibility(any(), anyCollection());
     }
 
     @Test
@@ -296,9 +294,9 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRefuseAnAuthorPackageWhenItsFrozenSupportIncludesAReviewerObservation() {
-        Observation author = authorObservation().build();
-        Observation reviewer = authorObservation()
+    void shouldRefuseAnAuthorPackageWhenItsFrozenSupportIncludesAReviewerResult() {
+        PracticeResult author = authorResult().build();
+        PracticeResult reviewer = authorResult()
                 .practiceRevision(revision(ActorRole.REVIEWER, ArtifactKinds.PULL_REQUEST))
                 .aboutUserId(REVIEWER_ID)
                 .build();
@@ -310,8 +308,8 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRefuseAPersistedPackageWhenItsCitedObservationsDifferFromItsBoundSupport() {
-        Observation support = authorObservation().build();
+    void shouldRefuseAPersistedPackageWhenItsCitedResultsDifferFromItsBoundSupport() {
+        PracticeResult support = authorResult().build();
         Feedback stored = storedFeedback().build();
         stubStoredPackage(stored, support);
 
@@ -330,12 +328,12 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldPermitAnUnboundPackageOnlyWhenEveryCitedObservationIsFoundAndAboutTheAuthor() {
-        Observation support = authorObservation().build();
+    void shouldPermitAnUnboundPackageOnlyWhenEveryCitedResultIsFoundAndAboutTheAuthor() {
+        PracticeResult support = authorResult().build();
         UUID missing = UUID.randomUUID();
-        when(observations.findAllByIdInAndWorkspaceId(Set.of(support.getId()), WORKSPACE_ID))
+        when(practiceResults.findAllByIdInAndWorkspaceId(Set.of(support.getId()), WORKSPACE_ID))
                 .thenReturn(List.of(support));
-        when(observations.findAllByIdInAndWorkspaceId(Set.of(support.getId(), missing), WORKSPACE_ID))
+        when(practiceResults.findAllByIdInAndWorkspaceId(Set.of(support.getId(), missing), WORKSPACE_ID))
                 .thenReturn(List.of(support));
 
         assertThat(eligibility.permitsDelivery(job, null, List.of(SLUG), Set.of(support.getId())))
@@ -348,37 +346,37 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
     void shouldRefuseAnUnboundPackageWhenItCitesNothing() {
         assertThat(eligibility.permitsDelivery(job, null, List.of(SLUG), Set.of()))
                 .isFalse();
-        verify(observations, never()).findAllByIdInAndWorkspaceId(anyCollection(), any());
+        verify(practiceResults, never()).findAllByIdInAndWorkspaceId(anyCollection(), any());
     }
 
     @Test
     void shouldPermitALegacyPackageOnlyWhenEveryPracticeItNamesHasAuthorSupport() {
-        Observation support = authorObservation().build();
-        when(observations.findByAgentJobId(job.getId(), WORKSPACE_ID)).thenReturn(List.of(support));
+        PracticeResult support = authorResult().build();
+        when(practiceResults.findByAgentJobId(job.getId(), WORKSPACE_ID)).thenReturn(List.of(support));
 
         assertThat(eligibility.permitsDelivery(job, null, List.of(SLUG), null)).isTrue();
         assertThat(eligibility.permitsDelivery(job, null, List.of(SLUG, "names-the-issue"), null))
                 .isFalse();
     }
 
-    private void stubStoredPackage(Feedback stored, Observation... support) {
+    private void stubStoredPackage(Feedback stored, PracticeResult... support) {
         when(feedback.findByIdAndWorkspaceId(stored.getId(), WORKSPACE_ID)).thenReturn(Optional.of(stored));
-        List<FeedbackObservationRepository.FeedbackObservationVisibility> rows = Stream.of(support)
-                .map(observation -> {
-                    var row = mock(FeedbackObservationRepository.FeedbackObservationVisibility.class);
-                    when(row.getObservation()).thenReturn(observation);
+        List<FeedbackEvidenceRepository.FeedbackResultVisibility> rows = Stream.of(support)
+                .map(practiceResult -> {
+                    var row = mock(FeedbackEvidenceRepository.FeedbackResultVisibility.class);
+                    when(row.getPracticeResult()).thenReturn(practiceResult);
                     return row;
                 })
                 .toList();
-        when(feedbackObservations.findForVisibility(WORKSPACE_ID, Set.of(stored.getId())))
+        when(feedbackResults.findForVisibility(WORKSPACE_ID, Set.of(stored.getId())))
                 .thenReturn(rows);
     }
 
     @Test
     void shouldKeepReviewerHistoryPrivateEvenWhenRecipientAndAuthorAreTheSamePerson() {
         Feedback prior = storedFeedback().workspaceId(WORKSPACE_ID).build();
-        Observation author = authorObservation().build();
-        Observation selfReview = authorObservation()
+        PracticeResult author = authorResult().build();
+        PracticeResult selfReview = authorResult()
                 .practiceRevision(revision(ActorRole.REVIEWER, ArtifactKinds.PULL_REQUEST))
                 .build();
         assertThat(eligibility.permitsPublicHistory(prior, List.of(author))).isTrue();
@@ -390,31 +388,30 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
 
     @Test
     void shouldAuthorizeOnlyExplicitAuthorSupportsWithoutUnrelatedSamePracticeReviewerRows() {
-        Observation author = authorObservation().build();
-        Observation reviewer = authorObservation()
+        PracticeResult author = authorResult().build();
+        PracticeResult reviewer = authorResult()
                 .practiceRevision(revision(ActorRole.REVIEWER, ArtifactKinds.PULL_REQUEST))
                 .build();
-        when(observations.findAllByIdInAndWorkspaceId(Set.of(author.getId()), WORKSPACE_ID))
+        when(practiceResults.findAllByIdInAndWorkspaceId(Set.of(author.getId()), WORKSPACE_ID))
                 .thenReturn(List.of(author));
         assertThat(eligibility.permitsDelivery(job, null, List.of(SLUG), Set.of(author.getId())))
                 .isTrue();
-        when(observations.findAllByIdInAndWorkspaceId(Set.of(author.getId(), reviewer.getId()), WORKSPACE_ID))
+        when(practiceResults.findAllByIdInAndWorkspaceId(Set.of(author.getId(), reviewer.getId()), WORKSPACE_ID))
                 .thenReturn(List.of(author, reviewer));
         assertThat(eligibility.permitsDelivery(job, null, List.of(SLUG), Set.of(author.getId(), reviewer.getId())))
                 .isFalse();
-        Observation abstention = authorObservation()
-                .outcome(Outcome.NOT_APPLICABLE)
-                .severity(null)
-                .build();
-        when(observations.findAllByIdInAndWorkspaceId(Set.of(abstention.getId()), WORKSPACE_ID))
+        PracticeResult abstention =
+                authorResult().outcome(Outcome.NOT_APPLICABLE).severity(null).build();
+        when(practiceResults.findAllByIdInAndWorkspaceId(Set.of(abstention.getId()), WORKSPACE_ID))
                 .thenReturn(List.of(abstention));
         assertThat(eligibility.permitsDelivery(job, null, List.of(SLUG), Set.of(abstention.getId())))
                 .isFalse();
     }
 
-    private Observation.ObservationBuilder authorObservation() {
+    private PracticeResult.PracticeResultBuilder authorResult() {
         PracticeRevision revision = revision(ActorRole.AUTHOR, ArtifactKinds.PULL_REQUEST);
-        return Observation.builder()
+        return PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .occurrenceKey(UUID.randomUUID().toString())
                 .agentJobId(job.getId())
@@ -491,13 +488,29 @@ class PublicReviewEligibilityTest extends BaseUnitTest {
         return evidence;
     }
 
+    private static JsonNode exampleCiting(String sourceKind) {
+        ObjectNode example = JsonNodeFactory.instance.objectNode();
+        example.putObject("citation").put("sourceKind", sourceKind);
+        example.put("note", "An earlier change explained itself well.");
+        return example;
+    }
+
+    private static JsonNode questionCiting(String sourceKind) {
+        ObjectNode evidence = (ObjectNode) citing(PullRequestContentSource.DIFF.value());
+        ObjectNode question = evidence.putArray("undecidability").addObject();
+        question.put("openQuestion", "Was the change discussed before?");
+        question.put("wouldSettleIt", "The earlier discussion.");
+        question.putObject("citation").put("sourceKind", sourceKind);
+        return evidence;
+    }
+
     private static JsonNode consulting(String sourceKind) {
         ObjectNode evidence = (ObjectNode) citing(PullRequestContentSource.DIFF.value());
         evidence.putObject("search").putArray("consulted").add(sourceKind);
         return evidence;
     }
 
-    private static Arguments outside(String name, UnaryOperator<Observation.ObservationBuilder> change) {
+    private static Arguments outside(String name, UnaryOperator<PracticeResult.PracticeResultBuilder> change) {
         return arguments(Named.of(name, change));
     }
 

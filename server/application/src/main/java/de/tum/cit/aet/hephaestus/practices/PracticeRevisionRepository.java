@@ -30,7 +30,7 @@ public interface PracticeRevisionRepository
 
     /**
      * The first revision after {@code revisionNumber} whose review rules differ from {@code fingerprint}:
-     * when the rules a past observation was measured against stopped being the ones in force. A later edit
+     * when the rules a past result was measured against stopped being the ones in force. A later edit
      * that touches only prose leaves the fingerprint alone and is skipped, so the moment does not drift.
      */
     Optional<PracticeRevision>

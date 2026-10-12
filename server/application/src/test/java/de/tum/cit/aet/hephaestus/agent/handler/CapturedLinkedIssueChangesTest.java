@@ -20,7 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkChanges.ObservationEvidence;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkChanges.ResultEvidence;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
@@ -47,7 +47,7 @@ class CapturedLinkedIssueChangesTest extends BaseUnitTest {
             new CapturedReviewedWorkChanges(jobs, mapper, catalogs, pullRequests, mock(IssueRepository.class));
 
     @Test
-    void shouldSelectOnlyTheObservationWhoseOwnVerifiedClosingIssueChanged() {
+    void shouldSelectOnlyTheResultWhoseOwnVerifiedClosingIssueChanged() {
         var citations = citations(PATH, LINKED.value(), digest(issue("- [ ] Confirm repair")));
         var unrelated =
                 citations(SandboxLayout.CONTEXT_PREFIX + "linked_work_items/19.md", LINKED.value(), "a".repeat(64));
@@ -58,8 +58,8 @@ class CapturedLinkedIssueChangesTest extends BaseUnitTest {
         assertThat(changes.materiallyChangedLinkedIssues(
                         7,
                         List.of(
-                                new ObservationEvidence(OBSERVATION, RUN, citations),
-                                new ObservationEvidence(other, RUN, unrelated)),
+                                new ResultEvidence(OBSERVATION, RUN, citations),
+                                new ResultEvidence(other, RUN, unrelated)),
                         42))
                 .containsExactly(OBSERVATION);
     }
@@ -105,7 +105,7 @@ class CapturedLinkedIssueChangesTest extends BaseUnitTest {
         capture(42, true);
         when(pullRequests.findClosingIssuesById(42L)).thenReturn(List.of(current));
         assertThat(changes.materiallyChangedLinkedIssues(
-                        7, List.of(new ObservationEvidence(OBSERVATION, RUN, citations)), 42))
+                        7, List.of(new ResultEvidence(OBSERVATION, RUN, citations)), 42))
                 .isEmpty();
     }
 
@@ -120,7 +120,7 @@ class CapturedLinkedIssueChangesTest extends BaseUnitTest {
             capture(refusal.equals("work") ? 43 : 42, !refusal.equals("policy"));
         }
         assertThat(changes.materiallyChangedLinkedIssues(
-                        7, List.of(new ObservationEvidence(OBSERVATION, RUN, citations)), 42))
+                        7, List.of(new ResultEvidence(OBSERVATION, RUN, citations)), 42))
                 .isEmpty();
     }
 
@@ -130,7 +130,7 @@ class CapturedLinkedIssueChangesTest extends BaseUnitTest {
         deleted.setDeletedAt(Instant.now());
         when(pullRequests.findClosingIssuesById(42L)).thenReturn(List.of(deleted));
         assertThat(changes.materiallyChangedLinkedIssues(
-                        7, List.of(new ObservationEvidence(OBSERVATION, RUN, mapper.createArrayNode())), 42))
+                        7, List.of(new ResultEvidence(OBSERVATION, RUN, mapper.createArrayNode())), 42))
                 .isEmpty();
         verifyNoInteractions(jobs, catalogs);
     }

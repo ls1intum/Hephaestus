@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.spi;
 
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 
 /**
  * Marker interface for type-safe handler dispatch: each {@link JobTypeHandler} accepts a specific
@@ -11,11 +11,11 @@ import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
  */
 public interface JobSubmissionRequest {
     /**
-     * What occasioned this run, and therefore which population its observations belong to. Declared on the
+     * What occasioned this run, and therefore which population its results belong to. Declared on the
      * submission rather than inferred downstream, where a live sweep and a backfill sweep look identical and
      * conflating them would silently merge two incomparable samples into one trend.
      */
-    default ObservationOrigin observationOrigin() {
-        return ObservationOrigin.LIVE;
+    default ResultOrigin practiceResultOrigin() {
+        return ResultOrigin.LIVE;
     }
 }

@@ -10,9 +10,8 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedObservations;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedResults;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
@@ -32,7 +31,7 @@ import tools.jackson.databind.node.ObjectNode;
  * turns ({@code context/conversation_thread.json}) plus the workspace-wide project inventory, since a
  * conversation isn't anchored to one repo.
  *
- * <p>Admission persists verified observations. Delivery publishes {@link PracticeFeedbackPreparationRequestedEvent}
+ * <p>Admission persists verified results. Delivery publishes {@link PracticeFeedbackPreparationRequestedEvent}
  * to drive the conversational-delivery loop: OBSERVED problems become PREPARED IN_CHAT units for the
  * judged author and surface in their next mentor DM turn. Nothing is posted back to Slack from here.
  */
@@ -42,7 +41,6 @@ public class ConversationReviewHandler implements JobTypeHandler {
 
     private final JsonMapper objectMapper;
     private final PracticeReviewPreparation preparation;
-    private final ReviewResultParser resultParser;
     private final ReviewOutputService deliveryService;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
@@ -50,13 +48,11 @@ public class ConversationReviewHandler implements JobTypeHandler {
     ConversationReviewHandler(
             JsonMapper objectMapper,
             PracticeReviewPreparation preparation,
-            ReviewResultParser resultParser,
             ReviewOutputService deliveryService,
             ApplicationEventPublisher eventPublisher,
             TransactionTemplate transactionTemplate) {
         this.objectMapper = objectMapper;
         this.preparation = preparation;
-        this.resultParser = resultParser;
         this.deliveryService = deliveryService;
         this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
@@ -75,7 +71,8 @@ public class ConversationReviewHandler implements JobTypeHandler {
         }
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put(
-                ReviewOutputService.ORIGIN_METADATA_KEY, r.observationOrigin().name());
+                ReviewOutputService.ORIGIN_METADATA_KEY,
+                r.practiceResultOrigin().name());
         metadata.put("artifact_kind", ArtifactKinds.CONVERSATION_THREAD.value());
         metadata.put("slack_thread_id", r.slackThreadId());
         metadata.put("slack_channel_id", r.slackChannelId());
@@ -143,52 +140,37 @@ public class ConversationReviewHandler implements JobTypeHandler {
                 + SandboxLayout.CONTEXT_PREFIX
                 + "project_inventory.json for cross-artifact awareness of the workspace's issues/PRs if "
                 + "present, then evaluate each communication practice in inputs/practices/ against the thread and "
-                + "persist every justified observation via the report_observation tool. The review is about one "
+                + "persist every justified result via the submit_result tool. The review is about one "
                 + "participant: judge only the turns marked \"underReview\": true. The other turns are context. "
                 + "Evidence should quote the exact turn(s) "
                 + "you assessed. Follow "
                 + SandboxLayout.ORCHESTRATOR_PATH
-                + " for the observation schema and rules.";
+                + " for the result schema and rules.";
         log.info("Built conversation orchestrator prompt: {} chars, jobId={}", prompt.length(), job.getId());
         return prompt;
     }
 
     @Override
-    public PreparedObservations prepareObservations(AgentJob job, JsonNode observations) {
-        var parsed = resultParser.parseObservations(observations);
-        if (!parsed.discarded().isEmpty()) {
-            log.info(
-                    "Discarded {} observations during parsing: jobId={}",
-                    parsed.discarded().size(),
-                    job.getId());
-        }
-        if (parsed.validObservations().isEmpty()) {
-            throw new ObservationsRefusedException(
-                    "no_valid_observations",
-                    "No valid observations in agent output: jobId=" + job.getId()
-                            + ", discarded="
-                            + parsed.discarded().size());
-        }
-        var admissible = deliveryService.prepare(job, ReviewResultParser.validateCoherence(parsed.validObservations()));
+    public PreparedResults prepareResults(AgentJob job, JsonNode results) {
+        // Admission decides, against the job's pinned practice revisions, whether an undecided review owed the
+        // captured change a reading.
+        var admissible = deliveryService.prepare(job, results);
         return admitted -> deliveryService.publish(admitted, admissible);
     }
 
     @Override
     public void deliver(AgentJob job) {
-        if (ObservationAdmissionService.observationsWereRefused(job)) return;
-        ObservationAdmissionService.requireMatchingCompositionDigest(job);
+        if (ResultAdmissionService.practiceResultsWereRefused(job)) return;
+        ResultAdmissionService.requireMatchingCompositionDigest(job);
         deliveryService.requirePublished(job);
         // Publish INSIDE a transaction so the AFTER_COMMIT listener fires (deliver() runs outside a transaction
-        // in the executor). Best-effort — a publish hiccup never fails the job; observations are already persisted.
+        // in the executor). Best-effort — a publish hiccup never fails the job; results are already persisted.
         try {
             transactionTemplate.executeWithoutResult(
                     status -> eventPublisher.publishEvent(new PracticeFeedbackPreparationRequestedEvent(
                             job.getId(), job.getWorkspace().getId())));
         } catch (RuntimeException e) {
-            log.warn(
-                    "Conversational-delivery trigger publish failed (observations persisted): jobId={}",
-                    job.getId(),
-                    e);
+            log.warn("Conversational-delivery trigger publish failed (results persisted): jobId={}", job.getId(), e);
         }
     }
 }

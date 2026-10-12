@@ -23,9 +23,9 @@ public enum InAppRoutingDecision {
 
     /**
      * Every measurement behind the message came from a backfill campaign. Backfill is sound as a
-     * snapshot and, by {@code ObservationOrigin}'s own words, "unusable as a trend against LIVE rows" —
+     * snapshot and, by {@code ResultOrigin}'s own words, "unusable as a trend against LIVE rows" —
      * and a process-level message is exactly a trend claim. Held back deliberately rather than
-     * structurally: the entitlement in {@code ObservationOrigin} still admits the lane, so lifting this is
+     * structurally: the entitlement in {@code ResultOrigin} still admits the lane, so lifting this is
      * one line and one decision, taken with a real workspace in front of you.
      */
     BACKFILL_HELD,

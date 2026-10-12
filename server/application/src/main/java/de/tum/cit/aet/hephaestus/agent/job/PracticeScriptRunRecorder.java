@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser.PracticeScriptRunReport;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelUseDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
 import io.micrometer.core.instrument.Counter;
@@ -28,9 +29,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Records what each staged practice script did in one attempt, from the runner's
- * {@link SandboxLayout#PRACTICE_SCRIPT_REPORT_FILE}. A script is staged when the job admitted its practice at a
- * revision that holds a practice script.
+ * Records what each admitted practice's program did in one attempt, from the runner's
+ * {@link SandboxLayout#PRACTICE_SCRIPT_REPORT_FILE}: its own script when the job admitted it at a revision that holds
+ * one, else the built-in review.
  */
 @Component
 @ConditionalOnWorkerRole
@@ -56,22 +57,25 @@ class PracticeScriptRunRecorder {
         if (admitted.isEmpty()) return;
         long workspaceId = job.getWorkspace().getId();
         Set<Long> withScript = runs.findPracticeScriptRevisionIdsByWorkspaceId(workspaceId, admitted.values());
-        Map<String, Long> staged = new HashMap<>();
-        admitted.forEach((slug, revisionId) -> {
-            if (withScript.contains(revisionId)) staged.put(slug, revisionId);
-        });
-        if (staged.isEmpty()) return;
+        Map<String, PracticeProgramKind> kinds = new HashMap<>();
+        admitted.forEach((slug, revisionId) -> kinds.put(
+                slug, withScript.contains(revisionId) ? PracticeProgramKind.CUSTOM : PracticeProgramKind.BUILTIN));
 
-        List<PracticeScriptRunReport> reported = parser.parsePracticeScriptReport(report, staged.keySet());
+        List<PracticeScriptRunReport> reported = parser.parsePracticeScriptReport(report, kinds);
         runs.saveAll(reported.stream()
                 .map(run -> new AgentJobPracticeScriptRun(
                         job,
                         job.getRetryCount(),
                         run.practiceSlug(),
-                        staged.get(run.practiceSlug()),
+                        admitted.get(run.practiceSlug()),
                         run.status(),
-                        run.leads(),
-                        stored(run.models(), slots),
+                        run.programKind(),
+                        run.programDigest(),
+                        run.stopReason(),
+                        run.calls() == null ? null : objectMapper.valueToTree(run.calls()),
+                        run.coverageReached() == null ? null : objectMapper.valueToTree(run.coverageReached()),
+                        // A program that never started declared nothing, whatever the report lists.
+                        run.status() == PracticeScriptRunStatus.NOT_REACHED ? null : stored(run.models(), slots),
                         finishedAt,
                         run.error(),
                         run.durationMs()))

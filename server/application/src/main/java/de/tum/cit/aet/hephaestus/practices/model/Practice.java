@@ -94,7 +94,7 @@ public class Practice {
     /**
      * Owning workspace (tenancy binding). {@code fk_practice_workspace} carries no DB cascade — a workspace
      * purge removes its practices explicitly in application code, keeping delete order over the dependent
-     * observation/revision graph under the purge contributor's control.
+     * result/revision graph under the purge contributor's control.
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "workspace_id", nullable = false, foreignKey = @ForeignKey(name = "fk_practice_workspace"))
@@ -102,8 +102,8 @@ public class Practice {
     private Workspace workspace;
 
     /**
-     * Read-only twin of {@link #workspace}'s column so the composite tenancy key on Observation can
-     * reference it: Hibernate binds Observation before Practice and resolves a non-key
+     * Read-only twin of {@link #workspace}'s column so the composite tenancy key on Result can
+     * reference it: Hibernate binds Result before Practice and resolves a non-key
      * {@code referencedColumnName} only against columns already bound.
      */
     @Column(name = "workspace_id", nullable = false, insertable = false, updatable = false)
@@ -226,7 +226,7 @@ public class Practice {
 
     /**
      * Optional Node/TypeScript practice script that runs before the review and produces leads (not
-     * observations) as starting points; {@code null} means no practice script runs.
+     * results) as starting points; {@code null} means no practice script runs.
      */
     @Column(name = "practice_script", columnDefinition = "TEXT")
     @ToString.Exclude

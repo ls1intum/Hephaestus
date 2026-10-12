@@ -20,7 +20,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -55,7 +55,7 @@ class PracticeFeedbackDispatchService {
     private final FeedbackRepository feedbackRepository;
     private final DiffNotePoster diffNotePoster;
     private final FeedbackDispatchStateMachine stateMachine;
-    private final ObservationInvalidationRepository invalidations;
+    private final PracticeResultInvalidationRepository invalidations;
     private final RepeatedSummaryCheck repeatedSummaries;
     private final PracticeFeedbackPersonDataAdmission personDataAdmission;
 
@@ -68,7 +68,7 @@ class PracticeFeedbackDispatchService {
             FeedbackRepository feedbackRepository,
             DiffNotePoster diffNotePoster,
             FeedbackDispatchStateMachine stateMachine,
-            ObservationInvalidationRepository invalidations,
+            PracticeResultInvalidationRepository invalidations,
             RepeatedSummaryCheck repeatedSummaries,
             PracticeFeedbackPersonDataAdmission personDataAdmission) {
         this.repository = repository;
@@ -569,14 +569,14 @@ class PracticeFeedbackDispatchService {
     }
 
     /**
-     * Admits this claimed attempt only while no cited observation is invalidated. The live claim is what a
+     * Admits this claimed attempt only while no cited result is invalidated. The live claim is what a
      * correction checks for, so once admitted the attempt runs to its end without a correction landing mid-write.
      */
     private boolean citesInvalidated(FeedbackDispatch dispatch) {
-        List<UUID> cited = repository.lockCitedObservations(dispatch.getWorkspaceId(), dispatch.getId());
+        List<UUID> cited = repository.lockCitedResults(dispatch.getWorkspaceId(), dispatch.getId());
         return !cited.isEmpty()
                 && !invalidations
-                        .findActiveObservationIds(dispatch.getWorkspaceId(), cited)
+                        .findActiveResultIds(dispatch.getWorkspaceId(), cited)
                         .isEmpty();
     }
 
@@ -703,7 +703,7 @@ class PracticeFeedbackDispatchService {
                 .map(JsonNode::asString)
                 .collect(Collectors.toUnmodifiableSet());
         List<UUID> cited = Objects.requireNonNull(transactionTemplate.execute(
-                status -> repository.lockCitedObservations(dispatch.getWorkspaceId(), dispatch.getId())));
+                status -> repository.lockCitedResults(dispatch.getWorkspaceId(), dispatch.getId())));
         return policy.evaluateAtEgress(job, dispatch.getFeedbackId(), practiceSlugs, Set.copyOf(cited));
     }
 

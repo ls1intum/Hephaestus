@@ -36,17 +36,17 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.FeedbackObservationVisibility;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository.FeedbackResultVisibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
@@ -90,19 +90,19 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Mock
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Mock
     private FeedbackRepository feedbackRepository;
 
     @Mock
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Mock
     private FeedbackWithdrawalRepository withdrawalRepository;
 
     @Mock
-    private ObservationVisibilityPolicy visibilityPolicy;
+    private ResultVisibilityPolicy visibilityPolicy;
 
     @Mock
     private ConversationSourceLiveness conversationLiveness;
@@ -124,14 +124,14 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
 
     private ReviewHistoryContentSource provider;
 
-    private final Map<UUID, List<Observation>> boundTo = new HashMap<>();
+    private final Map<UUID, List<PracticeResult>> boundTo = new HashMap<>();
 
     @BeforeEach
     void setUp() {
         provider = new ReviewHistoryContentSource(
-                observationRepository,
+                practiceResultRepository,
                 feedbackRepository,
-                feedbackObservationRepository,
+                feedbackEvidenceRepository,
                 withdrawalRepository,
                 visibilityPolicy,
                 conversationLiveness,
@@ -147,32 +147,34 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                     .filter(thread -> !inactiveThreads.contains(thread))
                     .collect(Collectors.toSet());
         });
-        lenient().when(observationRepository.findForPersonHistory(any(), any())).thenReturn(List.of());
+        lenient()
+                .when(practiceResultRepository.findForPersonHistory(any(), any()))
+                .thenReturn(List.of());
         lenient()
                 .when(feedbackRepository.findDeliveredForPersonHistory(any(), any()))
                 .thenReturn(List.of());
         lenient()
                 .when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
                 .thenReturn(List.of());
-        // Unless a test binds it, each row is bound to one current observation this review may read.
+        // Unless a test binds it, each row is bound to one current result this review may read.
         lenient()
-                .when(feedbackObservationRepository.findForVisibility(anyLong(), any()))
+                .when(feedbackEvidenceRepository.findForVisibility(anyLong(), any()))
                 .thenAnswer(invocation -> {
                     Collection<UUID> ids = invocation.getArgument(1);
                     return ids.stream()
-                            .flatMap(id -> boundTo.getOrDefault(id, List.of(boundObservation(false))).stream()
-                                    .map(o -> (FeedbackObservationVisibility) new Binding(id, o)))
+                            .flatMap(id -> boundTo.getOrDefault(id, List.of(boundResult(false))).stream()
+                                    .map(o -> (FeedbackResultVisibility) new Binding(id, o)))
                             .toList();
                 });
         lenient()
                 .when(visibilityPolicy.permitsShown(anyLong(), any(), eq(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)))
                 .thenAnswer(invocation -> {
-                    Collection<Observation> batch = invocation.getArgument(1);
-                    return batch.stream().map(Observation::getId).collect(Collectors.toSet());
+                    Collection<PracticeResult> batch = invocation.getArgument(1);
+                    return batch.stream().map(PracticeResult::getId).collect(Collectors.toSet());
                 });
         lenient().when(visibilityPolicy.permitsAll(anyLong(), any(), any())).thenAnswer(invocation -> {
-            Collection<Observation> batch = invocation.getArgument(1);
-            return batch.stream().map(Observation::getId).collect(Collectors.toSet());
+            Collection<PracticeResult> batch = invocation.getArgument(1);
+            return batch.stream().map(PracticeResult::getId).collect(Collectors.toSet());
         });
         lenient()
                 .when(pullRequestRepository.findByIdWithAuthorAndRepository(eq(PR_ID)))
@@ -190,7 +192,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     class WhenOnlyOneHalfIsAskedFor {
 
         @Test
-        void observationHistoryAloneAnswersForObservationHistoryOnly() {
+        void practiceResultHistoryAloneAnswersForResultHistoryOnly() {
             var captured = provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
             assertThat(captured.files()).containsOnlyKeys("inputs/history/observations.json");
             assertThat(captured.completeness()).containsOnlyKeys(ReviewHistoryContentSource.OBSERVATION_HISTORY);
@@ -219,12 +221,12 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     @Test
     void reviewerHistoryBelongsToTheActualSubjectRatherThanTheWorkAuthor() {
         long reviewerId = AUTHOR_ID + 1;
-        Observation authorObservation = observationWithRationale("Author history.");
-        Observation reviewerObservation = observationWithRationale("Reviewer history.");
-        when(observationRepository.findForPersonHistory(AUTHOR_ID, WORKSPACE_ID))
-                .thenReturn(List.of(authorObservation));
-        when(observationRepository.findForPersonHistory(reviewerId, WORKSPACE_ID))
-                .thenReturn(List.of(reviewerObservation));
+        PracticeResult authorResult = practiceResultWithRationale("Author history.");
+        PracticeResult reviewerResult = practiceResultWithRationale("Reviewer history.");
+        when(practiceResultRepository.findForPersonHistory(AUTHOR_ID, WORKSPACE_ID))
+                .thenReturn(List.of(authorResult));
+        when(practiceResultRepository.findForPersonHistory(reviewerId, WORKSPACE_ID))
+                .thenReturn(List.of(reviewerResult));
         var authorRequest = prRequest();
         ObjectNode metadata =
                 (ObjectNode) Objects.requireNonNull(authorRequest.job().getMetadata());
@@ -235,16 +237,24 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                         .files()
                         .get("inputs/history/observations.json"));
         assertThat(authorHistory.path("observations")).hasSize(1);
-        assertThat(authorHistory.path("observations").get(0).path("id").asString())
-                .isEqualTo(authorObservation.getId().toString());
+        assertThat(authorHistory
+                        .path("observations")
+                        .get(0)
+                        .path("practiceResultId")
+                        .asString())
+                .isEqualTo(authorResult.getId().toString());
         metadata.put("subject_role", "REVIEWER");
         JsonNode reviewerHistory =
                 read(provider.capture(authorRequest, Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY))
                         .files()
                         .get("inputs/history/observations.json"));
         assertThat(reviewerHistory.path("observations")).hasSize(1);
-        assertThat(reviewerHistory.path("observations").get(0).path("id").asString())
-                .isEqualTo(reviewerObservation.getId().toString());
+        assertThat(reviewerHistory
+                        .path("observations")
+                        .get(0)
+                        .path("practiceResultId")
+                        .asString())
+                .isEqualTo(reviewerResult.getId().toString());
     }
 
     @Test
@@ -295,19 +305,19 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         assertThat(missing.files()).isEmpty();
         assertThat(missing.stateOverrides().values())
                 .allMatch(state -> state instanceof SourceCaptureState.Unavailable);
-        verifyNoInteractions(observationRepository, feedbackRepository, pullRequestRepository);
+        verifyNoInteractions(practiceResultRepository, feedbackRepository, pullRequestRepository);
     }
 
     @Test
     void aFirstEverReviewGetsAPresentAndEmptyHistory() {
-        var observationsCapture = captureObservationHistory();
+        var practiceResultsCapture = captureResultHistory();
         var feedbackCapture = captureFeedbackHistory();
 
-        JsonNode observations = read(observationsCapture.files().get("inputs/history/observations.json"));
+        JsonNode practiceResults = read(practiceResultsCapture.files().get("inputs/history/observations.json"));
         JsonNode feedback = read(feedbackCapture.files().get("inputs/history/feedback.json"));
-        assertThat(observations.get("observations")).isEmpty();
+        assertThat(practiceResults.get("observations")).isEmpty();
         assertThat(feedback.get("feedback")).isEmpty();
-        assertThat(observationsCapture.contentStates())
+        assertThat(practiceResultsCapture.contentStates())
                 .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceContentState.EMPTY);
         assertThat(feedbackCapture.contentStates())
                 .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceContentState.EMPTY);
@@ -318,18 +328,18 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
 
         @Test
         void shouldStateItsRecordsAndScopeWithoutAHistoryWindowOrRecordLimit() {
-            JsonNode observations = read(captureObservationHistory().files().get("inputs/history/observations.json"));
+            JsonNode practiceResults = read(captureResultHistory().files().get("inputs/history/observations.json"));
             var feedbackCapture = captureFeedbackHistory();
             JsonNode feedback = read(feedbackCapture.files().get("inputs/history/feedback.json"));
             JsonNode prepared = read(feedbackCapture.files().get("inputs/history/prepared.json"));
 
-            assertThat(observations.propertyNames()).containsExactly("coverage", "recordRole", "observations");
+            assertThat(practiceResults.propertyNames()).containsExactly("coverage", "recordRole", "observations");
             assertThat(feedback.propertyNames()).containsExactly("coverage", "recordRole", "feedback");
             assertThat(prepared.propertyNames()).containsExactly("coverage", "recordRole", "prepared");
-            assertThat(observations.path("recordRole").asString()).isEqualTo("RECORDED_OBSERVATIONS");
+            assertThat(practiceResults.path("recordRole").asString()).isEqualTo("RECORDED_OBSERVATIONS");
             assertThat(feedback.path("recordRole").asString()).isEqualTo("RECORDED_DELIVERY");
             assertThat(prepared.path("recordRole").asString()).isEqualTo("PREPARED_NOT_DELIVERED");
-            for (JsonNode file : List.of(observations, feedback, prepared)) {
+            for (JsonNode file : List.of(practiceResults, feedback, prepared)) {
                 JsonNode coverage = file.path("coverage");
                 assertThat(coverage.propertyNames()).containsExactly("scope", "workChronology", "communicationHistory");
                 assertThat(coverage.path("scope").asString()).isEqualTo("AUTHORIZED_REVIEW_RECORDS_FOR_SUBJECT");
@@ -342,9 +352,9 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     @Test
     void stagesTheRecordedTextAsItWasWritten() {
         String rationale = "The practice requires a test; the assessment is BAD -> MAJOR severity band.";
-        String body = "Per the fixed bucketing this is a MINOR severity tier observation.";
-        when(observationRepository.findForPersonHistory(any(), any()))
-                .thenReturn(List.of(observationWithRationale(rationale)));
+        String body = "Per the fixed bucketing this is a MINOR severity tier result.";
+        when(practiceResultRepository.findForPersonHistory(any(), any()))
+                .thenReturn(List.of(practiceResultWithRationale(rationale)));
         when(feedbackRepository.findDeliveredForPersonHistory(any(), any()))
                 .thenReturn(List.of(Feedback.builder()
                         .id(UUID.randomUUID())
@@ -365,7 +375,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
 
         // History is the record of what was observed and said; rewriting it would stage a record that
         // never existed.
-        assertThat(read(captureObservationHistory().files().get("inputs/history/observations.json"))
+        assertThat(read(captureResultHistory().files().get("inputs/history/observations.json"))
                         .get("observations")
                         .get(0)
                         .get("summary")
@@ -386,7 +396,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldStageEarlierObservationsWithTheEvidenceAndRevisionTheyWereRecordedWith() {
+    void shouldStageEarlierResultsWithTheEvidenceAndRevisionTheyWereRecordedWith() {
         String rationale =
                 "The catch block logs and continues.\nOnly the changed file was read; callers were not searched.";
         ObjectNode evidence = objectMapper.createObjectNode();
@@ -409,28 +419,28 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         Practice practice = new Practice();
         practice.setSlug("swallows-errors");
         practice.setCurrentRevision(mock(PracticeRevision.class));
-        Observation recorded = Observation.builder()
+        PracticeResult recorded = PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .practice(practice)
                 .practiceRevision(recordedRevision)
-                .recurrenceKey("rec-1")
                 .summary("Caught and ignored")
                 .outcome(Outcome.NOT_MET)
                 .observedAt(Instant.parse("2026-07-01T09:00:00Z"))
                 .evidenceRationale(rationale)
                 .evidence(evidence)
                 .build();
-        Observation unrecorded = Observation.builder()
+        PracticeResult unrecorded = PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .practice(practice)
-                .recurrenceKey("rec-2")
                 .summary("Missing restart check")
                 .outcome(Outcome.NOT_MET)
                 .observedAt(Instant.parse("2026-06-01T09:00:00Z"))
                 .build();
-        when(observationRepository.findForPersonHistory(any(), any())).thenReturn(List.of(recorded, unrecorded));
+        when(practiceResultRepository.findForPersonHistory(any(), any())).thenReturn(List.of(recorded, unrecorded));
 
-        JsonNode records = read(captureObservationHistory().files().get("inputs/history/observations.json"))
+        JsonNode records = read(captureResultHistory().files().get("inputs/history/observations.json"))
                 .get("observations");
 
         JsonNode staged = records.get(0);
@@ -446,18 +456,18 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void stagesEarlierObservationsAsThePracticeTheVerdictAndTheSummary() {
-        Observation original = observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID);
-        when(observationRepository.findForPersonHistory(any(), any())).thenReturn(List.of(original));
+    void stagesEarlierResultsAsThePracticeTheVerdictAndTheSummary() {
+        PracticeResult original = practiceResultAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID);
+        when(practiceResultRepository.findForPersonHistory(any(), any())).thenReturn(List.of(original));
 
-        var captured = captureObservationHistory();
+        var captured = captureResultHistory();
 
         JsonNode entry = read(captured.files().get("inputs/history/observations.json"))
                 .get("observations")
                 .get(0);
         assertThat(entry.propertyNames())
                 .containsExactlyInAnyOrder(
-                        "id",
+                        "practiceResultId",
                         "practiceSlug",
                         "summary",
                         "outcome",
@@ -467,7 +477,8 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                         "practiceRevision",
                         "artifact",
                         "observedAt");
-        assertThat(entry.path("id").asString()).isEqualTo(original.getId().toString());
+        assertThat(entry.path("practiceResultId").asString())
+                .isEqualTo(original.getId().toString());
         assertThat(entry.get("practiceSlug").asString()).isEqualTo("swallows-errors");
         assertThat(entry.get("summary").asString()).isEqualTo("Caught and ignored");
         assertThat(captured.contentStates())
@@ -476,14 +487,14 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
 
     @Test
     void shouldKeepTheWholePermittedHistoryOfARecurringPractice() {
-        List<Observation> newestFirst = new ArrayList<>();
+        List<PracticeResult> newestFirst = new ArrayList<>();
         for (int i = 0; i < 3 + 2; i++) {
-            newestFirst.add(observation("swallows-errors", "rec-" + i, "Caught and ignored " + i));
+            newestFirst.add(practiceResult("swallows-errors", "Caught and ignored " + i));
         }
-        newestFirst.add(observation("verification-guidance", "rec-v", "Missing restart check"));
-        when(observationRepository.findForPersonHistory(any(), any())).thenReturn(newestFirst);
+        newestFirst.add(practiceResult("verification-guidance", "Missing restart check"));
+        when(practiceResultRepository.findForPersonHistory(any(), any())).thenReturn(newestFirst);
 
-        JsonNode records = read(captureObservationHistory().files().get("inputs/history/observations.json"))
+        JsonNode records = read(captureResultHistory().files().get("inputs/history/observations.json"))
                 .get("observations");
 
         assertThat(records.valueStream().map(r -> r.get("summary").asString()))
@@ -539,12 +550,12 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
 
     @Test
     void shouldPreserveSeparateBehaviorRecordsAtTheSameLocation() {
-        when(observationRepository.findForPersonHistory(any(), any()))
+        when(practiceResultRepository.findForPersonHistory(any(), any()))
                 .thenReturn(List.of(
-                        observation("verification-guidance", "same-location", "Missing restart check"),
-                        observation("verification-guidance", "same-location", "Misleading setup instruction")));
+                        practiceResult("verification-guidance", "Missing restart check"),
+                        practiceResult("verification-guidance", "Misleading setup instruction")));
 
-        var files = captureObservationHistory().files();
+        var files = captureResultHistory().files();
         assertThat(files).containsOnlyKeys("inputs/history/observations.json");
         JsonNode records = read(files.get("inputs/history/observations.json")).get("observations");
         assertThat(records).hasSize(2);
@@ -554,17 +565,17 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
 
     @Test
     void neverReportsCompleteBecauseTheWindowIsBounded() {
-        assertThat(captureObservationHistory().completeness().values()).containsOnly(SourceCompleteness.COMPLETE);
+        assertThat(captureResultHistory().completeness().values()).containsOnly(SourceCompleteness.COMPLETE);
         assertThat(captureFeedbackHistory().completeness().values()).containsOnly(SourceCompleteness.COMPLETE);
     }
 
     @Test
-    void withholdsAnObservationTheVisibilityPolicyRefuses() {
-        when(observationRepository.findForPersonHistory(any(), any()))
-                .thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
+    void withholdsAResultTheVisibilityPolicyRefuses() {
+        when(practiceResultRepository.findForPersonHistory(any(), any()))
+                .thenReturn(List.of(practiceResult("swallows-errors", "Caught and ignored")));
         doReturn(Set.of()).when(visibilityPolicy).permitsAll(anyLong(), any(), any());
 
-        var captured = captureObservationHistory();
+        var captured = captureResultHistory();
 
         assertThat(read(captured.files().get("inputs/history/observations.json"))
                         .get("observations"))
@@ -577,9 +588,9 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     void reportsUnavailableRatherThanEmptyWhenTheSubjectCannotBeResolved() {
         when(pullRequestRepository.findByIdWithAuthorAndRepository(eq(PR_ID))).thenReturn(Optional.empty());
 
-        assertUnavailable(captureObservationHistory(), ReviewHistoryContentSource.OBSERVATION_HISTORY);
+        assertUnavailable(captureResultHistory(), ReviewHistoryContentSource.OBSERVATION_HISTORY);
         assertUnavailable(captureFeedbackHistory(), ReviewHistoryContentSource.FEEDBACK_HISTORY);
-        verifyNoInteractions(observationRepository, feedbackRepository);
+        verifyNoInteractions(practiceResultRepository, feedbackRepository);
     }
 
     private static void assertUnavailable(EvidenceContribution captured, SourceKind kind) {
@@ -599,11 +610,11 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     class NamingTheWorkAnEntryIsAbout {
 
         @Test
-        void anObservationCarriesTheHandleOfTheWorkItWasFiledAgainst() {
-            when(observationRepository.findForPersonHistory(any(), any()))
-                    .thenReturn(List.of(observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID)));
+        void aResultCarriesTheHandleOfTheWorkItWasFiledAgainst() {
+            when(practiceResultRepository.findForPersonHistory(any(), any()))
+                    .thenReturn(List.of(practiceResultAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID)));
 
-            JsonNode artifact = read(captureObservationHistory().files().get("inputs/history/observations.json"))
+            JsonNode artifact = read(captureResultHistory().files().get("inputs/history/observations.json"))
                     .get("observations")
                     .get(0)
                     .get("artifact");
@@ -631,11 +642,11 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
 
         @Test
         void workNoResolverCanNameIsStagedAsItsKindWithoutANumber() {
-            when(observationRepository.findForPersonHistory(any(), any()))
-                    .thenReturn(
-                            List.of(observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)));
+            when(practiceResultRepository.findForPersonHistory(any(), any()))
+                    .thenReturn(List.of(
+                            practiceResultAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)));
 
-            JsonNode artifact = read(captureObservationHistory().files().get("inputs/history/observations.json"))
+            JsonNode artifact = read(captureResultHistory().files().get("inputs/history/observations.json"))
                     .get("observations")
                     .get(0)
                     .get("artifact");
@@ -648,19 +659,19 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
 
         @Test
         void noHistoryFileCarriesARowIdAnywhere() {
-            when(observationRepository.findForPersonHistory(any(), any()))
+            when(practiceResultRepository.findForPersonHistory(any(), any()))
                     .thenReturn(List.of(
-                            observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID),
-                            observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)));
+                            practiceResultAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID),
+                            practiceResultAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)));
             when(feedbackRepository.findDeliveredForPersonHistory(any(), any()))
                     .thenReturn(List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID)));
             when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
                     .thenReturn(List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID)));
 
-            var observationCapture = captureObservationHistory();
+            var practiceResultCapture = captureResultHistory();
             var feedbackCapture = captureFeedbackHistory();
             assertCarriesNoRowId(
-                    read(observationCapture.files().get("inputs/history/observations.json")), "observations.json");
+                    read(practiceResultCapture.files().get("inputs/history/observations.json")), "observations.json");
             assertCarriesNoRowId(read(feedbackCapture.files().get("inputs/history/feedback.json")), "feedback.json");
             assertCarriesNoRowId(read(feedbackCapture.files().get("inputs/history/prepared.json")), "prepared.json");
         }
@@ -673,7 +684,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         assertThat(provider.supports(prRequest())).isTrue();
     }
 
-    private EvidenceContribution captureObservationHistory() {
+    private EvidenceContribution captureResultHistory() {
         return provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
     }
 
@@ -684,8 +695,8 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         void keepsTheRecordOfWhatWasSaidButNotItsWords() {
             Feedback note = deliveredAgainst(ArtifactKinds.ISSUE, DELIVERED_ARTIFACT_ROW_ID);
             Feedback brief = queued("in-chat:7:subtasks", "None of the four issues has a task list.");
-            boundTo.put(note.getId(), List.of(boundObservation(true)));
-            boundTo.put(brief.getId(), List.of(boundObservation(true)));
+            boundTo.put(note.getId(), List.of(boundResult(true)));
+            boundTo.put(brief.getId(), List.of(boundResult(true)));
             when(feedbackRepository.findDeliveredForPersonHistory(any(), any())).thenReturn(List.of(note));
             when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
                     .thenReturn(List.of(brief));
@@ -712,9 +723,9 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        void oneStaleObservationBehindAPieceOfFeedbackMakesItsWordsStale() {
+        void oneStaleResultBehindAPieceOfFeedbackMakesItsWordsStale() {
             Feedback card = queued("in-app:99:subtasks", "#7 and #6 still lack checkable units.");
-            boundTo.put(card.getId(), List.of(boundObservation(false), boundObservation(true)));
+            boundTo.put(card.getId(), List.of(boundResult(false), boundResult(true)));
             when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
                     .thenReturn(List.of(card));
 
@@ -727,9 +738,9 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        void keepsTheWordsWhileEveryObservationBehindThemIsCurrent() {
+        void keepsTheWordsWhileEveryResultBehindThemIsCurrent() {
             Feedback card = queued("in-app:99:subtasks", "#9 and #10 open as one block.");
-            boundTo.put(card.getId(), List.of(boundObservation(false), boundObservation(false)));
+            boundTo.put(card.getId(), List.of(boundResult(false), boundResult(false)));
             when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
                     .thenReturn(List.of(card));
 
@@ -744,7 +755,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         @Test
         void keepsAWithdrawnCardsRecordButNotItsWordsWhileItsEvidenceIsCurrent() {
             Feedback card = queued("in-app:99:subtasks", "Wrong words about older issues.");
-            boundTo.put(card.getId(), List.of(boundObservation(false)));
+            boundTo.put(card.getId(), List.of(boundResult(false)));
             when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
                     .thenReturn(List.of(card));
             when(withdrawalRepository.withdrawnAmong(anyLong(), any())).thenReturn(Set.of(card.getId()));
@@ -821,9 +832,9 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         void stagesNothingAboutFeedbackWhoseEvidenceThisReviewMayNotRead() {
             Feedback note = deliveredAgainst(ArtifactKinds.ISSUE, DELIVERED_ARTIFACT_ROW_ID);
             Feedback brief = queued("in-chat:7:subtasks", "A brief on withheld evidence.");
-            Observation readable = boundObservation(false);
-            boundTo.put(note.getId(), List.of(readable, boundObservation(false)));
-            boundTo.put(brief.getId(), List.of(boundObservation(false)));
+            PracticeResult readable = boundResult(false);
+            boundTo.put(note.getId(), List.of(readable, boundResult(false)));
+            boundTo.put(brief.getId(), List.of(boundResult(false)));
             when(feedbackRepository.findDeliveredForPersonHistory(any(), any())).thenReturn(List.of(note));
             when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
                     .thenReturn(List.of(brief));
@@ -850,30 +861,27 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         private static final long ACTIVE_THREAD = 42L;
 
         @Test
-        void stagesNoObservationFromAConversationWhoseChannelNoLongerConsents() {
+        void stagesNoResultFromAConversationWhoseChannelNoLongerConsents() {
             inactiveThreads.add(PAUSED_THREAD);
-            when(observationRepository.findForPersonHistory(any(), any()))
+            when(practiceResultRepository.findForPersonHistory(any(), any()))
                     .thenReturn(List.of(
-                            observation(
+                            practiceResult(
                                     "paused-practice",
-                                    "rec-1",
                                     "From the paused channel",
                                     ArtifactKinds.CONVERSATION_THREAD,
                                     PAUSED_THREAD),
-                            observation(
+                            practiceResult(
                                     "active-practice",
-                                    "rec-2",
                                     "From the active channel",
                                     ArtifactKinds.CONVERSATION_THREAD,
                                     ACTIVE_THREAD),
-                            observation(
+                            practiceResult(
                                     "code-practice",
-                                    "rec-3",
                                     "From the pull request",
                                     ArtifactKinds.PULL_REQUEST,
                                     OBSERVED_ARTIFACT_ROW_ID)));
 
-            JsonNode staged = read(captureObservationHistory().files().get("inputs/history/observations.json"));
+            JsonNode staged = read(captureResultHistory().files().get("inputs/history/observations.json"));
 
             assertThat(staged.get("observations"))
                     .extracting(o -> o.get("summary").asString())
@@ -885,7 +893,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         void stagesNoFeedbackBoundToOrAboutAConversationWhoseChannelNoLongerConsents() {
             inactiveThreads.add(PAUSED_THREAD);
             Feedback mixed = queued("in-app:1:mixed", "Bound to code and to the paused conversation.");
-            boundTo.put(mixed.getId(), List.of(boundObservation(false), boundConversation(PAUSED_THREAD)));
+            boundTo.put(mixed.getId(), List.of(boundResult(false), boundConversation(PAUSED_THREAD)));
             Feedback aboutPaused = Feedback.builder()
                     .id(UUID.randomUUID())
                     .channel(FeedbackChannel.IN_CHAT)
@@ -930,9 +938,10 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                             "in-app:1:mixed", "in-chat:1:paused", "paused conversation", "in-chat:1:threadless");
         }
 
-        private static Observation boundConversation(long threadId) {
-            Observation current = boundObservation(false);
-            return Observation.builder()
+        private static PracticeResult boundConversation(long threadId) {
+            PracticeResult current = boundResult(false);
+            return PracticeResult.builder()
+                    .scopeKey("test-scope")
                     .id(current.getId())
                     .practice(current.getPractice())
                     .practiceRevision(current.getPracticeRevision())
@@ -952,13 +961,14 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                 .build();
     }
 
-    /** An observation measured under the practice's current review rules; {@code retired} marks it superseded. */
-    private static Observation boundObservation(boolean retired) {
+    /** A result measured under the practice's current review rules; {@code retired} marks it superseded. */
+    private static PracticeResult boundResult(boolean retired) {
         PracticeRevision revision = mock(PracticeRevision.class);
         lenient().when(revision.getReviewRuleFingerprint()).thenReturn("v5:rules");
         Practice practice = new Practice();
         practice.setCurrentRevision(revision);
-        return Observation.builder()
+        return PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .practice(practice)
                 .practiceRevision(revision)
@@ -967,15 +977,15 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                 .build();
     }
 
-    private record Binding(UUID feedbackId, Observation observation) implements FeedbackObservationVisibility {
+    private record Binding(UUID feedbackId, PracticeResult practiceResult) implements FeedbackResultVisibility {
         @Override
         public UUID getFeedbackId() {
             return feedbackId;
         }
 
         @Override
-        public Observation getObservation() {
-            return observation;
+        public PracticeResult getPracticeResult() {
+            return practiceResult;
         }
     }
 
@@ -998,9 +1008,9 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                 .thenReturn(Optional.of(note));
 
         assertThat(cites(note)).as("current and readable").isTrue();
-        boundTo.put(note.getId(), List.of(boundObservation(true)));
+        boundTo.put(note.getId(), List.of(boundResult(true)));
         assertThat(cites(note)).as("its evidence moved on").isFalse();
-        boundTo.put(note.getId(), List.of(boundObservation(false)));
+        boundTo.put(note.getId(), List.of(boundResult(false)));
         when(withdrawalRepository.withdrawnAmong(anyLong(), any())).thenReturn(Set.of(note.getId()));
         assertThat(cites(note)).as("withdrawn").isFalse();
         when(withdrawalRepository.withdrawnAmong(anyLong(), any())).thenReturn(Set.of());
@@ -1029,7 +1039,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                 .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
                 .reviewedRevision("original-head")
                 .build();
-        Observation support = boundObservation(false);
+        PracticeResult support = boundResult(false);
         support.getPractice().setSlug("review-the-change");
         PracticeRevision original = Objects.requireNonNull(support.getPracticeRevision());
         when(original.getId()).thenReturn(157L);
@@ -1048,7 +1058,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         assertThat(row.path("reviewedRevision").asString()).isEqualTo("original-head");
         assertThat(row.path("body").asString()).isEqualTo(note.getBody());
         JsonNode capturedSupport = row.path("basedOn").get(0);
-        assertThat(capturedSupport.path("id").asString())
+        assertThat(capturedSupport.path("practiceResultId").asString())
                 .isEqualTo(support.getId().toString());
         assertThat(capturedSupport.path("practiceSlug").asString()).isEqualTo("review-the-change");
         assertThat(capturedSupport.path("outcome").asString()).isEqualTo("MET");
@@ -1136,8 +1146,8 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         }
     }
 
-    private static Observation observationAgainst(ArtifactKind kind, long artifactId) {
-        return observation("swallows-errors", "rec-1", "Caught and ignored", kind, artifactId);
+    private static PracticeResult practiceResultAgainst(ArtifactKind kind, long artifactId) {
+        return practiceResult("swallows-errors", "Caught and ignored", kind, artifactId);
     }
 
     @Test
@@ -1168,7 +1178,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         assertThat(rows.get(1).path("withdrawn").asBoolean()).isTrue();
         assertThat(rows.get(1).has("body")).isFalse();
         verify(feedbackRepository, never()).findDeliveredForPersonHistory(any(), any());
-        verify(observationRepository, never()).findForPersonHistory(any(), any());
+        verify(practiceResultRepository, never()).findForPersonHistory(any(), any());
     }
 
     @Test
@@ -1177,11 +1187,11 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         Feedback withdrawn = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
         Feedback unreadable = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
         Feedback ineligible = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-        Observation hidden = boundObservation(true);
-        boundTo.put(mixed.getId(), List.of(boundObservation(false), boundObservation(true)));
-        boundTo.put(withdrawn.getId(), List.of(boundObservation(true)));
+        PracticeResult hidden = boundResult(true);
+        boundTo.put(mixed.getId(), List.of(boundResult(false), boundResult(true)));
+        boundTo.put(withdrawn.getId(), List.of(boundResult(true)));
         boundTo.put(unreadable.getId(), List.of(hidden));
-        boundTo.put(ineligible.getId(), List.of(boundObservation(true)));
+        boundTo.put(ineligible.getId(), List.of(boundResult(true)));
         when(feedbackRepository.findDeliveredForPublicWorkHistory(
                         WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
                 .thenReturn(List.of(mixed, withdrawn, unreadable, ineligible));
@@ -1191,9 +1201,9 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         when(publicEligibility.permitsPublicHistory(eq(ineligible), any())).thenReturn(false);
         when(visibilityPolicy.permitsShown(anyLong(), any(), eq(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)))
                 .thenAnswer(invocation -> {
-                    Collection<Observation> batch = invocation.getArgument(1);
+                    Collection<PracticeResult> batch = invocation.getArgument(1);
                     return batch.stream()
-                            .map(Observation::getId)
+                            .map(PracticeResult::getId)
                             .filter(id -> !id.equals(hidden.getId()))
                             .collect(Collectors.toSet());
                 });
@@ -1233,37 +1243,31 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                 .build();
     }
 
-    private static Observation observation(String practiceSlug, String recurrenceKey, String title) {
-        return observation(practiceSlug, recurrenceKey, title, null, null);
+    private static PracticeResult practiceResult(String practiceSlug, String title) {
+        return practiceResult(practiceSlug, title, null, null);
     }
 
-    private static Observation observationWithRationale(String rationale) {
-        return observation("swallows-errors", "rec-1", "Caught and ignored", null, null, rationale);
+    private static PracticeResult practiceResultWithRationale(String rationale) {
+        return practiceResult("swallows-errors", "Caught and ignored", null, null, rationale);
     }
 
-    private static Observation observation(
+    private static PracticeResult practiceResult(
+            String practiceSlug, String title, @Nullable ArtifactKind artifactKind, @Nullable Long artifactId) {
+        return practiceResult(practiceSlug, title, artifactKind, artifactId, "The catch block logs and continues.");
+    }
+
+    private static PracticeResult practiceResult(
             String practiceSlug,
-            String recurrenceKey,
-            String title,
-            @Nullable ArtifactKind artifactKind,
-            @Nullable Long artifactId) {
-        return observation(
-                practiceSlug, recurrenceKey, title, artifactKind, artifactId, "The catch block logs and continues.");
-    }
-
-    private static Observation observation(
-            String practiceSlug,
-            String recurrenceKey,
             String title,
             @Nullable ArtifactKind artifactKind,
             @Nullable Long artifactId,
             String evidenceRationale) {
         Practice practice = new Practice();
         practice.setSlug(practiceSlug);
-        return Observation.builder()
+        return PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .practice(practice)
-                .recurrenceKey(recurrenceKey)
                 .summary(title)
                 .outcome(Outcome.NOT_MET)
                 .artifactKind(artifactKind)

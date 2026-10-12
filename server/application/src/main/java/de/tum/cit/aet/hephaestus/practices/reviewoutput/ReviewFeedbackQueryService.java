@@ -10,8 +10,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackLocation;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackQueryFilter;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -21,10 +21,10 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApproval;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.FeedbackApprovalDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.FeedbackDisputeDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.FeedbackWithdrawalDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewBoundObservationDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewBoundResultDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDetailDTO;
@@ -59,7 +59,7 @@ import tools.jackson.databind.ObjectMapper;
 class ReviewFeedbackQueryService {
 
     private final FeedbackRepository feedbackRepository;
-    private final FeedbackObservationRepository feedbackObservationRepository;
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
     private final FeedbackDispatchRepository dispatchRepository;
     private final ReviewSubjectResolver subjectResolver;
@@ -156,9 +156,9 @@ class ReviewFeedbackQueryService {
         Feedback feedback = feedbackRepository
                 .findByIdAndWorkspaceId(feedbackId, workspaceId)
                 .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
-        List<ReviewBoundObservationDTO> observations =
-                feedbackObservationRepository.findBoundObservations(workspaceId, feedbackId).stream()
-                        .map(ReviewBoundObservationDTO::from)
+        List<ReviewBoundResultDTO> practiceResults =
+                feedbackEvidenceRepository.findBoundResults(workspaceId, feedbackId).stream()
+                        .map(ReviewBoundResultDTO::from)
                         .toList();
         List<ReviewPlacementDTO> placements =
                 feedbackPlacementRepository.findByFeedbackIdInDisplayOrder(feedbackId).stream()
@@ -198,7 +198,7 @@ class ReviewFeedbackQueryService {
                 reviewedWork,
                 subjects.get(feedback.getRecipientUserId()),
                 subjects.get(feedback.getAboutUserId()),
-                observations,
+                practiceResults,
                 placements,
                 dispatches(workspaceId, feedback),
                 approval,

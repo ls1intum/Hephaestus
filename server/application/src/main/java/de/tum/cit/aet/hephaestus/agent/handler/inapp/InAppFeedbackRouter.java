@@ -1,16 +1,16 @@
 package de.tum.cit.aet.hephaestus.agent.handler.inapp;
 
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationOrder;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultOrder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomyPolicy;
-import de.tum.cit.aet.hephaestus.practices.observation.LatestRun;
-import de.tum.cit.aet.hephaestus.practices.observation.ReviewedWorkKey;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
+import de.tum.cit.aet.hephaestus.practices.result.LatestRun;
+import de.tum.cit.aet.hephaestus.practices.result.ReviewedWorkKey;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
@@ -43,7 +43,7 @@ public final class InAppFeedbackRouter {
 
     public static InAppRoutingDecision route(
             ComposedInAppMessage message,
-            List<Observation> evidence,
+            List<PracticeResult> evidence,
             @Nullable PracticeAutonomy autonomy,
             ActorRole subjectRole,
             @Nullable Instant lastSurfaced,
@@ -59,7 +59,7 @@ public final class InAppFeedbackRouter {
      * message is written; preparation decides again through {@link #route}.
      */
     public static InAppRoutingDecision routeEvidence(
-            List<Observation> evidence,
+            List<PracticeResult> evidence,
             @Nullable PracticeAutonomy autonomy,
             ActorRole subjectRole,
             @Nullable Instant lastSurfaced,
@@ -70,17 +70,17 @@ public final class InAppFeedbackRouter {
         if (subjectRole != ActorRole.AUTHOR && subjectRole != ActorRole.MERGER && subjectRole != ActorRole.REVIEWER) {
             return InAppRoutingDecision.UNATTRIBUTABLE_SUBJECT;
         }
-        List<Observation> problems = problemsIn(evidence);
+        List<PracticeResult> problems = problemsIn(evidence);
         if (problems.isEmpty()) {
             return InAppRoutingDecision.NO_EVIDENCE;
         }
         // Origin is asked of the evidence, not of the run: what makes a pattern claim sound is how the
         // measurements behind it were taken, and a live run can compose over a backfilled record.
-        ObservationOrigin origin = weakestOrigin(problems);
+        ResultOrigin origin = weakestOrigin(problems);
         if (!PracticeAutonomyPolicy.delivers(origin, autonomy, FeedbackChannel.IN_APP)) {
             return InAppRoutingDecision.PRACTICE_REQUIRES_APPROVAL;
         }
-        if (problems.stream().allMatch(o -> o.getOrigin() == ObservationOrigin.BACKFILL)) {
+        if (problems.stream().allMatch(o -> o.getOrigin() == ResultOrigin.BACKFILL)) {
             return InAppRoutingDecision.BACKFILL_HELD;
         }
         if (distinctArtifacts(problems) < FeedbackCompositionInputs.MIN_DISTINCT_ARTIFACTS) {
@@ -98,10 +98,10 @@ public final class InAppFeedbackRouter {
      * {@link InAppRoutingDecision#BACKFILL_HELD} answers it below. LIVE is returned for an empty
      * cluster, which the caller has already refused.
      */
-    private static ObservationOrigin weakestOrigin(List<Observation> problems) {
-        return problems.stream().anyMatch(o -> o.getOrigin() != ObservationOrigin.BACKFILL)
-                ? ObservationOrigin.LIVE
-                : ObservationOrigin.BACKFILL;
+    private static ResultOrigin weakestOrigin(List<PracticeResult> problems) {
+        return problems.stream().anyMatch(o -> o.getOrigin() != ResultOrigin.BACKFILL)
+                ? ResultOrigin.LIVE
+                : ResultOrigin.BACKFILL;
     }
 
     /**
@@ -121,13 +121,13 @@ public final class InAppFeedbackRouter {
      * a live or requested one, and its problem stands only for work neither has judged.
      *
      * <p>Which of a run's several problems on one piece of work stands for it is decided by
-     * {@link ObservationOrder#worstFirst()}, not by the order the rows came back in: they all carry that
+     * {@link ResultOrder#worstFirst()}, not by the order the rows came back in: they all carry that
      * run's moment, so repository order would let the example the developer is shown be the mildest problem
      * on that work. The pieces of work keep the window's order.
      */
-    public static List<Observation> problemsIn(List<Observation> evidence) {
-        List<Observation> unbackfilled = evidence.stream()
-                .filter(observation -> observation.getOrigin() != ObservationOrigin.BACKFILL)
+    public static List<PracticeResult> problemsIn(List<PracticeResult> evidence) {
+        List<PracticeResult> unbackfilled = evidence.stream()
+                .filter(practiceResult -> practiceResult.getOrigin() != ResultOrigin.BACKFILL)
                 .toList();
         Set<ReviewedWorkKey> judged =
                 unbackfilled.stream().map(ReviewedWorkKey::of).collect(Collectors.toSet());
@@ -136,40 +136,41 @@ public final class InAppFeedbackRouter {
                 .map(ReviewedWorkKey::of)
                 .collect(Collectors.toSet());
         Set<UUID> citable = new HashSet<>();
-        LatestRun.perWork(withOrigin(evidence, ObservationOrigin.LIVE)).stream()
-                .filter(observation ->
-                        isProblem(observation) && stillProblems.contains(ReviewedWorkKey.of(observation)))
-                .forEach(observation -> citable.add(observation.getId()));
-        LatestRun.perWork(withOrigin(evidence, ObservationOrigin.BACKFILL)).stream()
-                .filter(observation -> isProblem(observation) && !judged.contains(ReviewedWorkKey.of(observation)))
-                .forEach(observation -> citable.add(observation.getId()));
+        LatestRun.perWork(withOrigin(evidence, ResultOrigin.LIVE)).stream()
+                .filter(practiceResult ->
+                        isProblem(practiceResult) && stillProblems.contains(ReviewedWorkKey.of(practiceResult)))
+                .forEach(practiceResult -> citable.add(practiceResult.getId()));
+        LatestRun.perWork(withOrigin(evidence, ResultOrigin.BACKFILL)).stream()
+                .filter(practiceResult ->
+                        isProblem(practiceResult) && !judged.contains(ReviewedWorkKey.of(practiceResult)))
+                .forEach(practiceResult -> citable.add(practiceResult.getId()));
 
-        Comparator<Observation> worstFirst = ObservationOrder.worstFirst();
-        Map<ReviewedWorkKey, Observation> worstPerWork = new LinkedHashMap<>();
-        for (Observation observation : evidence) {
-            if (!citable.contains(observation.getId())) {
+        Comparator<PracticeResult> worstFirst = ResultOrder.worstFirst();
+        Map<ReviewedWorkKey, PracticeResult> worstPerWork = new LinkedHashMap<>();
+        for (PracticeResult practiceResult : evidence) {
+            if (!citable.contains(practiceResult.getId())) {
                 continue;
             }
             worstPerWork.merge(
-                    ReviewedWorkKey.of(observation),
-                    observation,
+                    ReviewedWorkKey.of(practiceResult),
+                    practiceResult,
                     (kept, next) -> worstFirst.compare(next, kept) < 0 ? next : kept);
         }
         return List.copyOf(worstPerWork.values());
     }
 
-    private static boolean isProblem(Observation observation) {
-        return observation.getOutcome() == Outcome.NOT_MET;
+    private static boolean isProblem(PracticeResult practiceResult) {
+        return practiceResult.getOutcome() == Outcome.NOT_MET;
     }
 
-    private static List<Observation> withOrigin(List<Observation> evidence, ObservationOrigin origin) {
+    private static List<PracticeResult> withOrigin(List<PracticeResult> evidence, ResultOrigin origin) {
         return evidence.stream()
-                .filter(observation -> observation.getOrigin() == origin)
+                .filter(practiceResult -> practiceResult.getOrigin() == origin)
                 .toList();
     }
 
     /** How many separate pieces of work carry the problem — the unit of proof at the process level. */
-    public static int distinctArtifacts(List<Observation> problems) {
+    public static int distinctArtifacts(List<PracticeResult> problems) {
         return (int) problems.stream().map(ReviewedWorkKey::of).distinct().count();
     }
 }

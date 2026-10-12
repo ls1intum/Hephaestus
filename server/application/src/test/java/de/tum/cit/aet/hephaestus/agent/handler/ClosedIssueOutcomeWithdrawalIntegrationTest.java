@@ -12,8 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndexBuilder;
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.ValidatedObservation;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ResultsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReason;
@@ -65,6 +64,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -210,16 +210,20 @@ class ClosedIssueOutcomeWithdrawalIntegrationTest extends BaseIntegrationTest {
     void shouldAdmitNoClaimFromAReviewPreparedBeforeTheWithdrawal(Provider provider) {
         Installed installed = install(provider);
         AgentJob job = queuedCloseReview(installed);
-        ValidatedObservation lapse = claim(Outcome.NOT_MET, Severity.MAJOR);
-        ValidatedObservation cleanClose = claim(Outcome.MET, null);
+        ObjectNode lapse = claim(Outcome.NOT_MET);
+        ObjectNode cleanClose = claim(Outcome.MET);
 
-        for (ValidatedObservation observation : List.of(lapse, cleanClose)) {
-            assertThatThrownBy(() -> deliveryService.prepare(job, List.of(observation)))
-                    .isInstanceOf(ObservationsRefusedException.class)
-                    .hasMessageContaining("withheld=[" + WITHDRAWN + ": withdrawn from automated review]");
+        for (ObjectNode candidate : List.of(lapse, cleanClose)) {
+            ArrayNode results = OBJECT_MAPPER.createArrayNode();
+            results.addObject().put("practiceSlug", WITHDRAWN).set("candidate", candidate);
+            // The withdrawal withholds the practice before any check of its claim, so nothing is left to admit.
+            assertThatThrownBy(() -> deliveryService.prepare(job, results))
+                    .isInstanceOfSatisfying(
+                            ResultsRefusedException.class,
+                            refused -> assertThat(refused.reasonCode()).isEqualTo("no_admissible_results"));
         }
 
-        for (String table : List.of("observation", "feedback", "feedback_dispatch")) {
+        for (String table : List.of("practice_result", "feedback", "feedback_dispatch")) {
             assertThat(jdbcTemplate.queryForObject(
                             "SELECT count(*) FROM " + table + " WHERE workspace_id = ?",
                             Long.class,
@@ -371,13 +375,42 @@ class ClosedIssueOutcomeWithdrawalIntegrationTest extends BaseIntegrationTest {
         return agentJobRepository.save(job);
     }
 
-    private static ValidatedObservation claim(Outcome outcome, @Nullable Severity severity) {
-        ObjectNode evidence = OBJECT_MAPPER.createObjectNode();
-        evidence.putArray("citations")
-                .addObject()
+    /** A candidate that the withdrawn copy would have returned: a lapse with its problem, or a clean close. */
+    private static ObjectNode claim(Outcome outcome) {
+        ObjectNode citation = OBJECT_MAPPER
+                .createObjectNode()
                 .put("sourceKind", CORE.value())
                 .put("artifactPath", "context/description.md")
+                .put("path", "description.md")
+                .put("startLine", 1)
+                .put("endLine", 1)
                 .put("quote", "- [ ] Export to CSV");
-        return new ValidatedObservation(WITHDRAWN, "Closed with an unchecked item", outcome, severity, evidence, null);
+        ObjectNode candidate = OBJECT_MAPPER.createObjectNode();
+        candidate.put("outcome", outcome.name());
+        candidate.put("summary", "Closed with an unchecked item");
+        candidate.put("explanation", "The issue was closed while its checklist still lists an open item.");
+        ArrayNode citations = candidate.putArray("citations");
+        if (outcome == Outcome.NOT_MET) {
+            ObjectNode problem = candidate.putArray("problems").addObject();
+            problem.put("severity", Severity.MAJOR.name());
+            problem.put("summary", "Closed with an unchecked item");
+            problem.put("explanation", "The checklist item for the CSV export is still open.");
+            problem.putArray("citations").add(citation);
+            problem.putObject("basis")
+                    .put("type", "introduced")
+                    .put("head", 0)
+                    .put("explanation", "The close left this item unchecked.");
+        } else {
+            citations.add(citation);
+        }
+        candidate.putObject("evidence");
+        candidate
+                .putObject("coverage")
+                .put("source", "host")
+                .put("reads", 1)
+                .put("truncatedReads", 0)
+                .put("failedReads", 0)
+                .put("complete", true);
+        return candidate;
     }
 }

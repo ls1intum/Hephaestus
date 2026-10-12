@@ -353,7 +353,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
                 .thenReturn(List.of(
                         comment(
                                 "group_328643_bot_1",
-                                "**`App/WeatherViewModel.swift:13`**\n\nAdd observation support so the view refreshes."
+                                "**`App/WeatherViewModel.swift:13`**\n\nAdd result support so the view refreshes."
                                         + "\n<!-- hephaestus-diff-note -->\n<!-- hephaestus-diff-note-ck=abc -->",
                                 Instant.parse("2025-06-01T09:00:00Z")),
                         comment(

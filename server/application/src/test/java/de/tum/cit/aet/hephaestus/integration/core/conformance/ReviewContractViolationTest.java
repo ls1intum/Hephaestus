@@ -136,7 +136,7 @@ class ReviewContractViolationTest extends BaseUnitTest {
                             FixtureIntegration.descriptor(true, Set.of(), Set.of(FeedbackLane.IN_CONTEXT_SUMMARY))))
                     .singleElement()
                     .asString()
-                    .contains("names nobody to attribute an observation to");
+                    .contains("names nobody to attribute a result to");
         }
 
         @Test

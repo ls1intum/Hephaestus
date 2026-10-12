@@ -173,7 +173,7 @@ public class IssueAgentJobEventListener {
     }
 
     /**
-     * Records the observation, then decides whether it warrants a review — the same split as the PR
+     * Records the result, then decides whether it warrants a review — the same split as the PR
      * listener, and for the same reason: what we saw is a fact, whether to coach on it is a policy.
      */
     private void dispatchIssueEvent(

@@ -21,8 +21,8 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * Optional filters for the review listing, flattened onto the query string by {@link ParameterObject}.
  *
- * <p>{@code from}/{@code to} are the same half-open window the sibling observation and feedback
- * listings take — see {@code ReviewObservationFilterParams} — down to the rejection message, so the
+ * <p>{@code from}/{@code to} are the same half-open window the sibling result and feedback
+ * listings take — see {@code ReviewResultFilterParams} — down to the rejection message, so the
  * three surfaces under {@code /practices/reviews} answer a pasted date range identically.
  *
  * <p>{@code subjectUserId}, {@code practiceSlug} and {@code groupSlug} keep the reviews that recorded at least one

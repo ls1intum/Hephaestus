@@ -233,7 +233,7 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
 
     /**
      * The stamp that decides where the measurement is counted. A sweep is bounded to recent work, so it
-     * measures the population events measure; recording it as BACKFILL would hide every observation from the
+     * measures the population events measure; recording it as BACKFILL would hide every result from the
      * developer it is about and silence every channel but the profile.
      */
     @Test

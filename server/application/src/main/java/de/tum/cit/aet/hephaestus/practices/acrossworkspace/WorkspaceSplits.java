@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.acrossworkspace;
 import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.WorkspaceRangeDTO;
 import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.WorkspaceSplitDTO;
 import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.WorkspaceSplitPartDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO.Standing;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO.Standing;
 import java.util.Collection;
 import java.util.List;
 import org.jspecify.annotations.Nullable;

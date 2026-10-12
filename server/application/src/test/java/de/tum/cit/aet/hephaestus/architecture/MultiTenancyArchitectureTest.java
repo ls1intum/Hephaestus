@@ -14,7 +14,7 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import java.lang.reflect.Method;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -114,10 +114,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     class RepositoryWorkspaceFilteringTests {
 
         @Test
-        void observationQueriesBindWorkspaceParameter() {
-            assertThat(ObservationRepository.class.isAnnotationPresent(WorkspaceAgnostic.class))
+        void practiceResultQueriesBindWorkspaceParameter() {
+            assertThat(PracticeResultRepository.class.isAnnotationPresent(WorkspaceAgnostic.class))
                     .isFalse();
-            for (Method method : ObservationRepository.class.getDeclaredMethods()) {
+            for (Method method : PracticeResultRepository.class.getDeclaredMethods()) {
                 Query query = method.getAnnotation(Query.class);
                 if (query == null) continue;
                 if (method.isAnnotationPresent(WorkspaceAgnostic.class)) continue;

@@ -304,4 +304,356 @@ WHERE adopted_base -> 'practiceScript' IS NOT NULL;
             </column>
         </addColumn>
     </changeSet>
+    <changeSet id="1791486276211-23" author="hephaestus">
+        <preConditions onFail="HALT" onError="HALT">
+            <sqlCheck expectedResult="3">SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('observation', 'observation_invalidation', 'feedback_observation')</sqlCheck>
+        </preConditions>
+        <comment>Rename the per-practice verdict to practice result: observation becomes practice_result, its correction becomes practice_result_invalidation and the feedback join becomes feedback_evidence, with every constraint and index of the three tables. Row ids and every row are kept. No behaviour change.</comment>
+        <sql><![CDATA[
+ALTER TABLE observation RENAME TO practice_result;
+ALTER TABLE practice_result RENAME CONSTRAINT observation_pkey TO practice_result_pkey;
+ALTER TABLE practice_result RENAME CONSTRAINT chk_observation_artifact_kind TO chk_practice_result_artifact_kind;
+ALTER TABLE practice_result RENAME CONSTRAINT chk_observation_origin TO chk_practice_result_origin;
+ALTER TABLE practice_result RENAME CONSTRAINT chk_observation_outcome TO chk_practice_result_outcome;
+ALTER TABLE practice_result RENAME CONSTRAINT chk_observation_outcome_severity TO chk_practice_result_outcome_severity;
+ALTER TABLE practice_result RENAME CONSTRAINT chk_observation_severity TO chk_practice_result_severity;
+ALTER TABLE practice_result RENAME CONSTRAINT uk_observation_occurrence TO uk_practice_result_occurrence;
+ALTER TABLE practice_result RENAME CONSTRAINT uk_observation_workspace_id TO uk_practice_result_workspace_id;
+ALTER TABLE practice_result RENAME CONSTRAINT fk_observation_practice TO fk_practice_result_practice;
+ALTER TABLE practice_result RENAME CONSTRAINT fk_observation_practice_workspace TO fk_practice_result_practice_workspace;
+ALTER TABLE practice_result RENAME CONSTRAINT fk_observation_revision TO fk_practice_result_revision;
+ALTER TABLE practice_result RENAME CONSTRAINT sfk_observation_agent_job TO sfk_practice_result_agent_job;
+ALTER TABLE practice_result RENAME CONSTRAINT sfk_observation_subject TO sfk_practice_result_subject;
+ALTER TABLE practice_result RENAME CONSTRAINT sfk_observation_workspace TO sfk_practice_result_workspace;
+ALTER INDEX idx_observation_agent_job RENAME TO idx_practice_result_agent_job;
+ALTER INDEX idx_observation_correlation RENAME TO idx_practice_result_correlation;
+ALTER INDEX idx_observation_practice_observed RENAME TO idx_practice_result_practice_observed;
+ALTER INDEX idx_observation_subject RENAME TO idx_practice_result_subject;
+ALTER INDEX idx_observation_target RENAME TO idx_practice_result_target;
+ALTER INDEX idx_observation_target_run RENAME TO idx_practice_result_target_run;
+ALTER INDEX idx_observation_workspace_observed RENAME TO idx_practice_result_workspace_observed;
+ALTER TABLE observation_invalidation RENAME TO practice_result_invalidation;
+ALTER TABLE practice_result_invalidation RENAME COLUMN observation_id TO practice_result_id;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT "observation_invalidationPK" TO "practice_result_invalidationPK";
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT ck_observation_invalidation_provider_copy TO ck_practice_result_invalidation_provider_copy;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT ck_observation_invalidation_reason TO ck_practice_result_invalidation_reason;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT ck_observation_invalidation_restoration TO ck_practice_result_invalidation_restoration;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT fk_observation_invalidation_observation TO fk_practice_result_invalidation_practice_result;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT sfk_observation_invalidation_invalidated_by TO sfk_practice_result_invalidation_invalidated_by;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT sfk_observation_invalidation_restored_by TO sfk_practice_result_invalidation_restored_by;
+ALTER INDEX idx_observation_invalidation_observation RENAME TO idx_practice_result_invalidation_practice_result;
+ALTER INDEX idx_observation_invalidation_provider_copy_due RENAME TO idx_practice_result_invalidation_provider_copy_due;
+ALTER INDEX uk_observation_invalidation_active RENAME TO uk_practice_result_invalidation_active;
+ALTER TABLE feedback_observation RENAME TO feedback_evidence;
+ALTER TABLE feedback_evidence RENAME COLUMN observation_id TO practice_result_id;
+ALTER TABLE feedback_evidence RENAME CONSTRAINT feedback_observation_pkey TO feedback_evidence_pkey;
+ALTER TABLE feedback_evidence RENAME CONSTRAINT chk_feedback_observation_role TO chk_feedback_evidence_role;
+ALTER TABLE feedback_evidence RENAME CONSTRAINT fk_feedback_observation_feedback TO fk_feedback_evidence_feedback;
+ALTER TABLE feedback_evidence RENAME CONSTRAINT fk_feedback_observation_observation TO fk_feedback_evidence_practice_result;
+ALTER INDEX idx_feedback_observation_observation RENAME TO idx_feedback_evidence_practice_result;
+        ]]></sql>
+        <rollback>
+            <sql><![CDATA[
+ALTER INDEX idx_feedback_evidence_practice_result RENAME TO idx_feedback_observation_observation;
+ALTER TABLE feedback_evidence RENAME CONSTRAINT feedback_evidence_pkey TO feedback_observation_pkey;
+ALTER TABLE feedback_evidence RENAME CONSTRAINT chk_feedback_evidence_role TO chk_feedback_observation_role;
+ALTER TABLE feedback_evidence RENAME CONSTRAINT fk_feedback_evidence_feedback TO fk_feedback_observation_feedback;
+ALTER TABLE feedback_evidence RENAME CONSTRAINT fk_feedback_evidence_practice_result TO fk_feedback_observation_observation;
+ALTER TABLE feedback_evidence RENAME COLUMN practice_result_id TO observation_id;
+ALTER TABLE feedback_evidence RENAME TO feedback_observation;
+ALTER INDEX idx_practice_result_invalidation_practice_result RENAME TO idx_observation_invalidation_observation;
+ALTER INDEX idx_practice_result_invalidation_provider_copy_due RENAME TO idx_observation_invalidation_provider_copy_due;
+ALTER INDEX uk_practice_result_invalidation_active RENAME TO uk_observation_invalidation_active;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT "practice_result_invalidationPK" TO "observation_invalidationPK";
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT ck_practice_result_invalidation_provider_copy TO ck_observation_invalidation_provider_copy;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT ck_practice_result_invalidation_reason TO ck_observation_invalidation_reason;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT ck_practice_result_invalidation_restoration TO ck_observation_invalidation_restoration;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT fk_practice_result_invalidation_practice_result TO fk_observation_invalidation_observation;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT sfk_practice_result_invalidation_invalidated_by TO sfk_observation_invalidation_invalidated_by;
+ALTER TABLE practice_result_invalidation RENAME CONSTRAINT sfk_practice_result_invalidation_restored_by TO sfk_observation_invalidation_restored_by;
+ALTER TABLE practice_result_invalidation RENAME COLUMN practice_result_id TO observation_id;
+ALTER TABLE practice_result_invalidation RENAME TO observation_invalidation;
+ALTER INDEX idx_practice_result_agent_job RENAME TO idx_observation_agent_job;
+ALTER INDEX idx_practice_result_correlation RENAME TO idx_observation_correlation;
+ALTER INDEX idx_practice_result_practice_observed RENAME TO idx_observation_practice_observed;
+ALTER INDEX idx_practice_result_subject RENAME TO idx_observation_subject;
+ALTER INDEX idx_practice_result_target RENAME TO idx_observation_target;
+ALTER INDEX idx_practice_result_target_run RENAME TO idx_observation_target_run;
+ALTER INDEX idx_practice_result_workspace_observed RENAME TO idx_observation_workspace_observed;
+ALTER TABLE practice_result RENAME CONSTRAINT practice_result_pkey TO observation_pkey;
+ALTER TABLE practice_result RENAME CONSTRAINT chk_practice_result_artifact_kind TO chk_observation_artifact_kind;
+ALTER TABLE practice_result RENAME CONSTRAINT chk_practice_result_origin TO chk_observation_origin;
+ALTER TABLE practice_result RENAME CONSTRAINT chk_practice_result_outcome TO chk_observation_outcome;
+ALTER TABLE practice_result RENAME CONSTRAINT chk_practice_result_outcome_severity TO chk_observation_outcome_severity;
+ALTER TABLE practice_result RENAME CONSTRAINT chk_practice_result_severity TO chk_observation_severity;
+ALTER TABLE practice_result RENAME CONSTRAINT uk_practice_result_occurrence TO uk_observation_occurrence;
+ALTER TABLE practice_result RENAME CONSTRAINT uk_practice_result_workspace_id TO uk_observation_workspace_id;
+ALTER TABLE practice_result RENAME CONSTRAINT fk_practice_result_practice TO fk_observation_practice;
+ALTER TABLE practice_result RENAME CONSTRAINT fk_practice_result_practice_workspace TO fk_observation_practice_workspace;
+ALTER TABLE practice_result RENAME CONSTRAINT fk_practice_result_revision TO fk_observation_revision;
+ALTER TABLE practice_result RENAME CONSTRAINT sfk_practice_result_agent_job TO sfk_observation_agent_job;
+ALTER TABLE practice_result RENAME CONSTRAINT sfk_practice_result_subject TO sfk_observation_subject;
+ALTER TABLE practice_result RENAME CONSTRAINT sfk_practice_result_workspace TO sfk_observation_workspace;
+ALTER TABLE practice_result RENAME TO observation;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+    <changeSet id="1791486276211-24" author="hephaestus">
+        <preConditions onFail="HALT" onError="HALT">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'practice_result' AND column_name IN ('scope_key', 'example', 'coverage', 'provenance')</sqlCheck>
+        </preConditions>
+        <comment>Give each practice result its authored scope, an optional example from the work, its coverage and its provenance. The scope of an earlier result is derived from its practice's subject role and, for a pass over one submitted review, the review its job names. Coverage and provenance of an earlier result stay NULL: unknown, never complete. No example is invented. An earlier open question becomes a list of one.</comment>
+        <sql splitStatements="false"><![CDATA[
+ALTER TABLE practice_result
+    ADD COLUMN scope_key varchar(255),
+    ADD COLUMN example jsonb,
+    ADD COLUMN coverage jsonb,
+    ADD COLUMN provenance jsonb;
+
+UPDATE practice_result r
+SET scope_key = derived.scope_key
+FROM (
+    SELECT result.id,
+           result.artifact_kind || ':' || result.artifact_id || ':' || COALESCE(revision.subject, practice.subject)
+               || CASE
+                      WHEN COALESCE(revision.subject, practice.subject) = 'REVIEWER'
+                           AND jsonb_typeof(job.metadata -> 'review_id') = 'number'
+                      THEN ':review:' || (job.metadata ->> 'review_id')
+                      ELSE ''
+                  END AS scope_key
+    FROM practice_result result
+    JOIN practice practice ON practice.id = result.practice_id
+    LEFT JOIN practice_revision revision ON revision.id = result.practice_revision_id
+    LEFT JOIN agent_job job ON job.id = result.agent_job_id
+) derived
+WHERE derived.id = r.id;
+
+UPDATE practice_result
+SET evidence = jsonb_set(evidence, '{undecidability}', jsonb_build_array(evidence -> 'undecidability'))
+WHERE jsonb_typeof(evidence -> 'undecidability') = 'object';
+
+ALTER TABLE practice_result
+    ALTER COLUMN scope_key SET NOT NULL,
+    ADD CONSTRAINT ck_practice_result_scope CHECK (btrim(scope_key) <> ''),
+    ADD CONSTRAINT ck_practice_result_example
+        CHECK (example IS NULL OR (outcome IN ('MET', 'NOT_MET') AND jsonb_typeof(example) = 'object')),
+    ADD CONSTRAINT ck_practice_result_coverage CHECK (coverage IS NULL OR jsonb_typeof(coverage) = 'object'),
+    ADD CONSTRAINT ck_practice_result_provenance CHECK (provenance IS NULL OR jsonb_typeof(provenance) = 'object');
+        ]]></sql>
+        <rollback>
+            <stop>Restore a verified database backup made before this upgrade. Results recorded since then carry an example, coverage and provenance that the earlier schema cannot hold.</stop>
+        </rollback>
+    </changeSet>
+    <changeSet id="1791486276211-25" author="hephaestus">
+        <preConditions onFail="HALT" onError="HALT">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'practice_observation'</sqlCheck>
+            <sqlCheck expectedResult="0">SELECT count(*) FROM practice_result WHERE outcome = 'NOT_MET' AND severity IS NULL</sqlCheck>
+        </preConditions>
+        <comment>A practice result's located problems become its observations. Every earlier NOT_MET result gets one observation with a new id: its severity, summary, rationale and citations, and its recurrence key, which moves from the result to the observation. Its basis stays NULL, because no proof was recorded. Result ids and result evidence do not change, and no other outcome gets an observation.</comment>
+        <sql splitStatements="false"><![CDATA[
+CREATE TABLE practice_observation (
+    id uuid NOT NULL,
+    workspace_id bigint NOT NULL,
+    practice_result_id uuid NOT NULL,
+    position integer NOT NULL,
+    observation_key varchar(64),
+    severity varchar(16) NOT NULL,
+    summary varchar(255) NOT NULL,
+    explanation text NOT NULL,
+    citations jsonb NOT NULL,
+    basis jsonb,
+    next_step text,
+    recurrence_key varchar(64),
+    CONSTRAINT practice_observation_pkey PRIMARY KEY (id),
+    CONSTRAINT fk_practice_observation_result FOREIGN KEY (practice_result_id, workspace_id)
+        REFERENCES practice_result (id, workspace_id) ON DELETE CASCADE,
+    CONSTRAINT uk_practice_observation_position UNIQUE (practice_result_id, position),
+    CONSTRAINT uk_practice_observation_key UNIQUE (practice_result_id, observation_key),
+    CONSTRAINT uk_practice_observation_parent UNIQUE (id, practice_result_id, workspace_id),
+    CONSTRAINT ck_practice_observation_position CHECK (position >= 0),
+    CONSTRAINT ck_practice_observation_severity CHECK (severity IN ('CRITICAL', 'MAJOR', 'MINOR', 'INFO')),
+    CONSTRAINT ck_practice_observation_key CHECK (observation_key IS NULL OR observation_key ~ '^[a-z0-9][a-z0-9-]{0,63}$'),
+    CONSTRAINT ck_practice_observation_citations CHECK (jsonb_typeof(citations) = 'array'),
+    CONSTRAINT ck_practice_observation_basis CHECK (basis IS NULL OR jsonb_typeof(basis) = 'object')
+);
+CREATE INDEX idx_practice_observation_recurrence ON practice_observation (recurrence_key);
+
+INSERT INTO practice_observation (
+    id, workspace_id, practice_result_id, position, severity, summary, explanation, citations, recurrence_key)
+SELECT gen_random_uuid(), workspace_id, id, 0, severity, summary, COALESCE(evidence_rationale, summary),
+       CASE WHEN jsonb_typeof(evidence -> 'citations') = 'array' THEN evidence -> 'citations' ELSE '[]'::jsonb END,
+       recurrence_key
+FROM practice_result
+WHERE outcome = 'NOT_MET';
+
+ALTER TABLE practice_result DROP COLUMN recurrence_key;
+        ]]></sql>
+        <rollback>
+            <stop>Restore a verified database backup made before this upgrade. Observations recorded since then cannot be folded back into one result row.</stop>
+        </rollback>
+    </changeSet>
+    <changeSet id="1791486276211-26" author="hephaestus">
+        <comment>At commit, a NOT_MET result has at least one observation, any other result has none, and a result is at least as severe as its most severe observation. The check runs once for every existing result, because a new trigger does not check earlier rows.</comment>
+        <sql splitStatements="false"><![CDATA[
+CREATE FUNCTION public.check_practice_result_children(result_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+        DECLARE
+            result_outcome varchar;
+            result_rank integer;
+            children bigint;
+            worst integer;
+        BEGIN
+            SELECT r.outcome,
+                   CASE r.severity WHEN 'CRITICAL' THEN 3 WHEN 'MAJOR' THEN 2 WHEN 'MINOR' THEN 1 WHEN 'INFO' THEN 0 END
+              INTO result_outcome, result_rank
+              FROM practice_result r WHERE r.id = result_id;
+            IF NOT FOUND THEN
+                RETURN;
+            END IF;
+            SELECT count(*),
+                   max(CASE o.severity WHEN 'CRITICAL' THEN 3 WHEN 'MAJOR' THEN 2 WHEN 'MINOR' THEN 1 ELSE 0 END)
+              INTO children, worst
+              FROM practice_observation o WHERE o.practice_result_id = result_id;
+            IF (result_outcome = 'NOT_MET') <> (children > 0) THEN
+                RAISE EXCEPTION 'practice result % has % observations, and its outcome is %', result_id, children, result_outcome
+                    USING ERRCODE = '23514';
+            END IF;
+            IF children > 0 AND (result_rank IS NULL OR result_rank < worst) THEN
+                RAISE EXCEPTION 'practice result % is less severe than its most severe observation', result_id
+                    USING ERRCODE = '23514';
+            END IF;
+        END;
+        $$;
+
+CREATE FUNCTION public.enforce_practice_result_children() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+        BEGIN
+            IF TG_TABLE_NAME = 'practice_result' THEN
+                PERFORM public.check_practice_result_children(NEW.id);
+            ELSE
+                IF TG_OP <> 'INSERT' THEN
+                    PERFORM public.check_practice_result_children(OLD.practice_result_id);
+                END IF;
+                IF TG_OP <> 'DELETE' THEN
+                    PERFORM public.check_practice_result_children(NEW.practice_result_id);
+                END IF;
+            END IF;
+            RETURN NULL;
+        END;
+        $$;
+
+CREATE CONSTRAINT TRIGGER practice_result_children_consistent
+    AFTER INSERT OR UPDATE ON practice_result
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION public.enforce_practice_result_children();
+
+CREATE CONSTRAINT TRIGGER practice_observation_parent_consistent
+    AFTER INSERT OR UPDATE OR DELETE ON practice_observation
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION public.enforce_practice_result_children();
+
+DO $$
+    DECLARE
+        result_id uuid;
+    BEGIN
+        FOR result_id IN SELECT id FROM practice_result LOOP
+            PERFORM public.check_practice_result_children(result_id);
+        END LOOP;
+    END;
+$$;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+DROP TRIGGER practice_observation_parent_consistent ON practice_observation;
+DROP TRIGGER practice_result_children_consistent ON practice_result;
+DROP FUNCTION public.enforce_practice_result_children();
+DROP FUNCTION public.check_practice_result_children(uuid);
+            ]]></sql>
+        </rollback>
+    </changeSet>
+    <changeSet id="1791486276211-27" author="hephaestus">
+        <preConditions onFail="HALT" onError="HALT">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'feedback_evidence' AND column_name IN ('id', 'workspace_id', 'observation_id')</sqlCheck>
+            <sqlCheck expectedResult="0">SELECT count(*) FROM feedback_evidence e JOIN feedback f ON f.id = e.feedback_id JOIN practice_result r ON r.id = e.practice_result_id WHERE f.workspace_id &lt;&gt; r.workspace_id</sqlCheck>
+        </preConditions>
+        <comment>Feedback evidence carries its workspace and may name one observation of its result. Every earlier binding keeps its result and names no observation; its workspace is its feedback's. One binding per feedback, result and observation, with a missing observation counted as one value. The schema proves that the feedback, the result and the observation are in one workspace and that the observation belongs to the result.</comment>
+        <sql splitStatements="false"><![CDATA[
+ALTER TABLE feedback_evidence
+    ADD COLUMN id uuid DEFAULT gen_random_uuid(),
+    ADD COLUMN workspace_id bigint,
+    ADD COLUMN observation_id uuid;
+
+UPDATE feedback_evidence e
+SET workspace_id = f.workspace_id
+FROM feedback f
+WHERE f.id = e.feedback_id;
+
+ALTER TABLE feedback_evidence
+    ALTER COLUMN id DROP DEFAULT,
+    ALTER COLUMN id SET NOT NULL,
+    ALTER COLUMN workspace_id SET NOT NULL,
+    DROP CONSTRAINT feedback_evidence_pkey,
+    ADD CONSTRAINT feedback_evidence_pkey PRIMARY KEY (id),
+    ADD CONSTRAINT uk_feedback_evidence_ref UNIQUE NULLS NOT DISTINCT (feedback_id, practice_result_id, observation_id),
+    ADD CONSTRAINT sfk_feedback_evidence_workspace FOREIGN KEY (workspace_id) REFERENCES workspace (id),
+    ADD CONSTRAINT sfk_feedback_evidence_feedback_workspace FOREIGN KEY (workspace_id, feedback_id)
+        REFERENCES feedback (workspace_id, id) ON DELETE CASCADE,
+    ADD CONSTRAINT sfk_feedback_evidence_result_workspace FOREIGN KEY (practice_result_id, workspace_id)
+        REFERENCES practice_result (id, workspace_id) ON DELETE CASCADE,
+    ADD CONSTRAINT sfk_feedback_evidence_observation FOREIGN KEY (observation_id, practice_result_id, workspace_id)
+        REFERENCES practice_observation (id, practice_result_id, workspace_id) ON DELETE CASCADE;
+
+CREATE INDEX idx_feedback_evidence_observation ON feedback_evidence (observation_id);
+        ]]></sql>
+        <rollback>
+            <stop>Restore a verified database backup made before this upgrade. Feedback written since then can rest on two observations of one result, which the earlier key cannot hold.</stop>
+        </rollback>
+    </changeSet>
+    <changeSet id="1791486276211-28" author="hephaestus">
+        <preConditions onFail="HALT" onError="HALT">
+            <columnExists tableName="agent_job_practice_script_run" columnName="leads"/>
+        </preConditions>
+        <comment>A practice program run records the program it ran, why it stopped, the calls it made and the reads it reached, and no leads. Each earlier run was a staged custom script. An earlier timeout becomes a failure at its deadline, and an earlier failure without a reason an error.</comment>
+        <sql splitStatements="false"><![CDATA[
+ALTER TABLE agent_job_practice_script_run
+    DROP CONSTRAINT ck_agent_job_practice_script_run_status,
+    DROP COLUMN leads,
+    ADD COLUMN program_kind varchar(16),
+    ADD COLUMN program_digest varchar(64),
+    ADD COLUMN stop_reason varchar(24),
+    ADD COLUMN calls jsonb,
+    ADD COLUMN coverage_reached jsonb;
+
+UPDATE agent_job_practice_script_run SET program_kind = 'CUSTOM';
+UPDATE agent_job_practice_script_run SET status = 'FAILED', stop_reason = 'DEADLINE' WHERE status = 'TIMED_OUT';
+UPDATE agent_job_practice_script_run SET stop_reason = 'ERROR' WHERE status IN ('FAILED', 'SKIPPED') AND stop_reason IS NULL;
+
+ALTER TABLE agent_job_practice_script_run
+    ALTER COLUMN program_kind SET NOT NULL,
+    ADD CONSTRAINT ck_agent_job_practice_script_run_status
+        CHECK (status IN ('OK', 'SKIPPED', 'FAILED', 'NOT_REACHED', 'NOT_FINISHED')),
+    ADD CONSTRAINT ck_agent_job_practice_script_run_program_kind CHECK (program_kind IN ('BUILTIN', 'CUSTOM')),
+    ADD CONSTRAINT ck_agent_job_practice_script_run_program_digest
+        CHECK (program_digest IS NULL OR program_digest ~ '^[0-9a-f]{64}$'),
+    ADD CONSTRAINT ck_agent_job_practice_script_run_stop_reason CHECK (stop_reason IS NULL OR stop_reason IN (
+        'UNAVAILABLE', 'BUDGET', 'DEADLINE', 'TOO_LARGE', 'OFF_FORMAT', 'REFUSED', 'ERROR', 'CANCELLED',
+        'INVALID_PROGRAM', 'INVALID_CANDIDATE')),
+    ADD CONSTRAINT ck_agent_job_practice_script_run_stop
+        CHECK ((status IN ('OK', 'NOT_FINISHED')) = (stop_reason IS NULL)),
+    ADD CONSTRAINT ck_agent_job_practice_script_run_calls CHECK (calls IS NULL OR jsonb_typeof(calls) = 'object'),
+    ADD CONSTRAINT ck_agent_job_practice_script_run_coverage
+        CHECK (coverage_reached IS NULL OR jsonb_typeof(coverage_reached) = 'object');
+        ]]></sql>
+        <rollback>
+            <stop>Restore a verified database backup made before this upgrade. Runs recorded since then name a program and a stop reason that the earlier table cannot hold.</stop>
+        </rollback>
+    </changeSet>
+    <changeSet id="1791486276211-29" author="hephaestus">
+        <comment>When the server last moved this workspace's unchanged copies of bundled practice scripts to the shipped program. NULL until it did, so every existing installation is visited once.</comment>
+        <addColumn tableName="practice_catalog_installation">
+            <column name="practice_scripts_upgraded_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
 </databaseChangeLog>

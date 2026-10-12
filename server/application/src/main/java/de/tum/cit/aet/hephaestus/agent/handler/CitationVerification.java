@@ -3,16 +3,20 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Server-produced verdicts travel with admitted observations, never with unverified model output. */
+/** Server-produced verdicts travel with admitted results, never with unverified model output. */
 public final class CitationVerification {
 
     /** A pinned Git object id, in a SHA-1 or a SHA-256 repository. */
@@ -44,7 +48,23 @@ public final class CitationVerification {
         if (evidence == null) throw new JobDeliveryException("No admitted evidence");
         JsonNode citations = evidence.path("citations");
         if (!citations.isArray() || citations.isEmpty()) throw new JobDeliveryException("No admitted citations");
-        requireVerifiedCitations(job.getId(), ObservationAdmissionService.citationAttempt(job), citations);
+        requireVerifiedCitations(job.getId(), ResultAdmissionService.citationAttempt(job), citations);
+    }
+
+    /**
+     * Requires every citation of a result to carry the verdict of the attempt that admitted it: the result's own, each
+     * problem's and the example's. A result must rest on at least one citation; a NOT_MET result may rest on its
+     * problems' alone.
+     */
+    static void requireVerifiedResult(AgentJob job, PracticeResult result, List<Observation> problems) {
+        ArrayNode citations = MAPPER.createArrayNode();
+        JsonNode evidence = result.getEvidence();
+        if (evidence != null) evidence.path("citations").forEach(citations::add);
+        problems.forEach(problem -> problem.getCitations().forEach(citations::add));
+        JsonNode example = result.getExample();
+        if (example != null && example.path("citation").isObject()) citations.add(example.path("citation"));
+        if (citations.isEmpty()) throw new JobDeliveryException("No admitted citations");
+        requireVerifiedCitations(job.getId(), ResultAdmissionService.citationAttempt(job), citations);
     }
 
     public static void requireVerifiedCitations(UUID jobId, int attempt, JsonNode citations) {
@@ -93,6 +113,11 @@ public final class CitationVerification {
         String digest = utf8Digest(quote);
         if (digest == null) throw new JobDeliveryException("Citation quote is not valid Unicode");
         return digest;
+    }
+
+    /** The digest of a quote as a candidate submitted it; null when it has no UTF-8 encoding. */
+    static @Nullable String quoteDigestOrNull(String quote) {
+        return utf8Digest(quote);
     }
 
     /** Null for a quote with a lone surrogate, which has no UTF-8 encoding to digest. */

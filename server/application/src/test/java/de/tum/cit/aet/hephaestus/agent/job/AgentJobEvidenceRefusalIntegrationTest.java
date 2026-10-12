@@ -31,7 +31,7 @@ class AgentJobEvidenceRefusalIntegrationTest extends BaseIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Test
-    void evidenceRefusalSettlesProcessingWithoutModelExecutionOrObservations() {
+    void evidenceRefusalSettlesProcessingWithoutModelExecutionOrResults() {
         databaseTestUtils.cleanDatabase();
         var job = new AgentJob();
         job.setWorkspace(workspaces.save(TestEntities.activeWorkspace("evidence-refusal")));
@@ -55,7 +55,7 @@ class AgentJobEvidenceRefusalIntegrationTest extends BaseIntegrationTest {
         assertThat(saved.getExecutionStartedAt()).isNull();
         assertThat(saved.getDeliveryCommentId()).isNull();
         assertThat(saved.getOutput()).isEqualTo(output);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM observation WHERE agent_job_id = ?", Long.class, id))
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM practice_result WHERE agent_job_id = ?", Long.class, id))
                 .isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM feedback WHERE agent_job_id = ?", Long.class, id))
                 .isZero();

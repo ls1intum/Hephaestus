@@ -35,22 +35,12 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
     private PiPlanSpec spec(String apiProtocol, String modelId, boolean allowInternet) {
         return new PiPlanSpec(
-                apiProtocol, modelId, 200000, 8192, null, "job-token-123", allowInternet, 600, PRACTICE, Map.of(), "");
+                apiProtocol, modelId, 200000, 8192, null, "job-token-123", allowInternet, 600, PRACTICE, Map.of());
     }
 
     private PiPlanSpec spec(PiRunnerProfile profile) {
         return new PiPlanSpec(
-                "openai-completions",
-                "gpt-5.4-mini",
-                null,
-                null,
-                null,
-                "job-token-123",
-                false,
-                600,
-                profile,
-                Map.of(),
-                "");
+                "openai-completions", "gpt-5.4-mini", null, null, null, "job-token-123", false, 600, profile, Map.of());
     }
 
     @Nested
@@ -98,7 +88,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 assertThat(inputs.get(sidecar)).isNotEmpty();
             }
             assertThat(PRACTICE.sidecarScripts())
-                    .contains("pi-observation-normalize.ts", "pi-runner-usage.ts", "pi-provider.ts");
+                    .contains("pi-result-normalize.ts", "pi-runner-usage.ts", "pi-provider.ts")
+                    .doesNotContain("pi-observation-normalize.ts", "pi-practice-scripts.ts", "pi-practice-scripts.sh");
         }
 
         @Test
@@ -145,8 +136,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     true,
                     600,
                     PRACTICE,
-                    Map.of(SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH, payload),
-                    "");
+                    Map.of(SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH, payload));
             assertThat(factory.build(spec).inputFiles()).containsKey(SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH);
         }
     }
@@ -205,8 +195,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     false,
                     600,
                     PRACTICE,
-                    Map.of(),
-                    "");
+                    Map.of());
             byte[] json = factory.buildProviderConfigJson(spec);
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
 
@@ -259,8 +248,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     false,
                     timeoutSeconds,
                     PRACTICE,
-                    Map.of(),
-                    "");
+                    Map.of());
 
             long budgetMs = Long.parseLong(factory.build(spec).environment().get("AGENT_BUDGET_MS"));
 
@@ -379,26 +367,31 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        void shCommandWithPracticeScriptOrder() {
-            PiPlanSpec spec = new PiPlanSpec(
-                    "openai-completions",
-                    "gpt-x",
-                    null,
-                    null,
-                    null,
-                    "job-token-123",
-                    true,
-                    600,
-                    PRACTICE,
-                    Map.of(),
-                    "echo practice-scripts && ");
-            var plan = factory.build(spec);
+        void shouldRunTheProfileSetupAfterTheWritableDirectoriesAndBeforeNodeWhenTheProfileHasSetup() {
+            var plan = factory.build(spec("openai-completions", "gpt-x", true));
             assertThat(plan.command()).hasSize(3);
             assertThat(plan.command().get(0)).isEqualTo("sh");
             String body = plan.command().get(2);
-            assertThat(body.indexOf("echo practice-scripts"))
+            int writable = body.indexOf("mkdir -p " + String.join(" ", PiRunnerProfile.WRITABLE_DIRECTORIES));
+            int link = body.indexOf("ln -sfn /opt/practice-scripts/lib /workspace/work/practice-scripts/lib && ");
+            int node = body.indexOf("node ");
+
+            assertThat(writable).isZero();
+            assertThat(body.indexOf("mkdir -p /workspace/work/practice-scripts/ && "))
+                    .isGreaterThan(writable)
+                    .isLessThan(link);
+            assertThat(link).isLessThan(node);
+            assertThat(node)
                     .isLessThan(
                             body.indexOf(SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.RUNNER_SCRIPT_FILENAME));
+        }
+
+        @Test
+        void shouldRunNoSetupWhenTheProfileHasNone() {
+            String body = factory.build(spec(MENTOR)).command().get(2);
+
+            assertThat(MENTOR.setupCommands()).isEmpty();
+            assertThat(body).doesNotContain("ln -sfn").doesNotContain("practice-scripts");
         }
 
         @Test

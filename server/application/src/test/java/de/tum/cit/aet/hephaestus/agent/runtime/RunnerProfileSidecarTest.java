@@ -48,6 +48,10 @@ class RunnerProfileSidecarTest {
             Matcher matcher = RELATIVE_IMPORT.matcher(new String(in.readAllBytes(), StandardCharsets.UTF_8));
             while (matcher.find()) {
                 String imported = matcher.group(1);
+                // The practice toolkit resolves through the link the runtime creates, not through a sidecar.
+                if (imported.startsWith(SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK + "/")) {
+                    continue;
+                }
                 if (reached.add(imported)) {
                     collectRelativeImports(imported, reached);
                 }

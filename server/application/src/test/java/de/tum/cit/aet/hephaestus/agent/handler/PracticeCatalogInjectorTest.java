@@ -3,9 +3,12 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
@@ -40,6 +43,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -55,12 +60,18 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @Mock
     private PracticeRepository practiceRepository;
 
+    @Mock
+    private PracticeScriptInputs practiceScriptInputs;
+
+    @Captor
+    private ArgumentCaptor<List<Practice>> stagedPractices;
+
     private PracticeCatalogInjector injector;
 
     @BeforeEach
     void setUp() {
         injector = new PracticeCatalogInjector(
-                objectMapper, practiceRepository, workspaceDefaults(), mock(PracticeScriptInputs.class));
+                objectMapper, practiceRepository, workspaceDefaults(), practiceScriptInputs);
     }
 
     private Practice practice(String slug, SignalName... signals) {
@@ -330,11 +341,17 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         withScript.setPracticeScript("export default () => ({});");
         Practice blankScript = practice("retrospective", ScmSignals.PULL_REQUEST_MERGED);
         blankScript.setPracticeScript("   "); // blank → no .ts written
+        Practice builtIn = practice("describes-change", ScmSignals.PULL_REQUEST_OPENED);
         when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(withScript, blankScript));
+                .thenReturn(List.of(withScript, blankScript, builtIn));
+        String builtInCause = SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "describes-change"
+                + SandboxLayout.PRACTICE_SCRIPT_CAUSE_SUFFIX;
+        when(practiceScriptInputs.stage(any(), any(), any()))
+                .thenReturn(Map.of(builtInCause, "{}".getBytes(StandardCharsets.UTF_8)));
         Map<String, byte[]> files = new HashMap<>();
+        AgentJob job = job(null);
 
-        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
+        injector.inject(files, job, ArtifactKinds.PULL_REQUEST);
 
         // index.json lists both practices (group falls back to the slug when ungrouped).
         String index = new String(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"), StandardCharsets.UTF_8);
@@ -347,9 +364,15 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
                 .containsKey(md("authoring"))
                 .containsKey(md("retrospective"))
                 .doesNotContainKey(SandboxLayout.PRACTICES_PREFIX + "all-criteria.md");
-        // Only the populated practice script is written; the blank one is skipped.
-        assertThat(files).containsKey(SandboxLayout.PRACTICE_SCRIPT_PREFIX + "practices/authoring.ts");
-        assertThat(files).doesNotContainKey(SandboxLayout.PRACTICE_SCRIPT_PREFIX + "practices/retrospective.ts");
+        // Only the populated practice script is written; the blank one and the built-in program get none.
+        assertThat(files).containsKey(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "authoring.ts");
+        assertThat(files)
+                .doesNotContainKey(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "retrospective.ts")
+                .doesNotContainKey(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "describes-change.ts");
+        // Every admitted practice gets its cause and previous claim, whichever program runs it.
+        verify(practiceScriptInputs).stage(eq(job), eq(ArtifactKinds.PULL_REQUEST), stagedPractices.capture());
+        assertThat(stagedPractices.getValue()).containsExactlyInAnyOrder(withScript, blankScript, builtIn);
+        assertThat(files).containsKey(builtInCause);
     }
 
     @Test

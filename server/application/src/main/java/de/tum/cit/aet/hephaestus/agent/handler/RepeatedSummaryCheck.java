@@ -3,33 +3,34 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatch;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
 /**
  * Whether an automatic package's summary reads exactly as the summary last posted on the same work to the same
- * person, keyed the way the ledger records it: by this review's observations. Each summary's first line is its own
+ * person, keyed the way the ledger records it: by this review's results. Each summary's first line is its own
  * review's marker, which nobody reads.
  */
 @Component
 class RepeatedSummaryCheck {
 
-    private final ObservationRepository observationRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final FeedbackRepository feedbackRepository;
 
-    RepeatedSummaryCheck(ObservationRepository observationRepository, FeedbackRepository feedbackRepository) {
-        this.observationRepository = observationRepository;
+    RepeatedSummaryCheck(PracticeResultRepository practiceResultRepository, FeedbackRepository feedbackRepository) {
+        this.practiceResultRepository = practiceResultRepository;
         this.feedbackRepository = feedbackRepository;
     }
 
     boolean repeatsLastPosted(FeedbackDispatch dispatch, AgentJob job) {
-        List<Observation> observations = observationRepository.findByAgentJobId(job.getId(), dispatch.getWorkspaceId());
-        if (observations.isEmpty()) {
+        List<PracticeResult> practiceResults =
+                practiceResultRepository.findByAgentJobId(job.getId(), dispatch.getWorkspaceId());
+        if (practiceResults.isEmpty()) {
             return false;
         }
-        Observation any = observations.getFirst();
+        PracticeResult any = practiceResults.getFirst();
         String summary = withoutMarker(dispatch.getBody());
         return feedbackRepository
                 .findLatestDeliveredNote(

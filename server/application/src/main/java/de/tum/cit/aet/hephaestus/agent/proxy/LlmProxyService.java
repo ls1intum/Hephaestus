@@ -248,7 +248,7 @@ class LlmProxyService {
         if (accounting.refuseForBudget(routing)) {
             return ResponseEntity.status(spendingRefusal).body(budgetReachedMessage(routing.connectionScope()));
         }
-        if (practiceScript != null && accounting.refuseForPracticeScriptCap(routing, attempt)) {
+        if (practiceScript != null && accounting.refuseForDirectModelCap(routing, attempt)) {
             return ResponseEntity.status(spendingRefusal).body("Practice script budget spent");
         }
 

@@ -7,8 +7,8 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("review-run-outcomes")
 @Schema(
         description = "What one run decided about each practice it observed against the"
-                + " practice's whole positive standard, one count per practice however many observations it"
-                + " recorded; an invalidated observation decides nothing, and a met or not-met outcome recorded"
+                + " practice's whole positive standard, one count per practice however many results it"
+                + " recorded; an invalidated result decides nothing, and a met or not-met outcome recorded"
                 + " under an earlier or missing assessment scheme counts as undetermined. The practice profile counts"
                 + " only what the run observed about the calling developer")
 public record ReviewPracticeOutcomesDTO(

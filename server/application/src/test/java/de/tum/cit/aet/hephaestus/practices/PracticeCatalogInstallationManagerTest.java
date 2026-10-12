@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogLock;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeReleaseService;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
@@ -58,6 +59,12 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
 
     @Mock
     private WorkspaceRepository workspaceRepository;
+
+    @Mock
+    private PracticeReleaseService releaseService;
+
+    @Mock
+    private CuratedPracticeReleaseService instanceReleases;
 
     @Test
     void doesNothingWhenDisabled() {
@@ -161,7 +168,9 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
                 installationRepository,
                 workspaceRepository,
                 TransactionOperations.withoutTransaction(),
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                releaseService,
+                instanceReleases);
     }
 
     private static Workspace workspace(long id) {

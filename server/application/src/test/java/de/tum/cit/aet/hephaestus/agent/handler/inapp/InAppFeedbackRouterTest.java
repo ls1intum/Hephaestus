@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
@@ -31,7 +31,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
 
     @Test
     void admitsACorroboratedLivePatternNobodyHasBeenShownLately() {
-        assertThat(route(problems(2, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
+        assertThat(route(problems(2, ResultOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
                 .isEqualTo(InAppRoutingDecision.ADMIT);
     }
 
@@ -41,7 +41,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
 
         assertThat(InAppFeedbackRouter.route(
                         incomplete,
-                        problems(2, ObservationOrigin.LIVE),
+                        problems(2, ResultOrigin.LIVE),
                         PracticeAutonomy.AUTOMATIC,
                         ActorRole.AUTHOR,
                         null,
@@ -51,25 +51,25 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
 
     @Test
     void shouldAllowReviewerPatternsForTheirOwnPageWhileRefusingUnsupportedAssigneeSubjects() {
-        assertThat(route(problems(2, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.REVIEWER, null))
+        assertThat(route(problems(2, ResultOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.REVIEWER, null))
                 .isEqualTo(InAppRoutingDecision.ADMIT);
-        assertThat(route(problems(1, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.REVIEWER, null))
+        assertThat(route(problems(1, ResultOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.REVIEWER, null))
                 .isEqualTo(InAppRoutingDecision.UNCORROBORATED);
-        assertThat(route(problems(5, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.ASSIGNEE, null))
+        assertThat(route(problems(5, ResultOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.ASSIGNEE, null))
                 .isEqualTo(InAppRoutingDecision.UNATTRIBUTABLE_SUBJECT);
     }
 
     @Test
     void admitsAPracticeAboutTheAuthorAsMergerOnTheSameEvidenceRules() {
-        assertThat(route(problems(2, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.MERGER, null))
+        assertThat(route(problems(2, ResultOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.MERGER, null))
                 .isEqualTo(InAppRoutingDecision.ADMIT);
-        assertThat(route(problems(1, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.MERGER, null))
+        assertThat(route(problems(1, ResultOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.MERGER, null))
                 .isEqualTo(InAppRoutingDecision.UNCORROBORATED);
     }
 
     @Test
     void refusesAPracticeWithNoProblemsBehindIt() {
-        Observation strength = observation(1L, ObservationOrigin.LIVE, Outcome.MET);
+        PracticeResult strength = practiceResult(1L, ResultOrigin.LIVE, Outcome.MET);
 
         assertThat(route(List.of(strength), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
                 .isEqualTo(InAppRoutingDecision.NO_EVIDENCE);
@@ -77,7 +77,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
 
     @Test
     void refusesAPracticeWhoseTierDoesNotAdmitTheLane() {
-        assertThat(route(problems(2, ObservationOrigin.LIVE), PracticeAutonomy.OFF, ActorRole.AUTHOR, null))
+        assertThat(route(problems(2, ResultOrigin.LIVE), PracticeAutonomy.OFF, ActorRole.AUTHOR, null))
                 .isEqualTo(InAppRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
     }
 
@@ -85,22 +85,22 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     void admitsAHumanApprovalPracticeBecauseThePracticePageIsReadOnRequest() {
         // Approval gates what is pushed onto the work; the developer's own page is pulled, so the default
         // autonomy delivers here like AUTOMATIC does.
-        assertThat(route(problems(2, ObservationOrigin.LIVE), PracticeAutonomy.HUMAN_APPROVAL, ActorRole.AUTHOR, null))
+        assertThat(route(problems(2, ResultOrigin.LIVE), PracticeAutonomy.HUMAN_APPROVAL, ActorRole.AUTHOR, null))
                 .isEqualTo(InAppRoutingDecision.ADMIT);
     }
 
     /** The day-one bound: a sweep over a year of finished work does not become a wall of feedback. */
     @Test
     void refusesAPatternWhoseEveryMeasurementCameFromABackfill() {
-        assertThat(route(problems(4, ObservationOrigin.BACKFILL), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
+        assertThat(route(problems(4, ResultOrigin.BACKFILL), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
                 .isEqualTo(InAppRoutingDecision.BACKFILL_HELD);
     }
 
     /** One live measurement is enough to make the cluster a live one; the refusal is for a wholly backfilled set. */
     @Test
     void admitsAPatternThatMixesBackfilledAndLiveMeasurements() {
-        Observation backfilled = observation(1L, ObservationOrigin.BACKFILL, Outcome.NOT_MET);
-        Observation live = observation(2L, ObservationOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult backfilled = practiceResult(1L, ResultOrigin.BACKFILL, Outcome.NOT_MET);
+        PracticeResult live = practiceResult(2L, ResultOrigin.LIVE, Outcome.NOT_MET);
 
         assertThat(route(List.of(backfilled, live), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
                 .isEqualTo(InAppRoutingDecision.ADMIT);
@@ -109,7 +109,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     /** One occurrence is a task-level note; it was already delivered where it belongs. */
     @Test
     void refusesAProblemSeenOnOnlyOnePieceOfWork() {
-        assertThat(route(problems(1, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
+        assertThat(route(problems(1, ResultOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
                 .isEqualTo(InAppRoutingDecision.UNCORROBORATED);
     }
 
@@ -117,8 +117,8 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     @Test
     void countsTwoProblemsOnOneArtifactAsOneOccurrence() {
         UUID run = UUID.randomUUID();
-        Observation first = observation(42L, run, NOW, ObservationOrigin.LIVE, Outcome.NOT_MET);
-        Observation second = observation(42L, run, NOW, ObservationOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult first = practiceResult(42L, run, NOW, ResultOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult second = practiceResult(42L, run, NOW, ResultOrigin.LIVE, Outcome.NOT_MET);
 
         assertThat(route(List.of(first, second), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
                 .isEqualTo(InAppRoutingDecision.UNCORROBORATED);
@@ -134,8 +134,8 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     @Test
     void shouldCiteTheWorstProblemWhenOneRunFoundSeveralOnOnePieceOfWork() {
         UUID run = UUID.randomUUID();
-        Observation nit = problemOf(42L, run, Severity.MINOR);
-        Observation worst = problemOf(42L, run, Severity.CRITICAL);
+        PracticeResult nit = problemOf(42L, run, Severity.MINOR);
+        PracticeResult worst = problemOf(42L, run, Severity.CRITICAL);
 
         assertThat(InAppFeedbackRouter.problemsIn(List.of(nit, worst))).containsExactly(worst);
         assertThat(InAppFeedbackRouter.problemsIn(List.of(worst, nit))).containsExactly(worst);
@@ -147,11 +147,11 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
      */
     @Test
     void shouldNotCorroborateWhenTheReReviewCameBackClean() {
-        Observation slipped = observation(
-                7L, UUID.randomUUID(), NOW.minus(Duration.ofDays(2)), ObservationOrigin.LIVE, Outcome.NOT_MET);
-        Observation recovered =
-                observation(7L, UUID.randomUUID(), NOW.minus(Duration.ofDays(1)), ObservationOrigin.LIVE, Outcome.MET);
-        Observation other = observation(8L, UUID.randomUUID(), NOW, ObservationOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult slipped = practiceResult(
+                7L, UUID.randomUUID(), NOW.minus(Duration.ofDays(2)), ResultOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult recovered =
+                practiceResult(7L, UUID.randomUUID(), NOW.minus(Duration.ofDays(1)), ResultOrigin.LIVE, Outcome.MET);
+        PracticeResult other = practiceResult(8L, UUID.randomUUID(), NOW, ResultOrigin.LIVE, Outcome.NOT_MET);
 
         assertThat(route(List.of(other, recovered, slipped), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
                 .isEqualTo(InAppRoutingDecision.UNCORROBORATED);
@@ -163,17 +163,17 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
      */
     @Test
     void shouldCiteNoRequestedProblemAndNoLiveProblemARequestedReReviewFoundClean() {
-        Observation live = observation(
-                1L, UUID.randomUUID(), NOW.minus(Duration.ofDays(2)), ObservationOrigin.LIVE, Outcome.NOT_MET);
-        Observation requestedClean = observation(
-                1L, UUID.randomUUID(), NOW.minus(Duration.ofDays(1)), ObservationOrigin.MANUAL, Outcome.MET);
-        Observation requestedProblem =
-                observation(2L, UUID.randomUUID(), NOW, ObservationOrigin.MANUAL, Outcome.NOT_MET);
-        Observation otherLive = observation(3L, UUID.randomUUID(), NOW, ObservationOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult live = practiceResult(
+                1L, UUID.randomUUID(), NOW.minus(Duration.ofDays(2)), ResultOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult requestedClean =
+                practiceResult(1L, UUID.randomUUID(), NOW.minus(Duration.ofDays(1)), ResultOrigin.MANUAL, Outcome.MET);
+        PracticeResult requestedProblem =
+                practiceResult(2L, UUID.randomUUID(), NOW, ResultOrigin.MANUAL, Outcome.NOT_MET);
+        PracticeResult otherLive = practiceResult(3L, UUID.randomUUID(), NOW, ResultOrigin.LIVE, Outcome.NOT_MET);
 
         assertThat(InAppFeedbackRouter.problemsIn(List.of(otherLive, requestedProblem, requestedClean, live)))
                 .containsExactly(otherLive);
-        assertThat(route(problems(4, ObservationOrigin.MANUAL), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
+        assertThat(route(problems(4, ResultOrigin.MANUAL), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
                 .isEqualTo(InAppRoutingDecision.NO_EVIDENCE);
     }
 
@@ -181,10 +181,10 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     @ParameterizedTest(name = "a later {0} run that came back {1} cites the live problem: {2}")
     @CsvSource({"MANUAL, NOT_MET, true", "MANUAL, MET, false", "BACKFILL, MET, true", "BACKFILL, NOT_MET, true"})
     void shouldCiteTheLiveProblemUnlessARequestedReReviewFoundTheWorkClean(
-            ObservationOrigin laterOrigin, Outcome laterOutcome, boolean cited) {
-        Observation live = observation(
-                1L, UUID.randomUUID(), NOW.minus(Duration.ofDays(2)), ObservationOrigin.LIVE, Outcome.NOT_MET);
-        Observation later = observation(1L, UUID.randomUUID(), NOW, laterOrigin, laterOutcome);
+            ResultOrigin laterOrigin, Outcome laterOutcome, boolean cited) {
+        PracticeResult live = practiceResult(
+                1L, UUID.randomUUID(), NOW.minus(Duration.ofDays(2)), ResultOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult later = practiceResult(1L, UUID.randomUUID(), NOW, laterOrigin, laterOutcome);
 
         assertThat(InAppFeedbackRouter.problemsIn(List.of(later, live))).isEqualTo(cited ? List.of(live) : List.of());
     }
@@ -192,13 +192,13 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     /** Two pull requests that slipped and one that slipped and recovered: exactly two rows to cite. */
     @Test
     void shouldCiteOneRowPerPieceOfWorkWhenWorkWasReviewedTwice() {
-        Observation first = observation(
-                1L, UUID.randomUUID(), NOW.minus(Duration.ofDays(3)), ObservationOrigin.LIVE, Outcome.NOT_MET);
-        Observation second = observation(
-                2L, UUID.randomUUID(), NOW.minus(Duration.ofDays(2)), ObservationOrigin.LIVE, Outcome.NOT_MET);
-        Observation slipped = observation(
-                3L, UUID.randomUUID(), NOW.minus(Duration.ofDays(1)), ObservationOrigin.LIVE, Outcome.NOT_MET);
-        Observation recovered = observation(3L, UUID.randomUUID(), NOW, ObservationOrigin.LIVE, Outcome.MET);
+        PracticeResult first = practiceResult(
+                1L, UUID.randomUUID(), NOW.minus(Duration.ofDays(3)), ResultOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult second = practiceResult(
+                2L, UUID.randomUUID(), NOW.minus(Duration.ofDays(2)), ResultOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult slipped = practiceResult(
+                3L, UUID.randomUUID(), NOW.minus(Duration.ofDays(1)), ResultOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult recovered = practiceResult(3L, UUID.randomUUID(), NOW, ResultOrigin.LIVE, Outcome.MET);
 
         assertThat(InAppFeedbackRouter.problemsIn(List.of(recovered, slipped, second, first)))
                 .containsExactly(second, first);
@@ -208,7 +208,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     void refusesAPracticeTheDeveloperWasShownInsideTheCooldown() {
         Instant yesterday = NOW.minus(Duration.ofDays(1));
 
-        assertThat(route(problems(3, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, yesterday))
+        assertThat(route(problems(3, ResultOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, yesterday))
                 .isEqualTo(InAppRoutingDecision.RECENTLY_SURFACED);
     }
 
@@ -216,13 +216,13 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     void admitsAPracticeLastShownBeforeTheCooldownElapsed() {
         Instant longAgo = NOW.minus(Duration.ofDays(InAppFeedbackRouter.RESURFACE_COOLDOWN_DAYS + 1));
 
-        assertThat(route(problems(3, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, longAgo))
+        assertThat(route(problems(3, ResultOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, longAgo))
                 .isEqualTo(InAppRoutingDecision.ADMIT);
     }
 
     @Test
     void unresolvedAutonomyFailsClosed() {
-        assertThat(route(problems(2, ObservationOrigin.LIVE), null, ActorRole.AUTHOR, null))
+        assertThat(route(problems(2, ResultOrigin.LIVE), null, ActorRole.AUTHOR, null))
                 .isEqualTo(InAppRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
     }
 
@@ -233,15 +233,16 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
      */
     @Test
     void narrowsAWindowOfMeasurementsToJustTheProblems() {
-        Observation problem = observation(1L, ObservationOrigin.LIVE, Outcome.NOT_MET);
-        Observation strength = observation(2L, ObservationOrigin.LIVE, Outcome.MET);
-        Observation abstention = Observation.builder()
+        PracticeResult problem = practiceResult(1L, ResultOrigin.LIVE, Outcome.NOT_MET);
+        PracticeResult strength = practiceResult(2L, ResultOrigin.LIVE, Outcome.MET);
+        PracticeResult abstention = PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .agentJobId(UUID.randomUUID())
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
                 .artifactId(3L)
                 .outcome(Outcome.NOT_APPLICABLE)
-                .origin(ObservationOrigin.LIVE)
+                .origin(ResultOrigin.LIVE)
                 .observedAt(NOW)
                 .build();
 
@@ -250,7 +251,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     }
 
     private static InAppRoutingDecision route(
-            List<Observation> evidence,
+            List<PracticeResult> evidence,
             @Nullable PracticeAutonomy autonomy,
             ActorRole subjectRole,
             @Nullable Instant lastSurfaced) {
@@ -266,33 +267,35 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     }
 
     /** {@code count} problems, each on a different piece of work. */
-    private static List<Observation> problems(int count, ObservationOrigin origin) {
+    private static List<PracticeResult> problems(int count, ResultOrigin origin) {
         return IntStream.rangeClosed(1, count)
-                .mapToObj(i -> observation(i, origin, Outcome.NOT_MET))
+                .mapToObj(i -> practiceResult(i, origin, Outcome.NOT_MET))
                 .toList();
     }
 
     /** A problem of the given severity on one piece of work, recorded by {@code run}. */
-    private static Observation problemOf(long artifactId, UUID run, Severity severity) {
-        return Observation.builder()
+    private static PracticeResult problemOf(long artifactId, UUID run, Severity severity) {
+        return PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .agentJobId(run)
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
                 .artifactId(artifactId)
                 .outcome(Outcome.NOT_MET)
                 .severity(severity)
-                .origin(ObservationOrigin.LIVE)
+                .origin(ResultOrigin.LIVE)
                 .observedAt(NOW)
                 .build();
     }
 
-    private static Observation observation(long artifactId, ObservationOrigin origin, Outcome outcome) {
-        return observation(artifactId, UUID.randomUUID(), NOW, origin, outcome);
+    private static PracticeResult practiceResult(long artifactId, ResultOrigin origin, Outcome outcome) {
+        return practiceResult(artifactId, UUID.randomUUID(), NOW, origin, outcome);
     }
 
-    private static Observation observation(
-            long artifactId, UUID run, Instant observedAt, ObservationOrigin origin, Outcome outcome) {
-        return Observation.builder()
+    private static PracticeResult practiceResult(
+            long artifactId, UUID run, Instant observedAt, ResultOrigin origin, Outcome outcome) {
+        return PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .agentJobId(run)
                 .artifactKind(ArtifactKinds.PULL_REQUEST)

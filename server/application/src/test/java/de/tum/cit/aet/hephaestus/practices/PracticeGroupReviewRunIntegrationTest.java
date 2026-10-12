@@ -13,13 +13,13 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -42,20 +42,20 @@ import tools.jackson.databind.ObjectMapper;
  * what each review run saw.
  *
  * <p>The grain is the point: a run is returned whole or not at all, so the two queries behind it (which runs,
- * then their observations) must agree. And an undecided observation has to survive to the payload — this surface is
+ * then their results) must agree. And an undecided result has to survive to the payload — this surface is
  * the inspectable record, so a practice that ran and hedged must not read like one that never ran.
  */
 class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegrationTest {
 
     @Autowired
-    private ObservationInvalidationRepository invalidationRepository;
+    private PracticeResultInvalidationRepository invalidationRepository;
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String REVIEW_RUNS_URI = "/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/review-runs";
 
     /**
      * A citation of a source the shipped contract does not know. Delivery authorization refuses it, which is
-     * the only way a developer's own observation is withheld from them for its evidence rather than its age.
+     * the only way a developer's own result is withheld from them for its evidence rather than its age.
      */
     private static final String UNKNOWN_SOURCE_EVIDENCE_JSON =
             "{\"citations\":[{\"sourceKind\":\"scm.repository.secrets\",\"artifactPath\":\"context/secrets.txt\","
@@ -101,7 +101,7 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
         return agentJobRepository.save(job);
     }
 
-    /** One observation of this group's practice, recorded now by this test's run. */
+    /** One result of this group's practice, recorded now by this test's run. */
     private UUID observe(
             String title, Outcome kind, @Nullable Severity severity, String artifactKind, long artifactId) {
         return observe(
@@ -118,8 +118,8 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
                 null);
     }
 
-    /** Advice lives on the delivered {@link Feedback}, not the observation (ADR 0021); the feed reads it from here. */
-    private Feedback deliverFeedbackFor(UUID observationId, String body) {
+    /** Advice lives on the delivered {@link Feedback}, not the result (ADR 0021); the feed reads it from here. */
+    private Feedback deliverFeedbackFor(UUID practiceResultId, String body) {
         Feedback feedback = persistFeedback(
                 agentJob,
                 developer,
@@ -128,7 +128,7 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
                 FeedbackDeliveryState.DELIVERED,
                 body,
                 Instant.now());
-        bind(feedback, observationId);
+        bind(feedback, practiceResultId);
         return feedback;
     }
 
@@ -149,7 +149,7 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
      */
     @Test
     @WithUser
-    void shouldListEveryGroupsObservationsOfOneWorkWhenReadByTheWork() {
+    void shouldListEveryGroupsResultsOfOneWorkWhenReadByTheWork() {
         Practice ungrouped = persistPractice(workspace, null, "commit-discipline", "Commit discipline", null);
         UUID grouped = observe("No testing notes", NOT_MET, Severity.MAJOR, ArtifactKinds.PULL_REQUEST.value(), 1L);
         UUID loose = observe(
@@ -194,7 +194,7 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
                 .isEqualTo(1)
                 .jsonPath("$.content[0].reviewId")
                 .isEqualTo(agentJob.getId().toString())
-                .jsonPath("$.content[0].observations[*].id")
+                .jsonPath("$.content[0].practiceResults[*].id")
                 .value(ids -> assertThat(ids)
                         .asInstanceOf(InstanceOfAssertFactories.LIST)
                         .containsExactlyInAnyOrder(grouped.toString(), loose.toString()));
@@ -202,7 +202,7 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
 
     @Test
     @WithUser
-    @DisplayName("returns a review run whole, with every observation that explains it")
+    @DisplayName("returns a review run whole, with every result that explains it")
     void shouldReturnCompleteRun() {
         observe("Motivation is clear", MET, null, ArtifactKinds.PULL_REQUEST.value(), 1L);
         observe("No testing notes", NOT_MET, Severity.MAJOR, ArtifactKinds.PULL_REQUEST.value(), 1L);
@@ -212,26 +212,26 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
                 .isEqualTo(1)
                 .jsonPath("$.content[0].reviewId")
                 .isEqualTo(agentJob.getId().toString())
-                .jsonPath("$.content[0].observations.length()")
+                .jsonPath("$.content[0].practiceResults.length()")
                 .isEqualTo(2);
     }
 
     @Test
     @WithUser
-    @DisplayName("carries an undecided observation with a null assessment rather than dropping it")
-    void shouldCarryInconclusiveObservationWithoutAnAssessment() {
+    @DisplayName("carries an undecided result with a null assessment rather than dropping it")
+    void shouldCarryInconclusiveResultWithoutAnAssessment() {
         observe("Could not tell from the diff", UNDETERMINED, null, "scm.pull_request", 1L);
 
         getHistory()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].observations.length()")
+                .jsonPath("$.content[0].practiceResults.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].observations[0].outcome")
+                .jsonPath("$.content[0].practiceResults[0].outcome")
                 .isEqualTo("UNDETERMINED")
-                .jsonPath("$.content[0].observations[0].presence")
+                .jsonPath("$.content[0].practiceResults[0].presence")
                 .doesNotExist()
-                .jsonPath("$.content[0].observations[0].assessment")
+                .jsonPath("$.content[0].practiceResults[0].assessment")
                 .doesNotExist();
     }
 
@@ -244,9 +244,9 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
         getHistory()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].observations.length()")
+                .jsonPath("$.content[0].practiceResults.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].observations[0].summary")
+                .jsonPath("$.content[0].practiceResults[0].summary")
                 .isEqualTo("Issue lacks acceptance criteria");
     }
 
@@ -289,7 +289,7 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
                 ArtifactKinds.PULL_REQUEST.value(),
                 1L,
                 developer,
-                "Visible observation",
+                "Visible result",
                 MET,
                 null,
                 Instant.parse("2025-01-01T00:00:00Z"),
@@ -304,7 +304,7 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
                 ArtifactKinds.PULL_REQUEST.value(),
                 2L,
                 developer,
-                "Historical observation",
+                "Historical result",
                 MET,
                 null,
                 Instant.parse("2025-01-02T00:00:00Z"),
@@ -326,9 +326,9 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.content[0].observations[0].summary")
-                .isEqualTo("Historical observation")
-                .jsonPath("$.content[0].observations[0].claimCurrentness")
+                .jsonPath("$.content[0].practiceResults[0].summary")
+                .isEqualTo("Historical result")
+                .jsonPath("$.content[0].practiceResults[0].claimCurrentness")
                 .isEqualTo("STALE")
                 .jsonPath("$.hasNext")
                 .isEqualTo(true);
@@ -345,9 +345,9 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.content[0].observations[0].summary")
-                .isEqualTo("Visible observation")
-                .jsonPath("$.content[0].observations[0].claimCurrentness")
+                .jsonPath("$.content[0].practiceResults[0].summary")
+                .isEqualTo("Visible result")
+                .jsonPath("$.content[0].practiceResults[0].claimCurrentness")
                 .isEqualTo("CURRENT")
                 .jsonPath("$.hasNext")
                 .isEqualTo(false);
@@ -366,17 +366,17 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
         getHistory()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].observations[0].claimCurrentness")
+                .jsonPath("$.content[0].practiceResults[0].claimCurrentness")
                 .isEqualTo("STALE");
     }
 
     @Test
     @WithUser
-    @DisplayName("an invalidated observation stays in history, labelled with the admin's reason")
-    void shouldLabelAnInvalidatedObservationInsteadOfDroppingIt() {
+    @DisplayName("an invalidated result stays in history, labelled with the admin's reason")
+    void shouldLabelAnInvalidatedResultInsteadOfDroppingIt() {
         UUID wrong = observe("Closed issue #1 already", MET, null, ArtifactKinds.PULL_REQUEST.value(), 1L);
-        invalidationRepository.save(new ObservationInvalidation(
-                observationRepository
+        invalidationRepository.save(new PracticeResultInvalidation(
+                practiceResultRepository
                         .findByIdAndWorkspaceId(wrong, workspace.getId())
                         .orElseThrow(),
                 1L,
@@ -384,19 +384,19 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
                 Instant.now()));
 
         getHistory()
-                .jsonPath("$.content[0].observations[0].id")
+                .jsonPath("$.content[0].practiceResults[0].id")
                 .isEqualTo(wrong.toString())
-                .jsonPath("$.content[0].observations[0].invalidationReason")
+                .jsonPath("$.content[0].practiceResults[0].invalidationReason")
                 .isEqualTo("Issue #1 was still open")
-                .jsonPath("$.content[0].observations[0].invalidatedAt")
+                .jsonPath("$.content[0].practiceResults[0].invalidatedAt")
                 .exists();
     }
 
     @Test
     @WithUser
-    @DisplayName("carries each observation complete enough to open in place, so a row needs no detail request")
-    void shouldCarryEachObservationCompleteEnoughToOpenWhenListingARun() {
-        UUID observationId = observe(
+    @DisplayName("carries each result complete enough to open in place, so a row needs no detail request")
+    void shouldCarryEachResultCompleteEnoughToOpenWhenListingARun() {
+        UUID practiceResultId = observe(
                 practice,
                 agentJob,
                 ArtifactKinds.PULL_REQUEST.value(),
@@ -408,43 +408,44 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
                 Instant.parse("2025-03-04T05:06:07Z"),
                 DIFF_EVIDENCE_JSON,
                 "locus-testing-notes");
-        Feedback feedback = deliverFeedbackFor(observationId, "Add a Testing section that names what you ran.");
+        Feedback feedback = deliverFeedbackFor(practiceResultId, "Add a Testing section that names what you ran.");
 
         getHistory()
-                .jsonPath("$.content[0].observations[0].id")
-                .isEqualTo(observationId.toString())
-                .jsonPath("$.content[0].observations[0].summary")
+                .jsonPath("$.content[0].practiceResults[0].id")
+                .isEqualTo(practiceResultId.toString())
+                .jsonPath("$.content[0].practiceResults[0].summary")
                 .isEqualTo("No testing notes")
-                .jsonPath("$.content[0].observations[0].evidenceRationale")
+                .jsonPath("$.content[0].practiceResults[0].evidenceRationale")
                 .isEqualTo("Reasoning for No testing notes")
-                .jsonPath("$.content[0].observations[0].deliveredFeedback")
+                .jsonPath("$.content[0].practiceResults[0].deliveredFeedback")
                 .isEqualTo("Add a Testing section that names what you ran.")
-                .jsonPath("$.content[0].observations[0].feedbackResponse.feedbackId")
+                .jsonPath("$.content[0].practiceResults[0].feedbackResponse.feedbackId")
                 .isEqualTo(feedback.getId().toString())
-                .jsonPath("$.content[0].observations[0].evidence.citations.length()")
+                // A negative's places are its problem's; the result keeps only the citations of its own.
+                .jsonPath("$.content[0].practiceResults[0].evidence.citations.length()")
+                .isEqualTo(0)
+                .jsonPath("$.content[0].practiceResults[0].observations.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].observations[0].evidence.citations[0].path")
+                .jsonPath("$.content[0].practiceResults[0].observations[0].citations[0].path")
                 .isEqualTo("src/Main.java")
-                .jsonPath("$.content[0].observations[0].evidence.citations[0].startLine")
+                .jsonPath("$.content[0].practiceResults[0].observations[0].citations[0].startLine")
                 .isEqualTo(42)
-                .jsonPath("$.content[0].observations[0].evidence.citations[0].quote")
+                .jsonPath("$.content[0].practiceResults[0].observations[0].citations[0].quote")
                 .isEqualTo("example")
-                .jsonPath("$.content[0].observations[0].observedAt")
+                .jsonPath("$.content[0].practiceResults[0].observedAt")
                 .isEqualTo("2025-03-04T05:06:07Z")
-                .jsonPath("$.content[0].observations[0].origin")
+                .jsonPath("$.content[0].practiceResults[0].origin")
                 .isEqualTo("LIVE")
-                .jsonPath("$.content[0].observations[0].claimCurrentness")
-                .isEqualTo("CURRENT")
-                .jsonPath("$.content[0].observations[0].recurrenceKey")
-                .isEqualTo("locus-testing-notes");
+                .jsonPath("$.content[0].practiceResults[0].claimCurrentness")
+                .isEqualTo("CURRENT");
     }
 
-    /** The next step the run composed from an observation travels with it, even though no feedback was delivered. */
+    /** The next step the run composed from a result travels with it, even though no feedback was delivered. */
     @Test
     @WithUser
-    @DisplayName("an observation carries the next step its run wrote about it")
+    @DisplayName("a result carries the next step its run wrote about it")
     void shouldCarryTheNextStepWhenTheRunComposedFeedback() {
-        UUID observationId =
+        UUID practiceResultId =
                 observe("No testing notes", NOT_MET, Severity.MAJOR, ArtifactKinds.PULL_REQUEST.value(), 1L);
         agentJob.setOutput(OBJECT_MAPPER.readTree("""
                 {"feedback":{"observations":[{"id":"%s","practiceSlug":"pr-description-quality","anchorable":false,
@@ -453,29 +454,29 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
                    "basedOn":["%s"],"title":"No testing notes",
                    "nextStep":"Add a Testing section that names what you ran.",
                    "placement":{"kind":"ARTIFACT"}}]}}
-                """.formatted(observationId, observationId)));
+                """.formatted(practiceResultId, practiceResultId)));
         agentJobRepository.saveAndFlush(agentJob);
 
         getHistory()
-                .jsonPath("$.content[0].observations[0].nextStep")
+                .jsonPath("$.content[0].practiceResults[0].nextStep")
                 .isEqualTo("Add a Testing section that names what you ran.")
-                .jsonPath("$.content[0].observations[0].deliveredFeedback")
+                .jsonPath("$.content[0].practiceResults[0].deliveredFeedback")
                 .doesNotExist();
     }
 
     @Test
     @WithUser
-    @DisplayName("an observation whose run composed nothing carries no next step")
+    @DisplayName("a result whose run composed nothing carries no next step")
     void shouldCarryNoNextStepWhenTheRunComposedNothing() {
         observe("No testing notes", NOT_MET, Severity.MAJOR, ArtifactKinds.PULL_REQUEST.value(), 1L);
 
-        getHistory().jsonPath("$.content[0].observations[0].nextStep").doesNotExist();
+        getHistory().jsonPath("$.content[0].practiceResults[0].nextStep").doesNotExist();
     }
 
     @Test
     @WithUser
-    @DisplayName("an observation whose evidence is not authorised for delivery is withheld, never shown bare")
-    void shouldWithholdAnObservationWhenItsEvidenceIsNotAuthorisedForDelivery() {
+    @DisplayName("a result whose evidence is not authorised for delivery is withheld, never shown bare")
+    void shouldWithholdAResultWhenItsEvidenceIsNotAuthorisedForDelivery() {
         observe("Motivation is clear", MET, null, ArtifactKinds.PULL_REQUEST.value(), 1L);
         observe(
                 practice,
@@ -493,11 +494,11 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractPracticeReviewIntegr
         getHistory()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].observations.length()")
+                .jsonPath("$.content[0].practiceResults.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].observations[0].summary")
+                .jsonPath("$.content[0].practiceResults[0].summary")
                 .isEqualTo("Motivation is clear")
-                .jsonPath("$.content[0].observations[0].evidence.citations[0].quote")
+                .jsonPath("$.content[0].practiceResults[0].evidence.citations[0].quote")
                 .isEqualTo("example");
     }
 }

@@ -59,7 +59,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -126,7 +126,7 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
     private IssueCommentRepository comments;
 
     @Autowired
-    private ObservationRepository observations;
+    private PracticeResultRepository practiceResults;
 
     @Autowired
     private PracticeRepository practices;
@@ -254,14 +254,14 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
         if (state == Issue.State.OPEN) reopenIssue();
         commenter =
                 Objects.requireNonNull(issues.findById(issueId).orElseThrow().getAuthor());
-        UUID observation = recordObservation();
+        UUID practiceResult = recordResult();
         String closedRecord = storedDigest();
         UUID closedSnapshot = storedSnapshot();
 
         long written = comment(500L, "CSV export moved to #12.", webhook());
 
         assertThat(storedDigest()).isEqualTo(currentRevision()).isNotEqualTo(closedRecord);
-        assertThat(isSuperseded(observation)).isTrue();
+        assertThat(isSuperseded(practiceResult)).isTrue();
         assertThat(deferredUpdateRevisions()).contains(currentRevision());
         UUID afterComment = storedSnapshot();
 
@@ -514,11 +514,11 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
             names = {"OPEN", "CLOSED"})
     void shouldRetireClaimsForASyncedCommentWithoutOccasioningALiveReview(Issue.State state) {
         if (state == Issue.State.OPEN) reopenIssue();
-        UUID observation = recordObservation();
+        UUID practiceResult = recordResult();
 
         comment(700L, "Not doing the CSV export; out of scope for this release.", sync());
 
-        assertThat(isSuperseded(observation)).isTrue();
+        assertThat(isSuperseded(practiceResult)).isTrue();
         assertThat(storedDigest()).isEqualTo(currentRevision());
         assertThat(updates())
                 .filteredOn(signal -> signal.key().revision().value().equals(currentRevision()))
@@ -535,7 +535,7 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
             names = {"OPEN", "CLOSED"})
     void shouldRecordOnlyTheFinalDiscussionRevisionForASyncBatch(Issue.State state) {
         if (state == Issue.State.OPEN) reopenIssue();
-        UUID observation = recordObservation();
+        UUID practiceResult = recordResult();
         int before = updates().size();
         transactions.executeWithoutResult(status -> {
             saveAndAnnounce(701L, "CSV export completed.", sync());
@@ -543,7 +543,7 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
             saveAndAnnounce(703L, "Both exports verified.", sync());
         });
 
-        assertThat(isSuperseded(observation)).isTrue();
+        assertThat(isSuperseded(practiceResult)).isTrue();
         assertThat(storedDigest()).isEqualTo(currentRevision());
         assertThat(updates()).hasSize(before + 1);
         assertThat(updates())
@@ -623,7 +623,7 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldRetainDiscussionEvidenceOnReopenAndReadItUnderASecondClose() {
-        UUID observation = recordObservation();
+        UUID practiceResult = recordResult();
 
         transactions.executeWithoutResult(status -> {
             Issue issue = issues.findById(issueId).orElseThrow();
@@ -634,7 +634,7 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
             events.publishEvent(
                     new ScmDomainEvent.IssueUpdated(ScmEventPayload.IssueData.from(issue), Set.of("state"), webhook()));
         });
-        assertThat(isSuperseded(observation)).isTrue();
+        assertThat(isSuperseded(practiceResult)).isTrue();
         UUID reopened = storedSnapshot();
 
         comment(800L, "CSV export moved to #12.", webhook());
@@ -801,11 +801,11 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
                 .toList();
     }
 
-    private boolean isSuperseded(UUID observationId) {
-        return observations.findById(observationId).orElseThrow().getSupersededAt() != null;
+    private boolean isSuperseded(UUID practiceResultId) {
+        return practiceResults.findById(practiceResultId).orElseThrow().getSupersededAt() != null;
     }
 
-    private UUID recordObservation() {
+    private UUID recordResult() {
         Practice practice = new Practice();
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.ISSUE));
         practice.setWorkspace(workspace);
@@ -826,7 +826,7 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
         job = jobs.save(job);
         UUID id = UUID.randomUUID();
         Issue issue = issues.findById(issueId).orElseThrow();
-        assertThat(observations.insertIfAbsent(
+        assertThat(practiceResults.insertIfAbsent(
                         id,
                         "issue-" + id,
                         job.getId(),
@@ -839,6 +839,9 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
                         "The closed issue leaves the CSV export unaccounted for",
                         "NOT_MET",
                         "MINOR",
+                        null,
+                        null,
+                        "test-scope",
                         null,
                         null,
                         null,

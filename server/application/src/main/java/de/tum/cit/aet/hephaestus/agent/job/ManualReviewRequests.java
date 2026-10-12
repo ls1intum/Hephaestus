@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
@@ -44,7 +44,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>The job's metadata carries no trigger signal: a job with none runs every active practice of the
  * artifact's kind, which is what "Request review" means. The ledger key still names the request signal.
  *
- * <p>{@link ObservationOrigin#MANUAL} is passed explicitly rather than left to the submission request's
+ * <p>{@link ResultOrigin#MANUAL} is passed explicitly rather than left to the submission request's
  * default, which reads the trigger signal and would misreport this as an unbounded organic signal.
  *
  * <p>Checks run standing, then rate limits, then the ledger row, then the gate. Limiting before recording
@@ -131,7 +131,7 @@ public class ManualReviewRequests {
                         pullRequest.getBaseRefName(),
                         pullRequest.getBaseRefOid(),
                         null,
-                        ObservationOrigin.MANUAL));
+                        ResultOrigin.MANUAL));
     }
 
     /** Issue-shaped counterpart of {@link #requestPullRequestReview}, with the same preconditions. */
@@ -170,7 +170,7 @@ public class ManualReviewRequests {
                         issue.getHtmlUrl(),
                         issue.getUpdatedAt(),
                         null,
-                        ObservationOrigin.MANUAL,
+                        ResultOrigin.MANUAL,
                         null,
                         issue.getReviewSnapshotId()));
     }

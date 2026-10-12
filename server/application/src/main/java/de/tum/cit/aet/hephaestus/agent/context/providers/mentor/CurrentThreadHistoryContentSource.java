@@ -84,7 +84,7 @@ public class CurrentThreadHistoryContentSource implements ContentSource {
                 if (MentorVisibleTextSanitizer.isLeakedInternalAnalysis(text)) {
                     continue;
                 }
-            } else if (UIMessageChunk.DataObservation.PART_TYPE.equals(type)) {
+            } else if (UIMessageChunk.LinkParts.resultOf(part) != null) {
                 // Feedback the reply showed; a link stored before links carried text showed nothing.
                 text = part.path("data").path("text").asString("");
                 if (text.isBlank()) {

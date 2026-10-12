@@ -73,20 +73,19 @@ class WorkerJwtTest extends BaseUnitTest {
     @Test
     void shouldExpireJobTokenAtDeclaredUploadDeadline() {
         Instant deadline = Instant.now().plusSeconds(600).truncatedTo(ChronoUnit.SECONDS);
-        JobJwt jwt = (JobJwt) verifier.verify(
-                issuer.issueForJobUntil(UUID.randomUUID(), 42L, 0, deadline, WorkerJwtIssuer.LLM_PROXY_SCOPE));
+        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJobUntil(UUID.randomUUID(), 42L, 0, deadline));
 
         assertThat(jwt.expiresAt()).isEqualTo(deadline);
     }
 
+    /** The job has one credential: its practice programs' direct model calls use the review's own scope. */
     @Test
-    void shouldCarryOnlyThePracticeScriptScopeWhenIssuedForPracticeScript() {
+    void shouldCarryOnlyTheProxyScopeWhenIssuedUntilADeadline() {
         Instant deadline = Instant.now().plusSeconds(600);
 
-        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJobUntil(
-                UUID.randomUUID(), 42L, 0, deadline, WorkerJwtIssuer.LLM_PRACTICE_SCRIPT_SCOPE));
+        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJobUntil(UUID.randomUUID(), 42L, 0, deadline));
 
-        assertThat(jwt.scopes()).containsExactly("llm_practice_script");
+        assertThat(jwt.scopes()).containsExactly(WorkerJwtIssuer.LLM_PROXY_SCOPE);
     }
 
     @Test

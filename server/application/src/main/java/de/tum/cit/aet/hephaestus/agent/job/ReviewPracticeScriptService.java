@@ -97,7 +97,9 @@ class ReviewPracticeScriptService {
                 practiceName,
                 new PracticeScriptRunDTO(
                         run.getStatus(),
-                        run.getLeads(),
+                        run.getProgramKind(),
+                        run.path(),
+                        run.getStopReason(),
                         declared.stream().map(StoredModelUse::toDto).toList()),
                 List.copyOf(models),
                 run.getError(),

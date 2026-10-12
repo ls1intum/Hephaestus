@@ -13,11 +13,11 @@ public class WorkerJwtIssuer {
     static final String WORKER_TOKEN_TYPE = "worker-session+jwt";
     static final String JOB_TOKEN_TYPE = "job+jwt";
 
-    /** Lets a sandbox call the review model and the other gateway capabilities of its job. */
+    /**
+     * Lets a sandbox call the review model, the direct models of its practice programs and the other gateway
+     * capabilities of its job. A job holds one such credential.
+     */
     public static final String LLM_PROXY_SCOPE = "llm_proxy";
-
-    /** Lets a sandbox call only the models for practice scripts of its job, under {@code /internal/llm/practice-script/}. */
-    public static final String LLM_PRACTICE_SCRIPT_SCOPE = "llm_practice_script";
 
     private final WorkerKeyRing keyRing;
     private final WorkerTokenProperties properties;
@@ -51,11 +51,11 @@ public class WorkerJwtIssuer {
 
     public String issueForJob(UUID jobId, Long workspaceId, int attempt, Duration ttl) {
         if (ttl.isNegative() || ttl.isZero()) throw new IllegalArgumentException("ttl must be positive");
-        return issueForJobUntil(jobId, workspaceId, attempt, Instant.now().plus(ttl), LLM_PROXY_SCOPE);
+        return issueForJobUntil(jobId, workspaceId, attempt, Instant.now().plus(ttl));
     }
 
-    /** @param scope {@link #LLM_PROXY_SCOPE} or {@link #LLM_PRACTICE_SCRIPT_SCOPE}. One token never holds both. */
-    public String issueForJobUntil(UUID jobId, Long workspaceId, int attempt, Instant expiresAt, String scope) {
+    /** The job's one credential, scoped {@link #LLM_PROXY_SCOPE}. */
+    public String issueForJobUntil(UUID jobId, Long workspaceId, int attempt, Instant expiresAt) {
         WorkerSigningKey active = keyRing.active();
         Instant now = Instant.now();
         if (!expiresAt.isAfter(now)) throw new IllegalArgumentException("expiresAt must be in the future");
@@ -66,7 +66,7 @@ public class WorkerJwtIssuer {
                 .withClaim("job_id", jobId.toString())
                 .withClaim("workspace_id", workspaceId)
                 .withClaim("attempt", attempt)
-                .withClaim("scope", List.of(scope))
+                .withClaim("scope", List.of(LLM_PROXY_SCOPE))
                 .withJWTId(UUID.randomUUID().toString())
                 .withIssuedAt(now)
                 .withNotBefore(now)

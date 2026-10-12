@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRunnerClient;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
@@ -544,8 +545,7 @@ class MentorLiveLlmTest {
                 true,
                 300,
                 new MentorRunnerProfile(),
-                Map.of(),
-                "");
+                Map.of());
         byte[] settingsBytes = factory.buildPiSettingsJson(spec.upstreamModelId());
 
         // Pi loads its on-disk settings from `~/.pi/settings.json`; redirect with env vars so we
@@ -661,8 +661,8 @@ class MentorLiveLlmTest {
         void helloOk() {
             JsonNode response = call("hello", MAPPER.createObjectNode(), Duration.ofSeconds(10));
             assertThat(response.path("result").path("protocolVersion").asInt(0))
-                    .as("hello returns protocolVersion 1")
-                    .isEqualTo(1);
+                    .as("hello returns the server's protocolVersion")
+                    .isEqualTo(MentorRunnerClient.PROTOCOL_VERSION);
         }
 
         void openThread(UUID threadId) {

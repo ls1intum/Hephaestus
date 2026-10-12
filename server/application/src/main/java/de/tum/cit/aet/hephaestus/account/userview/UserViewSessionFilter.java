@@ -73,7 +73,7 @@ public class UserViewSessionFilter extends OncePerRequestFilter {
                     "/workspaces/{workspaceSlug}/practices/workspace-overview",
                     "/workspaces/{workspaceSlug}/practices/workspace-overview/tiles",
                     "/workspaces/{workspaceSlug}/practices/trace/{artifactKind}/{artifactId}",
-                    "/workspaces/{workspaceSlug}/practices/observations/{observationId}",
+                    "/workspaces/{workspaceSlug}/practices/results/{practiceResultId}",
                     "/workspaces/{workspaceSlug}/mentor/threads",
                     "/workspaces/{workspaceSlug}/mentor/threads/{threadId}")
             .stream()

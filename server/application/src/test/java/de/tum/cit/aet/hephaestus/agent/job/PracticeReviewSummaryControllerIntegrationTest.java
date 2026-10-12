@@ -28,7 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -70,7 +70,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private PracticeGroupRepository practiceGroupRepository;
@@ -144,9 +144,9 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         otherJob.setStatus(AgentJobStatus.COMPLETED);
         jobRepository.save(otherJob);
 
-        insertObservation("Problem", "NOT_MET", "MAJOR");
-        insertObservation("Strength", "MET", null);
-        insertObservation("Not applicable", "NOT_APPLICABLE", null);
+        insertResult("Problem", "NOT_MET", "MAJOR");
+        insertResult("Strength", "MET", null);
+        insertResult("Not applicable", "NOT_APPLICABLE", null);
         persistFeedback(0, FeedbackDeliveryState.DELIVERED, null, "Delivered");
         persistFeedback(1, FeedbackDeliveryState.SUPPRESSED, FeedbackSuppressionReason.VOLUME_CAPPED, "Withheld");
         persistFeedback(2, FeedbackDeliveryState.PREPARED, null, null);
@@ -184,11 +184,11 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
                 .isEqualTo("review-summary-org/review-ui")
                 .jsonPath("$.content[0].target.reviewedWork.url")
                 .isEqualTo("https://github.com/review-summary-org/review-ui/pull/42")
-                .jsonPath("$.content[0].observations.met")
+                .jsonPath("$.content[0].practiceResults.met")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].observations.notMet")
+                .jsonPath("$.content[0].practiceResults.notMet")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].observations.notApplicable")
+                .jsonPath("$.content[0].practiceResults.notApplicable")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].feedback.prepared")
                 .isEqualTo(1)
@@ -375,7 +375,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
 
     /**
      * The window intersects with {@code status} rather than replacing it, and is half-open like the
-     * sibling observation and feedback listings: a review created exactly at {@code from} is in, one
+     * sibling result and feedback listings: a review created exactly at {@code from} is in, one
      * created exactly at {@code to} is out.
      */
     @Test
@@ -566,8 +566,8 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         Instant at = Instant.parse("2026-03-10T00:00:00Z");
         AgentJob observedOther = persistReviewAt(workspace, at, AgentJobStatus.COMPLETED);
         User other = persistUser("review-summary-other");
-        insertObservationFor(observedOther, other, practice);
-        insertObservationFor(job, subject, practice);
+        insertResultFor(observedOther, other, practice);
+        insertResultFor(job, subject, practice);
         persistReviewAt(workspace, at.plusSeconds(60), AgentJobStatus.COMPLETED);
 
         listReviews("").jsonPath("$.page.totalElements").isEqualTo(3);
@@ -732,9 +732,9 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         return jobRepository.save(result);
     }
 
-    private void insertObservationFor(AgentJob review, User about, Practice observed) {
+    private void insertResultFor(AgentJob review, User about, Practice observed) {
         UUID id = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
+        practiceResultRepository.insertIfAbsent(
                 id,
                 "filter-" + id,
                 review.getId(),
@@ -750,13 +750,16 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
                 "{}",
                 "Reasoning",
                 "filter-" + id,
+                null,
+                null,
+                null,
                 Instant.now(),
                 "LIVE");
     }
 
-    private void insertObservation(String title, String outcome, @Nullable String severity) {
+    private void insertResult(String title, String outcome, @Nullable String severity) {
         UUID id = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
+        practiceResultRepository.insertIfAbsent(
                 id,
                 "summary-" + id,
                 job.getId(),
@@ -771,7 +774,10 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
                 severity,
                 "{}",
                 "Reasoning",
-                "summary-" + title,
+                "test-scope",
+                null,
+                null,
+                null,
                 Instant.now(),
                 "LIVE");
     }

@@ -78,7 +78,7 @@ public class DocumentArtifactDescriptor implements ArtifactDescriptor {
 
     /**
      * Outline's revision history names everyone who has edited a document, but "has edited" is not a
-     * role a review can attribute an observation to: deriving one would put a co-editor's name on a
+     * role a review can attribute a result to: deriving one would put a co-editor's name on a
      * judgement about somebody else's writing.
      */
     @Override

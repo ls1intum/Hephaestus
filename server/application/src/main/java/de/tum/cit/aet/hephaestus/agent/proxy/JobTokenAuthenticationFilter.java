@@ -99,6 +99,11 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
 
         Optional<ProxyRouting> routing = mentorRegistry.validate(token);
         Set<String> scopes = Set.of(WorkerJwtIssuer.LLM_PROXY_SCOPE);
+        if (routing.isPresent() && request.getRequestURI().startsWith(PRACTICE_SCRIPT_PATH)) {
+            // A practice program's direct model calls bill one review attempt; a mentor turn has none.
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
+            return;
+        }
         if (routing.isEmpty()) {
             JobJwt jwt;
             try {
@@ -242,8 +247,8 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
             FrozenModel model,
             LlmUsageSourceType sourceType,
             BigDecimal spentUsd,
-            long practiceScriptTokens,
-            long practiceScriptSearchUnits,
+            long directModelTokens,
+            long directModelSearchUnits,
             @Nullable ModelKind slot) {
         return new ProxyRouting(
                 principal,
@@ -259,8 +264,8 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                         job.getRetryCount(),
                         spentUsd,
                         job.getWorkerId(),
-                        practiceScriptTokens,
-                        practiceScriptSearchUnits),
+                        directModelTokens,
+                        directModelSearchUnits),
                 slot,
                 slot == null ? null : model.dataHandlingTier());
     }

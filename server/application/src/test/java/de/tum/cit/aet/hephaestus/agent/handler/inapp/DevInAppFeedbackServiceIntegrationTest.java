@@ -117,7 +117,7 @@ class DevInAppFeedbackServiceIntegrationTest extends AbstractPracticeReviewInteg
     }
 
     @Test
-    @DisplayName("a card citing another developer's observation is refused and nothing is written")
+    @DisplayName("a card citing another developer's result is refused and nothing is written")
     void shouldRefuseWhenTheEvidenceIsAboutAnotherDeveloper() {
         UUID theirs =
                 observe(scoping, run, 10L, teammate, NOT_MET, Severity.MINOR, PREPARED_AT.minus(Duration.ofHours(1)));
@@ -149,7 +149,7 @@ class DevInAppFeedbackServiceIntegrationTest extends AbstractPracticeReviewInteg
     /** Built by hand: the bean exists only while dev seeding is enabled, which the shared context is not. */
     private DevInAppFeedbackService service() {
         return new DevInAppFeedbackService(
-                feedbackRepository, feedbackObservationRepository, observationRepository, reactionRepository);
+                feedbackRepository, feedbackEvidenceRepository, practiceResultRepository, reactionRepository);
     }
 
     private DevInAppFeedbackService.Card card(

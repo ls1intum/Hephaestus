@@ -28,8 +28,8 @@ import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkChanges;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -88,8 +88,8 @@ class ReviewGateTest extends BaseUnitTest {
                 signalOptions,
                 coverageService,
                 new AutomatedReviewFence(Map.of()),
-                mock(ObservationRepository.class),
-                mock(ObservationVisibilityPolicy.class),
+                mock(PracticeResultRepository.class),
+                mock(ResultVisibilityPolicy.class),
                 mock(ReviewedWorkChanges.class));
         when(coverageService.assess(
                         any(Workspace.class),
@@ -1052,8 +1052,8 @@ class ReviewGateTest extends BaseUnitTest {
                                     null,
                                     null,
                                     null))),
-                    mock(ObservationRepository.class),
-                    mock(ObservationVisibilityPolicy.class),
+                    mock(PracticeResultRepository.class),
+                    mock(ResultVisibilityPolicy.class),
                     mock(ReviewedWorkChanges.class));
             PullRequest pr = createPullRequest();
             Practice adopted = createPractice(SIGNAL);

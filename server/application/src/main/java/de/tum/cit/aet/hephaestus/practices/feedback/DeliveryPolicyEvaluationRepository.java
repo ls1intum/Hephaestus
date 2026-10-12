@@ -50,12 +50,12 @@ public interface DeliveryPolicyEvaluationRepository extends JpaRepository<Delive
                 AND feedback.artifact_id IN (:threadIds)
             )
             OR EXISTS (
-              SELECT 1 FROM observation
-              JOIN practice ON practice.id = observation.practice_id
+              SELECT 1 FROM practice_result
+              JOIN practice ON practice.id = practice_result.practice_id
               WHERE practice.workspace_id = evaluation.workspace_id
-                AND observation.agent_job_id = evaluation.agent_job_id
-                AND observation.artifact_kind = 'chat.conversation_thread'
-                AND observation.artifact_id IN (:threadIds)
+                AND practice_result.agent_job_id = evaluation.agent_job_id
+                AND practice_result.artifact_kind = 'chat.conversation_thread'
+                AND practice_result.artifact_id IN (:threadIds)
             )
           )
         """, nativeQuery = true)
@@ -90,12 +90,12 @@ public interface DeliveryPolicyEvaluationRepository extends JpaRepository<Delive
                 AND feedback.about_user_id = :aboutUserId
             )
             OR EXISTS (
-              SELECT 1 FROM observation
-              JOIN practice ON practice.id = observation.practice_id
+              SELECT 1 FROM practice_result
+              JOIN practice ON practice.id = practice_result.practice_id
               WHERE practice.workspace_id = evaluation.workspace_id
-                AND observation.agent_job_id = evaluation.agent_job_id
-                AND observation.artifact_kind = 'chat.conversation_thread'
-                AND observation.about_user_id = :aboutUserId
+                AND practice_result.agent_job_id = evaluation.agent_job_id
+                AND practice_result.artifact_kind = 'chat.conversation_thread'
+                AND practice_result.about_user_id = :aboutUserId
             )
           )
         """, nativeQuery = true)

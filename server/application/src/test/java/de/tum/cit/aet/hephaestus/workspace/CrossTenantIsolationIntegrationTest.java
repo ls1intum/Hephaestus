@@ -29,7 +29,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
@@ -38,7 +38,7 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -84,13 +84,13 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     private AgentJobRepository agentJobRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
     private PracticeRevisionRepository practiceRevisionRepository;
@@ -131,7 +131,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     private TenantData tenantA;
     private TenantData tenantB;
 
-    private record TenantData(String practiceSlug, UUID observationId, UUID feedbackId, UUID threadId) {}
+    private record TenantData(String practiceSlug, UUID practiceResultId, UUID feedbackId, UUID threadId) {}
 
     @BeforeEach
     void provisionTwoTenants() {
@@ -178,10 +178,10 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         job = agentJobRepository.save(job);
 
-        UUID observationId = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
-                observationId,
-                "occ-" + observationId,
+        UUID practiceResultId = UUID.randomUUID();
+        practiceResultRepository.insertIfAbsent(
+                practiceResultId,
+                "occ-" + practiceResultId,
                 job.getId(),
                 job.getWorkspace().getId(),
                 practice.getId(),
@@ -189,11 +189,14 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                 "scm.pull_request",
                 1L,
                 overlapUser.getId(),
-                "Observation in " + ws.getWorkspaceSlug(),
+                "Result in " + ws.getWorkspaceSlug(),
                 "MET",
                 null,
                 null,
                 "reasoning",
+                "test-scope",
+                null,
+                null,
                 null,
                 Instant.now(),
                 "LIVE");
@@ -220,7 +223,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         thread.setUser(overlapUser);
         chatThreadRepository.save(thread);
 
-        return new TenantData(practiceSlug, observationId, feedback.getId(), thread.getId());
+        return new TenantData(practiceSlug, practiceResultId, feedback.getId(), thread.getId());
     }
 
     private void linkSyncedOrg(Workspace ws, IdentityProvider provider) {
@@ -281,14 +284,14 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     @Nested
     @DisplayName("Observations")
-    class Observations {
+    class PracticeResults {
 
         @Test
         @WithMentorUser
-        void listReturnsOnlyOwnWorkspaceObservations() {
+        void listReturnsOnlyOwnWorkspaceResults() {
             webTestClient
                     .get()
-                    .uri("/workspaces/{slug}/practices/observations", workspaceA.getWorkspaceSlug())
+                    .uri("/workspaces/{slug}/practices/results", workspaceA.getWorkspaceSlug())
                     .headers(TestAuthUtils.withCurrentUser())
                     .exchange()
                     .expectStatus()
@@ -297,16 +300,16 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                     .jsonPath("$.content.length()")
                     .isEqualTo(1)
                     .jsonPath("$.content[0].summary")
-                    .isEqualTo("Observation in tenant-a");
+                    .isEqualTo("Result in tenant-a");
         }
 
         @Test
         @WithMentorUser
         void detailIsScopedToWorkspace() {
-            expectDetailStatus("/practices/observations/{key}", tenantA.observationId())
+            expectDetailStatus("/practices/results/{key}", tenantA.practiceResultId())
                     .isOk()
                     .expectBody(Void.class);
-            expectDetailStatus("/practices/observations/{key}", tenantB.observationId())
+            expectDetailStatus("/practices/results/{key}", tenantB.practiceResultId())
                     .isNotFound()
                     .expectBody(Void.class);
         }
@@ -315,16 +318,22 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @WithMentorUser
         void adviceOnTheDetailReadComesOnlyFromThisWorkspace() {
             bindAdvice(
-                    workspaceA, tenantA.observationId(), "Advice in tenant A", Instant.parse("2026-01-01T00:00:00Z"));
+                    workspaceA,
+                    tenantA.practiceResultId(),
+                    "Advice in tenant A",
+                    Instant.parse("2026-01-01T00:00:00Z"));
             bindAdvice(
-                    workspaceB, tenantA.observationId(), "Advice in tenant B", Instant.parse("2026-02-01T00:00:00Z"));
+                    workspaceB,
+                    tenantA.practiceResultId(),
+                    "Advice in tenant B",
+                    Instant.parse("2026-02-01T00:00:00Z"));
 
             webTestClient
                     .get()
                     .uri(
-                            "/workspaces/{slug}/practices/observations/{key}",
+                            "/workspaces/{slug}/practices/results/{key}",
                             workspaceA.getWorkspaceSlug(),
-                            tenantA.observationId())
+                            tenantA.practiceResultId())
                     .headers(TestAuthUtils.withCurrentUser())
                     .exchange()
                     .expectStatus()
@@ -335,7 +344,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         }
     }
 
-    private void bindAdvice(Workspace ws, UUID observationId, String body, Instant createdAt) {
+    private void bindAdvice(Workspace ws, UUID practiceResultId, String body, Instant createdAt) {
         AgentJob job = new AgentJob();
         job.setWorkspace(ws);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
@@ -356,7 +365,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .source(FeedbackSource.AGENT)
                 .createdAt(createdAt)
                 .build());
-        feedbackObservationRepository.insertIfAbsent(unit.getId(), observationId, "PRIMARY", 0);
+        feedbackEvidenceRepository.insertIfAbsent(unit.getId(), practiceResultId, null, "PRIMARY", 0);
     }
 
     @Nested
@@ -461,10 +470,10 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         job.setEvidenceSnapshot(OBJECT_MAPPER.valueToTree(Map.of("manifest", Map.of("contractVersion", "1.2.0"))));
         job = agentJobRepository.save(job);
 
-        UUID observationId = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
-                observationId,
-                "in-app-occ-" + observationId,
+        UUID practiceResultId = UUID.randomUUID();
+        practiceResultRepository.insertIfAbsent(
+                practiceResultId,
+                "in-app-occ-" + practiceResultId,
                 job.getId(),
                 job.getWorkspace().getId(),
                 practice.getId(),
@@ -477,6 +486,9 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                 "MAJOR",
                 DIFF_EVIDENCE_JSON,
                 "reasoning",
+                "test-scope",
+                null,
+                null,
                 null,
                 Instant.now(),
                 "LIVE");
@@ -494,7 +506,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .threadKey(threadKey)
                 .createdAt(Instant.now())
                 .build());
-        feedbackObservationRepository.insertIfAbsent(unit.getId(), observationId, "PRIMARY", 0);
+        feedbackEvidenceRepository.insertIfAbsent(unit.getId(), practiceResultId, null, "PRIMARY", 0);
         return unit;
     }
 
@@ -674,7 +686,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         void nonMemberIsRefusedFromScopedEndpoint() {
             webTestClient
                     .get()
-                    .uri("/workspaces/{slug}/practices/observations", outsiderWorkspace.getWorkspaceSlug())
+                    .uri("/workspaces/{slug}/practices/results", outsiderWorkspace.getWorkspaceSlug())
                     .headers(TestAuthUtils.withCurrentUser())
                     .exchange()
                     .expectStatus()

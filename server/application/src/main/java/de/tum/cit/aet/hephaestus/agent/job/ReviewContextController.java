@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * "Which of this workspace's work is the page I am looking at?" — answered from the page's address.
  *
  * <p>The answer is the work's identity plus what the caller may do about it. Its history is not here: the
- * returned kind and id address the trace, observations and feedback endpoints, so work that is mirrored but
+ * returned kind and id address the trace, results and feedback endpoints, so work that is mirrored but
  * was never reviewed still resolves, and "nothing recorded" stays the trace's own answer.
  *
  */

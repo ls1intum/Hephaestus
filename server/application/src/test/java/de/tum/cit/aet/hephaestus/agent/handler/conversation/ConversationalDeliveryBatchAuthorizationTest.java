@@ -13,7 +13,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceDeliveryAuthorization;
 import de.tum.cit.aet.hephaestus.agent.context.CitedSourceAccess;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ConversationConsentGate;
-import de.tum.cit.aet.hephaestus.agent.handler.AdmittedObservationFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChannel.DeliveryOutcome;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
@@ -21,15 +21,15 @@ import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -43,19 +43,19 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 /**
- * The conversational reconciler reads and authorizes a whole turn's linked observations in two queries rather
- * than two per observation. This pins the answer that batching must not change, wired through the real
- * {@link ObservationVisibilityPolicy} and {@link EvidenceDeliveryAuthorization} rather than a stubbed
+ * The conversational reconciler reads and authorizes a whole turn's linked results in two queries rather
+ * than two per result. This pins the answer that batching must not change, wired through the real
+ * {@link ResultVisibilityPolicy} and {@link EvidenceDeliveryAuthorization} rather than a stubbed
  * verdict: the mistake being guarded against lives inside those, in how an absent key is read.
  *
  * <p>Only one direction of disagreement is visible to anyone. A turn that delivers less than it should
  * looks like a mentor with nothing to say. A turn that delivers more quotes evidence nobody may cite, and
  * no surface reports that it did.
  *
- * <p>Run once per ledger-writing turn ending, because the answer to "which linked observations may this turn
+ * <p>Run once per ledger-writing turn ending, because the answer to "which linked results may this turn
  * act on" cannot depend on how the turn ended. The two endings write opposite things — DELIVERED raises the
  * unit, INSTANCE_SILENCED burns it, and nothing ever writes a unit back to PREPARED — so an ending that
- * admits an id the other refuses spends a developer's coaching on an observation the turn was never allowed to
+ * admits an id the other refuses spends a developer's coaching on a result the turn was never allowed to
  * use. {@code MentorTurnPersistence#reconcileConversationalDelivery} is the switch these correspond to; a
  * new outcome added there fails this file's switch to compile.
  */
@@ -67,32 +67,32 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
     private static final String DENIED_KIND = "hephaestus.observation-history";
 
     /**
-     * Every way a linked observation can fail to be deliverable, in one turn, with the deliverable one LAST so
+     * Every way a linked result can fail to be deliverable, in one turn, with the deliverable one LAST so
      * that admitting any other would flip the <em>wrong</em> feedback unit rather than merely one extra: a
-     * source use the catalog withdrew, an id whose observation this workspace cannot read at all, a run with
+     * source use the catalog withdrew, an id whose result this workspace cannot read at all, a run with
      * no {@code agent_job} row, and a claim measured against superseded review rules.
      *
-     * <p>Each refused observation has a PREPARED unit waiting behind it. Those are the trap: they are what a
-     * wrongly-admitted observation would deliver, so a batch that reads a missing key as anything other than
+     * <p>Each refused result has a PREPARED unit waiting behind it. Those are the trap: they are what a
+     * wrongly-admitted result would deliver, so a batch that reads a missing key as anything other than
      * "refused" fails here instead of passing quietly.
      */
     @ParameterizedTest
     @EnumSource(
             value = DeliveryOutcome.class,
             names = {"DELIVERED", "INSTANCE_SILENCED"})
-    void actsOnlyOnTheLinkedObservationEveryConjunctStillAdmits(DeliveryOutcome ending) {
+    void actsOnlyOnTheLinkedResultEveryConjunctStillAdmits(DeliveryOutcome ending) {
         FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
-        FeedbackObservationRepository feedbackObservations = mock(FeedbackObservationRepository.class);
+        FeedbackEvidenceRepository feedbackResults = mock(FeedbackEvidenceRepository.class);
         FeedbackPlacementRepository placements = mock(FeedbackPlacementRepository.class);
-        ObservationRepository observations = mock(ObservationRepository.class);
+        PracticeResultRepository practiceResults = mock(PracticeResultRepository.class);
         AgentJobRepository jobs = mock(AgentJobRepository.class);
         ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
 
-        Observation deniedSource = observation(DENIED_KIND, true);
-        Observation unreadable = observation(PERMITTED_KIND, true);
-        Observation runWithoutRow = observation(PERMITTED_KIND, true);
-        Observation staleClaim = observation(PERMITTED_KIND, false);
-        Observation deliverable = observation(PERMITTED_KIND, true);
+        PracticeResult deniedSource = practiceResult(DENIED_KIND, true);
+        PracticeResult unreadable = practiceResult(PERMITTED_KIND, true);
+        PracticeResult runWithoutRow = practiceResult(PERMITTED_KIND, true);
+        PracticeResult staleClaim = practiceResult(PERMITTED_KIND, false);
+        PracticeResult deliverable = practiceResult(PERMITTED_KIND, true);
         List<UUID> linked = List.of(
                 deniedSource.getId(),
                 unreadable.getId(),
@@ -102,7 +102,7 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
 
         // Everything but `unreadable`: an id the workspace-scoped read does not return is the same absence
         // the single-id findByIdAndWorkspaceId reported as an empty Optional.
-        when(observations.findAllByIdInAndWorkspaceId(any(), eq(WS)))
+        when(practiceResults.findAllByIdInAndWorkspaceId(any(), eq(WS)))
                 .thenReturn(List.of(deniedSource, runWithoutRow, staleClaim, deliverable));
         List<UUID> authorizationAskedAbout = new ArrayList<>();
         when(jobs.findEvidenceContractVersions(eq(WS), any())).thenAnswer(invocation -> {
@@ -126,15 +126,15 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
                 .thenReturn(false);
 
         UUID deliverableUnit = UUID.randomUUID();
-        when(feedbackObservations.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, deliverable.getId()))
+        when(feedbackResults.findPreparedConversationFeedbackIdsByResult(WS, RECIPIENT, deliverable.getId()))
                 .thenReturn(List.of(deliverableUnit));
         // Lenient on purpose: neither ending may reach these lookups, and if one does, the unit it finds is
         // what the assertion below catches it acting on.
-        UUID deniedSourceUnit = trapUnit(feedbackObservations, deniedSource);
-        UUID unreadableUnit = trapUnit(feedbackObservations, unreadable);
-        UUID runWithoutRowUnit = trapUnit(feedbackObservations, runWithoutRow);
-        UUID staleClaimUnit = trapUnit(feedbackObservations, staleClaim);
-        // Answered for any unit, not just the deliverable one: a wrongly-admitted observation must fail on the
+        UUID deniedSourceUnit = trapUnit(feedbackResults, deniedSource);
+        UUID unreadableUnit = trapUnit(feedbackResults, unreadable);
+        UUID runWithoutRowUnit = trapUnit(feedbackResults, runWithoutRow);
+        UUID staleClaimUnit = trapUnit(feedbackResults, staleClaim);
+        // Answered for any unit, not just the deliverable one: a wrongly-admitted result must fail on the
         // assertion below, which names the unit it acted on, rather than on a stubbing mismatch.
         Feedback deliveredRow = mock(Feedback.class);
         lenient()
@@ -147,10 +147,10 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
 
         ConversationalDeliveryReconciler reconciler = new ConversationalDeliveryReconciler(
                 feedbackRepository,
-                feedbackObservations,
+                feedbackResults,
                 placements,
-                observations,
-                new ObservationVisibilityPolicy(
+                practiceResults,
+                new ResultVisibilityPolicy(
                         new EvidenceDeliveryAuthorization(
                                 jobs,
                                 catalogs,
@@ -159,7 +159,7 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
                                         call -> call.getMethod().getName().equals("checks")
                                                 ? (CitedSourceAccess.Checks) citation -> true
                                                 : Mockito.RETURNS_DEFAULTS.answer(call))),
-                        mock(ObservationInvalidationRepository.class)),
+                        mock(PracticeResultInvalidationRepository.class)),
                 mock(ConversationConsentGate.class));
 
         UUID actedOn =
@@ -199,21 +199,21 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
         assertThat(authorizationAskedAbout)
                 .doesNotContain(staleClaim.getAgentJobId())
                 .contains(deniedSource.getAgentJobId(), runWithoutRow.getAgentJobId(), deliverable.getAgentJobId());
-        // One read of each kind for the whole turn, however many observations the mentor linked.
-        verify(observations, times(1)).findAllByIdInAndWorkspaceId(any(), eq(WS));
+        // One read of each kind for the whole turn, however many results the mentor linked.
+        verify(practiceResults, times(1)).findAllByIdInAndWorkspaceId(any(), eq(WS));
         verify(jobs, times(1)).findEvidenceContractVersions(eq(WS), any());
     }
 
-    private static UUID trapUnit(FeedbackObservationRepository feedbackObservations, Observation observation) {
+    private static UUID trapUnit(FeedbackEvidenceRepository feedbackResults, PracticeResult practiceResult) {
         UUID feedbackId = UUID.randomUUID();
         lenient()
-                .when(feedbackObservations.findPreparedConversationFeedbackIdsByObservation(
-                        WS, RECIPIENT, observation.getId()))
+                .when(feedbackResults.findPreparedConversationFeedbackIdsByResult(
+                        WS, RECIPIENT, practiceResult.getId()))
                 .thenReturn(List.of(feedbackId));
         return feedbackId;
     }
 
-    private static Observation observation(String sourceKind, boolean current) {
+    private static PracticeResult practiceResult(String sourceKind, boolean current) {
         PracticeRevision evaluated = mock(PracticeRevision.class);
         PracticeRevision currentRevision = mock(PracticeRevision.class);
         Practice practice = mock(Practice.class);
@@ -222,12 +222,13 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
         lenient().when(currentRevision.getReviewRuleFingerprint()).thenReturn("v5:fingerprint");
         lenient().when(practice.getCurrentRevision()).thenReturn(currentRevision);
         UUID jobId = UUID.randomUUID();
-        return Observation.builder()
+        return PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .agentJobId(jobId)
                 .practice(practice)
                 .practiceRevision(evaluated)
-                .evidence(AdmittedObservationFixtures.evidence(jobId, sourceKind))
+                .evidence(AdmittedResultFixtures.evidence(jobId, sourceKind))
                 .build();
     }
 

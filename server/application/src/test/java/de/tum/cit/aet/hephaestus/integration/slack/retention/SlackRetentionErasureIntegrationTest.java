@@ -22,12 +22,12 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -48,11 +48,11 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Real-Postgres proof of the thread-grain Slack retention sweep. Once a thread goes cold (its {@code last_ts} is
- * older than the retention window), the sweep erases the derived {@code chat.conversation_thread} observations/feedback
+ * older than the retention window), the sweep erases the derived {@code chat.conversation_thread} results/feedback
  * (through the practices erasure port) <b>and</b> drops the {@code slack_thread} aggregate (which holds the
- * {@code participant_member_ids} PII) — while a still-active thread's derived rows and an unrelated PR observation
+ * {@code participant_member_ids} PII) — while a still-active thread's derived rows and an unrelated PR result
  * are left intact. The assertions fail if the retention erasure path is removed (the aged derived rows would
- * survive) and fail if it over-reaches (the fresh thread or the PR observation would vanish). Also proves the
+ * survive) and fail if it over-reaches (the fresh thread or the PR result would vanish). Also proves the
  * {@code participant_member_ids} {@code array_remove} prune is workspace-scoped.
  */
 class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
@@ -66,13 +66,13 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
     private SlackThreadRepository slackThreadRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -128,8 +128,8 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         UUID freshObs = seedBoundConversation(freshThreadId);
         UUID freshFb = lastFeedbackId;
 
-        // An unrelated PR observation for the same workspace — a different artifact type, MUST survive.
-        UUID prObs = seedObservation(ArtifactKinds.PULL_REQUEST, 7777L);
+        // An unrelated PR result for the same workspace — a different artifact type, MUST survive.
+        UUID prObs = seedResult(ArtifactKinds.PULL_REQUEST, 7777L);
 
         // At least one message so the workspace is enumerated by the sweep; also proves message-grain pruning.
         insertMessage("agedmsg.1", "aged-root", now.minus(Duration.ofDays(60)));
@@ -138,14 +138,14 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         slackRetentionSweeper.sweepNow();
 
         assertThat(slackThreadRepository.findById(agedThreadId)).isEmpty();
-        assertThat(observationRepository.findById(agedObs)).isEmpty();
+        assertThat(practiceResultRepository.findById(agedObs)).isEmpty();
         assertThat(feedbackRepository.findById(agedFb)).isEmpty();
 
         assertThat(slackThreadRepository.findById(freshThreadId)).isPresent();
-        assertThat(observationRepository.findById(freshObs)).isPresent();
+        assertThat(practiceResultRepository.findById(freshObs)).isPresent();
         assertThat(feedbackRepository.findById(freshFb)).isPresent();
 
-        assertThat(observationRepository.findById(prObs)).isPresent();
+        assertThat(practiceResultRepository.findById(prObs)).isPresent();
 
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT count(*) FROM slack_message WHERE slack_ts = 'agedmsg.1'", Long.class))
@@ -239,7 +239,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private UUID seedBoundConversation(long threadId) {
-        UUID observationId = seedObservation(ArtifactKinds.CONVERSATION_THREAD, threadId);
+        UUID practiceResultId = seedResult(ArtifactKinds.CONVERSATION_THREAD, threadId);
         Feedback feedback = feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(workspace.getId())
@@ -254,15 +254,16 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
                 .createdAt(Instant.now())
                 .build());
         lastFeedbackId = feedback.getId();
-        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
-        return observationId;
+        feedbackEvidenceRepository.insertIfAbsent(
+                feedback.getId(), practiceResultId, null, EvidenceRole.PRIMARY.name(), 0);
+        return practiceResultId;
     }
 
-    private UUID seedObservation(ArtifactKind artifactKind, long artifactId) {
-        UUID observationId = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
-                observationId,
-                "occ-" + observationId,
+    private UUID seedResult(ArtifactKind artifactKind, long artifactId) {
+        UUID practiceResultId = UUID.randomUUID();
+        practiceResultRepository.insertIfAbsent(
+                practiceResultId,
+                "occ-" + practiceResultId,
                 job.getId(),
                 job.getWorkspace().getId(),
                 practice.getId(),
@@ -270,15 +271,18 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
                 artifactKind.value(),
                 artifactId,
                 recipient.getId(),
-                "Observation title",
+                "Result title",
                 "NOT_MET",
                 "MAJOR",
+                null,
+                null,
+                "test-scope",
                 null,
                 null,
                 null,
                 Instant.now(),
                 "LIVE");
-        return observationId;
+        return practiceResultId;
     }
 
     private Practice savePractice(Workspace ws) {

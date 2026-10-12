@@ -7,7 +7,8 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.ResultCitations;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,6 +22,8 @@ import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 @Component
 public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
@@ -39,13 +42,20 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
     }
 
     @Override
-    public boolean permits(long workspaceId, Observation observation, SourceUsePurpose requestedPurpose) {
-        return permits(workspaceId, observation.getAgentJobId(), observation.getEvidence(), requestedPurpose);
+    public boolean permits(long workspaceId, PracticeResult practiceResult, SourceUsePurpose requestedPurpose) {
+        UUID jobId = practiceResult.getAgentJobId();
+        // Every place the result cites, its problems', its example's and its open questions' included.
+        return permitsCited(
+                workspaceId, jobId, citationsOrNull(jobId, ResultCitations.all(practiceResult)), requestedPurpose);
     }
 
     public boolean permits(
             long workspaceId, @Nullable UUID jobId, @Nullable JsonNode evidence, SourceUsePurpose requestedPurpose) {
-        JsonNode citations = citationsOrNull(jobId, evidence);
+        return permitsCited(workspaceId, jobId, citationsOrNull(jobId, evidence), requestedPurpose);
+    }
+
+    private boolean permitsCited(
+            long workspaceId, @Nullable UUID jobId, @Nullable JsonNode citations, SourceUsePurpose requestedPurpose) {
         if (jobId == null || citations == null) {
             return false;
         }
@@ -61,31 +71,32 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
 
     @Override
     public Set<UUID> permitsAll(
-            long workspaceId, Collection<Observation> observations, SourceUsePurpose requestedPurpose) {
-        return permitsBatch(workspaceId, observations, requestedPurpose, false);
+            long workspaceId, Collection<PracticeResult> practiceResults, SourceUsePurpose requestedPurpose) {
+        return permitsBatch(workspaceId, practiceResults, requestedPurpose, false);
     }
 
     @Override
     public Set<UUID> permitsForNewDelivery(
-            long workspaceId, Collection<Observation> observations, SourceUsePurpose requestedPurpose) {
-        return permitsBatch(workspaceId, observations, requestedPurpose, true);
+            long workspaceId, Collection<PracticeResult> practiceResults, SourceUsePurpose requestedPurpose) {
+        return permitsBatch(workspaceId, practiceResults, requestedPurpose, true);
     }
 
     private Set<UUID> permitsBatch(
             long workspaceId,
-            Collection<Observation> observations,
+            Collection<PracticeResult> practiceResults,
             SourceUsePurpose requestedPurpose,
             boolean newDelivery) {
         List<Citable> citable = new ArrayList<>();
         Set<UUID> jobIds = new HashSet<>();
-        for (Observation observation : observations) {
-            UUID observationId = observation.getId();
-            UUID jobId = observation.getAgentJobId();
-            JsonNode citations = citationsOrNull(jobId, observation.getEvidence());
-            if (observationId == null || jobId == null || citations == null) {
+        for (PracticeResult practiceResult : practiceResults) {
+            UUID practiceResultId = practiceResult.getId();
+            UUID jobId = practiceResult.getAgentJobId();
+            // Every place the result cites, its problems', its example's and its open questions' included.
+            JsonNode citations = citationsOrNull(jobId, ResultCitations.all(practiceResult));
+            if (practiceResultId == null || jobId == null || citations == null) {
                 continue;
             }
-            citable.add(new Citable(observationId, jobId, citations));
+            citable.add(new Citable(practiceResultId, jobId, citations));
             jobIds.add(jobId);
         }
         if (citable.isEmpty()) {
@@ -100,7 +111,7 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
                 contractVersions.put(row.getId(), row);
             }
         }
-        // One set of source checks for the whole batch: observations citing the same source share its answer.
+        // One set of source checks for the whole batch: results citing the same source share its answer.
         CitedSourceAccess.Checks sources = citedSourceAccess.checks(workspaceId, requestedPurpose);
         // And one batch per kind of history record the batch cites, rather than one check per record.
         List<JsonNode> cited = new ArrayList<>();
@@ -116,7 +127,7 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
                 continue;
             }
             if (permits(row.getContractVersion(), entry.citations(), requestedPurpose, sources)) {
-                permitted.add(entry.observationId());
+                permitted.add(entry.practiceResultId());
             }
         }
         return permitted;
@@ -127,7 +138,7 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
         return citedSourceAccess.asOneRead(workspaceId, purpose, read);
     }
 
-    private record Citable(UUID observationId, UUID jobId, JsonNode citations) {}
+    private record Citable(UUID practiceResultId, UUID jobId, JsonNode citations) {}
 
     @Nullable
     private static JsonNode citationsOrNull(@Nullable UUID jobId, @Nullable JsonNode evidence) {
@@ -136,6 +147,16 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
         }
         JsonNode citations = evidence.path("citations");
         return citations.isArray() && !citations.isEmpty() ? citations : null;
+    }
+
+    @Nullable
+    private static JsonNode citationsOrNull(@Nullable UUID jobId, List<JsonNode> cited) {
+        if (jobId == null || cited.isEmpty()) {
+            return null;
+        }
+        ArrayNode citations = JsonNodeFactory.instance.arrayNode();
+        cited.forEach(citations::add);
+        return citations;
     }
 
     private boolean permits(

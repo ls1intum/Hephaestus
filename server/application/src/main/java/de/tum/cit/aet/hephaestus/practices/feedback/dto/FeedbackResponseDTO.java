@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback.dto;
 
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.CurrentResponseProjection;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository.CurrentResponseProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;

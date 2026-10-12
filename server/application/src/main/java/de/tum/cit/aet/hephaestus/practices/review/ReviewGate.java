@@ -11,12 +11,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.ReviewWhen;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.observation.LatestRun;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.LatestRun;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkChanges;
@@ -45,8 +45,8 @@ public class ReviewGate {
     private final PracticeSignalOptions signalOptions;
     private final PracticeReviewCoverageService coverageService;
     private final AutomatedReviewFence fence;
-    private final ObservationRepository observations;
-    private final ObservationVisibilityPolicy observationVisibility;
+    private final PracticeResultRepository practiceResults;
+    private final ResultVisibilityPolicy practiceResultVisibility;
     private final ReviewedWorkChanges reviewedWorkChanges;
 
     public ReviewGate(
@@ -56,8 +56,8 @@ public class ReviewGate {
             PracticeSignalOptions signalOptions,
             PracticeReviewCoverageService coverageService,
             AutomatedReviewFence fence,
-            ObservationRepository observations,
-            ObservationVisibilityPolicy observationVisibility,
+            PracticeResultRepository practiceResults,
+            ResultVisibilityPolicy practiceResultVisibility,
             ReviewedWorkChanges reviewedWorkChanges) {
         this.practiceReviewReadiness = practiceReviewReadiness;
         this.practiceRepository = practiceRepository;
@@ -65,8 +65,8 @@ public class ReviewGate {
         this.signalOptions = signalOptions;
         this.coverageService = coverageService;
         this.fence = fence;
-        this.observations = observations;
-        this.observationVisibility = observationVisibility;
+        this.practiceResults = practiceResults;
+        this.practiceResultVisibility = practiceResultVisibility;
         this.reviewedWorkChanges = reviewedWorkChanges;
     }
 
@@ -284,30 +284,30 @@ public class ReviewGate {
                 || authorId == null) {
             return Set.of();
         }
-        List<Observation> negative = LatestRun.perClaim(observations.findStandingForWork(
+        List<PracticeResult> negative = LatestRun.perClaim(practiceResults.findStandingForWork(
                         workspace.getId(), signal.artifactKind(), reviewable.getId(), authorId))
                 .stream()
-                .filter(observation -> observation.getOutcome().isNotMet())
+                .filter(practiceResult -> practiceResult.getOutcome().isNotMet())
                 .toList();
         if (negative.isEmpty()) {
             return Set.of();
         }
-        Set<UUID> current = observationVisibility.permitsAll(
+        Set<UUID> current = practiceResultVisibility.permitsAll(
                 workspace.getId(), negative, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
         Set<UUID> runIds = negative.stream()
-                .filter(observation -> current.contains(observation.getId()))
-                .map(Observation::getAgentJobId)
+                .filter(practiceResult -> current.contains(practiceResult.getId()))
+                .map(PracticeResult::getAgentJobId)
                 .collect(Collectors.toSet());
         Set<UUID> changed = signalOptions.isInternalRepair(signal)
                 ? reviewedWorkChanges.materiallyChangedLinkedIssues(
                         workspace.getId(),
                         negative.stream()
-                                .filter(observation -> current.contains(observation.getId()))
-                                .filter(observation -> observation.getEvidence() != null)
-                                .map(observation -> new ReviewedWorkChanges.ObservationEvidence(
-                                        observation.getId(),
-                                        observation.getAgentJobId(),
-                                        Objects.requireNonNull(observation.getEvidence())
+                                .filter(practiceResult -> current.contains(practiceResult.getId()))
+                                .filter(practiceResult -> practiceResult.getEvidence() != null)
+                                .map(practiceResult -> new ReviewedWorkChanges.ResultEvidence(
+                                        practiceResult.getId(),
+                                        practiceResult.getAgentJobId(),
+                                        Objects.requireNonNull(practiceResult.getEvidence())
                                                 .path("citations")))
                                 .toList(),
                         pullRequest.getId())
@@ -320,13 +320,15 @@ public class ReviewGate {
                                 pullRequest.getTitle(),
                                 pullRequest.getBody()));
         return negative.stream()
-                .filter(observation -> current.contains(observation.getId()))
-                .filter(observation -> changed.contains(
-                        signalOptions.isInternalRepair(signal) ? observation.getId() : observation.getAgentJobId()))
-                .filter(observation -> !signalOptions.isInternalRepair(signal)
-                        || observation.getPractice().getEvidenceRequirements().stream()
+                .filter(practiceResult -> current.contains(practiceResult.getId()))
+                .filter(practiceResult -> changed.contains(
+                        signalOptions.isInternalRepair(signal)
+                                ? practiceResult.getId()
+                                : practiceResult.getAgentJobId()))
+                .filter(practiceResult -> !signalOptions.isInternalRepair(signal)
+                        || practiceResult.getPractice().getEvidenceRequirements().stream()
                                 .anyMatch(need -> need.sourceKind().equals(new SourceKind("scm.linked-work-items"))))
-                .map(observation -> observation.getPractice().getId())
+                .map(practiceResult -> practiceResult.getPractice().getId())
                 .collect(Collectors.toSet());
     }
 

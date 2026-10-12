@@ -4,8 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.DeliveryContent;
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.ValidatedObservation;
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.WithheldObservation;
+import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.ValidatedProblem;
+import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.ValidatedResult;
+import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.WithheldResult;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedReview;
 import de.tum.cit.aet.hephaestus.practices.PracticeDeliveryBehavior;
@@ -21,9 +22,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /** Admission of a complete review: each body goes out whole, exactly as written, or not at all. */
@@ -39,57 +42,105 @@ class AdmittedDeliveryTest extends BaseUnitTest {
     private final JsonMapper mapper = new JsonMapper();
     private final Map<UUID, Long> subjects = new HashMap<>();
 
-    private ValidatedObservation observation(String slug, Outcome outcome, String sourceKind, long about) {
+    private ValidatedResult practiceResult(String slug, Outcome outcome, String sourceKind, long about) {
         ObjectNode evidence = mapper.createObjectNode();
-        ObjectNode citation = evidence.putArray("citations").addObject();
-        citation.put("sourceKind", sourceKind);
-        citation.put("path", PATH);
-        citation.put("side", "NEW");
-        citation.put("startLine", 10);
-        citation.put("endLine", 10);
-        citation.putObject("verification").put("status", "VERIFIED").put("scope", "EXACT_LOCATION");
+        // The result's own citation is never verified at a line: only a problem's citation may carry a note.
+        ObjectNode own = evidence.putArray("citations").addObject();
+        own.put("sourceKind", sourceKind);
+        own.put("path", PATH);
+        own.put("startLine", 1);
         evidence.putObject("search").putArray("consulted").add("scm.pull-request.diff");
         UUID id = UUID.randomUUID();
         subjects.put(id, about);
-        return new ValidatedObservation(
-                        slug,
-                        "Summary of " + slug,
-                        outcome,
-                        outcome == Outcome.NOT_MET ? Severity.MINOR : null,
-                        evidence,
-                        "What the evidence shows.")
-                .withKeys(new ObservationKeys("occ-" + id, null, id));
+        List<ValidatedProblem> problems = outcome == Outcome.NOT_MET
+                ? List.of(problemAt(0, citations(diffCitation(sourceKind, PATH, 10))))
+                : List.of();
+        return new ValidatedResult(
+                slug,
+                "Summary of " + slug,
+                outcome,
+                outcome == Outcome.NOT_MET ? Severity.MINOR : null,
+                evidence,
+                "What the evidence shows.",
+                new ResultKeys("occ-" + id, id),
+                PracticeDeliveryBehavior.DEFAULT,
+                problems,
+                null);
     }
 
-    private ValidatedObservation problem(String slug) {
-        return observation(slug, Outcome.NOT_MET, "scm.pull-request.diff", AUTHOR);
+    private ObjectNode diffCitation(String sourceKind, String path, int line) {
+        ObjectNode citation = mapper.createObjectNode();
+        citation.put("sourceKind", sourceKind);
+        citation.put("path", path);
+        citation.put("side", "NEW");
+        citation.put("startLine", line);
+        citation.put("endLine", line);
+        citation.putObject("verification").put("status", "VERIFIED").put("scope", "EXACT_LOCATION");
+        return citation;
     }
 
-    private static String id(ValidatedObservation observation) {
-        return String.valueOf(observation.observationId());
+    private ArrayNode citations(ObjectNode... citations) {
+        ArrayNode array = mapper.createArrayNode();
+        for (ObjectNode citation : citations) array.add(citation);
+        return array;
     }
 
-    private static ComposedReview.InlineNote note(
-            String body, ValidatedObservation anchored, ValidatedObservation... more) {
+    private static ValidatedProblem problemAt(int position, ArrayNode citations) {
+        return new ValidatedProblem(
+                UUID.randomUUID(),
+                position,
+                null,
+                Severity.MINOR,
+                "A problem at position " + position,
+                "What this place shows.",
+                citations,
+                null,
+                null,
+                null);
+    }
+
+    private ValidatedResult problem(String slug) {
+        return practiceResult(slug, Outcome.NOT_MET, "scm.pull-request.diff", AUTHOR);
+    }
+
+    private static String id(ValidatedResult practiceResult) {
+        return String.valueOf(practiceResult.practiceResultId());
+    }
+
+    /** The id of the result's first problem; a result without one gets an id no problem has. */
+    private static String problemId(ValidatedResult practiceResult) {
+        return practiceResult.problems().isEmpty()
+                ? "no-problem-of-" + id(practiceResult)
+                : String.valueOf(practiceResult.problems().getFirst().observationId());
+    }
+
+    private static ComposedReview.InlineNote note(String body, ValidatedResult anchored, ValidatedResult... more) {
         List<String> basedOn = new ArrayList<>(List.of(id(anchored)));
-        for (ValidatedObservation also : more) basedOn.add(id(also));
+        List<String> observations = new ArrayList<>(List.of(problemId(anchored)));
+        for (ValidatedResult also : more) {
+            basedOn.add(id(also));
+            if (!also.problems().isEmpty()) observations.add(problemId(also));
+        }
         return new ComposedReview.InlineNote(
-                body, basedOn, new ComposedReview.ResolvedAnchor(id(anchored), 0, PATH, "NEW", 10, 10));
+                body,
+                basedOn,
+                observations,
+                new ComposedReview.ResolvedAnchor(id(anchored), problemId(anchored), 0, PATH, "NEW", 10, 10));
     }
 
     private AdmittedDelivery decide(
             ComposedReview review,
-            List<ValidatedObservation> recorded,
-            List<ValidatedObservation> awaitingApproval,
-            List<ValidatedObservation> automatic) {
+            List<ValidatedResult> recorded,
+            List<ValidatedResult> awaitingApproval,
+            List<ValidatedResult> automatic) {
         return decide(review, recorded, awaitingApproval, automatic, subjects.keySet());
     }
 
     private AdmittedDelivery decide(
             ComposedReview review,
-            List<ValidatedObservation> recorded,
-            List<ValidatedObservation> awaitingApproval,
-            List<ValidatedObservation> automatic,
+            List<ValidatedResult> recorded,
+            List<ValidatedResult> awaitingApproval,
+            List<ValidatedResult> automatic,
             Set<UUID> publicIds) {
         return AdmittedDelivery.decide(
                 review,
@@ -104,8 +155,8 @@ class AdmittedDeliveryTest extends BaseUnitTest {
 
     @Test
     void shouldPreserveAnIndependentAuthorPartButRefuseTheWholeBodyOfMixedRoleSupport() {
-        ValidatedObservation author = problem("describe-what-and-why");
-        ValidatedObservation reviewer = problem("review-communication");
+        ValidatedResult author = problem("describe-what-and-why");
+        ValidatedResult reviewer = problem("review-communication");
         ComposedReview review = new ComposedReview(
                 new ComposedReview.Summary("Explain the purpose of this change.", List.of(id(author))),
                 List.of(note("This body concerns both the change and its review.", author, reviewer)),
@@ -114,7 +165,7 @@ class AdmittedDeliveryTest extends BaseUnitTest {
                 review,
                 ArtifactKinds.PULL_REQUEST,
                 List.of(author, reviewer),
-                Map.of(Objects.requireNonNull(author.observationId()), AUTHOR),
+                Map.of(Objects.requireNonNull(author.practiceResultId()), AUTHOR),
                 List.of(),
                 List.of(author, reviewer)));
         assertThat(content.mrNote()).isEqualTo("Explain the purpose of this change.");
@@ -128,8 +179,8 @@ class AdmittedDeliveryTest extends BaseUnitTest {
 
     @Test
     void shouldKeepSummaryOnlySupportOutOfAnInlineBodyButAllowItsSummary() {
-        ValidatedObservation original = problem("describe-what-and-why");
-        ValidatedObservation summaryOnly = new ValidatedObservation(
+        ValidatedResult original = problem("describe-what-and-why");
+        ValidatedResult summaryOnly = new ValidatedResult(
                 original.practiceSlug(),
                 original.summary(),
                 original.outcome(),
@@ -137,12 +188,14 @@ class AdmittedDeliveryTest extends BaseUnitTest {
                 original.evidence(),
                 original.evidenceRationale(),
                 original.keys(),
-                new PracticeDeliveryBehavior(true, null, null));
-        ValidatedObservation lineConcern = problem("checks-tokens-first");
+                new PracticeDeliveryBehavior(true, null, null),
+                original.problems(),
+                original.example());
+        ValidatedResult lineConcern = problem("checks-tokens-first");
         DeliveryContent content = automatic(decide(
                 new ComposedReview(
                         new ComposedReview.Summary(SUMMARY, List.of(id(summaryOnly))),
-                        List.of(note("This complete note rests on both observations.", lineConcern, summaryOnly)),
+                        List.of(note("This complete note rests on both results.", lineConcern, summaryOnly)),
                         List.of()),
                 List.of(summaryOnly, lineConcern),
                 List.of(),
@@ -153,8 +206,8 @@ class AdmittedDeliveryTest extends BaseUnitTest {
 
     @Test
     void shouldPostTheCompleteSummaryVerbatimWithExactlyItsContributorsWhenEverySupportIsAutomatic() {
-        ValidatedObservation lapse = problem("checks-tokens-first");
-        ValidatedObservation unrelated = problem("describe-what-and-why");
+        ValidatedResult lapse = problem("checks-tokens-first");
+        ValidatedResult unrelated = problem("describe-what-and-why");
 
         DeliveryContent content = automatic(decide(
                 new ComposedReview(new ComposedReview.Summary(SUMMARY, List.of(id(lapse))), List.of(), List.of()),
@@ -168,8 +221,8 @@ class AdmittedDeliveryTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseTheWholeSummaryAndKeepAnIndependentNoteWhenOneSupportIsHeld() {
-        ValidatedObservation posted = problem("checks-tokens-first");
-        ValidatedObservation disputed = problem("describe-what-and-why");
+        ValidatedResult posted = problem("checks-tokens-first");
+        ValidatedResult disputed = problem("describe-what-and-why");
 
         DeliveryContent content = automatic(decide(
                 new ComposedReview(
@@ -183,31 +236,33 @@ class AdmittedDeliveryTest extends BaseUnitTest {
         assertThat(content.mrNote()).isNull();
         assertThat(content.diffNotes()).singleElement().satisfies(diff -> {
             assertThat(diff.body()).isEqualTo("Call the checked helper on this line.");
-            assertThat(diff.deliveryKey()).isEqualTo("observation:" + posted.occurrenceKey() + ":0");
+            assertThat(diff.deliveryKey()).isEqualTo("observation:" + posted.occurrenceKey() + ":0:0");
             assertThat(diff.contributors()).containsExactly(posted.occurrenceKey());
+            assertThat(diff.observations()).containsExactly(problemId(posted));
         });
     }
 
     @Test
-    void shouldPostAStrengthAloneWhenTheReviewDidNotReachEveryPractice() {
-        ValidatedObservation strength = observation("ships-a-preview", Outcome.MET, "scm.pull-request.diff", AUTHOR);
+    void shouldPostNothingWhenTheReviewRestsOnlyOnAMetResult() {
+        ValidatedResult strength = practiceResult("ships-a-preview", Outcome.MET, "scm.pull-request.diff", AUTHOR);
         String body = "The preview you added shows the screen in both appearances.";
 
-        DeliveryContent content = automatic(decide(
+        AdmittedDelivery delivery = decide(
                 new ComposedReview(new ComposedReview.Summary(body, List.of(id(strength))), List.of(), List.of()),
                 List.of(strength),
                 List.of(),
-                List.of(strength)));
+                List.of(strength));
 
-        assertThat(content.mrNote()).isEqualTo(body);
+        // A MET result is never acknowledged on the work.
+        assertThat(delivery).isEqualTo(new AdmittedDelivery.Automatic(null, Set.of()));
     }
 
     @Test
-    void shouldRefuseABodyRestingOnAnUndecidedOrPrivateObservationEvenWhenItPassedTheGates() {
-        ValidatedObservation undecided =
-                observation("keeps-tests-honest", Outcome.UNDETERMINED, "scm.pull-request.diff", AUTHOR);
-        ValidatedObservation fromHistory =
-                observation("checks-tokens-first", Outcome.NOT_MET, "hephaestus.feedback-history", AUTHOR);
+    void shouldRefuseABodyRestingOnAnUndecidedOrPrivateResultEvenWhenItPassedTheGates() {
+        ValidatedResult undecided =
+                practiceResult("keeps-tests-honest", Outcome.UNDETERMINED, "scm.pull-request.diff", AUTHOR);
+        ValidatedResult fromHistory =
+                practiceResult("checks-tokens-first", Outcome.NOT_MET, "hephaestus.feedback-history", AUTHOR);
 
         AdmittedDelivery delivery = decide(
                 new ComposedReview(
@@ -217,14 +272,14 @@ class AdmittedDeliveryTest extends BaseUnitTest {
                 List.of(undecided, fromHistory),
                 List.of(),
                 List.of(undecided, fromHistory),
-                Set.of(Objects.requireNonNull(undecided.observationId())));
+                Set.of(Objects.requireNonNull(undecided.practiceResultId())));
 
         assertThat(delivery).isEqualTo(new AdmittedDelivery.Automatic(null, Set.of()));
     }
 
     @Test
     void shouldRefuseAStandaloneApprovalLineButKeepTimingInsideASentence() {
-        ValidatedObservation lapse = problem("checks-tokens-first");
+        ValidatedResult lapse = problem("checks-tokens-first");
         String timing = "Before this is ready for another look, route the call through the checked helper.";
 
         DeliveryContent refused = automatic(decide(
@@ -245,17 +300,23 @@ class AdmittedDeliveryTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseANoteWhoseCitationIsNotAVerifiedLineOfThisChangeOrWhoseWorkHasNoLines() {
-        ValidatedObservation lapse = problem("checks-tokens-first");
-        // Verified, but not at its exact location: it cannot carry a note onto that line.
-        ((ObjectNode) Objects.requireNonNull(lapse.evidence()).get("citations").get(0))
-                .putObject("verification")
-                .put("status", "VERIFIED");
-        ComposedReview review = new ComposedReview(null, List.of(note("Call the checked helper.", lapse)), List.of());
+        List<Consumer<ObjectNode>> unplaceable = List.of(
+                // Verified, but not at its exact location: it cannot carry a note onto that line.
+                citation -> citation.putObject("verification").put("status", "VERIFIED"),
+                citation -> citation.put("side", "OLD"),
+                citation -> citation.put("sourceKind", "scm.review-threads"),
+                citation -> citation.put("startLine", 11));
+        for (Consumer<ObjectNode> change : unplaceable) {
+            ValidatedResult lapse = problem("checks-tokens-first");
+            change.accept((ObjectNode) lapse.problems().getFirst().citations().get(0));
+            ComposedReview review =
+                    new ComposedReview(null, List.of(note("Call the checked helper.", lapse)), List.of());
 
-        assertThat(decide(review, List.of(lapse), List.of(), List.of(lapse)))
-                .isEqualTo(new AdmittedDelivery.Automatic(null, Set.of()));
+            assertThat(decide(review, List.of(lapse), List.of(), List.of(lapse)))
+                    .isEqualTo(new AdmittedDelivery.Automatic(null, Set.of()));
+        }
 
-        ValidatedObservation onAnIssue = problem("states-acceptance-criteria");
+        ValidatedResult onAnIssue = problem("states-acceptance-criteria");
         assertThat(AdmittedDelivery.decide(
                         new ComposedReview(null, List.of(note("Say which criteria.", onAnIssue)), List.of()),
                         ArtifactKinds.ISSUE,
@@ -267,11 +328,82 @@ class AdmittedDeliveryTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldPlaceTheNoteOnTheNamedCitationOfTheAnchoredProblemWhenTheResultHasSeveralProblems() {
+        ValidatedResult base = problem("checks-tokens-first");
+        ObjectNode thread = mapper.createObjectNode()
+                .put("sourceKind", "scm.review-threads")
+                .put("path", "thread/3");
+        ValidatedProblem first = base.problems().getFirst();
+        ValidatedProblem second = problemAt(1, citations(thread, diffCitation("scm.pull-request.diff", PATH, 20)));
+        ValidatedResult lapse = new ValidatedResult(
+                base.practiceSlug(),
+                base.summary(),
+                base.outcome(),
+                base.severity(),
+                base.evidence(),
+                base.evidenceRationale(),
+                base.keys(),
+                base.deliveryBehavior(),
+                List.of(first, second),
+                null);
+        String firstId = String.valueOf(first.observationId());
+        String secondId = String.valueOf(second.observationId());
+        ComposedReview.InlineNote note = new ComposedReview.InlineNote(
+                "Check the token before this call.",
+                List.of(id(lapse)),
+                List.of(firstId, secondId),
+                new ComposedReview.ResolvedAnchor(id(lapse), secondId, 1, PATH, "NEW", 20, 20));
+
+        DeliveryContent content = automatic(decide(
+                new ComposedReview(
+                        new ComposedReview.Summary(SUMMARY, List.of(id(lapse)), List.of(firstId)),
+                        List.of(note),
+                        List.of()),
+                List.of(lapse),
+                List.of(),
+                List.of(lapse)));
+
+        assertThat(content.summaryObservations()).containsExactly(firstId);
+        assertThat(content.diffNotes()).singleElement().satisfies(diff -> {
+            assertThat(diff.filePath()).isEqualTo(PATH);
+            assertThat(diff.startLine()).isEqualTo(20);
+            assertThat(diff.deliveryKey()).isEqualTo("observation:" + lapse.occurrenceKey() + ":1:1");
+            assertThat(diff.observations()).containsExactly(secondId, firstId);
+        });
+    }
+
+    @Test
+    void shouldRefuseABodyWhenItNamesAProblemOfAResultItDoesNotRestOn() {
+        ValidatedResult lapse = problem("checks-tokens-first");
+        ValidatedResult other = problem("describe-what-and-why");
+        ComposedReview review = new ComposedReview(
+                new ComposedReview.Summary(SUMMARY, List.of(id(lapse)), List.of(problemId(other))),
+                List.of(
+                        // Anchored on the other result's problem while naming this result as the anchor's owner.
+                        new ComposedReview.InlineNote(
+                                "Call the checked helper.",
+                                List.of(id(lapse), id(other)),
+                                List.of(problemId(other)),
+                                new ComposedReview.ResolvedAnchor(id(lapse), problemId(other), 0, PATH, "NEW", 10, 10)),
+                        // Anchored on its own problem, but also naming a problem no result it rests on has.
+                        new ComposedReview.InlineNote(
+                                "Route the call through the checked helper.",
+                                List.of(id(lapse)),
+                                List.of(problemId(lapse), problemId(other)),
+                                new ComposedReview.ResolvedAnchor(
+                                        id(lapse), problemId(lapse), 0, PATH, "NEW", 10, 10))),
+                List.of());
+
+        assertThat(decide(review, List.of(lapse, other), List.of(), List.of(lapse, other)))
+                .isEqualTo(new AdmittedDelivery.Automatic(null, Set.of()));
+    }
+
+    @Test
     void shouldClearEveryPublicBodyButKeepWithholdingWhenBodiesWouldReachDifferentPeople() {
-        ValidatedObservation authors = problem("checks-tokens-first");
-        ValidatedObservation reviewers =
-                observation("answers-review-threads", Outcome.NOT_MET, "scm.pull-request.diff", OTHER_PERSON);
-        ValidatedObservation quiet = problem("describe-what-and-why");
+        ValidatedResult authors = problem("checks-tokens-first");
+        ValidatedResult reviewers =
+                practiceResult("answers-review-threads", Outcome.NOT_MET, "scm.pull-request.diff", OTHER_PERSON);
+        ValidatedResult quiet = problem("describe-what-and-why");
 
         DeliveryContent content = automatic(decide(
                 new ComposedReview(
@@ -286,16 +418,16 @@ class AdmittedDeliveryTest extends BaseUnitTest {
         assertThat(content.mrNote()).isNull();
         assertThat(content.diffNotes()).isEmpty();
         assertThat(content.withheld())
-                .containsExactly(new WithheldObservation(
+                .containsExactly(new WithheldResult(
                         Objects.requireNonNull(quiet.occurrenceKey()), FeedbackSuppressionReason.COMPOSER_WITHHELD));
     }
 
     @Test
-    void shouldRefuseAWholeWithholdingDecisionThatNamesAStrengthOrAPrivateObservation() {
-        ValidatedObservation lapse = problem("checks-tokens-first");
-        ValidatedObservation strength = observation("ships-a-preview", Outcome.MET, "scm.pull-request.diff", AUTHOR);
-        ValidatedObservation fromHistory =
-                observation("describe-what-and-why", Outcome.NOT_MET, "hephaestus.feedback-history", AUTHOR);
+    void shouldRefuseAWholeWithholdingDecisionThatNamesAStrengthOrAPrivateResult() {
+        ValidatedResult lapse = problem("checks-tokens-first");
+        ValidatedResult strength = practiceResult("ships-a-preview", Outcome.MET, "scm.pull-request.diff", AUTHOR);
+        ValidatedResult fromHistory =
+                practiceResult("describe-what-and-why", Outcome.NOT_MET, "hephaestus.feedback-history", AUTHOR);
 
         AdmittedDelivery delivery = decide(
                 new ComposedReview(
@@ -312,16 +444,16 @@ class AdmittedDeliveryTest extends BaseUnitTest {
                 List.of(),
                 List.of(lapse, strength, fromHistory),
                 Set.of(
-                        Objects.requireNonNull(lapse.observationId()),
-                        Objects.requireNonNull(strength.observationId())));
+                        Objects.requireNonNull(lapse.practiceResultId()),
+                        Objects.requireNonNull(strength.practiceResultId())));
 
         assertThat(delivery).isEqualTo(new AdmittedDelivery.Automatic(null, Set.of()));
     }
 
     @Test
-    void shouldProposeTheWholeReviewWhenAnyAdmittedBodyRestsOnAnObservationAwaitingApproval() {
-        ValidatedObservation automaticLapse = problem("checks-tokens-first");
-        ValidatedObservation gated = problem("describe-what-and-why");
+    void shouldProposeTheWholeReviewWhenAnyAdmittedBodyRestsOnAResultAwaitingApproval() {
+        ValidatedResult automaticLapse = problem("checks-tokens-first");
+        ValidatedResult gated = problem("describe-what-and-why");
 
         AdmittedDelivery delivery = decide(
                 new ComposedReview(
@@ -340,13 +472,18 @@ class AdmittedDeliveryTest extends BaseUnitTest {
 
     @Test
     void shouldNotBuildABodyWhoseSupportIsEmptyOrWhoseAnchorItDoesNotRestOn() {
-        ValidatedObservation lapse = problem("checks-tokens-first");
-        ValidatedObservation other = problem("describe-what-and-why");
-        ComposedReview.ResolvedAnchor anchor = new ComposedReview.ResolvedAnchor(id(lapse), 0, PATH, "NEW", 10, 10);
+        ValidatedResult lapse = problem("checks-tokens-first");
+        ValidatedResult other = problem("describe-what-and-why");
+        ComposedReview.ResolvedAnchor anchor =
+                new ComposedReview.ResolvedAnchor(id(lapse), problemId(lapse), 0, PATH, "NEW", 10, 10);
 
         assertThatThrownBy(() -> new ComposedReview.Summary(SUMMARY, List.of()))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ComposedReview.InlineNote("A note.", List.of(id(other)), anchor))
+        assertThatThrownBy(() ->
+                        new ComposedReview.InlineNote("A note.", List.of(id(other)), List.of(problemId(lapse)), anchor))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() ->
+                        new ComposedReview.InlineNote("A note.", List.of(id(lapse)), List.of(problemId(other)), anchor))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ComposedReview.Withheld(List.of(), ComposedFeedbackUnit.WithholdReason.BELOW_BAR))
                 .isInstanceOf(IllegalArgumentException.class);

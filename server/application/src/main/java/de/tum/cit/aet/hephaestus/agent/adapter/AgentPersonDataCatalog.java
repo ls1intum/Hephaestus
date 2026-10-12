@@ -40,7 +40,7 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
             WHERE j.metadata->>'author_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
             OR j.metadata->>'actor_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
             OR j.metadata->>'about_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
-            OR j.id IN (SELECT agent_job_id FROM observation WHERE about_user_id = ANY(:users))
+            OR j.id IN (SELECT agent_job_id FROM practice_result WHERE about_user_id = ANY(:users))
             OR j.id IN (SELECT agent_job_id FROM feedback
                 WHERE about_user_id = ANY(:users) OR recipient_user_id = ANY(:users))
             """;
@@ -57,7 +57,7 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
             OR j.metadata->>'docs_document_id' IN (SELECT unnest(CAST(:documents AS bigint[]))::text)
             OR j.metadata->>'pull_request_id' IN (SELECT unnest(CAST(:artifacts AS bigint[]))::text)
             OR j.metadata->>'issue_id' IN (SELECT unnest(CAST(:artifacts AS bigint[]))::text)
-            """ + " OR j.id IN (SELECT agent_job_id FROM observation WHERE " + REVIEWED_WORK + ")"
+            """ + " OR j.id IN (SELECT agent_job_id FROM practice_result WHERE " + REVIEWED_WORK + ")"
                     + " OR j.id IN (SELECT agent_job_id FROM feedback WHERE " + REVIEWED_WORK + ")";
 
     private final NamedParameterJdbcTemplate jdbc;

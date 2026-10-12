@@ -4,14 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramPath;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptStopReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -103,10 +107,10 @@ class ReviewOutcomeLookupAdapterTest extends BaseUnitTest {
         once.setId(UUID.randomUUID());
 
         var byJob = ReviewOutcomeLookupAdapter.latestAttemptRuns(List.of(
-                run(retried, 0, "tests", PracticeScriptRunStatus.FAILED),
-                run(retried, 0, "naming", PracticeScriptRunStatus.OK),
-                run(retried, 1, "tests", PracticeScriptRunStatus.SKIPPED),
-                run(once, 0, "tests", PracticeScriptRunStatus.TIMED_OUT)));
+                run(retried, 0, "tests", PracticeScriptRunStatus.FAILED, PracticeScriptStopReason.ERROR),
+                run(retried, 0, "naming", PracticeScriptRunStatus.OK, null),
+                run(retried, 1, "tests", PracticeScriptRunStatus.SKIPPED, PracticeScriptStopReason.UNAVAILABLE),
+                run(once, 0, "tests", PracticeScriptRunStatus.FAILED, PracticeScriptStopReason.DEADLINE)));
 
         assertThat(byJob.get(retried.getId()))
                 .containsOnlyKeys("tests")
@@ -115,14 +119,41 @@ class ReviewOutcomeLookupAdapterTest extends BaseUnitTest {
                 .isEqualTo(PracticeScriptRunStatus.SKIPPED);
         assertThat(byJob.get(once.getId()))
                 .extractingByKey("tests")
-                .extracting(PracticeScriptRunDTO::status)
-                .isEqualTo(PracticeScriptRunStatus.TIMED_OUT);
+                .isEqualTo(new PracticeScriptRunDTO(
+                        PracticeScriptRunStatus.FAILED,
+                        PracticeProgramKind.BUILTIN,
+                        PracticeProgramPath.CODE,
+                        PracticeScriptStopReason.DEADLINE,
+                        List.of()));
     }
 
     private static AgentJobPracticeScriptRun run(
-            AgentJob job, int attempt, String slug, PracticeScriptRunStatus status) {
+            AgentJob job,
+            int attempt,
+            String slug,
+            PracticeScriptRunStatus status,
+            @Nullable PracticeScriptStopReason stopReason) {
         return new AgentJobPracticeScriptRun(
-                job, attempt, slug, 7L, status, 0, JsonNodeFactory.instance.arrayNode(), Instant.EPOCH, null, null);
+                job,
+                attempt,
+                slug,
+                7L,
+                status,
+                PracticeProgramKind.BUILTIN,
+                null,
+                stopReason,
+                JsonNodeFactory.instance
+                        .objectNode()
+                        .put("review", 0)
+                        .put("chat", 0)
+                        .put("decision", 0)
+                        .put("embedding", 0)
+                        .put("reranking", 0),
+                null,
+                JsonNodeFactory.instance.arrayNode(),
+                Instant.EPOCH,
+                null,
+                null);
     }
 
     @Test

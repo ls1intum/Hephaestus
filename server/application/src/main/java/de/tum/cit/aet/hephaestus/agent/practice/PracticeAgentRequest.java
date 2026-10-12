@@ -11,10 +11,9 @@ import org.jspecify.annotations.Nullable;
  * Input for {@link PracticePiAdapter#buildSandboxSpec}. Carries no prompt — that travels in the
  * {@code task.json} envelope the handler writes.
  *
- * @param practiceScriptToken the credential of the practice scripts, scoped to the models for practice scripts
- *     only; {@code null} for a job that runs no practice scripts
- * @param practiceScriptModels the models that the practice scripts may call, by kind; empty without a
- *     {@code practiceScriptToken}
+ * @param jobToken the job's one proxy credential; the review and its practice programs' direct model calls share it
+ * @param practiceScriptModels the direct models that the practice programs may call, by kind; empty for a job that is
+ *     no practice review
  */
 public record PracticeAgentRequest(
         String apiProtocol,
@@ -24,7 +23,6 @@ public record PracticeAgentRequest(
         @Nullable ReasoningEffort reasoningEffort,
         String jobToken,
         int timeoutSeconds,
-        @Nullable String practiceScriptToken,
         Map<ModelKind, FrozenModel> practiceScriptModels) {
     public PracticeAgentRequest {
         Objects.requireNonNull(apiProtocol, "apiProtocol must not be null");

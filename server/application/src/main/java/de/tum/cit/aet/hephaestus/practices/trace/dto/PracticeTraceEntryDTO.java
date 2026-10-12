@@ -66,14 +66,14 @@ public record PracticeTraceEntryDTO(
         UUID reviewId,
 
         @NonNull @Schema(description = "Measurements this practice produced on this artifact")
-        Integer observationCount,
+        Integer practiceResultCount,
 
         @NonNull @Schema(description = "Interventions actually delivered to a person")
         Integer deliveredCount,
 
         @NonNull
         @Schema(
-                description = "Why prepared feedback was withheld. Non-empty with observations present means we "
+                description = "Why prepared feedback was withheld. Non-empty with results present means we "
                         + "measured and deliberately said nothing.")
         List<FeedbackSuppressionReason> withheldReasons,
 
@@ -98,7 +98,7 @@ public record PracticeTraceEntryDTO(
                 occasionedById,
                 decidedAt,
                 reviewId,
-                observationCount,
+                practiceResultCount,
                 deliveredCount,
                 withheldReasons,
                 run);

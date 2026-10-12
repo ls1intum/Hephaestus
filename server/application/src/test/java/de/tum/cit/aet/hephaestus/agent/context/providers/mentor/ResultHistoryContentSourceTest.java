@@ -1,0 +1,674 @@
+package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.springframework.data.domain.Pageable;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
+
+class ResultHistoryContentSourceTest extends BaseUnitTest {
+
+    @Mock
+    UserRepository userRepository;
+
+    @Mock
+    PracticeResultRepository practiceResultRepository;
+
+    @Mock
+    MentorContextQueryRepository queryRepository;
+
+    @Mock
+    ConversationConsentGate conversationConsentGate;
+
+    @Mock
+    ResultVisibilityPolicy visibilityPolicy;
+
+    @Mock
+    ReviewedWorkCoverage reviewedWorkCoverage;
+
+    @Mock
+    ObservationRepository observationRepository;
+
+    @Spy
+    ObjectMapper objectMapper = new ObjectMapper();
+
+    @InjectMocks
+    ResultHistoryContentSource provider;
+
+    private static final List<String> VERDICTS = List.of("MET", "NOT_MET");
+    private static final List<String> ABSTENTIONS = List.of("NOT_APPLICABLE", "UNDETERMINED");
+
+    @BeforeEach
+    void authorizeResults() {
+        lenient().when(reviewedWorkCoverage.of(anyLong(), any())).thenAnswer(invocation -> {
+            Map<UUID, ObjectNode> nodes = new HashMap<>();
+            for (PracticeResult practiceResult : invocation.<Collection<PracticeResult>>getArgument(1)) {
+                nodes.put(
+                        practiceResult.getId(), objectMapper.createObjectNode().put("coreCoverage", "UNKNOWN"));
+            }
+            return nodes;
+        });
+        lenient()
+                .when(practiceResultRepository.findRecentByDeveloperAndWorkspace(
+                        any(), any(), any(), eq(ABSTENTIONS), any()))
+                .thenReturn(List.of());
+        lenient()
+                .when(visibilityPolicy.permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
+                .thenAnswer(invocation -> {
+                    Collection<PracticeResult> batch = invocation.getArgument(1);
+                    return batch.stream().map(PracticeResult::getId).collect(Collectors.toSet());
+                });
+    }
+
+    @Test
+    void emptyDefaults() throws Exception {
+        User user = new User();
+        user.setLogin("octo");
+        when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
+        when(practiceResultRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), eq(VERDICTS), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of());
+
+        Map<String, byte[]> files = new HashMap<>();
+        provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
+
+        byte[] bytes = files.get("inputs/context/results_history.json");
+        assertThat(bytes).isNotNull();
+        JsonNode root = objectMapper.readTree(bytes);
+        assertThat(root.get("user").get("login").asString()).isEqualTo("octo");
+        assertThat(root.get("summary").get("includedResults").asLong()).isEqualTo(0L);
+        // All outcome states present even when count is 0 — keeps the wire shape stable.
+        for (Outcome v : Outcome.values()) {
+            assertThat(root.get("summary").get("byOutcome").has(v.name())).isTrue();
+        }
+        for (Severity s : Severity.values()) {
+            assertThat(root.get("summary").get("bySeverity").has(s.name())).isTrue();
+        }
+        assertThat(root.get("recentResults").isArray()).isTrue();
+        assertThat(root.get("reviewsReceived").isArray()).isTrue();
+    }
+
+    @Test
+    void unauthorizedResultIsAbsentFromHistoryAndSummary() throws Exception {
+        User user = new User();
+        user.setLogin("octo");
+        PracticeResult practiceResult = PracticeResult.builder()
+                .scopeKey("test-scope")
+                .id(UUID.randomUUID())
+                .agentJobId(UUID.randomUUID())
+                .build();
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        when(practiceResultRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), eq(VERDICTS), any(Pageable.class)))
+                .thenReturn(List.of(practiceResult));
+        when(queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(visibilityPolicy.permitsAll(1L, List.of(practiceResult), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(Set.of());
+
+        ObjectNode root = provider.buildPayload(1L, 2L);
+
+        assertThat(root.path("recentResults")).isEmpty();
+        assertThat(root.path("summary").path("includedResults").asInt()).isZero();
+    }
+
+    @Test
+    @DisplayName("raw rubric-voiced reasoning is scrubbed before its detail reaches the mentor")
+    void rubricVoicedReasoningIsScrubbed() throws Exception {
+        var practice = new Practice();
+        practice.setSlug("robust-error-handling");
+        // A real student-facing sentence followed by a pure grading-mechanics sentence the review echoed.
+        String reasoning =
+                "The retry block swallows the IOException without logging it. The assessment is BAD, capped at MINOR.";
+        var practiceResult = PracticeResult.builder()
+                .scopeKey("test-scope")
+                .id(UUID.randomUUID())
+                .agentJobId(UUID.randomUUID())
+                .summary("Swallowed IOException")
+                .practice(practice)
+                .outcome(Outcome.NOT_MET)
+                .severity(Severity.MINOR)
+                .observedAt(Instant.now())
+                .evidenceRationale(reasoning)
+                .build();
+
+        when(practiceResultRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), eq(VERDICTS), any(Pageable.class)))
+                .thenReturn(List.of(practiceResult));
+        JsonNode detail = provider.inspect(1L, 2L, practiceResult.getId());
+        String shipped = detail.get("result").get("evidenceRationale").asString();
+        // The student-facing sentence survives; the rubric mechanics ("assessment is BAD", "capped at MINOR")
+        // do NOT reach the mentor.
+        assertThat(shipped).contains("swallows the IOException");
+        assertThat(shipped).doesNotContain("assessment is BAD");
+        assertThat(shipped).doesNotContain("capped at MINOR");
+    }
+
+    @Test
+    @DisplayName("decided outcomes and abstentions stay separate from received reviews")
+    void recentResultsAndReviewsPopulated() throws Exception {
+        User user = new User();
+        user.setLogin("octo");
+        when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
+
+        var practiceBad = new Practice();
+        practiceBad.setSlug("robust-error-handling");
+        Instant observedBad = Instant.parse("2025-06-10T08:00:00Z");
+        var badResult = PracticeResult.builder()
+                .scopeKey("test-scope")
+                .id(UUID.randomUUID())
+                .agentJobId(UUID.randomUUID())
+                .summary("Swallowed IOException")
+                .practice(practiceBad)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(123L)
+                .outcome(Outcome.NOT_MET)
+                .severity(Severity.MAJOR)
+                .observedAt(observedBad)
+                .evidence(
+                        objectMapper.readTree(
+                                "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\",\"path\":\"src/Retry.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"catch (IOException ignored) {}\",\"quoteRedacted\":false}]}"))
+                .evidenceRationale("The retry block swallows the IOException.")
+                .build();
+
+        var practiceNa = new Practice();
+        practiceNa.setSlug("writes-tests");
+        Instant observedNa = Instant.parse("2025-06-09T08:00:00Z");
+        // An abstention carries no severity.
+        var naResult = PracticeResult.builder()
+                .scopeKey("test-scope")
+                .id(UUID.randomUUID())
+                .agentJobId(UUID.randomUUID())
+                .summary("No test surface")
+                .practice(practiceNa)
+                .outcome(Outcome.NOT_APPLICABLE)
+                .severity(null)
+                .observedAt(observedNa)
+                .evidenceRationale("Docs-only change.")
+                .build();
+
+        when(practiceResultRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), eq(VERDICTS), any(Pageable.class)))
+                .thenReturn(List.of(badResult));
+        when(practiceResultRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), eq(ABSTENTIONS), any(Pageable.class)))
+                .thenReturn(List.of(naResult));
+
+        var pr = new PullRequest();
+        pr.setNumber(42);
+        pr.setTitle("Add retry");
+        var review = new PullRequestReview();
+        review.setPullRequest(pr);
+        var reviewer = new User();
+        reviewer.setLogin("mentor-bot");
+        review.setAuthor(reviewer);
+        review.setState(PullRequestReview.State.CHANGES_REQUESTED);
+        review.setBody("Please add a test.");
+        review.setHtmlUrl("https://example.test/pr/42#review");
+        review.setSubmittedAt(Instant.parse("2025-06-11T12:00:00Z"));
+        when(queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of(review));
+
+        Map<String, byte[]> files = new HashMap<>();
+        provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
+
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/results_history.json"));
+
+        JsonNode obs = root.get("recentResults");
+        assertThat(obs).hasSize(1);
+        JsonNode bad = obs.get(0);
+        assertThat(bad.get("practiceSlug").asString()).isEqualTo("robust-error-handling");
+        assertThat(bad.get("summary").asString()).isEqualTo("Swallowed IOException");
+        assertThat(bad.has("presence")).isFalse();
+        assertThat(bad.get("outcome").asString()).isEqualTo("NOT_MET");
+        assertThat(bad.has("assessment")).isFalse();
+        assertThat(bad.get("severity").asString()).isEqualTo("MAJOR");
+        assertThat(bad.get("observedAt").asString()).isEqualTo(observedBad.toString());
+        assertThat(bad.get("artifactKind").asString()).isEqualTo("scm.pull_request");
+        assertThat(bad.get("artifactId").asLong()).isEqualTo(123L);
+        assertThat(bad.has("evidence")).isFalse();
+        assertThat(bad.has("evidenceRationale")).isFalse();
+        assertThat(root.get("detail").get("loaded").asBoolean()).isFalse();
+        assertThat(bad.get("resource").asString())
+                .isEqualTo("inputs/context/results_history/" + badResult.getId() + ".json");
+        assertThat(ResultHistoryContentSource.practiceResultIdOf(
+                        bad.get("resource").asString()))
+                .contains(badResult.getId());
+
+        JsonNode badDetail = provider.inspect(1L, 2L, badResult.getId());
+        assertThat(badDetail.get("list").asString()).isEqualTo("recentResults");
+        assertThat(badDetail
+                        .get("result")
+                        .get("reviewedWork")
+                        .get("coreCoverage")
+                        .asString())
+                .isEqualTo("UNKNOWN");
+        JsonNode citation =
+                badDetail.get("result").get("evidence").get("citations").get(0);
+        assertThat(citation.get("path").asString()).isEqualTo("src/Retry.java");
+        assertThat(citation.get("quote").asString()).contains("IOException");
+        assertThat(badDetail.get("result").get("evidenceRationale").asString())
+                .isEqualTo("The retry block swallows the IOException.");
+        assertThat(provider.inspect(1L, 2L, naResult.getId()).get("list").asString())
+                .isEqualTo("abstentions");
+
+        assertThat(root.get("abstentions")).hasSize(1);
+        JsonNode na = root.get("abstentions").get(0);
+        assertThat(na.get("outcome").asString()).isEqualTo("NOT_APPLICABLE");
+        // An abstention retains its outcome and carries explicit null severity.
+        assertThat(na.get("severity").isNull()).isTrue();
+
+        JsonNode reviews = root.get("reviewsReceived");
+        assertThat(reviews).hasSize(1);
+        JsonNode r0 = reviews.get(0);
+        assertThat(r0.get("prNumber").asInt()).isEqualTo(42);
+        assertThat(r0.get("prTitle").asString()).isEqualTo("Add retry");
+        assertThat(r0.get("reviewer").asString()).isEqualTo("mentor-bot");
+        assertThat(r0.get("state").asString()).isEqualTo("CHANGES_REQUESTED");
+        assertThat(r0.get("hasComment").asBoolean()).isTrue();
+        assertThat(r0.get("submittedAt").asString()).isEqualTo("2025-06-11T12:00:00Z");
+    }
+
+    @Test
+    @DisplayName("an overview of many evidence-heavy rows fits its bound and keeps every row, without evidence")
+    void overviewOfEvidenceHeavyRowsKeepsEveryRow() {
+        givenDeveloper();
+        List<PracticeResult> verdicts = new ArrayList<>();
+        List<PracticeResult> abstentions = new ArrayList<>();
+        for (int i = 0; i < 50; i++) {
+            verdicts.add(practiceResult(Outcome.NOT_MET, "Summary " + i, citations(1, 6_000), "r".repeat(1_500)));
+        }
+        for (int i = 0; i < 20; i++) {
+            abstentions.add(
+                    practiceResult(Outcome.NOT_APPLICABLE, "Summary " + i, citations(1, 6_000), "r".repeat(1_500)));
+        }
+        givenHistory(verdicts, abstentions);
+
+        ObjectNode root = provider.buildPayload(1L, 2L);
+
+        assertThat(objectMapper.writeValueAsString(root))
+                .hasSizeLessThanOrEqualTo(ResultHistoryContentSource.OVERVIEW_MAX_CHARS);
+        assertThat(ids(root.get("recentResults"))).isEqualTo(ids(verdicts));
+        assertThat(ids(root.get("abstentions"))).isEqualTo(ids(abstentions));
+        assertThat(root.findValues("evidence")).isEmpty();
+        assertThat(root.findValues("evidenceRationale")).isEmpty();
+        assertThat(root.has("omittedForSize")).isFalse();
+    }
+
+    @Test
+    @DisplayName("an overview too large leaves out the longest summaries, marked, before any row")
+    void overviewLeavesOutSummariesBeforeRows() {
+        givenDeveloper();
+        List<PracticeResult> verdicts = new ArrayList<>();
+        for (int i = 0; i < 50; i++) {
+            verdicts.add(practiceResult(Outcome.NOT_MET, "s".repeat(1_000 + i), citations(1, 10), "r"));
+        }
+        givenHistory(verdicts, List.of());
+
+        ObjectNode root = provider.buildPayload(1L, 2L);
+
+        assertThat(objectMapper.writeValueAsString(root))
+                .hasSizeLessThanOrEqualTo(ResultHistoryContentSource.OVERVIEW_MAX_CHARS);
+        assertThat(ids(root.get("recentResults"))).isEqualTo(ids(verdicts));
+        List<JsonNode> leftOut = root.get("recentResults")
+                .valueStream()
+                .filter(row -> row.path("summaryNotLoaded").asBoolean(false))
+                .toList();
+        assertThat(leftOut)
+                .isNotEmpty()
+                .allSatisfy(row -> assertThat(row.get("summary").isNull()).isTrue());
+        // The longest go first: the newest summary here is the longest.
+        assertThat(root.get("recentResults").get(49).path("summaryNotLoaded").asBoolean(false))
+                .isTrue();
+        assertThat(root.has("omittedForSize")).isFalse();
+    }
+
+    @Test
+    void shouldCarryTheEvaluatedCriteriaOnlyInTheDetail() {
+        givenDeveloper();
+        var revision = mock(PracticeRevision.class);
+        String criteria = "State why in the title or description. An issue's \"why\" is not enough. 🧭\nOne result.";
+        when(revision.getId()).thenReturn(1731L);
+        when(revision.getCriteria()).thenReturn(criteria);
+        var practice = new Practice();
+        practice.setSlug("describe-what-and-why");
+        practice.setCriteria("Different current criteria");
+        var practiceResult = PracticeResult.builder()
+                .scopeKey("test-scope")
+                .id(UUID.randomUUID())
+                .agentJobId(UUID.randomUUID())
+                .summary("Reason missing")
+                .practice(practice)
+                .practiceRevision(revision)
+                .outcome(Outcome.NOT_MET)
+                .observedAt(Instant.now())
+                .evidence(citations(1, 10))
+                .build();
+        givenHistory(List.of(practiceResult), List.of());
+
+        ObjectNode overview = provider.buildPayload(1L, 2L);
+        ObjectNode detail = provider.inspect(1L, 2L, practiceResult.getId());
+
+        assertThat(overview.get("recentResults").get(0).has("criteria")).isFalse();
+        JsonNode row = detail.get("result");
+        assertThat(row.get("practiceRevisionId").asLong()).isEqualTo(1731L);
+        assertThat(row.get("criteria").asString()).isEqualTo(criteria);
+        assertThat(row.path("criteriaNotLoaded").asBoolean(false)).isFalse();
+        assertThat(row.get("outcome").asString()).isEqualTo("NOT_MET");
+    }
+
+    @Test
+    @DisplayName("a detail lists the result's problems, each by the id link_observation takes, and its example")
+    void shouldListTheResultsProblemsAndExampleWhenItsDetailIsRead() {
+        PracticeResult practiceResult = PracticeResult.builder()
+                .scopeKey("test-scope")
+                .id(UUID.randomUUID())
+                .agentJobId(UUID.randomUUID())
+                .summary("Reason missing")
+                .practice(practice("describe-what-and-why"))
+                .outcome(Outcome.NOT_MET)
+                .severity(Severity.MAJOR)
+                .observedAt(Instant.now())
+                .evidence(citations(1, 10))
+                .example(objectMapper.createObjectNode().put("text", "Explain why the retry is safe."))
+                .build();
+        ArrayNode problemCitations = objectMapper.createArrayNode().add(citation("src/Retry.java", "retry()"));
+        Observation problem = Observation.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(1L)
+                .practiceResultId(practiceResult.getId())
+                .position(0)
+                .severity(Severity.MINOR)
+                .summary("No reason given for the retry")
+                .explanation("The description names the retry but not why it is safe.")
+                .citations(problemCitations)
+                .nextStep("Add one sentence on why it is safe.")
+                .build();
+        givenHistory(List.of(practiceResult), List.of());
+        when(observationRepository.findByPracticeResultIds(1L, List.of(practiceResult.getId())))
+                .thenReturn(List.of(problem));
+
+        ObjectNode detail = provider.inspect(1L, 2L, practiceResult.getId());
+
+        JsonNode row = detail.get("result");
+        assertThat(row.get("practiceResultId").asString())
+                .isEqualTo(practiceResult.getId().toString());
+        assertThat(row.get("example").get("text").asString()).isEqualTo("Explain why the retry is safe.");
+        assertThat(row.get("observations")).hasSize(1);
+        JsonNode shown = row.get("observations").get(0);
+        assertThat(shown.get("observationId").asString())
+                .isEqualTo(problem.getId().toString());
+        assertThat(shown.get("severity").asString()).isEqualTo("MINOR");
+        assertThat(shown.get("summary").asString()).isEqualTo("No reason given for the retry");
+        assertThat(shown.get("explanation").asString())
+                .isEqualTo("The description names the retry but not why it is safe.");
+        assertThat(shown.get("nextStep").asString()).isEqualTo("Add one sentence on why it is safe.");
+        assertThat(shown.get("citations")).isEqualTo(problemCitations);
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+            value = {"x|50000", "\"|20000"},
+            delimiter = '|')
+    void shouldOmitWholeCriteriaWhenTheirSerializedDetailCannotFit(String character, int length) {
+        var revision = mock(PracticeRevision.class);
+        when(revision.getId()).thenReturn(1731L);
+        when(revision.getCriteria()).thenReturn(character.repeat(length));
+        var practice = new Practice();
+        practice.setSlug("describe-what-and-why");
+        ObjectNode evidence = citations(1, 3_000);
+        String rationale = "r".repeat(4_000);
+        var practiceResult = PracticeResult.builder()
+                .scopeKey("test-scope")
+                .id(UUID.randomUUID())
+                .agentJobId(UUID.randomUUID())
+                .summary("Reason missing")
+                .practice(practice)
+                .practiceRevision(revision)
+                .outcome(Outcome.NOT_MET)
+                .observedAt(Instant.now())
+                .evidence(evidence)
+                .evidenceRationale(rationale)
+                .build();
+        givenHistory(List.of(practiceResult), List.of());
+
+        ObjectNode detail = provider.inspect(1L, 2L, practiceResult.getId());
+
+        assertThat(objectMapper.writeValueAsString(detail))
+                .hasSizeLessThanOrEqualTo(ResultHistoryContentSource.DETAIL_MAX_CHARS);
+        JsonNode row = detail.get("result");
+        assertThat(row.get("practiceRevisionId").asLong()).isEqualTo(1731L);
+        assertThat(row.has("criteria")).isFalse();
+        assertThat(row.get("criteriaNotLoaded").asBoolean()).isTrue();
+        assertThat(row.get("evidence")).isEqualTo(evidence);
+        assertThat(row.get("evidenceRationale").asString()).isEqualTo(rationale);
+        assertThat(row.has("evidenceLoaded")).isFalse();
+    }
+
+    @Test
+    @DisplayName("an admissible detail near its limits shortens its longest texts, says so, and keeps every location")
+    void detailShortensAnOversizedQuoteButKeepsItsSource() {
+        // Admission's own bounds: evidence at most 64 KiB, rationale at most 10,000 characters.
+        String quote = "q".repeat(60_000);
+        String rationale = "r".repeat(10_000);
+        ObjectNode evidence = objectMapper.createObjectNode();
+        evidence.putArray("citations").add(citation("src/Big.java", quote)).add(citation("src/Small.java", "ok()"));
+        PracticeResult practiceResult = practiceResult(Outcome.NOT_MET, "Big quote", evidence, rationale);
+        givenHistory(List.of(practiceResult), List.of());
+
+        ObjectNode detail = provider.inspect(1L, 2L, practiceResult.getId());
+
+        assertThat(objectMapper.writeValueAsString(detail))
+                .hasSizeLessThanOrEqualTo(ResultHistoryContentSource.DETAIL_MAX_CHARS);
+        JsonNode big = detail.get("result").get("evidence").get("citations").get(0);
+        assertThat(big.get("quoteTruncated").asBoolean()).isTrue();
+        assertThat(big.get("quoteChars").asInt()).isEqualTo(60_000);
+        assertThat(quote).startsWith(big.get("quote").asString());
+        assertThat(big.get("path").asString()).isEqualTo("src/Big.java");
+        assertThat(big.get("startLine").asInt()).isEqualTo(3);
+        assertThat(big.get("endLine").asInt()).isEqualTo(9);
+        JsonNode small = detail.get("result").get("evidence").get("citations").get(1);
+        assertThat(small.get("quote").asString()).isEqualTo("ok()");
+        assertThat(small.has("quoteTruncated")).isFalse();
+        JsonNode row = detail.get("result");
+        assertThat(row.get("practiceRevisionId").isNull()).isTrue();
+        assertThat(row.get("criteriaNotLoaded").asBoolean()).isTrue();
+        assertThat(rationale).startsWith(row.get("evidenceRationale").asString());
+        assertThat(row.path("evidenceRationaleTruncated").asBoolean(false))
+                .isEqualTo(row.get("evidenceRationale").asString().length() < 10_000);
+        assertThat(detail.has("status")).isFalse();
+    }
+
+    @Test
+    @DisplayName("a detail whose citations cannot fit leaves its evidence out and says so")
+    void detailThatCannotFitSaysSo() {
+        PracticeResult practiceResult =
+                // About 64 KiB of citations, as many as admission accepts, each with a short quote.
+                practiceResult(Outcome.NOT_MET, "Many citations", citations(350, 10), "Because.");
+        givenHistory(List.of(practiceResult), List.of());
+
+        ObjectNode detail = provider.inspect(1L, 2L, practiceResult.getId());
+
+        assertThat(objectMapper.writeValueAsString(detail))
+                .hasSizeLessThanOrEqualTo(ResultHistoryContentSource.DETAIL_MAX_CHARS);
+        assertThat(detail.get("status").asString()).isEqualTo("INCOMPLETE");
+        assertThat(detail.get("result").get("practiceResultId").asString())
+                .isEqualTo(practiceResult.getId().toString());
+        assertThat(detail.get("result").get("evidenceLoaded").asBoolean()).isFalse();
+        assertThat(detail.get("result").has("evidence")).isFalse();
+    }
+
+    @Test
+    @DisplayName("a detail answers alike for an unknown id and one this conversation may not use")
+    void detailOfAnUnlistedResultIsNotFound() {
+        PracticeResult withheld = practiceResult(Outcome.NOT_MET, "Hidden", citations(1, 10), "r");
+        givenHistory(List.of(withheld), List.of());
+        when(visibilityPolicy.permitsAll(1L, List.of(withheld), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(Set.of());
+
+        ObjectNode forbidden = provider.inspect(1L, 2L, withheld.getId());
+        ObjectNode unknown = provider.inspect(1L, 2L, UUID.randomUUID());
+
+        assertThat(forbidden.get("status").asString()).isEqualTo("NOT_FOUND");
+        assertThat(forbidden.has("result")).isFalse();
+        forbidden.remove("readAt");
+        unknown.remove("readAt");
+        assertThat(forbidden).isEqualTo(unknown);
+    }
+
+    private void givenDeveloper() {
+        User user = new User();
+        user.setLogin("octo");
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+    }
+
+    private void givenHistory(List<PracticeResult> verdicts, List<PracticeResult> abstentions) {
+        when(practiceResultRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), eq(VERDICTS), any(Pageable.class)))
+                .thenReturn(verdicts);
+        lenient()
+                .when(practiceResultRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), eq(ABSTENTIONS), any(Pageable.class)))
+                .thenReturn(abstentions);
+    }
+
+    private static Practice practice(String slug) {
+        var practice = new Practice();
+        practice.setSlug(slug);
+        return practice;
+    }
+
+    private PracticeResult practiceResult(Outcome outcome, String summary, JsonNode evidence, String rationale) {
+        boolean assessed = outcome == Outcome.NOT_MET;
+        return PracticeResult.builder()
+                .scopeKey("test-scope")
+                .id(UUID.randomUUID())
+                .agentJobId(UUID.randomUUID())
+                .summary(summary)
+                .practice(practice("practice-" + UUID.randomUUID()))
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(7L)
+                .outcome(outcome)
+                .severity(assessed ? Severity.MINOR : null)
+                .observedAt(Instant.parse("2025-06-10T08:00:00Z"))
+                .evidence(evidence)
+                .evidenceRationale(rationale)
+                .build();
+    }
+
+    private ObjectNode citations(int count, int quoteChars) {
+        ObjectNode evidence = objectMapper.createObjectNode();
+        ArrayNode citations = evidence.putArray("citations");
+        for (int i = 0; i < count; i++) {
+            citations.add(citation("src/File" + i + ".java", "c".repeat(quoteChars)));
+        }
+        return evidence;
+    }
+
+    private ObjectNode citation(String path, String quote) {
+        return objectMapper
+                .createObjectNode()
+                .put("sourceKind", "scm.pull-request.diff")
+                .put("artifactPath", "inputs/context/diff.patch")
+                .put("path", path)
+                .put("side", "NEW")
+                .put("startLine", 3)
+                .put("endLine", 9)
+                .put("quote", quote)
+                .put("quoteRedacted", false);
+    }
+
+    private static List<String> ids(JsonNode rows) {
+        return rows.valueStream()
+                .map(row -> row.get("practiceResultId").asString())
+                .toList();
+    }
+
+    private static List<String> ids(List<PracticeResult> rows) {
+        return rows.stream().map(o -> o.getId().toString()).toList();
+    }
+
+    @Test
+    @DisplayName("received reviews with the longest titles are left out oldest first, counted, and the whole fits")
+    void overviewLeavesOutTheOldestReceivedReviewsCounted() {
+        givenDeveloper();
+        List<PracticeResult> verdicts = new ArrayList<>();
+        for (int i = 0; i < 50; i++) {
+            verdicts.add(practiceResult(Outcome.NOT_MET, "Summary " + i, citations(1, 10), "r"));
+        }
+        givenHistory(verdicts, List.of());
+        List<PullRequestReview> reviews = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            var pr = new PullRequest();
+            pr.setNumber(i);
+            // A stored title may be 1,024 characters, and each quote doubles when escaped.
+            pr.setTitle("\"".repeat(1_024));
+            var review = new PullRequestReview();
+            review.setPullRequest(pr);
+            review.setHtmlUrl("https://example.test/pr/" + i);
+            review.setSubmittedAt(Instant.parse("2025-06-11T12:00:00Z").minusSeconds(i));
+            reviews.add(review);
+        }
+        when(queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(reviews);
+
+        ObjectNode root = provider.buildPayload(1L, 2L);
+
+        assertThat(objectMapper.writeValueAsString(root))
+                .hasSizeLessThanOrEqualTo(ResultHistoryContentSource.OVERVIEW_MAX_CHARS);
+        assertThat(ids(root.get("recentResults"))).isEqualTo(ids(verdicts));
+        int shown = root.get("reviewsReceived").size();
+        assertThat(shown).isLessThan(20);
+        assertThat(root.get("omittedForSize").get("reviewsReceived").asInt()).isEqualTo(20 - shown);
+        assertThat(root.get("reviewsReceived")
+                        .valueStream()
+                        .map(r -> r.get("prNumber").asInt()))
+                .containsExactlyElementsOf(IntStream.range(0, shown).boxed().toList());
+    }
+}

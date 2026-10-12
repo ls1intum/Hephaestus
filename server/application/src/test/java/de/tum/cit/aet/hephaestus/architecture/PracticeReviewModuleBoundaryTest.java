@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 class PracticeReviewModuleBoundaryTest {
 
     @Test
-    void shouldKeepScmPersistenceOutOfObservationAdmission() {
+    void shouldKeepScmPersistenceOutOfResultAdmission() {
         noClasses()
                 .that()
                 .haveSimpleName("ReviewOutputService")
@@ -19,7 +19,7 @@ class PracticeReviewModuleBoundaryTest {
                 .dependOnClassesThat()
                 .resideInAnyPackage(
                         "..integration.scm.domain..", "..integration.scm.github..", "..integration.scm.gitlab..")
-                .because("observation admission reads live SCM identity through ReviewTargetQuery")
+                .because("result admission reads live SCM identity through ReviewTargetQuery")
                 .check(classes);
     }
 

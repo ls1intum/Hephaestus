@@ -24,15 +24,15 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.FeedbackObservationVisibility;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository.FeedbackResultVisibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -60,8 +60,8 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Projects visible observations and feedback through the shared currentness, withdrawal and consent checks.
- * History guides inspection; it does not establish that two observations describe the same behavior.
+ * Projects visible results and feedback through the shared currentness, withdrawal and consent checks.
+ * History guides inspection; it does not establish that two results describe the same behavior.
  * Developer reactions are not review evidence.
  */
 @Component
@@ -77,12 +77,12 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     static final String FEEDBACK_FILE = SandboxLayout.HISTORY_PREFIX + "feedback.json";
     static final String PREPARED_FILE = SandboxLayout.HISTORY_PREFIX + "prepared.json";
 
-    private final ObservationRepository observationRepository;
+    private final PracticeResultRepository practiceResultRepository;
 
     private final FeedbackRepository feedbackRepository;
-    private final FeedbackObservationRepository feedbackObservationRepository;
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
     private final FeedbackWithdrawalRepository withdrawalRepository;
-    private final ObservationVisibilityPolicy visibilityPolicy;
+    private final ResultVisibilityPolicy visibilityPolicy;
     private final ConversationSourceLiveness conversationLiveness;
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
@@ -92,11 +92,11 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     private final PersonDataCopyRecorder personCopies;
 
     public ReviewHistoryContentSource(
-            ObservationRepository observationRepository,
+            PracticeResultRepository practiceResultRepository,
             FeedbackRepository feedbackRepository,
-            FeedbackObservationRepository feedbackObservationRepository,
+            FeedbackEvidenceRepository feedbackEvidenceRepository,
             FeedbackWithdrawalRepository withdrawalRepository,
-            ObservationVisibilityPolicy visibilityPolicy,
+            ResultVisibilityPolicy visibilityPolicy,
             ConversationSourceLiveness conversationLiveness,
             PullRequestRepository pullRequestRepository,
             IssueRepository issueRepository,
@@ -104,9 +104,9 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             ObjectMapper objectMapper,
             PublicReviewEligibility publicReviewEligibility,
             PersonDataCopyRecorder personCopies) {
-        this.observationRepository = observationRepository;
+        this.practiceResultRepository = practiceResultRepository;
         this.feedbackRepository = feedbackRepository;
-        this.feedbackObservationRepository = feedbackObservationRepository;
+        this.feedbackEvidenceRepository = feedbackEvidenceRepository;
         this.withdrawalRepository = withdrawalRepository;
         this.visibilityPolicy = visibilityPolicy;
         this.conversationLiveness = conversationLiveness;
@@ -134,7 +134,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         return Set.of(OBSERVATION_HISTORY, FEEDBACK_HISTORY);
     }
 
-    /** Prepared and delivered feedback share a source kind; observations have their own. */
+    /** Prepared and delivered feedback share a source kind; results have their own. */
     @Override
     public SourceKind sourceKindFor(String path) {
         return FEEDBACK_FILE.equals(path) || PREPARED_FILE.equals(path) ? FEEDBACK_HISTORY : OBSERVATION_HISTORY;
@@ -186,21 +186,23 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         Map<String, byte[]> files = new LinkedHashMap<>();
         Map<SourceKind, SourceCompleteness> completeness = new LinkedHashMap<>();
         Map<SourceKind, SourceContentState> contentStates = new LinkedHashMap<>();
-        int observationCount = -1;
+        int practiceResultCount = -1;
         int feedbackCount = -1;
         int preparedCount = -1;
 
         if (selectedKinds.contains(OBSERVATION_HISTORY)) {
-            List<Observation> observations =
-                    visibleObservations(workspaceId, subjectUserId, sourceJobExcludedFromHistory(job));
-            observationCount = observations.size();
-            files.put(OBSERVATIONS_FILE, serialize(observationsPayload(workspaceId, observations), OBSERVATIONS_FILE));
+            List<PracticeResult> practiceResults =
+                    visibleResults(workspaceId, subjectUserId, sourceJobExcludedFromHistory(job));
+            practiceResultCount = practiceResults.size();
+            files.put(
+                    OBSERVATIONS_FILE,
+                    serialize(practiceResultsPayload(workspaceId, practiceResults), OBSERVATIONS_FILE));
             completeness.put(OBSERVATION_HISTORY, SourceCompleteness.COMPLETE);
             // Reported explicitly rather than inferred from file presence: the file is always written,
             // so "there is a file" would wrongly answer NON_EMPTY for a person with no history.
             contentStates.put(
                     OBSERVATION_HISTORY,
-                    observations.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
+                    practiceResults.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
         }
 
         if (selectedKinds.contains(FEEDBACK_HISTORY)) {
@@ -233,10 +235,10 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         }
 
         log.debug(
-                "Review history: workspaceId={}, subjectUserId={}, observations={}, feedback={}, prepared={}",
+                "Review history: workspaceId={}, subjectUserId={}, results={}, feedback={}, prepared={}",
                 workspaceId,
                 subjectUserId,
-                observationCount,
+                practiceResultCount,
                 feedbackCount,
                 preparedCount);
         return new EvidenceContribution(
@@ -249,16 +251,16 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             long personId,
             Set<SourceKind> selectedKinds,
             UUID excludedJobId,
-            Consumer<ObjectNode> observations,
+            Consumer<ObjectNode> practiceResults,
             Consumer<ObjectNode> feedback) {
         if (selectedKinds.contains(OBSERVATION_HISTORY)) {
-            List<Observation> rows = authorizeObservations(
-                    workspaceId, observationRepository.findForPersonHistory(personId, workspaceId), excludedJobId);
-            var items = observationsPayload(workspaceId, rows).path("observations");
+            List<PracticeResult> rows = authorizeResults(
+                    workspaceId, practiceResultRepository.findForPersonHistory(personId, workspaceId), excludedJobId);
+            var items = practiceResultsPayload(workspaceId, rows).path("observations");
             for (int i = 0; i < rows.size(); i++) {
                 ObjectNode record = (ObjectNode) items.get(i);
                 record.put("synced_at", rows.get(i).getObservedAt().toString());
-                observations.accept(record);
+                practiceResults.accept(record);
             }
         }
         if (selectedKinds.contains(FEEDBACK_HISTORY)) {
@@ -279,14 +281,14 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         }
     }
 
-    /** Admission and later disclosure use the same observation visibility and feedback withdrawal decisions. */
+    /** Admission and later disclosure use the same result visibility and feedback withdrawal decisions. */
     public boolean permitsHistoryRecord(long workspaceId, String type, UUID id, SourceUsePurpose purpose) {
         if (type.equals("observation")) {
-            var row = observationRepository
+            var row = practiceResultRepository
                     .findByIdAndWorkspaceId(id, workspaceId)
                     .orElse(null);
             return row != null
-                    && !authorizeObservations(workspaceId, List.of(row), null, purpose)
+                    && !authorizeResults(workspaceId, List.of(row), null, purpose)
                             .isEmpty();
         }
         if (!type.equals("feedback")) return false;
@@ -301,20 +303,20 @@ public class ReviewHistoryContentSource implements EvidenceSource {
 
     /**
      * {@link #permitsHistoryRecord} for several records of one type at once: the ids it would permit one by one.
-     * Each record is decided by its own row and the observations it is bound to, never by another record of the
+     * Each record is decided by its own row and the results it is bound to, never by another record of the
      * batch, so the batch answers each one as it is answered alone.
      */
     public Set<UUID> permittedHistoryRecords(
             long workspaceId, String type, Collection<UUID> ids, SourceUsePurpose purpose) {
         if (ids.isEmpty()) return Set.of();
         if (type.equals("observation")) {
-            return authorizeObservations(
+            return authorizeResults(
                             workspaceId,
-                            observationRepository.findAllByIdInAndWorkspaceId(ids, workspaceId),
+                            practiceResultRepository.findAllByIdInAndWorkspaceId(ids, workspaceId),
                             null,
                             purpose)
                     .stream()
-                    .map(Observation::getId)
+                    .map(PracticeResult::getId)
                     .collect(Collectors.toSet());
         }
         if (!type.equals("feedback")) return Set.of();
@@ -332,55 +334,54 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     }
 
     /**
-     * The citations whose checks decide each record's own check: an observation's own, and those of the
-     * observations a feedback row is bound to. A record outside the workspace has none.
+     * The citations whose checks decide each record's own check: a result's own, and those of the
+     * results a feedback row is bound to. A record outside the workspace has none.
      */
     public Map<UUID, List<JsonNode>> historyRecordCitations(long workspaceId, String type, Collection<UUID> ids) {
         if (ids.isEmpty()) return Map.of();
         Map<UUID, List<JsonNode>> citations = new HashMap<>();
         if (type.equals("observation")) {
-            for (Observation row : observationRepository.findAllByIdInAndWorkspaceId(ids, workspaceId)) {
+            for (PracticeResult row : practiceResultRepository.findAllByIdInAndWorkspaceId(ids, workspaceId)) {
                 citations.put(row.getId(), citationsOf(row));
             }
         } else if (type.equals("feedback")) {
-            for (FeedbackObservationVisibility binding :
-                    feedbackObservationRepository.findForVisibility(workspaceId, ids)) {
+            for (FeedbackResultVisibility binding : feedbackEvidenceRepository.findForVisibility(workspaceId, ids)) {
                 citations
                         .computeIfAbsent(binding.getFeedbackId(), ignored -> new ArrayList<>())
-                        .addAll(citationsOf(binding.getObservation()));
+                        .addAll(citationsOf(binding.getPracticeResult()));
             }
         }
         return citations;
     }
 
-    private static List<JsonNode> citationsOf(Observation observation) {
-        JsonNode evidence = observation.getEvidence();
+    private static List<JsonNode> citationsOf(PracticeResult practiceResult) {
+        JsonNode evidence = practiceResult.getEvidence();
         if (evidence == null) return List.of();
         List<JsonNode> citations = new ArrayList<>();
         evidence.path("citations").forEach(citations::add);
         return citations;
     }
 
-    private List<Observation> visibleObservations(long workspaceId, Long subjectUserId, @Nullable UUID excludedJobId) {
-        return authorizeObservations(
-                workspaceId, observationRepository.findForPersonHistory(subjectUserId, workspaceId), excludedJobId);
+    private List<PracticeResult> visibleResults(long workspaceId, Long subjectUserId, @Nullable UUID excludedJobId) {
+        return authorizeResults(
+                workspaceId, practiceResultRepository.findForPersonHistory(subjectUserId, workspaceId), excludedJobId);
     }
 
-    private List<Observation> authorizeObservations(
-            long workspaceId, List<Observation> recent, @Nullable UUID excludedJobId) {
-        return authorizeObservations(workspaceId, recent, excludedJobId, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
+    private List<PracticeResult> authorizeResults(
+            long workspaceId, List<PracticeResult> recent, @Nullable UUID excludedJobId) {
+        return authorizeResults(workspaceId, recent, excludedJobId, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
     }
 
-    private List<Observation> authorizeObservations(
-            long workspaceId, List<Observation> recent, @Nullable UUID excludedJobId, SourceUsePurpose purpose) {
+    private List<PracticeResult> authorizeResults(
+            long workspaceId, List<PracticeResult> recent, @Nullable UUID excludedJobId, SourceUsePurpose purpose) {
         Set<UUID> visible = visibilityPolicy.permitsAll(workspaceId, recent, purpose);
-        List<Observation> authorized =
+        List<PracticeResult> authorized =
                 recent.stream().filter(o -> visible.contains(o.getId())).toList();
         Set<Long> activeThreads =
                 activeThreads(workspaceId, authorized.stream().map(ReviewHistoryContentSource::referenceOf));
         return authorized.stream()
                 .filter(o -> live(referenceOf(o), activeThreads))
-                // Composition receives the current observations separately, with durable ids. Counting them
+                // Composition receives the current results separately, with durable ids. Counting them
                 // again as history would turn a first occurrence into an apparent recurrence.
                 .filter(o -> excludedJobId == null || !excludedJobId.equals(o.getAgentJobId()))
                 .toList();
@@ -407,7 +408,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     }
 
     /**
-     * The feedback this review may read, as the developer's own surfaces decide it: every observation it is
+     * The feedback this review may read, as the developer's own surfaces decide it: every result it is
      * bound to may be shown. A row whose evidence is no longer current is labelled stale: its words describe work as
      * it was and are not evidence about the work as it is.
      */
@@ -415,8 +416,9 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         return shownFeedback(workspaceId, delivered, queued, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
     }
 
-    /** The rows that may be read, the currentness of their evidence, and the observations each is bound to. */
-    private record ShownFeedback(Map<UUID, ReviewClaimCurrentness> currentness, Map<UUID, List<Observation>> basedOn) {}
+    /** The rows that may be read, the currentness of their evidence, and the results each is bound to. */
+    private record ShownFeedback(
+            Map<UUID, ReviewClaimCurrentness> currentness, Map<UUID, List<PracticeResult>> basedOn) {}
 
     private ShownFeedback shownFeedback(
             long workspaceId, List<Feedback> delivered, List<Feedback> queued, SourceUsePurpose purpose) {
@@ -426,12 +428,11 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         if (ids.isEmpty()) {
             return new ShownFeedback(Map.of(), Map.of());
         }
-        List<FeedbackObservationVisibility> bindings =
-                feedbackObservationRepository.findForVisibility(workspaceId, ids);
+        List<FeedbackResultVisibility> bindings = feedbackEvidenceRepository.findForVisibility(workspaceId, ids);
         Set<UUID> visible = new HashSet<>(visibilityPolicy.permitsShown(
                 workspaceId,
                 bindings.stream()
-                        .map(FeedbackObservationVisibility::getObservation)
+                        .map(FeedbackResultVisibility::getPracticeResult)
                         .toList(),
                 purpose));
         Set<Long> activeThreads = activeThreads(
@@ -439,23 +440,24 @@ public class ReviewHistoryContentSource implements EvidenceSource {
                 Stream.concat(
                         Stream.concat(delivered.stream(), queued.stream()).map(ReviewHistoryContentSource::referenceOf),
                         bindings.stream()
-                                .map(FeedbackObservationVisibility::getObservation)
+                                .map(FeedbackResultVisibility::getPracticeResult)
                                 .map(ReviewHistoryContentSource::referenceOf)));
-        // An observation from a conversation whose channel no longer consents withholds every row it is bound to.
+        // A result from a conversation whose channel no longer consents withholds every row it is bound to.
         bindings.stream()
-                .map(FeedbackObservationVisibility::getObservation)
+                .map(FeedbackResultVisibility::getPracticeResult)
                 .filter(o -> !live(referenceOf(o), activeThreads))
                 .forEach(o -> visible.remove(o.getId()));
-        Map<UUID, ReviewClaimCurrentness> shown = new HashMap<>(FeedbackObservationVisibility.shown(bindings, visible));
+        Map<UUID, ReviewClaimCurrentness> shown = new HashMap<>(FeedbackResultVisibility.shown(bindings, visible));
         Stream.concat(delivered.stream(), queued.stream())
                 .filter(f -> !live(referenceOf(f), activeThreads))
                 .forEach(f -> shown.remove(f.getId()));
-        Map<UUID, List<Observation>> basedOn = bindings.stream()
+        Map<UUID, List<PracticeResult>> basedOn = bindings.stream()
                 .filter(binding -> shown.containsKey(binding.getFeedbackId()))
-                .sorted(Comparator.comparing(binding -> binding.getObservation().getId()))
+                .sorted(Comparator.comparing(
+                        binding -> binding.getPracticeResult().getId()))
                 .collect(Collectors.groupingBy(
-                        FeedbackObservationVisibility::getFeedbackId,
-                        Collectors.mapping(FeedbackObservationVisibility::getObservation, Collectors.toList())));
+                        FeedbackResultVisibility::getFeedbackId,
+                        Collectors.mapping(FeedbackResultVisibility::getPracticeResult, Collectors.toList())));
         return new ShownFeedback(shown, basedOn);
     }
 
@@ -481,8 +483,8 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         return threadId != null && activeThreads.contains(threadId);
     }
 
-    private static StagedArtifactNames.Reference referenceOf(Observation observation) {
-        return new StagedArtifactNames.Reference(observation.getArtifactKind(), observation.getArtifactId());
+    private static StagedArtifactNames.Reference referenceOf(PracticeResult practiceResult) {
+        return new StagedArtifactNames.Reference(practiceResult.getArtifactKind(), practiceResult.getArtifactId());
     }
 
     private static StagedArtifactNames.Reference referenceOf(Feedback feedback) {
@@ -604,19 +606,19 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         return root;
     }
 
-    private ObjectNode observationsPayload(long workspaceId, List<Observation> observations) {
+    private ObjectNode practiceResultsPayload(long workspaceId, List<PracticeResult> practiceResults) {
         ObjectNode root = historyRoot("RECORDED_OBSERVATIONS");
         StagedArtifactNames.Resolved names = artifactNames.resolve(
                 workspaceId,
-                observations.stream()
+                practiceResults.stream()
                         .map(ReviewHistoryContentSource::referenceOf)
                         .toList());
         ArrayNode items = root.putArray("observations");
-        for (Observation o : observations) {
+        for (PracticeResult o : practiceResults) {
             recordCopy(o.getAgentJobId(), o.getAboutUserId());
             ObjectNode node = items.addObject();
-            // The handle delivered feedback's basedOn names; a trace, not evidence that two observations agree.
-            node.put("id", o.getId().toString());
+            // The handle delivered feedback's basedOn names; a trace, not evidence that two results agree.
+            node.put("practiceResultId", o.getId().toString());
             node.put(
                     "practiceSlug",
                     o.getPractice() == null ? null : o.getPractice().getSlug());
@@ -643,7 +645,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     }
 
     /**
-     * What was delivered, each row with the observations it rests on as they were recorded: their outcome and the
+     * What was delivered, each row with the results it rests on as they were recorded: their outcome and the
      * practice revision they were made against, never the practice's current one. A row whose words are withheld
      * keeps these without its body; the ids are trace handles, not evidence.
      */
@@ -656,7 +658,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         ArrayNode items = root.putArray("feedback");
         for (Feedback f : delivered) {
             recordCopy(f.getAgentJobId(), f.getRecipientUserId(), f.getAboutUserId());
-            for (Observation o : shown.basedOn().getOrDefault(f.getId(), List.of())) {
+            for (PracticeResult o : shown.basedOn().getOrDefault(f.getId(), List.of())) {
                 recordCopy(o.getAgentJobId(), o.getAboutUserId());
             }
             ObjectNode node = items.addObject();
@@ -668,9 +670,9 @@ public class ReviewHistoryContentSource implements EvidenceSource {
                     f.getDeliveredAt() == null ? null : f.getDeliveredAt().toString());
             node.put("reviewedRevision", f.getReviewedRevision());
             ArrayNode basedOn = node.putArray("basedOn");
-            for (Observation o : shown.basedOn().getOrDefault(f.getId(), List.of())) {
+            for (PracticeResult o : shown.basedOn().getOrDefault(f.getId(), List.of())) {
                 ObjectNode support = basedOn.addObject();
-                support.put("id", o.getId().toString());
+                support.put("practiceResultId", o.getId().toString());
                 support.put(
                         "practiceSlug",
                         o.getPractice() == null ? null : o.getPractice().getSlug());
@@ -699,7 +701,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     /**
      * The person the review is about: the author for work with one, the explicitly carried subject
      * otherwise — mirrors the resolution delivery performs, so history can't be staged for one person
-     * while observations are filed against another.
+     * while results are filed against another.
      */
     private @Nullable Long resolveSubject(ContextRequest request, AgentJob job) {
         return switch (request) {

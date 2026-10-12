@@ -15,10 +15,10 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PreviousInAppFeedback;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService.StandingSnapshot;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.StandingSnapshot;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.Reaction;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -108,7 +108,7 @@ class InAppFeedbackWorkResolutionIntegrationTest extends AbstractPracticeReviewI
 
     /**
      * The evidence and the clean work are named the same way: the card links "#10" as it links "#11", and
-     * the outcome comes from the observation itself rather than from whatever the standing lists.
+     * the outcome comes from the result itself rather than from whatever the standing lists.
      */
     @Test
     @WithUser
@@ -315,7 +315,7 @@ class InAppFeedbackWorkResolutionIntegrationTest extends AbstractPracticeReviewI
     private void requestedReview(int number, Outcome outcome, Instant at) {
         AgentJob requested = persistPullRequestReview(workspace, number, at);
         UUID id = observe(practice, requested, number, developer, outcome, null, at);
-        jdbc.update("UPDATE observation SET origin = 'MANUAL' WHERE id = ?", id);
+        jdbc.update("UPDATE practice_result SET origin = 'MANUAL' WHERE id = ?", id);
     }
 
     private PracticeStandingDTO standing() {

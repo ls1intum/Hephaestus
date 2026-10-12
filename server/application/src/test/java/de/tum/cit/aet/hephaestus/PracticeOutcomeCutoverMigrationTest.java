@@ -68,12 +68,13 @@ class PracticeOutcomeCutoverMigrationTest {
         assertThatThrownBy(() ->
                         execute("UPDATE practice SET review_when='{\"draftStatus\":[\"NOT_DRAFT\"]}' WHERE id=991201"))
                 .isInstanceOf(SQLException.class);
-        assertThat(scalar(
-                        "SELECT string_agg(outcome, ',' ORDER BY summary) FROM observation WHERE workspace_id=991101"))
+        assertThat(
+                        scalar(
+                                "SELECT string_agg(outcome, ',' ORDER BY summary) FROM practice_result WHERE workspace_id=991101"))
                 .isEqualTo("MET,NOT_MET,NOT_MET,MET,NOT_APPLICABLE,UNDETERMINED");
         assertThat(
                         scalar(
-                                "SELECT count(*)::text FROM observation WHERE workspace_id=991101 AND (outcome='NOT_MET') <> (severity IS NOT NULL)"))
+                                "SELECT count(*)::text FROM practice_result WHERE workspace_id=991101 AND (outcome='NOT_MET') <> (severity IS NOT NULL)"))
                 .isEqualTo("0");
         assertThat(scalar("SELECT review_rule_fingerprint FROM practice_revision WHERE id=991301"))
                 .isEqualTo("v4:" + "a".repeat(64));
@@ -114,10 +115,10 @@ class PracticeOutcomeCutoverMigrationTest {
                 .isInstanceOf(SQLException.class);
         assertThatThrownBy(() -> execute("UPDATE practice_revision SET criteria='Rewritten' WHERE id=991301"))
                 .isInstanceOf(SQLException.class);
-        assertThatThrownBy(() ->
-                        execute("UPDATE observation SET outcome='MET' WHERE workspace_id=991101 AND outcome='NOT_MET'"))
+        assertThatThrownBy(() -> execute(
+                        "UPDATE practice_result SET outcome='MET' WHERE workspace_id=991101 AND outcome='NOT_MET'"))
                 .isInstanceOf(SQLException.class);
-        assertThatThrownBy(() -> execute("UPDATE observation SET outcome='UNKNOWN' WHERE workspace_id=991101"))
+        assertThatThrownBy(() -> execute("UPDATE practice_result SET outcome='UNKNOWN' WHERE workspace_id=991101"))
                 .isInstanceOf(SQLException.class);
     }
 

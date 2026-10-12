@@ -6,8 +6,8 @@ import java.util.Objects;
  * One process-level message the composition stage wrote, before the server has decided whether the
  * recipient may see it.
  *
- * <p>It names a practice, not a set of observations. The model reads a bounded, sanitised window of the
- * recipient's record and cannot know observation ids; the server resolves the practice to the
+ * <p>It names a practice, not a set of results. The model reads a bounded, sanitised window of the
+ * recipient's record and cannot know result ids; the server resolves the practice to the
  * recipient's own measurements, so what a message is evidenced by is never the model's to assert. Nor
  * does it name what it replaces: the card still open about the same practice is the server's to find and
  * retire, whatever the composer meant.

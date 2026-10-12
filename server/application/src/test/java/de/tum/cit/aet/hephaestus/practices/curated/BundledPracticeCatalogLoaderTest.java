@@ -191,10 +191,10 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldKeepCaptureFailuresOutOfObservationStatuses() {
+    void shouldKeepCaptureFailuresOutOfResultStatuses() {
         assertThat(loader.catalog().practices())
                 .allSatisfy(practice -> assertThat(practice.definition().criteria())
-                        .as("canonical observation vocabulary in %s", practice.slug())
+                        .as("canonical result vocabulary in %s", practice.slug())
                         .doesNotContain("INCONCLUSIVE", "NO_REVIEW_OCCASION", "INSUFFICIENT_EVIDENCE"));
         assertThat(loader.catalog().practices())
                 .filteredOn(practice -> Set.of(

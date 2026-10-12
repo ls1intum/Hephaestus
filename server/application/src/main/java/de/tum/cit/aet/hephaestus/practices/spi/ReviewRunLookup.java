@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * What a review run knows about itself, read without knowing about agent-job persistence: the work it reviewed
  * and the facts it records. {@link ReviewRunNarrativeLookup} does the same for what a run wrote about each
- * observation. Both lookups answer by review id, and a run this workspace does not own is absent.
+ * result. Both lookups answer by review id, and a run this workspace does not own is absent.
  */
 public interface ReviewRunLookup {
 

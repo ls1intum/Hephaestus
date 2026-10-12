@@ -31,11 +31,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.AbstractPracticeReviewIntegrationTest;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
@@ -76,7 +76,7 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
     private static final Instant CAPTURED = NOW.minus(2, ChronoUnit.HOURS);
 
     @Autowired
-    private ObservationHistoryContentSource historySource;
+    private ResultHistoryContentSource historySource;
 
     @Autowired
     private ReviewedWorkCoverage coverage;
@@ -109,7 +109,7 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
     private ConversationConsentGate consentGate;
 
     @Autowired
-    private ObservationVisibilityPolicy visibilityPolicy;
+    private ResultVisibilityPolicy visibilityPolicy;
 
     @Autowired
     private WorkspaceActorSelector actorSelector;
@@ -151,7 +151,7 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
         pending.setStatus(recheck);
         agentJobRepository.save(pending);
 
-        JsonNode entry = history().path("recentObservations").get(0);
+        JsonNode entry = history().path("recentResults").get(0);
 
         assertThat(entry.path("outcome").asString()).isEqualTo("NOT_MET");
         assertThat(entry.has("presence")).isFalse();
@@ -180,7 +180,7 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
         agentJobRepository.saveAndFlush(reviewed);
         observe(practice, reviewed, mr.getId(), student, Outcome.NOT_MET, Severity.MINOR, NOW);
 
-        JsonNode entry = history().path("recentObservations").get(0);
+        JsonNode entry = history().path("recentResults").get(0);
         assertThat(entry.path("reviewId").asString()).isEqualTo(reviewed.getId().toString());
         assertThat(entry.path("outcome").asString()).isEqualTo("NOT_MET");
         assertThat(entry.path("reviewedWork").path("coreCoverage").asString()).isEqualTo("MATCHES_STORED_WORK");
@@ -189,7 +189,7 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
     }
 
     /**
-     * Citing the diff makes the observation usable in conversation; it does not make the pull request's own record
+     * Citing the diff makes the result usable in conversation; it does not make the pull request's own record
      * usable. Under a contract that denies that for the core source, nothing about the captured core is told.
      */
     @Test
@@ -203,17 +203,18 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
                 .when(coreDenied)
                 .isSourceUsePermitted(
                         any(), eq(PullRequestContentSource.CORE), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING));
-        ObservationHistoryContentSource underCoreDenial = new ObservationHistoryContentSource(
+        ResultHistoryContentSource underCoreDenial = new ResultHistoryContentSource(
                 userRepository,
-                observationRepository,
+                practiceResultRepository,
                 queryRepository,
                 consentGate,
                 visibilityPolicy,
                 new ReviewedWorkCoverage(agentJobRepository, queryRepository, actorSelector, coreDenied, objectMapper),
-                objectMapper);
+                objectMapper,
+                observationRepository);
 
         assertThat(history()
-                        .path("recentObservations")
+                        .path("recentResults")
                         .get(0)
                         .path("reviewedWork")
                         .path("coreCoverage")
@@ -221,7 +222,7 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
                 .isEqualTo("DIFFERS_FROM_STORED_WORK");
         JsonNode entry = Objects.requireNonNull(new TransactionTemplate(transactionManager)
                         .execute(tx -> underCoreDenial.buildPayload(workspace.getId(), student.getId())))
-                .path("recentObservations")
+                .path("recentResults")
                 .get(0);
 
         assertThat(entry.path("reviewId").asString()).isEqualTo(reviewed.getId().toString());
@@ -281,15 +282,14 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
         observe(practice, review(mr, "MR !2", "Closes #12", HEAD), mr.getId(), student, Outcome.MET, null, NOW);
 
         JsonNode payload = history();
-        assertThat(result(payload.path("recentObservations").get(0))).containsExactly("MET", "MATCHES_STORED_WORK");
-        assertThat(result(payload.path("earlierObservations").get(0)))
+        assertThat(result(payload.path("recentResults").get(0))).containsExactly("MET", "MATCHES_STORED_WORK");
+        assertThat(result(payload.path("earlierResults").get(0)))
                 .containsExactly("NOT_MET", "DIFFERS_FROM_STORED_WORK");
 
         mr.setBody("Closes #12 and #13");
         pullRequestRepository.save(mr);
 
-        assertThat(result(history().path("recentObservations").get(0)))
-                .containsExactly("MET", "DIFFERS_FROM_STORED_WORK");
+        assertThat(result(history().path("recentResults").get(0))).containsExactly("MET", "DIFFERS_FROM_STORED_WORK");
     }
 
     @Test
@@ -349,7 +349,7 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
                 null);
 
         JsonNode work = Objects.requireNonNull(
-                coverage.of(workspace.getId(), List.of(observation(id))).get(id));
+                coverage.of(workspace.getId(), List.of(practiceResult(id))).get(id));
         assertThat(work.path("coreCoverage").asString()).isEqualTo("DIFFERS_FROM_STORED_WORK");
         assertThat(work.path("titleAndDescriptionCoverage").asString()).isEqualTo("DIFFERS_FROM_STORED_WORK");
         assertThat(work.path("headCoverage").asString()).isEqualTo("UNKNOWN");
@@ -360,13 +360,13 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
     @Test
     void shouldEstablishNothingAboutWorkItCannotBindToTheReviewOrSee() {
         PullRequest deleted = mergeRequest(course, "MR !4", "Closes #15");
-        UUID deletedObservation = observed(deleted, review(deleted, "MR !4", "Closes #15", HEAD));
+        UUID deletedResult = observed(deleted, review(deleted, "MR !4", "Closes #15", HEAD));
         deleted.setDeletedAt(NOW);
         pullRequestRepository.save(deleted);
 
         IdentityProvider otherInstance = gitLabInstance("https://gitlab.other.example");
         PullRequest samePath = mergeRequest(repository(otherInstance), "MR !5", "Closes #16");
-        UUID samePathObservation = observed(samePath, review(samePath, "MR !5", "Closes #16", HEAD));
+        UUID samePathResult = observed(samePath, review(samePath, "MR !5", "Closes #16", HEAD));
 
         PullRequest mr = mergeRequest(course, "MR !6", "Closes #17");
         ObjectNode incomplete = capture(mr, "MR !6", "Closes #17", HEAD);
@@ -374,11 +374,11 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
                 .putObject(ReviewedWork.SNAPSHOT_KEY)
                 .put("artifactKind", ArtifactKinds.PULL_REQUEST.value())
                 .put("artifactId", mr.getId());
-        UUID malformedObservation = observed(mr, reviewWith(mr, incomplete));
+        UUID malformedResult = observed(mr, reviewWith(mr, incomplete));
 
         ObjectNode misboundCapture = capture(mr, "MR !6", "Closes #17", HEAD);
         ((ObjectNode) misboundCapture.get(ReviewedWork.SNAPSHOT_KEY)).put("artifactId", samePath.getId());
-        UUID misboundObservation = observed(mr, reviewWith(mr, misboundCapture));
+        UUID misboundResult = observed(mr, reviewWith(mr, misboundCapture));
 
         Workspace foreign = createWorkspace(
                 "foreign-" + nativeIds.incrementAndGet(), "Foreign", "foreign", AccountType.ORG, student);
@@ -386,13 +386,12 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
         foreignJob.setEvidenceSnapshot(capture(mr, "MR !6", "Closes #17", HEAD));
         agentJobRepository.save(foreignJob);
         Practice foreignPractice = persistPractice(foreign, null, "links-the-issue", "Links the issue", null);
-        UUID foreignObservation =
+        UUID foreignResult =
                 observe(foreignPractice, foreignJob, mr.getId(), student, Outcome.NOT_MET, Severity.MINOR, NOW);
 
-        List<UUID> ids = List.of(
-                deletedObservation, samePathObservation, malformedObservation, misboundObservation, foreignObservation);
+        List<UUID> ids = List.of(deletedResult, samePathResult, malformedResult, misboundResult, foreignResult);
         var nodes = coverage.of(
-                workspace.getId(), ids.stream().map(this::observation).toList());
+                workspace.getId(), ids.stream().map(this::practiceResult).toList());
 
         assertThat(ids).allSatisfy(id -> {
             JsonNode work = Objects.requireNonNull(nodes.get(id));
@@ -413,7 +412,7 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
     private List<String> coverageOf(PullRequest mr, AgentJob job) {
         UUID id = observed(mr, job);
         JsonNode work = Objects.requireNonNull(
-                coverage.of(workspace.getId(), List.of(observation(id))).get(id));
+                coverage.of(workspace.getId(), List.of(practiceResult(id))).get(id));
         return List.of(
                 work.path("coreCoverage").asString(),
                 work.path("titleAndDescriptionCoverage").asString(),
@@ -430,8 +429,8 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
         return observe(practice, job, mr.getId(), student, Outcome.NOT_MET, Severity.MINOR, NOW);
     }
 
-    private Observation observation(UUID id) {
-        return observationRepository.findById(id).orElseThrow();
+    private PracticeResult practiceResult(UUID id) {
+        return practiceResultRepository.findById(id).orElseThrow();
     }
 
     /** A completed review of {@code mr} that captured {@code title} and {@code body} at {@code head}. */
@@ -450,7 +449,7 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
         Map<String, byte[]> files = new HashMap<>();
         historySource.contribute(
                 new ContextRequest.MentorChatRequest(workspace.getId(), student.getId(), UUID.randomUUID()), files);
-        return objectMapper.readTree(files.get(ObservationHistoryContentSource.OUTPUT_KEY));
+        return objectMapper.readTree(files.get(ResultHistoryContentSource.OUTPUT_KEY));
     }
 
     /** A review from before {@code reviewedWork} was recorded: only its manifest remains. */

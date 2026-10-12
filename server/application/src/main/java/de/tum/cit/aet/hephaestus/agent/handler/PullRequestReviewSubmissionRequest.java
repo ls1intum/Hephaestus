@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  *
  * @param baseRefOid the base the mirror recorded together with {@code headRefOid}, read from the same pull request row;
  *     the retained range requested for this occasion, whose provider authority is that of the mirror
- * @param observationOrigin which population this run's observations belong to; {@code null} defaults to
+ * @param practiceResultOrigin which population this run's results belong to; {@code null} defaults to
  *     the rule below. Explicit because the default cannot see a backfill: a campaign replays the signal
  *     the artifact's current state would have raised, so its request carries a trigger signal and would
  *     otherwise be filed as LIVE.
@@ -25,7 +25,7 @@ public record PullRequestReviewSubmissionRequest(
         String baseRefName,
         @Nullable String baseRefOid,
         @Nullable SignalName triggerSignal,
-        @Nullable ObservationOrigin observationOrigin,
+        @Nullable ResultOrigin practiceResultOrigin,
         @Nullable Long reviewId,
         @Nullable Long aboutUserId,
         @Nullable String linkedIssueRevision)
@@ -48,10 +48,10 @@ public record PullRequestReviewSubmissionRequest(
         if (baseRefName.isBlank()) {
             throw new IllegalArgumentException("baseRefName must not be blank");
         }
-        if (observationOrigin == null) {
-            // A run with no lifecycle event behind it was asked for by a person, so its observations are a
+        if (practiceResultOrigin == null) {
+            // A run with no lifecycle event behind it was asked for by a person, so its results are a
             // self-selected sample (not a random draw from the work) and are recorded as such.
-            observationOrigin = triggerSignal == null ? ObservationOrigin.MANUAL : ObservationOrigin.LIVE;
+            practiceResultOrigin = triggerSignal == null ? ResultOrigin.MANUAL : ResultOrigin.LIVE;
         }
     }
 
@@ -62,7 +62,7 @@ public record PullRequestReviewSubmissionRequest(
             String baseRefName,
             @Nullable String baseRefOid,
             @Nullable SignalName triggerSignal,
-            @Nullable ObservationOrigin observationOrigin,
+            @Nullable ResultOrigin practiceResultOrigin,
             @Nullable Long reviewId,
             @Nullable Long aboutUserId) {
         this(
@@ -72,7 +72,7 @@ public record PullRequestReviewSubmissionRequest(
                 baseRefName,
                 baseRefOid,
                 triggerSignal,
-                observationOrigin,
+                practiceResultOrigin,
                 reviewId,
                 aboutUserId,
                 null);
@@ -96,7 +96,7 @@ public record PullRequestReviewSubmissionRequest(
             String baseRefName,
             @Nullable String baseRefOid,
             @Nullable SignalName triggerSignal,
-            @Nullable ObservationOrigin observationOrigin) {
+            @Nullable ResultOrigin practiceResultOrigin) {
         this(
                 pullRequest,
                 headRefName,
@@ -104,7 +104,7 @@ public record PullRequestReviewSubmissionRequest(
                 baseRefName,
                 baseRefOid,
                 triggerSignal,
-                observationOrigin,
+                practiceResultOrigin,
                 null,
                 null);
     }
@@ -120,7 +120,7 @@ public record PullRequestReviewSubmissionRequest(
     }
 
     /** The same request filed under a named population; {@code null} falls back to the origin rule above. */
-    public PullRequestReviewSubmissionRequest withOrigin(@Nullable ObservationOrigin origin) {
+    public PullRequestReviewSubmissionRequest withOrigin(@Nullable ResultOrigin origin) {
         return new PullRequestReviewSubmissionRequest(
                 pullRequest,
                 headRefName,
@@ -143,7 +143,7 @@ public record PullRequestReviewSubmissionRequest(
                 baseRefName,
                 baseRefOid,
                 triggerSignal,
-                observationOrigin,
+                practiceResultOrigin,
                 review.id(),
                 Objects.requireNonNull(review.authorId(), "submitted review must have an author"),
                 linkedIssueRevision);
@@ -157,7 +157,7 @@ public record PullRequestReviewSubmissionRequest(
                 baseRefName,
                 baseRefOid,
                 triggerSignal,
-                observationOrigin,
+                practiceResultOrigin,
                 reviewId,
                 aboutUserId,
                 revision);

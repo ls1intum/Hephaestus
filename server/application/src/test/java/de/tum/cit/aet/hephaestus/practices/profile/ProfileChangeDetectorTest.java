@@ -5,10 +5,10 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeGroupStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendDirection;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution.Work;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileChangeDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.result.trend.TrendDirection;
+import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution.Work;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkRefDTO;
 import java.time.Instant;
 import java.util.List;
@@ -128,9 +128,8 @@ class ProfileChangeDetectorTest {
     }
 
     @Test
-    @DisplayName(
-            "a practice observed for the first time inside the window is first observed, dated by that observation")
-    void shouldDetectAFirstObservationWhenItFallsInsideTheWindow() {
+    @DisplayName("a practice observed for the first time inside the window is first observed, dated by that result")
+    void shouldDetectAFirstResultWhenItFallsInsideTheWindow() {
         Instant first = Instant.parse("2026-09-09T14:10:00Z");
         List<ProfileChangeDTO> changes = ProfileChangeDetector.detect(
                 WINDOW,
@@ -150,7 +149,7 @@ class ProfileChangeDetectorTest {
     }
 
     @Test
-    @DisplayName("a practice with a new verdict and a first observation keeps both: they are different types")
+    @DisplayName("a practice with a new verdict and a first result keeps both: they are different types")
     void shouldKeepOneChangePerTypeWhenAPracticeChangedTwice() {
         List<ProfileChangeDTO> changes = ProfileChangeDetector.detect(
                 WINDOW,

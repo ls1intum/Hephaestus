@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackSupersession;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationOrder;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultOrder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.practices.feedback.ConversationBriefBody;
@@ -10,13 +10,13 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -38,8 +38,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Prepares bounded {@code IN_CHAT} units for each observation subject. Only complete composed briefs are
- * queued: observations are evidence for a mentor move, not a substitute for one.
+ * Prepares bounded {@code IN_CHAT} units for each result subject. Only complete composed briefs are
+ * queued: results are evidence for a mentor move, not a substitute for one.
  *
  * <p>A practice-scoped thread key keeps one unread unit per practice. Supersession and replacement run in the
  * same transaction, while deterministic job positions make retries idempotent.
@@ -53,29 +53,29 @@ public class ConversationalFeedbackPreparer {
     static final int TOP_N_PER_RECIPIENT = 3;
 
     private final FeedbackRepository feedbackRepository;
-    private final FeedbackObservationRepository feedbackObservationRepository;
-    private final ObservationRepository observationRepository;
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final FeedbackSupersession supersession;
     private final ApplicationEventPublisher eventPublisher;
     private final OutboundEgressGuard egressGuard;
 
     public ConversationalFeedbackPreparer(
             FeedbackRepository feedbackRepository,
-            FeedbackObservationRepository feedbackObservationRepository,
-            ObservationRepository observationRepository,
+            FeedbackEvidenceRepository feedbackEvidenceRepository,
+            PracticeResultRepository practiceResultRepository,
             FeedbackSupersession supersession,
             ApplicationEventPublisher eventPublisher,
             OutboundEgressGuard egressGuard) {
         this.feedbackRepository = feedbackRepository;
-        this.feedbackObservationRepository = feedbackObservationRepository;
-        this.observationRepository = observationRepository;
+        this.feedbackEvidenceRepository = feedbackEvidenceRepository;
+        this.practiceResultRepository = practiceResultRepository;
         this.supersession = supersession;
         this.eventPublisher = eventPublisher;
         this.egressGuard = egressGuard;
     }
 
     /**
-     * Prepare PREPARED IN_CHAT units for {@code admitted} observations of a job. Runs REQUIRES_NEW so a
+     * Prepare PREPARED IN_CHAT units for {@code admitted} results of a job. Runs REQUIRES_NEW so a
      * preparation failure is isolated; idempotent on a re-run via the {@code (agent_job_id, position)} guard.
      *
      * @param composed this job's composed units for this lane, in the order the stage reported them; empty when
@@ -84,7 +84,7 @@ public class ConversationalFeedbackPreparer {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int prepare(
-            UUID agentJobId, Long workspaceId, List<Observation> admitted, List<ComposedFeedbackUnit> composed) {
+            UUID agentJobId, Long workspaceId, List<PracticeResult> admitted, List<ComposedFeedbackUnit> composed) {
         if (admitted.isEmpty()) {
             return 0;
         }
@@ -98,12 +98,12 @@ public class ConversationalFeedbackPreparer {
             // silence from infrastructure failure. The lane recovery marker is still written by the caller.
             return 0;
         }
-        List<Observation> ordered = admitted.stream()
-                .sorted(Comparator.comparingLong(Observation::getAboutUserId)
-                        .thenComparing(ObservationOrder.worstFirst()))
+        List<PracticeResult> ordered = admitted.stream()
+                .sorted(Comparator.comparingLong(PracticeResult::getAboutUserId)
+                        .thenComparing(ResultOrder.worstFirst()))
                 .collect(Collectors.toList());
 
-        // Every admitted observation consumes a slot, so the band is not bounded by the per-recipient cap.
+        // Every admitted result consumes a slot, so the band is not bounded by the per-recipient cap.
         // Overflowing it would collide with the next band and silently drop the very rows this records —
         // fail loud instead; a job with this many admitted loci is pathological.
         if (ordered.size() > FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
@@ -116,7 +116,7 @@ public class ConversationalFeedbackPreparer {
 
         // Read once, from a projection, and needed on every path: the practice is both the join between what
         // the composer wrote and what was measured, and the scope of the row's continuity key. The
-        // observations arrive from whichever caller routed them and may be detached, so walking
+        // results arrive from whichever caller routed them and may be detached, so walking
         // o.practice.slug would make a row supersedable — or a composed message deliverable — depending on
         // whether that caller happened to hold a session.
         Map<UUID, String> practiceSlugs = practiceSlugsOf(ordered, workspaceId);
@@ -131,9 +131,9 @@ public class ConversationalFeedbackPreparer {
         int position = FeedbackLedgerRecorder.IN_CHAT_UNIT_ORDINAL_BASE;
         int prepared = 0;
         int superseded = 0;
-        for (Observation observation : ordered) {
-            long recipient = observation.getAboutUserId();
-            String practiceSlug = practiceSlugs.get(observation.getId());
+        for (PracticeResult practiceResult : ordered) {
+            long recipient = practiceResult.getAboutUserId();
+            String practiceSlug = practiceSlugs.get(practiceResult.getId());
             // Advanced for every admitted locus, raised or not, so the grain a re-run recognises depends on
             // the measurements alone and not on what the composer happened to say about them.
             int unitPosition = position++;
@@ -199,8 +199,8 @@ public class ConversationalFeedbackPreparer {
             Feedback unit = feedbackRepository.save(Feedback.builder()
                     .agentJobId(agentJobId)
                     .workspaceId(workspaceId)
-                    .artifactKind(observation.getArtifactKind())
-                    .artifactId(observation.getArtifactId())
+                    .artifactKind(practiceResult.getArtifactKind())
+                    .artifactId(practiceResult.getArtifactId())
                     .recipientUserId(recipient)
                     .aboutUserId(recipient)
                     .channel(FeedbackChannel.IN_CHAT)
@@ -220,8 +220,8 @@ public class ConversationalFeedbackPreparer {
                     .replacesId(outcome.replacesId())
                     .createdAt(now)
                     .build());
-            feedbackObservationRepository.insertIfAbsent(
-                    unit.getId(), observation.getId(), EvidenceRole.PRIMARY.name(), 0);
+            feedbackEvidenceRepository.insertIfAbsent(
+                    unit.getId(), practiceResult.getId(), null, EvidenceRole.PRIMARY.name(), 0);
             if (!overCap) {
                 newlyPreparedByRecipient.merge(recipient, 1, Integer::sum);
                 prepared++;
@@ -236,7 +236,7 @@ public class ConversationalFeedbackPreparer {
                     composition.spoke());
         }
         // A move about a practice this run measured nothing admissible for cannot be prepared: the queue is
-        // read through the observations bound to a unit, so an evidence-free unit would be invisible to the
+        // read through the results bound to a unit, so an evidence-free unit would be invisible to the
         // mentor and unexplainable afterwards.
         composition.raisableSlugs().stream()
                 .filter(slug -> !matchedUnits.contains(slug))
@@ -312,20 +312,20 @@ public class ConversationalFeedbackPreparer {
      * and, because a practice thread is scoped to the practice, the same spelling is what the continuity key is
      * derived from, on this lane and on the in-app lane alike.
      */
-    private Map<UUID, String> practiceSlugsOf(List<Observation> observations, Long workspaceId) {
-        List<UUID> ids = observations.stream()
-                .map(Observation::getId)
+    private Map<UUID, String> practiceSlugsOf(List<PracticeResult> practiceResults, Long workspaceId) {
+        List<UUID> ids = practiceResults.stream()
+                .map(PracticeResult::getId)
                 .filter(Objects::nonNull)
                 .toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
         Map<UUID, String> slugs = new HashMap<>(ids.size());
-        for (ObservationRepository.ObservationPracticeSlug row :
-                observationRepository.practiceSlugsFor(ids, workspaceId)) {
+        for (PracticeResultRepository.ResultPracticeSlug row :
+                practiceResultRepository.practiceSlugsFor(ids, workspaceId)) {
             String slug = row.getPracticeSlug();
             if (slug != null && !slug.isBlank()) {
-                slugs.put(row.getObservationId(), normalizeSlug(slug));
+                slugs.put(row.getPracticeResultId(), normalizeSlug(slug));
             }
         }
         return slugs;

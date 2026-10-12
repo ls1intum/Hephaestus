@@ -22,14 +22,15 @@ import org.springframework.validation.annotation.Validated;
  *                            practice it carries, and never less than three practices' worth.
  * @param practiceOutputTokens
  *                            the output tokens one practice is owed in a review turn, counted the same way.
- * @param practiceScriptMaxTokensPerAttempt
- *                            the input and output tokens that the practice scripts of one review attempt
- *                            may spend on all their models together. The practice script runner holds its scripts to it,
- *                            and the proxy refuses further calls.
- * @param practiceScriptMaxSearchUnitsPerAttempt
- *                            the search units that the reranking calls of one review attempt's practice scripts may
- *                            bill, for providers such as Cohere that bill search units instead of tokens. Only the
- *                            proxy counts them, and it refuses further calls.
+ * @param directModelTokensPerAttempt
+ *                            the input and output tokens that the direct model calls of one review attempt's practice
+ *                            programs may spend on all their slots together: a sublimit of the attempt, which the
+ *                            review session's own calls do not count against. The runner holds its programs to it,
+ *                            and the proxy refuses further direct calls.
+ * @param directModelSearchUnitsPerAttempt
+ *                            the search units that the direct reranking calls of one review attempt may bill, for
+ *                            providers such as Cohere that bill search units instead of tokens. Only the proxy counts
+ *                            them, and it refuses further direct calls.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.practice-review")
@@ -40,5 +41,5 @@ public record PracticeReviewProperties(
         @Nullable @DecimalMin("0.0") @DecimalMax("2.0") Double samplingTemperature,
         @Min(1) @DefaultValue("12") int practiceModelCalls,
         @Min(1000) @DefaultValue("16000") int practiceOutputTokens,
-        @Min(1) @DefaultValue("200000") long practiceScriptMaxTokensPerAttempt,
-        @Min(1) @DefaultValue("1000") long practiceScriptMaxSearchUnitsPerAttempt) {}
+        @Min(1) @DefaultValue("200000") long directModelTokensPerAttempt,
+        @Min(1) @DefaultValue("1000") long directModelSearchUnitsPerAttempt) {}

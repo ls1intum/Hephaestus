@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
@@ -22,9 +22,10 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.Reaction;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -39,7 +40,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Seeds one practice review's history the way the production writers leave it: a practice with a current
- * revision, a pull request review run with the metadata the target lookup reads, the observations the run
+ * revision, a pull request review run with the metadata the target lookup reads, the results the run
  * recorded, the in-app feedback composed from them and the developer's responses. A helper returns the row a
  * test may assert on, so a test asserts on its own rows and never on a count.
  */
@@ -68,6 +69,9 @@ public abstract class AbstractPracticeReviewIntegrationTest extends AbstractWork
     protected PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
+    protected PracticeResultRepository practiceResultRepository;
+
+    @Autowired
     protected ObservationRepository observationRepository;
 
     @Autowired
@@ -77,7 +81,7 @@ public abstract class AbstractPracticeReviewIntegrationTest extends AbstractWork
     protected FeedbackRepository feedbackRepository;
 
     @Autowired
-    protected FeedbackObservationRepository feedbackObservationRepository;
+    protected FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
     protected ReactionRepository reactionRepository;
@@ -164,7 +168,7 @@ public abstract class AbstractPracticeReviewIntegrationTest extends AbstractWork
     }
 
     /**
-     * One live observation of {@code practice} about {@code about}, recorded by {@code job} on a pull request.
+     * One live result of {@code practice} about {@code about}, recorded by {@code job} on a pull request.
      * {@code severity} is required exactly when {@code kind} is a problem.
      */
     protected UUID observe(
@@ -273,8 +277,8 @@ public abstract class AbstractPracticeReviewIntegrationTest extends AbstractWork
             String evidenceJson,
             @Nullable String recurrenceKey) {
         UUID id = UUID.randomUUID();
-        String summary = title == null ? "Observation " + id : title;
-        observationRepository.insertIfAbsent(
+        String summary = title == null ? "Result " + id : title;
+        practiceResultRepository.insertIfAbsent(
                 id,
                 "occ-" + id,
                 job.getId(),
@@ -289,10 +293,34 @@ public abstract class AbstractPracticeReviewIntegrationTest extends AbstractWork
                 severity == null ? null : severity.name(),
                 evidenceJson,
                 "Reasoning for " + summary,
-                recurrenceKey,
+                "test-scope",
+                null,
+                null,
+                null,
                 observedAt,
                 "LIVE");
+        if (kind == Outcome.NOT_MET) {
+            // A negative stands on its problems; the recurrence key that dates a repeat lives on the problem.
+            observationRepository.insert(
+                    UUID.randomUUID(),
+                    job.getWorkspace().getId(),
+                    id,
+                    0,
+                    null,
+                    (severity == null ? Severity.MINOR : severity).name(),
+                    summary,
+                    "Reasoning for " + summary,
+                    citationsOf(evidenceJson),
+                    null,
+                    null,
+                    recurrenceKey);
+        }
         return id;
+    }
+
+    private static String citationsOf(String evidenceJson) {
+        var citations = OBJECT_MAPPER.readTree(evidenceJson).path("citations");
+        return citations.isArray() ? citations.toString() : "[]";
     }
 
     /**
@@ -328,9 +356,9 @@ public abstract class AbstractPracticeReviewIntegrationTest extends AbstractWork
                 .build());
     }
 
-    /** Binds the observation the feedback was written from. */
-    protected void bind(Feedback feedback, UUID observationId) {
-        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, "PRIMARY", 0);
+    /** Binds the result the feedback was written from. */
+    protected void bind(Feedback feedback, UUID practiceResultId) {
+        feedbackEvidenceRepository.insertIfAbsent(feedback.getId(), practiceResultId, null, "PRIMARY", 0);
     }
 
     /**

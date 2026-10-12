@@ -119,7 +119,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         owningWorkspace = new Workspace();
         owningWorkspace.setId(WORKSPACE_ID);
         // Every dispatching path asks two questions before it may do anything: who owns this
-        // repository, and is this observation ours to act on. Lenient because the paths that
+        // repository, and is this result ours to act on. Lenient because the paths that
         // short-circuit before dispatch never ask them.
         lenient().when(workspaceResolver.resolveAllForRepository(any())).thenReturn(List.of(owningWorkspace));
         lenient().when(signalRecorder.record(any(), any(), any())).thenReturn(true);

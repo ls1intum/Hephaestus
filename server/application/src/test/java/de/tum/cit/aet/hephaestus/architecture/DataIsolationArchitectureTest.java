@@ -62,7 +62,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             "TeamMembership",
             // Practice catalog entities
             "Practice", // has direct Workspace field
-            "Observation", // through Practice.workspace
+            "PracticeResult", // through Practice.workspace
             // Through chat thread -> workspace
             "ChatMessage", // through ChatThread.workspace
             "ChatMessageVote", // through ChatMessage (via messageId) -> ChatThread.workspace
@@ -84,9 +84,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             "Connection", // has direct Workspace field
             "ConnectionAudit", // through Connection.workspace
             // Feedback synthesis seam — scoped via a raw workspace_id scalar (cross-module
-            // FK to avoid a Modulith cycle, mirrors Observation.agentJobId).
+            // FK to avoid a Modulith cycle, mirrors Result.agentJobId).
             "Feedback", // direct workspace_id scalar column (sfk_feedback_workspace)
-            "FeedbackObservation", // through Feedback.workspace_id (and observation -> Practice.workspace)
+            "FeedbackEvidence", // through Feedback.workspace_id (and result -> Practice.workspace)
             "FeedbackPlacement", // through Feedback.workspace_id
             // Slack integration — every table carries a direct workspace_id scalar and is therefore
             // auto-classified scoped by WorkspaceScopedTables (absent from GLOBAL_TABLES). Listed here

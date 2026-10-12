@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.handler.LinkedRepairFollowupRequest;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.MonitoredRepositoryScope;
@@ -415,7 +415,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * One page of practice review runs narrowed by {@code filter}.
      *
      * <p>The window is inclusive at {@code from} and exclusive at {@code to}, the same half-open convention the
-     * observation and feedback listings use, so a day picked in both surfaces means the same day; a null bound drops
+     * result and feedback listings use, so a day picked in both surfaces means the same day; a null bound drops
      * out of the predicate. The bounds are bound on their own rather than read from {@code filter}: {@code CAST(:from
      * AS Instant)} types a null bound only when Hibernate sees an {@code Instant} parameter. A run whose results have
      * no processing status yet matches only when the filter leaves result processing open. A review matches the status
@@ -936,7 +936,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * <p>A snapshot carries one entry per staged file, so a repository-tree capture makes it megabytes,
      * and Postgres has no partial read for a TOASTed jsonb. Loading the job to take one string out of it
      * therefore detoasts, ships and parses the whole document — and evidence authorization asks this
-     * question once per observation, on surfaces that list hundreds. Extracting the key in SQL keeps the
+     * question once per result, on surfaces that list hundreds. Extracting the key in SQL keeps the
      * detoast on the server and the answer to a few bytes.
      *
      * @return the contract version, or empty when this workspace has no such run or the run recorded no
@@ -951,7 +951,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     /**
      * The same answer as {@link #findEvidenceContractVersion} for a whole set of runs, in one round trip.
      *
-     * <p>Evidence authorization asks the question once per observation, and the surfaces that ask it list
+     * <p>Evidence authorization asks the question once per result, and the surfaces that ask it list
      * hundreds — a developer with forty pull requests across ten practices costs four hundred sequential
      * round trips on one dashboard read. The per-row query is cheap; the latency is the count.
      *
@@ -1275,7 +1275,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             WHERE j.id = :jobId AND j.workspace_id = :workspaceId
               AND j.retry_count = :attempt AND j.worker_id = :workerId
               AND jsonb_typeof(j.evidence_snapshot #> '{manifest,sources}') = 'array'
-              AND (j.status <> 'RUNNING' OR COALESCE(j.metadata ->> '""" + ObservationAdmissionService.DIGEST_METADATA_KEY + "', '') <> '')", nativeQuery = true)
+              AND (j.status <> 'RUNNING' OR COALESCE(j.metadata ->> '""" + ResultAdmissionService.DIGEST_METADATA_KEY + "', '') <> '')", nativeQuery = true)
     int discardRetiredArtifactInventory(
             @Param("jobId") UUID jobId,
             @Param("workspaceId") Long workspaceId,
@@ -1667,13 +1667,13 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             @Param("newJobTokenHash") String newJobTokenHash);
 
     /**
-     * The admission's digest is absent. Requeuing an admitted attempt would discard the observations its
+     * The admission's digest is absent. Requeuing an admitted attempt would discard the results its
      * citations were verified for: the next attempt captures again and cannot submit against the digest
      * the job carries. The predicate sits in the UPDATE, so it is evaluated under the row lock the
      * admission takes, whatever the caller read before.
      */
     String NOT_ADMITTED = "COALESCE(FUNCTION('jsonb_extract_path_text', j.metadata, '"
-            + ObservationAdmissionService.DIGEST_METADATA_KEY + "'), '') = ''";
+            + ResultAdmissionService.DIGEST_METADATA_KEY + "'), '') = ''";
 
     /**
      * Locks this exact owned attempt, as erasure's cancellation locks it before marking receipts, and finds it only
@@ -1692,10 +1692,10 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             WHERE j.id = :id AND j.status = 'RUNNING' AND j.worker_id = :workerId AND j.retry_count = :attempt
               AND j.output IS NULL
               AND b.basis_version = :version AND b.expires_at > :now AND b.admission_attempt <= j.retry_count
-              AND b.admission_digest = j.metadata ->> '""" + ObservationAdmissionService.DIGEST_METADATA_KEY + """
+              AND b.admission_digest = j.metadata ->> '""" + ResultAdmissionService.DIGEST_METADATA_KEY + """
             '
               AND j.metadata ->> '"""
-                    + ObservationAdmissionService.ATTEMPT_METADATA_KEY + """
+                    + ResultAdmissionService.ATTEMPT_METADATA_KEY + """
             ' = CAST(b.admission_attempt AS text)
               AND c.state = 'READY' AND c.payload ->> 'dependencies' = 'COMPLETE'
               AND c.payload ->> 'attempt' = CAST(b.admission_attempt AS text)
@@ -1723,7 +1723,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             + "AND EXISTS (SELECT 1 FROM ReviewCompositionBasis b WHERE b.jobId = j.id "
             + "AND b.workspaceId = j.workspace.id AND b.expiresAt > :#{#request.now} "
             + "AND b.admissionDigest = FUNCTION('jsonb_extract_path_text', j.metadata, '"
-            + ObservationAdmissionService.DIGEST_METADATA_KEY + "'))")
+            + ResultAdmissionService.DIGEST_METADATA_KEY + "'))")
     int requeueLockedForComposition(
             @Param("id") UUID id, @Param("workerId") String workerId, @Param("request") CompositionRequeue request);
 
@@ -1736,8 +1736,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             String newJobTokenHash) {}
 
     /**
-     * Ends a RUNNING attempt whose observations were admitted but whose run was lost before it finished:
-     * it fails with what is known, and its observations, capture and digest stay as recorded. Fenced on
+     * Ends a RUNNING attempt whose results were admitted but whose run was lost before it finished:
+     * it fails with what is known, and its results, capture and digest stay as recorded. Fenced on
      * the owning worker and the attempt, so a stale caller cannot end a run another claim started;
      * {@link #requeueOrphan} refuses exactly these rows.
      *
@@ -1891,7 +1891,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
                     + "  AND j.completed_at < :cutoff "
                     + "  AND j.delivery_status <> 'PENDING' "
                     + "  AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.agent_job_id = j.id) "
-                    + "  AND NOT EXISTS (SELECT 1 FROM observation o WHERE o.agent_job_id = j.id) "
+                    + "  AND NOT EXISTS (SELECT 1 FROM practice_result o WHERE o.agent_job_id = j.id) "
                     + "  LIMIT :batchSize"
                     + ")",
             nativeQuery = true)

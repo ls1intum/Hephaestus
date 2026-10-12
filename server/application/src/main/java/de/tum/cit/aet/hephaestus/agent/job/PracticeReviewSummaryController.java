@@ -52,7 +52,7 @@ public class PracticeReviewSummaryController {
 
     @GetMapping
     @Operation(
-            summary = "List practice reviews with observation and feedback outcomes",
+            summary = "List practice reviews with result and feedback outcomes",
             description = "Results are ordered newest first.",
             operationId = "listPracticeReviews")
     @ApiResponse(responseCode = "200", description = "Paginated review summaries returned")
@@ -85,10 +85,10 @@ public class PracticeReviewSummaryController {
 
     @GetMapping("/overview")
     @Operation(
-            summary = "Count practice reviews, observations and feedback in a time range",
+            summary = "Count practice reviews, results and feedback in a time range",
             description = "In total, over time and by practice. Reviews count by when they were created,"
-                    + " observations by when they were recorded and feedback by when it was created, as the review,"
-                    + " observation and feedback lists filter them. The range is split into days, weeks or months,"
+                    + " results by when they were recorded and feedback by when it was created, as the review,"
+                    + " result and feedback lists filter them. The range is split into days, weeks or months,"
                     + " by its length, in the given time zone.",
             operationId = "getPracticeReviewOverview")
     @ApiResponse(responseCode = "200", description = "Practice reviews counted")

@@ -172,9 +172,10 @@ class PracticeCriteriaCaseStagingIntegrationTest {
         }
         var metadata =
                 mapper.readTree(workspace.resolve("context/metadata.json").toFile());
-        var defaults = mapper.readTree(PracticeCriteriaCaseFixtures.FIXTURE_DIR
-                .resolve("metadata.json")
-                .toFile());
+        // Every field the content source writes is staged, whatever the case states.
+        var defaults = scenario.path("workType").asString().equals("issue")
+                ? LiveWorkRecords.issue(PracticeCriteriaCaseFixtures.DEFAULT_TITLE, "")
+                : LiveWorkRecords.pullRequest("0".repeat(40), PracticeCriteriaCaseFixtures.DEFAULT_TITLE, "", 1);
         for (var field : defaults.properties()) {
             assertThat(metadata.has(field.getKey()))
                     .as("default %s", field.getKey())

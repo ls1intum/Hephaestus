@@ -15,15 +15,15 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.FeedbackObservationVisibility;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository.FeedbackResultVisibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.RecipientFeedbackRow;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -58,7 +58,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
     FeedbackRepository feedbackRepository;
 
     @Mock
-    FeedbackObservationRepository feedbackObservationRepository;
+    FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Mock
     FeedbackWithdrawalRepository withdrawalRepository;
@@ -67,7 +67,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
     ConversationConsentGate conversationConsentGate;
 
     @Mock
-    ObservationVisibilityPolicy visibilityPolicy;
+    ResultVisibilityPolicy visibilityPolicy;
 
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
@@ -176,12 +176,12 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void withholdsFeedbackWhenItsObservationIsNoLongerVisible() {
+    void withholdsFeedbackWhenItsResultIsNoLongerVisible() {
         givenUser();
         Row row = delivered(ArtifactKinds.PULL_REQUEST, 575L, "Previously delivered");
         givenRows(row);
-        FeedbackObservationVisibility binding = binding(row);
-        when(feedbackObservationRepository.findForVisibility(eq(1L), any())).thenReturn(List.of(binding));
+        FeedbackResultVisibility binding = binding(row);
+        when(feedbackEvidenceRepository.findForVisibility(eq(1L), any())).thenReturn(List.of(binding));
         when(visibilityPolicy.permitsShown(eq(1L), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
                 .thenReturn(Set.of());
 
@@ -233,25 +233,25 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
     }
 
     private void authorize(Row... rows) {
-        List<FeedbackObservationVisibility> bindings = new ArrayList<>();
+        List<FeedbackResultVisibility> bindings = new ArrayList<>();
         Set<UUID> permitted = new HashSet<>();
         for (Row row : rows) {
-            FeedbackObservationVisibility binding = binding(row);
+            FeedbackResultVisibility binding = binding(row);
             bindings.add(binding);
-            permitted.add(binding.getObservation().getId());
+            permitted.add(binding.getPracticeResult().getId());
         }
-        when(feedbackObservationRepository.findForVisibility(eq(1L), any())).thenReturn(bindings);
+        when(feedbackEvidenceRepository.findForVisibility(eq(1L), any())).thenReturn(bindings);
         when(visibilityPolicy.permitsShown(eq(1L), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
                 .thenReturn(permitted);
     }
 
-    private static FeedbackObservationVisibility binding(Row row) {
-        Observation observation = mock(Observation.class);
-        when(observation.getId()).thenReturn(UUID.randomUUID());
-        when(observation.getPractice()).thenReturn(new Practice());
-        FeedbackObservationVisibility binding = mock(FeedbackObservationVisibility.class);
+    private static FeedbackResultVisibility binding(Row row) {
+        PracticeResult practiceResult = mock(PracticeResult.class);
+        when(practiceResult.getId()).thenReturn(UUID.randomUUID());
+        when(practiceResult.getPractice()).thenReturn(new Practice());
+        FeedbackResultVisibility binding = mock(FeedbackResultVisibility.class);
         when(binding.getFeedbackId()).thenReturn(row.getId());
-        when(binding.getObservation()).thenReturn(observation);
+        when(binding.getPracticeResult()).thenReturn(practiceResult);
         return binding;
     }
 

@@ -395,7 +395,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * delete event, but from this repository's perspective the outcome is identical: the issue is gone.
      *
      * <p>Tombstoned rather than deleted, matching the {@code RECONCILIATION} sweep: the issue's
-     * feedback/observation rows reference it by bare id with no FK, so removing the row would orphan
+     * feedback/result rows reference it by bare id with no FK, so removing the row would orphan
      * them. The sweep would eventually catch this anyway (a transferred issue vanishes from the
      * source repository's upstream listing); handling the event makes it immediate.
      */

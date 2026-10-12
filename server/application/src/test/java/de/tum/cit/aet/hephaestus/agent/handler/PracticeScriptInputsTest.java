@@ -24,14 +24,16 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -65,13 +67,16 @@ class PracticeScriptInputsTest extends BaseUnitTest {
     private final JsonMapper mapper = JsonMapper.builder().build();
 
     @Mock
+    private PracticeResultRepository practiceResults;
+
+    @Mock
     private ObservationRepository observations;
 
     @Mock
     private EvidenceAuthorization evidenceAuthorization;
 
     @Mock
-    private ObservationInvalidationRepository invalidations;
+    private PracticeResultInvalidationRepository invalidations;
 
     @Mock
     private ConversationSourceLiveness conversations;
@@ -92,8 +97,9 @@ class PracticeScriptInputsTest extends BaseUnitTest {
         // The visibility rules are the real ones: currentness, invalidation and evidence authorization.
         inputs = new PracticeScriptInputs(
                 mapper,
+                practiceResults,
                 observations,
-                new ObservationVisibilityPolicy(evidenceAuthorization, invalidations),
+                new ResultVisibilityPolicy(evidenceAuthorization, invalidations),
                 conversations,
                 jobs,
                 reviewTargets,
@@ -102,7 +108,7 @@ class PracticeScriptInputsTest extends BaseUnitTest {
                 .when(reviewTargets.findPullRequest(PULL_REQUEST))
                 .thenReturn(Optional.of(new ReviewTargetQuery.Target(5L, "example/shop", 7, AUTHOR, false)));
         lenient()
-                .when(observations.findStandingForWork(WORKSPACE, ArtifactKinds.PULL_REQUEST, PULL_REQUEST, AUTHOR))
+                .when(practiceResults.findStandingForWork(WORKSPACE, ArtifactKinds.PULL_REQUEST, PULL_REQUEST, AUTHOR))
                 .thenReturn(List.of());
     }
 
@@ -119,7 +125,7 @@ class PracticeScriptInputsTest extends BaseUnitTest {
         return practice;
     }
 
-    private AgentJob job(TriggerMode mode, ObservationOrigin origin, SignalName signal, String... rechecked) {
+    private AgentJob job(TriggerMode mode, ResultOrigin origin, SignalName signal, String... rechecked) {
         AgentJob job = new AgentJob();
         job.setId(UUID.randomUUID());
         Workspace workspace = new Workspace();
@@ -143,7 +149,7 @@ class PracticeScriptInputsTest extends BaseUnitTest {
     }
 
     private JsonNode staged(Map<String, byte[]> files, String slug, String suffix) {
-        byte[] bytes = files.get(SandboxLayout.PRACTICE_SCRIPT_PREFIX + "practices/" + slug + suffix);
+        byte[] bytes = files.get(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + slug + suffix);
         assertThat(bytes).as("%s%s is staged", slug, suffix).isNotNull();
         return mapper.readTree(bytes);
     }
@@ -161,17 +167,28 @@ class PracticeScriptInputsTest extends BaseUnitTest {
         Practice bound = practice("cites-tests", ScmSignals.PULL_REQUEST_SYNCHRONIZED);
 
         Map<String, byte[]> files = inputs.stage(
-                job(TriggerMode.AUTO, ObservationOrigin.LIVE, ScmSignals.PULL_REQUEST_SYNCHRONIZED),
+                job(TriggerMode.AUTO, ResultOrigin.LIVE, ScmSignals.PULL_REQUEST_SYNCHRONIZED),
                 ArtifactKinds.PULL_REQUEST,
                 List.of(bound));
 
         assertThat(cause(files, "cites-tests")).isEqualTo(mapper.readTree("""
-                        {"kind": "scm.pull_request", "subject": {"role": "AUTHOR"}, "cause": {
+                        {"kind": "scm.pull_request", "subject": {"role": "AUTHOR"},
+                         "practice": {"revisionId": %d},
+                         "scope": {"key": "scm.pull_request:70:AUTHOR", "mode": "change",
+                                   "description": "What its author contributed to the pull request"},
+                         "cause": {
                           "type": "moment", "signal": "scm.pull_request.synchronized", "origin": "LIVE",
                           "state": {"draftStatus": "NOT_DRAFT", "state": "OPEN"},
                           "admittedAt": "2026-02-03T04:05:06.123456Z"}}
-                        """));
+                        """.formatted(
+                        bound.getCurrentRevision().getId())));
         assertThat(previous(files, "cites-tests").isNull()).isTrue();
+        assertThat(files)
+                .containsOnlyKeys(
+                        SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "cites-tests"
+                                + SandboxLayout.PRACTICE_SCRIPT_CAUSE_SUFFIX,
+                        SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "cites-tests"
+                                + SandboxLayout.PRACTICE_SCRIPT_PREVIOUS_SUFFIX);
     }
 
     @Test
@@ -183,7 +200,7 @@ class PracticeScriptInputsTest extends BaseUnitTest {
         Map<String, byte[]> files = inputs.stage(
                 job(
                         TriggerMode.AUTO,
-                        ObservationOrigin.LIVE,
+                        ResultOrigin.LIVE,
                         ScmSignals.PULL_REQUEST_SYNCHRONIZED,
                         "describes-change",
                         "cites-tests"),
@@ -200,7 +217,7 @@ class PracticeScriptInputsTest extends BaseUnitTest {
     @Test
     void shouldStageARequestByHandWithoutASignal() {
         Map<String, byte[]> files = inputs.stage(
-                job(TriggerMode.MANUAL, ObservationOrigin.MANUAL, ScmSignals.PULL_REQUEST_MANUAL_REVIEW),
+                job(TriggerMode.MANUAL, ResultOrigin.MANUAL, ScmSignals.PULL_REQUEST_MANUAL_REVIEW),
                 ArtifactKinds.PULL_REQUEST,
                 List.of(practice("merges-after-approval", ScmSignals.PULL_REQUEST_MERGED)));
 
@@ -214,7 +231,7 @@ class PracticeScriptInputsTest extends BaseUnitTest {
     void shouldStageTheReviewAndReviewerOfAReviewerMoment() {
         Practice reviewerPractice = practice("explains-requests", ScmSignals.PULL_REQUEST_REVIEWED);
         reviewerPractice.setSubject(ActorRole.REVIEWER);
-        AgentJob job = job(TriggerMode.AUTO, ObservationOrigin.LIVE, ScmSignals.PULL_REQUEST_REVIEWED);
+        AgentJob job = job(TriggerMode.AUTO, ResultOrigin.LIVE, ScmSignals.PULL_REQUEST_REVIEWED);
         ObjectNode metadata = assertInstanceOf(ObjectNode.class, job.getMetadata());
         metadata.put("review_id", 99L);
         metadata.put("about_user_id", 42L);
@@ -222,7 +239,7 @@ class PracticeScriptInputsTest extends BaseUnitTest {
         User reviewer = new User();
         reviewer.setLogin("ada");
         when(users.findById(42L)).thenReturn(Optional.of(reviewer));
-        when(observations.findStandingForWork(WORKSPACE, ArtifactKinds.PULL_REQUEST, PULL_REQUEST, 42L))
+        when(practiceResults.findStandingForWork(WORKSPACE, ArtifactKinds.PULL_REQUEST, PULL_REQUEST, 42L))
                 .thenReturn(List.of());
 
         JsonNode staged =
@@ -231,10 +248,33 @@ class PracticeScriptInputsTest extends BaseUnitTest {
         assertThat(staged.path("subject").path("role").asString()).isEqualTo("REVIEWER");
         assertThat(staged.path("cause").path("review"))
                 .isEqualTo(mapper.readTree("{\"id\": 99, \"reviewer\": \"ada\"}"));
+        assertThat(staged.path("scope")).isEqualTo(mapper.readTree("""
+                        {"key": "scm.pull_request:70:REVIEWER:review:99", "mode": "change",
+                         "description": "What a reviewer contributed to the pull request, in one submitted review"}
+                        """));
+    }
+
+    @Test
+    void shouldScopeAReviewerPassToTheWorkAloneWhenNoSubmittedReviewOccasionedIt() {
+        AgentJob reviewed = job(TriggerMode.AUTO, ResultOrigin.LIVE, ScmSignals.PULL_REQUEST_REVIEWED);
+        assertInstanceOf(ObjectNode.class, reviewed.getMetadata()).put("review_id", 99L);
+        AgentJob requested = job(TriggerMode.MANUAL, ResultOrigin.MANUAL, ScmSignals.PULL_REQUEST_REVIEWED);
+        assertInstanceOf(ObjectNode.class, requested.getMetadata()).put("review_id", 99L);
+        AgentJob synchronizedJob = job(TriggerMode.AUTO, ResultOrigin.LIVE, ScmSignals.PULL_REQUEST_SYNCHRONIZED);
+        assertInstanceOf(ObjectNode.class, synchronizedJob.getMetadata()).put("review_id", 99L);
+
+        assertThat(PracticeScriptInputs.scopeKey(reviewed, ArtifactKinds.PULL_REQUEST, 70L, ActorRole.REVIEWER))
+                .isEqualTo("scm.pull_request:70:REVIEWER:review:99");
+        assertThat(PracticeScriptInputs.scopeKey(reviewed, ArtifactKinds.PULL_REQUEST, 70L, ActorRole.AUTHOR))
+                .isEqualTo("scm.pull_request:70:AUTHOR");
+        assertThat(PracticeScriptInputs.scopeKey(requested, ArtifactKinds.PULL_REQUEST, 70L, ActorRole.REVIEWER))
+                .isEqualTo("scm.pull_request:70:REVIEWER");
+        assertThat(PracticeScriptInputs.scopeKey(synchronizedJob, ArtifactKinds.PULL_REQUEST, 70L, ActorRole.REVIEWER))
+                .isEqualTo("scm.pull_request:70:REVIEWER");
     }
 
     /** The current claim, made by a synchronized review of {@link #PREVIOUS_HEAD}. */
-    private Observation claim(Practice practice, Outcome outcome, AgentJob run) {
+    private PracticeResult claim(Practice practice, Outcome outcome, AgentJob run) {
         ObjectNode evidence = mapper.createObjectNode();
         evidence.putArray("citations")
                 .add(mapper.readTree("""
@@ -243,7 +283,8 @@ class PracticeScriptInputsTest extends BaseUnitTest {
                          "quote": "count += 1;"}
                         """))
                 .add(mapper.readTree("{\"sourceKind\": \"scm.pull-request.core\", \"path\": \"broken\"}"));
-        return Observation.builder()
+        return PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .workspaceId(WORKSPACE)
                 .practice(practice)
@@ -262,7 +303,7 @@ class PracticeScriptInputsTest extends BaseUnitTest {
     }
 
     private AgentJob previousRun() {
-        AgentJob run = job(TriggerMode.AUTO, ObservationOrigin.LIVE, ScmSignals.PULL_REQUEST_OPENED);
+        AgentJob run = job(TriggerMode.AUTO, ResultOrigin.LIVE, ScmSignals.PULL_REQUEST_OPENED);
         ObjectNode snapshot = mapper.createObjectNode();
         snapshot.putObject("reviewedWork").put("head", PREVIOUS_HEAD);
         run.setEvidenceSnapshot(snapshot);
@@ -274,27 +315,46 @@ class PracticeScriptInputsTest extends BaseUnitTest {
     void shouldStageTheCurrentClaimWithoutModelTextOrDelivery() {
         Practice practice =
                 practice("cites-tests", ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_SYNCHRONIZED);
-        Observation current = claim(practice, Outcome.NOT_MET, previousRun());
-        when(observations.findStandingForWork(WORKSPACE, ArtifactKinds.PULL_REQUEST, PULL_REQUEST, AUTHOR))
+        PracticeResult current = claim(practice, Outcome.NOT_MET, previousRun());
+        when(practiceResults.findStandingForWork(WORKSPACE, ArtifactKinds.PULL_REQUEST, PULL_REQUEST, AUTHOR))
                 .thenReturn(List.of(current));
-        when(invalidations.findActiveObservationIds(eq(WORKSPACE), anyCollection()))
-                .thenReturn(Set.of());
+        when(invalidations.findActiveResultIds(eq(WORKSPACE), anyCollection())).thenReturn(Set.of());
         when(evidenceAuthorization.permitsAll(
                         eq(WORKSPACE), anyCollection(), eq(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)))
                 .thenReturn(Set.of(current.getId()));
+        Observation problem = Observation.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(WORKSPACE)
+                .practiceResultId(current.getId())
+                .position(0)
+                .severity(Severity.MINOR)
+                .summary("model words that never reach the script")
+                .explanation("model words that never reach the script")
+                .citations(mapper.readTree("""
+                        [{"sourceKind": "scm.pull-request.diff", "path": "src/cart.test.ts",
+                          "startLine": 9, "side": "OLD", "quote": "expect(count).toBe(1);"}]
+                        """))
+                .nextStep("model words that never reach the script")
+                .build();
+        when(observations.findByPracticeResultIds(WORKSPACE, List.of(current.getId())))
+                .thenReturn(List.of(problem));
 
         Map<String, byte[]> files = inputs.stage(
-                job(TriggerMode.AUTO, ObservationOrigin.LIVE, ScmSignals.PULL_REQUEST_SYNCHRONIZED),
+                job(TriggerMode.AUTO, ResultOrigin.LIVE, ScmSignals.PULL_REQUEST_SYNCHRONIZED),
                 ArtifactKinds.PULL_REQUEST,
                 List.of(practice));
 
-        assertThat(previous(files, "cites-tests")).isEqualTo(mapper.readTree("""
-                        {"reviewedAt": "2026-02-01T00:00:00Z", "cause": "moment",
+        // The result's own citations come first, then its problems'; only located ones are staged.
+        assertThat(previous(files, "cites-tests"))
+                .isEqualTo(mapper.readTree("""
+                        {"practiceResultId": "%s", "reviewedAt": "2026-02-01T00:00:00Z", "cause": "moment",
                          "signal": "scm.pull_request.opened", "outcome": "NOT_MET", "severity": "MINOR",
                          "citations": [{"sourceKind": "scm.pull-request.diff", "path": "src/cart.ts",
-                                        "startLine": 4, "endLine": 5, "side": "NEW"}],
+                                        "startLine": 4, "endLine": 5, "side": "NEW"},
+                                       {"sourceKind": "scm.pull-request.diff", "path": "src/cart.test.ts",
+                                        "startLine": 9, "endLine": 9, "side": "OLD"}],
                          "head": "%s"}
-                        """.formatted(PREVIOUS_HEAD)));
+                        """.formatted(current.getId(), PREVIOUS_HEAD)));
     }
 
     @Test
@@ -303,18 +363,17 @@ class PracticeScriptInputsTest extends BaseUnitTest {
         Practice unauthorized = practice("describes-change", ScmSignals.PULL_REQUEST_OPENED);
         AgentJob run = new AgentJob();
         run.setId(UUID.randomUUID());
-        Observation marked = claim(invalidated, Outcome.NOT_MET, run);
-        Observation withdrawnSource = claim(unauthorized, Outcome.MET, run);
-        when(observations.findStandingForWork(WORKSPACE, ArtifactKinds.PULL_REQUEST, PULL_REQUEST, AUTHOR))
+        PracticeResult marked = claim(invalidated, Outcome.NOT_MET, run);
+        PracticeResult withdrawnSource = claim(unauthorized, Outcome.MET, run);
+        when(practiceResults.findStandingForWork(WORKSPACE, ArtifactKinds.PULL_REQUEST, PULL_REQUEST, AUTHOR))
                 .thenReturn(List.of(marked, withdrawnSource));
         // An admin marked one incorrect; the evidence of the other is no longer authorized for review.
-        when(invalidations.findActiveObservationIds(eq(WORKSPACE), anyCollection()))
-                .thenReturn(Set.of(marked.getId()));
+        when(invalidations.findActiveResultIds(eq(WORKSPACE), anyCollection())).thenReturn(Set.of(marked.getId()));
         when(evidenceAuthorization.permitsAll(anyLong(), anyCollection(), any()))
                 .thenReturn(Set.of());
 
         Map<String, byte[]> files = inputs.stage(
-                job(TriggerMode.AUTO, ObservationOrigin.LIVE, ScmSignals.PULL_REQUEST_OPENED),
+                job(TriggerMode.AUTO, ResultOrigin.LIVE, ScmSignals.PULL_REQUEST_OPENED),
                 ArtifactKinds.PULL_REQUEST,
                 List.of(invalidated, unauthorized));
 
@@ -329,13 +388,14 @@ class PracticeScriptInputsTest extends BaseUnitTest {
                 practice("answers-questions", PracticeTestEvidence.defaultSignal(ArtifactKinds.CONVERSATION_THREAD));
         AgentJob job = job(
                 TriggerMode.AUTO,
-                ObservationOrigin.LIVE,
+                ResultOrigin.LIVE,
                 PracticeTestEvidence.defaultSignal(ArtifactKinds.CONVERSATION_THREAD));
         ObjectNode metadata = assertInstanceOf(ObjectNode.class, job.getMetadata());
         metadata.put("slack_thread_id", 8L);
         metadata.put("about_user_id", AUTHOR);
         metadata.remove(PracticeCatalogInjector.REVIEW_STATE_METADATA_KEY);
-        Observation current = Observation.builder()
+        PracticeResult current = PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .workspaceId(WORKSPACE)
                 .practice(practice)
@@ -348,10 +408,9 @@ class PracticeScriptInputsTest extends BaseUnitTest {
                 .summary("s")
                 .outcome(Outcome.MET)
                 .build();
-        when(observations.findStandingForWork(WORKSPACE, conversation, 8L, AUTHOR))
+        when(practiceResults.findStandingForWork(WORKSPACE, conversation, 8L, AUTHOR))
                 .thenReturn(List.of(current));
-        when(invalidations.findActiveObservationIds(eq(WORKSPACE), anyCollection()))
-                .thenReturn(Set.of());
+        when(invalidations.findActiveResultIds(eq(WORKSPACE), anyCollection())).thenReturn(Set.of());
         when(evidenceAuthorization.permitsAll(anyLong(), anyCollection(), any()))
                 .thenReturn(Set.of(current.getId()));
         when(conversations.activeThreadIds(WORKSPACE, List.of(8L))).thenReturn(Set.of());

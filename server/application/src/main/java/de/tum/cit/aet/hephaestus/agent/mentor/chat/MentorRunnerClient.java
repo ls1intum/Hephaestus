@@ -34,7 +34,7 @@ public final class MentorRunnerClient implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(MentorRunnerClient.class);
 
-    public static final int PROTOCOL_VERSION = 1;
+    public static final int PROTOCOL_VERSION = 2;
     public static final Duration DEFAULT_CONTROL_TIMEOUT = Duration.ofSeconds(10);
     /**
      * Deadline for the {@code prompt} JSON-RPC <em>ack</em> — not a turn duration. The runner
@@ -55,7 +55,7 @@ public final class MentorRunnerClient implements AutoCloseable {
     private final Consumer<JsonNode> onEvent;
     private final Runnable onStreamLost;
     private final Function<FetchContextRequest, JsonNode> fetchContextHandler;
-    private final Predicate<LinkObservationRequest> linkObservationHandler;
+    private final Predicate<LinkRequest> linkHandler;
     private final ScheduledExecutorService timeoutScheduler;
 
     /**
@@ -91,7 +91,7 @@ public final class MentorRunnerClient implements AutoCloseable {
             Consumer<JsonNode> onEvent,
             Runnable onStreamLost,
             Function<FetchContextRequest, JsonNode> fetchContextHandler,
-            Predicate<LinkObservationRequest> linkObservationHandler,
+            Predicate<LinkRequest> linkHandler,
             ScheduledExecutorService timeoutScheduler,
             UUID boundThreadId) {
         this.sandbox = Objects.requireNonNull(sandbox, "sandbox");
@@ -99,7 +99,7 @@ public final class MentorRunnerClient implements AutoCloseable {
         this.onEvent = Objects.requireNonNull(onEvent, "onEvent");
         this.onStreamLost = Objects.requireNonNull(onStreamLost, "onStreamLost");
         this.fetchContextHandler = Objects.requireNonNull(fetchContextHandler, "fetchContextHandler");
-        this.linkObservationHandler = Objects.requireNonNull(linkObservationHandler, "linkObservationHandler");
+        this.linkHandler = Objects.requireNonNull(linkHandler, "linkHandler");
         this.timeoutScheduler = Objects.requireNonNull(timeoutScheduler, "timeoutScheduler");
         this.boundThreadId = Objects.requireNonNull(boundThreadId, "boundThreadId");
     }
@@ -247,8 +247,10 @@ public final class MentorRunnerClient implements AutoCloseable {
                 handleEvent(frame);
             } else if ("fetch_context".equals(method)) {
                 handleFetchContext(frame);
+            } else if ("link_result".equals(method)) {
+                handleLink(frame, LinkKind.RESULT);
             } else if ("link_observation".equals(method)) {
-                handleLinkObservation(frame);
+                handleLink(frame, LinkKind.OBSERVATION);
             } else {
                 log.debug("Unknown runner-side method '{}' — ignoring", method);
             }
@@ -347,22 +349,24 @@ public final class MentorRunnerClient implements AutoCloseable {
     }
 
     /**
-     * The runner asks before its {@code link_observation} tool reports success or emits the link, so the server, not
-     * the model, decides which observation a reply may show feedback about. A refusal is one message whatever the
-     * reason, so the answer never tells an id that does not exist from one that belongs to someone else.
+     * The runner asks before its {@code link_result} or {@code link_observation} tool reports success or emits the
+     * link, so the server, not the model, decides which result or problem a reply may show feedback about. A refusal
+     * is one message whatever the reason, so the answer never tells an id that does not exist from one that belongs
+     * to someone else.
      */
-    private void handleLinkObservation(JsonNode frame) {
+    private void handleLink(JsonNode frame, LinkKind kind) {
         JsonNode idNode = frame.get("id");
         JsonNode params = frame.path("params");
-        if (!params.path("threadId").isString() || !params.path("observationId").isString()) {
+        String idKey = kind.idKey();
+        if (!params.path("threadId").isString() || !params.path(idKey).isString()) {
             sendCallbackError(idNode, -32602, LINK_REFUSED);
             return;
         }
         UUID threadId;
-        UUID observationId;
+        UUID linkedId;
         try {
             threadId = UUID.fromString(params.get("threadId").asString());
-            observationId = UUID.fromString(params.get("observationId").asString());
+            linkedId = UUID.fromString(params.get(idKey).asString());
         } catch (IllegalArgumentException ex) {
             sendCallbackError(idNode, -32602, LINK_REFUSED);
             return;
@@ -371,7 +375,7 @@ public final class MentorRunnerClient implements AutoCloseable {
             return;
         }
         try {
-            if (!linkObservationHandler.test(new LinkObservationRequest(threadId, observationId))) {
+            if (!linkHandler.test(new LinkRequest(threadId, kind, linkedId))) {
                 sendCallbackError(idNode, -32602, LINK_REFUSED);
                 return;
             }
@@ -379,12 +383,11 @@ public final class MentorRunnerClient implements AutoCloseable {
             response.put("jsonrpc", "2.0");
             response.set("id", idNode != null ? idNode : objectMapper.nullNode());
             // Echoed as asked, so the runner can match its own request exactly.
-            response.putObject("result")
-                    .put("observationId", params.get("observationId").asString());
+            response.putObject("result").put(idKey, params.get(idKey).asString());
             sandbox.send(response);
         } catch (RuntimeException e) {
-            log.warn("link_observation callback failed: {}", e.getMessage(), e);
-            sendCallbackError(idNode, -32000, "link_observation could not be checked; nothing was shown");
+            log.warn("{} callback failed: {}", kind.method(), e.getMessage(), e);
+            sendCallbackError(idNode, -32000, kind.method() + " could not be checked; nothing was shown");
         }
     }
 
@@ -405,12 +408,34 @@ public final class MentorRunnerClient implements AutoCloseable {
     /** Server-callback request from the runner. */
     public record FetchContextRequest(UUID threadId, String path) {}
 
-    /** The runner's request to show feedback about one observation; the handler answers whether it may. */
-    public record LinkObservationRequest(UUID threadId, UUID observationId) {}
+    /** What a link names: a practice result, or one located problem of a result. */
+    public enum LinkKind {
+        RESULT("link_result", "practiceResultId"),
+        OBSERVATION("link_observation", "observationId");
+
+        private final String method;
+        private final String idKey;
+
+        LinkKind(String method, String idKey) {
+            this.method = method;
+            this.idKey = idKey;
+        }
+
+        public String method() {
+            return method;
+        }
+
+        public String idKey() {
+            return idKey;
+        }
+    }
+
+    /** The runner's request to show feedback about one result or problem; the handler answers whether it may. */
+    public record LinkRequest(UUID threadId, LinkKind kind, UUID linkedId) {}
 
     static final String LINK_REFUSED =
-            "Nothing was shown: that is not an observation of theirs you can give feedback on. Use the id of an item"
-                    + " in prepared_conversation_feedback.json or observations_history.json exactly as written.";
+            "Nothing was shown: that is not a result of theirs you can give feedback on. Use the id of an item"
+                    + " in prepared_conversation_feedback.json or results_history.json exactly as written.";
 
     private record PendingCall(CompletableFuture<JsonNode> future, ScheduledFuture<?> timeoutTask, String method) {}
 }

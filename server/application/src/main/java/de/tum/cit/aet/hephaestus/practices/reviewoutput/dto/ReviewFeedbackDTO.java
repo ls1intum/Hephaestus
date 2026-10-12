@@ -54,8 +54,8 @@ public record ReviewFeedbackDTO(
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean bodyTruncated,
 
-        @NonNull @Schema(description = "Number of observations used to compose the feedback")
-        Long observationCount) {
+        @NonNull @Schema(description = "Number of results used to compose the feedback")
+        Long practiceResultCount) {
     public static ReviewFeedbackDTO from(
             OperatorFeedbackRow row, @Nullable ReviewedWorkRefDTO reviewedWork, Map<Long, ReviewSubjectDTO> subjects) {
         return new ReviewFeedbackDTO(
@@ -73,6 +73,6 @@ public record ReviewFeedbackDTO(
                 row.getDeliveredAt(),
                 row.getBodyPreview(),
                 Boolean.TRUE.equals(row.getBodyTruncated()),
-                row.getObservationCount());
+                row.getPracticeResultCount());
     }
 }

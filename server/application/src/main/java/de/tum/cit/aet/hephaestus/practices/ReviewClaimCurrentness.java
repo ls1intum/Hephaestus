@@ -7,12 +7,11 @@ import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
 @Schema(
-        description =
-                "Whether an observation's claim still stands: its practice's review rules are unchanged and it was"
-                        + " not superseded, which an issue's observations are when a change to its reviewable content is"
-                        + " recorded. It says neither whether a later review ran nor whether the work changed since it was"
-                        + " reviewed. Earlier observation standards and missing fingerprints are unverifiable under the"
-                        + " current whole-practice standard")
+        description = "Whether a result's claim still stands: its practice's review rules are unchanged and it was"
+                + " not superseded, which an issue's results are when a change to its reviewable content is"
+                + " recorded. It says neither whether a later review ran nor whether the work changed since it was"
+                + " reviewed. Earlier result standards and missing fingerprints are unverifiable under the"
+                + " current whole-practice standard")
 public enum ReviewClaimCurrentness {
     CURRENT,
     STALE,

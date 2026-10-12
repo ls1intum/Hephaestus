@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
  * Identifier of a family of reviewable artifacts, e.g. {@code scm.pull_request}. Core owns the grammar
  * and enforcement; the domain-owning module owns the meaning. Kinds are vendor-neutral so one practice
  * holds across every provider of a domain, and are the only name for what a practice observes, what an
- * agent job is about, and what an observation is filed against — a second per-module vocabulary would
+ * agent job is about, and what a result is filed against — a second per-module vocabulary would
  * drift.
  *
  * <p>The grammar is narrower than "any string" because these values are persisted and outlive the code

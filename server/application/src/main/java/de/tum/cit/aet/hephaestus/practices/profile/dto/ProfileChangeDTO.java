@@ -23,7 +23,7 @@ public record ProfileChangeDTO(
 
         @NonNull
         @Schema(
-                description = "When it changed: the observation, the run that composed the feedback, or the"
+                description = "When it changed: the result, the run that composed the feedback, or the"
                         + " response that did it")
         Instant at,
 
@@ -81,7 +81,7 @@ public record ProfileChangeDTO(
         TREND_TURNED,
         /** The group's standing is not what it was before the previous run. */
         GROUP_MOVED,
-        /** The practice recorded its first observation about the developer. */
+        /** The practice recorded its first result about the developer. */
         FIRST_OBSERVED,
     }
 

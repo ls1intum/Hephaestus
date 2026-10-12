@@ -24,33 +24,34 @@ import tools.jackson.databind.ObjectMapper;
     "feedback_dispatch",
     "reaction",
     "feedback_placement",
-    "feedback_observation",
+    "feedback_evidence",
     "feedback_approval",
     "feedback_withdrawal",
-    "observation_invalidation",
+    "practice_result_invalidation",
     "feedback",
-    "observation",
+    "practice_observation",
+    "practice_result",
     "feedback_approval_actor",
     "feedback_withdrawal_actor",
     "feedback_restoration_actor",
-    "observation_invalidation_actor",
-    "observation_restoration_actor"
+    "practice_result_invalidation_actor",
+    "practice_result_restoration_actor"
 })
 public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConversationCopySource {
-    // Observations and feedback belong to the developer they are about. Rows about another developer
+    // Results and feedback belong to the developer they are about. Rows about another developer
     // stay even when they derive from shared work; the agent and evidence catalogs erase hidden copies.
-    private static final String OBSERVATION_IDS = "SELECT id FROM observation WHERE about_user_id = ANY(:users)";
+    private static final String RESULT_IDS = "SELECT id FROM practice_result WHERE about_user_id = ANY(:users)";
     private static final String FEEDBACK_IDS =
             "SELECT id FROM feedback WHERE about_user_id = ANY(:users) OR recipient_user_id = ANY(:users)"
-                    + " OR id IN (SELECT feedback_id FROM feedback_observation WHERE observation_id IN ("
-                    + OBSERVATION_IDS + "))";
+                    + " OR id IN (SELECT feedback_id FROM feedback_evidence WHERE practice_result_id IN ("
+                    + RESULT_IDS + "))";
     private static final String JOB_IDS =
             """
             SELECT j.id FROM agent_job j
             WHERE j.metadata->>'author_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
             OR j.metadata->>'actor_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
             OR j.metadata->>'about_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
-            """ + " OR j.id IN (SELECT agent_job_id FROM observation WHERE id IN (" + OBSERVATION_IDS
+            """ + " OR j.id IN (SELECT agent_job_id FROM practice_result WHERE id IN (" + RESULT_IDS
                     + ")) OR j.id IN (SELECT agent_job_id FROM feedback WHERE id IN (" + FEEDBACK_IDS + "))";
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -127,11 +128,11 @@ public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConv
                 new JdbcPersonDataStore(
                         jdbc,
                         mapper,
-                        "feedback_observation",
-                        "feedback_observation",
+                        "feedback_evidence",
+                        "feedback_evidence",
                         "t.feedback_id IN (" + FEEDBACK_IDS + ")",
-                        "feedback_id,observation_id,role,ordinal",
-                        "feedback_id,observation_id",
+                        "id,workspace_id,feedback_id,practice_result_id,observation_id,role,ordinal",
+                        "id",
                         "",
                         -190),
                 new JdbcPersonDataStore(
@@ -157,10 +158,10 @@ public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConv
                 new JdbcPersonDataStore(
                         jdbc,
                         mapper,
-                        "observation_invalidation",
-                        "observation_invalidation",
-                        "t.observation_id IN (" + OBSERVATION_IDS + ")",
-                        "id,invalidated_at,invalidated_by_account_id,observation_id,provider_copy,provider_copy_retry_at,reason,restoration_reason,restored_at,restored_by_account_id,workspace_id",
+                        "practice_result_invalidation",
+                        "practice_result_invalidation",
+                        "t.practice_result_id IN (" + RESULT_IDS + ")",
+                        "id,invalidated_at,invalidated_by_account_id,practice_result_id,provider_copy,provider_copy_retry_at,reason,restoration_reason,restored_at,restored_by_account_id,workspace_id",
                         "id",
                         "",
                         -180),
@@ -177,10 +178,20 @@ public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConv
                 new JdbcPersonDataStore(
                         jdbc,
                         mapper,
-                        "observation",
-                        "observation",
-                        "t.id IN (" + OBSERVATION_IDS + ")",
-                        "id,occurrence_key,agent_job_id,practice_id,artifact_kind,artifact_id,about_user_id,summary,outcome,severity,evidence,evidence_rationale,observed_at,recurrence_key,practice_revision_id,origin,workspace_id,superseded_at",
+                        "practice_observation",
+                        "practice_observation",
+                        "t.practice_result_id IN (" + RESULT_IDS + ")",
+                        "id,workspace_id,practice_result_id,position,observation_key,severity,summary,explanation,citations,basis,next_step,recurrence_key",
+                        "id",
+                        "",
+                        -155),
+                new JdbcPersonDataStore(
+                        jdbc,
+                        mapper,
+                        "practice_result",
+                        "practice_result",
+                        "t.id IN (" + RESULT_IDS + ")",
+                        "id,occurrence_key,agent_job_id,practice_id,artifact_kind,artifact_id,about_user_id,summary,outcome,severity,evidence,evidence_rationale,observed_at,practice_revision_id,origin,workspace_id,superseded_at,scope_key,example,coverage,provenance",
                         "id",
                         "",
                         -150),
@@ -217,20 +228,20 @@ public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConv
                 new JdbcPersonDataStore(
                         jdbc,
                         mapper,
-                        "observation_invalidation_actor",
-                        "observation_invalidation",
+                        "practice_result_invalidation_actor",
+                        "practice_result_invalidation",
                         "t.invalidated_by_account_id = :account",
-                        "id,observation_id,workspace_id,invalidated_by_account_id,invalidated_at,reason",
+                        "id,practice_result_id,workspace_id,invalidated_by_account_id,invalidated_at,reason",
                         "id",
                         "invalidated_by_account_id=NULL,reason='Erased administrator text'",
                         -185),
                 new JdbcPersonDataStore(
                         jdbc,
                         mapper,
-                        "observation_restoration_actor",
-                        "observation_invalidation",
+                        "practice_result_restoration_actor",
+                        "practice_result_invalidation",
                         "t.restored_by_account_id = :account",
-                        "id,observation_id,workspace_id,restored_by_account_id,restored_at,restoration_reason",
+                        "id,practice_result_id,workspace_id,restored_by_account_id,restored_at,restoration_reason",
                         "id",
                         "restored_by_account_id=NULL,restoration_reason=NULL",
                         -185));

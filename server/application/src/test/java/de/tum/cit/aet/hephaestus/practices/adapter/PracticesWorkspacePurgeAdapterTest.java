@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,7 +28,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     private FeedbackDispatchRepository dispatchRepository;
 
     @Mock
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Mock
     private PracticeRepository practiceRepository;
@@ -44,7 +44,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
                 evaluationRepository,
                 dispatchRepository,
                 feedbackRepository,
-                observationRepository,
+                practiceResultRepository,
                 practiceRepository,
                 practiceGroupRepository);
     }
@@ -62,13 +62,13 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
                 evaluationRepository,
                 dispatchRepository,
                 feedbackRepository,
-                observationRepository,
+                practiceResultRepository,
                 practiceRepository,
                 practiceGroupRepository);
         inOrder.verify(evaluationRepository).deleteAllByWorkspaceId(workspaceId);
         inOrder.verify(dispatchRepository).deleteAllByWorkspaceId(workspaceId);
         inOrder.verify(feedbackRepository).deleteAllByWorkspaceId(workspaceId);
-        inOrder.verify(observationRepository).deleteAllByPracticeWorkspaceId(workspaceId);
+        inOrder.verify(practiceResultRepository).deleteAllByPracticeWorkspaceId(workspaceId);
         inOrder.verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
         inOrder.verify(practiceGroupRepository).deleteAllByWorkspaceId(workspaceId);
     }

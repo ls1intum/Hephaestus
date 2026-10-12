@@ -1,11 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser;
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -54,11 +51,11 @@ class PiResultParserTest extends BaseUnitTest {
     @ValueSource(
             strings = {
                 "",
-                "{\"observations\":[]}",
-                "{\"summary\":\"no observations\"}",
-                "Saved:\n{\"observations\":[{\"practiceSlug\":\"x\"}]}",
-                "{\"observations\":[{\"practiceSlug\":\"x\"}]}\nDone.",
-                "{\"observations\":[{\"summary\":\"\\(error)\"}]}"
+                "{\"results\":[]}",
+                "{\"summary\":\"no results\"}",
+                "Saved:\n{\"results\":[{\"practiceSlug\":\"x\"}]}",
+                "{\"results\":[{\"practiceSlug\":\"x\"}]}\nDone.",
+                "{\"results\":[{\"summary\":\"\\(error)\"}]}"
             })
     @DisplayName("a run with no result and no usable review state is not a success, even when it exits cleanly")
     void noUsableResultIsNotASuccess(String reviewState) {
@@ -78,29 +75,34 @@ class PiResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    void rebuildsFromReviewState() {
+    void shouldAssembleTheAdmissionBodyWhenOnlyTheReviewStateIsLeft() {
         String reviewState = """
-            {"observations":[{"practiceSlug":"x","summary":"t","outcome": "NOT_MET","severity":"MAJOR",
-            "evidence":{"citations":[]},"evidenceRationale":"r"}]}""";
+            {"schemaVersion":2,"results":[{"practiceSlug":"x","candidate":{"outcome":"MET","summary":"t",\
+            "explanation":"r","citations":[]}}]}""";
         var result = parser.parse(new SandboxResult(
                 1,
                 Map.of("review-state.json", reviewState.getBytes(StandardCharsets.UTF_8)),
                 "runner failed",
                 false,
                 Duration.ofSeconds(10)));
-        String raw = rawOutput(result).toString();
-        assertThat(raw).contains("\"x\"").contains("\"NOT_MET\"");
+
+        JsonMapper mapper = JsonMapper.builder().build();
+        JsonNode assembled = mapper.readTree(rawOutput(result).toString());
+        assertThat(result.success()).isFalse();
+        assertThat(assembled.path("schemaVersion").asInt()).isEqualTo(2);
+        assertThat(assembled.path("results"))
+                .isEqualTo(mapper.readTree(reviewState).path("results"));
     }
 
     @Test
-    @DisplayName("keeps the runner's serialized result exactly, and its observations read back verbatim")
+    @DisplayName("keeps the runner's serialized result exactly, and its results read back verbatim")
     void keepsNativeJsonExactly() {
         // As JSON.stringify writes it: escaped quotes, a backslash pair before a Swift interpolation, a newline.
         String nativeJson = """
-                {"observations":[{"practiceSlug":"silent-failure","summary":"Catch says \\"ok\\"",\
-                "outcome":"NOT_MET","severity":"MAJOR","evidence":{"citations":[{"path":"App/Weather.swift",\
-                "quote":"Text(\\"\\\\(weather.temp)°\\")"}]},\
-                "evidenceRationale":"print(\\"Error: \\\\(error)\\")\\nC:\\\\temp"}]}""";
+                {"schemaVersion":2,"results":[{"practiceSlug":"silent-failure","candidate":{"outcome":"NOT_MET",\
+                "summary":"Catch says \\"ok\\"","explanation":"print(\\"Error: \\\\(error)\\")\\nC:\\\\temp",\
+                "citations":[],"problems":[{"severity":"MAJOR","summary":"s","explanation":"e",\
+                "citations":[{"path":"App/Weather.swift","quote":"Text(\\"\\\\(weather.temp)°\\")"}]}]}}]}""";
 
         var result = parser.parse(new SandboxResult(
                 0, Map.of("result.json", nativeJson.getBytes(UTF_8)), "done", false, Duration.ofSeconds(10)));
@@ -108,27 +110,39 @@ class PiResultParserTest extends BaseUnitTest {
         assertThat(result.success()).isTrue();
         assertThat(rawOutput(result)).isEqualTo(nativeJson);
         JsonMapper mapper = JsonMapper.builder().build();
-        var parsed = new ReviewResultParser(mapper)
-                .parseObservations(mapper.readTree(rawOutput(result).toString()).get("observations"));
-        assertThat(parsed.discarded()).isEmpty();
-        ValidatedObservation observation = parsed.validObservations().getFirst();
-        assertThat(observation.summary()).isEqualTo("Catch says \"ok\"");
-        assertThat(observation.evidenceRationale()).isEqualTo("print(\"Error: \\(error)\")\nC:\\temp");
-        JsonNode evidence = requireNonNull(observation.evidence());
-        assertThat(evidence.path("citations").get(0).path("quote").asString()).isEqualTo("Text(\"\\(weather.temp)°\")");
+        JsonNode candidate = mapper.readTree(rawOutput(result).toString())
+                .path("results")
+                .path(0)
+                .path("candidate");
+        assertThat(candidate.path("summary").asString()).isEqualTo("Catch says \"ok\"");
+        assertThat(candidate.path("explanation").asString()).isEqualTo("print(\"Error: \\(error)\")\nC:\\temp");
+        JsonNode citation = candidate.path("problems").path(0).path("citations").path(0);
+        assertThat(citation.path("quote").asString()).isEqualTo("Text(\"\\(weather.temp)°\")");
+    }
+
+    /** A composition continuation submits nothing and runs no program, so it writes no execution report. */
+    @Test
+    void shouldAcceptAnEmptySubmissionWhenAContinuationWritesNoReport() {
+        String empty = "{\"schemaVersion\":2,\"results\":[]}";
+
+        var result = parser.parse(new SandboxResult(
+                0, Map.of("result.json", empty.getBytes(UTF_8)), "done", false, Duration.ofSeconds(10)));
+
+        assertThat(result.success()).isTrue();
+        assertThat(rawOutput(result)).isEqualTo(empty);
     }
 
     @Test
     @DisplayName("a malformed result is not rescued by the backup, and the run's other artifacts are kept")
     void malformedResultKeepsOtherArtifacts() {
         String reviewState = """
-            {"observations":[{"practiceSlug":"x","summary":"t","outcome":"MET","severity":null,
-            "evidence":{"citations":[]},"evidenceRationale":"r"}]}""";
+            {"schemaVersion":2,"results":[{"practiceSlug":"x","candidate":{"outcome":"MET","summary":"t",
+            "explanation":"r","citations":[]}}]}""";
         var result = parser.parse(new SandboxResult(
                 0,
                 Map.of(
                         "result.json",
-                        "Result:\n{\"observations\":[]}".getBytes(UTF_8),
+                        "Result:\n{\"results\":[]}".getBytes(UTF_8),
                         "review-state.json",
                         reviewState.getBytes(UTF_8),
                         "usage.json",
@@ -147,14 +161,14 @@ class PiResultParserTest extends BaseUnitTest {
     @ParameterizedTest
     @ValueSource(
             strings = {
-                "Here:\n{\"observations\":[]}",
-                "```json\n{\"observations\":[]}\n```",
-                "{\"observations\":[]}\nDone.",
-                "{\"observations\":[{\"summary\":\"\\(error)\"}]}",
-                "{\"summary\":\"no observations\"}",
+                "Here:\n{\"results\":[]}",
+                "```json\n{\"results\":[]}\n```",
+                "{\"results\":[]}\nDone.",
+                "{\"results\":[{\"summary\":\"\\(error)\"}]}",
+                "{\"summary\":\"no results\"}",
                 "[]"
             })
-    @DisplayName("refuses a result that is not one serialized object with observations, and repairs nothing")
+    @DisplayName("refuses a result that is not one serialized object with results, and repairs nothing")
     void refusesMalformedResult(String malformed) {
         var result = parser.parse(new SandboxResult(
                 0, Map.of("result.json", malformed.getBytes(UTF_8)), "done", false, Duration.ofSeconds(10)));
@@ -169,9 +183,9 @@ class PiResultParserTest extends BaseUnitTest {
 
     @Test
     void surfacesUsageAndRunnerDebug() {
-        String observations =
-                "{\"observations\":[{\"practiceSlug\":\"t\",\"title\":\"x\",\"presence\":\"PRESENT\",\"assessment\":\"GOOD\","
-                        + "\"severity\":\"INFO\",\"confidence\":0.9}]}";
+        String practiceResults =
+                "{\"schemaVersion\":2,\"results\":[{\"practiceSlug\":\"t\",\"candidate\":{\"outcome\":\"MET\","
+                        + "\"summary\":\"x\",\"explanation\":\"y\",\"citations\":[]}}]}";
         String usage = "{\"model\":\"m\",\"inputTokens\":10,\"outputTokens\":5,\"cacheReadTokens\":20,"
                 + "\"costUsd\":0.12,\"totalCalls\":2}";
         String debug = "{\"attempts\":[],\"usageTotals\":{\"totalCalls\":2}}";
@@ -179,7 +193,7 @@ class PiResultParserTest extends BaseUnitTest {
                 0,
                 Map.of(
                         "result.json",
-                        observations.getBytes(UTF_8),
+                        practiceResults.getBytes(UTF_8),
                         "usage.json",
                         usage.getBytes(UTF_8),
                         "runner-debug.json",
@@ -288,11 +302,11 @@ class PiResultParserTest extends BaseUnitTest {
 
     @Test
     void zeroCallsUsageIgnored() {
-        String observations = "{\"observations\":[]}";
+        String practiceResults = "{\"results\":[]}";
         String usage = "{\"model\":\"m\",\"totalCalls\":0}";
         var result = parser.parse(new SandboxResult(
                 0,
-                Map.of("result.json", observations.getBytes(UTF_8), "usage.json", usage.getBytes(UTF_8)),
+                Map.of("result.json", practiceResults.getBytes(UTF_8), "usage.json", usage.getBytes(UTF_8)),
                 "done",
                 false,
                 Duration.ofSeconds(10)));

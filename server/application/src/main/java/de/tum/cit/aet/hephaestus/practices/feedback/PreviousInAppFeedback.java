@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.FeedbackClosure;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackEvidence;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +70,7 @@ public class PreviousInAppFeedback {
             return Optional.empty();
         }
         Feedback feedback = previous.getFirst();
-        Map<UUID, List<Observation>> evidence =
+        Map<UUID, List<PracticeResult>> evidence =
                 feedbackEvidence.visibleEvidence(workspaceId, List.of(feedback.getId()));
         Map<UUID, Instant> practiceChangedAt = feedbackEvidence.practiceChangedAt(evidence);
         Instant byWork = feedbackEvidence

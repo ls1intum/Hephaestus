@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.profile;
 
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.PracticeProfileOverviewDTO;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;

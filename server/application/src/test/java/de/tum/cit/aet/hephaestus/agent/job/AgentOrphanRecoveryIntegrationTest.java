@@ -17,8 +17,8 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
-import de.tum.cit.aet.hephaestus.agent.handler.AdmittedObservationFixtures;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
@@ -34,11 +34,11 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
@@ -118,7 +118,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -335,10 +335,10 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("an orphan whose observations were admitted fails with them kept, after its practice changed")
-    void shouldFailWithTheAdmittedObservationsKeptWhenTheOwningWorkerIsLostAfterAdmission() {
+    @DisplayName("an orphan whose results were admitted fails with them kept, after its practice changed")
+    void shouldFailWithTheAdmittedResultsKeptWhenTheOwningWorkerIsLostAfterAdmission() {
         UUID jobId = runningJobOwnedBy("dead-replica-6", Instant.now().minus(Duration.ofMinutes(5)), 0);
-        Observation observed = admitWithObservation(jobId);
+        PracticeResult observed = admitWithResult(jobId);
         changePracticeDefinition();
         registerStaleWorker("dead-replica-6");
         AgentJob before = jobRepository.findById(jobId).orElseThrow();
@@ -347,12 +347,13 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         AgentJob failed = jobRepository.findById(jobId).orElseThrow();
         assertThat(failed.getStatus()).isEqualTo(AgentJobStatus.FAILED);
-        assertThat(failed.getErrorMessage()).isEqualTo(ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION);
+        assertThat(failed.getErrorMessage()).isEqualTo(ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
         assertThat(failed.getRetryCount()).isZero();
         assertThat(failed.getJobTokenHash()).isEqualTo(before.getJobTokenHash());
         assertThat(failed.getMetadata()).isEqualTo(before.getMetadata());
         assertThat(failed.getEvidenceSnapshot()).isEqualTo(before.getEvidenceSnapshot());
-        Observation kept = observationRepository.findById(observed.getId()).orElseThrow();
+        PracticeResult kept =
+                practiceResultRepository.findById(observed.getId()).orElseThrow();
         assertThat(kept.getAgentJobId()).isEqualTo(jobId);
         PracticeRevision originalRevision = requireNonNull(observed.getPracticeRevision());
         Long originalRevisionId = requireNonNull(originalRevision.getId());
@@ -372,7 +373,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     @DisplayName("requeueOrphan refuses an admitted attempt in SQL, and only its owner's attempt can end it")
     void shouldRefuseToRequeueAnAdmittedAttemptWhenAnyCallerTries() {
         UUID admitted = runningJobOwnedBy("owner", Instant.now(), 0);
-        admitWithObservation(admitted);
+        admitWithResult(admitted);
         UUID unadmitted = runningJobOwnedBy("owner", Instant.now(), 0);
 
         String token = AgentJob.generateJobToken();
@@ -400,7 +401,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
             "a lost admitted review whose original inputs are vouched for continues as one writer of its admission")
     void shouldContinueALostAdmittedReviewUnderItsOriginalAdmissionAsANewAttempt() {
         UUID jobId = runningJobOwnedBy("dead-replica-9", Instant.now().minus(Duration.ofMinutes(5)), 0);
-        Observation observed = admitWithObservation(jobId);
+        PracticeResult observed = admitWithResult(jobId);
         keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
         spentBeforeItWasLost(jobId, 3);
         registerStaleWorker("dead-replica-9");
@@ -415,9 +416,9 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         // The admission and the evidence it was verified against are the original attempt's, untouched.
         assertThat(continuing.getMetadata()).isEqualTo(before.getMetadata());
         assertThat(continuing.getEvidenceSnapshot()).isEqualTo(before.getEvidenceSnapshot());
-        assertThat(ObservationAdmissionService.isContinuation(continuing)).isTrue();
-        assertThat(ObservationAdmissionService.citationAttempt(continuing)).isZero();
-        assertThat(observationRepository.findById(observed.getId())).isPresent();
+        assertThat(ResultAdmissionService.isContinuation(continuing)).isTrue();
+        assertThat(ResultAdmissionService.citationAttempt(continuing)).isZero();
+        assertThat(practiceResultRepository.findById(observed.getId())).isPresent();
         // The lost attempt is settled as itself; the new attempt starts from nothing.
         assertThat(continuing.getLlmTotalCalls()).isZero();
         assertThat(jdbc.queryForList(
@@ -455,7 +456,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     @DisplayName("a lost admitted review whose original inputs cannot be vouched for fails as before")
     void shouldFailTheLostAdmittedReviewWhenItsOriginalInputsCannotBeContinued(String why) {
         UUID jobId = runningJobOwnedBy("dead-replica-10", Instant.now().minus(Duration.ofMinutes(5)), 0);
-        admitWithObservation(jobId);
+        admitWithResult(jobId);
         Instant fresh = Instant.now().plus(Duration.ofHours(1));
         switch (why) {
             case "erased receipt" -> keepOriginalInputs(jobId, 0, "ERASE_REQUESTED", "COMPLETE", fresh);
@@ -475,7 +476,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 // Admitted before the admitting attempt was recorded: nothing says whose citations these were.
                 jdbc.update(
                         "UPDATE agent_job SET metadata = metadata - CAST(? AS text) WHERE id = ?",
-                        ObservationAdmissionService.ATTEMPT_METADATA_KEY,
+                        ResultAdmissionService.ATTEMPT_METADATA_KEY,
                         jobId);
             }
         }
@@ -487,7 +488,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         AgentJob failed = jobRepository.findById(jobId).orElseThrow();
         assertThat(failed.getStatus()).isEqualTo(AgentJobStatus.FAILED);
-        assertThat(failed.getErrorMessage()).isEqualTo(ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION);
+        assertThat(failed.getErrorMessage()).isEqualTo(ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
         assertThat(failed.getRetryCount()).isZero();
         assertThat(failed.getJobTokenHash()).isEqualTo(before.getJobTokenHash());
         assertThat(jdbc.queryForList(
@@ -509,17 +510,17 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 committed,
                 job -> job.setMetadata(objectMapper
                         .createObjectNode()
-                        .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted-digest")));
+                        .put(ResultAdmissionService.DIGEST_METADATA_KEY, "admitted-digest")));
 
         AgentJob after = jobRepository.findById(jobId).orElseThrow();
         if (committed) {
             assertThat(after.getStatus()).isEqualTo(AgentJobStatus.FAILED);
             assertThat(after.getRetryCount()).isZero();
-            assertThat(ObservationAdmissionService.isAdmitted(after)).isTrue();
+            assertThat(ResultAdmissionService.isAdmitted(after)).isTrue();
         } else {
             assertThat(after.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
             assertThat(after.getRetryCount()).isEqualTo(1);
-            assertThat(ObservationAdmissionService.isAdmitted(after)).isFalse();
+            assertThat(ResultAdmissionService.isAdmitted(after)).isFalse();
         }
     }
 
@@ -583,12 +584,12 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * An admission as it is persisted: an observation of a practice revision, citing this job's capture,
+     * An admission as it is persisted: a result of a practice revision, citing this job's capture,
      * and the digest on the job's metadata.
      */
-    private Observation admitWithObservation(UUID jobId) {
+    private PracticeResult admitWithResult(UUID jobId) {
         UUID id = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
+        practiceResultRepository.insertIfAbsent(
                 id,
                 "occurrence-" + id,
                 jobId,
@@ -598,12 +599,15 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 "scm.pull_request",
                 42L,
                 developer.getId(),
-                "Observation title",
+                "Result title",
                 "NOT_MET",
                 "MAJOR",
-                AdmittedObservationFixtures.evidence(
+                AdmittedResultFixtures.evidence(
                                 jobId, "scm.pull-request.core", "context/metadata.json", "metadata.json", "example")
                         .toString(),
+                null,
+                "test-scope",
+                null,
                 null,
                 null,
                 Instant.now(),
@@ -613,14 +617,14 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
             job.setMetadata(objectMapper
                     .createObjectNode()
                     .put("pull_request_id", 42)
-                    .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted-digest")
-                    .put(ObservationAdmissionService.ATTEMPT_METADATA_KEY, job.getRetryCount()));
+                    .put(ResultAdmissionService.DIGEST_METADATA_KEY, "admitted-digest")
+                    .put(ResultAdmissionService.ATTEMPT_METADATA_KEY, job.getRetryCount()));
             job.setEvidenceSnapshot(objectMapper
                     .createObjectNode()
                     .set("manifest", objectMapper.createObjectNode().put("contractVersion", "1.2.0")));
             jobRepository.saveAndFlush(job);
         });
-        return observationRepository.findById(id).orElseThrow();
+        return practiceResultRepository.findById(id).orElseThrow();
     }
 
     /**

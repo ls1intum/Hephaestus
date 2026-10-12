@@ -9,11 +9,11 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository.PostedCopy;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation.ProviderCopy;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation.ProviderCopy;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -28,14 +28,14 @@ import org.springframework.stereotype.Component;
 
 /**
  * Brings the comments Hephaestus already posted in line with a correction. A summary comment is edited in place
- * to open with a correction notice naming every practice whose observation behind it is invalidated, and back to
+ * to open with a correction notice naming every practice whose result behind it is invalidated, and back to
  * its original text once none is; the stored feedback never changes. Inline comments have no edit path, so a
  * correction that still has one reports it instead of claiming the work shows the correction.
  */
 @Component
 @ConditionalOnServerRole
 @RequiredArgsConstructor
-@WorkspaceAgnostic("Each correction reloads its observation, feedback and job through the row's tenant key")
+@WorkspaceAgnostic("Each correction reloads its result, feedback and job through the row's tenant key")
 class PostedCopyCorrector {
 
     private static final Logger log = LoggerFactory.getLogger(PostedCopyCorrector.class);
@@ -43,22 +43,22 @@ class PostedCopyCorrector {
     private static final Duration MIN_BACKOFF = Duration.ofMinutes(1);
     private static final Duration MAX_BACKOFF = Duration.ofHours(6);
 
-    private final ObservationInvalidationRepository invalidations;
-    private final ObservationRepository observations;
+    private final PracticeResultInvalidationRepository invalidations;
+    private final PracticeResultRepository practiceResults;
     private final FeedbackDispatchRepository dispatches;
     private final FeedbackPlacementRepository placements;
     private final AgentJobRepository jobs;
     private final PullRequestCommentPoster commentPoster;
 
     @Scheduled(fixedDelayString = "PT30S", initialDelayString = "PT20S")
-    @SchedulerLock(name = "observation-posted-copy-correction", lockAtMostFor = "PT15M", lockAtLeastFor = "PT5S")
+    @SchedulerLock(name = "practice-result-posted-copy-correction", lockAtMostFor = "PT15M", lockAtLeastFor = "PT5S")
     void settleDue() {
         settleDue(Instant.now());
     }
 
     /** Unresolved corrections stay due too, so a copy confirmed later is still corrected. */
     void settleDue(Instant now) {
-        for (ObservationInvalidation invalidation :
+        for (PracticeResultInvalidation invalidation :
                 invalidations.findDueProviderCopies(now, PageRequest.of(0, BATCH_SIZE))) {
             ProviderCopy outcome = null;
             try {
@@ -84,7 +84,7 @@ class PostedCopyCorrector {
     }
 
     /** Half the time the correction has been pending, from a minute up to six hours. */
-    static Duration backoff(ObservationInvalidation invalidation, Instant now) {
+    static Duration backoff(PracticeResultInvalidation invalidation, Instant now) {
         Instant restoredAt = invalidation.getRestoredAt();
         Instant pendingSince = restoredAt != null ? restoredAt : invalidation.getInvalidatedAt();
         Duration half = Duration.between(pendingSince, now).dividedBy(2);
@@ -93,16 +93,16 @@ class PostedCopyCorrector {
 
     /**
      * What became of the posted copies, or {@code null} while that is not known yet: a delivery citing the
-     * observation is unsettled, or an edit can only be retried. A write left unconfirmed past its window reads as
+     * result is unsettled, or an edit can only be retried. A write left unconfirmed past its window reads as
      * unresolved meanwhile, never as nothing posted.
      */
     @Nullable
-    ProviderCopy settle(ObservationInvalidation invalidation, Instant now) {
+    ProviderCopy settle(PracticeResultInvalidation invalidation, Instant now) {
         long workspaceId = invalidation.getWorkspaceId();
-        Observation observation = observations
-                .findByIdAndWorkspaceId(invalidation.getObservationId(), workspaceId)
+        PracticeResult practiceResult = practiceResults
+                .findByIdAndWorkspaceId(invalidation.getPracticeResultId(), workspaceId)
                 .orElse(null);
-        if (observation == null) {
+        if (practiceResult == null) {
             return null;
         }
         boolean inForce = invalidation.getRestoredAt() == null;
@@ -112,7 +112,7 @@ class PostedCopyCorrector {
         boolean unresolved = false;
         boolean inlineRemains = false;
         boolean touchedSummary = false;
-        for (PostedCopy copy : placements.findPostedCopies(workspaceId, observation.getId())) {
+        for (PostedCopy copy : placements.findPostedCopies(workspaceId, practiceResult.getId())) {
             if (copy.getPlacementType() != PlacementType.SUMMARY) {
                 // Confirmed posted, but with no id nothing can say whether it is still there.
                 unresolved |= inForce && copy.getCommentRef() == null;
@@ -126,13 +126,13 @@ class PostedCopyCorrector {
                 case UNSUPPORTED -> unresolved = true;
             }
         }
-        if (dispatches.existsUnsettledCiting(workspaceId, observation.getId())) {
-            Instant unconfirmedSince = dispatches.findUnconfirmedWriteSince(workspaceId, observation.getId());
+        if (dispatches.existsUnsettledCiting(workspaceId, practiceResult.getId())) {
+            Instant unconfirmedSince = dispatches.findUnconfirmedWriteSince(workspaceId, practiceResult.getId());
             boolean overdue = unconfirmedSince != null
                     && now.isAfter(unconfirmedSince.plus(PracticeFeedbackDispatchService.UNCONFIRMED_WINDOW));
             return inForce && (overdue || unresolved) ? ProviderCopy.UNRESOLVED : null;
         }
-        unresolved |= inForce && dispatches.existsUnconfirmedCiting(workspaceId, observation.getId());
+        unresolved |= inForce && dispatches.existsUnconfirmedCiting(workspaceId, practiceResult.getId());
         if (retry) {
             return null;
         }

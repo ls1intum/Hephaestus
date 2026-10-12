@@ -14,7 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryMan
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionService;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.Nested;
@@ -65,57 +65,50 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     }
 
     private JobTypeHandler prReviewHandler() {
-        var parser = new ReviewResultParser(objectMapper);
         return new PullRequestReviewHandler(
                 objectMapper,
                 preparation(practiceCatalogInjector()),
-                parser,
                 new FeedbackCompositionResultParser(),
                 deliveryService,
                 feedbackService,
                 mock(FeedbackResponseSuppressionFilter.class),
                 InContextDeliveryGateFixtures.gate(
-                        practiceRepository, mock(ObservationRepository.class), mock(FeedbackLedgerRecorder.class)),
-                mock(ObservationRepository.class),
+                        practiceRepository, mock(PracticeResultRepository.class), mock(FeedbackLedgerRecorder.class)),
+                mock(PracticeResultRepository.class),
                 mock(PublicReviewEligibility.class));
     }
 
     private JobTypeHandler issueReviewHandler() {
-        var parser = new ReviewResultParser(objectMapper);
         return new IssueReviewHandler(
                 objectMapper,
                 preparation(practiceCatalogInjector()),
-                parser,
                 new FeedbackCompositionResultParser(),
                 deliveryService,
                 InContextDeliveryGateFixtures.gate(
-                        practiceRepository, mock(ObservationRepository.class), mock(FeedbackLedgerRecorder.class)),
+                        practiceRepository, mock(PracticeResultRepository.class), mock(FeedbackLedgerRecorder.class)),
                 mock(FeedbackLedgerRecorder.class),
                 mock(PracticeFeedbackDeliveryPolicy.class),
                 mock(PracticeFeedbackCommentFormatter.class),
                 mock(FeedbackResponseSuppressionFilter.class),
-                mock(ObservationRepository.class),
+                mock(PracticeResultRepository.class),
                 mock(PracticeFeedbackDispatchService.class),
                 mock(FeedbackDeliveryService.class),
                 mock(PublicReviewEligibility.class));
     }
 
     private JobTypeHandler conversationReviewHandler() {
-        var parser = new ReviewResultParser(objectMapper);
         var practiceCatalogInjector = practiceCatalogInjector();
         return new ConversationReviewHandler(
                 objectMapper,
                 preparation(practiceCatalogInjector),
-                parser,
                 deliveryService,
                 mock(ApplicationEventPublisher.class),
                 mock(TransactionTemplate.class));
     }
 
     private JobTypeHandler documentReviewHandler() {
-        var parser = new ReviewResultParser(objectMapper);
         var practiceCatalogInjector = practiceCatalogInjector();
-        return new DocumentReviewHandler(objectMapper, preparation(practiceCatalogInjector), parser, deliveryService);
+        return new DocumentReviewHandler(objectMapper, preparation(practiceCatalogInjector), deliveryService);
     }
 
     /** A registry with the full handler set (every {@link AgentJobType} mapped). */

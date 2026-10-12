@@ -110,6 +110,10 @@ dependencies {
     }
 }
 
+// agent/work/ holds the toolkit link for editors and tests; the practice runtime creates the real
+// one.
+tasks.processResources { exclude("agent/work/**") }
+
 tasks.processTestResources {
     from(rootProject.file("../docs/db/archive/v0.77.4")) { into("db") }
 }

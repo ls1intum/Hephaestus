@@ -15,18 +15,18 @@ public interface ReviewRunNarrativeLookup {
     Map<UUID, ReviewRunNarrative> findByJobIds(long workspaceId, Collection<UUID> jobIds);
 
     /**
-     * @param nextStepByObservationId what the review wrote on the work about each observation by itself — the
+     * @param nextStepByResultId what the review wrote on the work about each result by itself — the
      *     note on a line it cites — whether or not the feedback carrying it was ever delivered. The developer's own
      *     page is the one surface silent mode does not gate, so what was written about their work reaches them there
      *     even when nothing was said on the work itself.
      */
-    record ReviewRunNarrative(Map<UUID, String> nextStepByObservationId) {
+    record ReviewRunNarrative(Map<UUID, String> nextStepByResultId) {
         public ReviewRunNarrative {
-            nextStepByObservationId = Map.copyOf(nextStepByObservationId);
+            nextStepByResultId = Map.copyOf(nextStepByResultId);
         }
 
-        public @Nullable String nextStepFor(UUID observationId) {
-            return nextStepByObservationId.get(observationId);
+        public @Nullable String nextStepFor(UUID practiceResultId) {
+            return nextStepByResultId.get(practiceResultId);
         }
     }
 }

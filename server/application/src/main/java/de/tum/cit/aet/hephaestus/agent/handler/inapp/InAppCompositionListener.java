@@ -12,8 +12,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousInAppFeedback;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,7 +34,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Prepares composed IN_APP feedback and resolves its eligible supporting observations.
+ * Prepares composed IN_APP feedback and resolves its eligible supporting results.
  *
  * <p>The asynchronous listener is the fast path. {@code FeedbackLanePreparationSweeper} retries
  * unmarked jobs within its recovery window, including jobs whose listener submission was rejected.
@@ -45,7 +45,7 @@ public class InAppCompositionListener {
     private static final Logger log = LoggerFactory.getLogger(InAppCompositionListener.class);
 
     private final AgentJobRepository agentJobRepository;
-    private final ObservationRepository observationRepository;
+    private final PracticeResultRepository practiceResultRepository;
     private final FeedbackCompositionResultParser resultParser;
     private final InAppFeedbackPreparer preparer;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
@@ -54,14 +54,14 @@ public class InAppCompositionListener {
 
     public InAppCompositionListener(
             AgentJobRepository agentJobRepository,
-            ObservationRepository observationRepository,
+            PracticeResultRepository practiceResultRepository,
             ObjectProvider<InAppSupportReader> supportReaders,
             FeedbackCompositionResultParser resultParser,
             InAppFeedbackPreparer preparer,
             PracticeFeedbackDeliveryPolicy deliveryPolicy,
             Clock clock) {
         this.agentJobRepository = agentJobRepository;
-        this.observationRepository = observationRepository;
+        this.practiceResultRepository = practiceResultRepository;
         this.resultParser = resultParser;
         this.preparer = preparer;
         this.deliveryPolicy = deliveryPolicy;
@@ -94,7 +94,7 @@ public class InAppCompositionListener {
         return prepare(agentJobId, agentJobId, workspaceId);
     }
 
-    /** Prepare source observations using a separate composition job's output. */
+    /** Prepare source results using a separate composition job's output. */
     public int prepare(UUID sourceJobId, UUID compositionJobId, Long workspaceId) {
         int prepared = route(sourceJobId, compositionJobId, workspaceId);
         agentJobRepository.markInAppPrepared(compositionJobId, clock.instant());
@@ -114,7 +114,7 @@ public class InAppCompositionListener {
         if (messages.isEmpty()) {
             return 0;
         }
-        List<Long> recipients = observationRepository.findSubjectUserIdsByAgentJobId(agentJobId, workspaceId);
+        List<Long> recipients = practiceResultRepository.findSubjectUserIdsByAgentJobId(agentJobId, workspaceId);
         // Stable recipient ordering preserves unique (agent_job_id, position) slots across retries.
         int positionBase = FeedbackLedgerRecorder.IN_APP_UNIT_ORDINAL_BASE;
         int prepared = 0;
@@ -168,7 +168,7 @@ public class InAppCompositionListener {
             InAppSupportReader.Selection selection =
                     reader.select(workspaceId, recipientUserId, message.practiceSlug(), now);
             Optional<PreviousInAppFeedback.Previous> previous = selection.previous();
-            List<Observation> evidence = selection.evidence();
+            List<PracticeResult> evidence = selection.evidence();
             InAppSupportReader.RoutingFacts facts =
                     reader.routingFacts(workspaceId, recipientUserId, message.practiceSlug(), evidence);
             InAppRoutingDecision decision = InAppFeedbackRouter.route(
@@ -180,7 +180,7 @@ public class InAppCompositionListener {
                         message.practiceSlug(),
                         agentJobId);
             }
-            // The card presents bound observations as examples of the problem, not the full review window.
+            // The card presents bound results as examples of the problem, not the full review window.
             routed.add(new InAppFeedbackPreparer.RoutedMessage(
                     message,
                     decision,

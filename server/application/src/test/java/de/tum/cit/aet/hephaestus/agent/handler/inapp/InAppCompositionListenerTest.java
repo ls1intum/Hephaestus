@@ -21,17 +21,17 @@ import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousInAppFeedback;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -54,22 +54,22 @@ class InAppCompositionListenerTest extends BaseUnitTest {
     private static final Instant NOW = Instant.parse("2026-10-07T08:00:00Z");
     private static final List<String> SLUGS = List.of("record-outcomes", "ship-tests");
     private final AgentJobRepository jobs = mock(AgentJobRepository.class);
-    private final ObservationRepository observations = mock(ObservationRepository.class);
+    private final PracticeResultRepository practiceResults = mock(PracticeResultRepository.class);
     private final FeedbackRepository feedback = mock(FeedbackRepository.class);
-    private final ObservationVisibilityPolicy visibility = mock(ObservationVisibilityPolicy.class);
+    private final ResultVisibilityPolicy visibility = mock(ResultVisibilityPolicy.class);
     private final WorkspaceReviewDefaultsProvider defaults = mock(WorkspaceReviewDefaultsProvider.class);
     private final FeedbackCompositionResultParser parser = mock(FeedbackCompositionResultParser.class);
     private final PracticeFeedbackDeliveryPolicy policy = mock(PracticeFeedbackDeliveryPolicy.class);
     private final PreviousInAppFeedback previous = mock(PreviousInAppFeedback.class);
     private final InAppFeedbackPreparer preparer = new InAppFeedbackPreparer(
-            feedback, mock(FeedbackObservationRepository.class), mock(FeedbackSupersession.class));
+            feedback, mock(FeedbackEvidenceRepository.class), mock(FeedbackSupersession.class));
     private final InAppCompositionListener listener = new InAppCompositionListener(
             jobs,
-            observations,
+            practiceResults,
             new StaticListableBeanFactory(Map.of(
                             "supportReader",
                             new InAppSupportReader(
-                                    observations,
+                                    practiceResults,
                                     visibility,
                                     previous,
                                     policy,
@@ -92,7 +92,7 @@ class InAppCompositionListenerTest extends BaseUnitTest {
         AgentJob output = new AgentJob();
         output.setId(outputId);
         when(jobs.findById(outputId)).thenReturn(Optional.of(output));
-        when(observations.findSubjectUserIdsByAgentJobId(source.getId(), WORKSPACE_ID))
+        when(practiceResults.findSubjectUserIdsByAgentJobId(source.getId(), WORKSPACE_ID))
                 .thenReturn(Arrays.asList(null, 21L, 22L, 23L));
         allow(source, 21L);
         refuse(source, 22L, FeedbackSuppressionReason.ARTIFACT_GONE);
@@ -128,7 +128,7 @@ class InAppCompositionListenerTest extends BaseUnitTest {
             names = {"RECIPIENT_OPTED_OUT", "ARTIFACT_GONE"})
     void shouldPrepareNothingWhenTheRecipientIsNoLongerEligible(FeedbackSuppressionReason reason) {
         AgentJob source = setup();
-        when(observations.findSubjectUserIdsByAgentJobId(source.getId(), WORKSPACE_ID))
+        when(practiceResults.findSubjectUserIdsByAgentJobId(source.getId(), WORKSPACE_ID))
                 .thenReturn(List.of(21L));
         refuse(source, 21L, reason);
 
@@ -186,27 +186,29 @@ class InAppCompositionListenerTest extends BaseUnitTest {
         when(defaults.forWorkspace(WORKSPACE_ID)).thenReturn(new WorkspaceReviewDefaults(PracticeAutonomy.AUTOMATIC));
         when(feedback.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         for (String slug : SLUGS) {
-            List<Observation> evidence = List.of(problem(1L), problem(2L));
-            when(observations.findRecentForSubjectAndPractice(eq(WORKSPACE_ID), eq(recipient), eq(slug), any(), any()))
+            List<PracticeResult> evidence = List.of(problem(1L), problem(2L));
+            when(practiceResults.findRecentForSubjectAndPractice(
+                            eq(WORKSPACE_ID), eq(recipient), eq(slug), any(), any()))
                     .thenReturn(evidence);
             when(visibility.permitsForNewDelivery(eq(WORKSPACE_ID), eq(evidence), any()))
-                    .thenReturn(evidence.stream().map(Observation::getId).collect(Collectors.toSet()));
-            ObservationRepository.ObservationPracticeAutonomy autonomy =
-                    mock(ObservationRepository.ObservationPracticeAutonomy.class);
+                    .thenReturn(evidence.stream().map(PracticeResult::getId).collect(Collectors.toSet()));
+            PracticeResultRepository.ResultPracticeAutonomy autonomy =
+                    mock(PracticeResultRepository.ResultPracticeAutonomy.class);
             when(autonomy.getPracticeAutonomy()).thenReturn(tier);
-            when(observations.findPracticeAutonomyFor(
-                            evidence.stream().map(Observation::getId).toList(), WORKSPACE_ID))
+            when(practiceResults.findPracticeAutonomyFor(
+                            evidence.stream().map(PracticeResult::getId).toList(), WORKSPACE_ID))
                     .thenReturn(List.of(autonomy));
         }
     }
 
-    private Observation problem(long artifact) {
-        return Observation.builder()
+    private PracticeResult problem(long artifact) {
+        return PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .agentJobId(UUID.randomUUID())
                 .artifactKind(ArtifactKinds.ISSUE)
                 .artifactId(artifact)
-                .origin(ObservationOrigin.LIVE)
+                .origin(ResultOrigin.LIVE)
                 .outcome(Outcome.NOT_MET)
                 .observedAt(NOW)
                 .build();

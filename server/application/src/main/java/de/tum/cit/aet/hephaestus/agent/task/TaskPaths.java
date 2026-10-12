@@ -44,6 +44,6 @@ public record TaskPaths(
                 SandboxLayout.PRACTICES_PREFIX + "index.json",
                 SandboxLayout.FEEDBACK_COMPOSITION_PATH,
                 SandboxLayout.HISTORY_PREFIX + "prepared.json",
-                SandboxLayout.PRACTICE_SCRIPT_PREFIX + "practices");
+                SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX.replaceFirst("/$", ""));
     }
 }

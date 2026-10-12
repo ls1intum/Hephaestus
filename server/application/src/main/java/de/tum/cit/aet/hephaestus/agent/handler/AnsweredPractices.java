@@ -14,12 +14,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.LatestRun;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.LatestRun;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -47,7 +47,7 @@ import tools.jackson.databind.node.MissingNode;
  * be answered: those two sources carry immutable identities ({@code base:head} and {@code commit:tree}) that survive
  * admission, while the description, metadata, comments, linked work and documents have no retained identity that
  * proves them unchanged. The proof is the producing run's own record — its status, the source states and
- * generated-path policy it staged, and the revision each observation was made under — never the catalogue now.
+ * generated-path policy it staged, and the revision each result was made under — never the catalogue now.
  * Anything unknown leaves the practice to be asked.
  */
 @Service
@@ -58,8 +58,8 @@ public class AnsweredPractices {
             Set.of(ScmSignals.PULL_REQUEST_SYNCHRONIZED.value(), ScmSignals.PULL_REQUEST_EDITED.value());
     private static final Set<SourceKind> CODE = Set.of(PullRequestContentSource.DIFF, RepositoryTreeContentSource.KIND);
 
-    private final ObservationRepository observations;
-    private final ObservationVisibilityPolicy visibility;
+    private final PracticeResultRepository practiceResults;
+    private final ResultVisibilityPolicy visibility;
     private final AgentJobRepository jobs;
     private final ObjectMapper mapper;
 
@@ -96,7 +96,7 @@ public class AnsweredPractices {
             return List.of();
         }
         long workspaceId = job.getWorkspace().getId();
-        List<Observation> latest = LatestRun.perClaim(observations.findStandingForWork(
+        List<PracticeResult> latest = LatestRun.perClaim(practiceResults.findStandingForWork(
                 workspaceId,
                 ArtifactKinds.PULL_REQUEST,
                 metadata.path("pull_request_id").asLong(),
@@ -108,24 +108,24 @@ public class AnsweredPractices {
         Map<UUID, AgentJobRepository.CapturedReviewedWorkRow> runs = jobs
                 .findCapturedReviewedWork(
                         workspaceId,
-                        latest.stream().map(Observation::getAgentJobId).collect(Collectors.toSet()))
+                        latest.stream().map(PracticeResult::getAgentJobId).collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(AgentJobRepository.CapturedReviewedWorkRow::getId, Function.identity()));
-        Map<Long, List<Observation>> claims = latest.stream()
+        Map<Long, List<PracticeResult>> claims = latest.stream()
                 .collect(Collectors.groupingBy(
-                        observation -> observation.getPractice().getId()));
+                        practiceResult -> practiceResult.getPractice().getId()));
         JsonNode current = mapper.valueToTree(manifest);
         JsonNode policy = mapper.readTree(generatedPaths);
         List<AnsweredPractice> answered = new ArrayList<>();
         for (Practice practice : candidates) {
-            List<Observation> claim = claims.getOrDefault(practice.getId(), List.of());
+            List<PracticeResult> claim = claims.getOrDefault(practice.getId(), List.of());
             @Nullable Long pinned = revisionId(practice.getCurrentRevision());
             if (claim.isEmpty() || pinned == null) {
                 continue;
             }
             boolean currentWord = claim.stream()
-                    .allMatch(observation -> permitted.contains(observation.getId())
-                            && Objects.equals(pinned, revisionId(observation.getPracticeRevision())));
+                    .allMatch(practiceResult -> permitted.contains(practiceResult.getId())
+                            && Objects.equals(pinned, revisionId(practiceResult.getPracticeRevision())));
             UUID producedBy = claim.getFirst().getAgentJobId();
             var run = runs.get(producedBy);
             if (currentWord && run != null && stagedTheSameCode(run, current, policy, practice)) {

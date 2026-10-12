@@ -32,7 +32,7 @@ public class FeedbackCompositionResultParser {
 
     private static final int MAX_PRACTICE_SLUG_LENGTH = 128;
 
-    private static final int MAX_OBSERVATION_ID_LENGTH = 64;
+    private static final int MAX_RESULT_ID_LENGTH = 64;
 
     public static final String INCOMPLETE_COMPOSITION_MESSAGE = "Some feedback could not be composed.";
 
@@ -104,7 +104,7 @@ public class FeedbackCompositionResultParser {
         if (units == null || !units.isArray()) {
             return List.of();
         }
-        Map<String, StagedObservation> observations = readObservations(payload.get("observations"));
+        Map<String, StagedResult> practiceResults = readResults(payload.get("results"));
         Set<PreparedTarget> preparedTargets = readPreparedTargets(payload.get("preparedTargets"));
 
         List<ComposedFeedbackUnit> parsed = new ArrayList<>();
@@ -114,7 +114,7 @@ public class FeedbackCompositionResultParser {
                 log.warn("Composition stage reported more than {} units; the tail was ignored", MAX_UNITS);
                 break;
             }
-            ComposedFeedbackUnit composed = read(unit, observations, preparedTargets);
+            ComposedFeedbackUnit composed = read(unit, practiceResults, preparedTargets);
             if (composed == null) {
                 continue;
             }
@@ -161,18 +161,18 @@ public class FeedbackCompositionResultParser {
         if (review == null || !review.isObject() || !onlyFields(review, "summary", "inline", "withheld")) {
             return null;
         }
-        Map<String, StagedObservation> observations = readObservations(stagedObservations);
+        Map<String, StagedResult> practiceResults = readResults(payload.get("results"));
         try {
             ComposedReview.Summary summary = null;
             JsonNode summaryNode = review.get("summary");
             if (summaryNode != null && !summaryNode.isNull()) {
-                summary = summaryOf(summaryNode, observations);
+                summary = summaryOf(summaryNode, practiceResults);
                 if (summary == null) return invalid("summary");
             }
             List<ComposedReview.InlineNote> inline = new ArrayList<>();
             Set<String> anchors = new HashSet<>();
             for (JsonNode note : listOf(review.get("inline"), ComposedReview.MAX_INLINE_NOTES)) {
-                ComposedReview.InlineNote read = inlineOf(note, observations);
+                ComposedReview.InlineNote read = inlineOf(note, practiceResults);
                 if (read == null
                         || !anchors.add(read.anchor().observationId()
                                 + '#'
@@ -183,7 +183,7 @@ public class FeedbackCompositionResultParser {
             }
             List<ComposedReview.Withheld> withheld = new ArrayList<>();
             for (JsonNode decision : listOf(review.get("withheld"), Integer.MAX_VALUE)) {
-                ComposedReview.Withheld read = withheldOf(decision, observations);
+                ComposedReview.Withheld read = withheldOf(decision, practiceResults);
                 if (read == null) return invalid("withholding decision");
                 withheld.add(read);
             }
@@ -193,7 +193,7 @@ public class FeedbackCompositionResultParser {
             if (withheld.stream()
                     .flatMap(decision -> decision.basedOn().stream())
                     .anyMatch(said::contains)) {
-                return invalid("said and withheld observation");
+                return invalid("said and withheld result");
             }
             return new ComposedReview(summary, inline, withheld);
         } catch (IllegalArgumentException malformed) {
@@ -223,20 +223,26 @@ public class FeedbackCompositionResultParser {
     }
 
     /**
-     * The next step a composition written before the review on the work had its own envelope gave each observation
-     * it spoke about on the work, by observation id. Read for history only: such a composition is not delivered
-     * again.
+     * What a composition written before results had problems said on the work about each result by itself, by
+     * result id: the line note it anchored on that result, then the next step a unit about the work gave it. Its
+     * staged list was flat, and every reference and anchor named a result id. Read for history only: such a
+     * composition is not delivered again. A review whose line notes break the contract gives no line note.
      */
     public Map<String, String> historicalNextSteps(@Nullable JsonNode jobOutput) {
         JsonNode payload = payloadOf(jobOutput);
         if (payload == null) return Map.of();
-        JsonNode units = payload.get("units");
-        if (units == null || !units.isArray()) {
-            return Map.of();
+        JsonNode legacy = payload.get("observations");
+        if (legacy == null || !legacy.isArray()) return Map.of();
+        Set<String> staged = new HashSet<>();
+        for (JsonNode entry : legacy) {
+            String id = text(entry, "id", MAX_RESULT_ID_LENGTH);
+            if (id != null) staged.add(id);
         }
-        Map<String, StagedObservation> observations = readObservations(payload.get("observations"));
-        Map<String, String> nextSteps = new LinkedHashMap<>();
-        for (JsonNode unit : units) {
+        Map<String, String> nextSteps = new LinkedHashMap<>(historicalLineNotes(payload.get("review"), staged));
+        JsonNode units = payload.get("units");
+        for (JsonNode unit : units == null || !units.isArray()
+                ? List.<JsonNode>of()
+                : units.valueStream().toList()) {
             if (!unit.isObject() || channelOf(unit) != FeedbackChannel.IN_CONTEXT) {
                 continue;
             }
@@ -246,7 +252,7 @@ public class FeedbackCompositionResultParser {
                 continue;
             }
             for (String id : strings(unit.get("basedOn"))) {
-                if (observations.containsKey(id)) {
+                if (staged.contains(id)) {
                     nextSteps.putIfAbsent(id, nextStep);
                 }
             }
@@ -254,52 +260,106 @@ public class FeedbackCompositionResultParser {
         return Map.copyOf(nextSteps);
     }
 
+    /** The body of each line note a pre-problem review anchored on one staged result, by that result's id. */
+    private static Map<String, String> historicalLineNotes(@Nullable JsonNode review, Set<String> staged) {
+        JsonNode inline = review == null || !review.isObject() ? null : review.get("inline");
+        if (inline == null || !inline.isArray()) return Map.of();
+        Map<String, String> notes = new LinkedHashMap<>();
+        for (JsonNode note : inline) {
+            String body = note.isObject() ? publishable(note, ComposedReview.MAX_INLINE_LENGTH) : null;
+            JsonNode anchor = note.get("anchor");
+            String id =
+                    anchor == null || !anchor.isObject() ? null : text(anchor, "observationId", MAX_RESULT_ID_LENGTH);
+            if (body == null || id == null || !staged.contains(id)) return Map.of();
+            notes.putIfAbsent(id, body);
+        }
+        return notes;
+    }
+
     private static ComposedReview.@Nullable Summary summaryOf(
-            @Nullable JsonNode node, Map<String, StagedObservation> observations) {
+            @Nullable JsonNode node, Map<String, StagedResult> practiceResults) {
         if (node == null || !node.isObject()) {
             return null;
         }
         String body = publishable(node, ComposedReview.MAX_SUMMARY_LENGTH);
-        List<String> basedOn = grounded(node.get("basedOn"), observations);
-        if (body == null || basedOn == null) {
-            log.warn("Composed summary is empty, too long, or rests on an observation this run did not admit");
+        Refs refs = grounded(node.get("basedOn"), practiceResults, true);
+        if (body == null || refs == null) {
+            log.warn("Composed summary is empty, too long, or rests on a result this run did not admit");
             return null;
         }
-        return new ComposedReview.Summary(body, basedOn);
+        return new ComposedReview.Summary(body, refs.results(), refs.observations());
     }
 
     private static ComposedReview.@Nullable InlineNote inlineOf(
-            JsonNode node, Map<String, StagedObservation> observations) {
+            JsonNode node, Map<String, StagedResult> practiceResults) {
         if (!node.isObject()) {
             return null;
         }
         String body = publishable(node, ComposedReview.MAX_INLINE_LENGTH);
-        List<String> basedOn = grounded(node.get("basedOn"), observations);
-        ComposedReview.ResolvedAnchor anchor = resolveAnchor(node.get("anchor"), observations);
-        if (body == null || basedOn == null || anchor == null || !basedOn.contains(anchor.observationId())) {
+        Refs refs = grounded(node.get("basedOn"), practiceResults, true);
+        ComposedReview.ResolvedAnchor anchor = resolveAnchor(node.get("anchor"), practiceResults);
+        if (body == null
+                || refs == null
+                || anchor == null
+                || !refs.observations().contains(anchor.observationId())) {
             log.warn("Composed line note is empty, too long, ungrounded, or not placeable on its own evidence");
             return null;
         }
-        return new ComposedReview.InlineNote(body, basedOn, anchor);
+        return new ComposedReview.InlineNote(body, refs.results(), refs.observations(), anchor);
     }
 
     private static ComposedReview.@Nullable Withheld withheldOf(
-            JsonNode node, Map<String, StagedObservation> observations) {
+            JsonNode node, Map<String, StagedResult> practiceResults) {
         if (!node.isObject()) {
             return null;
         }
-        List<String> basedOn = grounded(node.get("basedOn"), observations);
+        Refs refs = grounded(node.get("basedOn"), practiceResults, true);
         ComposedFeedbackUnit.WithholdReason reason = withholdReasonOf(node, "reason");
-        if (basedOn == null
+        if (refs == null
                 || reason == null
-                || basedOn.stream().anyMatch(id -> {
-                    StagedObservation observation = observations.get(id);
-                    return observation == null || !"NOT_MET".equals(observation.outcome());
+                || refs.results().stream().anyMatch(id -> {
+                    StagedResult practiceResult = practiceResults.get(id);
+                    return practiceResult == null || !"NOT_MET".equals(practiceResult.outcome());
                 })) {
-            log.warn("Composed withholding names no admitted observation or no reason");
+            log.warn("Composed withholding names no admitted result or no reason");
             return null;
         }
-        return new ComposedReview.Withheld(basedOn, reason);
+        return new ComposedReview.Withheld(refs.results(), reason);
+    }
+
+    /** The results and problems a list of evidence references names, each once and in order. */
+    private record Refs(List<String> results, List<String> observations) {}
+
+    /**
+     * The evidence named, when {@code basedOn} is an array of at least one reference {@code {practiceResultId,
+     * observationId?}}, each naming a result this run admitted and, if it names a problem, a problem of that result.
+     * Nothing is dropped from it: a text whose support names anything else says something no result backs. With
+     * {@code problemsOnly}, each result must be NOT_MET: the review on the work speaks only about problems, and a MET
+     * result is never acknowledged there.
+     */
+    private static @Nullable Refs grounded(
+            @Nullable JsonNode node, Map<String, StagedResult> staged, boolean problemsOnly) {
+        if (node == null || !node.isArray() || node.isEmpty()) {
+            return null;
+        }
+        Set<String> results = new LinkedHashSet<>();
+        Set<String> observations = new LinkedHashSet<>();
+        for (JsonNode entry : node) {
+            if (!entry.isObject() || !onlyFields(entry, "practiceResultId", "observationId")) return null;
+            String id = text(entry, "practiceResultId", MAX_RESULT_ID_LENGTH);
+            StagedResult practiceResult = id == null ? null : staged.get(id);
+            if (practiceResult == null) return null;
+            String outcome = practiceResult.outcome();
+            if (problemsOnly && !"NOT_MET".equals(outcome)) return null;
+            JsonNode child = entry.get("observationId");
+            if (child != null) {
+                String observationId = child.isString() ? child.asString().strip() : null;
+                if (observationId == null || !practiceResult.problems().containsKey(observationId)) return null;
+                observations.add(observationId);
+            }
+            results.add(id);
+        }
+        return new Refs(List.copyOf(results), List.copyOf(observations));
     }
 
     /**
@@ -320,33 +380,8 @@ public class FeedbackCompositionResultParser {
         return body;
     }
 
-    /**
-     * The ids named, when {@code basedOn} is an array of at least one string, each an observation this run admitted.
-     * Nothing is dropped from it: a text whose support names anything else says something no observation backs.
-     */
-    private static @Nullable List<String> grounded(@Nullable JsonNode node, Map<String, StagedObservation> staged) {
-        if (node == null || !node.isArray() || node.isEmpty()) {
-            return null;
-        }
-        Set<String> ids = new LinkedHashSet<>();
-        for (JsonNode entry : node) {
-            if (!entry.isString()
-                    || entry.asString().isBlank()
-                    || !staged.containsKey(entry.asString().strip())) {
-                return null;
-            }
-            String id = entry.asString().strip();
-            StagedObservation observation = staged.get(id);
-            if (observation == null) return null;
-            String outcome = observation.outcome();
-            if (!"MET".equals(outcome) && !"NOT_MET".equals(outcome)) return null;
-            ids.add(id);
-        }
-        return List.copyOf(ids);
-    }
-
     private static @Nullable ComposedFeedbackUnit read(
-            JsonNode unit, Map<String, StagedObservation> observations, Set<PreparedTarget> preparedTargets) {
+            JsonNode unit, Map<String, StagedResult> practiceResults, Set<PreparedTarget> preparedTargets) {
         if (unit == null || !unit.isObject()) {
             return null;
         }
@@ -360,16 +395,15 @@ public class FeedbackCompositionResultParser {
         if (channel == null || action == null || practiceSlug == null) {
             return null;
         }
-        List<String> basedOn = strings(unit.get("basedOn"));
-        if (basedOn.isEmpty()) {
-            return null;
-        }
+        Refs refs = grounded(unit.get("basedOn"), practiceResults, false);
+        List<String> basedOn = refs == null ? List.of() : refs.results();
+        List<String> named = refs == null ? List.of() : refs.observations();
         String normalizedPracticeSlug = normalizeSlug(practiceSlug);
-        boolean grounded = basedOn.stream().allMatch(observations::containsKey);
+        boolean grounded = refs != null;
         boolean ownsEvidence = basedOn.stream()
-                .map(observations::get)
+                .map(practiceResults::get)
                 .filter(Objects::nonNull)
-                .anyMatch(observation -> normalizedPracticeSlug.equals(observation.practiceSlug()));
+                .anyMatch(practiceResult -> normalizedPracticeSlug.equals(practiceResult.practiceSlug()));
         if (!grounded || !ownsEvidence) {
             log.warn(
                     "Composed unit is not grounded in admitted evidence for its practice: channel={}, practice={}",
@@ -383,7 +417,17 @@ public class FeedbackCompositionResultParser {
             return reason == null
                     ? null
                     : new ComposedFeedbackUnit(
-                            channel, normalizedPracticeSlug, basedOn, action, null, reason, null, null, null, null);
+                            channel,
+                            normalizedPracticeSlug,
+                            basedOn,
+                            action,
+                            null,
+                            reason,
+                            null,
+                            null,
+                            null,
+                            null,
+                            named);
         }
 
         String supersedesThreadKey = null;
@@ -423,7 +467,8 @@ public class FeedbackCompositionResultParser {
                             title,
                             null,
                             null,
-                            brief);
+                            brief,
+                            named);
         }
 
         String nextStep =
@@ -439,37 +484,53 @@ public class FeedbackCompositionResultParser {
                 title,
                 body,
                 nextStep,
-                null);
+                null,
+                named);
         return composed.isComplete() ? composed : null;
     }
 
+    /** A line note's place: one citation of one problem this run admitted, which the server verified on the change. */
     private static ComposedReview.@Nullable ResolvedAnchor resolveAnchor(
-            @Nullable JsonNode anchor, Map<String, StagedObservation> observations) {
+            @Nullable JsonNode anchor, Map<String, StagedResult> practiceResults) {
         if (anchor == null || !anchor.isObject()) {
             return null;
         }
-        String observationId = text(anchor, "observationId", MAX_OBSERVATION_ID_LENGTH);
+        String observationId = text(anchor, "observationId", MAX_RESULT_ID_LENGTH);
         JsonNode indexNode = anchor.get("citationIndex");
         if (observationId == null || indexNode == null || !indexNode.isIntegralNumber()) {
             return null;
         }
-        StagedObservation observation = observations.get(observationId);
-        if (observation == null) {
+        String practiceResultId = null;
+        StagedProblem problem = null;
+        for (var entry : practiceResults.entrySet()) {
+            StagedProblem candidate = entry.getValue().problems().get(observationId);
+            if (candidate != null) {
+                practiceResultId = entry.getKey();
+                problem = candidate;
+            }
+        }
+        if (problem == null || practiceResultId == null) {
             return null;
         }
         int index = indexNode.asInt();
-        if (index < 0 || index >= observation.citations().size()) {
+        if (index < 0 || index >= problem.citations().size()) {
             return null;
         }
-        StagedCitation citation = observation.citations().get(index);
-        if (!observation.anchorable()
+        StagedCitation citation = problem.citations().get(index);
+        if (!problem.anchorable()
                 || !citation.anchorable()
                 || citation.path() == null
                 || citation.startLine() == null) {
             return null;
         }
         return new ComposedReview.ResolvedAnchor(
-                observationId, index, citation.path(), citation.side(), citation.startLine(), citation.endLine());
+                practiceResultId,
+                observationId,
+                index,
+                citation.path(),
+                citation.side(),
+                citation.startLine(),
+                citation.endLine());
     }
 
     private static @Nullable JsonNode payloadOf(@Nullable JsonNode jobOutput) {
@@ -480,37 +541,48 @@ public class FeedbackCompositionResultParser {
         return payload == null || !payload.isObject() ? null : payload;
     }
 
-    private static Map<String, StagedObservation> readObservations(@Nullable JsonNode node) {
-        Map<String, StagedObservation> observations = new LinkedHashMap<>();
+    /** The admitted results the composition was read against, by id, each with its problems by id. */
+    private static Map<String, StagedResult> readResults(@Nullable JsonNode node) {
+        Map<String, StagedResult> practiceResults = new LinkedHashMap<>();
         if (node == null || !node.isArray()) {
-            return observations;
+            return practiceResults;
         }
         for (JsonNode entry : node) {
-            String id = text(entry, "id", MAX_OBSERVATION_ID_LENGTH);
+            String id = text(entry, "practiceResultId", MAX_RESULT_ID_LENGTH);
             if (id == null) {
                 continue;
             }
-            List<StagedCitation> citations = new ArrayList<>();
-            JsonNode citationNodes = entry.get("citations");
-            if (citationNodes != null && citationNodes.isArray()) {
-                for (JsonNode citation : citationNodes) {
-                    citations.add(new StagedCitation(
-                            text(citation, "path", 1024),
-                            text(citation, "side", 8),
-                            integer(citation, "startLine"),
-                            integer(citation, "endLine"),
-                            citation.path("anchorable").asBoolean(false)));
+            Map<String, StagedProblem> problems = new LinkedHashMap<>();
+            JsonNode children = entry.get("observations");
+            if (children != null && children.isArray()) {
+                for (JsonNode child : children) {
+                    String observationId = text(child, "observationId", MAX_RESULT_ID_LENGTH);
+                    if (observationId == null) continue;
+                    List<StagedCitation> citations = new ArrayList<>();
+                    JsonNode citationNodes = child.get("citations");
+                    if (citationNodes != null && citationNodes.isArray()) {
+                        for (JsonNode citation : citationNodes) {
+                            citations.add(new StagedCitation(
+                                    text(citation, "path", 1024),
+                                    text(citation, "side", 8),
+                                    integer(citation, "startLine"),
+                                    integer(citation, "endLine"),
+                                    citation.path("anchorable").asBoolean(false)));
+                        }
+                    }
+                    problems.put(
+                            observationId,
+                            new StagedProblem(child.path("anchorable").asBoolean(false), List.copyOf(citations)));
                 }
             }
-            observations.put(
+            practiceResults.put(
                     id,
-                    new StagedObservation(
+                    new StagedResult(
                             normalizedSlug(text(entry, "practiceSlug", MAX_PRACTICE_SLUG_LENGTH)),
                             text(entry, "outcome", 32),
-                            entry.path("anchorable").asBoolean(false),
-                            citations));
+                            Map.copyOf(problems)));
         }
-        return observations;
+        return practiceResults;
     }
 
     private static Set<PreparedTarget> readPreparedTargets(@Nullable JsonNode node) {
@@ -629,11 +701,10 @@ public class FeedbackCompositionResultParser {
         return text.length() <= maxLength ? text : null;
     }
 
-    private record StagedObservation(
-            @Nullable String practiceSlug,
-            @Nullable String outcome,
-            boolean anchorable,
-            List<StagedCitation> citations) {}
+    private record StagedResult(
+            @Nullable String practiceSlug, @Nullable String outcome, Map<String, StagedProblem> problems) {}
+
+    private record StagedProblem(boolean anchorable, List<StagedCitation> citations) {}
 
     private record PreparedTarget(String threadKey, FeedbackChannel channel, String practiceSlug) {}
 

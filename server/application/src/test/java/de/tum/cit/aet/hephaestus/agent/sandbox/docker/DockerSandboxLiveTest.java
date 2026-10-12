@@ -160,7 +160,7 @@ class DockerSandboxLiveTest {
 
         @Test
         void shouldCollectExactBytesWhenContainerWritesOutput() {
-            String written = "{\"observations\":[],\"schemaVersion\":1}\n";
+            String written = "{\"results\":[],\"schemaVersion\":1}\n";
 
             SandboxResult result = run("printf '%s' '" + written + "' > /workspace/out/result.json");
 

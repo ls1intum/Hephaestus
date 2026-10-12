@@ -16,8 +16,11 @@ import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramPath;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -37,6 +40,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,17 +50,19 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The practice script runs of a review, from the runner's report to the trace and the practice needs: one row per
- * staged script under the job's workspace, and needs that come from the newest run of today's script and from
- * today's routing.
+ * The program runs of a review, from the runner's report to the trace and the practice needs: one row per admitted
+ * practice under the job's workspace, built-in or custom, and needs that come from the newest run of today's script
+ * and from today's routing.
  */
 class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String NEEDS_URI = "/workspaces/{slug}/practices/practice-script-needs";
     private static final String REVIEW_URI = "/workspaces/{slug}/agents/jobs/{jobId}/practice-scripts";
     private static final Instant MONDAY = Instant.parse("2026-10-05T09:00:00Z");
+    private static final String DIGEST = "0123456789abcdef".repeat(4);
 
     @Autowired
     private WebTestClient webTestClient;
@@ -116,23 +122,30 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
-    void shouldRecordEachStagedScriptOnceWhenTheReportNamesSomeOfThem() {
+    void shouldRecordEveryAdmittedPracticeOnceWhenTheReportNamesSomeOfThem() {
         Practice commentQuality = persistPractice(workspace, "comment-quality", "Comment quality", "decide()");
         Practice errorHandling = persistPractice(workspace, "error-handling", "Error handling", "scan()");
         Practice naming = persistPractice(workspace, "naming", "Naming", null);
         AgentJob job = persistJob(workspace, commentQuality, errorHandling, naming);
         double skippedBefore = scriptsCounted("skipped");
 
-        record(job, MONDAY, """
-                {"slug":"comment-quality","status":"skipped","leads":0,
-                 "models":[{"slot":"decision","need":"required","bound":false,"notRated":{}}]}""", """
-                {"slug":"naming","status":"ok","leads":4,"models":[]}""");
+        record(
+                job,
+                MONDAY,
+                skippedNeedingA("comment-quality", "decision"),
+                calls(entry("naming", PracticeProgramKind.BUILTIN, "ok", null), 1, 0, 0)
+                        .set(
+                                "coverageReached",
+                                objectMapper.readTree("{\"reads\":4,\"truncatedReads\":1,\"failedReads\":0}")));
 
         Map<String, AgentJobPracticeScriptRun> runs = runsOf(workspace, job);
-        assertThat(runs).containsOnlyKeys("comment-quality", "error-handling");
+        assertThat(runs).containsOnlyKeys("comment-quality", "error-handling", "naming");
         AgentJobPracticeScriptRun skipped = Objects.requireNonNull(runs.get("comment-quality"));
         assertThat(skipped.getStatus()).isEqualTo(PracticeScriptRunStatus.SKIPPED);
-        assertThat(skipped.getLeads()).isZero();
+        assertThat(skipped.getProgramKind()).isEqualTo(PracticeProgramKind.CUSTOM);
+        assertThat(skipped.getProgramDigest()).isEqualTo(DIGEST);
+        assertThat(skipped.getStopReason()).isEqualTo(PracticeScriptStopReason.UNAVAILABLE);
+        assertThat(skipped.path()).isNull();
         assertThat(skipped.getPracticeRevisionId())
                 .isEqualTo(Objects.requireNonNull(commentQuality.getCurrentRevision())
                         .getId());
@@ -140,12 +153,37 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(skipped.attempt()).isEqualTo(job.getRetryCount());
         assertThat(skipped.getModels()).isEqualTo(objectMapper.readTree("""
                         [{"purpose":"PRACTICE_DECISION","need":"REQUIRED","bound":false,"notRated":[]}]"""));
+        AgentJobPracticeScriptRun builtin = Objects.requireNonNull(runs.get("naming"));
+        assertThat(builtin.getStatus()).isEqualTo(PracticeScriptRunStatus.OK);
+        assertThat(builtin.getProgramKind()).isEqualTo(PracticeProgramKind.BUILTIN);
+        assertThat(builtin.getProgramDigest()).isNull();
+        assertThat(builtin.getStopReason()).isNull();
+        assertThat(builtin.getCalls()).isEqualTo(objectMapper.readTree("""
+                        {"review":1,"chat":0,"decision":0,"embedding":0,"reranking":0}"""));
+        assertThat(builtin.getCoverageReached())
+                .isEqualTo(objectMapper.readTree("{\"reads\":4,\"truncatedReads\":1,\"failedReads\":0}"));
+        assertThat(builtin.path()).isEqualTo(PracticeProgramPath.REVIEW);
+        assertThat(builtin.getModels()).isEqualTo(objectMapper.createArrayNode());
         AgentJobPracticeScriptRun unfinished = Objects.requireNonNull(runs.get("error-handling"));
         assertThat(unfinished.getStatus()).isEqualTo(PracticeScriptRunStatus.NOT_FINISHED);
+        assertThat(unfinished.getProgramKind()).isEqualTo(PracticeProgramKind.CUSTOM);
         assertThat(unfinished.getModels()).isNull();
+        assertThat(unfinished.getCalls()).isNull();
+        assertThat(unfinished.getCoverageReached()).isNull();
         assertThat(runRepository.findByWorkspaceIdAndJobIdIn(otherWorkspace.getId(), List.of(job.getId())))
                 .isEmpty();
         assertThat(scriptsCounted("skipped")).isEqualTo(skippedBefore + 1);
+    }
+
+    /** The program kind comes from the admitted revision, so a report that names another program records no run. */
+    @Test
+    void shouldRecordNoRunWhenTheReportNamesAnotherProgramThanTheRevisionHolds() {
+        Practice naming = persistPractice(workspace, "naming", "Naming", null);
+        AgentJob job = persistJob(workspace, naming);
+
+        record(job, MONDAY, entry("naming", PracticeProgramKind.CUSTOM, "ok", null));
+
+        assertThat(runsOf(workspace, job)).isEmpty();
     }
 
     @Test
@@ -163,11 +201,14 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void shouldGiveTheTraceTheRunsOfTheReviewWhenAskedFromItsOwnWorkspaceOnly() {
         Practice commentQuality = persistPractice(workspace, "comment-quality", "Comment quality", "decide()");
         Practice errorHandling = persistPractice(workspace, "error-handling", "Error handling", "scan()");
-        AgentJob job = persistJob(workspace, commentQuality, errorHandling);
-        record(job, MONDAY, """
-                {"slug":"comment-quality","status":"ok","leads":4,
-                 "models":[{"slot":"decision","need":"optional","bound":true,"notRated":{"deadline":5}}]}""", """
-                {"slug":"error-handling","status":"timeout","leads":0}""");
+        Practice naming = persistPractice(workspace, "naming", "Naming", null);
+        AgentJob job = persistJob(workspace, commentQuality, errorHandling, naming);
+        record(
+                job,
+                MONDAY,
+                models(calls(entry("comment-quality", PracticeProgramKind.CUSTOM, "ok", null), 0, 0, 2), """
+                        [{"slot":"decision","need":"optional","bound":true,"notRated":{"deadline":5}}]"""),
+                calls(entry("naming", PracticeProgramKind.BUILTIN, "ok", null), 1, 0, 0));
 
         ReviewOutcomeLookup.ReviewOutcome outcome = Objects.requireNonNull(reviewOutcomes
                 .findByIds(workspace.getId(), List.of(job.getId()))
@@ -176,12 +217,21 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 Objects.requireNonNull(outcome.practiceScriptByPracticeSlug().get("comment-quality"));
 
         assertThat(run.status()).isEqualTo(PracticeScriptRunStatus.OK);
-        assertThat(run.leads()).isEqualTo(4);
+        assertThat(run.programKind()).isEqualTo(PracticeProgramKind.CUSTOM);
+        assertThat(run.path()).isEqualTo(PracticeProgramPath.MODELS);
+        assertThat(run.stopReason()).isNull();
         assertThat(run.models().getFirst().notRated().getFirst().count()).isEqualTo(5);
-        // The trace lists what became of model calls; a script whose models are not known made none it can list.
-        assertThat(Objects.requireNonNull(outcome.practiceScriptByPracticeSlug().get("error-handling"))
-                        .models())
-                .isEmpty();
+        assertThat(outcome.practiceScriptByPracticeSlug().get("naming"))
+                .isEqualTo(new PracticeScriptRunDTO(
+                        PracticeScriptRunStatus.OK,
+                        PracticeProgramKind.BUILTIN,
+                        PracticeProgramPath.REVIEW,
+                        null,
+                        List.of()));
+        // The trace lists what became of model calls; a program whose models are not known made none it can list.
+        assertThat(outcome.practiceScriptByPracticeSlug().get("error-handling"))
+                .isEqualTo(new PracticeScriptRunDTO(
+                        PracticeScriptRunStatus.NOT_FINISHED, PracticeProgramKind.CUSTOM, null, null, List.of()));
         assertThat(reviewOutcomes.findByIds(otherWorkspace.getId(), List.of(job.getId())))
                 .isEmpty();
     }
@@ -193,16 +243,12 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
         persistPractice(workspace, "fresh-script", "Fresh script", "scan()");
         persistPractice(workspace, "naming", "Naming", null);
         AgentJob older = persistJob(workspace, commentQuality);
-        record(older, MONDAY, skippedNeedingAReranker("comment-quality"));
+        record(older, MONDAY, skippedNeedingA("comment-quality", "reranking"));
         AgentJob newer = persistJob(workspace, commentQuality);
         record(newer, MONDAY.plus(1, ChronoUnit.DAYS), needingADecisionModel("comment-quality"));
-        // A run that did not finish, or that failed before the script declared its models, reported no
-        // models, so it never stands for the script's needs.
+        // A run that did not finish reported no models, so it never stands for the script's needs.
         AgentJob unfinished = persistJob(workspace, commentQuality);
         record(unfinished, MONDAY.plus(2, ChronoUnit.DAYS));
-        AgentJob failedEarly = persistJob(workspace, commentQuality);
-        record(failedEarly, MONDAY.plus(3, ChronoUnit.DAYS), """
-                {"slug":"comment-quality","status":"timeout","leads":0}""");
 
         needs().jsonPath("$.length()")
                 .isEqualTo(2)
@@ -236,12 +282,10 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void shouldNotClaimTheScriptUsesNoModelWhenNoRunReportedItsModels() {
-        Practice failing = persistPractice(workspace, "comment-quality", "Comment quality", "decide()");
+        Practice unfinished = persistPractice(workspace, "comment-quality", "Comment quality", "decide()");
         Practice scanning = persistPractice(workspace, "naming", "Naming", "scan()");
-        AgentJob job = persistJob(workspace, failing, scanning);
-        record(job, MONDAY, """
-                {"slug":"comment-quality","status":"error","leads":0}""", """
-                {"slug":"naming","status":"ok","leads":1,"models":[]}""");
+        AgentJob job = persistJob(workspace, unfinished, scanning);
+        record(job, MONDAY, entry("naming", PracticeProgramKind.CUSTOM, "ok", null));
 
         needs().jsonPath("$[0].practiceSlug")
                 .isEqualTo("comment-quality")
@@ -339,9 +383,10 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Practice practice = persistPractice(workspace, "comment-quality", "Comment quality", "decide()");
         AgentJob job = persistJob(workspace, practice);
 
-        record(job, MONDAY, """
-                {"slug":"comment-quality","status":"error","leads":0,"models":[],
-                 "error":"TypeError: answer is undefined\\n    at decide (comment-quality.ts:4:9)"}""");
+        record(
+                job,
+                MONDAY,
+                failed("comment-quality", "TypeError: answer is undefined\n    at decide (comment-quality.ts:4:9)"));
 
         assertThat(Objects.requireNonNull(runsOf(workspace, job).get("comment-quality"))
                         .getError())
@@ -356,21 +401,25 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
         AgentJob job = persistJob(workspace, commentQuality, errorHandling);
         job.setConfigSnapshot(snapshotWithDecisionModel(DataHandlingTier.CLOUD));
         job = jobRepository.save(job);
-        record(job, MONDAY, """
-                {"slug":"comment-quality","status":"timeout","leads":0}""", """
-                {"slug":"error-handling","status":"ok","leads":1,"models":[]}""");
+        record(
+                job,
+                MONDAY,
+                entry("comment-quality", PracticeProgramKind.CUSTOM, "failed", "deadline"),
+                entry("error-handling", PracticeProgramKind.CUSTOM, "ok", null));
         countCalls(job, 0, "comment-quality", ModelKind.DECISION, DataHandlingTier.CLOUD, 9, 900, 90);
         // A model that only the earlier attempt called is not a model of the attempt shown.
         countCalls(job, 0, "comment-quality", ModelKind.RERANKING, DataHandlingTier.CLOUD, 3, 30, 0);
 
         job.setRetryCount(1);
         job = jobRepository.save(job);
-        record(job, MONDAY.plus(1, ChronoUnit.HOURS), """
-                {"slug":"error-handling","status":"error","leads":0,"models":[],
-                 "error":"TypeError: answer is undefined"}""", """
-                {"slug":"comment-quality","status":"ok","leads":3,"durationMs":4200,
-                 "models":[{"slot":"decision","need":"required","bound":true,"notRated":{"deadline":2}},
-                           {"slot":"chat","need":"optional","bound":true,"notRated":{}}]}""");
+        record(
+                job,
+                MONDAY.plus(1, ChronoUnit.HOURS),
+                failed("error-handling", "TypeError: answer is undefined"),
+                models(calls(entry("comment-quality", PracticeProgramKind.CUSTOM, "ok", null), 0, 2, 4), """
+                                [{"slot":"decision","need":"required","bound":true,"notRated":{"deadline":2}},
+                                 {"slot":"chat","need":"optional","bound":true,"notRated":{}}]""")
+                        .put("durationMs", 4200));
         countCalls(job, 1, "comment-quality", ModelKind.DECISION, DataHandlingTier.CLOUD, 4, 120, 8);
         // Chat calls of a script are the review model's calls, which the review counts.
         countCalls(job, 1, "comment-quality", ModelKind.CHAT, DataHandlingTier.CLOUD, 2, 50, 5);
@@ -387,8 +436,14 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .isEqualTo("Comment quality")
                 .jsonPath("$[0].run.status")
                 .isEqualTo("OK")
+                .jsonPath("$[0].run.programKind")
+                .isEqualTo("CUSTOM")
+                .jsonPath("$[0].run.path")
+                .isEqualTo("MODELS")
+                .jsonPath("$[0].run.stopReason")
+                .doesNotExist()
                 .jsonPath("$[0].run.leads")
-                .isEqualTo(3)
+                .doesNotExist()
                 .jsonPath("$[0].run.models[0].notRated[0].count")
                 .isEqualTo(2)
                 .jsonPath("$[0].models.length()")
@@ -413,6 +468,8 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .isEqualTo("error-handling")
                 .jsonPath("$[1].run.status")
                 .isEqualTo("FAILED")
+                .jsonPath("$[1].run.stopReason")
+                .isEqualTo("ERROR")
                 .jsonPath("$[1].models.length()")
                 .isEqualTo(0)
                 .jsonPath("$[1].error")
@@ -490,8 +547,7 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Practice practice = persistPractice(workspace, "comment-quality", "Comment quality", "decide()");
         AgentJob job = persistJob(workspace, practice);
 
-        record(job, MONDAY, """
-                {"slug":"comment-quality","status":"error","leads":0,"models":[],"error":"a\\u0000b"}""");
+        record(job, MONDAY, failed("comment-quality", "a\u0000b"));
 
         assertThat(Objects.requireNonNull(runsOf(workspace, job).get("comment-quality"))
                         .getError())
@@ -606,20 +662,65 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .expectBody();
     }
 
-    private static String needingADecisionModel(String slug) {
-        return """
-                {"slug":"%s","status":"ok","leads":2,
-                 "models":[{"slot":"decision","need":"required","bound":true,"notRated":{}}]}""".formatted(slug);
+    /**
+     * An entry inside the report contract for a practice the job admitted: the program it admitted, no models, no
+     * calls and no reads, and no duration.
+     */
+    private ObjectNode entry(String slug, PracticeProgramKind kind, String status, @Nullable String stopReason) {
+        ObjectNode entry = objectMapper.createObjectNode();
+        entry.put("practiceSlug", slug);
+        ObjectNode program = entry.putObject("program");
+        if (kind == PracticeProgramKind.CUSTOM) {
+            program.put("kind", "custom").put("digest", DIGEST);
+        } else {
+            program.put("kind", "builtin").putNull("digest");
+        }
+        entry.putArray("models");
+        entry.put("status", status);
+        if (stopReason == null) {
+            entry.putNull("stopReason");
+        } else {
+            entry.put("stopReason", stopReason);
+        }
+        calls(entry, 0, 0, 0);
+        ObjectNode coverage = entry.putObject("coverageReached");
+        Stream.of("reads", "truncatedReads", "failedReads").forEach(count -> coverage.put(count, 0));
+        return entry;
     }
 
-    private static String skippedNeedingAReranker(String slug) {
-        return """
-                {"slug":"%s","status":"skipped","leads":0,
-                 "models":[{"slot":"reranking","need":"required","bound":false,"notRated":{}}]}""".formatted(slug);
+    private static ObjectNode calls(ObjectNode entry, int review, int chat, int decision) {
+        entry.putObject("calls")
+                .put("review", review)
+                .put("chat", chat)
+                .put("decision", decision)
+                .put("embedding", 0)
+                .put("reranking", 0);
+        return entry;
     }
 
-    private void record(AgentJob job, Instant finishedAt, String... entries) {
-        byte[] report = ("{\"practices\":[" + String.join(",", entries) + "],\"truncated\":false}").getBytes(UTF_8);
+    private ObjectNode models(ObjectNode entry, String models) {
+        return entry.set("models", objectMapper.readTree(models));
+    }
+
+    private ObjectNode failed(String slug, String error) {
+        return entry(slug, PracticeProgramKind.CUSTOM, "failed", "error").put("error", error);
+    }
+
+    private ObjectNode needingADecisionModel(String slug) {
+        return models(entry(slug, PracticeProgramKind.CUSTOM, "ok", null), """
+                [{"slot":"decision","need":"required","bound":true,"notRated":{}}]""");
+    }
+
+    private ObjectNode skippedNeedingA(String slug, String slot) {
+        return models(entry(slug, PracticeProgramKind.CUSTOM, "skipped", "unavailable"), """
+                [{"slot":"%s","need":"required","bound":false,"notRated":{}}]""".formatted(slot));
+    }
+
+    private void record(AgentJob job, Instant finishedAt, ObjectNode... entries) {
+        byte[] report = ("{\"schemaVersion\":2,\"truncated\":false,\"practices\":["
+                        + Stream.of(entries).map(ObjectNode::toString).collect(Collectors.joining(","))
+                        + "]}")
+                .getBytes(UTF_8);
         transactions.executeWithoutResult(status -> {
             AgentJob current = jobRepository.findById(job.getId()).orElseThrow();
             recorder.record(

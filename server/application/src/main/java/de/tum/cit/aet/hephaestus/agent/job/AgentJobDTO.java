@@ -36,16 +36,15 @@ public record AgentJobDTO(
 
         @NonNull
         @Schema(
-                description =
-                        "Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE means no model "
-                                + "ran because required evidence was missing, unreadable, stale, or unauthorized — so no observations "
-                                + "means nothing was assessed, not that nothing was wrong. COALESCED means no model ran because a "
-                                + "completed review had already answered every ready practice on exactly the same code — its "
-                                + "answers are listed in answeredPractices, and this run assessed nothing anew. SUPERSEDED "
-                                + "means the waiting attempt was replaced by an admitted newer review of the same author's "
-                                + "current work, named in coveringJobId, which carries this review's practices and may still "
-                                + "be waiting or running; the replacement makes no additional assessment, and earlier attempt "
-                                + "history remains. REVIEWED means the model ran against sufficient evidence.")
+                description = "Why a COMPLETED run produced the results it did. INSUFFICIENT_EVIDENCE means no model "
+                        + "ran because required evidence was missing, unreadable, stale, or unauthorized — so no results "
+                        + "means nothing was assessed, not that nothing was wrong. COALESCED means no model ran because a "
+                        + "completed review had already answered every ready practice on exactly the same code — its "
+                        + "answers are listed in answeredPractices, and this run assessed nothing anew. SUPERSEDED "
+                        + "means the waiting attempt was replaced by an admitted newer review of the same author's "
+                        + "current work, named in coveringJobId, which carries this review's practices and may still "
+                        + "be waiting or running; the replacement makes no additional assessment, and earlier attempt "
+                        + "history remains. REVIEWED means the model ran against sufficient evidence.")
         ReviewRunOutcome reviewOutcome,
 
         @Schema(description = "The newer review that replaced this one; set only when reviewOutcome is SUPERSEDED")

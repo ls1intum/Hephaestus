@@ -54,7 +54,7 @@ public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlace
             @Nullable String postedCommentUrl) {}
 
     /**
-     * The comments Hephaestus posted on a provider for in-context feedback citing this observation, including one the
+     * The comments Hephaestus posted on a provider for in-context feedback citing this result, including one the
      * provider confirmed without an id. A newer placement for the same comment reference replaces that copy;
      * separately posted comments retain their own placements.
      */
@@ -63,10 +63,10 @@ public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlace
                f.id AS "feedbackId", f.agent_job_id AS "agentJobId", f.body AS "body",
                EXISTS (SELECT 1 FROM feedback_approval fa
                        WHERE fa.feedback_id = f.id AND fa.workspace_id = f.workspace_id) AS "approved"
-        FROM feedback_observation fo
+        FROM feedback_evidence fo
         JOIN feedback f ON f.id = fo.feedback_id
         JOIN feedback_placement pl ON pl.feedback_id = f.id
-        WHERE fo.observation_id = :observationId AND f.workspace_id = :workspaceId
+        WHERE fo.practice_result_id = :practiceResultId AND f.workspace_id = :workspaceId
           AND f.channel = 'IN_CONTEXT'
           AND NOT EXISTS (
               SELECT 1 FROM feedback_placement newer
@@ -76,7 +76,7 @@ public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlace
                 AND newer.created_at > pl.created_at)
         """, nativeQuery = true)
     List<PostedCopy> findPostedCopies(
-            @Param("workspaceId") Long workspaceId, @Param("observationId") UUID observationId);
+            @Param("workspaceId") Long workspaceId, @Param("practiceResultId") UUID practiceResultId);
 
     interface PostedCopy {
         @Nullable
@@ -132,14 +132,14 @@ public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlace
         String getUrl();
     }
 
-    /** The practices behind this feedback whose observations a workspace admin currently holds invalidated. */
+    /** The practices behind this feedback whose results a workspace admin currently holds invalidated. */
     @Query(value = """
         SELECT DISTINCT p.name
-        FROM feedback_observation fo
-        JOIN observation o ON o.id = fo.observation_id
+        FROM feedback_evidence fo
+        JOIN practice_result o ON o.id = fo.practice_result_id
         JOIN practice p ON p.id = o.practice_id
-        JOIN observation_invalidation oi
-          ON oi.observation_id = o.id AND oi.workspace_id = o.workspace_id AND oi.restored_at IS NULL
+        JOIN practice_result_invalidation oi
+          ON oi.practice_result_id = o.id AND oi.workspace_id = o.workspace_id AND oi.restored_at IS NULL
         WHERE fo.feedback_id = :feedbackId AND o.workspace_id = :workspaceId
         ORDER BY p.name
         """, nativeQuery = true)

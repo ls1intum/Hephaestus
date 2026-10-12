@@ -458,7 +458,12 @@ class ConfigSnapshotTest extends BaseUnitTest {
         void shouldRaiseTheTimeoutToThePracticeFloorWhenTheBindingIsShorter() {
             assertThat(snapshot("openai-completions", "https://api.openai.com", 30)
                             .timeoutSeconds())
-                    .isEqualTo(PracticePiAdapter.MIN_TIMEOUT_SECONDS);
+                    .isEqualTo(PracticePiAdapter.MIN_TIMEOUT_SECONDS)
+                    .as("one second past the runner's shutdown buffer; no program stage is reserved")
+                    .isEqualTo(61);
+            assertThat(snapshot("openai-completions", "https://api.openai.com", 62)
+                            .timeoutSeconds())
+                    .isEqualTo(62);
         }
 
         @ParameterizedTest(name = "a timeout of {0}s cannot be built")

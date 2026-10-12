@@ -82,7 +82,7 @@ class DiffNotePoster {
                     + ". Check that the vendor integration is enabled and its channel bean is registered.");
         }
         SummaryChannel.FeedbackTarget target = target(job, kind, scope);
-        List<InlineFeedback> items = mapObservations(job, scope, diffNotes);
+        List<InlineFeedback> items = mapResults(job, scope, diffNotes);
         Receipt receipt = new Receipt(recorded, items, scope);
 
         List<InlineFeedback> unconfirmed = new ArrayList<>();
@@ -135,7 +135,7 @@ class DiffNotePoster {
      */
     InlineLookup findUnacknowledged(
             AgentJob job, InlinePackageScope scope, List<DiffNote> diffNotes, List<DeliveredSignal> recorded) {
-        List<InlineFeedback> items = mapObservations(job, scope, diffNotes);
+        List<InlineFeedback> items = mapResults(job, scope, diffNotes);
         Receipt receipt = new Receipt(recorded, items, scope);
         List<InlineFeedback> unconfirmed = receipt.open().stream()
                 .filter(item -> item.deliveryKey() != null && !receipt.safeToCreate(item))
@@ -171,8 +171,8 @@ class DiffNotePoster {
         }
     }
 
-    private List<InlineFeedback> mapObservations(AgentJob job, InlinePackageScope scope, List<DiffNote> diffNotes) {
-        List<InlineFeedback> observations = new ArrayList<>(diffNotes.size());
+    private List<InlineFeedback> mapResults(AgentJob job, InlinePackageScope scope, List<DiffNote> diffNotes) {
+        List<InlineFeedback> practiceResults = new ArrayList<>(diffNotes.size());
         for (int index = 0; index < diffNotes.size(); index++) {
             DiffNote note = diffNotes.get(index);
             // A sealed package stores the exact provider text; only historical text is made safe again here.
@@ -186,13 +186,13 @@ class DiffNotePoster {
                     ? FeedbackAnchor.DiffAnchor.range(
                             note.filePath(), note.startLine(), Objects.requireNonNull(endLine))
                     : FeedbackAnchor.DiffAnchor.singleLine(note.filePath(), note.startLine());
-            observations.add(new InlineFeedback(
+            practiceResults.add(new InlineFeedback(
                     anchor,
                     scope.appendsDisclosure() ? commentFormatter.appendInlineFeedbackPrompt(text, job) : text,
                     scope.marker(),
                     scope.keyFor(note, index)));
         }
-        return observations;
+        return practiceResults;
     }
 
     private static List<String> keys(List<InlineFeedback> items) {

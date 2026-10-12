@@ -225,6 +225,22 @@ public class CuratedPracticeOverride {
         adoptBundledBase(bundled);
     }
 
+    /**
+     * Moves an unchanged copy of the shipped practice script to the one now shipped: the script and the script of the
+     * adopted base, and nothing else. Every other field and its pending offer stay. When the script was all the
+     * shipped release changed, the release is then accepted, so it is not offered again with nothing to take.
+     */
+    public void adoptShippedPracticeScript(PracticeDefinition shipped, Instant now) {
+        PracticeDefinition base = Objects.requireNonNull(adoptedBase, "adoptedBase");
+        this.practiceScript = shipped.practiceScript();
+        PracticeDefinition moved = base.withPracticeScript(shipped.practiceScript());
+        this.adoptedBase = moved;
+        if (moved.equals(shipped)) {
+            this.acceptedBundledDigest = CuratedDefinitionDigest.of(slug, shipped);
+        }
+        this.updatedAt = Objects.requireNonNull(now, "now");
+    }
+
     public void backfillBase(@Nullable PracticeDefinition bundled) {
         if (adoptedBase != null || acceptedBundledDigest == null) {
             return;

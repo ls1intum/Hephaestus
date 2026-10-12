@@ -39,9 +39,9 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <ol>
  *   <li>the sandbox capabilities on the gateway connector, authenticated by a proxy-scoped bearer
- *       credential, authorized by its scope, and rate-limited per authenticated principal. The
- *       {@link WorkerJwtIssuer#LLM_PRACTICE_SCRIPT_SCOPE} reaches only the practice script calls, and
- *       {@link WorkerJwtIssuer#LLM_PROXY_SCOPE} reaches everything else;
+ *       credential, authorized by its {@link WorkerJwtIssuer#LLM_PROXY_SCOPE}, and rate-limited per authenticated
+ *       principal. One job credential reaches every capability, the practice programs' direct model calls
+ *       included: they run in the same process as the review;
  *   <li>everything else on the gateway connector, denied and answered {@code 404} so the connector
  *       admits to no route a sandbox is not meant to call;
  *   <li>the capability paths on every other connector, denied the same way, so they exist only where
@@ -74,9 +74,8 @@ class LlmProxySecurityConfig {
                 paths.matcher(HttpMethod.POST, "/internal/llm/chat/completions"),
                 paths.matcher(HttpMethod.POST, "/internal/llm/responses"),
                 practiceScriptCalls,
-                paths.matcher(HttpMethod.POST, "/internal/llm/admit-observations"),
-                paths.matcher(HttpMethod.POST, "/internal/llm/public-feedback-history"),
-                paths.matcher(HttpMethod.POST, "/internal/llm/complete-public-review"));
+                paths.matcher(HttpMethod.POST, "/internal/llm/admit-results"),
+                paths.matcher(HttpMethod.POST, "/internal/llm/public-feedback-history"));
         RequestMatcher runtimeReads = new OrRequestMatcher(
                 paths.matcher(HttpMethod.GET, "/internal/llm/runtime/{id}"),
                 paths.matcher(HttpMethod.GET, "/internal/llm/runtime/{id}/workspace"),
@@ -90,10 +89,7 @@ class LlmProxySecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(
                         (request, response, exception) -> response.setStatus(HttpStatus.NOT_FOUND.value())))
-                .authorizeHttpRequests(auth -> auth.requestMatchers(practiceScriptCalls)
-                        .access(hasScope(WorkerJwtIssuer.LLM_PRACTICE_SCRIPT_SCOPE))
-                        .anyRequest()
-                        .access(hasScope(WorkerJwtIssuer.LLM_PROXY_SCOPE)))
+                .authorizeHttpRequests(auth -> auth.anyRequest().access(hasScope(WorkerJwtIssuer.LLM_PROXY_SCOPE)))
                 .addFilterBefore(
                         new JobTokenAuthenticationFilter(
                                 agentJobRepository,

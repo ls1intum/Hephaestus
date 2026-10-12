@@ -17,14 +17,14 @@ import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousInAppFeedback;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -54,10 +54,10 @@ class InAppSupportReaderTest extends BaseUnitTest {
     private static final ArtifactKind PULL_REQUEST = ArtifactKind.of("scm.pull_request");
 
     @Mock
-    private ObservationRepository observations;
+    private PracticeResultRepository practiceResults;
 
     @Mock
-    private ObservationVisibilityPolicy visibility;
+    private ResultVisibilityPolicy visibility;
 
     @Mock
     private PreviousInAppFeedback previous;
@@ -78,7 +78,7 @@ class InAppSupportReaderTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         reader = new InAppSupportReader(
-                observations, visibility, previous, policy, feedback, defaults, Clock.fixed(NOW, ZoneOffset.UTC));
+                practiceResults, visibility, previous, policy, feedback, defaults, Clock.fixed(NOW, ZoneOffset.UTC));
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE);
         job = new AgentJob();
@@ -90,13 +90,13 @@ class InAppSupportReaderTest extends BaseUnitTest {
 
     @Test
     void shouldSelectTheVisibleCitableOccurrencesForEachCurrentNegativePractice() {
-        Observation onA = negative(11L, NOW.minus(Duration.ofDays(5)));
-        Observation onB = negative(12L, NOW.minus(Duration.ofDays(2)));
-        Observation hidden = negative(13L, NOW.minus(Duration.ofDays(1)));
-        Observation current = negative(14L, NOW);
+        PracticeResult onA = negative(11L, NOW.minus(Duration.ofDays(5)));
+        PracticeResult onB = negative(12L, NOW.minus(Duration.ofDays(2)));
+        PracticeResult hidden = negative(13L, NOW.minus(Duration.ofDays(1)));
+        PracticeResult current = negative(14L, NOW);
         allowRecipient();
         when(previous.find(WORKSPACE, RECIPIENT, "handles-errors", NOW)).thenReturn(Optional.empty());
-        when(observations.findRecentForSubjectAndPractice(
+        when(practiceResults.findRecentForSubjectAndPractice(
                         WORKSPACE,
                         RECIPIENT,
                         "handles-errors",
@@ -116,7 +116,7 @@ class InAppSupportReaderTest extends BaseUnitTest {
             assertThat(selected.practiceSlug()).isEqualTo("handles-errors");
             assertThat(selected.decision()).isEqualTo(InAppRoutingDecision.ADMIT);
             assertThat(selected.occurrences())
-                    .extracting(InAppSupportContext.Occurrence::observationId)
+                    .extracting(InAppSupportContext.Occurrence::practiceResultId)
                     .containsExactlyInAnyOrder(current.getId(), onB.getId(), onA.getId());
             assertThat(selected.occurrences())
                     .extracting(InAppSupportContext.Occurrence::artifactId)
@@ -126,11 +126,11 @@ class InAppSupportReaderTest extends BaseUnitTest {
 
     @Test
     void shouldSelectSupportThroughTheReaderAWorkerOnlyContextRegisters() {
-        Observation current = negative(14L, NOW);
-        Observation earlier = negative(12L, NOW.minus(Duration.ofDays(2)));
+        PracticeResult current = negative(14L, NOW);
+        PracticeResult earlier = negative(12L, NOW.minus(Duration.ofDays(2)));
         allowRecipient();
         when(previous.find(WORKSPACE, RECIPIENT, "handles-errors", NOW)).thenReturn(Optional.empty());
-        when(observations.findRecentForSubjectAndPractice(
+        when(practiceResults.findRecentForSubjectAndPractice(
                         eq(WORKSPACE), eq(RECIPIENT), eq("handles-errors"), any(), any()))
                 .thenReturn(List.of(current, earlier));
         when(visibility.permitsForNewDelivery(
@@ -140,8 +140,8 @@ class InAppSupportReaderTest extends BaseUnitTest {
 
         new ApplicationContextRunner()
                 .withPropertyValues("hephaestus.runtime.server.enabled=false", "hephaestus.runtime.worker.enabled=true")
-                .withBean(ObservationRepository.class, () -> observations)
-                .withBean(ObservationVisibilityPolicy.class, () -> visibility)
+                .withBean(PracticeResultRepository.class, () -> practiceResults)
+                .withBean(ResultVisibilityPolicy.class, () -> visibility)
                 .withBean(PreviousInAppFeedback.class, () -> previous)
                 .withBean(PracticeFeedbackDeliveryPolicy.class, () -> policy)
                 .withBean(FeedbackRepository.class, () -> feedback)
@@ -158,7 +158,7 @@ class InAppSupportReaderTest extends BaseUnitTest {
                     assertThat(support.practices())
                             .singleElement()
                             .satisfies(selected -> assertThat(selected.occurrences())
-                                    .extracting(InAppSupportContext.Occurrence::observationId)
+                                    .extracting(InAppSupportContext.Occurrence::practiceResultId)
                                     .containsExactlyInAnyOrder(current.getId(), earlier.getId()));
                 });
     }
@@ -172,18 +172,18 @@ class InAppSupportReaderTest extends BaseUnitTest {
             value = InAppRoutingDecision.class,
             names = {"UNCORROBORATED", "PRACTICE_REQUIRES_APPROVAL", "RECENTLY_SURFACED"})
     void shouldRouteEachPracticeAsThePageWouldAndCopyNoSupportItRefuses(InAppRoutingDecision refusal) {
-        Observation current = negative(14L, NOW);
-        Observation earlier = negative(12L, NOW.minus(Duration.ofDays(2)));
-        List<Observation> window =
+        PracticeResult current = negative(14L, NOW);
+        PracticeResult earlier = negative(12L, NOW.minus(Duration.ofDays(2)));
+        List<PracticeResult> window =
                 refusal == InAppRoutingDecision.UNCORROBORATED ? List.of(current) : List.of(current, earlier);
         allowRecipient();
         when(previous.find(WORKSPACE, RECIPIENT, "handles-errors", NOW)).thenReturn(Optional.empty());
-        when(observations.findRecentForSubjectAndPractice(
+        when(practiceResults.findRecentForSubjectAndPractice(
                         eq(WORKSPACE), eq(RECIPIENT), eq("handles-errors"), any(), any()))
                 .thenReturn(window);
         when(visibility.permitsForNewDelivery(
                         eq(WORKSPACE), anyList(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
-                .thenReturn(window.stream().map(Observation::getId).collect(Collectors.toSet()));
+                .thenReturn(window.stream().map(PracticeResult::getId).collect(Collectors.toSet()));
         autonomy(
                 refusal == InAppRoutingDecision.PRACTICE_REQUIRES_APPROVAL
                         ? PracticeAutonomy.OFF
@@ -216,12 +216,13 @@ class InAppSupportReaderTest extends BaseUnitTest {
         assertThat(support.state()).isEqualTo(InAppSupportContext.State.REFUSED);
         assertThat(support.refusal()).isEqualTo(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT);
         assertThat(support.practices()).isEmpty();
-        verifyNoInteractions(observations);
+        verifyNoInteractions(practiceResults);
     }
 
     @Test
     void shouldNotAttributeSupportWhenTheAdmittedNegativesConcernSeveralPeople() {
-        Observation other = Observation.builder()
+        PracticeResult other = PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .agentJobId(job.getId())
                 .workspaceId(WORKSPACE)
@@ -231,7 +232,7 @@ class InAppSupportReaderTest extends BaseUnitTest {
                 .aboutUserId(RECIPIENT + 1)
                 .outcome(Outcome.NOT_MET)
                 .severity(Severity.MINOR)
-                .origin(ObservationOrigin.LIVE)
+                .origin(ResultOrigin.LIVE)
                 .summary("Caught and ignored")
                 .observedAt(NOW)
                 .build();
@@ -239,12 +240,13 @@ class InAppSupportReaderTest extends BaseUnitTest {
         InAppSupportContext support = reader.snapshot(job, List.of(negative(14L, NOW), other));
 
         assertThat(support.state()).isEqualTo(InAppSupportContext.State.UNAVAILABLE);
-        verifyNoInteractions(policy, observations);
+        verifyNoInteractions(policy, practiceResults);
     }
 
     @Test
-    void shouldAnswerCompleteAndEmptyWhenNoAdmittedObservationIsNegative() {
-        Observation met = Observation.builder()
+    void shouldAnswerCompleteAndEmptyWhenNoAdmittedResultIsNegative() {
+        PracticeResult met = PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .agentJobId(job.getId())
                 .workspaceId(WORKSPACE)
@@ -253,7 +255,7 @@ class InAppSupportReaderTest extends BaseUnitTest {
                 .artifactId(14L)
                 .aboutUserId(RECIPIENT)
                 .outcome(Outcome.MET)
-                .origin(ObservationOrigin.LIVE)
+                .origin(ResultOrigin.LIVE)
                 .summary("Errors are reported")
                 .observedAt(NOW)
                 .build();
@@ -262,7 +264,7 @@ class InAppSupportReaderTest extends BaseUnitTest {
 
         assertThat(support.state()).isEqualTo(InAppSupportContext.State.COMPLETE);
         assertThat(support.practices()).isEmpty();
-        verifyNoInteractions(policy, observations);
+        verifyNoInteractions(policy, practiceResults);
     }
 
     private void allowRecipient() {
@@ -273,14 +275,15 @@ class InAppSupportReaderTest extends BaseUnitTest {
 
     private void autonomy(PracticeAutonomy tier) {
         when(defaults.forWorkspace(WORKSPACE)).thenReturn(new WorkspaceReviewDefaults(PracticeAutonomy.AUTOMATIC));
-        ObservationRepository.ObservationPracticeAutonomy row =
-                mock(ObservationRepository.ObservationPracticeAutonomy.class);
+        PracticeResultRepository.ResultPracticeAutonomy row =
+                mock(PracticeResultRepository.ResultPracticeAutonomy.class);
         when(row.getPracticeAutonomy()).thenReturn(tier);
-        when(observations.findPracticeAutonomyFor(anyList(), eq(WORKSPACE))).thenReturn(List.of(row));
+        when(practiceResults.findPracticeAutonomyFor(anyList(), eq(WORKSPACE))).thenReturn(List.of(row));
     }
 
-    private Observation negative(long workId, Instant observedAt) {
-        return Observation.builder()
+    private PracticeResult negative(long workId, Instant observedAt) {
+        return PracticeResult.builder()
+                .scopeKey("test-scope")
                 .id(UUID.randomUUID())
                 .agentJobId(UUID.randomUUID())
                 .workspaceId(WORKSPACE)
@@ -290,7 +293,7 @@ class InAppSupportReaderTest extends BaseUnitTest {
                 .aboutUserId(RECIPIENT)
                 .outcome(Outcome.NOT_MET)
                 .severity(Severity.MINOR)
-                .origin(ObservationOrigin.LIVE)
+                .origin(ResultOrigin.LIVE)
                 .summary("Caught and ignored")
                 .observedAt(observedAt)
                 .build();

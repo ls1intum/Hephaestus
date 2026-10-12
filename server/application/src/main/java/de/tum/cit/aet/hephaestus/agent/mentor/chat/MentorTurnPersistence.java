@@ -477,8 +477,8 @@ public class MentorTurnPersistence {
     }
 
     private void reconcileConversationalDelivery(ChatMessage assistant, MentorChannel.DeliveryOutcome deliveryOutcome) {
-        List<UUID> shownObservationIds = UIMessageChunk.DataObservation.shownObservationIds(assistant.getParts());
-        if (shownObservationIds.isEmpty()) {
+        List<UUID> shownResultIds = UIMessageChunk.LinkParts.shownResultIds(assistant.getParts());
+        if (shownResultIds.isEmpty()) {
             return;
         }
         ChatThread thread = assistant.getThread();
@@ -488,13 +488,10 @@ public class MentorTurnPersistence {
         switch (deliveryOutcome) {
             case INSTANCE_SILENCED ->
                 conversationalDeliveryReconciler.suppressForSilentMode(
-                        thread.getWorkspace().getId(), thread.getUser().getId(), shownObservationIds);
+                        thread.getWorkspace().getId(), thread.getUser().getId(), shownResultIds);
             case DELIVERED ->
                 conversationalDeliveryReconciler.reconcile(
-                        thread.getWorkspace().getId(),
-                        thread.getUser().getId(),
-                        assistant.getId(),
-                        shownObservationIds);
+                        thread.getWorkspace().getId(), thread.getUser().getId(), assistant.getId(), shownResultIds);
             case NOT_DELIVERED -> {}
         }
     }
@@ -506,7 +503,7 @@ public class MentorTurnPersistence {
         } catch (OptimisticLockingFailureException stale) {
             // Theirs wins: never downgrade a row another writer already completed.
             log.info(
-                    "interrupt lost optimistic-lock race for assistantMessageId={} — leaving prior observation in place",
+                    "interrupt lost optimistic-lock race for assistantMessageId={} — leaving prior result in place",
                     cookie.assistantMessageId());
         }
     }

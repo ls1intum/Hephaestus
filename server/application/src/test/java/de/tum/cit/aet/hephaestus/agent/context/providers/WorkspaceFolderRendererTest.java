@@ -367,10 +367,10 @@ class WorkspaceFolderRendererTest extends BaseUnitTest {
         when(memberships.findByWorkspace_Id(1L)).thenReturn(List.of(visible, denied, hidden));
         when(memberPolicy.allowsPerson(job, 42L)).thenReturn(true);
         doAnswer(call -> {
-                    Consumer<ObjectNode> observations = call.getArgument(4);
+                    Consumer<ObjectNode> practiceResults = call.getArgument(4);
                     Consumer<ObjectNode> feedback = call.getArgument(5);
-                    observations.accept(mapper.createObjectNode()
-                            .put("summary", "prior observation")
+                    practiceResults.accept(mapper.createObjectNode()
+                            .put("summary", "prior result")
                             .putNull("synced_at"));
                     feedback.accept(mapper.createObjectNode()
                             .put("body", "prior feedback")
@@ -400,7 +400,7 @@ class WorkspaceFolderRendererTest extends BaseUnitTest {
                             "context/practices/review%20quality.md",
                             "context/project_inventory.json");
             assertThat(Files.readString(captured.filesOnDisk().get("context/people/42/observations.jsonl")))
-                    .contains("prior observation", "synced_at");
+                    .contains("prior result", "synced_at");
             assertThat(Files.readString(captured.filesOnDisk().get("context/people/42/feedback.jsonl")))
                     .contains("prior feedback", "synced_at");
             assertThat(captured.filesOnDisk().keySet()).noneMatch(path -> path.startsWith("context/people/43/"));

@@ -15,8 +15,8 @@ import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderLease;
 import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
 import de.tum.cit.aet.hephaestus.agent.gateway.WorkspaceBudgetExceededException;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService.AdmissionIdentity;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService.AdmissionIdentity;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
@@ -125,9 +125,8 @@ class JobEvidenceFilesTest extends BaseUnitTest {
             assertThat(PreparedJobInputsFixtures.files(prepared)).containsKey("context/quote");
             files.discardAdmittedAttempt(identity);
             assertThat(read(files, job, "context/quote", sha)).contains(bytes);
-            job.setMetadata(new JsonMapper()
-                    .createObjectNode()
-                    .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "verified"));
+            job.setMetadata(
+                    new JsonMapper().createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "verified"));
             files.discardAdmittedAttempt(new AdmissionIdentity(job.getId(), 1L, 1, "worker"));
             assertThat(read(files, job, "context/quote", sha)).contains(bytes);
             files.discardAdmittedAttempt(identity);
@@ -324,7 +323,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         var job = job();
         job.setStatus(AgentJobStatus.COMPLETED);
         job.setMetadata(
-                new JsonMapper().createObjectNode().put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted"));
+                new JsonMapper().createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "admitted"));
         when(jobs.findByIdAndWorkspaceId(job.getId(), 1L)).thenReturn(Optional.of(job));
         byte[] bytes = "source".getBytes(StandardCharsets.UTF_8);
         String sha = ProvenanceDigest.sha256Hex(bytes);
@@ -610,9 +609,8 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         var runtime =
                 EvidenceFolderLease.tryAcquire(layout.root(), 1L, job.getId()).orElseThrow();
         try (runtime) {
-            job.setMetadata(new JsonMapper()
-                    .createObjectNode()
-                    .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "verified"));
+            job.setMetadata(
+                    new JsonMapper().createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "verified"));
             // Before the capture shares its lease, admission cannot remove through it.
             files.discardAdmittedAttempt(identity);
             assertThat(read(files, job, "context/quote", sha)).contains(bytes);
@@ -645,7 +643,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         var prepared = PreparedJobInputsFixtures.prepare(
                 files, job, PreparedJobInputsFixtures.filesOnly(Map.of("context/quote", bytes)));
         job.setMetadata(
-                new JsonMapper().createObjectNode().put(ObservationAdmissionService.DIGEST_METADATA_KEY, "verified"));
+                new JsonMapper().createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "verified"));
         var entered = new CountDownLatch(1);
         var proceed = new CountDownLatch(1);
         var first = new AtomicBoolean(true);
@@ -713,7 +711,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
 
     /** An upload as the gateway runner sends it: the result, a native session copy and its manifest. */
     private static final Map<String, byte[]> TRACED_UPLOAD = Map.of(
-            "result.json", "{\"observations\":[]}".getBytes(StandardCharsets.UTF_8),
+            "result.json", "{\"results\":[]}".getBytes(StandardCharsets.UTF_8),
             "traces/0001.jsonl", "{\"type\":\"session\",\"cwd\":\"Jane Roe\"}\n".getBytes(StandardCharsets.UTF_8),
             "traces/manifest.json", FORGED_MANIFEST.getBytes(StandardCharsets.UTF_8));
 

@@ -13,7 +13,7 @@ import java.util.Objects;
  *
  * <p>The clauses are alternatives. Evaluation is skipped only when complete evidence disproves every
  * clause; unresolved clauses make the practice run. This makes the applicability check conservative: it may
- * spend an unnecessary model call, but it cannot hide a potentially relevant observation.
+ * spend an unnecessary model call, but it cannot hide a potentially relevant result.
  *
  * @param skipReason a factual explanation shown when every clause is disproved
  * @param anyOf      alternative conditions; at least one

@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MergeReadinessContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ObservationHistoryContentSource;
+import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ResultHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ReviewAttemptsContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
@@ -43,10 +43,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiChoice;
 import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiPreferences;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -109,9 +112,10 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
     private final PersonProcessingSuppression personSuppression;
     private final MemberAiPreferences memberAiPreferences;
     private final MergeReadinessContentSource mergeReadiness;
-    private final ObservationHistoryContentSource observationHistory;
+    private final ResultHistoryContentSource practiceResultHistory;
     private final ReviewAttemptsContentSource reviewAttempts;
     private final ConversationalDeliveryReconciler conversationalDeliveryReconciler;
+    private final ObservationRepository observationRepository;
 
     /** The holder lets a disconnect abort a runner attached after lifecycle callbacks were registered. */
     @Override
@@ -339,11 +343,25 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
             Map<String, byte[]> contextInputs = buildMentorContext(request, user, cookie.userMessageId());
             Function<MentorRunnerClient.FetchContextRequest, JsonNode> fetchContext =
                     callback -> handleFetchContext(callback, contextInputs, request.workspaceId(), user.getId());
-            Predicate<MentorRunnerClient.LinkObservationRequest> linkObservation = link -> {
-                boolean admitted = conversationalDeliveryReconciler.admits(
-                        request.workspaceId(), user.getId(), link.observationId());
+            Predicate<MentorRunnerClient.LinkRequest> linkObservation = link -> {
+                // A problem is shown under its result: the result decides whether either may be shown.
+                UUID practiceResultId = link.kind() == MentorRunnerClient.LinkKind.RESULT
+                        ? link.linkedId()
+                        : observationRepository.findAllByIds(request.workspaceId(), List.of(link.linkedId())).stream()
+                                .map(Observation::getPracticeResultId)
+                                .findFirst()
+                                .orElse(null);
+                if (practiceResultId == null) {
+                    return false;
+                }
+                boolean admitted =
+                        conversationalDeliveryReconciler.admits(request.workspaceId(), user.getId(), practiceResultId);
                 if (admitted) {
-                    state.admitLink(link.observationId());
+                    if (link.kind() == MentorRunnerClient.LinkKind.RESULT) {
+                        state.admitLink(practiceResultId);
+                    } else {
+                        state.admitObservationLink(link.linkedId(), practiceResultId);
+                    }
                 }
                 return admitted;
             };
@@ -566,7 +584,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
             MentorTurnPersistence.TurnPersistenceCookie cookie,
             Turn turn,
             Function<MentorRunnerClient.FetchContextRequest, JsonNode> fetchContext,
-            Predicate<MentorRunnerClient.LinkObservationRequest> linkObservation)
+            Predicate<MentorRunnerClient.LinkRequest> linkObservation)
             throws InterruptedException, ExecutionException, TimeoutException {
         if (channel.isClientGone()) {
             throw new ClientDisconnectedException("Client disconnected during sandbox attach");
@@ -949,9 +967,9 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
         if (mergeRequest.isPresent()) {
             return mergeReadiness.inspect(workspaceId, developerId, mergeRequest.get());
         }
-        Optional<UUID> observation = ObservationHistoryContentSource.observationIdOf(path);
-        if (observation.isPresent()) {
-            return observationHistory.inspect(workspaceId, developerId, observation.get());
+        Optional<UUID> practiceResult = ResultHistoryContentSource.practiceResultIdOf(path);
+        if (practiceResult.isPresent()) {
+            return practiceResultHistory.inspect(workspaceId, developerId, practiceResult.get());
         }
         Optional<AgentJobRepository.ScmWork> reviewedWork = ReviewAttemptsContentSource.workOf(path);
         if (reviewedWork.isPresent()) {

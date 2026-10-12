@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
-/** Which observation source supplied a ledger row's token buckets. */
+/** Which result source supplied a ledger row's token buckets. */
 public enum UsageProvenance {
     /** Every bucket came from the runner's own report, whose prompt and output totals covered the proxy's. */
     RUNNER,

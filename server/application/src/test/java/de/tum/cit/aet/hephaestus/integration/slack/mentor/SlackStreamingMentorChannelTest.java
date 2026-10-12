@@ -101,8 +101,12 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         return new UIMessageChunk.TextDelta("m1", s);
     }
 
-    private static UIMessageChunk.DataObservation feedback(String text) {
-        return UIMessageChunk.DataObservation.of(UUID.randomUUID(), text);
+    private static UIMessageChunk.DataResult feedback(String text) {
+        return UIMessageChunk.DataResult.of(UUID.randomUUID(), text);
+    }
+
+    private static UIMessageChunk.DataResultObservation problemFeedback(String text) {
+        return UIMessageChunk.DataResultObservation.of(UUID.randomUUID(), UUID.randomUUID(), text);
     }
 
     @Test
@@ -387,6 +391,23 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
                 .isEqualTo("Your description names the decision but not why it beat the alternative. Also"
                         + "\n\nYour description names the decision but not why it beat the alternative.\n\n"
                         + "What made you pick it?");
+    }
+
+    @Test
+    void shouldSendFeedbackAboutAProblemLikeFeedbackAboutAResultWhenBothAreShown() {
+        SlackMessageService slack = slackThatStreamsOk();
+        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+
+        channel.send(delta("Two things."));
+        channel.send(feedback("Name the trade-off."));
+        channel.send(delta("And on line 42:"));
+        channel.send(problemFeedback("Log the IOException before the retry."));
+        channel.send(delta("Which one first?"));
+
+        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.DELIVERED);
+        assertThat(String.join("", delivered))
+                .isEqualTo("Two things.\n\nName the trade-off.\n\nAnd on line 42:"
+                        + "\n\nLog the IOException before the retry.\n\nWhich one first?");
     }
 
     @Test

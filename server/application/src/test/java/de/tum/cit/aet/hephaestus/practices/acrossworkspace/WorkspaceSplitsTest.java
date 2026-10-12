@@ -1,17 +1,17 @@
 package de.tum.cit.aet.hephaestus.practices.acrossworkspace;
 
-import static de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO.Standing.DEVELOPING;
-import static de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO.Standing.MIXED;
-import static de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO.Standing.NOT_OBSERVED;
-import static de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO.Standing.NO_OPPORTUNITY;
-import static de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO.Standing.STRENGTH;
+import static de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO.Standing.DEVELOPING;
+import static de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO.Standing.MIXED;
+import static de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO.Standing.NOT_OBSERVED;
+import static de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO.Standing.NO_OPPORTUNITY;
+import static de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO.Standing.STRENGTH;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.practices.acrossworkspace.WorkspaceSplits.Verdict;
 import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.WorkspaceRangeDTO;
 import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.WorkspaceSplitDTO;
 import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.WorkspaceSplitPartDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO.Standing;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO.Standing;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

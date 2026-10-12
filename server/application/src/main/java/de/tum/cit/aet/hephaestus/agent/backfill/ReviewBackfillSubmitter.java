@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>The signal is recorded with the run's own {@link DiscoveredVia} (from
  * {@link ReviewBackfillRun#getDiscoveredVia()}, mapped once in {@code SignalOrigins}), and the submission
- * states its {@link ObservationOrigin} explicitly, so a hand-scoped campaign (BACKFILL) and a
+ * states its {@link ResultOrigin} explicitly, so a hand-scoped campaign (BACKFILL) and a
  * {@link ReviewSweepSchedule}'s recurring run (SWEEP) each stay filed against the population they measure
  * rather than blending into the health metrics the event path watches.
  *
@@ -116,7 +116,7 @@ public class ReviewBackfillSubmitter {
                                 pr.getBaseRefName(),
                                 pr.getBaseRefOid(),
                                 key.get().signalName(),
-                                SignalOrigins.observationOriginOf(run.getDiscoveredVia())),
+                                SignalOrigins.practiceResultOriginOf(run.getDiscoveredVia())),
                         key.get(),
                         admission);
                 return Outcome.SUBMITTED;
@@ -157,7 +157,7 @@ public class ReviewBackfillSubmitter {
                                 issue.getHtmlUrl(),
                                 issue.getUpdatedAt(),
                                 key.get().signalName(),
-                                SignalOrigins.observationOriginOf(run.getDiscoveredVia()),
+                                SignalOrigins.practiceResultOriginOf(run.getDiscoveredVia()),
                                 null,
                                 issue.getReviewSnapshotId()),
                         key.get(),

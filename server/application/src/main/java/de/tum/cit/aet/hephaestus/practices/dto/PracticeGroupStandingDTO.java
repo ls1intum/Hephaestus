@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingObservationDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendDirection;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.TrendSupportDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingResultDTO;
+import de.tum.cit.aet.hephaestus.practices.result.trend.TrendDirection;
+import de.tum.cit.aet.hephaestus.practices.result.trend.dto.TrendSupportDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
@@ -38,19 +38,17 @@ public record PracticeGroupStandingDTO(
         @Schema(description = "Calendar span covered by the feedback, for provenance only; never a trend-analysis unit")
         Integer feedbackSpanDays,
 
-        @Nullable @Schema(description = "Oldest contributing observation, for provenance only (null without a verdict)")
+        @Nullable @Schema(description = "Oldest contributing result, for provenance only (null without a verdict)")
         Instant feedbackSince,
 
         @NonNull
-        @Schema(
-                description =
-                        "Supporting observations the standing derives from (problems first); empty without a verdict")
-        List<PracticeStandingObservationDTO> observations,
+        @Schema(description = "Supporting results the standing derives from (problems first); empty without a verdict")
+        List<PracticeStandingResultDTO> practiceResults,
 
         @NonNull
         @Schema(
                 description =
-                        "Distinct pieces of reviewed work the observations come from, per kind (provenance, not a score); empty without a verdict")
+                        "Distinct pieces of reviewed work the results come from, per kind (provenance, not a score); empty without a verdict")
         List<FeedbackSourceCountDTO> sources) {
     public enum Standing {
         DEVELOPING,

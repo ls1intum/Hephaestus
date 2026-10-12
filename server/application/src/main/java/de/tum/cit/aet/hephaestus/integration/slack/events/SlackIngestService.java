@@ -238,7 +238,7 @@ public class SlackIngestService {
      * those rows carry {@code artifact_kind = chat.conversation_thread} + {@code artifact_id = slack_thread.id} with no
      * FK back to {@code slack_thread}, so the channel's thread ids are collected first and passed to the
      * practices-owned {@link ConversationFeedbackErasure} port, which deletes exactly those rows (cascading their
-     * observation/placement/reaction children) — PR/ISSUE rows and other tenants' rows are untouched. The port
+     * result/placement/reaction children) — PR/ISSUE rows and other tenants' rows are untouched. The port
      * inverts the dependency ({@code integration.slack → practices::spi}), so no Spring Modulith cycle forms.
      */
     @Transactional

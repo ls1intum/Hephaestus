@@ -440,7 +440,7 @@ class EvidenceFolderPersonErasureIntegrationTest extends BaseIntegrationTest {
         var inputs = copy(
                 root, catalog, recorder, running, new PersonCopyIdentity("GITLAB", "https://late.example", "1", null));
         try (inputs) {
-            UUID supported = observation(source, developerId);
+            UUID supported = practiceResult(source, developerId);
 
             String answered = catalog.indexLateRead(
                     running.getId(),
@@ -467,7 +467,7 @@ class EvidenceFolderPersonErasureIntegrationTest extends BaseIntegrationTest {
             assertThat(catalog.jobsContaining(person)).contains(running.getId());
 
             var legacy = legacyCopy(workspace, new PersonCopyIdentity("GITLAB", "https://legacy.example", "8", null));
-            UUID legacySupport = observation(legacy, developerId);
+            UUID legacySupport = practiceResult(legacy, developerId);
             catalog.indexLateRead(
                     running.getId(),
                     workspace.getId(),
@@ -581,7 +581,7 @@ class EvidenceFolderPersonErasureIntegrationTest extends BaseIntegrationTest {
                 new PersonCopyIdentity("GITLAB", "https://late-diagnostics.example", "1", null));
         try (inputs;
                 var diagnostics = new Diagnostics()) {
-            UUID supported = observation(source, developerId);
+            UUID supported = practiceResult(source, developerId);
             UUID vanished = UUID.randomUUID();
             catalog.indexLateRead(
                     running.getId(), workspace.getId(), 0, () -> "read", read -> Set.of(supported), read -> Set.of());
@@ -737,16 +737,16 @@ class EvidenceFolderPersonErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * An observation another review recorded. Seeded as SchemaRowSeeder documents, with foreign keys off: the late
+     * A result another review recorded. Seeded as SchemaRowSeeder documents, with foreign keys off: the late
      * index reads only its workspace, source job and developer, and nothing here depends on the rows it would reference.
      */
-    private UUID observation(AgentJob source, long aboutUserId) {
+    private UUID practiceResult(AgentJob source, long aboutUserId) {
         UUID id = UUID.randomUUID();
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
             jdbc.execute("SET LOCAL session_replication_role = replica");
             new SchemaRowSeeder(jdbc)
                     .insert(
-                            "observation",
+                            "practice_result",
                             Map.of(
                                     "id",
                                     id,

@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.core.event.ScmMirrorErasedEvent;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
  * connection-disconnect or workspace-purge — the {@code PULL_REQUEST}/{@code ISSUE} counterpart of
  * the Slack {@code ConversationFeedbackErasure} path.
  *
- * <p>These rows are not reachable from the repository cascade: {@code observation.artifact_id} and
+ * <p>These rows are not reachable from the repository cascade: {@code practice_result.artifact_id} and
  * {@code feedback.artifact_id} are soft references with no FK to {@code issue}/{@code pull_request},
  * and the {@code evidence} jsonb quotes mirrored diff and comment text verbatim. Left alone they
  * would survive the mirror's deletion as dangling, still-queryable copies of third-party content.
@@ -38,17 +38,17 @@ public class PracticesScmMirrorErasureListener {
     private final DeliveryPolicyEvaluationRepository evaluationRepository;
     private final FeedbackDispatchRepository dispatchRepository;
     private final FeedbackRepository feedbackRepository;
-    private final ObservationRepository observationRepository;
+    private final PracticeResultRepository practiceResultRepository;
 
     public PracticesScmMirrorErasureListener(
             DeliveryPolicyEvaluationRepository evaluationRepository,
             FeedbackDispatchRepository dispatchRepository,
             FeedbackRepository feedbackRepository,
-            ObservationRepository observationRepository) {
+            PracticeResultRepository practiceResultRepository) {
         this.evaluationRepository = evaluationRepository;
         this.dispatchRepository = dispatchRepository;
         this.feedbackRepository = feedbackRepository;
-        this.observationRepository = observationRepository;
+        this.practiceResultRepository = practiceResultRepository;
     }
 
     @EventListener
@@ -57,17 +57,17 @@ public class PracticesScmMirrorErasureListener {
         long workspaceId = event.workspaceId();
         int evaluationsDeleted = evaluationRepository.deleteScmArtifactEvaluations(workspaceId);
         int dispatchesDeleted = dispatchRepository.deleteScmArtifactDispatches(workspaceId);
-        // Feedback first: its DB ON DELETE CASCADE clears feedback_observation / _placement / _reaction.
+        // Feedback first: its DB ON DELETE CASCADE clears feedback_evidence / _placement / _reaction.
         int feedbackDeleted = feedbackRepository.deleteAllScmArtifactFeedback(workspaceId);
-        int observationsDeleted = observationRepository.deleteAllScmArtifactObservations(workspaceId);
-        if (evaluationsDeleted > 0 || dispatchesDeleted > 0 || feedbackDeleted > 0 || observationsDeleted > 0) {
+        int practiceResultsDeleted = practiceResultRepository.deleteAllScmArtifactResults(workspaceId);
+        if (evaluationsDeleted > 0 || dispatchesDeleted > 0 || feedbackDeleted > 0 || practiceResultsDeleted > 0) {
             log.info(
-                    "Erased SCM-derived practice rows: workspaceId={}, evaluations={}, dispatches={}, feedback={}, observations={}",
+                    "Erased SCM-derived practice rows: workspaceId={}, evaluations={}, dispatches={}, feedback={}, results={}",
                     workspaceId,
                     evaluationsDeleted,
                     dispatchesDeleted,
                     feedbackDeleted,
-                    observationsDeleted);
+                    practiceResultsDeleted);
         }
     }
 }

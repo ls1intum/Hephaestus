@@ -8,8 +8,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeSignalDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramPath;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.PracticeCoverageOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.PracticeReadinessOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.ReviewOutcome;
@@ -43,7 +46,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
     class Measured {
 
         @Test
-        void reportsAPracticeThatProducedObservationsAsReviewed() {
+        void reportsAPracticeThatProducedResultsAsReviewed() {
             var entry = only(
                     practice(PracticeAutonomy.AUTOMATIC, READY),
                     List.of(triggered(READY, RUN)),
@@ -51,14 +54,14 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
                     Map.of(1L, new PracticeOutput(2, 1, List.of(), RUN, AT)));
 
             assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.REVIEWED);
-            assertThat(entry.observationCount()).isEqualTo(2);
+            assertThat(entry.practiceResultCount()).isEqualTo(2);
             assertThat(entry.deliveredCount()).isEqualTo(1);
             assertThat(entry.reviewId()).isEqualTo(RUN);
         }
 
         /**
          * A later push review that left this practice out, because the Ready review had already answered it on the
-         * same code, records it ready with no coverage of its own. The trace names the review whose observation
+         * same code, records it ready with no coverage of its own. The trace names the review whose result
          * answers it, not the later run and not an unreached practice.
          */
         @Test
@@ -83,7 +86,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
 
             assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.REVIEWED);
             assertThat(entry.reviewId()).isEqualTo(RUN);
-            assertThat(entry.observationCount()).isOne();
+            assertThat(entry.practiceResultCount()).isOne();
         }
 
         /**
@@ -113,7 +116,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             assertThat(entry.reviewId()).isEqualTo(RUN);
             assertThat(entry.occasionedById()).isEqualTo(OCCURRENCE);
             assertThat(entry.decidedAt()).isEqualTo(AT.plusSeconds(600));
-            assertThat(entry.observationCount()).isZero();
+            assertThat(entry.practiceResultCount()).isZero();
             assertThat(entry.deliveredCount()).isZero();
             assertThat(entry.explanation())
                     .contains("earlier review", "did not assess it again")
@@ -122,7 +125,12 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
 
         @Test
         void shouldCarryThePracticeScriptRunOfTheReviewTheEntryNames() {
-            var run = new PracticeScriptRunDTO(PracticeScriptRunStatus.SKIPPED, 0, List.of());
+            var run = new PracticeScriptRunDTO(
+                    PracticeScriptRunStatus.SKIPPED,
+                    PracticeProgramKind.CUSTOM,
+                    null,
+                    PracticeScriptStopReason.UNAVAILABLE,
+                    List.of());
             var review = new ReviewOutcome(
                     ReviewRunState.COMPLETED,
                     false,
@@ -134,7 +142,12 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
                             "slug",
                             run,
                             "other-practice",
-                            new PracticeScriptRunDTO(PracticeScriptRunStatus.OK, 4, List.of())));
+                            new PracticeScriptRunDTO(
+                                    PracticeScriptRunStatus.OK,
+                                    PracticeProgramKind.BUILTIN,
+                                    PracticeProgramPath.REVIEW,
+                                    null,
+                                    List.of())));
 
             var entry = only(
                     practice(PracticeAutonomy.AUTOMATIC, READY),
@@ -171,7 +184,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldReportAnExplicitlyEvaluatedPracticeWithoutObservationsAsReviewed() {
+        void shouldReportAnExplicitlyEvaluatedPracticeWithoutResultsAsReviewed() {
             var review = new ReviewOutcome(
                     ReviewRunState.COMPLETED,
                     false,
@@ -186,7 +199,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
 
             assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.REVIEWED);
             assertThat(entry.explanation()).contains("found nothing to report");
-            assertThat(entry.observationCount()).isZero();
+            assertThat(entry.practiceResultCount()).isZero();
         }
 
         @Test
@@ -241,7 +254,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
                                     3, 0, List.of(FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL), RUN, AT)));
 
             assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.REVIEWED);
-            assertThat(entry.observationCount()).isEqualTo(3);
+            assertThat(entry.practiceResultCount()).isEqualTo(3);
             assertThat(entry.deliveredCount()).isZero();
             assertThat(entry.withheldReasons()).containsExactly(FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL);
         }
@@ -371,7 +384,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
 
             assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.NOT_REACHED);
             assertThat(entry.explanation()).isEqualTo("The review did not record whether it reached this practice.");
-            assertThat(entry.observationCount()).isZero();
+            assertThat(entry.practiceResultCount()).isZero();
         }
 
         @Test

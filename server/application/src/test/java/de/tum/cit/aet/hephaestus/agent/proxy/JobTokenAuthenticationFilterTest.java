@@ -597,7 +597,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
     }
 
-    /** Which scope reaches which path is the chain's rule, in {@link LlmProxySecurityConfigTest}. */
+    /** The job's one token reaches every path; the path decides the routing. */
     @Nested
     class PracticeScriptRouting {
 
@@ -612,7 +612,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
                 null);
 
         @Test
-        void shouldRouteTheChatSlotToTheReviewModelWhenThePracticeScriptTokenCallsIt() throws Exception {
+        void shouldRouteTheChatSlotToTheReviewModelWhenTheJobTokenCallsIt() throws Exception {
             AgentJob job = createPracticeScriptJob();
 
             ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/chat/chat/completions");
@@ -630,7 +630,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             "embedding,embeddings,EMBEDDING,openai-embeddings,PRACTICE_SCRIPT_EMBEDDING,32",
             "reranking,rerank,RERANKING,cohere-rerank,PRACTICE_SCRIPT_RERANKING,33"
         })
-        void shouldRouteASlotToItsFrozenModelWhenThePracticeScriptTokenCallsIt(
+        void shouldRouteASlotToItsFrozenModelWhenTheJobTokenCallsIt(
                 String slot,
                 String op,
                 ModelKind kind,
@@ -656,7 +656,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @Test
         void shouldRefuseASlotWhenNoModelOfItsKindIsBound() throws Exception {
             AgentJob job = createRunningJob();
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_practice_script")));
+            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
             when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
 
             var response = call("POST", "/internal/llm/practice-script/decision/decisions");
@@ -667,10 +667,10 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRefuseThePracticeScriptTokenWhenItsJobHasEnded() throws Exception {
+        void shouldRefuseTheJobTokenOnAPracticeScriptPathWhenItsJobHasEnded() throws Exception {
             AgentJob job = createPracticeScriptJob();
             job.setStatus(AgentJobStatus.COMPLETED);
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_practice_script")));
+            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
             when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
 
             var response = call("POST", "/internal/llm/practice-script/decision/decisions");
@@ -683,7 +683,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @ValueSource(strings = {"/internal/llm/practice-script/speech/speak", "/internal/llm/practice-script/decision"})
         void shouldRefuseAPracticeScriptPathWhenItNamesNoKnownSlot(String path) throws Exception {
             AgentJob job = createPracticeScriptJob();
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_practice_script")));
+            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
             when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
 
             assertThat(call("POST", path).getStatus()).isEqualTo(HttpServletResponse.SC_NOT_FOUND);
@@ -701,9 +701,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/embedding/embeddings");
 
             // The token limit counts the whole prompt; search units have their own limit.
-            assertThat(Objects.requireNonNull(routing.attempt()).practiceScriptTokens())
+            assertThat(Objects.requireNonNull(routing.attempt()).directModelTokens())
                     .isEqualTo(5_600);
-            assertThat(Objects.requireNonNull(routing.attempt()).practiceScriptSearchUnits())
+            assertThat(Objects.requireNonNull(routing.attempt()).directModelSearchUnits())
                     .isEqualTo(9);
         }
 
@@ -719,12 +719,12 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             // 1M input at $2 plus 100k output at $8. The review model is paid from the other purse.
             assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("2.8");
             // The per-attempt cap reads the same totals, whichever purse paid for them.
-            assertThat(Objects.requireNonNull(routing.attempt()).practiceScriptTokens())
+            assertThat(Objects.requireNonNull(routing.attempt()).directModelTokens())
                     .isEqualTo(1_100_000);
         }
 
         private ProxyRouting routeAs(AgentJob job, String path) throws Exception {
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_practice_script")));
+            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
             when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {

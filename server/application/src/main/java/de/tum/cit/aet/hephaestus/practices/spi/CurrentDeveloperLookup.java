@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import java.util.Optional;
 
 /**
- * Who the current request is acting as, as the developer id the practices module files observations
+ * Who the current request is acting as, as the developer id the practices module files results
  * and feedback against.
  *
  * <p>Practices needs one fact about the caller — their developer id — and used to reach into the SCM

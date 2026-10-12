@@ -13,7 +13,13 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +58,7 @@ class PracticePiAdapterTest extends BaseUnitTest {
 
     private PracticeAgentRequest proxyRequest() {
         return new PracticeAgentRequest(
-                "azure-openai-responses", "gpt-5.4-mini", null, null, null, "job-token-123", 600, null, Map.of());
+                "azure-openai-responses", "gpt-5.4-mini", null, null, null, "job-token-123", 600, Map.of());
     }
 
     @Test
@@ -62,6 +68,37 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 .containsEntry(PracticePiAdapter.PRACTICE_OUTPUT_TOKENS_ENV, "16000");
     }
 
+    /**
+     * The runner stops before any work when a variable it requires is missing or not a positive integer. The
+     * sandbox adapter adds the proxy URL and the job token; this adapter and the runtime factory set every other one.
+     */
+    @Test
+    void shouldSetEveryVariableTheRunnerRequiresWhenItBuildsTheSpec() throws IOException {
+        Path runner = Path.of("src/main/resources/agent/pi-runner.ts");
+        String source = Files.readString(
+                Files.exists(runner) ? runner : Path.of("server/application").resolve(runner));
+        Set<String> required = Pattern.compile("(?:requiredEnv|positiveIntegerEnv)\\(\"([A-Z_]+)\"\\)")
+                .matcher(source)
+                .results()
+                .map(match -> match.group(1))
+                .collect(Collectors.toSet());
+
+        assertThat(required)
+                .contains(
+                        PracticePiAdapter.PRACTICE_MODEL_CALLS_ENV,
+                        PracticePiAdapter.PRACTICE_OUTPUT_TOKENS_ENV,
+                        PracticePiAdapter.DIRECT_MODEL_TOKENS_ENV);
+        Set<String> set = adapter.buildSandboxSpec(proxyRequest()).environment().keySet();
+        assertThat(required)
+                .as("set here, or by the sandbox adapter from the network policy")
+                .allMatch(name -> set.contains(name)
+                        || Set.of("LLM_PROXY_URL", "LLM_PROXY_TOKEN").contains(name));
+        assertThat(adapter.buildSandboxSpec(proxyRequest())
+                        .environment()
+                        .get(PracticePiAdapter.DIRECT_MODEL_TOKENS_ENV))
+                .isEqualTo("150000");
+    }
+
     @Test
     void buildsSpecWithImage() {
         var spec = adapter.buildSandboxSpec(proxyRequest());
@@ -69,33 +106,34 @@ class PracticePiAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldDeriveTheChangeBeforePracticeScriptAndStageBothWithTheRunner() {
+    void shouldStageTheResultNormalizerAndNoPracticeScriptStageWhenBuildingTheSpec() {
         var spec = adapter.buildSandboxSpec(proxyRequest());
+
         assertThat(spec.inputFiles())
-                .containsKeys("pi-change.ts", "pi-practice-scripts.sh", "pi-practice-scripts.ts", "pi-task-paths.ts");
-        assertThat(spec.command())
-                .anySatisfy(command -> assertThat(command)
-                        .contains(
-                                "node /workspace/pi-change.ts && sh /workspace/pi-practice-scripts.sh 60 150000 && "));
+                .containsKeys("pi-change.ts", "pi-result-normalize.ts", "pi-task-paths.ts")
+                .doesNotContainKeys("pi-practice-scripts.sh", "pi-practice-scripts.ts", "pi-observation-normalize.ts");
+        assertThat(spec.command().getLast()).doesNotContain("pi-practice-scripts");
     }
 
     @Test
-    void shouldStartTheReviewRunnerWithoutThePracticeScriptToken() {
+    void shouldLinkTheToolkitAfterTheWritableDirectoriesAndBeforeNodeWhenBuildingTheCommand() {
         String command = adapter.buildSandboxSpec(proxyRequest()).command().getLast();
+        String link = "ln -sfn /opt/practice-scripts/lib /workspace/work/practice-scripts/lib";
 
-        assertThat(command)
-                .contains("sh /workspace/pi-practice-scripts.sh 60 150000 && unset PRACTICE_SCRIPT_PROXY_TOKEN && ");
-        assertThat(command.indexOf("unset PRACTICE_SCRIPT_PROXY_TOKEN"))
-                .isLessThan(command.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME));
+        assertThat(command).contains("mkdir -p /workspace/work/practice-scripts/ && " + link + " && ");
+        assertThat(command.indexOf(link)).isGreaterThan(command.indexOf("mkdir -p " + SandboxLayout.PI_AGENT_DIR));
+        assertThat(command.indexOf(link)).isLessThan(command.indexOf("node "));
+        assertThat(command.indexOf("node ")).isLessThan(command.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME));
     }
 
     @Test
-    void shouldCapPracticeScriptAtNinetySecondsAndOneTenthOfTheJobDeadline() {
-        assertThat(PracticePiAdapter.practiceScriptBudgetSeconds(3600)).isEqualTo(90);
-        assertThat(PracticePiAdapter.practiceScriptBudgetSeconds(900)).isEqualTo(90);
-        assertThat(PracticePiAdapter.practiceScriptBudgetSeconds(600)).isEqualTo(60);
-        assertThat(PracticePiAdapter.practiceScriptBudgetSeconds(120)).isEqualTo(12);
-        assertThat(PracticePiAdapter.practiceScriptBudgetSeconds(5)).isEqualTo(1);
+    void shouldGiveTheRunnerOneTokenAndTheDirectModelBudgetWhenBuildingTheSpec() {
+        var spec = adapter.buildSandboxSpec(proxyRequest());
+
+        assertThat(spec.environment())
+                .containsEntry(PracticePiAdapter.DIRECT_MODEL_TOKENS_ENV, "150000")
+                .doesNotContainKey("PRACTICE_SCRIPT_PROXY_TOKEN");
+        assertThat(spec.command().getLast()).doesNotContain("PRACTICE_SCRIPT_PROXY_TOKEN");
     }
 
     @Test
@@ -108,7 +146,6 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 null,
                 "job-token-123",
                 PracticePiAdapter.MIN_TIMEOUT_SECONDS,
-                null,
                 Map.of());
 
         assertThat(Long.parseLong(
@@ -117,10 +154,11 @@ class PracticePiAdapterTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"600, 480000", "3600, 3450000", "120, 48000"})
-    void shouldTakeThePracticeScriptStageOutOfTheRunnerBudget(int timeoutSeconds, long expectedBudgetMs) {
+    @CsvSource({"600, 540000", "3600, 3540000", "120, 60000"})
+    void shouldGiveTheRunnerTheWholeTimeoutLessTheShutdownBufferWhenBuildingTheSpec(
+            int timeoutSeconds, long expectedBudgetMs) {
         PracticeAgentRequest request = new PracticeAgentRequest(
-                "openai-completions", "m", null, null, null, "job-token-123", timeoutSeconds, null, Map.of());
+                "openai-completions", "m", null, null, null, "job-token-123", timeoutSeconds, Map.of());
 
         long budgetMs =
                 Long.parseLong(adapter.buildSandboxSpec(request).environment().get("AGENT_BUDGET_MS"));
@@ -129,11 +167,10 @@ class PracticePiAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldGiveThePracticeScriptStageNoModelsAndNoTokenWhenTheJobHasNone() {
+    void shouldStageNoModelsFileWhenTheJobHasNoDirectModels() {
         var spec = adapter.buildSandboxSpec(proxyRequest());
 
         assertThat(spec.inputFiles()).doesNotContainKey(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE);
-        assertThat(spec.environment()).doesNotContainKey("PRACTICE_SCRIPT_PROXY_TOKEN");
     }
 
     @Test
@@ -146,12 +183,11 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 null,
                 "job-token-123",
                 600,
-                "practice-script-token-456",
                 Map.of(ModelKind.CHAT, model("openai-completions", "qwen-chat")));
 
         var spec = adapter.buildSandboxSpec(request);
 
-        assertThat(spec.environment()).containsEntry("PRACTICE_SCRIPT_PROXY_TOKEN", "practice-script-token-456");
+        assertThat(spec.environment()).doesNotContainKey("PRACTICE_SCRIPT_PROXY_TOKEN");
         assertThat(spec.networkPolicy()).isNotNull();
         assertThat(spec.networkPolicy().llmProxyToken()).isEqualTo("job-token-123");
         JsonNode models = new ObjectMapper().readTree(spec.inputFiles().get(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE));
@@ -169,7 +205,6 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 null,
                 "job-token-123",
                 600,
-                "practice-script-token-456",
                 Map.of(ModelKind.CHAT, legacyChat, ModelKind.EMBEDDING, model("openai-embeddings", "embedder")));
 
         JsonNode models = new ObjectMapper()
@@ -185,7 +220,6 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 null,
                 "job-token-123",
                 600,
-                "practice-script-token-456",
                 Map.of(ModelKind.CHAT, legacyChat));
         assertThat(adapter.buildSandboxSpec(withoutSlots).inputFiles())
                 .as("a job without any callable model has no models file")
@@ -225,7 +259,6 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 ReasoningEffort.MEDIUM,
                 "job-token-123",
                 600,
-                null,
                 Map.of());
 
         var spec = adapter.buildSandboxSpec(request);

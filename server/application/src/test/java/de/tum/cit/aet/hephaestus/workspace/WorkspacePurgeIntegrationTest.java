@@ -44,7 +44,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -52,7 +52,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.SharedTestDoubles.LateFailingWorkspacePurgeContributor;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -141,13 +141,13 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackEvidenceRepository feedbackEvidenceRepository;
 
     @Autowired
     private FeedbackPlacementRepository feedbackPlacementRepository;
@@ -772,10 +772,10 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         private record DerivedConversation(
-                List<UUID> observationIds, UUID preparedId, UUID deliveredId, UUID messageId) {}
+                List<UUID> practiceResultIds, UUID preparedId, UUID deliveredId, UUID messageId) {}
 
         private void assertDerivedConversationExists(DerivedConversation derived) {
-            assertThat(observationRepository.findAllById(derived.observationIds()))
+            assertThat(practiceResultRepository.findAllById(derived.practiceResultIds()))
                     .hasSize(2);
             assertThat(feedbackRepository.findById(derived.preparedId()))
                     .get()
@@ -794,7 +794,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         private void assertDerivedConversationErased(DerivedConversation derived) {
-            assertThat(observationRepository.findAllById(derived.observationIds()))
+            assertThat(practiceResultRepository.findAllById(derived.practiceResultIds()))
                     .isEmpty();
             assertThat(feedbackRepository.findById(derived.preparedId())).isEmpty();
             assertThat(feedbackRepository.findById(derived.deliveredId())).isEmpty();
@@ -805,7 +805,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         private List<@Nullable UUID> boundFeedbackIds(DerivedConversation derived) {
             return jdbcTemplate.queryForList(
-                    "SELECT feedback_id FROM feedback_observation WHERE feedback_id IN (?, ?)",
+                    "SELECT feedback_id FROM feedback_evidence WHERE feedback_id IN (?, ?)",
                     UUID.class,
                     derived.preparedId(),
                     derived.deliveredId());
@@ -849,11 +849,11 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             job.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
             job = agentJobRepository.save(job);
 
-            List<UUID> observationIds = List.of(UUID.randomUUID(), UUID.randomUUID());
-            for (UUID observationId : observationIds) {
-                observationRepository.insertIfAbsent(
-                        observationId,
-                        "occ-" + observationId,
+            List<UUID> practiceResultIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+            for (UUID practiceResultId : practiceResultIds) {
+                practiceResultRepository.insertIfAbsent(
+                        practiceResultId,
+                        "occ-" + practiceResultId,
                         job.getId(),
                         job.getWorkspace().getId(),
                         practice.getId(),
@@ -861,9 +861,12 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         ArtifactKinds.CONVERSATION_THREAD.value(),
                         threadId,
                         owner.getId(),
-                        "Observation title",
+                        "Result title",
                         "NOT_MET",
                         "MAJOR",
+                        null,
+                        null,
+                        "test-scope",
                         null,
                         null,
                         null,
@@ -883,8 +886,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     .source(FeedbackSource.AGENT)
                     .createdAt(Instant.now())
                     .build());
-            feedbackObservationRepository.insertIfAbsent(
-                    prepared.getId(), observationIds.get(0), EvidenceRole.PRIMARY.name(), 0);
+            feedbackEvidenceRepository.insertIfAbsent(
+                    prepared.getId(), practiceResultIds.get(0), null, EvidenceRole.PRIMARY.name(), 0);
             Feedback delivered = feedbackRepository.save(Feedback.builder()
                     .agentJobId(job.getId())
                     .workspaceId(workspace.getId())
@@ -899,15 +902,15 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     .createdAt(Instant.now())
                     .deliveredAt(Instant.now())
                     .build());
-            feedbackObservationRepository.insertIfAbsent(
-                    delivered.getId(), observationIds.get(1), EvidenceRole.PRIMARY.name(), 0);
+            feedbackEvidenceRepository.insertIfAbsent(
+                    delivered.getId(), practiceResultIds.get(1), null, EvidenceRole.PRIMARY.name(), 0);
             feedbackPlacementRepository.save(FeedbackPlacement.builder()
                     .feedback(delivered)
                     .placementType(PlacementType.CONVERSATION_TURN)
                     .chatMessageId(message.getId())
                     .createdAt(Instant.now())
                     .build());
-            return new DerivedConversation(observationIds, prepared.getId(), delivered.getId(), message.getId());
+            return new DerivedConversation(practiceResultIds, prepared.getId(), delivered.getId(), message.getId());
         }
     }
 }

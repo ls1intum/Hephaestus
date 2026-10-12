@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.feedback.inapp.dto;
 
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup.Target;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkLabels;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkRefDTO;
@@ -40,14 +40,14 @@ public record InAppEvidenceDTO(
         @Schema(description = "What the review recorded on this piece of work") @Nullable
         String summary) {
     /**
-     * @param target the run that produced the observation, when the lookup found it; without it the work is
+     * @param target the run that produced the result, when the lookup found it; without it the work is
      *     named by its kind alone
      */
-    public static InAppEvidenceDTO from(Observation observation, @Nullable Target target) {
+    public static InAppEvidenceDTO from(PracticeResult practiceResult, @Nullable Target target) {
         return new InAppEvidenceDTO(
-                ReviewedWorkLabels.ref(observation.getArtifactKind(), observation.getArtifactId(), target),
-                observation.getObservedAt(),
-                observation.getOutcome(),
-                observation.getSummary());
+                ReviewedWorkLabels.ref(practiceResult.getArtifactKind(), practiceResult.getArtifactId(), target),
+                practiceResult.getObservedAt(),
+                practiceResult.getOutcome(),
+                practiceResult.getSummary());
     }
 }

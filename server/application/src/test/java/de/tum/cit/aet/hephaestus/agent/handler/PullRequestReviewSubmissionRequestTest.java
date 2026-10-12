@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import org.junit.jupiter.api.Nested;
@@ -89,14 +89,14 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
     }
 
     @Nested
-    class ObservationPopulation {
+    class ResultPopulation {
 
         @Test
         void aLifecycleEventPutsTheRunInTheUnbiasedPopulation() {
             var request = new PullRequestReviewSubmissionRequest(
                     samplePullRequestData(), "branch", "sha", "main", "base", ScmSignals.PULL_REQUEST_READY);
 
-            assertThat(request.observationOrigin()).isEqualTo(ObservationOrigin.LIVE);
+            assertThat(request.practiceResultOrigin()).isEqualTo(ResultOrigin.LIVE);
         }
 
         @Test
@@ -107,7 +107,7 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
             var request =
                     new PullRequestReviewSubmissionRequest(samplePullRequestData(), "branch", "sha", "main", "base");
 
-            assertThat(request.observationOrigin()).isEqualTo(ObservationOrigin.MANUAL);
+            assertThat(request.practiceResultOrigin()).isEqualTo(ResultOrigin.MANUAL);
         }
     }
 }

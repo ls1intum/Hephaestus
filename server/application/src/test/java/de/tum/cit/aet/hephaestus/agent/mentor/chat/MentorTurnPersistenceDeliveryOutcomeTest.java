@@ -58,7 +58,7 @@ class MentorTurnPersistenceDeliveryOutcomeTest extends BaseUnitTest {
 
         persistence.recordDelivery(fixture.cookie(), MentorChannel.DeliveryOutcome.INSTANCE_SILENCED);
 
-        verify(reconciler).suppressForSilentMode(1L, 2L, List.of(fixture.observationId()));
+        verify(reconciler).suppressForSilentMode(1L, 2L, List.of(fixture.practiceResultId()));
         verify(reconciler, never()).reconcile(anyLong(), anyLong(), any(), any());
     }
 
@@ -70,11 +70,12 @@ class MentorTurnPersistenceDeliveryOutcomeTest extends BaseUnitTest {
         persistence.recordDelivery(fixture.cookie(), MentorChannel.DeliveryOutcome.DELIVERED);
 
         verify(reconciler, never()).suppressForSilentMode(anyLong(), anyLong(), any());
-        verify(reconciler).reconcile(1L, 2L, fixture.cookie().assistantMessageId(), List.of(fixture.observationId()));
+        verify(reconciler)
+                .reconcile(1L, 2L, fixture.cookie().assistantMessageId(), List.of(fixture.practiceResultId()));
     }
 
     @Test
-    void aReplyThatOnlyNamedAnObservationSettlesNothing() {
+    void aReplyThatOnlyNamedAResultSettlesNothing() {
         enableTransaction();
         Fixture fixture = fixture();
         fixture.assistant().setParts(parts(link(UUID.randomUUID(), null)));
@@ -84,6 +85,36 @@ class MentorTurnPersistenceDeliveryOutcomeTest extends BaseUnitTest {
 
         verify(reconciler, never()).reconcile(anyLong(), anyLong(), any(), any());
         verify(reconciler, never()).suppressForSilentMode(anyLong(), anyLong(), any());
+    }
+
+    @Test
+    void shouldReconcileTheResultsOfProblemAndLegacyLinksWhenTheReplyWasDelivered() {
+        enableTransaction();
+        Fixture fixture = fixture();
+        UUID problemResult = UUID.randomUUID();
+        UUID legacyResult = UUID.randomUUID();
+        ObjectNode problemLink = NODES.objectNode()
+                .put("type", "data-result-observation")
+                .put("id", UUID.randomUUID().toString());
+        problemLink
+                .putObject("data")
+                .put("practiceResultId", problemResult.toString())
+                .put("observationId", UUID.randomUUID().toString())
+                .put("text", "Log it before the retry.");
+        // Stored before protocol 2: its observationId is the result's id.
+        ObjectNode legacyLink = NODES.objectNode()
+                .put("type", "data-observation")
+                .put("id", UUID.randomUUID().toString());
+        legacyLink
+                .putObject("data")
+                .put("observationId", legacyResult.toString())
+                .put("text", "Say why.");
+        fixture.assistant().setParts(parts(problemLink, legacyLink));
+
+        persistence.recordDelivery(fixture.cookie(), MentorChannel.DeliveryOutcome.DELIVERED);
+
+        verify(reconciler)
+                .reconcile(1L, 2L, fixture.cookie().assistantMessageId(), List.of(problemResult, legacyResult));
     }
 
     @Test
@@ -99,7 +130,7 @@ class MentorTurnPersistenceDeliveryOutcomeTest extends BaseUnitTest {
 
     private Fixture fixture() {
         UUID assistantId = UUID.randomUUID();
-        UUID observationId = UUID.randomUUID();
+        UUID practiceResultId = UUID.randomUUID();
         Workspace workspace = new Workspace();
         workspace.setId(1L);
         User user = new User();
@@ -111,16 +142,16 @@ class MentorTurnPersistenceDeliveryOutcomeTest extends BaseUnitTest {
         assistant.setId(assistantId);
         assistant.setThread(thread);
         // A link stored before links carried their feedback, beside one that showed it: only the second counts.
-        assistant.setParts(parts(link(UUID.randomUUID(), null), link(observationId, "Name the trade-off.")));
+        assistant.setParts(parts(link(UUID.randomUUID(), null), link(practiceResultId, "Name the trade-off.")));
         when(chatMessageRepository.findById(assistantId)).thenReturn(Optional.of(assistant));
-        return new Fixture(cookie(assistantId), assistant, observationId);
+        return new Fixture(cookie(assistantId), assistant, practiceResultId);
     }
 
-    private static ObjectNode link(UUID observationId, @Nullable String text) {
+    private static ObjectNode link(UUID practiceResultId, @Nullable String text) {
         ObjectNode part = NODES.objectNode()
-                .put("type", "data-observation")
+                .put("type", "data-result")
                 .put("id", UUID.randomUUID().toString());
-        ObjectNode data = part.putObject("data").put("observationId", observationId.toString());
+        ObjectNode data = part.putObject("data").put("practiceResultId", practiceResultId.toString());
         if (text != null) {
             data.put("text", text);
         }
@@ -147,5 +178,5 @@ class MentorTurnPersistenceDeliveryOutcomeTest extends BaseUnitTest {
     }
 
     private record Fixture(
-            MentorTurnPersistence.TurnPersistenceCookie cookie, ChatMessage assistant, UUID observationId) {}
+            MentorTurnPersistence.TurnPersistenceCookie cookie, ChatMessage assistant, UUID practiceResultId) {}
 }

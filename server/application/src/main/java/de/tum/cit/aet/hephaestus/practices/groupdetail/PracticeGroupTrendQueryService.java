@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.practices.groupdetail;
 
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupService;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService.StandingSnapshot;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService.StandingSnapshot.PracticeStanding;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrend;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrendService;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.PracticeGroupTrendDTO;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.StandingSnapshot;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.StandingSnapshot.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrend;
+import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
+import de.tum.cit.aet.hephaestus.practices.result.trend.dto.PracticeGroupTrendDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
 import java.util.Set;

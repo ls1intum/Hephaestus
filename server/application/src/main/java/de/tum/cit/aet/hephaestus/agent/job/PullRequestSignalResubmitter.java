@@ -168,10 +168,10 @@ public class PullRequestSignalResubmitter {
                 }
                 if (reviewData != null) request = request.forSubmittedReview(reviewData);
                 JobSubmissionRequest selected =
-                        request.withOrigin(SignalOrigins.observationOriginOf(signal.getDiscoveredVia()));
+                        request.withOrigin(SignalOrigins.practiceResultOriginOf(signal.getDiscoveredVia()));
                 if (followup.parent() != null) {
                     selected = new LinkedRepairFollowupRequest(
-                            request.withOrigin(SignalOrigins.observationOriginOf(signal.getDiscoveredVia())),
+                            request.withOrigin(SignalOrigins.practiceResultOriginOf(signal.getDiscoveredVia())),
                             followup.parent().predecessorJobId(),
                             followup.parent().rootJobId());
                 }

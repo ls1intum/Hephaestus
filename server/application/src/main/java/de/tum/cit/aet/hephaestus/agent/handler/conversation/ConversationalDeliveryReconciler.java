@@ -3,15 +3,15 @@ package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ConversationConsentGate;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -32,51 +32,51 @@ public class ConversationalDeliveryReconciler {
     private static final Logger log = LoggerFactory.getLogger(ConversationalDeliveryReconciler.class);
 
     private final FeedbackRepository feedbackRepository;
-    private final FeedbackObservationRepository feedbackObservationRepository;
+    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
-    private final ObservationRepository observationRepository;
-    private final ObservationVisibilityPolicy visibilityPolicy;
+    private final PracticeResultRepository practiceResultRepository;
+    private final ResultVisibilityPolicy visibilityPolicy;
     private final ConversationConsentGate consentGate;
 
     public ConversationalDeliveryReconciler(
             FeedbackRepository feedbackRepository,
-            FeedbackObservationRepository feedbackObservationRepository,
+            FeedbackEvidenceRepository feedbackEvidenceRepository,
             FeedbackPlacementRepository feedbackPlacementRepository,
-            ObservationRepository observationRepository,
-            ObservationVisibilityPolicy visibilityPolicy,
+            PracticeResultRepository practiceResultRepository,
+            ResultVisibilityPolicy visibilityPolicy,
             ConversationConsentGate consentGate) {
         this.feedbackRepository = feedbackRepository;
-        this.feedbackObservationRepository = feedbackObservationRepository;
+        this.feedbackEvidenceRepository = feedbackEvidenceRepository;
         this.feedbackPlacementRepository = feedbackPlacementRepository;
-        this.observationRepository = observationRepository;
+        this.practiceResultRepository = practiceResultRepository;
         this.visibilityPolicy = visibilityPolicy;
         this.consentGate = consentGate;
     }
 
     /**
-     * Whether the mentor may show {@code recipientUserId} feedback about this observation now: one {@link #admitted}
+     * Whether the mentor may show {@code recipientUserId} feedback about this result now: one {@link #admitted}
      * would act on, and about the recipient. Asked while the turn runs, before the link is acknowledged, shown or
      * stored, so an id the model invented or borrowed never reaches the developer; {@link #reconcile} still settles
      * the ledger once the reply is stored.
      */
     @Transactional(readOnly = true)
-    public boolean admits(long workspaceId, long recipientUserId, UUID observationId) {
-        Observation observation = admitted(workspaceId, List.of(observationId)).get(observationId);
-        return observation != null && Long.valueOf(recipientUserId).equals(observation.getAboutUserId());
+    public boolean admits(long workspaceId, long recipientUserId, UUID practiceResultId) {
+        PracticeResult practiceResult =
+                admitted(workspaceId, List.of(practiceResultId)).get(practiceResultId);
+        return practiceResult != null && Long.valueOf(recipientUserId).equals(practiceResult.getAboutUserId());
     }
 
-    public int reconcile(long workspaceId, long recipientUserId, UUID chatMessageId, List<UUID> linkedObservationIds) {
+    public int reconcile(long workspaceId, long recipientUserId, UUID chatMessageId, List<UUID> linkedResultIds) {
         Instant now = Instant.now();
-        for (Observation observation :
-                admitted(workspaceId, linkedObservationIds).values()) {
-            UUID observationId = observation.getId();
-            List<UUID> feedbackIds = feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
-                    workspaceId, recipientUserId, observationId);
+        for (PracticeResult practiceResult :
+                admitted(workspaceId, linkedResultIds).values()) {
+            UUID practiceResultId = practiceResult.getId();
+            List<UUID> feedbackIds = feedbackEvidenceRepository.findPreparedConversationFeedbackIdsByResult(
+                    workspaceId, recipientUserId, practiceResultId);
             if (feedbackIds.isEmpty()) {
                 continue;
             }
-            if (feedbackRepository.existsDeliveredInContextForObservation(
-                    workspaceId, recipientUserId, observationId)) {
+            if (feedbackRepository.existsDeliveredInContextForResult(workspaceId, recipientUserId, practiceResultId)) {
                 continue;
             }
             UUID feedbackId = feedbackIds.get(0);
@@ -101,12 +101,12 @@ public class ConversationalDeliveryReconciler {
     }
 
     /**
-     * The linked observations this turn may act on: the observations this workspace can read whose claim and
+     * The linked results this turn may act on: the results this workspace can read whose claim and
      * evidence the visibility policy still permits for mentoring and, for one drawn from a conversation, whose
      * conversation is still consented to, keyed by id, in the mentor's emission order. Pausing a channel erases
      * nothing, so its consent is read here, not inferred from the evidence.
      *
-     * <p>{@code linkedObservationIds} are the links the stored reply shows. {@link #admits} already checked each one
+     * <p>{@code linkedResultIds} are the links the stored reply shows. {@link #admits} already checked each one
      * while the turn ran, but authorization can change between that check and the end of the turn, so the ledger is
      * gated again here, and <em>both</em> endings of a turn are ledger writes — one flips a unit to DELIVERED, the
      * other burns it to SUPPRESSED — so both are gated here rather than at one call site.
@@ -118,19 +118,20 @@ public class ConversationalDeliveryReconciler {
      * still settled, by {@link ConversationFeedbackTtlSweeper} at the end of its window.
      *
      * <p>Each check is one batch for the whole turn, not one query per linked id — nothing caps how many
-     * observations a mentor turn links (the reply stores a part per {@code link_observation} tool call).
+     * results a mentor turn links (the reply stores a part per {@code link_observation} tool call).
      */
-    private Map<UUID, Observation> admitted(long workspaceId, List<UUID> linkedObservationIds) {
-        if (linkedObservationIds == null || linkedObservationIds.isEmpty()) {
+    private Map<UUID, PracticeResult> admitted(long workspaceId, List<UUID> linkedResultIds) {
+        if (linkedResultIds == null || linkedResultIds.isEmpty()) {
             return Map.of();
         }
-        // Emission order, deduplicated: the first linked observation that survives every gate wins the turn, so
+        // Emission order, deduplicated: the first linked result that survives every gate wins the turn, so
         // the order the mentor linked them in is part of the answer and must survive the batching below.
-        Set<UUID> observationIds = new LinkedHashSet<>(linkedObservationIds);
-        List<Observation> rows = observationRepository.findAllByIdInAndWorkspaceId(observationIds, workspaceId);
-        Map<UUID, Observation> byId = new HashMap<>(rows.size());
-        for (Observation observation : rows) {
-            byId.put(observation.getId(), observation);
+        Set<UUID> practiceResultIds = new LinkedHashSet<>(linkedResultIds);
+        List<PracticeResult> rows =
+                practiceResultRepository.findAllByIdInAndWorkspaceId(practiceResultIds, workspaceId);
+        Map<UUID, PracticeResult> byId = new HashMap<>(rows.size());
+        for (PracticeResult practiceResult : rows) {
+            byId.put(practiceResult.getId(), practiceResult);
         }
         Set<UUID> visible = visibilityPolicy.permitsForNewDelivery(
                 workspaceId, byId.values(), SourceUsePurpose.CONVERSATIONAL_MENTORING);
@@ -138,37 +139,38 @@ public class ConversationalDeliveryReconciler {
                 workspaceId,
                 byId.values().stream()
                         .filter(ConversationalDeliveryReconciler::fromConversation)
-                        .map(Observation::getArtifactId)
+                        .map(PracticeResult::getArtifactId)
                         .toList());
-        Map<UUID, Observation> admitted = new LinkedHashMap<>();
-        for (UUID observationId : observationIds) {
-            Observation observation = byId.get(observationId);
+        Map<UUID, PracticeResult> admitted = new LinkedHashMap<>();
+        for (UUID practiceResultId : practiceResultIds) {
+            PracticeResult practiceResult = byId.get(practiceResultId);
             // Absent from any batch means refused.
-            if (observation != null
-                    && visible.contains(observationId)
-                    && (!fromConversation(observation) || consentedThreads.contains(observation.getArtifactId()))) {
-                admitted.put(observationId, observation);
+            if (practiceResult != null
+                    && visible.contains(practiceResultId)
+                    && (!fromConversation(practiceResult)
+                            || consentedThreads.contains(practiceResult.getArtifactId()))) {
+                admitted.put(practiceResultId, practiceResult);
             }
         }
         return admitted;
     }
 
-    private static boolean fromConversation(Observation observation) {
-        return ArtifactKinds.CONVERSATION_THREAD.equals(observation.getArtifactKind());
+    private static boolean fromConversation(PracticeResult practiceResult) {
+        return ArtifactKinds.CONVERSATION_THREAD.equals(practiceResult.getArtifactKind());
     }
 
     /**
      * Silent Mode permanently suppresses the unit instead of postponing it: the mentor had this to say and
      * the instance stopped it, which is a different answer to "why was nothing said" than "it is still
-     * queued". Walks the same {@link #admitted} observations {@link #reconcile} may act on: a linked id that
+     * queued". Walks the same {@link #admitted} results {@link #reconcile} may act on: a linked id that
      * subsystem is not allowed to raise is not one Silent Mode gets to claim it stopped. It does not repeat
-     * that method's exact-observation delivery check — "already said inline" is about what to say next, and nothing is
+     * that method's exact-practiceResult delivery check — "already said inline" is about what to say next, and nothing is
      * being said.
      */
-    public int suppressForSilentMode(long workspaceId, long recipientUserId, List<UUID> linkedObservationIds) {
-        for (UUID observationId : admitted(workspaceId, linkedObservationIds).keySet()) {
-            List<UUID> feedbackIds = feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
-                    workspaceId, recipientUserId, observationId);
+    public int suppressForSilentMode(long workspaceId, long recipientUserId, List<UUID> linkedResultIds) {
+        for (UUID practiceResultId : admitted(workspaceId, linkedResultIds).keySet()) {
+            List<UUID> feedbackIds = feedbackEvidenceRepository.findPreparedConversationFeedbackIdsByResult(
+                    workspaceId, recipientUserId, practiceResultId);
             if (feedbackIds.isEmpty()) {
                 continue;
             }
