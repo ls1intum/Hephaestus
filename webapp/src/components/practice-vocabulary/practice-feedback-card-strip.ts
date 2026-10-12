@@ -5,9 +5,7 @@ import { count, countedWork } from "./feedback-text";
 import type { CleanWork, ReviewedWorkOutcome } from "./PracticeFeedbackCard";
 
 /**
- * The strip is a window on the newest reviews of this developer's work, at most this many, the
- * evidence and the clean work alike: a glance at the pattern, not a log of every place it was
- * seen. The label counts the distinct work on show, never more.
+ * The card supplies support examples and clean work, not every review of the developer's work.
  */
 const STRIP_WORK_LIMIT = 5;
 
@@ -18,8 +16,8 @@ export interface StripPiece extends ReviewedWorkOutcome {
 
 /**
  * The strip: evidence and clean work in one run, left to right in time, so a clean piece reviewed
- * before the newest evidence stands where its date puts it rather than after it. The window keeps
- * the newest.
+ * before the latest evidence stands where its date puts it rather than after it. The window keeps
+ * the latest of what was supplied.
  */
 export function stripPieces(
 	reviewedWork: ReviewedWorkOutcome[],
@@ -63,11 +61,9 @@ export function countedStripWork(refs: ReviewedWorkRef[]): {
 	const counted = oneKind
 		? countedWork(first.kind, distinct, provider)
 		: count(distinct, "piece of work", "pieces of work");
-	// "Newest three pull requests" is also right when three is all there ever were; one piece is
-	// simply where it was seen.
 	return {
 		kind: oneKind ? first.kind : undefined,
 		provider,
-		text: distinct > 1 ? `Newest ${counted}` : `Seen on ${counted}`,
+		text: `Seen on ${counted}`,
 	};
 }

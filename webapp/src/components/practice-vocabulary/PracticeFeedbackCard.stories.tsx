@@ -64,7 +64,7 @@ export const New: Story = {
 		// The number rule and the two day rules of `feedback-text` and `lib/dates`: a word below ten,
 		// the short day in the strip, the full day and the minute in the footer. The label counts
 		// the wire's distinct pieces of evidence, by the kind every piece carries.
-		await expect(canvas.getByText("Newest three pull requests")).toBeVisible();
+		await expect(canvas.getByText("Seen on three pull requests")).toBeVisible();
 		await expect(canvas.getByRole("meter", { name: "Clean work in a row" })).toHaveAttribute(
 			"aria-valuetext",
 			"0 of 3 clean",
@@ -105,7 +105,7 @@ export const New: Story = {
 		await userEvent.click(groupName);
 		await expect(args.onOpenGroup).toHaveBeenCalledWith("review-ready-work");
 		// The strip reads left to right in time: #17 on 28 Aug, #20 on 3 Sep, #19 on 6 Sep.
-		const strip = canvas.getByText("Newest three pull requests").parentElement;
+		const strip = canvas.getByText("Seen on three pull requests").parentElement;
 		if (!strip) {
 			throw new Error("Expected the strip around its label.");
 		}
@@ -193,7 +193,7 @@ export const TwoOfThreeClean: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByText("New")).toBeNull();
 		await expect(canvas.getByText("Open")).toBeVisible();
-		await expect(canvas.getByText("Newest five pull requests")).toBeVisible();
+		await expect(canvas.getByText("Seen on five pull requests")).toBeVisible();
 		// A count toward a threshold: the meter says it in words as well as in its value.
 		const meter = canvas.getByRole("meter", { name: "Clean work in a row" });
 		await expect(meter).toHaveAttribute("aria-valuenow", "2");
@@ -393,13 +393,21 @@ export const GitLabWork: Story = {
 			state: "open",
 			reviewedWork: card.reviewedWork.map((piece) => ({
 				...piece,
-				ref: { ...piece.ref, provider: "GITLAB", label: `!${piece.ref.id}` },
+				ref: {
+					...piece.ref,
+					provider: "GITLAB",
+					label: `!${piece.ref.id}`,
+					url: `https://gitlab.example.com/team/project/-/merge_requests/${piece.ref.id}`,
+				},
 			})),
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Newest three merge requests")).toBeVisible();
-		await expect(canvas.getByRole("link", { name: /^!17/u })).toBeVisible();
+		await expect(canvas.getByText("Seen on three merge requests")).toBeVisible();
+		await expect(canvas.getByRole("link", { name: /^!17/u })).toHaveAttribute(
+			"href",
+			"https://gitlab.example.com/team/project/-/merge_requests/17",
+		);
 	},
 };
 
@@ -421,7 +429,7 @@ export const MixedWork: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Newest three pieces of work")).toBeVisible();
+		await expect(canvas.getByText("Seen on three pieces of work")).toBeVisible();
 		await expect(canvas.queryByText(/pull requests/u)).toBeNull();
 	},
 };
@@ -464,7 +472,7 @@ export const WorkWithoutAnAddress: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("link")).toBeNull();
-		await expect(canvas.getByText("Newest two conversations")).toBeVisible();
+		await expect(canvas.getByText("Seen on two conversations")).toBeVisible();
 		// The body names it in its own words, since only a number carries an address to link to.
 		await expect(canvas.getByText(/^In #backend-review the outage/u)).toBeVisible();
 	},
