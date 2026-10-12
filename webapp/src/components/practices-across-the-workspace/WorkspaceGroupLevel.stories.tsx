@@ -94,7 +94,9 @@ export const Default: Story = {
 		// The bars' explanation waits behind the legend's (i), worded for a practice.
 		await expect(level.queryByText(/^Each bar counts developers/u)).toBeNull();
 		await userEvent.click(level.getByRole("button", { name: "About the bars" }));
-		const bars = within(await screen.findByRole("dialog", { name: "About the bars" }));
+		const barsPanel = await screen.findByRole("dialog", { name: "About the bars" });
+		await expectSettledVisible(barsPanel);
+		const bars = within(barsPanel);
 		await expect(bars.getByText(/current standing in the practice,/u)).toBeVisible();
 		await expect(
 			bars.getByText(/So a small count can let others tell where you stand\.$/u),
