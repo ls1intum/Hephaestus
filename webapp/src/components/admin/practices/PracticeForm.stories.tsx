@@ -90,7 +90,7 @@ export const Create: Story = {
 		await expect(script).toHaveAttribute("aria-expanded", "false");
 		await userEvent.click(script);
 		await expect(
-			screen.getByText(/^TypeScript that runs before each review of this practice\./u),
+			screen.getByText(/^TypeScript that reviews this practice and returns its result\./u),
 		).toBeVisible();
 	},
 };
@@ -128,7 +128,7 @@ export const EditWithPracticeScript: Story = {
 			"false",
 		);
 		await expect(
-			screen.getByText("Optional. Code that finds places for the review to check."),
+			screen.getByText("Optional. The program that reviews this practice."),
 		).toBeVisible();
 		await expect(screen.getByText("Identifier and feedback delivery")).toBeVisible();
 		await expect(screen.getByRole("link", { name: /^Write a practice script/u })).toHaveAttribute(

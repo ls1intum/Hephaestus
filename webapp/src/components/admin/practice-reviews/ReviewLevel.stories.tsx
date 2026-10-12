@@ -539,7 +539,7 @@ export const WithPracticeScripts: Story = {
 		const panel = within(await settledDrawerPanel());
 		const section = panel.getByRole("region", { name: "Practice scripts" });
 		await expect(
-			within(section).getByText("What each practice script did before this review."),
+			within(section).getByText("How the program of each practice ran in this review."),
 		).toBeVisible();
 		await expect(within(section).getByRole("link", { name: "AI usage" })).toHaveAttribute(
 			"href",

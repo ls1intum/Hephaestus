@@ -62,7 +62,7 @@ export function ReviewPracticeScriptTable({
 	// figures to their right scroll into view.
 	return (
 		<Table bordered className="sm:min-w-160">
-			<caption className="sr-only">What each practice script did before this review</caption>
+			<caption className="sr-only">How the program of each practice ran in this review</caption>
 			<TableHeader>
 				<TableRow variant="static">
 					<TableHead scope="col" className="sm:min-w-40">

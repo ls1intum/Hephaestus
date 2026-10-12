@@ -1011,13 +1011,14 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								<Separator />
 								<CollapsibleSection
 									title="Script"
-									subtitle="Optional. Code that finds places for the review to check."
+									subtitle="Optional. The program that reviews this practice."
 									open={showPracticeScript}
 									onOpenChange={setShowPracticeScript}
 								>
 									<p className="max-w-2xl text-sm text-muted-foreground">
-										TypeScript that runs before each review of this practice. It points the review
-										at places to check and never writes feedback.{" "}
+										TypeScript that reviews this practice and returns its result. It can decide in
+										code, call models, or prepare places for the review to decide. It never writes
+										feedback. Without a script, the practice runs the built-in review.{" "}
 										<InlineLink href={PRACTICE_SCRIPT_GUIDE_URL} external>
 											Write a practice script
 										</InlineLink>

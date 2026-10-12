@@ -194,25 +194,24 @@ type PracticeScriptModelSlots = Partial<
 	Record<"chat" | "decision" | "embedding" | "reranking", "required" | "optional">
 >;
 
-/** The contract the practice script guide teaches: `definePracticeScript`, declared models and kinds, and leads. */
+/**
+ * The contract the practice script guide teaches: `definePracticeScript`, declared models, and a
+ * program that prepares leads and lets `ctx.review()` decide.
+ */
 export function practiceScript(models: PracticeScriptModelSlots = {}): string {
 	const declared = Object.entries(models).map(([slot, need]) => `${slot}: "${need}"`);
 	return [
-		'import { addedComments, definePracticeScript, type Lead } from "../lib/practice-script.ts";',
+		'import { addedComments, definePracticeScript, requireChange } from "../lib/practice-script.ts";',
 		"",
 		String.raw`const OPEN_WORK = /\b(TODO|FIXME)\b/u;`,
 		"",
 		"export default definePracticeScript({",
-		"  meta: {",
-		"    version: 1,",
-		...(declared.length > 0 ? [`    models: { ${declared.join(", ")} },`] : []),
-		'    kinds: { "open-work": "A TODO or FIXME that the change adds." },',
-		"  },",
+		declared.length > 0 ? `  meta: { models: { ${declared.join(", ")} } },` : "  meta: {},",
 		"  async run(ctx) {",
-		"    const leads: Lead[] = addedComments(ctx.change)",
+		"    const leads = addedComments(requireChange(ctx.files))",
 		"      .filter((comment) => OPEN_WORK.test(comment.text))",
-		'      .map((comment) => ({ at: comment.at, kind: "open-work" }));',
-		"    return { leads };",
+		'      .map((comment) => ({ at: comment.at, label: "A TODO or FIXME that the change adds." }));',
+		"    return ctx.review({ leads });",
 		"  },",
 		"});",
 	].join("\n");

@@ -74,6 +74,8 @@ export const Default: Story = {
 		await expect(canvas.getAllByText("Not met · 2 problems")).toHaveLength(3);
 		await expect(canvas.getAllByText("Not met · 3 problems")).toHaveLength(1);
 		await expect(canvas.queryByRole("button", { name: /^Not met/u })).not.toBeInTheDocument();
+		// The count also shows beside the practice, so a sighted reader sees it without the icon.
+		await expect(canvas.getAllByText("2 problems")).toHaveLength(3);
 		canvas.getByText("Does not apply");
 		// Severity is named only where it costs something: critical or major.
 		canvas.getByText("Critical");

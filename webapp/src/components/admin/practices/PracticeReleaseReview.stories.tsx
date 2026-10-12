@@ -208,7 +208,7 @@ export const GuidanceUpdate: Story = {
 	},
 };
 
-/** The script that runs before each review carries the editor's name for it. */
+/** The practice's review program carries the editor's name for it. */
 export const PracticeScriptUpdate: Story = {
 	args: {
 		proposal: {

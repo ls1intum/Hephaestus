@@ -6,7 +6,7 @@ import { useNow } from "@/components/common/use-now";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { ReviewRunWorkCell } from "@/components/practice-trace/ReviewRunDayTable";
 import { ClaimCurrentnessBadge } from "@/components/practice-vocabulary/ClaimCurrentness";
-import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
+import { OUTCOME_DEFS, problemCount } from "@/components/practice-vocabulary/outcome-defs";
 import { PracticeTableRow } from "@/components/practice-vocabulary/PracticeTable";
 import {
 	RecordDayTable,
@@ -198,6 +198,9 @@ export function ResultRow({ result, withDay = false }: ResultRowProps) {
 					<span className="max-w-md text-sm font-semibold break-words">{result.summary}</span>
 					<span className="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
 						<ReviewPracticeName practiceName={result.practiceName} group={result.group} />
+						{result.outcome === "NOT_MET" && result.problemCount > 0 && (
+							<span>{problemCount(result.problemCount)}</span>
+						)}
 						{severity && <StatusLabel def={severity} className="text-xs" />}
 						<ResultOriginNote origin={result.origin} />
 					</span>

@@ -631,7 +631,7 @@ function PracticeScripts({
 		<SheetSection
 			part="details"
 			title="Practice scripts"
-			description="What each practice script did before this review."
+			description="How the program of each practice ran in this review."
 		>
 			{state.status === "error" ? (
 				<QueryErrorAlert
