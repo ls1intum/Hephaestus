@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.92.1
+
+### Patch Changes
+
+- Practice reviews avoid redundant database writes while preparing copied evidence. New people and repositories remain recorded immediately, and evidence erasure safeguards remain in force.
+
 ## 0.92.0
 
 ### Minor Changes
