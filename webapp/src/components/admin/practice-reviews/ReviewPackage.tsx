@@ -2,6 +2,7 @@ import { FileCode2Icon } from "lucide-react";
 
 import type { GetPracticeReviewFeedbackResponse, ReviewProposedPlacement } from "@/api/types.gen";
 import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
+import { OPERATOR_WITHHELD_TEXT } from "@/components/practice-vocabulary/delivery-place-defs";
 import { PLACEMENT_DEFS } from "@/components/practice-vocabulary/placement-defs";
 import {
 	Accordion,
@@ -12,6 +13,10 @@ import {
 
 import { FeedbackBody } from "./FeedbackBody";
 
+/**
+ * The placements a review proposed, the summary and the notes on lines. A private place's text is
+ * never shown here, even when a caller passes placements for it: the place's own words stand in.
+ */
 export function ReviewPackage({
 	feedback,
 	defaultExpanded = false,
@@ -19,6 +24,9 @@ export function ReviewPackage({
 	feedback: GetPracticeReviewFeedbackResponse;
 	defaultExpanded?: boolean;
 }) {
+	if (OPERATOR_WITHHELD_TEXT[feedback.channel] !== undefined) {
+		return <FeedbackBody feedback={{ ...feedback, body: undefined }} />;
+	}
 	const summary = feedback.proposedPlacements.find((placement) => placement.type === "SUMMARY");
 	const inline = feedback.proposedPlacements.filter(isInline);
 

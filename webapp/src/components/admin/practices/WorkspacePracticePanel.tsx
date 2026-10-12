@@ -3,30 +3,21 @@ import { ClipboardCheck, Pencil } from "lucide-react";
 
 import { cn } from "cn";
 import type { Practice, PracticeDefinitionOptions } from "@/api/types.gen";
-import { practiceLevel } from "@/components/admin/practice-reviews/review-levels";
-import { CatalogOriginNote } from "@/components/admin/practices/CatalogOriginBadge";
 import {
 	PRACTICE_SETUP_LEVEL_LABELS,
 	practiceFormLevel,
 } from "@/components/admin/practices/practice-search";
-import { PracticeDefinitionPreview } from "@/components/admin/practices/PracticeDefinitionPreview";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import { WorkspacePracticeDefinition } from "@/components/admin/practices/WorkspacePracticeDefinition";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { StatusBadge } from "@/components/common/StatusBadge";
-import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { LevelHeader } from "@/components/layout/detail-drawer/LevelHeader";
-import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
-import { AutonomySourceNote } from "@/components/practice-vocabulary/AutonomySourceNote";
 import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
 import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
 import { buttonVariants } from "@/components/ui/button";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
-import { Separator } from "@/components/ui/separator";
-import { autonomySourceOf } from "@/lib/practice-autonomy";
 
 export type WorkspacePracticeState = PanelState<{
 	practice: Practice;
@@ -82,8 +73,6 @@ export function WorkspacePracticePanel({
 	}
 
 	const { practice, definitionOptions, groupName } = state;
-	const autonomy = AUTONOMY_DEFS[practice.autonomy.effective];
-	const autonomySource = autonomySourceOf(practice.autonomy, groupName ?? null);
 
 	return (
 		<>
@@ -96,33 +85,19 @@ export function WorkspacePracticePanel({
 				description={<WorkTypeLabel artifactKind={practice.artifactKind} />}
 			/>
 
-			<DrawerBody className="space-y-6">
-				<ItemGroup className="gap-2">
-					<CatalogOriginNote origin={practice.catalogOrigin} kind="practice" />
-					<Item variant="muted" size="sm" role="listitem">
-						<ItemContent>
-							<ItemTitle className="flex flex-wrap items-center gap-2">
-								<StatusBadge def={autonomy} />
-								<AutonomySourceNote
-									source={autonomySource}
-									className="text-xs font-normal text-muted-foreground"
-								/>
-							</ItemTitle>
-							<ItemDescription className="line-clamp-none">{autonomy.description}</ItemDescription>
-						</ItemContent>
-					</Item>
-				</ItemGroup>
-
-				<Separator />
-
-				<PracticeDefinitionPreview definition={practice} options={definitionOptions} />
+			<DrawerBody>
+				<WorkspacePracticeDefinition
+					practice={practice}
+					definitionOptions={definitionOptions}
+					groupName={groupName}
+				/>
 			</DrawerBody>
 
 			<DrawerFooter>
 				<Link
-					to="/w/$workspaceSlug/admin/practices/reviews"
+					to="/w/$workspaceSlug/admin/practices/reviews/observations"
 					params={{ workspaceSlug }}
-					search={detailSearch(practiceLevel(practice.slug))}
+					search={{ practiceSlug: [practice.slug] }}
 					className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
 				>
 					<ClipboardCheck /> See review outcomes

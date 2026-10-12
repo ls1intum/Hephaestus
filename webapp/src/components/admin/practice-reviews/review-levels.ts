@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { REVIEW_RANGES } from "@/components/admin/practice-reviews/review-range";
+import { REVIEW_RANGES, reviewRangeOf } from "@/components/admin/practice-reviews/review-range";
 import {
 	type DetailStackEntry,
 	detailStackSchema,
@@ -12,11 +12,13 @@ import { workspaceAdminHead } from "@/lib/page-title";
 import { reviewArtifactTypeFromSlug, reviewArtifactTypeSlug } from "@/lib/artifact-kind-slugs";
 
 /**
- * The records Practice reviews opens over its tabs, as `?detail=kind:id`, by what each is called in
- * a level's header and in the path of the levels over it. They link to each other — feedback to its
- * observations and back — so every tab hosts every kind.
+ * What Practice reviews opens over its tabs, as `?detail=kind:id`, by what each is called in a
+ * level's header. Every record opens as its own sheet: a review, an observation, a piece of
+ * feedback, a piece of work and a practice. `trace` is the trace of one of them
+ * (`trace:review:<id>`), and a record opened from a trace is the one level over it
+ * (`review-layers.ts`).
  */
-const LEVEL_KINDS = ["review", "observation", "feedback", "work", "practice"] as const;
+const LEVEL_KINDS = ["review", "observation", "feedback", "work", "practice", "trace"] as const;
 
 export type PracticeReviewLevelKind = (typeof LEVEL_KINDS)[number];
 export type PracticeReviewLevel = DetailStackEntry<PracticeReviewLevelKind>;
@@ -25,15 +27,18 @@ export const PRACTICE_REVIEW_LEVEL_LABELS = {
 	review: "Review",
 	observation: "Observation",
 	feedback: "Feedback",
-	work: "Reviewed work",
+	work: "Work",
 	practice: "Practice",
+	trace: "Trace",
 } as const satisfies Record<PracticeReviewLevelKind, string>;
 
 /**
- * How far back the overview and a practice level count. The default covers 30 days.
+ * How far back the overview counts. Longer than Activity's week: reviews run
+ * per piece of work, so a week of them is often too few to read a mix from.
  */
 const rangeFilterSchema = z.object({
-	range: z.enum(REVIEW_RANGES).default("30d").catch("30d"),
+	// An address from before that asked for 12 months opens all time, which took its place.
+	range: z.preprocess(reviewRangeOf, z.enum(REVIEW_RANGES).default("30d").catch("30d")),
 });
 
 export const PRACTICE_REVIEWS_SEARCH_DEFAULTS = rangeFilterSchema.parse({});

@@ -142,7 +142,7 @@ function PracticeCatalogRoute() {
 	// Every open level owns its own preview query, keyed by that level's slug. Sharing one query per
 	// kind would let `?detail=practice:a&detail=practice:b` show a's definition while adding b.
 	const detailStack = parseDetailStack(detail, DETAIL_LEVEL_KINDS);
-	const stackControls = useDetailStack(detailStack);
+	const stackControls = useDetailStack();
 
 	const groupsQuery = useQuery({
 		...listGroupsOptions({ path: { workspaceSlug } }),

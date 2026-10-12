@@ -1,0 +1,199 @@
+import { PanelRightOpenIcon } from "lucide-react";
+import { createContext, type ReactElement, type ReactNode, use } from "react";
+
+import { cn } from "cn";
+import type { AgentJob, ReviewLineage } from "@/api/types.gen";
+import type { ObservationOrigin } from "@/components/practice-vocabulary/observation-origin-defs";
+
+import type { NumberedById, NumberedObservation } from "./lineage-chain";
+import type { RailItem } from "./lineage-story";
+import { HereBadge, hereFrame } from "./LineageStep";
+import type { RecordRef } from "./review-layers";
+import { sameTraceNode, type TraceNode, type Traced, traceStepKey } from "./review-trace";
+import type { TraceBottleneck } from "./trace-bottleneck";
+import type { TraceDisplay } from "./trace-display";
+import type { TraceFilter } from "./trace-filter";
+
+/** What every step of the trace reads from the story it is drawn in. */
+export interface StoryContext {
+	here: TraceNode | undefined;
+	/** The record a step opens, or undefined where it opens none. */
+	recordOf: (node: TraceNode) => RecordRef | undefined;
+	open: ((record: RecordRef) => void) | undefined;
+	/** The facts of a step, drawn under the record the reader started from where system info shows, or under every step. */
+	facts: (node: TraceNode) => ReactElement | null;
+	display: TraceDisplay;
+	/** Whether every step shows its facts, as "Expand all" asks. */
+	factsOpen: boolean;
+	/** When a developer first read the review's feedback, from the review itself. */
+	firstReadAt: Date | undefined;
+	/** How the review processed its results, from the review itself; undefined until it is read. */
+	resultProcessing: AgentJob["deliveryStatus"];
+	/** How the review came to run, from its row. */
+	origin: ObservationOrigin | undefined;
+	/** The review's own record, where the page read it and it is the trace's review. */
+	job: AgentJob | undefined;
+	/** Where the review stands among the reviews of its work. */
+	position: { index: number; total: number } | undefined;
+	/** Where the path was lost or slowed, which its stage's header marks. */
+	bottleneck: TraceBottleneck | undefined;
+}
+
+export const StoryNodes = createContext<StoryContext | undefined>(undefined);
+
+export function useStory(): StoryContext {
+	const context = use(StoryNodes);
+	if (context === undefined) {
+		throw new Error("A story step renders inside ReviewLineageGraph");
+	}
+	return context;
+}
+
+/** Whether a step lies off the path of the record in front. The work, the review and the moments never do. */
+export function offPath(traced: Traced | undefined, node: TraceNode): boolean {
+	if (traced === undefined) {
+		return false;
+	}
+	if (node.kind === "observation") {
+		return !traced.observations.has(node.id);
+	}
+	if (node.kind === "feedback") {
+		return !traced.feedback.has(node.id);
+	}
+	return false;
+}
+
+// ------------------------------------------------------------------------------------------------
+// A step the reader can stand on and open
+// ------------------------------------------------------------------------------------------------
+
+/**
+ * The part of a step that is its record. "You started here" and a ring mark the record the trace
+ * was opened for, with its facts under it where system info shows. A press on a step opens its
+ * record's sheet over the trace; the mark stays where it is.
+ */
+export function StoryNode({
+	node,
+	className,
+	after,
+	row = false,
+	children,
+}: {
+	node: TraceNode;
+	className?: string;
+	/** What belongs to the step but is no part of its control: the dots, which open themselves. */
+	after?: ReactNode;
+	/** A row of a table in a stage: flush with its neighbours, its columns saying what "Open" would. */
+	row?: boolean;
+	children: ReactNode;
+}) {
+	const context = useStory();
+	const key = traceStepKey(node);
+	const here = sameTraceNode(context.here, node);
+	const record = context.recordOf(node);
+	const { open } = context;
+	const card = cn(
+		"block w-full min-w-0 text-left outline-none",
+		row ? "rounded-none" : "rounded-md",
+		here && hereFrame(row),
+		className,
+	);
+	const body =
+		open !== undefined && record !== undefined ? (
+			<button
+				type="button"
+				data-step-control
+				aria-current={here ? "step" : undefined}
+				title="Open its sheet"
+				onClick={() => {
+					open(record);
+				}}
+				className={cn(
+					card,
+					"group/open hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring",
+					row ? "focus-visible:ring-inset" : "relative pr-14",
+				)}
+			>
+				{children}
+				{!row && (
+					<span
+						aria-hidden
+						className="absolute top-1 right-1.5 hidden items-center gap-0.5 font-medium text-primary group-hover/open:inline-flex group-focus-visible/open:inline-flex"
+					>
+						Open
+						<PanelRightOpenIcon aria-hidden className="size-3.5" />
+					</span>
+				)}
+			</button>
+		) : (
+			<div
+				data-step-control
+				tabIndex={-1}
+				aria-current={here ? "step" : undefined}
+				className={card}
+			>
+				{children}
+			</div>
+		);
+	// Only what the step's own line does not say already: a step with nothing more draws no box.
+	const facts = (here && context.display.system) || context.factsOpen ? context.facts(node) : null;
+	return (
+		<div data-step-key={key} data-lineage-node={key} data-here={here} className="min-w-0">
+			{here && <HereMarker inset={row} />}
+			{body}
+			{after}
+			{facts !== null && (
+				<div
+					data-step-facts
+					className={cn(
+						"rounded-md border border-dashed bg-muted/30 px-2.5 py-2 text-xs",
+						row ? "mx-1.5 mb-1.5 ml-[2.125rem]" : "mt-1.5",
+					)}
+				>
+					{facts}
+				</div>
+			)}
+		</div>
+	);
+}
+
+function HereMarker({ inset = false }: { inset?: boolean }) {
+	return (
+		<p className={cn("mb-1", inset && "px-1.5 pt-1.5")}>
+			<HereBadge />
+		</p>
+	);
+}
+
+export interface StepProps {
+	/** The chain as the filter leaves it. */
+	lineage: ReviewLineage;
+	/** The whole chain, which says what the review did whatever the filter hides. */
+	full: ReviewLineage;
+	filter: TraceFilter;
+	numbered: NumberedObservation[];
+	self: NumberedObservation | undefined;
+	/** The observations on the record's path, where the siblings fold; undefined lists them all. */
+	path: NumberedObservation[] | undefined;
+	/** Whether every observation is a row of the review stage's table rather than a dot. */
+	listed: boolean;
+	/** The observations the table lists, the rest being dots. */
+	rows: NumberedObservation[];
+	/** Opens or folds the observations' table by hand. */
+	onListedChange: (open: boolean) => void;
+	byId: NumberedById;
+	letters: ReadonlyMap<string, string>;
+	traced: Traced | undefined;
+	here: TraceNode | undefined;
+	/** Whether a moment on the work starts the rail, so the review need not say why it ran. */
+	hasStart: boolean;
+	reviewOutcome: AgentJob["reviewOutcome"] | undefined;
+	othersOpen: boolean;
+	onOthersOpenChange: (open: boolean) => void;
+	onShowSiblings: () => void;
+}
+
+export interface RailStepProps extends StepProps {
+	item: RailItem;
+	previous: Date | undefined;
+}

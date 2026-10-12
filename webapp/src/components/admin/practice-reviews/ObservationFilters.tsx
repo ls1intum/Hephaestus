@@ -1,13 +1,5 @@
-import type { ReviewedWorkRef } from "@/api/types.gen";
-import { DateRangeFacet } from "@/components/common/DateRangeFacet";
-import {
-	FacetMultiSelect,
-	type FacetOption,
-	type FacetSource,
-} from "@/components/common/FacetMultiSelect";
-import { FilterToolbar } from "@/components/common/FilterToolbar";
+import type { FacetOption, FacetSource } from "@/components/common/FacetMultiSelect";
 import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
-import { ResultCount } from "@/components/common/ResultCount";
 import { statusFacetOptions } from "@/components/common/status-def";
 import {
 	DEVELOPER_RESPONSE_DEFS,
@@ -17,14 +9,14 @@ import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observati
 import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
-import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { nonEmpty } from "@/lib/search-params";
-import { hasText } from "@/lib/text";
 
-import { AppliedFacetPills, facetPills } from "./AppliedFacetPills";
+import { listFacet } from "./AppliedFacetPills";
+import { clearedScope, hasAppliedScope, readScope, scopeSearch } from "./review-scope";
 import type { ObservationSort, ObservationsSearch } from "./review-search";
-import { reviewArtifactScopeLabel } from "./ReviewArtifact";
-import { type ReviewPeople, ReviewPersonFacet } from "./ReviewPersonFacet";
+import { ReviewFilterBar } from "./ReviewFilterBar";
+import type { ReviewPeople } from "./ReviewPersonFacet";
+import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { type ReviewSortItem, ReviewSortSelect } from "./ReviewSortSelect";
 
 /** Every option wears the badge its rows wear; see the note on `FeedbackFilters`' facets. */
@@ -51,45 +43,36 @@ const SORT_ITEMS: [ReviewSortItem<ObservationSort>, ...ReviewSortItem<Observatio
 ];
 
 /**
- * Every field this toolbar can set, cleared — `order` deliberately excluded, because sorting does not
- * narrow anything and Reset leaves it alone. Exported so the list's empty state clears exactly what
- * Reset clears.
+ * The facets this list owns, cleared: what the toolbar's Reset clears. `order` is excluded, because
+ * sorting does not narrow anything, and the shared scope is excluded, because "Clear scope" owns it.
  */
-export function clearedObservationFilters(): Partial<ObservationsSearch> {
+export function clearedObservationFacets(): Partial<ObservationsSearch> {
 	return {
-		groupSlug: undefined,
-		practiceSlug: undefined,
-
 		outcome: undefined,
 		invalidated: undefined,
 		disputed: undefined,
-
 		severity: undefined,
-		agentJobId: undefined,
-		artifactKind: undefined,
-		artifactId: undefined,
-		subjectUserId: undefined,
 		origin: undefined,
-		from: undefined,
-		to: undefined,
 	};
 }
 
-export function hasObservationFilter(search: ObservationsSearch): boolean {
+/** Every filter on this list, the shared scope included: what the empty list's button clears. */
+export function clearedObservationFilters(): Partial<ObservationsSearch> {
+	return { ...clearedObservationFacets(), ...clearedScope() };
+}
+
+function hasObservationFacet(search: ObservationsSearch): boolean {
 	return (
-		(search.groupSlug?.length ?? 0) > 0 ||
-		(search.practiceSlug?.length ?? 0) > 0 ||
 		(search.outcome?.length ?? 0) > 0 ||
 		search.invalidated !== undefined ||
 		search.disputed !== undefined ||
 		(search.severity?.length ?? 0) > 0 ||
-		search.agentJobId !== undefined ||
-		search.artifactKind !== undefined ||
-		search.subjectUserId !== undefined ||
-		(search.origin?.length ?? 0) > 0 ||
-		search.from !== undefined ||
-		search.to !== undefined
+		(search.origin?.length ?? 0) > 0
 	);
+}
+
+export function hasObservationFilter(search: ObservationsSearch): boolean {
+	return hasObservationFacet(search) || hasAppliedScope("observations", readScope(search));
 }
 
 interface NamedGroup {
@@ -101,14 +84,32 @@ export function groupFacetOptions(groups: readonly NamedGroup[] | undefined): Fa
 	return (groups ?? []).map((group) => ({ value: group.slug, label: group.name }));
 }
 
+/**
+ * A practice as a facet offers it, with its group, so a chosen group can narrow the offer, and
+ * whether it is turned off today, so the facet can leave it out.
+ */
+export interface PracticeFacetOption extends FacetOption {
+	groupSlug?: string;
+	turnedOff?: boolean;
+}
+
 export function practiceFacetOptions(
-	practices: readonly { slug: string; name: string; groupSlug?: string }[] | undefined,
+	practices:
+		| readonly {
+				slug: string;
+				name: string;
+				groupSlug?: string;
+				autonomy?: { effective: string };
+		  }[]
+		| undefined,
 	groups: readonly NamedGroup[] | undefined,
-): FacetOption[] {
+): PracticeFacetOption[] {
 	return (practices ?? []).map((practice) => ({
 		value: practice.slug,
 		label: practice.name,
 		description: (groups ?? []).find((group) => group.slug === practice.groupSlug)?.name,
+		groupSlug: practice.groupSlug,
+		turnedOff: practice.autonomy?.effective === "OFF",
 	}));
 }
 
@@ -116,16 +117,16 @@ export interface ObservationFiltersProps {
 	search: ObservationsSearch;
 	/** Reports one changed facet. The caller sends the reader back to page one. */
 	onPatch: (patch: Partial<ObservationsSearch>) => void;
+	/** Clears this list's own facets. The shared scope stays. */
 	onReset: () => void;
+	/** Clears the shared scope, on this tab and every tab after it. */
+	onClearScope: () => void;
 	groups: FacetSource;
-	practices: FacetSource;
+	practices: FacetSource<PracticeFacetOption>;
 	people: ReviewPeople;
 	total: number | undefined;
-	/**
-	 * The work `artifactKind`/`artifactId` points at, so the pill can name it rather than print an
-	 * id. Absent until a row carrying that work has arrived.
-	 */
-	scopedWork?: ReviewedWorkRef;
+	/** The one record the scope is filtered to, by name; absent for none, or for a selection. */
+	record?: ScopeRecordFilter;
 	/**
 	 * The name of the person `subjectUserId` identifies. It must name *that* person: reading it off
 	 * the first row is right only while the filter is on.
@@ -137,137 +138,73 @@ export function ObservationFilters({
 	search,
 	onPatch,
 	onReset,
+	onClearScope,
 	groups,
 	practices,
 	people,
 	total,
-	scopedWork,
+	record,
 	subjectName,
 }: ObservationFiltersProps) {
-	const hasFilter = hasObservationFilter(search);
-
+	const outcome = listFacet("Outcome", OUTCOME_OPTIONS, search.outcome, (values) =>
+		onPatch({ outcome: nonEmpty(values) }),
+	);
+	const severity = listFacet("Severity", SEVERITY_OPTIONS, search.severity, (values) =>
+		onPatch({ severity: nonEmpty(values) }),
+	);
+	const response = listFacet(
+		"Developer response",
+		RESPONSE_OPTIONS,
+		responseSelection(search.disputed),
+		(values) => onPatch({ disputed: disputedFrom(values) }),
+	);
+	// Every origin is offered, live included, though a row badges only the other two: a reader
+	// comparing live reviews with requested ones has to be able to pick either.
+	const origin = listFacet("Origin", ORIGIN_OPTIONS, search.origin, (values) =>
+		onPatch({ origin: nonEmpty(values) }),
+	);
 	return (
-		<FilterToolbar
-			hasFilter={hasFilter}
-			onReset={onReset}
-			actions={
+		<ReviewFilterBar
+			tab="observations"
+			scope={readScope(search)}
+			onChange={(patch) => onPatch(scopeSearch("observations", patch))}
+			onClearScope={onClearScope}
+			// "Observed", not "Date": this range filters `observedAt`, while the same control on the
+			// feedback list filters when the feedback was composed.
+			dateTitle="Observed"
+			groups={groups}
+			practices={practices}
+			people={people}
+			personName={subjectName}
+			record={record}
+			facets={
 				<>
-					{/* Sort sits with the count rather than among the facets: it does not narrow the set,
-					    and `Reset` deliberately leaves it alone. */}
+					{outcome.control}
+					{severity.control}
+					{response.control}
+					{origin.control}
+					{/* `Reset` leaves the sort alone: it orders the set and does not narrow it. */}
 					<ReviewSortSelect
 						items={SORT_ITEMS}
 						value={search.order}
 						onChange={(order) => onPatch({ order })}
 					/>
-					<ResultCount total={total} noun={["observation", "observations"]} hasFilter={hasFilter} />
 				</>
 			}
-		>
-			<div className="flex flex-wrap gap-2">
-				<FacetMultiSelect
-					title="Group"
-					options={groups.options}
-					selected={search.groupSlug ?? []}
-					onChange={(values) => onPatch({ groupSlug: nonEmpty(values) })}
-					disabled={groups.isLoading}
-					emptyLabel={groups.isError ? "We could not load groups" : "No groups available"}
-				/>
-				<FacetMultiSelect
-					title="Practice"
-					options={practices.options}
-					selected={search.practiceSlug ?? []}
-					onChange={(values) => onPatch({ practiceSlug: nonEmpty(values) })}
-					disabled={practices.isLoading}
-					emptyLabel={practices.isError ? "We could not load practices" : "No practices available"}
-				/>
-
-				<FacetMultiSelect
-					title="Outcome"
-					options={OUTCOME_OPTIONS}
-					selected={search.outcome ?? []}
-					onChange={(values) => onPatch({ outcome: nonEmpty(values) })}
-				/>
-				<FacetMultiSelect
-					title="Severity"
-					options={SEVERITY_OPTIONS}
-					selected={search.severity ?? []}
-					onChange={(values) => onPatch({ severity: nonEmpty(values) })}
-				/>
-				<FacetMultiSelect
-					title="Developer response"
-					options={RESPONSE_OPTIONS}
-					selected={responseSelection(search.disputed)}
-					onChange={(values) => onPatch({ disputed: disputedFrom(values) })}
-				/>
-				{/* Every origin is offered, live included, though a row badges only the other two: a
-				    reader comparing live reviews with requested ones has to be able to pick either. */}
-				<FacetMultiSelect
-					title="Origin"
-					options={ORIGIN_OPTIONS}
-					selected={search.origin ?? []}
-					onChange={(values) => onPatch({ origin: nonEmpty(values) })}
-				/>
-				<ReviewPersonFacet
-					title="Developer"
-					people={people}
-					selected={search.subjectUserId}
-					onChange={(subjectUserId) => onPatch({ subjectUserId })}
-					fallbackName={subjectName}
-				/>
-				{/* "Observed", not "Date": this range filters `observedAt`, while the same control on
-				    Delivery filters when the feedback was composed. */}
-				<DateRangeFacet
-					title="Observed"
-					value={toDateRange(search)}
-					onChange={(range) => onPatch(fromDateRange(range))}
-				/>
-			</div>
-			<AppliedFacetPills
-				pills={[
-					...facetPills("Group", groups.options, search.groupSlug, (values) =>
-						onPatch({ groupSlug: nonEmpty(values) }),
-					),
-					...facetPills("Practice", practices.options, search.practiceSlug, (values) =>
-						onPatch({ practiceSlug: nonEmpty(values) }),
-					),
-					...facetPills("Outcome", OUTCOME_OPTIONS, search.outcome, (values) =>
-						onPatch({ outcome: nonEmpty(values) }),
-					),
-					...facetPills("Severity", SEVERITY_OPTIONS, search.severity, (values) =>
-						onPatch({ severity: nonEmpty(values) }),
-					),
-					...facetPills("Origin", ORIGIN_OPTIONS, search.origin, (values) =>
-						onPatch({ origin: nonEmpty(values) }),
-					),
-					...facetPills(
-						"Developer response",
-						RESPONSE_OPTIONS,
-						responseSelection(search.disputed),
-						(values) => onPatch({ disputed: disputedFrom(values) }),
-					),
-				]}
-			/>
-			{search.invalidated !== undefined && (
-				<ReferenceFilterPill
-					label={MARKED_INCORRECT_DEF.label}
-					value={search.invalidated ? "Only" : "Excluded"}
-					onClear={() => onPatch({ invalidated: undefined })}
-				/>
-			)}
-			{hasText(search.agentJobId) && (
-				<ReferenceFilterPill
-					label="Review"
-					value={search.agentJobId}
-					onClear={() => onPatch({ agentJobId: undefined })}
-				/>
-			)}
-			{search.artifactKind && (
-				<ReferenceFilterPill
-					label="Reviewed work"
-					value={reviewArtifactScopeLabel(search.artifactKind, search.artifactId, scopedWork)}
-					onClear={() => onPatch({ artifactKind: undefined, artifactId: undefined })}
-				/>
-			)}
-		</FilterToolbar>
+			pills={[...outcome.pills, ...severity.pills, ...response.pills, ...origin.pills]}
+			referencePills={
+				search.invalidated !== undefined && (
+					<ReferenceFilterPill
+						label={MARKED_INCORRECT_DEF.label}
+						value={search.invalidated ? "Only" : "Excluded"}
+						onClear={() => onPatch({ invalidated: undefined })}
+					/>
+				)
+			}
+			hasFacet={hasObservationFacet(search)}
+			onReset={onReset}
+			total={total}
+			noun={["observation", "observations"]}
+		/>
 	);
 }

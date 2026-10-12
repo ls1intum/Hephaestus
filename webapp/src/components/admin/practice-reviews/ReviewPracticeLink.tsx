@@ -1,11 +1,10 @@
+import { Link, useParams } from "@tanstack/react-router";
+
 import { cn } from "cn";
 import type { Practice, ReviewPracticeGroup } from "@/api/types.gen";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-editor/PracticeDetailHoverCard";
 import { InlineLink } from "@/components/common/InlineLink";
-import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
-
-import { practiceLevel } from "./review-levels";
 
 export interface ReviewPracticeLinkProps {
 	practiceSlug: string;
@@ -16,9 +15,9 @@ export interface ReviewPracticeLinkProps {
 }
 
 /**
- * Opens the practice's level over the current one rather than Practice setup: the reader is asking
- * how the practice behaves, and Practice setup is one press from that level when the answer is
- * "change it".
+ * Opens the Observations list filtered to the practice rather than Practice setup: the reader is
+ * asking how the practice behaves, and Practice setup is one press from the counts above that list
+ * when the answer is "change it".
  */
 export function ReviewPracticeLink({
 	practiceSlug,
@@ -27,11 +26,18 @@ export function ReviewPracticeLink({
 	practice,
 	className,
 }: ReviewPracticeLinkProps) {
+	const workspaceSlug = useParams({ strict: false, select: (params) => params.workspaceSlug });
 	// `relative` lifts this above the stretched title link of `ReviewRow`, which otherwise covers the
 	// whole row and would swallow the click.
 	const link = (
 		<InlineLink
-			render={<DetailStackLink entry={practiceLevel(practiceSlug)} />}
+			render={
+				<Link
+					to="/w/$workspaceSlug/admin/practices/reviews/observations"
+					params={{ workspaceSlug: workspaceSlug ?? "" }}
+					search={{ practiceSlug: [practiceSlug] }}
+				/>
+			}
 			className={cn("relative inline-flex max-w-full min-w-0 items-center gap-1.5", className)}
 		>
 			<PracticeGroupMark group={group} />
@@ -43,6 +49,25 @@ export function ReviewPracticeLink({
 		<PracticeDetailHoverCard practice={practice}>{link}</PracticeDetailHoverCard>
 	) : (
 		link
+	);
+}
+
+export interface ReviewPracticeNameProps {
+	practiceName: string;
+	group: ReviewPracticeGroup | undefined;
+	className?: string;
+}
+
+/**
+ * The practice by its group's mark and its name, as plain text. A row names its practice this way:
+ * the row's title is its one link, and the record's level links the practice.
+ */
+export function ReviewPracticeName({ practiceName, group, className }: ReviewPracticeNameProps) {
+	return (
+		<span className={cn("inline-flex max-w-full min-w-0 items-center gap-1.5", className)}>
+			<PracticeGroupMark group={group} />
+			<span className="min-w-0 break-words">{practiceName}</span>
+		</span>
 	);
 }
 

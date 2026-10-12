@@ -9,7 +9,10 @@ export function workspaceBase(webAppOrigin: string, workspaceSlug: string): stri
 	return `${webAppOrigin}/w/${encodeURIComponent(workspaceSlug)}`;
 }
 
-/** The reader's feedback page, and the admin's existing work drawer when this kind has a route. */
+/**
+ * The reader's feedback page, and for an admin the reviews of this work with its sheet open, when
+ * this kind has a route.
+ */
 export function workLinks(
 	webAppOrigin: string,
 	workspaceSlug: string,
@@ -22,7 +25,11 @@ export function workLinks(
 	return admin && kindSlug !== undefined
 		? {
 				trace,
-				reviewDetails: `${base}/admin/practices/reviews/work?${new URLSearchParams({ detail: `work:${kindSlug}:${work.id}` })}`,
+				reviewDetails: `${base}/admin/practices/reviews/runs?${new URLSearchParams({
+					artifactKind: work.kind,
+					artifactId: work.id,
+					detail: `work:${kindSlug}:${work.id}`,
+				})}`,
 			}
 		: { trace };
 }

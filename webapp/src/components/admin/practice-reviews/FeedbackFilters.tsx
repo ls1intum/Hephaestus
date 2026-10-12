@@ -1,33 +1,23 @@
-import type { ReviewedWorkRef } from "@/api/types.gen";
-import { DateRangeFacet } from "@/components/common/DateRangeFacet";
-import { FacetMultiSelect, type FacetSource } from "@/components/common/FacetMultiSelect";
-import { FilterToolbar } from "@/components/common/FilterToolbar";
-import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
-import { ResultCount } from "@/components/common/ResultCount";
+import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { statusFacetOptions } from "@/components/common/status-def";
 import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
-import {
-	DELIVERY_PLACE_DEFS,
-	FILTERABLE_PLACES,
-} from "@/components/practice-vocabulary/delivery-place-defs";
+import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
 import { WITHHOLDING_FAMILY_DEFS } from "@/components/practice-vocabulary/withholding-defs";
-import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { nonEmpty } from "@/lib/search-params";
-import { hasText } from "@/lib/text";
 
-import { AppliedFacetPills, facetPills } from "./AppliedFacetPills";
+import { listFacet } from "./AppliedFacetPills";
+import type { PracticeFacetOption } from "./ObservationFilters";
+import { clearedScope, hasAppliedScope, readScope, scopeSearch } from "./review-scope";
 import type { FeedbackSearch, FeedbackSort } from "./review-search";
-import { reviewArtifactScopeLabel } from "./ReviewArtifact";
-import { type ReviewPeople, ReviewPersonFacet } from "./ReviewPersonFacet";
+import { ReviewFilterBar } from "./ReviewFilterBar";
+import type { ReviewPeople } from "./ReviewPersonFacet";
+import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { type ReviewSortItem, ReviewSortSelect } from "./ReviewSortSelect";
 
 const OUTCOME_OPTIONS = statusFacetOptions(DELIVERY_STATE_DEFS);
-// The one facet that offers a subset: a place nothing is ever written to would be a filter with no
-// rows behind it. Narrowing here rather than in `statusFacetOptions` keeps the registry total, so a
-// value the server adds still renders on a row.
-const PLACE_OPTIONS = statusFacetOptions(DELIVERY_PLACE_DEFS).filter((option) =>
-	FILTERABLE_PLACES.includes(option.value),
-);
+// The channel facet offers locations: each channel split by the provider that shows it, so an admin
+// can ask for GitHub or Slack alone. The channel-wide entries cover feedback whose provider is unknown.
+const LOCATION_OPTIONS = statusFacetOptions(FEEDBACK_LOCATION_DEFS);
 const WITHHELD_FAMILY_OPTIONS = statusFacetOptions(WITHHOLDING_FAMILY_DEFS);
 
 const SORT_ITEMS: [ReviewSortItem<FeedbackSort>, ...ReviewSortItem<FeedbackSort>[]] = [
@@ -36,55 +26,51 @@ const SORT_ITEMS: [ReviewSortItem<FeedbackSort>, ...ReviewSortItem<FeedbackSort>
 ];
 
 /**
- * Every field this toolbar can set, cleared — `order` deliberately excluded, as on the observations
- * list, because sorting does not narrow anything and Reset leaves it alone. Exported so the list's
- * empty state can offer the same "clear all" the toolbar's Reset does without the two drifting into
- * clearing different things.
+ * The facets this list owns, cleared: what the toolbar's Reset clears. `order` is excluded, as on the
+ * observations list, and so is the shared scope, which "Clear scope" owns.
  */
-export function clearedFeedbackFilters(): Partial<FeedbackSearch> {
+export function clearedFeedbackFacets(): Partial<FeedbackSearch> {
 	return {
 		deliveryState: undefined,
 		withheldFamily: undefined,
-		channel: undefined,
-		practiceSlug: undefined,
-		agentJobId: undefined,
-		artifactKind: undefined,
-		artifactId: undefined,
-		recipientUserId: undefined,
-		from: undefined,
-		to: undefined,
+		location: undefined,
 	};
 }
 
-export function hasFeedbackFilter(search: FeedbackSearch): boolean {
+/** Every filter on this list, the shared scope included: what the empty list's button clears. */
+export function clearedFeedbackFilters(): Partial<FeedbackSearch> {
+	return { ...clearedFeedbackFacets(), ...clearedScope() };
+}
+
+function hasFeedbackFacet(search: FeedbackSearch): boolean {
 	return (
 		(search.deliveryState?.length ?? 0) > 0 ||
 		(search.withheldFamily?.length ?? 0) > 0 ||
-		(search.channel?.length ?? 0) > 0 ||
-		(search.practiceSlug?.length ?? 0) > 0 ||
-		search.agentJobId !== undefined ||
-		search.artifactKind !== undefined ||
-		search.recipientUserId !== undefined ||
-		search.from !== undefined ||
-		search.to !== undefined
+		(search.location?.length ?? 0) > 0
 	);
+}
+
+export function hasFeedbackFilter(search: FeedbackSearch): boolean {
+	return hasFeedbackFacet(search) || hasAppliedScope("feedback", readScope(search));
 }
 
 export interface FeedbackFiltersProps {
 	search: FeedbackSearch;
 	/** Reports one changed facet. The caller sends the reader back to page one. */
 	onPatch: (patch: Partial<FeedbackSearch>) => void;
+	/** Clears this list's own facets. The shared scope stays. */
 	onReset: () => void;
+	/** Clears the shared scope, on this tab and every tab after it. */
+	onClearScope: () => void;
+	/** The groups whose practices' observations the feedback was written from. */
+	groups: FacetSource;
 	/** The practices whose observations the feedback was written from. */
-	practices: FacetSource;
+	practices: FacetSource<PracticeFacetOption>;
 	people: ReviewPeople;
 	/** How many rows the filters currently select, or `undefined` while that is unknown. */
 	total: number | undefined;
-	/**
-	 * The work `artifactKind`/`artifactId` points at, so the pill can name it rather than print an
-	 * id. Absent until a row carrying that work has arrived.
-	 */
-	scopedWork?: ReviewedWorkRef;
+	/** The one record the scope is filtered to, by name; absent for none, or for a selection. */
+	record?: ScopeRecordFilter;
 	/**
 	 * The name of the person `recipientUserId` identifies. It must name *that* person: reading it off
 	 * the first row is right only while the filter is on.
@@ -96,106 +82,59 @@ export function FeedbackFilters({
 	search,
 	onPatch,
 	onReset,
+	onClearScope,
+	groups,
 	practices,
 	people,
 	total,
-	scopedWork,
+	record,
 	recipientName,
 }: FeedbackFiltersProps) {
-	const hasFilter = hasFeedbackFilter(search);
+	const scope = readScope(search);
+	const outcome = listFacet("Outcome", OUTCOME_OPTIONS, search.deliveryState, (values) =>
+		onPatch({ deliveryState: nonEmpty(values) }),
+	);
+	const channel = listFacet("Channel", LOCATION_OPTIONS, search.location, (values) =>
+		onPatch({ location: nonEmpty(values) }),
+	);
+	const withheld = listFacet(
+		"Why withheld",
+		WITHHELD_FAMILY_OPTIONS,
+		search.withheldFamily,
+		(values) => onPatch({ withheldFamily: nonEmpty(values) }),
+	);
 
 	return (
-		<FilterToolbar
-			hasFilter={hasFilter}
-			onReset={onReset}
-			actions={
+		<ReviewFilterBar
+			tab="feedback"
+			scope={scope}
+			onChange={(patch) => onPatch(scopeSearch("feedback", patch))}
+			onClearScope={onClearScope}
+			// "Composed" rather than "Date": this range filters when the feedback was written, which is
+			// not when it was delivered and not when the observation behind it was made.
+			dateTitle="Composed"
+			groups={groups}
+			practices={practices}
+			people={people}
+			personName={recipientName}
+			record={record}
+			facets={
 				<>
-					{/* With the count rather than among the facets, as on the observations list. */}
+					{outcome.control}
+					{channel.control}
+					{withheld.control}
 					<ReviewSortSelect
 						items={SORT_ITEMS}
 						value={search.order}
 						onChange={(order) => onPatch({ order })}
 					/>
-					<ResultCount
-						total={total}
-						noun={["piece of feedback", "pieces of feedback"]}
-						hasFilter={hasFilter}
-					/>
 				</>
 			}
-		>
-			<div className="flex flex-wrap gap-2">
-				<FacetMultiSelect
-					title="Practice"
-					options={practices.options}
-					selected={search.practiceSlug ?? []}
-					onChange={(values) => onPatch({ practiceSlug: nonEmpty(values) })}
-					disabled={practices.isLoading}
-					emptyLabel={practices.isError ? "We could not load practices" : "No practices available"}
-				/>
-				<FacetMultiSelect
-					title="Outcome"
-					options={OUTCOME_OPTIONS}
-					selected={search.deliveryState ?? []}
-					onChange={(values) => onPatch({ deliveryState: nonEmpty(values) })}
-				/>
-				<FacetMultiSelect
-					title="Channel"
-					options={PLACE_OPTIONS}
-					selected={search.channel ?? []}
-					onChange={(values) => onPatch({ channel: nonEmpty(values) })}
-				/>
-				<FacetMultiSelect
-					title="Why withheld"
-					options={WITHHELD_FAMILY_OPTIONS}
-					selected={search.withheldFamily ?? []}
-					onChange={(values) => onPatch({ withheldFamily: nonEmpty(values) })}
-				/>
-				<ReviewPersonFacet
-					title="Recipient"
-					people={people}
-					selected={search.recipientUserId}
-					onChange={(recipientUserId) => onPatch({ recipientUserId })}
-					fallbackName={recipientName}
-				/>
-				{/* "Composed" rather than "Date": this range filters when the feedback was written, which
-				    is not when it was delivered and not when the observation behind it was made. */}
-				<DateRangeFacet
-					title="Composed"
-					value={toDateRange(search)}
-					onChange={(range) => onPatch(fromDateRange(range))}
-				/>
-			</div>
-			<AppliedFacetPills
-				pills={[
-					...facetPills("Practice", practices.options, search.practiceSlug, (values) =>
-						onPatch({ practiceSlug: nonEmpty(values) }),
-					),
-					...facetPills("Outcome", OUTCOME_OPTIONS, search.deliveryState, (values) =>
-						onPatch({ deliveryState: nonEmpty(values) }),
-					),
-					...facetPills("Channel", PLACE_OPTIONS, search.channel, (values) =>
-						onPatch({ channel: nonEmpty(values) }),
-					),
-					...facetPills("Why withheld", WITHHELD_FAMILY_OPTIONS, search.withheldFamily, (values) =>
-						onPatch({ withheldFamily: nonEmpty(values) }),
-					),
-				]}
-			/>
-			{hasText(search.agentJobId) && (
-				<ReferenceFilterPill
-					label="Review"
-					value={search.agentJobId}
-					onClear={() => onPatch({ agentJobId: undefined })}
-				/>
-			)}
-			{search.artifactKind && (
-				<ReferenceFilterPill
-					label="Reviewed work"
-					value={reviewArtifactScopeLabel(search.artifactKind, search.artifactId, scopedWork)}
-					onClear={() => onPatch({ artifactKind: undefined, artifactId: undefined })}
-				/>
-			)}
-		</FilterToolbar>
+			pills={[...outcome.pills, ...channel.pills, ...withheld.pills]}
+			hasFacet={hasFeedbackFacet(search)}
+			onReset={onReset}
+			total={total}
+			noun={["piece of feedback", "pieces of feedback"]}
+		/>
 	);
 }

@@ -58,13 +58,38 @@ const pool = loadedList<ReviewObservation>;
  * would actually send, so a facet that stopped reaching the request would stop working here too.
  * What the *endpoint* names those parameters is a separate contract, pinned by the route test.
  */
+const SEVERITY_RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, INFO: 3 };
+
+/** The server's "Most actionable first" (`ObservationRepository.OPERATOR_ORDER`), as a sort key. */
+function actionabilityKey(observation: ReviewObservation): number {
+	if (observation.outcome === "NOT_MET") {
+		return SEVERITY_RANK[observation.severity ?? ""] ?? 4;
+	}
+	return observation.outcome === "MET" ? 10 : 20;
+}
+
+/** The rows in the order the server would send them for `search`. */
+function inServerOrder(
+	list: PagedListState<ReviewObservation>,
+	search: ObservationsSearch,
+): PagedListState<ReviewObservation> {
+	if (list.status !== "ready" || search.order !== "ACTIONABILITY") {
+		return list;
+	}
+	const rows = [...list.rows].sort(
+		(a, b) =>
+			actionabilityKey(a) - actionabilityKey(b) || b.observedAt.getTime() - a.observedAt.getTime(),
+	);
+	return { ...list, rows };
+}
+
 function observationPage(
 	list: PagedListState<ReviewObservation>,
 	search: ObservationsSearch,
 ): PagedListState<ReviewObservation> {
 	const query = observationsQuery(search, REVIEW_PAGE_SIZE);
 	return narrowedList(
-		list,
+		inServerOrder(list, search),
 		(row) =>
 			(!query.from || row.observedAt >= new Date(query.from)) &&
 			(!query.to || row.observedAt < new Date(query.to)) &&
@@ -72,6 +97,7 @@ function observationPage(
 			selects(query.practiceSlug, row.practiceSlug) &&
 			selects(query.severity, row.severity) &&
 			selects(query.origin, row.origin) &&
+			(query.agentJobId === undefined || row.agentJobId === query.agentJobId) &&
 			(query.subjectUserId === undefined || row.subject?.id === query.subjectUserId),
 		query.size,
 	);
@@ -97,7 +123,6 @@ const meta = {
 		groups: GROUPS,
 		practices: PRACTICES,
 		// The facet needs a label per slug; the hover card on a row's practice name needs the record.
-		practiceRecords: workspacePractices,
 		people: PEOPLE,
 	},
 	// The screen is controlled: with a frozen `search` prop every facet reads as dead, because
@@ -144,9 +169,18 @@ async function pickFacet(
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await canvas.findByText("12 observations.");
-		for (const name of ["Group", "Practice", "Outcome", "Severity"]) {
+		// Every facet sits in the row, with no toggle to open first.
+		for (const name of [
+			"Group",
+			"Practice",
+			"Outcome",
+			"Severity",
+			"Developer response",
+			"Origin",
+		]) {
 			canvas.getByRole("combobox", { name });
 		}
+		await expect(canvas.queryByRole("button", { name: /More filters/u })).toBeNull();
 		canvas.getByRole("combobox", { name: "Developer" });
 		canvas.getByRole("button", { name: "Observed" });
 		// A pull request, a chat thread and a document all reach this list and have to read as one
@@ -179,6 +213,37 @@ export const FilterToOnePerson: Story = {
 	},
 };
 
+/**
+ * An observation selected elsewhere narrows this list to the review that recorded it, the
+ * observation among its siblings. The selection is set where a chain starts — the Reviews and Work
+ * lists, or a level — so no row here offers a "Select".
+ */
+export const NarrowedToTheSelectedObservation: Story = {
+	args: {
+		search: {
+			outcome: undefined,
+			severity: undefined,
+			origin: undefined,
+			agentJobId: "11111111-1111-1111-1111-111111111111",
+			observationId: "66666666-6666-6666-6666-666666666666",
+		},
+	},
+	parameters: {
+		router: {
+			initialUrl:
+				"/?agentJobId=11111111-1111-1111-1111-111111111111&observationId=66666666-6666-6666-6666-666666666666",
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("button", { name: /^Select/u })).not.toBeInTheDocument();
+		await expect(
+			within(canvas.getByRole("table", { name: "Observations" }))
+				.getAllByRole("row")
+				.filter((row) => within(row).queryAllByRole("cell").length > 0),
+		).toHaveLength(4);
+	},
+};
+
 export const FilteredToNothing: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
@@ -207,6 +272,27 @@ export const SortByActionability: Story = {
 		await expect(args.onSearchChange).toHaveBeenLastCalledWith(
 			expect.objectContaining({ order: "ACTIONABILITY" }),
 		);
+		// Out of time order a day would head the rows again each time it came back, so the table keeps
+		// its headed bodies, one per rank of the order, and each row names its own day.
+		const table = canvas.getByRole("table", { name: "Observations" });
+		await waitFor(async () =>
+			expect(
+				[...table.querySelectorAll("th[scope=rowgroup]")].map((heading) => heading.textContent),
+			).toContain("Met"),
+		);
+		const headings = [...table.querySelectorAll("th[scope=rowgroup]")].map(
+			(heading) => heading.textContent,
+		);
+		// In the server's order: not met worst first, then met, then the rest.
+		await expect(headings.slice(0, 5)).toStrictEqual([
+			"Not met · Critical",
+			"Not met · Major",
+			"Not met · Minor",
+			"Not met · Informational",
+			"Met",
+		]);
+		await expect(new Set(headings).size).toBe(headings.length);
+		await expect(table.querySelectorAll("tbody")).toHaveLength(headings.length);
 	},
 };
 
@@ -307,7 +393,10 @@ export const Loading: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	args: { observations: { status: "loading" } },
 	play: async ({ canvas }) => {
-		await canvas.findByText("Loading observations");
+		await expect(await canvas.findByRole("table", { name: "Observations" })).toHaveAttribute(
+			"aria-busy",
+			"true",
+		);
 	},
 };
 

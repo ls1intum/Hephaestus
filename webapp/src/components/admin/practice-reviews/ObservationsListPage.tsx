@@ -1,17 +1,22 @@
-import type { Practice, ReviewObservation } from "@/api/types.gen";
+import type { ReactNode } from "react";
+
+import type { ReviewObservation } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
 
 import {
+	clearedObservationFacets,
 	clearedObservationFilters,
 	hasObservationFilter,
 	ObservationFilters,
 } from "./ObservationFilters";
 import { ObservationResults, type ObservationResultsState } from "./ObservationResults";
+import { clearedScope } from "./review-scope";
 import type { ObservationsSearch } from "./review-search";
 import { ReviewListEnd } from "./ReviewListEnd";
 import type { ReviewPeople } from "./ReviewPersonFacet";
+import type { ScopeRecordFilter } from "./ReviewScopeFilters";
+import { ReviewTabIntro } from "./ReviewTabIntro";
 
 export interface ObservationsListPageProps {
 	search: ObservationsSearch;
@@ -20,13 +25,14 @@ export interface ObservationsListPageProps {
 	observations: PagedListState<ReviewObservation>;
 	groups: FacetSource;
 	practices: FacetSource;
-	/**
-	 * The practice records themselves, which the rows' practice links show as a hover card. Distinct
-	 * from `practices` above: that is the facet's option list, a label per slug, and it carries none
-	 * of the prose the card shows.
-	 */
-	practiceRecords?: Practice[];
 	people: ReviewPeople;
+	/** The one record the scope is filtered to, by name, for its pill. */
+	record?: ScopeRecordFilter;
+	/**
+	 * Counts above the list for the one practice it is filtered to (`PracticeObservationsSummary`),
+	 * drawn by the route.
+	 */
+	summary?: ReactNode;
 }
 
 function resultsState(
@@ -47,8 +53,9 @@ export function ObservationsListPage({
 	observations,
 	groups,
 	practices,
-	practiceRecords,
 	people,
+	record,
+	summary,
 }: ObservationsListPageProps) {
 	const rows = observations.status === "ready" ? observations.rows : [];
 	// Guarded on the filter being set, because that is the only condition under which the first row
@@ -57,35 +64,38 @@ export function ObservationsListPage({
 	const filteredSubject = search.subjectUserId == null ? undefined : rows[0]?.subject;
 	const hasFilter = hasObservationFilter(search);
 	const reset = () => onSearchChange(clearedObservationFilters());
+	// The server sorts "Most actionable first" by outcome and severity, not by time.
+	const byDay = search.order !== "ACTIONABILITY";
 
 	return (
 		<section aria-label="Practice review observations" className="space-y-4">
+			<ReviewTabIntro tab="observations" />
 			<ObservationFilters
 				search={search}
 				onPatch={onSearchChange}
-				onReset={reset}
+				onReset={() => onSearchChange(clearedObservationFacets())}
+				onClearScope={() => onSearchChange(clearedScope())}
 				groups={groups}
 				practices={practices}
 				people={people}
 				total={observations.status === "ready" ? observations.total : undefined}
-				scopedWork={rows[0]?.reviewedWork}
 				subjectName={filteredSubject?.name ?? filteredSubject?.login}
+				record={record}
 			/>
+			{summary}
 			{observations.status === "error" && (
-				<QueryErrorAlert
-					error={observations.error}
-					title="We could not load observations"
-					onRetry={observations.onRetry}
+				<ObservationResults
+					state={{ status: "error", error: observations.error, onRetry: observations.onRetry }}
 				/>
 			)}
 			{observations.status === "loading" && <ObservationResults state={{ status: "loading" }} />}
 			{observations.status === "ready" && (
 				<>
 					<ObservationResults
-						practices={practiceRecords}
 						state={resultsState(rows, hasFilter ? reset : undefined)}
+						byDay={byDay}
 					/>
-					<ReviewListEnd {...observations} noun="observations" />
+					{rows.length > 0 && <ReviewListEnd {...observations} noun="observations" />}
 				</>
 			)}
 		</section>

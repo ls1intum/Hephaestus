@@ -4,8 +4,10 @@ import { listPracticeReviewFeedbackOptions } from "@/api/@tanstack/react-query.g
 import {
 	type FeedbackSearch,
 	feedbackQuery,
-	REVIEW_PREVIEW_SIZE,
 } from "@/components/admin/practice-reviews/review-search";
+
+/** How many proposals the admin navigation and Needs you read beside the total. */
+const AWAITING_APPROVAL_PEEK_SIZE = 5;
 
 /**
  * Every piece of feedback awaiting approval, whenever it was composed and oldest first: a decision
@@ -21,7 +23,7 @@ export const AWAITING_APPROVAL_SEARCH: Partial<FeedbackSearch> = {
  * default size the admin navigation and Needs you share one cache entry, so their counts cannot
  * disagree; the approval queue reads the same search at a page of its own.
  */
-export function awaitingApprovalOptions(workspaceSlug: string, size = REVIEW_PREVIEW_SIZE) {
+export function awaitingApprovalOptions(workspaceSlug: string, size = AWAITING_APPROVAL_PEEK_SIZE) {
 	return listPracticeReviewFeedbackOptions({
 		path: { workspaceSlug },
 		query: feedbackQuery(AWAITING_APPROVAL_SEARCH, size),

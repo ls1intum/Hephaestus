@@ -15,8 +15,6 @@ import {
 } from "@/components/admin/practice-editor/PracticeDefinitionForm";
 import { PracticeAutomatedReviewValidationSummary } from "@/components/admin/practice-editor/PracticeEvidenceSummary";
 import { normalizeReviewSettings } from "@/components/admin/practice-editor/review-settings";
-import { practiceLevel } from "@/components/admin/practice-reviews/review-levels";
-import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -168,9 +166,9 @@ export function PracticeForm(props: PracticeFormProps) {
 						</p>
 					</div>
 					<Link
-						to="/w/$workspaceSlug/admin/practices/reviews"
+						to="/w/$workspaceSlug/admin/practices/reviews/observations"
 						params={{ workspaceSlug }}
-						search={detailSearch(practiceLevel(initialData.slug))}
+						search={{ practiceSlug: [initialData.slug] }}
 						className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
 					>
 						See review outcomes

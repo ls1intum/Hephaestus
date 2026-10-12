@@ -11,9 +11,13 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import {
 	awaitingApprovalFeedback,
+	feedbackDetail,
 	reviewFeedbackDetail,
 } from "@/components/admin/practice-reviews/fixtures";
-import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
+import {
+	reviewHandlers,
+	feedbackCountHandlers,
+} from "@/components/admin/practice-reviews/story-mock-server";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { server } from "@/mocks/server";
 import { deferred, sleep } from "@/test/async";
@@ -87,6 +91,7 @@ describe("feedback approval level", () => {
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
 				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
 			),
+			...feedbackCountHandlers(),
 			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () =>
 				HttpResponse.json(proposalWire(deliveryState)),
 			),
@@ -106,11 +111,15 @@ describe("feedback approval level", () => {
 		const theirs = seedCountingReads(queryClient, "other");
 		renderRouteAtWithRouter(FEEDBACK_LEVEL, queryClient);
 
-		await screen.findByRole("heading", { name: /Feedback for/u }, ROUTE_RENDER_WAIT);
-		expect(screen.getByText(/Please keep the cache scoped/u)).not.toBeNull();
-		const [firstObservation] = reviewFeedbackDetail.observations;
-		assert(firstObservation);
-		expect(screen.getByRole("link", { name: firstObservation.summary })).not.toBeNull();
+		// Titled by its first line, as its row is; the text itself is in the package below.
+		await screen.findByRole(
+			"heading",
+			{ name: /^Please keep the cache scoped/u },
+			ROUTE_RENDER_WAIT,
+		);
+		expect(screen.getAllByText(/Please keep the cache scoped/u).length).toBeGreaterThan(1);
+		// The sheet is the feedback alone: what it was based on is its trace, not a link here.
+		expect(screen.queryByRole("group", { name: "How this came about" })).toBeNull();
 
 		await userEvent.click(screen.getByRole("button", { name: "Approve for delivery" }));
 		await screen.findByText("Feedback approved. Delivery is being checked.");
@@ -134,6 +143,7 @@ describe("feedback approval level", () => {
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
 				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
 			),
+			...feedbackCountHandlers(),
 			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () =>
 				HttpResponse.json(proposalWire("AWAITING_APPROVAL")),
 			),
@@ -148,7 +158,11 @@ describe("feedback approval level", () => {
 		);
 
 		renderRouteAtWithRouter(FEEDBACK_LEVEL);
-		await screen.findByRole("heading", { name: /Feedback for/u }, ROUTE_RENDER_WAIT);
+		await screen.findByRole(
+			"heading",
+			{ name: /^Please keep the cache scoped/u },
+			ROUTE_RENDER_WAIT,
+		);
 		await userEvent.click(screen.getByRole("button", { name: "Reject feedback" }));
 		const dialog = await screen.findByRole("dialog", { name: "Reject this feedback" });
 		await userEvent.click(within(dialog).getByText("Missing important context"));
@@ -173,6 +187,7 @@ describe("feedback approval level", () => {
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
 				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
 			),
+			...feedbackCountHandlers(),
 			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () => {
 				detailReads += 1;
 				return HttpResponse.json(proposalWire(deliveryState));
@@ -229,6 +244,7 @@ describe("feedback approval level", () => {
 				http.get("*/workspaces/:workspaceSlug/members/me", () =>
 					HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
 				),
+				...feedbackCountHandlers(),
 				http.get(
 					"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId",
 					({ params }) => {
@@ -425,15 +441,20 @@ describe("feedback approval level", () => {
 				return found;
 			}, ROUTE_RENDER_WAIT);
 			await userEvent.click(row);
-			await screen.findByRole("dialog", { name: /^Feedback for/u }, ROUTE_RENDER_WAIT);
+			await screen.findByRole(
+				"dialog",
+				{ name: /^Please keep the cache scoped/u },
+				ROUTE_RENDER_WAIT,
+			);
 			expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
 				`feedback:${second.id}`,
 			]);
 		});
 
-		/** A record opened over the queue while a decision is in flight is still there once it lands. */
-		it("keeps a record opened over the queue while a decision is in flight", async () => {
-			const [source] = reviewFeedbackDetail.observations;
+		/** A record opened from the queue while a decision is in flight is still there once it lands. */
+		it("keeps a record opened from the queue while a decision is in flight", async () => {
+			// Another record, opened while the decision on the oldest in the queue is in flight.
+			const [source] = feedbackDetail(oldest.id).observations;
 			assert(source);
 			const approved: string[] = [];
 			serveQueue(approved);
@@ -449,9 +470,12 @@ describe("feedback approval level", () => {
 
 			await queueSteps("1 of 3");
 			await userEvent.click(screen.getByRole("button", { name: "Approve and open next" }));
-			const feedbackLevel = screen.getByRole("dialog", { name: /^Feedback for/u });
-			await userEvent.click(within(feedbackLevel).getByRole("link", { name: source.summary }));
-			const opened = [`feedback:${oldest.id}`, `observation:${source.observationId}`];
+			// A sheet links to no other record: the reader opens the observation from its address.
+			const opened = [`observation:${source.observationId}`];
+			await router.navigate({
+				to: ".",
+				search: (previous: Record<string, unknown>) => ({ ...previous, detail: opened }),
+			});
 			await waitFor(
 				() => expect(stackInSearch(router.state.location.search.detail)).toStrictEqual(opened),
 				ROUTE_RENDER_WAIT,

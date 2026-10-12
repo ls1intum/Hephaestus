@@ -3,12 +3,22 @@ import { HttpResponse, http } from "msw";
 import type { ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { artifactTrace, tracedArtifacts } from "@/components/practice-trace/fixtures";
 import { hasText } from "@/lib/text";
+import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 
 import {
 	feedbackDetail,
+	feedbackIdsFrom,
+	locationCounts,
+	mergedPullRequestFacts,
+	mockJobUsageTwoAttempts,
 	observationDetail,
+	openIssueFacts,
 	practiceGroups,
 	practiceReviewOverview,
+	practiceReviewTiming,
+	practiceRevisions,
+	busyReviewQueue,
+	reasonCounts,
 	reviewFeedback,
 	reviewJob,
 	reviewObservations,
@@ -16,6 +26,7 @@ import {
 	workspaceMembers,
 	workspacePractices,
 } from "./fixtures";
+import { reviewLineage } from "./lineage-fixtures";
 
 // These handlers filter, sort and paginate the fixture the way the server does. A mock that answers
 // every URL with the same array leaves a story that clicks a facet testing nothing.
@@ -106,9 +117,12 @@ function filterObservations(rows: ReviewObservation[], url: URL) {
 
 function filterFeedback(rows: ReviewFeedback[], url: URL) {
 	const recipientUserId = single(url, "recipientUserId");
+	const observationId = single(url, "observationId");
+	const fromObservation = hasText(observationId) ? feedbackIdsFrom(observationId) : undefined;
 	return rows.filter(
 		(row) =>
 			withinScope(url, row) &&
+			(fromObservation === undefined || fromObservation.has(row.id)) &&
 			withinDates(url, row.createdAt) &&
 			matches(values(url, "deliveryState"), row.deliveryState) &&
 			matches(values(url, "channel"), row.channel) &&
@@ -179,6 +193,12 @@ export function reviewHandlers({
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/overview", () =>
 			HttpResponse.json(practiceReviewOverview),
 		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/timing", () =>
+			HttpResponse.json(practiceReviewTiming),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/queue", () =>
+			HttpResponse.json(busyReviewQueue),
+		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", ({ request }) => {
 			const url = new URL(request.url);
 			if (hasText(requireObservationSort) && single(url, "sort") !== requireObservationSort) {
@@ -199,9 +219,16 @@ export function reviewHandlers({
 			// The fixture is newest first, as the endpoint's default order is.
 			return page(single(url, "sort") === "OLDEST" ? [...rows].reverse() : rows, url);
 		}),
+		...feedbackCountHandlers(feedbackRows),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", ({ params }) =>
 			HttpResponse.json(feedbackDetail(String(params.feedbackId))),
 		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", ({ request }) => {
+			const url = new URL(request.url);
+			return HttpResponse.json(
+				reviewLineage(single(url, "kind") ?? "REVIEW", single(url, "id") ?? ""),
+			);
+		}),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
 			const url = new URL(request.url);
 			return page(
@@ -209,7 +236,18 @@ export function reviewHandlers({
 				// `status` here would let a story "prove" a date range that the screen never sent.
 				reviewRuns.filter(
 					(run) =>
-						matches(values(url, "status"), run.status) &&
+						withinScope(url, { agentJobId: run.id, reviewedWork: run.target.reviewedWork }) &&
+						// "On hold" and "Waiting" join the listed statuses as more alternatives.
+						((values(url, "status").length === 0 &&
+							single(url, "onHold") !== "true" &&
+							single(url, "waiting") !== "true") ||
+							values(url, "status").includes(run.status) ||
+							(single(url, "onHold") === "true" &&
+								run.status === "QUEUED" &&
+								hasText(run.holdReason)) ||
+							(single(url, "waiting") === "true" &&
+								run.status === "QUEUED" &&
+								run.holdReason !== "BUDGET")) &&
 						matches(values(url, "resultProcessing"), run.resultProcessing) &&
 						withinDates(url, run.createdAt),
 				),
@@ -219,8 +257,14 @@ export function reviewHandlers({
 		http.get("*/workspaces/:workspaceSlug/practices/trace", ({ request }) => {
 			const url = new URL(request.url);
 			const kind = single(url, "artifactKind");
+			const id = single(url, "artifactId");
 			return page(
-				tracedArtifacts.filter((work) => !hasText(kind) || work.artifactKind === kind),
+				tracedArtifacts.filter(
+					(work) =>
+						(!hasText(kind) || work.artifactKind === kind) &&
+						(!hasText(id) || String(work.artifactId) === id) &&
+						(single(url, "withoutReview") !== "true" || work.reviewedSignalCount === 0),
+				),
 				url,
 			);
 		}),
@@ -237,10 +281,51 @@ export function reviewHandlers({
 		http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", ({ params }) =>
 			HttpResponse.json(reviewJob(String(params.jobId))),
 		),
+		http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId/usage", () =>
+			HttpResponse.json(mockJobUsageTwoAttempts),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/runs/:jobId/delivery-checks", () =>
+			HttpResponse.json([]),
+		),
+		// A pull request reads as merged and an issue as open; other work has no provider facts.
+		http.get(
+			"*/workspaces/:workspaceSlug/practices/reviews/work/:artifactKind/:artifactId",
+			({ params }) => {
+				const artifactId = Number(params.artifactId);
+				if (params.artifactKind === "scm.pull_request") {
+					return HttpResponse.json({ ...mergedPullRequestFacts, artifactId });
+				}
+				if (params.artifactKind === "scm.issue") {
+					return HttpResponse.json({ ...openIssueFacts, artifactId });
+				}
+				return HttpResponse.json({ detail: "No such work" }, { status: 404 });
+			},
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/revisions", () =>
+			HttpResponse.json(practiceRevisions),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
+			HttpResponse.json(mockPracticeDefinitionOptions),
+		),
 		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(workspacePractices)),
 		http.get("*/workspaces/:workspaceSlug/practice-groups", () =>
 			HttpResponse.json(practiceGroups),
 		),
 		http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json(workspaceMembers)),
+	];
+}
+
+/**
+ * The counts the feedback list's own filter selects, by location and by reason. A test that answers
+ * `feedback/:feedbackId` itself puts these before it, since that path would take them too.
+ */
+export function feedbackCountHandlers(feedbackRows: ReviewFeedback[] = reviewFeedback) {
+	return [
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/locations", ({ request }) =>
+			HttpResponse.json(locationCounts(filterFeedback(feedbackRows, new URL(request.url)))),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/reasons", ({ request }) =>
+			HttpResponse.json(reasonCounts(filterFeedback(feedbackRows, new URL(request.url)))),
+		),
 	];
 }

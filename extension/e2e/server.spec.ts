@@ -119,7 +119,7 @@ test.describe("inline review activity", () => {
 		const frame = await openInline(page);
 		await expectWork(frame, TRACE_URL);
 		// Every developer's records, delivery and runs are the web app's: one link, for this work.
-		const details = `${WEB_APP_URL}/w/ext-e2e/admin/practices/reviews/work?detail=work%3Apull-request%3A${MR4_WORK_ID}`;
+		const details = `${WEB_APP_URL}/w/ext-e2e/admin/practices/reviews/runs?artifactKind=scm.pull_request&artifactId=${MR4_WORK_ID}&detail=work%3Apull-request%3A${MR4_WORK_ID}`;
 		await expectSafeLink(frame.getByRole("link", { name: /^Review details/u }), details);
 		await expect(frame.getByRole("button", { name: /Manage/u })).toHaveCount(0);
 		// Only the line opens; nothing inside it opens further.

@@ -129,8 +129,8 @@ export const AskingByHandIsNotAMoment: Story = {
 	play: async ({ canvas }) => {
 		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
 		await expect(canvas.queryByRole("checkbox", { name: /Review requested by hand/u })).toBeNull();
-		await expect(strip.queryByText(/ask for this review by hand/u)).toBeNull();
-		await expect(canvas.getByText(/ask for this review by hand/u)).toBeVisible();
+		await expect(strip.queryByText(/request this review with “Request review”/u)).toBeNull();
+		await expect(canvas.getByText(/request this review with “Request review”/u)).toBeVisible();
 	},
 };
 
@@ -142,7 +142,7 @@ export const GuidanceOnlyPromisesNoHandAskedReview: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/reads nothing, because no review runs/u)).toBeVisible();
-		await expect(canvas.queryByText(/ask for this review by hand/u)).toBeNull();
+		await expect(canvas.queryByText(/request this review with “Request review”/u)).toBeNull();
 	},
 };
 
@@ -158,7 +158,7 @@ export const RecordedButNotReviewed: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/nothing is reviewed while the practice asks/u)).toBeVisible();
 		// Asking by hand would not review it either while it waits for a human.
-		await expect(canvas.queryByText(/ask for this review by hand/u)).toBeNull();
+		await expect(canvas.queryByText(/request this review with “Request review”/u)).toBeNull();
 	},
 };
 

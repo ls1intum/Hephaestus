@@ -77,6 +77,9 @@ export const Populated: Story = {
 		sheet.getByText("Exam week");
 		await expect(sheet.queryByText("ACTIVE")).not.toBeInTheDocument();
 		await expect(sheet.queryByText("PENDING")).not.toBeInTheDocument();
+		// The page behind is dimmed like behind a detail drawer, never blurred.
+		const overlay = document.querySelector('[data-slot="sheet-overlay"]');
+		await expect(overlay && getComputedStyle(overlay).backdropFilter).toBe("none");
 	},
 };
 

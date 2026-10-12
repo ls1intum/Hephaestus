@@ -5,13 +5,15 @@ import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 
-import { practiceGroups, reviewArtifact, workspaceMembers, workspacePractices } from "./fixtures";
+import { practiceGroups, workspaceMembers, workspacePractices } from "./fixtures";
 import {
-	clearedObservationFilters,
+	clearedObservationFacets,
 	groupFacetOptions,
 	ObservationFilters,
+	type PracticeFacetOption,
 	practiceFacetOptions,
 } from "./ObservationFilters";
+import { clearedScope } from "./review-scope";
 import type { ObservationsSearch } from "./review-search";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 
@@ -30,7 +32,7 @@ const GROUPS: FacetSource = {
 	isLoading: false,
 	isError: false,
 };
-const PRACTICES: FacetSource = {
+const PRACTICES: FacetSource<PracticeFacetOption> = {
 	options: practiceFacetOptions(workspacePractices, practiceGroups),
 	isLoading: false,
 	isError: false,
@@ -53,6 +55,7 @@ const meta = {
 		search: UNFILTERED,
 		onPatch: fn(),
 		onReset: fn(),
+		onClearScope: fn(),
 		groups: GROUPS,
 		practices: PRACTICES,
 		people: PEOPLE,
@@ -71,8 +74,12 @@ const meta = {
 						args.onPatch(next);
 					}}
 					onReset={() => {
-						patch(clearedObservationFilters());
+						patch(clearedObservationFacets());
 						args.onReset();
+					}}
+					onClearScope={() => {
+						patch(clearedScope());
+						args.onClearScope();
 					}}
 				/>
 			)}
@@ -102,8 +109,10 @@ export const FilteredCountReadsDifferently: Story = {
 	},
 };
 
+/** Severity and origin sit in the row with the other facets, with no toggle to open first. */
 export const ReportsAChosenSeverity: Story = {
 	play: async ({ args, canvas, userEvent }) => {
+		await expect(canvas.queryByRole("button", { name: /More filters/u })).toBeNull();
 		await userEvent.click(canvas.getByRole("combobox", { name: "Severity" }));
 		const listbox = await screen.findByRole("listbox", { name: "Severity options" });
 		await userEvent.click(await within(listbox).findByRole("option", { name: /Major/u }));
@@ -152,26 +161,6 @@ export const TheCatalogueCouldNotBeLoaded: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Group" }));
 		await screen.findByText("We could not load groups");
-	},
-};
-
-/**
- * Arriving from a review or from a piece of work, the scope is a filter the reader did not set and
- * has to be able to see and drop. The work is named rather than printed as an id.
- */
-export const ScopedToOnePieceOfWork: Story = {
-	args: {
-		search: {
-			...UNFILTERED,
-			artifactKind: "scm.pull_request",
-			artifactId: 42,
-		},
-		scopedWork: reviewArtifact.reviewedWork,
-		total: 5,
-	},
-	play: async ({ canvas }) => {
-		canvas.getByText(/Reviewed work/u);
-		canvas.getByText(/ls1intum\/Hephaestus · #1423/u);
 	},
 };
 
@@ -281,5 +270,107 @@ export const AnOriginOnAPhone: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: "Reset" }));
 		await expect(args.onReset).toHaveBeenCalledTimes(1);
 		await expect(canvas.queryByTitle("Origin: Requested")).not.toBeInTheDocument();
+	},
+};
+
+/** A facet the address already sets shows its value in its own control, in the row. */
+export const SetFacetShowsItsValue: Story = {
+	args: { search: { ...UNFILTERED, severity: ["MAJOR"] }, total: 2 },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("combobox", { name: /Severity/u })).toHaveTextContent("Major");
+	},
+};
+
+/**
+ * The scope came along from another tab: a developer, a practice and a range. Reset clears this
+ * list's own facets and leaves the scope. "Clear scope" clears the scope.
+ */
+export const ScopeCarriedFromAnotherTab: Story = {
+	args: {
+		search: {
+			...UNFILTERED,
+			outcome: ["NOT_MET"],
+			subjectUserId: PEOPLE.options[0]?.userId,
+			practiceSlug: [workspacePractices[0]?.slug ?? ""],
+			from: "2026-09-01",
+			to: "2026-09-10",
+		},
+		total: 3,
+	},
+	play: async ({ args, canvas, userEvent }) => {
+		const scope = canvas.getByRole("group", { name: "Applies to every tab" });
+		await expect(
+			within(scope).getByRole("combobox", { name: /^Developer(?::|$)/u }),
+		).toHaveTextContent(PEOPLE.options[0]?.label ?? "");
+		await expect(within(scope).getByRole("button", { name: /Observed/u })).toHaveTextContent(
+			"1 Sep – 10 Sep 2026",
+		);
+
+		await userEvent.click(canvas.getByRole("button", { name: "Reset" }));
+		await expect(args.onReset).toHaveBeenCalledTimes(1);
+		await expect(
+			within(scope).getByRole("combobox", { name: /^Developer(?::|$)/u }),
+		).toHaveTextContent(PEOPLE.options[0]?.label ?? "");
+
+		await userEvent.click(within(scope).getByRole("button", { name: "Clear scope" }));
+		await expect(args.onClearScope).toHaveBeenCalledTimes(1);
+		await expect(
+			within(scope).queryByRole("button", { name: "Clear scope" }),
+		).not.toBeInTheDocument();
+	},
+};
+
+/** A chosen group narrows the practices on offer to the practices in it. */
+export const AGroupNarrowsThePractices: Story = {
+	args: { search: { ...UNFILTERED, groupSlug: [practiceGroups[0]?.slug ?? ""] } },
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("combobox", { name: "Practice" }));
+		const listbox = await screen.findByRole("listbox", { name: "Practice options" });
+		const offered = await within(listbox).findAllByRole("option");
+		const inGroup = workspacePractices.filter(
+			(practice) => practice.groupSlug === practiceGroups[0]?.slug,
+		);
+		await expect(offered).toHaveLength(inGroup.length);
+	},
+};
+
+/**
+ * "Thin controllers" is turned off today, so the Practice facet leaves it out until the reader turns
+ * on "Show turned-off practices" inside it. The same switch sits above the overview's Practices table.
+ */
+export const TurnedOffPracticesHidden: Story = {
+	args: {
+		practices: {
+			...PRACTICES,
+			options: PRACTICES.options.map((option) =>
+				option.value === "thin-controllers" ? { ...option, turnedOff: true } : option,
+			),
+		},
+	},
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("combobox", { name: "Practice" }));
+		const options = await screen.findByRole("listbox", { name: "Practice options" });
+		await expect(within(options).queryByRole("option", { name: /Thin controllers/u })).toBeNull();
+		const show = screen.getByRole("switch", { name: "Show turned-off practices (1 hidden)" });
+		await userEvent.click(show);
+		await within(options).findByRole("option", { name: /Thin controllers/u });
+	},
+};
+
+/** A turned-off practice already chosen stays offered, so the choice can be seen and cleared. */
+export const ChosenTurnedOffPracticeStays: Story = {
+	args: {
+		search: { ...UNFILTERED, practiceSlug: ["thin-controllers"] },
+		practices: {
+			...PRACTICES,
+			options: PRACTICES.options.map((option) =>
+				option.value === "thin-controllers" ? { ...option, turnedOff: true } : option,
+			),
+		},
+	},
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("combobox", { name: /^Practice/u }));
+		const options = await screen.findByRole("listbox", { name: "Practice options" });
+		await within(options).findByRole("option", { name: /Thin controllers/u });
 	},
 };

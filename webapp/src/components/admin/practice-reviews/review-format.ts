@@ -12,3 +12,12 @@ export function subjectLabel(subject: ReviewSubject | undefined): string {
 	}
 	return firstNonBlank(subject.name, subject.login) ?? `#${subject.id}`;
 }
+
+/**
+ * A stored revision without its scheme marker. The server keeps revisions as `sha~<commit>`,
+ * `dig~<digest>` and so on (`RevisionScheme`), so a ledger row explains its own identity; a reader
+ * wants the commit or digest itself.
+ */
+export function revisionLabel(revision: string): string {
+	return revision.replace(/^[a-z]+~/u, "");
+}

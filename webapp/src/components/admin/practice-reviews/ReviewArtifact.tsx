@@ -2,23 +2,11 @@ import { cn } from "cn";
 import type { ReviewedWorkRef } from "@/api/types.gen";
 import { InlineLink } from "@/components/common/InlineLink";
 import { reviewedWorkIcon } from "@/components/icons/reviewed-work-icon";
-import { artifactKindNoun } from "@/lib/artifact-kinds";
 import { hasText } from "@/lib/text";
 
 /** The repository and the item, when a repository is recorded: `ls1intum/Hephaestus · #1423`. */
 function qualifiedLabel(reviewedWork: ReviewedWorkRef): string {
 	return [reviewedWork.container, reviewedWork.label].filter(hasText).join(" · ");
-}
-
-export function reviewArtifactScopeLabel(
-	kind: string,
-	id: number | undefined,
-	reviewedWork: ReviewedWorkRef | undefined,
-): string {
-	if (id != null && reviewedWork) {
-		return qualifiedLabel(reviewedWork);
-	}
-	return id == null ? `All ${artifactKindNoun(kind, 2)}` : `One ${artifactKindNoun(kind, 1)}`;
 }
 
 export interface ReviewArtifactProps {

@@ -9,7 +9,10 @@ import {
 	DELIVERY_FAMILY_STATES,
 	type DeliveryFamily,
 } from "@/components/practice-vocabulary/delivery-family-defs";
-import type { DeliveryState } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import {
+	DELIVERY_STATE_DEFS,
+	type DeliveryState,
+} from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
 import { OUTCOME_DEFS, outcomeCountNoun } from "@/components/practice-vocabulary/outcome-defs";
 import {
@@ -47,6 +50,8 @@ export interface OutcomeScope {
 	from?: string;
 	to?: string;
 	practiceSlug?: string;
+	/** The developer feedback is addressed to. Only feedback counts carry it. */
+	recipientUserId?: number;
 }
 
 /**
@@ -58,6 +63,8 @@ export const OUTCOME_LEGEND_LABELS = {
 	observations: "Observations by outcome",
 	/** The counts that overlap the observations' outcomes, listed apart from them. */
 	checkedObservations: "Observations checked by an admin",
+	/** The reviews of the range without an outcome yet, listed apart from the outcomes. */
+	openReviews: "Reviews not finished yet",
 	feedback: "Feedback by delivery",
 } as const;
 
@@ -83,17 +90,30 @@ export function reviewSlots(counts: ReviewRunCounts, scope?: OutcomeScope): Outc
 		def: REVIEW_STATUS_DEFS[status],
 		label: lower(REVIEW_STATUS_DEFS[status]),
 		count: counts[REVIEW_COUNT[status]],
-		target: scope && { list: "runs", search: { from: scope.from, to: scope.to, status: [status] } },
+		target: scope && { list: "runs", search: { ...scopeSearch(scope, "runs"), status: [status] } },
 	}));
 }
 
-/** The statuses a review ends in, which is what a count of reviews in a range splits into. */
+/**
+ * The statuses of a review that finished: it ran to an end. A canceled review ended without
+ * finishing, so the queue's "finished" and the failure share leave it out, as the server does.
+ */
 export const FINISHED_REVIEW_STATUSES = [
 	"COMPLETED",
 	"FAILED",
 	"TIMED_OUT",
+] as const satisfies readonly ReviewStatus[];
+
+/** The statuses a review ends in, which is what a count of reviews in a range splits into. */
+export const ENDED_REVIEW_STATUSES = [
+	...FINISHED_REVIEW_STATUSES,
 	"CANCELLED",
 ] as const satisfies readonly ReviewStatus[];
+
+/** The reviews that finished, by `FINISHED_REVIEW_STATUSES`. */
+export function finishedCount(counts: ReviewRunCounts): number {
+	return counts.completed + counts.failed + counts.timedOut;
+}
 
 /**
  * The four results that partition observations: the two outcomes of an assessment, then the two
@@ -103,7 +123,7 @@ export function observationSlots(
 	counts: ReviewObservationCounts,
 	scope?: OutcomeScope,
 ): OutcomeSlot[] {
-	const search = scope && observationsSearch(scope);
+	const search = scope && scopeSearch(scope, "observations");
 	return [
 		{
 			key: "met",
@@ -144,7 +164,7 @@ export function markedIncorrectSlot(count: number, scope?: OutcomeScope): Outcom
 		count,
 		target: scope && {
 			list: "observations",
-			search: { ...observationsSearch(scope), invalidated: true },
+			search: { ...scopeSearch(scope, "observations"), invalidated: true },
 		},
 	};
 }
@@ -172,7 +192,8 @@ export function familyCount(counts: ReviewFeedbackCounts, family: DeliveryFamily
 
 /**
  * Feedback by delivery family, each opening the Feedback list filtered to exactly the states it
- * counts — and, for a practice's counts, to the feedback citing that practice.
+ * counts — and, for a practice's or a developer's counts, to the feedback citing that practice or
+ * addressed to that developer.
  */
 export function feedbackSlots(counts: ReviewFeedbackCounts, scope?: OutcomeScope): OutcomeSlot[] {
 	return statusValues(DELIVERY_FAMILY_DEFS).map((family) => ({
@@ -183,13 +204,48 @@ export function feedbackSlots(counts: ReviewFeedbackCounts, scope?: OutcomeScope
 		target: scope && {
 			list: "feedback",
 			search: {
-				from: scope.from,
-				to: scope.to,
-				practiceSlug: scope.practiceSlug === undefined ? undefined : [scope.practiceSlug],
+				...scopeSearch(scope, "feedback"),
 				deliveryState: [...DELIVERY_FAMILY_STATES[family]],
 			},
 		},
 	}));
+}
+
+/**
+ * Feedback by delivery family as the overview counts it: replaced feedback is no loss, so it leaves
+ * the withheld count and stands apart in a neutral word, and withheld itself is neutral too, since
+ * most of it is the review working as meant. Why it was withheld is the By channel and reason card's.
+ */
+export function overviewFeedbackSlots(
+	counts: ReviewFeedbackCounts,
+	scope?: OutcomeScope,
+): OutcomeSlot[] {
+	const search = (deliveryState: DeliveryState[]): ReviewListTarget | undefined =>
+		scope && {
+			list: "feedback",
+			search: { ...scopeSearch(scope, "feedback"), deliveryState },
+		};
+	const slots = feedbackSlots(counts, scope).map((slot): OutcomeSlot => {
+		if (slot.key !== "WITHHELD") {
+			return slot;
+		}
+		return {
+			...slot,
+			def: { ...slot.def, badgeVariant: "outline" },
+			count: counts.suppressed + counts.discarded,
+			target: search(["SUPPRESSED", "DISCARDED"]),
+		};
+	});
+	return [
+		...slots,
+		{
+			key: "SUPERSEDED",
+			def: DELIVERY_STATE_DEFS.SUPERSEDED,
+			label: lower(DELIVERY_STATE_DEFS.SUPERSEDED),
+			count: counts.superseded,
+			target: search(["SUPERSEDED"]),
+		},
+	];
 }
 
 export function slotsTotal(slots: readonly OutcomeSlot[]): number {
@@ -201,10 +257,18 @@ export function rangeScope(from: Date, nowMs: number): OutcomeScope {
 	return { from: toDayParam(from), to: toDayParam(new Date(nowMs)) };
 }
 
-function observationsSearch(scope: OutcomeScope): Partial<ObservationsSearch> {
+/**
+ * The list search a scope stands for, which every count's link starts from so it matches its count:
+ * the days and the practice, and on the Feedback list the recipient.
+ */
+export function scopeSearch(
+	scope: OutcomeScope,
+	list: ReviewListTarget["list"],
+): Pick<FeedbackSearch, "from" | "to" | "practiceSlug" | "recipientUserId"> {
 	return {
 		from: scope.from,
 		to: scope.to,
 		practiceSlug: scope.practiceSlug === undefined ? undefined : [scope.practiceSlug],
+		recipientUserId: list === "feedback" ? scope.recipientUserId : undefined,
 	};
 }

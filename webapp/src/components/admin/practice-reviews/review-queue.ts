@@ -1,0 +1,72 @@
+import type { PracticeReviewQueue, PracticeReviewQueueItem } from "@/api/types.gen";
+
+import { QUEUE_WAIT_THRESHOLDS } from "./review-attention-thresholds";
+
+/**
+ * How often the queue is re-read while something in it waits or runs. Slower than a single
+ * review's poll: the card is a glance at the whole workspace, not a watch over one review.
+ */
+export const QUEUE_POLL_MS = 10_000;
+
+/**
+ * A wait from this long on is the queue's problem and is marked: the overview's long-wait mark
+ * (icon and words, no colour) for the oldest wait (`review-attention-thresholds.ts`), the wait the
+ * trace calls slow. The server's `waitingLong` still counts waits over 10 minutes.
+ */
+export const LONG_WAIT_SECONDS = QUEUE_WAIT_THRESHOLDS.warningSeconds;
+
+/** How many of the queue's head the card lists before it links to the rest. */
+export const QUEUE_ROWS = 3;
+
+/** Every review the queue holds now: running, waiting and on hold. */
+export function queueTotal(queue: PracticeReviewQueue): number {
+	return queue.running + queue.waiting + queue.heldForBudget;
+}
+
+/**
+ * Something waits for a worker or runs, so the queue is worth re-reading. A budget hold alone is
+ * not: it waits for the monthly cap, which can take days, and nothing in the queue moves meanwhile.
+ */
+export function queueActive(queue: PracticeReviewQueue): boolean {
+	return queue.running + queue.waiting > 0;
+}
+
+/** Seconds from `at` until the queue was read, never negative when the clocks disagree. */
+export function secondsUntilRead(queue: PracticeReviewQueue, at: Date): number {
+	return Math.max(0, (queue.asOf.getTime() - at.getTime()) / 1000);
+}
+
+/** How long the oldest review has waited for a worker, or undefined when none waits. */
+export function oldestWaitSeconds(queue: PracticeReviewQueue): number | undefined {
+	return queue.oldestWaitingSince === undefined
+		? undefined
+		: secondsUntilRead(queue, queue.oldestWaitingSince);
+}
+
+/** The oldest wait has reached the overview's long-wait mark (30 minutes): an icon and words, no colour. */
+export function waitsLong(queue: PracticeReviewQueue): boolean {
+	return (oldestWaitSeconds(queue) ?? 0) >= LONG_WAIT_SECONDS;
+}
+
+export type QueueItemState = "running" | "waiting" | "held";
+
+export function queueItemState(item: PracticeReviewQueueItem): QueueItemState {
+	if (item.status === "RUNNING") {
+		return "running";
+	}
+	return item.heldForBudget ? "held" : "waiting";
+}
+
+/**
+ * A rate as a person says it: whole from ten up, one decimal below, no trailing zero, and "less
+ * than 0.1" where rounding would say a review that finished never did.
+ */
+export function perHourText(perHour: number): string {
+	if (perHour >= 10) {
+		return String(Math.round(perHour));
+	}
+	if (perHour > 0 && perHour < 0.05) {
+		return "less than 0.1";
+	}
+	return String(Math.round(perHour * 10) / 10);
+}

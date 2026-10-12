@@ -1,5 +1,6 @@
 import { formatDistanceStrict } from "date-fns";
 import type { AgentJob } from "@/api/types.gen";
+import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
 import { asDate } from "@/lib/dates";
 import { hasText } from "@/lib/text";
 
@@ -63,6 +64,16 @@ export function isResultProcessingRetryable(
 	return job.status === "COMPLETED" && job.deliveryStatus === "FAILED";
 }
 
+/**
+ * The kinds the request endpoint accepts. A conversation and a document are reviewed on the occasion
+ * their source produces, and asking for one by hand is refused. Nothing on the wire says which kinds
+ * have a front door; being wrong in this direction costs a missing button rather than a broken one.
+ */
+export const REVIEWABLE_ON_DEMAND: ReadonlySet<string> = new Set([
+	ARTIFACT_KIND.pullRequest,
+	ARTIFACT_KIND.issue,
+]);
+
 export interface JobPhases {
 	wait: string;
 	preparation: string;
@@ -120,9 +131,4 @@ export function jobPhases(
 			job.status === "RUNNING" ? IN_PROGRESS : elapsed(executing, instant(job.completedAt));
 	}
 	return { wait, preparation, execution, retried };
-}
-
-/** The submit-time snapshot, not the runner-reported `llmModel`, which exists only once it has run. */
-export function modelLabel(job: Pick<AgentJob, "model">): string {
-	return job.model ?? "—";
 }

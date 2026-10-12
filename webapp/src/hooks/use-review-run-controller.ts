@@ -1,44 +1,42 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import {
 	cancelAgentJobMutation,
 	getAgentJobOptions,
 	getAgentJobQueryKey,
-	listPracticeReviewFeedbackOptions,
-	listPracticeReviewFeedbackQueryKey,
-	listPracticeReviewObservationsOptions,
-	listPracticeReviewObservationsQueryKey,
+	getAgentJobUsageOptions,
+	getArtifactTraceOptions,
+	listPracticeReviewDeliveryChecksOptions,
+	listPracticeReviewsQueryKey,
 	retryAgentJobDeliveryMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { AgentJob, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
+import type { AgentJob, AgentJobUsage, DeliveryPolicyTrace } from "@/api/types.gen";
+import type { RunTraceState } from "@/components/admin/practice-reviews/review-run-sections";
 import {
 	ACTIVE_REVIEW_POLL_MS,
 	PRACTICE_REVIEW_READS,
-	REVIEW_PREVIEW_SIZE,
 } from "@/components/admin/practice-reviews/review-search";
 import { type PanelState, panelState } from "@/components/common/panel-state";
-import { problemDetailOf } from "@/lib/problem-detail";
+import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
-
-import {
-	type ReviewSectionState,
-	toSectionState,
-} from "@/components/admin/practice-reviews/review-states";
+import { retryUnlessNotFound } from "@/runtime/tanstack-query/query-defaults";
 
 /**
- * Everything the review level needs, already resolved: the run, the two previews of what it
- * produced, and the two actions an operator can take on it.
+ * Everything the review's sheet needs, already resolved: the review, how it answered each practice,
+ * the delivery checks it ran for itself, what it cost, and the two actions an operator can take on
+ * it. Its
+ * observations and feedback are other records: the sheet does not read them.
  *
- * The screen is handed states, not queries. "Still running" reaches it as a section's `pending`
- * status — that a running review is re-asked for on a timer, and that the timer stops by itself at a
- * terminal status, is this module's business alone.
+ * The screen is handed states, not queries. That a running review is re-asked for on a timer, and
+ * that the timer stops by itself at a terminal status, is this module's business alone.
  */
 export interface ReviewRunController {
 	job: PanelState<{ job: AgentJob }>;
-	observations: ReviewSectionState<ReviewObservation>;
-	feedback: ReviewSectionState<ReviewFeedback>;
+	trace: RunTraceState;
+	deliveryChecks: PanelState<{ checks: DeliveryPolicyTrace[] }>;
+	usage: PanelState<{ usage: AgentJobUsage }>;
 	onCancel: () => void;
 	cancelPending: boolean;
 	onRetryResultProcessing: () => void;
@@ -49,6 +47,7 @@ export function useReviewRunController(workspaceSlug: string, jobId: string): Re
 	const queryClient = useQueryClient();
 	const jobQuery = useQuery({
 		...getAgentJobOptions({ path: { workspaceSlug, jobId } }),
+		retry: retryUnlessNotFound,
 		refetchInterval: (result) =>
 			result.state.data?.status === "QUEUED" ||
 			result.state.data?.status === "RUNNING" ||
@@ -57,43 +56,54 @@ export function useReviewRunController(workspaceSlug: string, jobId: string): Re
 				: false,
 	});
 	const runIsActive = jobQuery.data?.status === "QUEUED" || jobQuery.data?.status === "RUNNING";
-	const observationsQuery = useQuery({
-		...listPracticeReviewObservationsOptions({
-			path: { workspaceSlug },
-			// The screen shows only the observations most worth acting on, so it has to *ask* for that
-			// ordering: the endpoint's default is newest-first, and re-sorting a page of five here would
-			// order the five that happened to arrive rather than the five that matter.
-			query: { agentJobId: jobId, sort: "ACTIONABILITY", size: REVIEW_PREVIEW_SIZE },
-		}),
+	const work = jobQuery.data?.target.reviewedWork;
+	const traceOptions = getArtifactTraceOptions({
+		path: {
+			workspaceSlug,
+			artifactKind: work?.kind ?? "",
+			artifactId: Number(work?.id ?? 0),
+		},
+		// This review's answers, not the newest review's of the same work.
+		query: { reviewId: jobId },
+	});
+	const traceQuery = useQuery({
+		...traceOptions,
+		queryFn: work === undefined ? skipToken : traceOptions.queryFn,
+		// A 404 is work nothing was ever recorded about: asking again answers the same.
+		retry: retryUnlessNotFound,
 		refetchInterval: runIsActive ? ACTIVE_REVIEW_POLL_MS : false,
 	});
-	const feedbackQuery = useQuery({
-		...listPracticeReviewFeedbackOptions({
-			path: { workspaceSlug },
-			query: { agentJobId: jobId, size: REVIEW_PREVIEW_SIZE },
-		}),
-		refetchInterval: runIsActive ? ACTIVE_REVIEW_POLL_MS : false,
+	const checksOptions = listPracticeReviewDeliveryChecksOptions({
+		path: { workspaceSlug, agentJobId: jobId },
 	});
+	const checksQuery = useQuery({ ...checksOptions, retry: retryUnlessNotFound });
+	const usageOptions = getAgentJobUsageOptions({ path: { workspaceSlug, jobId } });
+	const usageQuery = useQuery({ ...usageOptions, retry: retryUnlessNotFound });
 
-	// Processing finishes after execution. Reload the outputs when either stage settles, including
-	// retries of a completed review; its previously cached feedback can otherwise stay stale.
+	// The trace polls only while the review runs, the checks are written when its results are
+	// processed and its cost when an attempt ends, and the review's row (its counts and developers,
+	// which the sheet and the trace read) is written with its results: the review settling is what
+	// asks all four once more.
+	const settled =
+		jobQuery.data !== undefined && !runIsActive && jobQuery.data.deliveryStatus !== "PENDING";
+	// Undefined until the review is first read, so arriving at a settled review asks nothing again.
+	const wasSettled = useRef<boolean | undefined>(undefined);
 	useEffect(() => {
-		if (!jobQuery.data || runIsActive || jobQuery.data.deliveryStatus === "PENDING") {
-			return;
+		const before = wasSettled.current;
+		wasSettled.current = jobQuery.data === undefined ? undefined : settled;
+		if (before === false && settled) {
+			void queryClient.invalidateQueries({ queryKey: traceOptions.queryKey });
+			void queryClient.invalidateQueries({ queryKey: checksOptions.queryKey });
+			void queryClient.invalidateQueries({ queryKey: usageOptions.queryKey });
+			// Any read of the review's row, whatever its page size.
+			void queryClient.invalidateQueries({
+				queryKey: listPracticeReviewsQueryKey({
+					path: { workspaceSlug },
+					query: { agentJobId: jobId },
+				}),
+			});
 		}
-		void queryClient.invalidateQueries({
-			queryKey: listPracticeReviewObservationsQueryKey({
-				path: { workspaceSlug },
-				query: { agentJobId: jobId, sort: "ACTIONABILITY", size: REVIEW_PREVIEW_SIZE },
-			}),
-		});
-		void queryClient.invalidateQueries({
-			queryKey: listPracticeReviewFeedbackQueryKey({
-				path: { workspaceSlug },
-				query: { agentJobId: jobId, size: REVIEW_PREVIEW_SIZE },
-			}),
-		});
-	}, [jobQuery.data, runIsActive, queryClient, workspaceSlug, jobId]);
+	});
 
 	/**
 	 * Both actions answer with the job as it now stands, so it is written straight into the cache;
@@ -128,11 +138,12 @@ export function useReviewRunController(workspaceSlug: string, jobId: string): Re
 
 	return {
 		job: panelState(jobQuery, (job) => ({ status: "ready" as const, job })),
-		observations: toSectionState<ReviewObservation>(observationsQuery, runIsActive),
-		feedback: toSectionState<ReviewFeedback>(
-			feedbackQuery,
-			runIsActive || jobQuery.data?.deliveryStatus === "PENDING",
-		),
+		trace:
+			work === undefined || problemStatusOf(traceQuery.error) === 404
+				? { status: "none" }
+				: panelState(traceQuery, (trace) => ({ status: "ready" as const, trace })),
+		deliveryChecks: panelState(checksQuery, (checks) => ({ status: "ready" as const, checks })),
+		usage: panelState(usageQuery, (usage) => ({ status: "ready" as const, usage })),
 		onCancel: () => cancelJob.mutate({ path: { workspaceSlug, jobId } }),
 		cancelPending: cancelJob.isPending,
 		onRetryResultProcessing: () => retryResultProcessing.mutate({ path: { workspaceSlug, jobId } }),

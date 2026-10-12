@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { useId, useState } from "react";
 
-import { RelativeTime } from "@/components/common/RelativeTime";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import {
@@ -98,31 +97,5 @@ export function CorrectionReasonPopover({
 				</div>
 			</PopoverContent>
 		</Popover>
-	);
-}
-
-/** One entry in a correction history: who did what, when, and why. */
-export function CorrectionEntry({
-	action,
-	actor,
-	at,
-	reason,
-	note,
-}: {
-	action: string;
-	actor: string | undefined;
-	at: Date;
-	reason: string | undefined;
-	note?: string;
-}) {
-	return (
-		<li className="space-y-1 rounded-lg border p-3">
-			<p className="text-muted-foreground">
-				<span className="font-medium text-foreground">{action}</span> by{" "}
-				{actor ?? "an account that no longer exists"} <RelativeTime value={at} />
-			</p>
-			{hasText(reason) && <p className="break-words whitespace-pre-wrap">{reason}</p>}
-			{hasText(note) && <p className="text-muted-foreground">{note}</p>}
-		</li>
 	);
 }
