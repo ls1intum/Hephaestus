@@ -533,6 +533,11 @@ The ledger keeps it.
 The overview is the Practice profile's account of what changed.
 It reads standings and the feedback ledger and composes sentences on the page.
 Nothing in it is a second standing or resolution rule.
+
+The HTTP overview's top-level `holdingUp` and `reviewedWork` fields are deprecated and retain their computed values during the announced transition.
+The bundled profile does not render these fields.
+Their removal follows the [deprecation policy](https://docs.hephaestus.build/admin/compatibility-policy#deprecation-policy).
+
 Its rules, in one place:
 
 - **The window** every change is measured over opens at the review run before the latest one and

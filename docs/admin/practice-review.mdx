@@ -211,7 +211,7 @@ Its figure is the median of whole reviews: half took less, half took longer.
 It starts at the moment on the work that started a review, or at its request if nothing started it.
 It ends when the review posted its comment on the work.
 Under the figure, one bar splits the same time into stages, with the words of the trace and the sheet of a review.
-Each stage is as wide in the bar as its part of the time, and the legend under the bar gives its time:
+Each stage is as wide in the bar as its share of the reviews' combined time:
 
 - **Until asked**: from the moment on the work that started the review until it was asked for.
   A review that a developer or an admin asked for waits nothing here.
@@ -225,7 +225,8 @@ Each stage is as wide in the bar as its part of the time, and the legend under t
   The bar shows this stage only when the range has such reviews.
 - **To developer**: from the end of the review until it posted its first comment on the work.
 
-Each stage is its part of the time of the same reviews, so the stages add up to the figure.
+The legend apportions the whole-review median using these shares, so its numbers add up to the figure.
+These are a proportional breakdown, not the median of each stage or the times of one actual review.
 The trace of a review splits its run into **Preparation** and **Execution** in the same way when the review recorded when its execution started.
 Otherwise, the trace shows one **Run**.
 
@@ -241,9 +242,9 @@ The (i) beside the name of the range gives one short line for the figure and for
 It also gives one line each for **Finished**, **Lost to merge** and **Finished after merge**.
 The part of each stage is its time summed over the reviews of the figure, divided by their total time.
 
-Some comments can be withheld because the work was already merged when they were ready.
+Some pieces of feedback can be withheld because the work was already merged when they were ready.
 **Lost to merge** then says how many.
-It counts comments, not reviews, and has no colour.
+It counts pieces of feedback, not comments or reviews, and has no colour.
 
 Some reviews complete after the merge of their pull request or merge request.
 **Finished after merge** gives their number as a link.
@@ -316,7 +317,7 @@ Each row is one line: a long practice name is cut short, and the full name shows
 By default, **Needs a look first** puts the practices with a marker at the top:
 
 - **Never applies here**: 90 % or more of its observations were not applicable.
-  The practice costs reviews and tells nobody anything, so consider turning it off for this course.
+  The practice costs reviews and tells nobody anything, so consider turning it off for this workspace.
 - **Often undecided**: 30 % or more of its observations were undetermined.
   The review may lack the evidence to decide.
 
@@ -431,7 +432,7 @@ An older link that opened a piece of work as a panel opens the sheet of the work
 
 Select a row to open the sheet of its record.
 The sheet slides in from the right over the current list.
-A sheet shows all the data of one record, and nothing about other records.
+A sheet shows the permitted details of one record, and nothing about other records.
 Every sheet has the same structure: a title, one status line, **What it is**, **State and history**, the details,
 **Technical**, and the actions.
 Each fact appears once, and every time is a date and a time.
@@ -439,13 +440,16 @@ Each fact appears once, and every time is a date and a time.
 - **Review**: its history from the request to the first posted comment, and where its time went.
   It also shows how it answered each practice, and its own delivery checks.
   **Technical** holds the model, the tokens, the retries and the exit code.
+  These execution facts do not expose the retained runtime result or private feedback text.
   Its actions are **Cancel review**, **Retry result processing** and **Request another review**.
   **Request another review** asks you to confirm first, because the review runs as an agent job.
   It is disabled while another review of the same work is queued or running.
 - **Observation**: the outcome and severity, the practice, why it was raised, and all the evidence.
   It also shows each dispute in the developer's words, each correction and restore, and when it stopped being current.
   Its action is **Mark as incorrect** or **Restore observation**.
-- **Feedback**: its first line as the title, the recipient, where it appears, and the text as **Rendered** or **Source**.
+- **Feedback**: the recipient and where it appears.
+  Feedback on the work shows its first line as the title and its text as **Rendered** or **Source**.
+  Feedback on a developer's Practice profile or in conversation shows delivery metadata, never its private text.
   It also shows who approved or rejected it, and why it was withheld.
   The status line gives its outcome, such as **Failed to deliver**, once.
   **State and history** tells what became of each delivery to the provider, such as **Stopped trying**.
@@ -555,8 +559,8 @@ It tells the story of the record from top to bottom in the order that things hap
 7. **Effect**: whether the developer answered or disputes it, and whether their work resolved it.
    The end of the path tells if it worked, did not arrive, or is still open.
 
-The trace shows a dispute with the reason the developer wrote to the admins.
-It shows that the developer answered.
+The trace shows a current dispute with the reason the developer wrote to the admins.
+It shows a recorded current answer and its date, but never a rating given alone.
 It does not show how they rated the feedback, what else they decided, or any note beside it.
 These stay private to the developer.
 
