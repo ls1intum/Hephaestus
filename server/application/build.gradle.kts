@@ -280,6 +280,22 @@ for ((taskName, tag) in
             if (tag != "live") excludeTags("live")
         }
         shouldRunAfter(tasks.test)
+        if (tag == "live") {
+            listOf(
+                    "PI_RUNNER_CWD",
+                    "HEPHAESTUS_LIVE_LLM_BASE_URL",
+                    "HEPHAESTUS_LIVE_LLM_API_KEY",
+                    "HEPHAESTUS_LIVE_LLM_MODEL",
+                )
+                .forEach { name ->
+                    val value = providers.environmentVariable(name).orNull
+                    if (value == null) {
+                        environment.remove(name)
+                    } else {
+                        environment(name, value)
+                    }
+                }
+        }
         if (tag == "integration") {
             require(!criteriaCases.isPresent || integrationShard.get().isEmpty()) {
                 "criteriaCases cannot be combined with HEPHAESTUS_INTEGRATION_SHARD"
