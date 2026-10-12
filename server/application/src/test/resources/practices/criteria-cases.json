@@ -13,12 +13,12 @@
 	{
 		"id": "runtime-url",
 		"expected": {
-			"handles-errors-instead-of-swallowing-them": "NOT_MET"
+			"handles-errors-instead-of-swallowing-them": "MET"
 		},
 		"files": {
 			"repo/Loader.swift": "import Foundation\nfunc endpoint(_ input: String) -> URL? {\n    guard let url = URL(string: input) else { return nil }\n    return url\n}\n"
 		},
-		"reason": "Runtime input can fail to parse and the bare return drops that failure.",
+		"reason": "The wrapper returns the failable constructor's nil unchanged through its optional result, preserving the available failure signal; no caller is captured, so downstream handling is not established.",
 		"workType": "pull_request"
 	},
 	{
@@ -1684,5 +1684,71 @@
 		"expectedSeverity": {
 			"avoids-insecure-defaults-and-over-broad-permissions": "MAJOR"
 		}
+	},
+	{
+		"id": "runtime-url-loading-failure",
+		"expected": {
+			"handles-errors-instead-of-swallowing-them": "NOT_MET"
+		},
+		"files": {
+			"repo/Loader.swift": "import Foundation\nfinal class Loader {\n    enum State { case idle, loading, ready(URL), failed }\n    private(set) var state = State.idle\n    func prepare(_ input: String) {\n        state = .loading\n        guard let url = URL(string: input) else { return }\n        state = .ready(url)\n    }\n}\n"
+		},
+		"reason": "The same runtime failable constructor feeds a Void operation; nil neither propagates nor records failure and leaves loading unfinished.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "optional-selection-absent",
+		"expected": {
+			"handles-errors-instead-of-swallowing-them": "NOT_APPLICABLE"
+		},
+		"files": {
+			"repo/Selection.swift": "final class Selection {\n    private(set) var selected: String?\n    // Selecting from an empty list leaves no selection.\n    func chooseFirst(from items: [String]) {\n        selected = nil\n        guard let first = items.first else { return }\n        selected = first\n    }\n}\n"
+		},
+		"reason": "An empty collection is a normal no-selection result and the owned selection is cleared; the optional guard adds no failed operation or unfinished work.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "required-selection-left-loading",
+		"expected": {
+			"handles-errors-instead-of-swallowing-them": "NOT_MET"
+		},
+		"files": {
+			"repo/Selection.swift": "final class Selection {\n    enum State { case idle, loading, selected(String), failed }\n    private(set) var state = State.idle\n    func chooseFirst(from items: [String]) {\n        state = .loading\n        guard let first = items.first else { return }\n        state = .selected(first)\n    }\n}\n"
+		},
+		"reason": "The requested selection enters loading; an empty runtime collection returns without propagating or recording failure, leaving the owned operation unfinished.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "preview-error-to-fallback",
+		"expected": {
+			"handles-errors-instead-of-swallowing-them": "MET"
+		},
+		"files": {
+			"repo/Preview.swift": "import SwiftUI\nenum PreviewError: Error { case unavailable, invalid }\nstruct PreviewSource {\n    let caption: String?\n    func loadCaption() throws -> String {\n        guard let caption else { throw PreviewError.unavailable }\n        guard !caption.isEmpty else { throw PreviewError.invalid }\n        return caption\n    }\n}\nstruct PreviewCaption: View {\n    let source: PreviewSource\n    var body: some View {\n        let caption = try? source.loadCaption()\n        return Text(caption ?? \"Preview unavailable\")\n    }\n}\n"
+		},
+		"reason": "The local throwing preview source exposes two failure outcomes; the captured view deliberately reduces either to nil and selects a visible unavailable fallback, with no unfinished required state. This proves the coded fallback path, not that a UI ran.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "preview-error-to-success-default",
+		"expected": {
+			"handles-errors-instead-of-swallowing-them": "NOT_MET"
+		},
+		"files": {
+			"repo/Preview.swift": "import SwiftUI\nenum PreviewError: Error { case unavailable, invalid }\nstruct PreviewSource {\n    let caption: String?\n    func loadCaption() throws -> String {\n        guard let caption else { throw PreviewError.unavailable }\n        guard !caption.isEmpty else { throw PreviewError.invalid }\n        return caption\n    }\n}\nstruct PreviewCaption: View {\n    let source: PreviewSource\n    var body: some View {\n        let caption = try? source.loadCaption()\n        return Text(caption ?? \"Preview loaded successfully\")\n    }\n}\n"
+		},
+		"reason": "The same two captured load failures reduce to a result presented as successful preview content; the view exposes no failure or unavailable state and no other failure signal. Distinct exception cases alone are not the reason.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "optional-style-error-to-default",
+		"expected": {
+			"handles-errors-instead-of-swallowing-them": "MET"
+		},
+		"files": {
+			"repo/Badge.swift": "enum BadgeStyle { case plain, accented }\nenum OptionalStyleError: Error { case unavailable }\nstruct OptionalBadgeStyle {\n    let customStyle: BadgeStyle?\n    func load() throws -> BadgeStyle {\n        guard let customStyle else { throw OptionalStyleError.unavailable }\n        return customStyle\n    }\n}\nstruct Badge {\n    let title: String\n    let style: BadgeStyle\n}\nfunc makeBadge(title: String, defaultStyle: BadgeStyle, optionalStyle: OptionalBadgeStyle?) -> Badge {\n    let style = optionalStyle.flatMap { try? $0.load() } ?? defaultStyle\n    return Badge(title: title, style: style)\n}\nlet badge = makeBadge(title: \"Profile\", defaultStyle: .plain, optionalStyle: OptionalBadgeStyle(customStyle: nil))\n"
+		},
+		"reason": "The caller supplies a valid base style for optional customization. A missing override can throw, but the function always returns a complete Badge with its independent title unchanged and that supplied style; the captured contract makes the normal default safe without a failure-label cue or unfinished required state. This establishes the coded fallback, not runtime rendering.",
+		"workType": "pull_request"
 	}
 ]
