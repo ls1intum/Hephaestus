@@ -441,6 +441,10 @@ const pullRequestRecordSchema = z.object({
 	pr_number: z.int(),
 	pr_url: z.string(),
 	repository_full_name: z.string(),
+	/** The admitted repository's id: a full name is unique only within one provider. */
+	repository_id: z.int().positive().optional(),
+	/** That repository's provider, as the mirror held it at capture. Absent when it could not be told. */
+	provider_id: z.int().positive().optional(),
 	source_branch: z.string(),
 	target_branch: z.string(),
 	/** The reviewed head. */
@@ -496,6 +500,10 @@ const issueRecordSchema = z.object({
 	state_reason: z.string().nullable(),
 	html_url: z.string().nullable(),
 	repository_full_name: z.string(),
+	/** The admitted repository's id: a full name is unique only within one provider. */
+	repository_id: z.int().positive().optional(),
+	/** That repository's provider, as the mirror held it at capture. Absent when it could not be told. */
+	provider_id: z.int().positive().optional(),
 	author: z.string().nullable(),
 	author_id: z.int().nullable(),
 	issue_type: z.string().nullable(),

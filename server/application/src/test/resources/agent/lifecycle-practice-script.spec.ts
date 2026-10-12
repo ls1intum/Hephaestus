@@ -13,6 +13,8 @@ const metadata = {
 	pr_number: 16,
 	pr_url: "https://example.org/team/project/pull/16",
 	repository_full_name: "team/project",
+	repository_id: 1,
+	provider_id: 1,
 	source_branch: "18-add-ingredient-view",
 	target_branch: "main",
 	title: "#18: Add ingredient creation view",
@@ -666,7 +668,7 @@ void test("an open issue that an open merge request may close stays open, its cl
 	);
 	assert.equal(result.facts?.providerClosingLinks, 1);
 	assert.match(
-		result.directions?.[1] ?? "",
+		result.directions?.[2] ?? "",
 		/1 captured, 1 of them provider closing candidates #1 \(state OPEN\)/u,
 	);
 	const evidence = [
@@ -770,17 +772,39 @@ void test("every authored commit is one lead, however many there are", async () 
 	}
 });
 
+/** The captured identity of an inventory row's repository: a full name and the ids that settle it. */
+const teamProject = { repository: "team/project", repository_id: 1, provider_id: 1 };
+const teamOther = { repository: "team/other", repository_id: 2, provider_id: 1 };
+const gitlab = (repository: string, repositoryId: number) => ({
+	repository,
+	repository_id: repositoryId,
+	provider_id: 2,
+});
+
 void test("an issue reference is resolved against the inventory and the linked items", async () => {
 	const result = await review("links-the-change-to-its-issue", {
 		work: { ...metadata, body: "Closes #18\n\nSee also #21 and #99." },
 		context: {
 			"linked_work_items.json": {
-				workItems: [{ number: 18, title: "Add ingredients", body: "" }],
+				workItems: [
+					{
+						number: 18,
+						title: "Add ingredients",
+						body: "",
+						url: "https://example.org/team/project/issues/18",
+					},
+				],
 			},
 			"project_inventory.json": {
 				issues: [
-					{ number: 18, title: "Add ingredients", state: "OPEN" },
-					{ number: 21, title: "Confetti", state: "CLOSED" },
+					{
+						...teamProject,
+						number: 18,
+						title: "Add ingredients",
+						state: "OPEN",
+						url: "https://example.org/team/project/issues/18",
+					},
+					{ ...teamProject, number: 21, title: "Confetti", state: "CLOSED" },
 				],
 			},
 		},
@@ -805,6 +829,318 @@ void test("an issue reference is resolved against the inventory and the linked i
 	assert.equal(result.facts?.inventoryOpenIssues, 1);
 	assert.equal(result.facts.referencesInInventory, 2);
 	assert.equal(result.facts.linkedWorkItems, 1);
+});
+
+/** Run links-the-change-to-its-issue on one inventory and one description; the leads keyed by reference. */
+async function linksAgainst(
+	inventory: unknown,
+	reviewed: {
+		repository_full_name: string;
+		repository_id?: number | undefined;
+		provider_id?: number | undefined;
+		body: string;
+	},
+	linked?: unknown,
+) {
+	const result = await review("links-the-change-to-its-issue", {
+		work: { ...metadata, ...reviewed, title: "Add the view", source_branch: "add-the-view" },
+		context: {
+			"project_inventory.json": inventory,
+			...(linked === undefined ? {} : { "linked_work_items.json": linked }),
+		},
+	});
+	const rows = new Map(
+		result.leads.map((lead) => [
+			`${typeof lead.facts?.target === "string" ? lead.facts.target : ""}#${String(lead.facts?.number)}`,
+			lead,
+		]),
+	);
+	return { ...result, rows };
+}
+
+void test("a plain #number is the reviewed repository's issue, whichever permitted repository is listed last", async () => {
+	const result = await linksAgainst(
+		{
+			synced_at: null,
+			truncated: false,
+			issues: [
+				{ ...teamProject, number: 7, title: "Show the map", state: "OPEN" },
+				{ ...teamOther, number: 7, title: "Rename the app", state: "CLOSED" },
+				{ ...teamOther, number: 8, title: "Fix the icon", state: "OPEN" },
+				// The same full name on another provider is another repository.
+				{
+					repository: "team/project",
+					repository_id: 3,
+					provider_id: 2,
+					number: 7,
+					title: "Close the map",
+					state: "CLOSED",
+				},
+			],
+		},
+		{ repository_full_name: "team/project", body: "Refs #7" },
+	);
+	const seven = result.rows.get("#7");
+	assert.ok(seven);
+	assert.equal(seven.facts?.title, "Show the map");
+	assert.equal(seven.facts.state, "OPEN");
+	assert.equal(seven.facts.inInventory, true);
+	// The counts are the reviewed repository's, not the workspace's.
+	assert.equal(result.facts?.inventoryIssues, 1);
+	assert.equal(result.facts.inventoryOpenIssues, 1);
+});
+
+void test("a reviewed repository with no issues counts none, while other permitted repositories hold some", async () => {
+	const result = await linksAgainst(
+		{
+			synced_at: null,
+			truncated: false,
+			issues: [{ ...teamOther, number: 3, title: "Fix the icon", state: "OPEN" }],
+		},
+		{ repository_full_name: "team/project", body: "Adds the view." },
+	);
+	assert.equal(result.facts?.inventoryIssues, 0);
+	assert.equal(result.facts.inventoryOpenIssues, 0);
+	assert.match(result.directions?.[1] ?? "", /0 issues, 0 open, in team\/project/u);
+});
+
+void test("a qualified reference stays an issue of the repository it names, on GitHub and in a nested GitLab group", async () => {
+	const result = await linksAgainst(
+		{
+			synced_at: null,
+			truncated: false,
+			issues: [
+				{ ...gitlab("group/sub/project", 10), number: 7, title: "Show the map", state: "OPENED" },
+				{ ...gitlab("group/sub/other", 11), number: 8, title: "Share the map", state: "OPENED" },
+				{ ...gitlab("owner/repo", 12), number: 9, title: "Export the map", state: "OPENED" },
+				// The same path on another provider is another repository and never answers for this one.
+				{
+					repository: "group/sub/other",
+					repository_id: 13,
+					provider_id: 1,
+					number: 8,
+					title: "Rename the map",
+					state: "OPEN",
+				},
+			],
+		},
+		{
+			repository_full_name: "group/sub/project",
+			repository_id: 10,
+			provider_id: 2,
+			body: "Closes #7\n\nNeeds group/sub/other#8; see owner/repo#7 and other#7.",
+		},
+	);
+	assert.equal(result.rows.get("#7")?.facts?.title, "Show the map");
+	const other = result.rows.get("group/sub/other#8");
+	assert.ok(other);
+	assert.equal(other.kind, "qualified-issue-reference");
+	assert.equal(other.facts?.title, "Share the map");
+	assert.equal(other.facts.inInventory, true);
+	// owner/repo has no #7, and the reviewed repository's #7 is not it.
+	const elsewhere = result.rows.get("owner/repo#7");
+	assert.ok(elsewhere);
+	assert.equal(elsewhere.facts?.inInventory, false);
+	assert.equal(elsewhere.facts.title, undefined);
+	assert.equal(result.rows.has("#8"), false);
+	assert.equal(result.rows.get("other#7")?.facts?.inInventory, "unknown");
+	assert.equal(result.rows.get("other#7")?.facts?.title, undefined);
+	assert.equal(result.facts?.referencesFound, 4);
+	assert.equal(result.facts.inventoryIssues, 1);
+});
+
+void test("an inventory that does not say whose issues it holds leaves the reviewed repository's rows unknown", async () => {
+	for (const inventory of [
+		{ issues: [{ number: 7, title: "Show the map", state: "OPEN" }] },
+		// A capture of one other repository says nothing about the reviewed one.
+		{ repository: "team/other", issues: [{ number: 7, title: "Rename the app", state: "OPEN" }] },
+	]) {
+		const result = await linksAgainst(inventory, {
+			repository_full_name: "team/project",
+			body: "Refs #7",
+		});
+		const seven = result.rows.get("#7");
+		assert.ok(seven);
+		assert.equal(seven.facts?.inInventory, "unknown");
+		assert.equal(seven.facts.title, undefined);
+		assert.equal(result.facts?.inventoryIssues, -1);
+		assert.equal(result.facts.inventoryOpenIssues, -1);
+		assert.match(
+			result.directions?.[1] ?? "",
+			/the inventory does not say which of its issues belong to team\/project/u,
+		);
+	}
+	const unbound = await linksAgainst(
+		{ issues: [{ repository: "team/project", number: 7, title: "Show the map", state: "OPEN" }] },
+		{ repository_full_name: "", body: "Refs #7" },
+	);
+	assert.equal(unbound.facts?.inventoryIssues, -1);
+	assert.equal(unbound.rows.get("#7")?.facts?.title, undefined);
+	for (const [inventory, reviewed] of [
+		// Identified rows, but no admitted repository id: the full name alone settles nothing.
+		[
+			{ issues: [{ ...teamProject, number: 7, title: "Show the map", state: "OPEN" }] },
+			{
+				repository_full_name: "team/project",
+				repository_id: undefined,
+				provider_id: undefined,
+				body: "Refs #7 and team/project#7",
+			},
+		],
+		// One repository id under two names is a capture that identifies nothing.
+		[
+			{
+				issues: [
+					{ ...teamProject, number: 7, title: "Show the map", state: "OPEN" },
+					{ ...teamProject, repository: "team/renamed", number: 8, title: "Fix it", state: "OPEN" },
+				],
+			},
+			{ repository_full_name: "team/project", body: "Refs #7 and team/project#7" },
+		],
+	] as const) {
+		const unknown = await linksAgainst(inventory, reviewed);
+		assert.equal(unknown.rows.get("#7")?.facts?.inInventory, "unknown");
+		assert.equal(unknown.rows.get("team/project#7")?.facts?.inInventory, "unknown");
+		assert.equal(unknown.rows.get("team/project#7")?.facts?.title, undefined);
+		assert.equal(unknown.facts?.inventoryIssues, -1);
+	}
+});
+
+void test("unsafe captured repository identities cannot answer a plain or qualified reference", async () => {
+	for (const invalid of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+		const result = await linksAgainst(
+			{ issues: [{ ...teamProject, repository_id: invalid, number: 7, title: "Show the map" }] },
+			{ repository_full_name: "team/project", body: "Refs #7 and team/project#7" },
+		);
+		assert.equal(result.rows.get("#7")?.facts?.inInventory, "unknown");
+		assert.equal(result.rows.get("team/project#7")?.facts?.inInventory, "unknown");
+		assert.equal(result.facts?.inventoryIssues, -1);
+		// The record of the work refuses an identity that the server never writes.
+		await assert.rejects(
+			linksAgainst(
+				{ issues: [{ ...teamProject, number: 7, title: "Show the map" }] },
+				{
+					repository_full_name: "team/project",
+					repository_id: invalid,
+					provider_id: invalid,
+					body: "Refs #7 and team/project#7",
+				},
+			),
+		);
+	}
+});
+
+void test("a URL match without provider custody keeps a closing candidate outside known inventory", async () => {
+	const address = "https://example.org/team/project/issues/7";
+	const result = await linksAgainst(
+		{
+			issues: [
+				{
+					...teamProject,
+					provider_id: undefined,
+					number: 7,
+					title: "Inventory title",
+					url: address,
+				},
+			],
+		},
+		{ repository_full_name: "team/project", provider_id: undefined, body: "" },
+		{
+			workItems: [
+				{
+					number: 7,
+					title: "Captured candidate",
+					state: "CLOSED",
+					how: "closesOnMerge",
+					url: address,
+				},
+			],
+		},
+	);
+	const closing = result.leads.find((lead) => lead.kind === "closing-reference");
+	assert.ok(closing);
+	assert.equal(closing.facts?.inInventory, "unknown");
+	assert.equal(closing.facts.title, "Captured candidate");
+	assert.equal(closing.facts.state, "CLOSED");
+	assert.equal(result.facts?.referencesInInventory, 0);
+});
+
+void test("a foreign provider closing candidate does not supply a plain reference's state or identity", async () => {
+	const result = await linksAgainst(
+		{
+			issues: [
+				{
+					...teamProject,
+					number: 7,
+					title: "Show the map",
+					url: "https://example.org/team/project/issues/7",
+				},
+				{
+					...teamOther,
+					number: 7,
+					title: "Rename the app",
+					state: "CLOSED",
+					url: "https://example.org/team/other/issues/7",
+				},
+			],
+		},
+		{ repository_full_name: "team/project", body: "Refs #7" },
+		{
+			workItems: [
+				{
+					number: 7,
+					title: "Rename the app",
+					state: "CLOSED",
+					how: "closesOnMerge",
+					url: "https://example.org/team/other/issues/7",
+				},
+			],
+		},
+	);
+	const closing = result.leads.find((lead) => lead.kind === "closing-reference");
+	assert.ok(closing);
+	assert.equal(closing.facts?.title, "Rename the app");
+	assert.equal(closing.facts.state, "CLOSED");
+	const local = result.leads.find((lead) => lead.kind === "issue-reference");
+	assert.ok(local);
+	assert.equal(local.facts?.title, "Show the map");
+	assert.equal(local.facts.state, undefined);
+	assert.equal(local.facts.inLinkedItems, "unknown");
+});
+
+void test("an unmatched closing candidate keeps its own URL instead of an unrelated inventory scope", async () => {
+	const foreign = "https://example.org/team/other/issues/7";
+	const result = await linksAgainst(
+		{
+			repository: "team/project",
+			issues: [
+				{
+					...teamProject,
+					number: 7,
+					title: "Local issue",
+					url: "https://example.org/team/project/issues/7",
+				},
+			],
+		},
+		{ repository_full_name: "team/project", body: "Refs #7" },
+		{
+			workItems: [
+				{
+					number: 7,
+					title: "Foreign candidate",
+					state: "CLOSED",
+					how: "closesOnMerge",
+					url: foreign,
+				},
+			],
+		},
+	);
+	const closing = result.leads.find((lead) => lead.kind === "closing-reference");
+	assert.ok(closing);
+	assert.equal(closing.facts?.target, foreign);
+	assert.equal(closing.facts.inInventory, "unknown");
+	assert.equal(closing.facts.state, "CLOSED");
+	assert.equal(result.facts?.referencesFound, 2);
 });
 
 void test("every reviewer comment is one lead with the reply, the thread and the later commits beside it", async () => {

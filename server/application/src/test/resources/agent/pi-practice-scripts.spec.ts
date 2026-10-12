@@ -263,7 +263,10 @@ export default {
 			);
 			assert.ok(readFileSync(path.join(root, "work/practice-scripts-out/.complete"), "utf8"));
 			const scoped: unknown = JSON.parse(
-				readFileSync(path.join(root, "work/practice-scripts-out/stored-scoped-inventory.json"), "utf8"),
+				readFileSync(
+					path.join(root, "work/practice-scripts-out/stored-scoped-inventory.json"),
+					"utf8",
+				),
 			);
 			assert.ok(typeof scoped === "object" && scoped !== null);
 			assert.equal(Reflect.get(scoped, "status"), "ok");

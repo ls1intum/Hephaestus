@@ -3,6 +3,7 @@
     "admission_fields": [
       "pr_number",
       "pr_url",
+      "repository_id",
       "repository_full_name",
       "source_branch",
       "target_branch",
@@ -18,6 +19,8 @@
   "pr_number": 7,
   "pr_url": "https://github.com/example/shop/pull/7",
   "repository_full_name": "example/shop",
+  "repository_id": 1,
+  "provider_id": 1,
   "source_branch": "cart-count",
   "target_branch": "main",
   "commit_sha": "0000000000000000000000000000000000000000",

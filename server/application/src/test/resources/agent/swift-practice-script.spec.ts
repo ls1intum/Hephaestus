@@ -317,13 +317,29 @@ void test("each state declaration is a lead with its enclosing type, and a plain
 
 void test("a change with no reference anywhere says what it scanned and what the inventory holds", async () => {
 	const slug = "links-the-change-to-its-issue";
+	// Each row carries the ids of its repository; the reviewed one is the admitted repository id.
 	const context = {
 		"project_inventory.json": {
-			issues: [{ number: 4, title: "Add the event map", state: "opened" }],
+			issues: [
+				{
+					repository: "team/project",
+					repository_id: 1,
+					provider_id: 1,
+					number: 4,
+					title: "Add the event map",
+					state: "opened",
+				},
+			],
 		},
 	};
+	const reviewed = { repository_id: 1, provider_id: 1 };
 	const result = await runBundled(slug, {
-		work: { title: "Add the map", body: "Shows the events on a map.", source_branch: "map" },
+		work: {
+			...reviewed,
+			title: "Add the map",
+			body: "Shows the events on a map.",
+			source_branch: "map",
+		},
 		context,
 	});
 	assert.equal(result.facts?.referencesFound, 0);
@@ -331,6 +347,7 @@ void test("a change with no reference anywhere says what it scanned and what the
 	assert.equal(result.facts.linkedWorkItems, -1);
 	const referenced = await runBundled(slug, {
 		work: {
+			...reviewed,
 			title: "Add the map",
 			// The template's commented example is not the author's reference.
 			body: "<!-- Example: Closes #12 -->\nCloses #4",

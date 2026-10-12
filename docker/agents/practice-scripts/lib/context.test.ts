@@ -12,6 +12,7 @@ void test("an inventory issue with an empty title is held, and one without a tit
 	await writeFile(
 		path.join(dir, "project_inventory.json"),
 		JSON.stringify({
+			repository: "team/project",
 			issues: [{ number: 7, title: "", state: "OPEN" }, { number: 8 }, { title: "No number" }],
 		}),
 	);
