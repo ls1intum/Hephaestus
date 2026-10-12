@@ -166,6 +166,90 @@ class EvidenceFolderPersonErasureIntegrationTest extends BaseIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    void shouldKeepProgressDurableWithoutRewritingUnchangedCopies(boolean finish) throws Exception {
+        databaseTestUtils.cleanDatabase();
+        var job = job("unchanged-copy-progress");
+        var source = jobIn(job.getWorkspace());
+        var inherited = new PersonCopyIdentity("GITLAB", "https://copy-progress.example", "43", null);
+        receipt(
+                source,
+                "READY",
+                Map.of(
+                        "attempt",
+                        0,
+                        "identities",
+                        List.of(inherited),
+                        "repositories",
+                        List.of(19L),
+                        "copiedJobs",
+                        List.of(),
+                        "dependencies",
+                        "COMPLETE"));
+        var recorder = new ExactPersonDataCopyRecorder(jdbc);
+        var catalog = catalog(root, recorder);
+        catalog.beginCapture(job);
+        try {
+            String initial = progressVersion(job);
+            var direct = new PersonCopyIdentity("GITLAB", "https://copy-progress.example", "42", null);
+            recorder.recordIdentity(direct);
+            String identified = progressVersion(job);
+            assertThat(identified).isNotEqualTo(initial);
+            assertThat(identities(job)).containsExactly("https://copy-progress.example#42");
+            recorder.recordRepository(17L);
+            String indexed = progressVersion(job);
+            assertThat(indexed).isNotEqualTo(identified);
+            assertThat(payload(job).path("repositories").get(0).asLong()).isEqualTo(17L);
+            var copied = new ArrayList<UUID>();
+            copied.add(source.getId());
+            for (int index = 0; index < 32; index++) copied.add(UUID.randomUUID());
+            copied.forEach(recorder::recordCopiedJob);
+            assertThat(progressVersion(job)).isEqualTo(indexed);
+            assertThat(payload(job).has("copiedJobs")).isFalse();
+            if (finish) {
+                try (var lease = catalog.finishCapture(job)) {
+                    assertThat(lease).isNotNull();
+                }
+            } else {
+                catalog.abortCapture(job);
+            }
+            assertThat(identities(job))
+                    .containsExactlyInAnyOrder("https://copy-progress.example#42", "https://copy-progress.example#43");
+            var finalPayload = payload(job);
+            assertThat(finalPayload.path("dependencies").asString()).isEqualTo("UNKNOWN");
+            assertThat(List.of(mapper.convertValue(finalPayload.path("copiedJobs"), UUID[].class)))
+                    .containsExactlyElementsOf(copied.stream().sorted().toList());
+            assertThat(List.of(mapper.convertValue(finalPayload.path("repositories"), Long[].class)))
+                    .containsExactly(17L, 19L);
+        } finally {
+            catalog.abortCapture(job);
+        }
+    }
+
+    @Test
+    void shouldRefuseUnchangedProgressWhenCaptureOwnershipWasRevoked() {
+        databaseTestUtils.cleanDatabase();
+        var job = job("revoked-copy-progress");
+        var recorder = new ExactPersonDataCopyRecorder(jdbc);
+        var catalog = catalog(root, recorder);
+        catalog.beginCapture(job);
+        try {
+            jdbc.update("UPDATE person_evidence_copy SET state='ERASE_REQUESTED' WHERE job_id=?", job.getId());
+            assertThatThrownBy(() -> recorder.recordCopiedJob(UUID.randomUUID()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Evidence capture ownership changed");
+            assertThat(payload(job).path("identities").isEmpty()).isTrue();
+        } finally {
+            assertThatThrownBy(() -> catalog.abortCapture(job)).hasMessage("Evidence capture ownership changed");
+        }
+    }
+
+    private String progressVersion(AgentJob job) {
+        return Objects.requireNonNull(jdbc.queryForObject(
+                "SELECT xmin::text FROM person_evidence_copy WHERE job_id=?", String.class, job.getId()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void shouldReleaseCaptureAndUntransferredFolderWhenCloseFails(boolean finish) throws Exception {
         databaseTestUtils.cleanDatabase();
         var job = job("close-failure");

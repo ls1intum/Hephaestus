@@ -526,14 +526,20 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                 .set("identities", mapper.valueToTree(capture.provenance().identities()));
         capture.receipt()
                 .set("repositories", mapper.valueToTree(capture.provenance().repositoryIds()));
-        int changed = capture.admission()
-                .jdbc()
-                .update(
-                        "UPDATE person_evidence_copy SET payload=CAST(? AS jsonb) WHERE id=? AND job_id=? AND workspace_id=? AND state='CAPTURING'",
-                        mapper.writeValueAsString(capture.receipt()),
-                        capture.copyId(),
-                        capture.jobId(),
-                        capture.workspaceId());
+        String payload = mapper.writeValueAsString(capture.receipt());
+        var controls = capture.admission().jdbc();
+        int changed = controls.update("""
+            UPDATE person_evidence_copy SET payload=CAST(? AS jsonb)
+            WHERE id=? AND job_id=? AND workspace_id=? AND state='CAPTURING'
+              AND payload IS DISTINCT FROM CAST(? AS jsonb)
+            """, payload, capture.copyId(), capture.jobId(), capture.workspaceId(), payload);
+        // Copied-job callbacks may leave this progress receipt unchanged; they still require capture ownership.
+        if (changed == 0
+                && Boolean.TRUE.equals(controls.queryForObject(
+                        """
+            SELECT EXISTS(SELECT 1 FROM person_evidence_copy
+                WHERE id=? AND job_id=? AND workspace_id=? AND state='CAPTURING')
+            """, Boolean.class, capture.copyId(), capture.jobId(), capture.workspaceId()))) return;
         if (changed != 1) throw new IllegalStateException("Evidence capture ownership changed");
     }
 
