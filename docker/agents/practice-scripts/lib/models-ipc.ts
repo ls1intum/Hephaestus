@@ -45,7 +45,7 @@ export function ipcModels(
 	): Promise<SlotAnswer<S>["result"]> => {
 		const answer = await call(slot, portable(options), options.abortSignal);
 		if (!isAnswerOf(answer, slot)) {
-			throw new Error(`the runner answered a ${slot} call with another slot's result`);
+			throw new Error(`the host answered a ${slot} call with another slot's result`);
 		}
 		return answer.result;
 	};

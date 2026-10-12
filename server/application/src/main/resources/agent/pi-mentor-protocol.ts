@@ -7,7 +7,7 @@
 //   hello handshake       → MentorChatService#verifyProtocol
 //   event → UI chunks     → PiEventToUiChunkTranslator
 //   fetch_context replies → MentorChatService#handleFetchContext
-//   link_observation      → ConversationalDeliveryReconciler#admits
+//   link_result / link_observation → MentorRunnerClient#handleLink
 
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
@@ -19,9 +19,9 @@ export const JSONRPC_VERSION = "2.0";
  * MentorRunnerClient.PROTOCOL_VERSION and refuses the session on a mismatch, so the two move
  * together or not at all.
  */
-export const MENTOR_PROTOCOL_VERSION = 1;
+export const MENTOR_PROTOCOL_VERSION = 2;
 
-export const MENTOR_TOOL_NAMES = ["fetch_context", "link_observation"] as const;
+export const MENTOR_TOOL_NAMES = ["fetch_context", "link_result", "link_observation"] as const;
 
 // Context-key whitelist for the fetch_context tool. Java remains authoritative and
 // re-checks against MentorContextKeys.ALLOWED_OUTPUT_KEYS.
@@ -29,7 +29,7 @@ export const FETCH_CONTEXT_ALLOWED = new Set([
 	"inputs/context/workspace.json",
 	"inputs/context/user.json",
 	"inputs/context/practice_catalog.json",
-	"inputs/context/observations_history.json",
+	"inputs/context/results_history.json",
 	"inputs/context/delivered_feedback.json",
 	"inputs/context/recent_authored_work.json",
 	"inputs/context/merge_readiness.json",
@@ -41,9 +41,9 @@ export const FETCH_CONTEXT_ALLOWED = new Set([
 ]);
 // One authored pull request by artifactId, in any stored state, read on demand; mirrors MergeReadinessContentSource.ITEM_KEY.
 const MERGE_READINESS_ITEM = /^inputs\/context\/merge_readiness\/\d{1,18}\.json$/u;
-// One listed observation's evidence by its canonical id; mirrors ObservationHistoryContentSource.DETAIL_KEY.
-const OBSERVATION_DETAIL =
-	/^inputs\/context\/observations_history\/[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.json$/u;
+// One listed result's detail by its canonical id; mirrors ResultHistoryContentSource.DETAIL_KEY.
+const RESULT_DETAIL =
+	/^inputs\/context\/results_history\/[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.json$/u;
 // One authored pull request's or issue's retained reviews by artifactId; mirrors ReviewAttemptsContentSource.WORK_KEY.
 const REVIEW_ATTEMPTS_ITEM =
 	/^inputs\/context\/review_attempts\/(?:pull_request|issue)\/\d{1,18}\.json$/u;
@@ -52,7 +52,7 @@ export function isFetchContextKey(key: string): boolean {
 	return (
 		FETCH_CONTEXT_ALLOWED.has(key) ||
 		MERGE_READINESS_ITEM.test(key) ||
-		OBSERVATION_DETAIL.test(key) ||
+		RESULT_DETAIL.test(key) ||
 		REVIEW_ATTEMPTS_ITEM.test(key)
 	);
 }
@@ -60,7 +60,7 @@ export function isFetchContextKey(key: string): boolean {
 /**
  * JSON-RPC 2.0 §4 restricts an id to String, Number or Null. Java always sends a Number (an
  * `AtomicLong` counter) and the runner echoes back whatever it received; the runner's own
- * callbacks (`fetch_context`, `link_observation`) use a String id, which Java echoes back unchanged in turn.
+ * callbacks (`fetch_context`, `link_result`, `link_observation`) use a String id, which Java echoes back unchanged in turn.
  */
 export type JsonRpcId = string | number | null;
 
@@ -224,8 +224,19 @@ export interface TurnWatchdogFiredEvent {
 }
 
 /**
- * Emitted by the `link_observation` tool. Java requires `observationId` to parse as a UUID and `text` to be
- * nonblank: `text` is shown to the developer as part of the reply, and only a link that carries it settles feedback.
+ * Emitted by the `link_result` tool: feedback about one practice result, the verdict of a practice on one piece of
+ * reviewed work. Java requires `practiceResultId` to parse as a UUID and `text` to be nonblank: `text` is shown to
+ * the developer as part of the reply, and only a link that carries it settles feedback.
+ */
+export interface LinkResultEvent {
+	type: "link_result";
+	practiceResultId: string;
+	text: string;
+}
+
+/**
+ * Emitted by the `link_observation` tool: feedback about one observation, a located problem of a `NOT_MET` result.
+ * Java reads `observationId` and `text` as it reads a {@link LinkResultEvent}'s.
  */
 export interface LinkObservationEvent {
 	type: "link_observation";
@@ -239,6 +250,7 @@ export type MentorRunnerEvent =
 	| SessionPersistedEvent
 	| PiErrorEvent
 	| TurnWatchdogFiredEvent
+	| LinkResultEvent
 	| LinkObservationEvent;
 
 /**
@@ -289,15 +301,28 @@ export interface FetchContextSuccessResponse {
 	result: FetchContextResult;
 }
 
+export interface LinkResultParams {
+	threadId: string;
+	practiceResultId: string;
+}
+
 export interface LinkObservationParams {
 	threadId: string;
 	observationId: string;
 }
 
 /**
- * Asked while a `link_observation` tool call is in flight: may the reply show the developer feedback about this
- * observation? The tool reports success and emits its `link_observation` event only after a success response.
+ * Asked while a `link_result` tool call is in flight: may the reply show the developer feedback about this result?
+ * The tool reports success and emits its `link_result` event only after a success response that echoes the id.
  */
+export interface LinkResultRequest {
+	jsonrpc: typeof JSONRPC_VERSION;
+	id: string;
+	method: "link_result";
+	params: LinkResultParams;
+}
+
+/** The `link_observation` counterpart of {@link LinkResultRequest}, for one observation of a result. */
 export interface LinkObservationRequest {
 	jsonrpc: typeof JSONRPC_VERSION;
 	id: string;
@@ -305,10 +330,10 @@ export interface LinkObservationRequest {
 	params: LinkObservationParams;
 }
 
-export interface LinkObservationSuccessResponse {
+export interface LinkSuccessResponse {
 	jsonrpc: typeof JSONRPC_VERSION;
 	id: JsonRpcId;
-	result: { observationId: string };
+	result: { practiceResultId: string } | { observationId: string };
 }
 
 /** Java's answer when it refuses or fails a callback. */
@@ -319,7 +344,10 @@ export interface ServerCallbackErrorResponse {
 }
 
 /** A callback the runner sends Java. */
-export type ServerCallbackRequest = FetchContextRequest | LinkObservationRequest;
+export type ServerCallbackRequest =
+	| FetchContextRequest
+	| LinkResultRequest
+	| LinkObservationRequest;
 
 /** Everything the runner writes to stdout. */
 export type MentorOutboundFrame =
@@ -335,5 +363,5 @@ export type MentorOutboundFrame =
 export type MentorInboundFrame =
 	| MentorRequest
 	| FetchContextSuccessResponse
-	| LinkObservationSuccessResponse
+	| LinkSuccessResponse
 	| ServerCallbackErrorResponse;

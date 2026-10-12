@@ -3,27 +3,31 @@
 import { factsOf } from "../lib/bounded-text.ts";
 import { isCommentLine } from "../lib/declarations.ts";
 import { isTestPath, languageOf } from "../lib/languages.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 
 const VIEW_DECLARATION =
 	/^\s*(?:@\w+\s+)*(?:(?:public|private|fileprivate|internal)\s+)?struct\s+(?<name>[A-Za-z_]\w*)\s*(?:<[^>]*>)?\s*:\s*[^{]*\bView\b/u;
 const PREVIEW = /^\s*#Preview\b|:\s*PreviewProvider\b/u;
 
+export const LABELS = {
+	"new-view-type": "An added struct that conforms to View, with its name.",
+	preview: "An added #Preview or PreviewProvider.",
+};
+
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"new-view-type": "An added struct that conforms to View, with its name.",
-			preview: "An added #Preview or PreviewProvider.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const leads: Lead[] = [];
+		const leads: ReviewLead[] = [];
 		let newViews = 0;
 		let previewsAdded = 0;
 		let filesWithNewViewAndNoPreview = 0;
-		for (const [path, df] of ctx.change) {
+		for (const [path, df] of requireChange(ctx.files)) {
 			if (languageOf(path) !== "swift" || isTestPath(path)) {
 				continue;
 			}
@@ -38,12 +42,12 @@ export default definePracticeScript({
 					views += 1;
 					leads.push({
 						at: { change: path, line },
-						kind: "new-view-type",
+						label: LABELS["new-view-type"],
 						facts: factsOf({ name: view.groups?.name ?? "" }),
 					});
 				} else if (PREVIEW.test(content)) {
 					previews += 1;
-					leads.push({ at: { change: path, line }, kind: "preview" });
+					leads.push({ at: { change: path, line }, label: LABELS.preview });
 				}
 			}
 			newViews += views;
@@ -59,10 +63,10 @@ export default definePracticeScript({
 				"These counts pair no preview with a view. Read the previews and view bodies to trace the presentation coverage described in the criteria, including nested views and content delegated by an effect-only owner.",
 			);
 		}
-		return {
+		return ctx.review({
 			leads: leads.slice(0, 40),
 			facts: { newViews, previewsAdded, filesWithNewViewAndNoPreview },
 			directions,
-		};
+		});
 	},
 });

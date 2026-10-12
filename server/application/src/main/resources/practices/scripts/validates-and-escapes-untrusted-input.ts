@@ -4,7 +4,12 @@
 import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
 import { isCommentLine } from "../lib/declarations.ts";
 import { languageOf } from "../lib/languages.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 
 /** A label -> pattern table row. The label is a fact of the lead, so it is rendered verbatim. */
 type PatternRows = [string, RegExp][];
@@ -151,6 +156,10 @@ const SINKS: PatternTable = {
 // Sources and sinks co-occurring within this many added lines are surfaced as a candidate flow.
 const WINDOW = 25;
 
+export const LABELS = {
+	"source-near-sink": `An added line with a dangerous operation (a sink) and an untrusted input (a source) at most ${String(WINDOW)} added lines away.`,
+};
+
 /** JavaScript shares TypeScript's surfaces; the lib names the two apart. */
 function rowsLanguage(lang: string | null): string | null {
 	return lang === "javascript" ? "typescript" : lang;
@@ -171,19 +180,15 @@ function firstMatch(rows: PatternRows, content: string): string | null {
 }
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"source-near-sink": `An added line with a dangerous operation (a sink) and an untrusted input (a source) at most ${String(WINDOW)} added lines away.`,
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const leads: Lead[] = [];
+		const change = requireChange(ctx.files);
+		const leads: ReviewLead[] = [];
 		let flowCount = 0;
 		let linesAdded = 0;
 
-		for (const [path, df] of ctx.change) {
+		for (const [path, df] of change) {
 			const lang = languageOf(path);
 			const sourceRows = rowsFor(SOURCES, rowsLanguage(lang));
 			const sinkRows = rowsFor(SINKS, rowsLanguage(lang));
@@ -218,7 +223,7 @@ export default definePracticeScript({
 				flowCount += 1;
 				leads.push({
 					at: { change: path, line: sink.line },
-					kind: "source-near-sink",
+					label: LABELS["source-near-sink"],
 					facts: factsOf({
 						sourceLine: near.line,
 						sourceToken: near.label,
@@ -235,12 +240,12 @@ export default definePracticeScript({
 						`Found ${flowCount} added line(s) where an untrusted-input source (request/params/env/file/stdin/argv) and a dangerous sink (raw SQL concat, exec/eval/system, innerHTML, path join, template render, deserialize) co-occur within ${WINDOW} lines.`,
 						"Trace whether the source reaches the sink without validation/escaping/parameterization, and confirm before deciding.",
 					]
-				: noMatchDirections(linesAdded, ctx.change.size);
+				: noMatchDirections(linesAdded, change.size);
 
-		return {
+		return ctx.review({
 			leads: leads.slice(0, 40),
-			facts: { sourceSinkFlows: flowCount, filesScanned: ctx.change.size, linesAdded },
+			facts: { sourceSinkFlows: flowCount, filesScanned: change.size, linesAdded },
 			directions,
-		};
+		});
 	},
 });

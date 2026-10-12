@@ -10,7 +10,7 @@ import {
 	type PinnedBlob,
 	type PinnedDiff,
 } from "../../../main/resources/agent/pi-change.ts";
-import { isRecord } from "../../../main/resources/agent/pi-observation-normalize.ts";
+import { isRecord } from "../../../main/resources/agent/pi-result-normalize.ts";
 import {
 	buildBrief,
 	buildPrimarySourceReference,
@@ -120,11 +120,13 @@ function cited(
 	};
 }
 
+/** A public NOT_MET result whose one observation cites these lines: a problem's citations are its observations'. */
 const decided = (citations: unknown[]) => ({
-	id: "o",
+	practiceResultId: "r",
 	outcome: "NOT_MET",
 	publicEligible: true,
-	citations,
+	citations: [],
+	observations: [{ observationId: "o", citations }],
 });
 
 /** A reader over fixed blobs and one pinned diff that remembers every blob and range it was asked for. */
@@ -165,23 +167,27 @@ void test("cited primary code arrives whole, once per file and revision, with it
 		"repos/reviewed",
 		index,
 		[
+			decided([cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" })]),
 			{
-				id: "concern",
+				practiceResultId: "second",
 				outcome: "NOT_MET",
-				publicEligible: true,
-				citations: [
-					cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" }),
-				],
-			},
-			{
-				id: "strength",
-				outcome: "MET",
 				publicEligible: true,
 				citations: [
 					cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" }),
 					cited("scm.repository.tree", "App/Model.swift", EARLIER, model),
 					cited("scm.pull-request.diff", "App/Legacy.swift", BASE, legacy, { side: "OLD" }),
 				],
+				observations: [],
+			},
+			// The review on the work never acknowledges a MET result, so the code it cites is not read.
+			{
+				practiceResultId: "strength",
+				outcome: "MET",
+				publicEligible: true,
+				citations: [
+					cited("scm.repository.tree", "App/Strength.swift", HEAD, "struct Strength {}\n"),
+				],
+				observations: [],
 			},
 		],
 		read.reader,
@@ -216,6 +222,54 @@ void test("cited primary code arrives whole, once per file and revision, with it
 		reference.includes("`scm.pull-request.diff` capture is of unknown completeness"),
 		reference,
 	);
+});
+
+void test("every citation of a public result is read: its own, its example's and each observation's", (t) => {
+	const { root, index } = primaryCapture(t);
+	const model = "struct Item {}\n";
+	const example = "func handled() throws {}\n";
+	const read = blobs({
+		[`${HEAD}:App/Loader.swift`]: { kind: "regular", bytes: Buffer.from(LOADER) },
+		[`${EARLIER}:App/Model.swift`]: { kind: "regular", bytes: Buffer.from(model) },
+		[`${HEAD}:App/Handled.swift`]: { kind: "regular", bytes: Buffer.from(example) },
+	});
+	const reference = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		index,
+		[
+			{
+				practiceResultId: "r",
+				outcome: "NOT_MET",
+				publicEligible: true,
+				citations: [cited("scm.repository.tree", "App/Model.swift", EARLIER, model)],
+				example: {
+					citation: cited("scm.repository.tree", "App/Handled.swift", HEAD, example),
+					note: "This one is handled.",
+				},
+				observations: [
+					{
+						observationId: "o-1",
+						citations: [
+							cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" }),
+						],
+					},
+				],
+			},
+		],
+		read.reader,
+	);
+	assert.deepEqual(read.asked, [
+		`${EARLIER}:App/Model.swift`,
+		`${HEAD}:App/Handled.swift`,
+		`${HEAD}:App/Loader.swift`,
+		`diff ${BASE}..${HEAD}`,
+	]);
+	assert.ok(reference.includes("[L1] struct Item {}"), reference);
+	assert.ok(reference.includes("[L1] func handled() throws {}"), reference);
+	assert.ok(reference.includes("[L2]     let id: Int"), reference);
+	assert.equal(reference.split(LOADER_SECTION).length, 2, reference);
 });
 
 void test("private, auxiliary, undecided or unverifiable citations never expose source", (t) => {
@@ -331,18 +385,13 @@ void test("text is shown only as valid UTF-8 and a rejected citation does not hi
 		"repos/reviewed",
 		index,
 		[
-			{
-				id: "o",
-				outcome: "NOT_MET",
-				publicEligible: true,
-				citations: [
-					cited("scm.repository.tree", "Recovered.swift", HEAD, "something else\n"),
-					cited("scm.repository.tree", "Recovered.swift", HEAD, recovered),
-					cited("scm.repository.tree", "Invalid.swift", HEAD, invalid),
-					cited("scm.repository.tree", "Marked.swift", HEAD, marked),
-					cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" }),
-				],
-			},
+			decided([
+				cited("scm.repository.tree", "Recovered.swift", HEAD, "something else\n"),
+				cited("scm.repository.tree", "Recovered.swift", HEAD, recovered),
+				cited("scm.repository.tree", "Invalid.swift", HEAD, invalid),
+				cited("scm.repository.tree", "Marked.swift", HEAD, marked),
+				cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" }),
+			]),
 		],
 		read.reader,
 	);
@@ -382,20 +431,13 @@ void test("a regular new file cannot expose an excluded counterpart through its 
 			HEAD,
 			diff,
 		);
-		const observations = [
-			{
-				id: "o",
-				outcome: "NOT_MET",
-				publicEligible: true,
-				citations: [cited("scm.pull-request.diff", file, HEAD, code, { side: "NEW" })],
-			},
-		];
+		const results = [decided([cited("scm.pull-request.diff", file, HEAD, code, { side: "NEW" })])];
 		const reference = buildPrimarySourceReference(
 			root,
 			"context",
 			"repos/reviewed",
 			index,
-			observations,
+			results,
 			read.reader,
 		);
 		assert.ok(reference.includes("[L1] let visible = true"), reference);
@@ -407,7 +449,7 @@ void test("a regular new file cannot expose an excluded counterpart through its 
 			"context",
 			"repos/reviewed",
 			index,
-			observations,
+			results,
 			read.reader,
 			{ filePerChars: 24_000, diffChars: 64_000, totalChars: 600 },
 		);

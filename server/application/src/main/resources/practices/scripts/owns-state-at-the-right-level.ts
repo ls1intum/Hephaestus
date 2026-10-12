@@ -1,7 +1,12 @@
 // Finds each state declaration and each state wiring that the change adds to Swift files, with the
 // type that encloses it. The review applies the four rules of the practice to each lead.
 import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 import { sampleNote, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
 
 const SWIFTUI_VIEW = /\b(?:View|App|Scene)\b/u;
@@ -27,41 +32,40 @@ const STATE_DECLARATIONS: readonly SourcePattern[] = [
 	["environment-injection", /\.environment(?:Object)?\s*\(/u],
 ];
 
+export const LABELS = {
+	"state-creating-an-object": "An added @State or @StateObject declaration that creates an object.",
+	"state-property": "An added @State declaration.",
+	"state-object": "An added @StateObject declaration.",
+	"observed-object": "An added @ObservedObject declaration.",
+	binding: "An added @Binding declaration.",
+	bindable: "An added @Bindable declaration.",
+	"environment-value": "An added @Environment or @EnvironmentObject declaration.",
+	"app-storage": "An added @AppStorage declaration.",
+	query: "An added @Query declaration.",
+	"observable-type": "An added line with @Observable, usually on a model type.",
+	"observable-object-type": "An added line that names ObservableObject, usually on a model type.",
+	"published-property": "An added @Published property.",
+	"mutable-stored-property": "An added stored var without a property wrapper.",
+	"environment-injection": "An added .environment or .environmentObject modifier.",
+};
+const LABEL_OF = new Map<string, string>(Object.entries(LABELS));
+
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"state-creating-an-object":
-				"An added @State or @StateObject declaration that creates an object.",
-			"state-property": "An added @State declaration.",
-			"state-object": "An added @StateObject declaration.",
-			"observed-object": "An added @ObservedObject declaration.",
-			binding: "An added @Binding declaration.",
-			bindable: "An added @Bindable declaration.",
-			"environment-value": "An added @Environment or @EnvironmentObject declaration.",
-			"app-storage": "An added @AppStorage declaration.",
-			query: "An added @Query declaration.",
-			"observable-type": "An added line with @Observable, usually on a model type.",
-			"observable-object-type":
-				"An added line that names ObservableObject, usually on a model type.",
-			"published-property": "An added @Published property.",
-			"mutable-stored-property": "An added stored var without a property wrapper.",
-			"environment-injection": "An added .environment or .environmentObject modifier.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const scan = await scanAddedLines(ctx.repo, ctx.change, {
+		const scan = await scanAddedLines(ctx.files?.head ?? null, requireChange(ctx.files), {
 			languages: ["swift"],
 			patterns: STATE_DECLARATIONS,
 			scope: SWIFTUI_VIEW,
 			maxHints: 60,
 		});
-		const leads: Lead[] = scan.hints.map((hint) => ({
-			at: { change: hint.file, line: hint.line },
-			kind: hint.pattern,
-			facts: factsOf(hint.flags),
-		}));
+		const leads: ReviewLead[] = scan.hints.flatMap((hint) => {
+			const label = LABEL_OF.get(hint.pattern);
+			return label === undefined
+				? []
+				: [{ at: { change: hint.file, line: hint.line }, label, facts: factsOf(hint.flags) }];
+		});
 		const inViews = scan.hints.filter((hint) => hint.flags.inScope === true);
 		const objectsCreatedInViews = inViews.filter(
 			(hint) => hint.pattern === "state-creating-an-object" || hint.pattern === "state-object",
@@ -88,7 +92,7 @@ export default definePracticeScript({
 				`${storedVarsInViews} plain stored var(s) in a view type. Read whether the view mutates each one: the first rule covers a value that the view owns and mutates. A var that the view only receives from its parent is an input.`,
 			);
 		}
-		return {
+		return ctx.review({
 			leads,
 			facts: {
 				stateDeclarationsAdded: scan.matched,
@@ -100,6 +104,6 @@ export default definePracticeScript({
 				linesAdded: scan.linesAdded,
 			},
 			directions,
-		};
+		});
 	},
 });

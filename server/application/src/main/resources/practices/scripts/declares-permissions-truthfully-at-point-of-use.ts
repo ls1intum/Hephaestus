@@ -4,9 +4,6 @@
 // change requests restricted access. A key in some file does not show that the target declares it, and
 // a key that is not found does not show that the target does not declare it. The review reads the
 // target, the actual API and the description.
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
 import {
 	DIRECTION_CHARS,
 	factsOf,
@@ -14,8 +11,13 @@ import {
 	noMatchDirections,
 	oneLine,
 } from "../lib/bounded-text.ts";
-import { globFilesSync } from "../lib/files.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type FileTree,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 import { countLabel, sampleNote, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
 
 // reference kind -> [a permission-related type or call to inspect, usage keys that may declare its access].
@@ -95,7 +97,7 @@ const KIND_OF_LABEL = new Map<string, string>([
 	]),
 ]);
 
-const KINDS: Record<string, string> = {
+export const LABELS = {
 	"authorization-request": "An added call that requests an authorization from the user.",
 	"usage-key-added": "An added line of a plist or project file that holds a usage-description key.",
 	...Object.fromEntries(
@@ -105,6 +107,8 @@ const KINDS: Record<string, string> = {
 		]),
 	),
 };
+
+const LABEL_OF = new Map<string, string>(Object.entries(LABELS));
 
 const USAGE_KEY = /\b(?<key>NS\w+UsageDescription)\b/gu;
 
@@ -124,30 +128,35 @@ interface CheckoutKeys {
 	unreadable: number;
 }
 
-async function usageKeysInCheckout(repoPath: string): Promise<CheckoutKeys> {
+const PROJECT_FILES = [
+	"**/Info.plist",
+	"**/project.yml",
+	"**/project.yaml",
+	"**/*.xcodeproj/project.pbxproj",
+];
+
+async function usageKeysInCheckout(tree: FileTree | null): Promise<CheckoutKeys> {
 	const keys = new Map<string, string[]>();
 	let files: string[] = [];
 	try {
-		files = [
-			...globFilesSync("**/Info.plist", repoPath),
-			...globFilesSync("**/project.yml", repoPath),
-			...globFilesSync("**/project.yaml", repoPath),
-			...globFilesSync("**/*.xcodeproj/project.pbxproj", repoPath),
-		].filter((f) => !/(?:^|\/)(?:Pods|\.build|DerivedData|Carthage)\//u.test(f));
+		for (const glob of PROJECT_FILES) {
+			const listed = await tree?.list(glob);
+			files.push(...(listed?.paths ?? []));
+		}
 	} catch {
 		// no readable checkout: no file read, so no key located
+		files = [];
 	}
+	files = files.filter((f) => !/(?:^|\/)(?:Pods|\.build|DerivedData|Carthage)\//u.test(f));
 	let unreadable = 0;
 	const read = files.slice(0, PROJECT_FILES_READ);
 	for (const file of read) {
-		let text: string;
-		try {
-			text = await readFile(path.join(repoPath, file), "utf8");
-		} catch {
+		const found = await tree?.read(file).catch(() => null);
+		if (found?.status !== "FOUND") {
 			unreadable += 1;
 			continue;
 		}
-		for (const match of text.matchAll(USAGE_KEY)) {
+		for (const match of found.text.matchAll(USAGE_KEY)) {
 			const key = match.groups?.key ?? "";
 			keys.set(key, [...new Set([...(keys.get(key) ?? []), file])]);
 		}
@@ -156,22 +165,25 @@ async function usageKeysInCheckout(repoPath: string): Promise<CheckoutKeys> {
 }
 
 export default definePracticeScript({
-	meta: { version: 1, kinds: KINDS },
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const scan = await scanAddedLines(ctx.repo, ctx.change, {
+		const change = requireChange(ctx.files);
+		const tree = ctx.files?.head ?? null;
+		const scan = await scanAddedLines(tree, change, {
 			languages: ["swift"],
 			patterns: REQUEST,
 		});
-		const leads: Lead[] = scan.hints.flatMap((hint) => {
+		const leads: ReviewLead[] = scan.hints.flatMap((hint) => {
 			const kind = KIND_OF_LABEL.get(hint.pattern);
-			return kind === undefined
+			const label = kind === undefined ? undefined : LABEL_OF.get(kind);
+			return label === undefined
 				? []
-				: [{ at: { change: hint.file, line: hint.line }, kind, facts: factsOf(hint.flags) }];
+				: [{ at: { change: hint.file, line: hint.line }, label, facts: factsOf(hint.flags) }];
 		});
 		// Usage keys the change itself adds, in any file.
 		const keysInChange = new Map<string, string>();
-		for (const [file, df] of ctx.change) {
+		for (const [file, df] of change) {
 			if (!/Info\.plist$|project\.ya?ml$|project\.pbxproj$/u.test(file)) {
 				continue;
 			}
@@ -179,11 +191,15 @@ export default definePracticeScript({
 				for (const match of content.matchAll(USAGE_KEY)) {
 					const key = match.groups?.key ?? "";
 					keysInChange.set(key, file);
-					leads.push({ at: { change: file, line }, kind: "usage-key-added", facts: { key } });
+					leads.push({
+						at: { change: file, line },
+						label: LABELS["usage-key-added"],
+						facts: { key },
+					});
 				}
 			}
 		}
-		const checkout = await usageKeysInCheckout(ctx.repo);
+		const checkout = await usageKeysInCheckout(tree);
 		const references = PERMISSION_REFERENCES.filter(([kind]) =>
 			scan.counts.has(`permission-related reference ${kind}`),
 		);
@@ -232,7 +248,7 @@ export default definePracticeScript({
 		if (leads.length === 0) {
 			directions.push(...noMatchDirections(scan.linesAdded, scan.filesScanned));
 		}
-		return {
+		return ctx.review({
 			leads: leads.slice(0, 40),
 			facts: {
 				permissionReferenceKinds: references.length,
@@ -244,6 +260,6 @@ export default definePracticeScript({
 				linesAdded: scan.linesAdded,
 			},
 			directions,
-		};
+		});
 	},
 });

@@ -25,7 +25,15 @@ import {
 	SANDBOX_SETTINGS_MANAGER_OPTIONS,
 } from "./pi-agent-sandbox.ts";
 import { assessmentCacheExtension } from "./pi-assessment-cache.ts";
-import { CHANGE_ROOT, checkedOutCommit, pinnedDiff, readPinnedBlob } from "./pi-change.ts";
+import {
+	CHANGE_ROOT,
+	checkedOutCommit,
+	pinnedDiff,
+	readChange,
+	readDescription,
+	readPinnedBlob,
+	writeChangeView,
+} from "./pi-change.ts";
 import { errorText } from "./pi-error-text.ts";
 import { folderCitationIndex } from "./pi-folder-index.ts";
 import {
@@ -36,30 +44,27 @@ import {
 	modelFailure,
 	newModelCallTiming,
 } from "./pi-model-failure.ts";
+import { PracticeCoverageLedger } from "./pi-practice-coverage.ts";
+import { executionReport } from "./pi-practice-scripts-report.ts";
+import { loadProviderConfig, reasoningSetting, registerHephaestusProvider } from "./pi-provider.ts";
 import {
 	CONVERSATION_THREAD,
-	OUTCOME_VALUES,
-	OUTCOME_DESCRIPTIONS,
 	MAX_SUMMARY_CHARS,
-	SEVERITY_VALUES,
+	OUTCOME_DESCRIPTIONS,
 	SEVERITY_DESCRIPTIONS,
 	citesReviewedTurn,
 	describeVocabulary,
 	isRecord,
-	type NormalizedCitation,
-	type NormalizedObservation,
-	type Outcome,
-	normalizeObservation,
 	normalizePracticeSlug,
+	normalizeSubmission,
 	resolveQuote,
+	submissionCitations,
 	validateEvidenceSources,
 	validateInapplicabilityScope,
 	validateSearchScope,
-} from "./pi-observation-normalize.ts";
-import { PracticeCoverageLedger } from "./pi-practice-coverage.ts";
-import { practiceScriptReport } from "./pi-practice-scripts-report.ts";
-import { loadProviderConfig, reasoningSetting, registerHephaestusProvider } from "./pi-provider.ts";
-import { completePublicReview } from "./pi-public-completion.ts";
+	type NormalizedCitation,
+	type NormalizedSubmission,
+} from "./pi-result-normalize.ts";
 import {
 	buildBrief,
 	buildPrimarySourceReference,
@@ -81,31 +86,31 @@ import {
 	type ComposedFeedbackEnvelope,
 	type ComposedFeedbackUnit,
 	type ComposedReview,
+	type EvidenceRef,
+	type InAppSupport,
+	type InChatEligibility,
 	PRIOR_ADVICE_REASONS,
 	PRIVATE_CHANNELS,
 	type PreparedFeedbackTarget,
-	type OwnPriorFeedback,
-	READ_PRACTICE_TOOL_DESCRIPTION,
 	type ReviewPractice,
 	REVIEW_CONTRACT_VERSION,
 	REVIEW_TOOL_DESCRIPTION,
-	type ReviewedObservation,
-	STANDARD_REFERENCE,
+	type ReviewedResult,
 	WITHHOLD_REASONS,
 	buildReviewTurn,
-	consultedStandard,
 	decidedByReview,
+	evidenceRefs,
+	namedEvidence,
 	notReachedNote,
-	practiceStandard,
 	priorAdviceWitnesses,
 	priorPublicFeedback,
-	publicObservations,
+	publicResults,
 	publicQualifications,
 	qualificationEvidence,
-	readPracticeParameters,
+	readInAppSupport,
+	readInChatEligibility,
 	readReview,
 	prepareReviewArguments,
-	readablePractices,
 	reviewToolParameters,
 	undeliverableUnits,
 	validateFeedbackEvidence,
@@ -128,8 +133,44 @@ import {
 } from "./pi-session-lifecycle.ts";
 import { SUPPORTED_SCHEMA_VERSION, taskPaths, resolveTaskPaths } from "./pi-task-paths.ts";
 import { hasText, isBlank } from "./pi-text.ts";
-import { prepareObservationArguments } from "./pi-tool-arguments.ts";
+import { prepareResultArguments } from "./pi-tool-arguments.ts";
 import { prepareTurnText } from "./pi-turn-context.ts";
+import { MODEL_CONCURRENCY } from "./work/practice-scripts/lib/concurrency.ts";
+import {
+	boundModelsSchema,
+	CANDIDATE_LIMITS,
+	DIFF_SOURCE,
+	OUTCOMES,
+	parseCandidate,
+	SEVERITIES,
+	TREE_SOURCE,
+	type BoundModels,
+	type Candidate,
+	type Coverage,
+	type Omission,
+	type Outcome,
+	type ReviewOptions,
+} from "./work/practice-scripts/lib/contract.ts";
+import { parseDiff } from "./work/practice-scripts/lib/diff-parser.ts";
+import {
+	EvidenceReader,
+	noReceipts,
+	type EvidenceSources,
+	type Receipts,
+} from "./work/practice-scripts/lib/evidence-reader.ts";
+import type { JobFiles } from "./work/practice-scripts/lib/ipc.ts";
+import { renderReviewInput, resolveLeads } from "./work/practice-scripts/lib/leads.ts";
+import { hostModels, ModelBudget } from "./work/practice-scripts/lib/models-host.ts";
+import { UnratedError, type UnratedReason } from "./work/practice-scripts/lib/practice-script.ts";
+import {
+	notReached as notReachedOutcome,
+	runPracticeProgram,
+	type PracticeProgram,
+	type ProgramOutcome,
+} from "./work/practice-scripts/lib/program-host.ts";
+import { InputReader } from "./work/practice-scripts/lib/script-inputs.ts";
+import { abortReasonOf, RETURN_MS } from "./work/practice-scripts/lib/script-run.ts";
+import type { DiffFile } from "./work/practice-scripts/lib/types.ts";
 
 // Staged work notes survive isolated sessions and context compaction.
 
@@ -359,17 +400,30 @@ interface CompositionRequest {
 	minDistinctArtifacts: number;
 }
 
+/** One citation as admission projected it: its index, its coordinates and whether a note may sit on it. */
 interface AdmittedCitation {
 	index: number;
 	[key: string]: unknown;
 }
 
-/** Validate consumed fields; preserve other server fields for the composer. */
-interface AdmittedObservation {
-	id: string;
+/** One admitted observation: a problem of a NOT_MET result, under its own id, with its own citations. */
+interface AdmittedChild {
+	observationId: string;
+	citations: AdmittedCitation[];
+	[key: string]: unknown;
+}
+
+/**
+ * One admitted result as admission projected it: one practice's verdict and its observations. Composition rests on a
+ * result by its practiceResultId and on one observation by its observationId. A result's own citations never anchor a
+ * note; an observation's may. Validate consumed fields; preserve other server fields for the composer.
+ */
+interface AdmittedResult {
+	practiceResultId: string;
 	practiceSlug: string;
 	outcome: Outcome;
 	citations: AdmittedCitation[];
+	observations: AdmittedChild[];
 	[key: string]: unknown;
 }
 
@@ -377,14 +431,29 @@ function isAdmittedCitation(value: unknown): value is AdmittedCitation {
 	return isRecord(value) && typeof value.index === "number";
 }
 
-function isAdmittedObservation(value: unknown): value is AdmittedObservation {
+function isAdmittedChild(value: unknown): value is AdmittedChild {
 	return (
 		isRecord(value) &&
-		typeof value.id === "string" &&
-		typeof value.practiceSlug === "string" &&
-		OUTCOME_VALUES.some((outcome) => outcome === value.outcome) &&
+		typeof value.observationId === "string" &&
+		value.observationId !== "" &&
 		Array.isArray(value.citations) &&
 		value.citations.every(isAdmittedCitation)
+	);
+}
+
+function isAdmittedResult(value: unknown): value is AdmittedResult {
+	return (
+		isRecord(value) &&
+		typeof value.practiceResultId === "string" &&
+		value.practiceResultId !== "" &&
+		typeof value.practiceSlug === "string" &&
+		OUTCOMES.some((outcome) => outcome === value.outcome) &&
+		Array.isArray(value.citations) &&
+		value.citations.every(isAdmittedCitation) &&
+		Array.isArray(value.observations) &&
+		value.observations.every(isAdmittedChild) &&
+		// Observations are the problems of a NOT_MET result, and only of one.
+		(value.outcome === "NOT_MET") === value.observations.length > 0
 	);
 }
 
@@ -398,6 +467,14 @@ const ENVELOPE_MISMATCH_EXIT = 42;
 const TASK_PATH = `${CWD}/task.json`;
 const taskEnvelope = readTaskEnvelope();
 const INPUT_PATHS = resolveTaskPaths(CWD, taskEnvelope.paths);
+/**
+ * Staged beside the composition request only when this attempt continues a review an earlier attempt admitted and lost
+ * the writer of: what the server admitted then. Such an attempt assesses nothing; it composes the review on the work.
+ */
+const CONTINUATION_PATH = nodePath.join(
+	nodePath.dirname(INPUT_PATHS.compositionRequest),
+	"composition-continuation.json",
+);
 const OUTPUT = `${CWD}/out`;
 const RESULT_PATH = outputPath(OUTPUT, "result.json");
 const REVIEW_STATE_PATH = outputPath(OUTPUT, "review-state.json");
@@ -405,13 +482,12 @@ const WATCHDOG_PATH = outputPath(OUTPUT, "watchdog-killed.json");
 const USAGE_PATH = outputPath(OUTPUT, "usage.json");
 const RUNNER_DEBUG_PATH = outputPath(OUTPUT, "runner-debug.json");
 const PRACTICE_COVERAGE_PATH = outputPath(OUTPUT, "practice-coverage.json");
+/** SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE: how the program of each admitted practice ran. */
 const PRACTICE_SCRIPT_REPORT_PATH = outputPath(OUTPUT, "practice-scripts.json");
-// Read at the start: the practice script stage ended before this runner started, and composition removes
-// its output.
-const practiceScriptReportText = practiceScriptReport(
-	INPUT_PATHS.practiceScripts,
-	`${CWD}/work/practice-scripts-out`,
-);
+/** SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE: the direct models the server bound; absent when none may be called. */
+const PRACTICE_SCRIPT_MODELS_PATH = `${CWD}/practice-script-models.json`;
+/** Each review's whole input, for the session to read beyond its bounded section; never composition's. */
+const REVIEW_INPUT_ROOT = "work/review-input";
 /** The runner's own record of what this review has recorded so far; read back after a compaction. */
 const NOTES_PATH = `${CWD}/work/notes/review.md`;
 /** The server sets every one of these; a missing one stops the runner before it does any work. */
@@ -434,6 +510,8 @@ const AGENT_BUDGET_MS = positiveIntegerEnv("AGENT_BUDGET_MS");
 const AGENT_DIR = requiredEnv("PI_CODING_AGENT_DIR");
 const LLM_PROXY_URL = requiredEnv("LLM_PROXY_URL");
 const LLM_PROXY_TOKEN = requiredEnv("LLM_PROXY_TOKEN");
+/** The tokens all direct model calls of this attempt may spend together: the proxy's direct-call cap. */
+const DIRECT_MODEL_TOKENS = positiveIntegerEnv("PI_DIRECT_MODEL_TOKENS");
 /** Practices a turn carries at once; a catalog group larger than this is split. */
 const PRACTICES_PER_TURN = hasText(process.env.PI_PRACTICE_BATCH_SIZE)
 	? Number(process.env.PI_PRACTICE_BATCH_SIZE)
@@ -615,6 +693,13 @@ interface TurnTrace {
  * ceiling, or a loop guard fired.
  */
 type StopReason = "budget" | "stall" | "safety" | "loop";
+/** Why a review that a stopped turn cut short gives no result. */
+const UNRATED_BY_STOP: Readonly<Record<StopReason, UnratedReason>> = {
+	budget: "budget",
+	safety: "deadline",
+	stall: "unavailable",
+	loop: "off-format",
+};
 interface PublicHistoryReceipt {
 	readAt: string;
 	workCapturedAt: string | null;
@@ -641,7 +726,31 @@ let currentTurn: TurnTrace | null = null;
 
 /** How much of a refusal reason the trace keeps: the kind of failure, not the whole excerpt. */
 const TRACE_REASON_CHARS = 140;
-const reviewState: { observations: NormalizedObservation[] } = { observations: [] };
+/** The final result of each practice whose program returned one, by slug: what admission is asked to admit. */
+const reviewState = new Map<string, Candidate>();
+/** How the program of each admitted practice ran, by slug. A practice missing here was not reached. */
+const executions = new Map<string, ProgramOutcome>();
+/** Why a practice that no program reached was not reached, when the run ends before it. */
+let unreachedReason: "deadline" | "budget" | "error" = "deadline";
+
+/** Slugs in the order the server sorts them: by UTF-16 code unit, as Java compares strings. */
+function compareSlugs(a: string, b: string): number {
+	if (a === b) {
+		return 0;
+	}
+	return a < b ? -1 : 1;
+}
+
+/** The admission request: one entry for each practice with a final result, sorted by slug. */
+function admissionRequest() {
+	return {
+		schemaVersion: 2,
+		results: [...reviewState]
+			.toSorted(([a], [b]) => compareSlugs(a, b))
+			.map(([practiceSlug, candidate]) => ({ practiceSlug, candidate })),
+	};
+}
+
 const searchSchema = {
 	type: "object",
 	additionalProperties: false,
@@ -657,7 +766,7 @@ const searchSchema = {
 			type: "string",
 			minLength: 1,
 			description:
-				"The specific behavior whose absence you report, matching the behavior assessed in the summary and rationale.",
+				"The specific behavior whose absence you report, matching the behavior assessed in the summary and explanation.",
 		},
 		boundary: {
 			type: "string",
@@ -691,7 +800,54 @@ const inapplicabilitySchema = {
 		},
 	},
 } as const;
-const undecidabilitySchema = {
+const citationSchema = {
+	type: "object",
+	additionalProperties: false,
+	required: ["sourceKind", "artifactPath", "path", "startLine"],
+	properties: {
+		sourceKind: { type: "string", enum: availableSourceKindValues },
+		// Membership is checked when the result is submitted (validateEvidenceSources): a large capture
+		// enumerated here produces a declaration the SDK's schema compiler cannot compile.
+		artifactPath: {
+			type: "string",
+			minLength: 1,
+			description:
+				"The captured artifact the citation reads, exactly as the capture manifest names it.",
+		},
+		path: { type: "string", minLength: 1 },
+		side: {
+			type: ["string", "null"],
+			enum: ["OLD", "NEW", null],
+			description:
+				"For a quote of the change: artifactPath names the pinned change (change.json), path is the file as named on that side, and the lines are the [L<n>] coordinates of work/change/diff.patch.",
+		},
+		revision: {
+			type: ["string", "null"],
+			pattern: "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+			description:
+				"For repository text: artifactPath names the captured .git/HEAD, path is repository-relative, and revision optionally selects a full commit SHA; omission means the captured HEAD.",
+		},
+		startLine: {
+			type: "integer",
+			minimum: 1,
+			maximum: 2_147_483_647,
+			description:
+				"The 1-based line of the quoted text in the artifact; for a quote of the change, the [L<n>] coordinate of work/change/diff.patch.",
+		},
+		endLine: {
+			type: ["integer", "null"],
+			minimum: 1,
+			maximum: 2_147_483_647,
+			description: "The last line of the quote, at least startLine; omitted means one line.",
+		},
+		quote: {
+			type: ["string", "null"],
+			description:
+				"The text at those lines, copied as shown; a diff marker, a [L<n>] prefix or a non-breaking space read as a space are tolerated. Omit it to cite the whole of the lines: what was recorded is echoed back.",
+		},
+	},
+} as const;
+const openQuestionSchema = {
 	type: "object",
 	additionalProperties: false,
 	required: ["openQuestion", "wouldSettleIt"],
@@ -710,122 +866,145 @@ const undecidabilitySchema = {
 				"this'. NOT what the author should have written: advice belongs to a later step, and " +
 				"answering with it leaves nobody any wiser about which source this practice is missing.",
 		},
+		citation: {
+			anyOf: [citationSchema, { type: "null" }],
+			description: "Where the question arises, when one place of the work does.",
+		},
 	},
 } as const;
-const evidenceSchema = {
+const problemSchema = {
 	type: "object",
 	additionalProperties: false,
-	required: ["citations"],
-	description:
-		"citations always: the lines that decide the outcome. Beside them, at most the one branch the " +
-		"outcome takes: search for a MET or NOT_MET that rests on something missing — what you looked " +
-		"for, where, and what the search did not cover; inapplicability for NOT_APPLICABLE; " +
-		"undecidability for UNDETERMINED. Use null for branches that do not apply.",
+	required: ["severity", "summary", "explanation", "citations", "basis"],
 	properties: {
-		search: { anyOf: [searchSchema, { type: "null" }] },
-		inapplicability: { anyOf: [inapplicabilitySchema, { type: "null" }] },
-		undecidability: { anyOf: [undecidabilitySchema, { type: "null" }] },
+		key: {
+			type: ["string", "null"],
+			description:
+				"Optional: a short lowercase-hyphenated name for this problem, unique within the result.",
+		},
+		severity: {
+			type: "string",
+			enum: SEVERITIES,
+			description: `From the practice's Severity section. ${describeVocabulary(SEVERITIES, SEVERITY_DESCRIPTIONS)}`,
+		},
+		summary: {
+			type: "string",
+			minLength: 1,
+			maxLength: MAX_SUMMARY_CHARS,
+			description: `One line of at most ${MAX_SUMMARY_CHARS} characters naming this one problem, such as 'Debug print left in the request handler'.`,
+		},
+		explanation: {
+			type: "string",
+			minLength: 1,
+			maxLength: CANDIDATE_LIMITS.problemExplanationChars,
+			description:
+				"What the cited evidence shows about this one problem and its consequence. Evidence, not advice, intent, confidence, or hidden chain-of-thought.",
+		},
 		citations: {
 			type: "array",
 			minItems: 1,
-			items: {
-				type: "object",
-				additionalProperties: false,
-				required: ["sourceKind", "artifactPath", "path", "startLine"],
-				properties: {
-					sourceKind: { type: "string", enum: availableSourceKindValues },
-					// Membership is checked when the observation is recorded (validateEvidenceSources): a large capture
-					// enumerated here produces a declaration the SDK's schema compiler cannot compile.
-					artifactPath: {
-						type: "string",
-						minLength: 1,
-						description:
-							"The captured artifact the citation reads, exactly as the capture manifest names it.",
-					},
-					path: { type: "string", minLength: 1 },
-					side: {
-						type: ["string", "null"],
-						enum: ["OLD", "NEW", null],
-						description:
-							"For a quote of the change: artifactPath names the pinned change (change.json), path is the file as named on that side, and the lines are the [L<n>] coordinates of work/change/diff.patch.",
-					},
-					revision: {
-						type: ["string", "null"],
-						pattern: "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
-						description:
-							"For repository text: artifactPath names the captured .git/HEAD, path is repository-relative, and revision optionally selects a full commit SHA; omission means the captured HEAD.",
-					},
-					startLine: {
-						type: "integer",
-						minimum: 1,
-						maximum: 2_147_483_647,
-						description:
-							"The 1-based line of the quoted text in the artifact; for a quote of the change, the [L<n>] coordinate of work/change/diff.patch.",
-					},
-					endLine: {
-						type: ["integer", "null"],
-						minimum: 1,
-						maximum: 2_147_483_647,
-						description: "The last line of the quote, at least startLine; omitted means one line.",
-					},
-					quote: {
-						type: ["string", "null"],
-						description:
-							"The text at those lines, copied as shown; a diff marker, a [L<n>] prefix or a non-breaking space read as a space are tolerated. Omit it to cite the whole of the lines: what was recorded is echoed back.",
-					},
-				},
+			items: citationSchema,
+			description: "The lines that show this problem.",
+		},
+		basis: {
+			type: "object",
+			additionalProperties: false,
+			required: ["type", "explanation"],
+			description:
+				"Why the problem belongs to this work. introduced: the change adds it (head: the index of a citation of the NEW side or the reviewed head). worsened: the change makes it worse (base: the index of the OLD side's citation, head: the NEW side's). duty: the criteria require an event that this work lacks (criterionQuote: the criteria's exact words, event: the index of the citation that shows the event).",
+			properties: {
+				type: { type: "string", enum: ["introduced", "worsened", "duty"] },
+				head: { type: ["integer", "null"], minimum: 0 },
+				base: { type: ["integer", "null"], minimum: 0 },
+				event: { type: ["integer", "null"], minimum: 0 },
+				criterionQuote: { type: ["string", "null"] },
+				explanation: { type: "string", minLength: 1 },
 			},
+		},
+		nextStep: {
+			type: ["string", "null"],
+			description:
+				"Optional: the one change that would resolve this problem, when the criteria name it.",
 		},
 	},
 } as const;
-const observationSchema: ToolDefinition["parameters"] = {
+const resultSchema: ToolDefinition["parameters"] = {
 	type: "object",
 	additionalProperties: false,
-	required: [
-		"revises",
-		"practiceSlug",
-		"summary",
-		"outcome",
-		"severity",
-		"evidence",
-		"evidenceRationale",
-	],
+	required: ["outcome", "summary", "explanation", "citations", "evidence"],
 	properties: {
-		revises: {
-			type: ["string", "null"],
-			minLength: 1,
-			description:
-				"Use null for the first draft. To correct a draft already recorded in this review, copy its returned draft reference here and resend the complete observation. A refused correction leaves the previous draft unchanged.",
+		outcome: {
+			type: "string",
+			enum: OUTCOMES,
+			description: describeVocabulary(OUTCOMES, OUTCOME_DESCRIPTIONS),
 		},
-		practiceSlug: { type: "string", minLength: 1 },
 		summary: {
 			type: "string",
 			minLength: 1,
 			maxLength: MAX_SUMMARY_CHARS,
 			description:
 				`A short phrase of at most ${MAX_SUMMARY_CHARS} characters identifying the specific behavior whose conformance to the practice standard you assess, such as 'Debug print left in the request handler'. ` +
-				"Never a single word and never the practice's own name; the reasons, titles and quotes go in evidenceRationale. " +
+				"Never a single word and never the practice's own name; the reasons, titles and quotes go in explanation. " +
 				"A longer summary is refused, not shortened.",
 		},
-		outcome: {
-			type: "string",
-			enum: OUTCOME_VALUES,
-			description: describeVocabulary(OUTCOME_VALUES, OUTCOME_DESCRIPTIONS),
-		},
-		severity: {
-			type: ["string", "null"],
-			enum: [...SEVERITY_VALUES, null],
-			description: `Required for a NOT_MET outcome, from the practice's Severity section; null otherwise. ${describeVocabulary(SEVERITY_VALUES, SEVERITY_DESCRIPTIONS)}`,
-		},
-		evidence: evidenceSchema,
-		evidenceRationale: {
+		explanation: {
 			type: "string",
 			minLength: 1,
+			maxLength: CANDIDATE_LIMITS.explanationChars,
 			description:
 				"A concise explanation a developer can read: the source facts that decide whether this work holds " +
 				"this criterion's subject and occasion, then, when it does, how the cited evidence meets or falls " +
 				"short of what this criterion judges, leaving to other practices what it assigns to them. Describe " +
 				"evidence, not advice, intent, confidence, or hidden chain-of-thought.",
+		},
+		citations: {
+			type: "array",
+			items: citationSchema,
+			description:
+				"The lines that decide the outcome. Required for MET, NOT_APPLICABLE and UNDETERMINED; a NOT_MET result may leave it empty, since each problem cites its own lines.",
+		},
+		problems: {
+			anyOf: [{ type: "array", minItems: 1, items: problemSchema }, { type: "null" }],
+			description:
+				"NOT_MET only, and required there: each problem the evidence shows, each with its own severity, citations and basis. null for every other outcome.",
+		},
+		severity: {
+			type: ["string", "null"],
+			enum: [...SEVERITIES, null],
+			description:
+				"NOT_MET only, and optional: the result's severity when the pattern of problems is worse than the worst one alone. null takes the worst problem's severity.",
+		},
+		example: {
+			anyOf: [
+				{
+					type: "object",
+					additionalProperties: false,
+					required: ["citation", "note"],
+					properties: {
+						citation: citationSchema,
+						note: { type: "string", minLength: 1, maxLength: CANDIDATE_LIMITS.exampleNoteChars },
+					},
+				},
+				{ type: "null" },
+			],
+			description:
+				"Optional, MET or NOT_MET only: one place of this work that shows the practice as the criteria ask, when the evidence holds one; never on the lines of a problem. null otherwise.",
+		},
+		evidence: {
+			type: "object",
+			additionalProperties: false,
+			description:
+				"The warrant the outcome owes, and nothing else: search for a MET or NOT_MET or UNDETERMINED that rests on something " +
+				"missing — what you looked for, where, and what the search did not cover; inapplicability for NOT_APPLICABLE; " +
+				"undecidability, a list of open questions, for UNDETERMINED and, beside its problems, for a NOT_MET. Use null for " +
+				"branches that do not apply.",
+			properties: {
+				search: { anyOf: [searchSchema, { type: "null" }] },
+				inapplicability: { anyOf: [inapplicabilitySchema, { type: "null" }] },
+				undecidability: {
+					anyOf: [{ type: "array", minItems: 1, items: openQuestionSchema }, { type: "null" }],
+				},
+			},
 		},
 	},
 } as const;
@@ -837,34 +1016,39 @@ function persistRunnerDebug() {
 	writeFileSync(RUNNER_DEBUG_PATH, JSON.stringify(runnerDebug, null, 2));
 }
 function persistReviewState() {
-	writeFileSync(
-		REVIEW_STATE_PATH,
-		JSON.stringify({ observations: reviewState.observations }, null, 2),
-	);
+	writeFileSync(REVIEW_STATE_PATH, JSON.stringify(admissionRequest(), null, 2));
 }
 
-/** This attempt continues an admitted review: it measured nothing, and its result is what was admitted. */
-let continuing = false;
+/**
+ * This attempt continues an admitted review: it runs no program, and submits no result of its own. Known before
+ * anything runs, so that a failure even before the first practice reports no program of its own.
+ */
+const continuing = existsSync(CONTINUATION_PATH);
 
+/** The admission request as this run's result; a continuing writer's holds none, since it submitted none. */
 function maybeWriteResultFile(): boolean {
-	const observations: readonly unknown[] = continuing
-		? admittedObservations
-		: reviewState.observations;
-	if (observations.length === 0) {
+	if (!continuing && reviewState.size === 0) {
 		return false;
 	}
-	writeFileSync(
-		RESULT_PATH,
-		JSON.stringify(
-			{
-				observations,
-				...(admissionDigest === null ? {} : { admissionDigest }),
-			},
-			null,
-			2,
-		),
-	);
+	writeFileSync(RESULT_PATH, JSON.stringify(admissionRequest(), null, 2));
 	return true;
+}
+
+/** The program each admitted practice runs: its staged custom program, or the built-in. */
+function programOf(slug: string): PracticeProgram {
+	const file = nodePath.join(INPUT_PATHS.practiceScripts, `${slug}.ts`);
+	return existsSync(file)
+		? { script: { path: file, source: readFileSync(file) } }
+		: { script: null };
+}
+
+/** One entry for each admitted practice: how its program ran, or that none reached it. */
+function persistExecutionReport(): void {
+	const entries = practiceIndex.map(
+		({ slug }) =>
+			[slug, executions.get(slug) ?? notReachedOutcome(programOf(slug), unreachedReason)] as const,
+	);
+	writeFileSync(PRACTICE_SCRIPT_REPORT_PATH, executionReport(entries));
 }
 
 // out/ is the sandbox's own claim, so the runner writes every file in it last, from memory, and
@@ -886,10 +1070,9 @@ function finalizeOutput(): void {
 	if (compositionAdmitted) {
 		persist(FEEDBACK_PATH, persistComposedFeedback);
 	}
-	if (practiceScriptReportText !== undefined) {
-		persist(PRACTICE_SCRIPT_REPORT_PATH, () => {
-			writeFileSync(PRACTICE_SCRIPT_REPORT_PATH, practiceScriptReportText);
-		});
+	// A continuing writer runs no program: its earlier attempt reported them.
+	if (!continuing) {
+		persist(PRACTICE_SCRIPT_REPORT_PATH, persistExecutionReport);
 	}
 	for (const entry of readdirSync(OUTPUT)) {
 		const path = `${OUTPUT}/${entry}`;
@@ -900,12 +1083,12 @@ function finalizeOutput(): void {
 }
 
 function hasPersistedReviewState(): boolean {
-	return reviewState.observations.length > 0;
+	return reviewState.size > 0;
 }
 
-/** A checked observation, and what the check changed about its citations, for the session to see. */
+/** A checked result, and what the check changed about its citations, for the session to see. */
 interface Validated {
-	observation: NormalizedObservation;
+	candidate: Candidate;
 	notes: string[];
 }
 
@@ -932,23 +1115,33 @@ function orchestratorWithPaths(text: string): string {
 	);
 }
 
-function normalizeAndValidateObservation(rawObservation: unknown): Validated {
-	const notes: string[] = [];
-	const observation = normalizeObservation(rawObservation, notes, (artifact) =>
-		artifactSources.get(artifact),
+/** What a MET with incomplete coverage is told: which reads fell short, and what it may submit instead. */
+function incompleteCoverageText(coverage: Coverage): string {
+	const omitted = coverage.complete
+		? []
+		: coverage.omitted.map(
+				(omission) =>
+					`${omission.count} ${omission.what}${omission.units === undefined ? "" : ` (${omission.units.join(", ")})`}`,
+			);
+	return (
+		`a MET result needs complete coverage, and this session's reads did not complete: ${omitted.join("; ")}. ` +
+		"Read the rest of what was cut short, with an offset or a narrower search, and submit again; or submit what the " +
+		"evidence supports: NOT_MET for a problem it proves, or UNDETERMINED with the open question"
 	);
-	if (!admittedPractices.has(observation.practiceSlug)) {
-		throw new Error(
-			`unknown practice '${observation.practiceSlug}'; this turn's practices are ${currentTurnSlugs.join(", ")}`,
-		);
-	}
-	const fenced = outsideActivePractice(observation.practiceSlug);
-	if (fenced !== null) {
-		throw new Error(fenced);
-	}
+}
+
+/**
+ * Check a submitted result for the session's one practice the way admission will: its shape, its sources, its
+ * search and inapplicability scope, its quotes against the artifacts, and its rules with the coverage the host
+ * measured. Each repair is noted.
+ */
+function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Validated {
+	const notes: string[] = [];
+	const submission = normalizeSubmission(raw, notes, (artifact) => artifactSources.get(artifact));
+	const citations = submissionCitations(submission);
 	// The manifest says which source staged an artifact; a citation that names the artifact under
 	// another source kind is read as the manifest reads it, and the correction is echoed back.
-	for (const citation of observation.evidence.citations) {
+	for (const citation of citations) {
 		// A quote of a staged record (description.md, comments.json) named as its path under the pinned
 		// change is a quote of that record: the artifact is the path.
 		const stagedAtPath = artifactSources.get(citation.path);
@@ -968,7 +1161,7 @@ function normalizeAndValidateObservation(rawObservation: unknown): Validated {
 		}
 		// Once the source is settled: a side selects a line of the change and a revision a commit of the
 		// checkout, and neither says anything of another source. Admission refuses either one elsewhere, and
-		// with it every observation the review recorded, so neither leaves the runner on any other source.
+		// with it the whole result, so neither leaves the runner on any other source.
 		if (citation.sourceKind !== DIFF_SOURCE && citation.side !== undefined) {
 			notes.push(`${citation.path}: side dropped — only a line of the change has a side`);
 			delete citation.side;
@@ -980,35 +1173,42 @@ function normalizeAndValidateObservation(rawObservation: unknown): Validated {
 			delete citation.revision;
 		}
 	}
-	validateEvidenceSources(observation, availableSourceKinds, artifactSources);
+	validateEvidenceSources(
+		submission,
+		availableSourceKinds,
+		artifactSources,
+		`${taskEnvelope.paths.repositoryRoot.replace(/\/+$/u, "")}/`,
+	);
 	validateSearchScope(
-		observation,
-		practiceExhaustiveSources.get(observation.practiceSlug) ?? new Set(),
+		submission,
+		practiceExhaustiveSources.get(slug) ?? new Set(),
 		availableSourceKinds,
 	);
-	validateInapplicabilityScope(observation, availableSourceKinds);
-	// A practice that reads the change grounds a decision of nothing in it, unless another observation
-	// already consulted it; a practice judging comments or history alone owes the change nothing.
+	validateInapplicabilityScope(submission, availableSourceKinds);
+	if ((submission.problems ?? []).some((problem) => problem.basis.type === "state")) {
+		throw new Error(
+			"a problem's basis is introduced, worsened or duty in a review of a change: a state basis is for a review of the whole work",
+		);
+	}
+	// A practice that reads the change grounds a decision of nothing in it, unless another practice's
+	// result already consulted it; a practice judging comments or history alone owes the change nothing.
 	if (
-		(observation.outcome === "NOT_APPLICABLE" || observation.outcome === "UNDETERMINED") &&
+		(submission.outcome === "NOT_APPLICABLE" || submission.outcome === "UNDETERMINED") &&
 		availableSourceKinds.has(DIFF_SOURCE) &&
-		practiceIndex
-			.find((practice) => practice.slug === observation.practiceSlug)
-			?.readsSources.includes(DIFF_SOURCE) === true &&
-		![
-			...reviewState.observations.filter(
-				(previous) => previous.practiceSlug !== observation.practiceSlug,
-			),
-			observation,
-		].some(readTheChange)
+		practiceIndex.find((practice) => practice.slug === slug)?.readsSources.includes(DIFF_SOURCE) ===
+			true &&
+		!readTheChange(submission) &&
+		![...reviewState].some(
+			([other, candidate]) => other !== slug && candidateReadTheChange(candidate),
+		)
 	) {
 		throw new Error(
-			"an observation that decides nothing must show it read the change: cite a line of " +
+			"a result that decides nothing must show it read the change: cite a line of " +
 				`${CHANGE_ROOT}/diff.patch (sourceKind ${DIFF_SOURCE}), or list ${DIFF_SOURCE} among the ` +
 				"sources consulted in evidence.search or evidence.inapplicability",
 		);
 	}
-	for (const citation of observation.evidence.citations) {
+	for (const citation of citations) {
 		// Match admission: repository quotes use Git blobs; change quotes use the derived diff.
 		const content = citedContent(citation);
 		const resolved = resolveCited(citation, content);
@@ -1037,20 +1237,29 @@ function normalizeAndValidateObservation(rawObservation: unknown): Validated {
 		}
 		citation.quote = resolved.quote;
 	}
-	// A conversation is reviewed once for each participant; a lapse must be that participant's own.
+	// A conversation is reviewed once for each participant; each lapse must be that participant's own.
 	const thread = `${CWD}/${CONVERSATION_THREAD}`;
-	if (
-		observation.outcome === "NOT_MET" &&
-		existsSync(thread) &&
-		!citesReviewedTurn(observation.evidence.citations, readFileSync(thread, "utf8"))
-	) {
+	if (submission.outcome === "NOT_MET" && existsSync(thread)) {
+		const turns = readFileSync(thread, "utf8");
+		if (
+			(submission.problems ?? []).some((problem) => !citesReviewedTurn(problem.citations, turns))
+		) {
+			throw new Error(
+				`each problem of a NOT_MET of this conversation review must cite a turn of the participant under review: quote a ` +
+					`line inside a turn of ${CONVERSATION_THREAD} marked "underReview": true. The other turns are ` +
+					"context, and a lapse that only they show is not this participant's",
+			);
+		}
+	}
+	const parsed = parseCandidate({ ...submission, coverage });
+	if (!parsed.ok) {
 		throw new Error(
-			`a NOT_MET of this conversation review must cite a turn of the participant under review: quote a ` +
-				`line inside a turn of ${CONVERSATION_THREAD} marked "underReview": true. The other turns are ` +
-				"context, and a lapse that only they show is not this participant's",
+			parsed.reasonCode === "met_coverage_incomplete"
+				? incompleteCoverageText(coverage)
+				: `${parsed.reasonCode}: ${parsed.message}`,
 		);
 	}
-	return { observation, notes };
+	return { candidate: parsed.candidate, notes };
 }
 
 /** Infer an omitted diff side by exact quote match, preferring NEW; never override a supplied side. */
@@ -1078,19 +1287,34 @@ function excerptOf(text: string): string {
 	return JSON.stringify(text.length > 160 ? `${text.slice(0, 160)}…` : text);
 }
 
-const DIFF_SOURCE = "scm.pull-request.diff";
-const TREE_SOURCE = "scm.repository.tree";
-
-/** Whether an observation cites the change or names it among the sources its warrant consulted. */
-function readTheChange(observation: NormalizedObservation): boolean {
-	if (observation.evidence.citations.some((citation) => citation.sourceKind === DIFF_SOURCE)) {
+/** Whether a submission cites the change or names it among the sources its warrants consulted. */
+function readTheChange(submission: NormalizedSubmission): boolean {
+	if (submissionCitations(submission).some((citation) => citation.sourceKind === DIFF_SOURCE)) {
 		return true;
 	}
 	const consulted = [
-		...(observation.evidence.search?.consulted ?? []),
-		...(observation.evidence.inapplicability?.consulted ?? []),
+		...(submission.evidence.search?.consulted ?? []),
+		...(submission.evidence.inapplicability?.consulted ?? []),
 	];
 	return consulted.includes(DIFF_SOURCE);
+}
+
+/** Whether a final result cites the change or names it among the sources its warrants consulted. */
+function candidateReadTheChange(candidate: Candidate): boolean {
+	const cited = [
+		...candidate.citations,
+		...(candidate.outcome === "NOT_MET"
+			? candidate.problems.flatMap((problem) => problem.citations)
+			: []),
+	];
+	const { evidence } = candidate;
+	const consulted = [
+		...("search" in evidence && evidence.search !== undefined ? evidence.search.consulted : []),
+		...("inapplicability" in evidence ? evidence.inapplicability.consulted : []),
+	];
+	return (
+		cited.some((citation) => citation.sourceKind === DIFF_SOURCE) || consulted.includes(DIFF_SOURCE)
+	);
 }
 
 /** What a repository read returns for a file that is not text: git's own rule, a NUL in the opening bytes. */
@@ -1176,6 +1400,7 @@ function readCheckoutFile(path: string, repository: string): string | typeof BIN
 }
 
 /** A draft disposition; its practice slug is its stable reference within this review. */
+/** What one submission did to the review call's draft result. */
 type Recorded =
 	| (({ kind: "stored" } | { kind: "revised" }) & {
 			slug: string;
@@ -1185,7 +1410,7 @@ type Recorded =
 	| { kind: "duplicate"; slug: string }
 	| { kind: "refused"; slug: string; reason: string };
 
-/** Set once the recorded observations have gone to admission; no observation is accepted after it. */
+/** Set once the final results have gone to admission; no result is accepted after it. */
 let measurementClosed = false;
 
 /** Calls of the recording tools one turn may make before recording anything; past it, the turn ends. */
@@ -1210,14 +1435,10 @@ async function refusal<T>(toolCallId: string, text: string): Promise<AgentToolRe
 	throw new Error(text);
 }
 
-/**
- * The tools a turn exists to call: what it records with them is what it owes. read_practice stores nothing, but its
- * answer is a function of its arguments like theirs, so it shares their repeat and attempt bounds.
- */
+/** The tools a turn exists to call: what it records with them is what it owes. */
 const RECORDING_TOOLS: ReadonlySet<string> = new Set([
-	"report_observation",
+	"submit_result",
 	"report_feedback",
-	"read_practice",
 	"report_review",
 ]);
 
@@ -1246,7 +1467,7 @@ let activeSession: AgentSession | null = null;
 
 /**
  * What the turn in flight still owes and how it is told to record it; set and cleared with its trace.
- * Measuring owes one observation per practice, composition one decision per NOT_MET practice.
+ * Measuring owes one result per practice, composition one decision per NOT_MET practice.
  * `endsWhenPaid` marks a turn that exists only to pay what it owes, so it ends once nothing is owed.
  */
 interface TurnDemand {
@@ -1257,9 +1478,9 @@ interface TurnDemand {
 let turnDemand: TurnDemand | null = null;
 
 /**
- * Output tokens the model spends per observation it records, averaged over its recording messages: what
- * a turn must keep back to record what it owes. The prior is a slow open model's pace until the session
- * has recorded once.
+ * Output tokens the model spends per result it submits, averaged over its submitting messages: what a
+ * turn must keep back to submit what it owes. The prior is a slow open model's pace until the session
+ * has submitted once.
  */
 let tokensPerObservation = 1500;
 /** Output tokens of the last assistant message, when that message carries a recording call. */
@@ -1267,7 +1488,7 @@ let recordingMessageTokens = 0;
 /** When the session last showed any sign of life; what the stall watchdog reads. */
 let lastEventAt = Date.now();
 
-/** How many observations a report_observation call carried, stored, duplicate or refused alike. */
+/** How many results a submit_result call carried, stored, duplicate or refused alike. */
 function observationsIn(result: unknown): number {
 	const details = isRecord(result) ? result.details : undefined;
 	if (!isRecord(details)) {
@@ -1289,7 +1510,7 @@ function chargeWork(event: AgentSessionEvent): void {
 	if (event.type === "message_end" && event.message.role === "assistant") {
 		const output = outputTokensOf(event.message);
 		recordingMessageTokens = listOrEmpty(event.message.content).some(
-			(c) => c.type === "toolCall" && c.name === "report_observation",
+			(c) => c.type === "toolCall" && c.name === "submit_result",
 		)
 			? output
 			: 0;
@@ -1316,7 +1537,7 @@ function chargeWork(event: AgentSessionEvent): void {
 		}
 		return;
 	}
-	if (event.type === "tool_execution_end" && event.toolName === "report_observation") {
+	if (event.type === "tool_execution_end" && event.toolName === "submit_result") {
 		const written = observationsIn(event.result);
 		if (written > 0 && recordingMessageTokens > 0) {
 			tokensPerObservation = Math.round(
@@ -1385,7 +1606,7 @@ const refusals = new Map<string, number>();
  * Practices this review asks no more about: past the refusal limit, too large for the context, or ended on their
  * own again after the one request to record. Without a draft, each stays not reached.
  */
-const blockedPractices = new Set<string>();
+const blockedPractices = new Map<string, UnratedReason>();
 
 /** Whether the practice was closed by its refused submissions, not by another reason. */
 function refusalLimited(slug: string): boolean {
@@ -1396,12 +1617,8 @@ function countRefusal(slug: string): void {
 	const count = (refusals.get(slug) ?? 0) + 1;
 	refusals.set(slug, count);
 	if (count >= MAX_REFUSALS_PER_PRACTICE) {
-		blockedPractices.add(slug);
+		blockedPractices.set(slug, "off-format");
 	}
-}
-
-function slugOf(raw: unknown): string {
-	return (isRecord(raw) ? normalizePracticeSlug(raw.practiceSlug) : "") || "unknown";
 }
 
 /**
@@ -1413,22 +1630,150 @@ const refusedItems = new Map<string, { reason: string; resent: number }>();
 /** An identical refused item sent this many times more ends the turn: the circuit breaker. */
 const IDENTICAL_REFUSAL_ABORT = 2;
 
-function record(raw: unknown): Recorded {
-	const slug = slugOf(raw);
-	// Answered before anything is counted: an item for a known practice outside the session's own neither
-	// records, revises, nor spends that practice's refusals.
-	const fenced = admittedPractices.has(slug) ? outsideActivePractice(slug) : null;
-	if (fenced !== null) {
-		return { kind: "refused", slug, reason: fenced };
+/** The session tools whose answers are evidence reads the host keeps receipts of. */
+const READ_TOOLS: ReadonlySet<string> = new Set(["read", "grep", "find", "ls"]);
+/** The most units an omission names; the count says how many there are. */
+const OMISSION_UNITS = CANDIDATE_LIMITS.omissionUnits;
+/** A tool error that says the source could not be read, not that the session asked for something absent. */
+const READ_FAILURE =
+	/EACCES|EPERM|EIO|ETIMEDOUT|permission denied|operation not permitted|timed out/iu;
+
+/**
+ * What one review session's evidence reads reached, from the host's own receipts of its tools: every read,
+ * the reads its tool cut short and the session did not read on from, and the reads that failed.
+ */
+interface SessionReads {
+	reads: number;
+	/** Files whose last read was cut at the tool's limit, and not read on to their end since. */
+	cutFiles: Set<string>;
+	/** Searches and listings cut at their limit. */
+	cutSearches: string[];
+	failed: string[];
+	/** The arguments of each read in flight, by call. */
+	pending: Map<string, unknown>;
+}
+
+function newSessionReads(): SessionReads {
+	return { reads: 0, cutFiles: new Set(), cutSearches: [], failed: [], pending: new Map() };
+}
+
+/** Keep the receipt of one read the session made, directly or from a codemode script. */
+function noteSessionRead(reads: SessionReads, event: AgentSessionEvent): void {
+	if (event.type === "tool_execution_start" && READ_TOOLS.has(event.toolName)) {
+		reads.pending.set(event.toolCallId, event.args);
+		return;
 	}
-	// An item with no slug is answered with what it lacks, never with the bound of a practice named
-	// "unknown": the refusal it is counted under is a bookkeeping name, not one the session sent.
-	if (slug !== "unknown" && blockedPractices.has(slug)) {
+	if (event.type !== "tool_execution_end" || !reads.pending.has(event.toolCallId)) {
+		return;
+	}
+	const args = reads.pending.get(event.toolCallId);
+	reads.pending.delete(event.toolCallId);
+	reads.reads += 1;
+	const target = isRecord(args)
+		? [args.path, args.pattern].find((value): value is string => typeof value === "string")
+		: undefined;
+	const named = target ?? event.toolName;
+	const result: unknown = event.result;
+	if (event.isError) {
+		if (READ_FAILURE.test(toolResultText(result))) {
+			reads.failed.push(named);
+		}
+		return;
+	}
+	const details = isRecord(result) && isRecord(result.details) ? result.details : {};
+	const cut =
+		(isRecord(details.truncation) && details.truncation.truncated === true) ||
+		details.matchLimitReached !== undefined ||
+		details.resultLimitReached !== undefined ||
+		details.entryLimitReached !== undefined;
+	if (event.toolName === "read" && target !== undefined) {
+		// A read that reaches the end of its file without a cut, or a read with no offset, is the file's last word.
+		const continued = isRecord(args) && args.offset !== undefined;
+		if (cut) {
+			reads.cutFiles.add(target);
+		} else if (continued && !/more lines in file/u.test(toolResultText(result))) {
+			reads.cutFiles.delete(target);
+		}
+		return;
+	}
+	if (cut) {
+		reads.cutSearches.push(named);
+	}
+}
+
+/** The host's receipts of a session's reads, as a report counts them. */
+function sessionReceipts(reads: SessionReads): Receipts {
+	return {
+		reads: reads.reads,
+		truncatedReads: reads.cutFiles.size + reads.cutSearches.length,
+		failedReads: reads.failed.length,
+	};
+}
+
+/** What a session's reads covered: complete only when no read was cut short or failed. */
+function sessionCoverage(reads: SessionReads): Coverage {
+	const receipts = sessionReceipts(reads);
+	const cut = [...reads.cutFiles, ...reads.cutSearches];
+	const omitted: Omission[] = [
+		...(cut.length > 0
+			? [
+					{
+						what: "reads cut short at the tool's output limit",
+						count: cut.length,
+						reason: "truncated" as const,
+						units: cut
+							.slice(0, OMISSION_UNITS)
+							.map((unit) => unit.slice(0, CANDIDATE_LIMITS.warrantFieldChars)),
+					},
+				]
+			: []),
+		...(reads.failed.length > 0
+			? [
+					{
+						what: "reads that failed",
+						count: reads.failed.length,
+						reason: "unavailable" as const,
+						units: reads.failed
+							.slice(0, OMISSION_UNITS)
+							.map((unit) => unit.slice(0, CANDIDATE_LIMITS.warrantFieldChars)),
+					},
+				]
+			: []),
+	];
+	const [first, ...rest] = omitted;
+	return first === undefined
+		? { source: "host", ...receipts, complete: true }
+		: { source: "host", ...receipts, complete: false, omitted: [first, ...rest] };
+}
+
+/**
+ * The one review in flight: the practice it reviews, its private draft result, and what its session's
+ * reads reached. A submission goes to this draft only; it becomes the practice's result only when the
+ * program returns it.
+ */
+interface ActiveReview {
+	slug: string;
+	draft: Candidate | null;
+	reads: SessionReads;
+}
+let activeReview: ActiveReview | null = null;
+
+function record(raw: unknown): Recorded {
+	const review = activeReview;
+	if (review === null) {
+		return {
+			kind: "refused",
+			slug: "unknown",
+			reason: "no review of a practice is open in this session; nothing is accepted",
+		};
+	}
+	const { slug } = review;
+	if (blockedPractices.has(slug)) {
 		return {
 			kind: "refused",
 			slug,
 			reason: refusalLimited(slug)
-				? `${MAX_REFUSALS_PER_PRACTICE} submissions for '${slug}' were refused; no more are accepted for it, so it is not owed any more. Record the other practices.`
+				? `${MAX_REFUSALS_PER_PRACTICE} submissions for '${slug}' were refused; no more are accepted for it.`
 				: `this review asks no more about '${slug}'; no more submissions are accepted for it.`,
 		};
 	}
@@ -1440,112 +1785,88 @@ function record(raw: unknown): Recorded {
 		if (earlier.resent >= IDENTICAL_REFUSAL_ABORT) {
 			stopTurn(
 				"loop",
-				`the same refused ${slug} observation sent ${earlier.resent + 1} times — aborting this turn`,
+				`the same refused ${slug} result sent ${earlier.resent + 1} times — aborting this turn`,
 			);
 		}
 		return {
 			kind: "refused",
 			slug,
 			reason:
-				`identical to an item this turn already refused, so the answer is the same: ${earlier.reason}. ` +
-				"Change what that names, or leave this practice and record the others",
+				`identical to a result this turn already refused, so the answer is the same: ${earlier.reason}. ` +
+				"Change what that names",
 		};
-	}
-	const revises = isRecord(raw) ? raw.revises : undefined;
-	const index = reviewState.observations.findIndex((draft) => draft.practiceSlug === slug);
-	if (
-		index === -1 ? revises !== null : revises !== null && revises !== undefined && revises !== slug
-	) {
-		countRefusal(slug);
-		return {
-			kind: "refused",
-			slug,
-			// Before a first draft no reference was ever returned, so naming one cannot be the correction.
-			reason:
-				index === -1
-					? `No draft reference has been issued for '${slug}': use revises: null for its first observation.`
-					: `revises must name this practice's draft reference, '${slug}'.`,
-		};
-	}
-	const candidate = isRecord(raw) ? { ...raw } : raw;
-	if (isRecord(candidate)) {
-		delete candidate.revises;
 	}
 	let validated: Validated;
 	try {
-		validated = normalizeAndValidateObservation(candidate);
+		validated = validateSubmission(raw, slug, sessionCoverage(review.reads));
 	} catch (error) {
 		countRefusal(slug);
 		const reason = errorText(error);
 		refusedItems.set(sent, { reason, resent: 0 });
 		return { kind: "refused", slug, reason };
 	}
-	const { observation, notes } = validated;
-	const previous = reviewState.observations[index];
-	if (previous !== undefined && isDeepStrictEqual(previous, observation)) {
+	const { candidate, notes } = validated;
+	const previous = review.draft;
+	if (previous !== null && isDeepStrictEqual(previous, candidate)) {
 		return { kind: "duplicate", slug };
 	}
-	if (previous !== undefined && revises !== slug) {
-		countRefusal(slug);
-		return {
-			kind: "refused",
-			slug,
-			reason: `Draft '${slug}' already exists. To correct it, resend the complete observation with revises: '${slug}'.`,
-		};
-	}
-	if (previous === undefined) {
-		reviewState.observations.push(observation);
-	} else {
-		reviewState.observations[index] = observation;
-	}
+	review.draft = candidate;
 	return {
-		kind: previous === undefined ? "stored" : "revised",
+		kind: previous === null ? "stored" : "revised",
 		slug,
-		negative: observation.outcome === "NOT_MET",
+		negative: candidate.outcome === "NOT_MET",
 		filled: notes,
 	};
 }
 
-/** Rebuild the notes from current drafts instead of retaining replaced results. */
+/** The results submitted so far, for the review's notes; read back after a compaction. */
 function persistRecordedNotes(): void {
 	try {
 		mkdirSync(nodePath.dirname(NOTES_PATH), { recursive: true });
-		writeFileSync(NOTES_PATH, `# Current observation drafts\n\n${recordedSoFar()}\n`);
+		writeFileSync(NOTES_PATH, `# Current results\n\n${recordedSoFar()}\n`);
 	} catch (error) {
 		console.error(`[pi-runner] notes could not be written: ${errorText(error)}`);
 	}
 }
 
-/** One line per current draft, of the given practices or of all, for a session's opening and the review's notes. */
+/** One line for each result: the final ones and the open review's draft, or of the given practices only. */
 function recordedSoFar(only?: readonly string[]): string {
-	const drafts = reviewState.observations.filter(
-		(observation) => only === undefined || only.includes(observation.practiceSlug),
-	);
-	if (drafts.length === 0) {
+	const results = new Map(reviewState);
+	if (activeReview?.draft != null) {
+		results.set(activeReview.slug, activeReview.draft);
+	}
+	const shown = [...results].filter(([slug]) => only === undefined || only.includes(slug));
+	if (shown.length === 0) {
 		return "Nothing recorded yet.";
 	}
-	return drafts
-		.map((observation) => {
-			const verdict = observation.outcome;
-			const cited = [...new Set(observation.evidence.citations.map((citation) => citation.path))];
-			return `- ${observation.practiceSlug}: ${verdict} — ${observation.summary} (cites ${cited.join(", ")})`;
+	return shown
+		.map(([slug, candidate]) => {
+			const cited = [
+				...new Set(
+					[
+						...candidate.citations,
+						...(candidate.outcome === "NOT_MET"
+							? candidate.problems.flatMap((problem) => problem.citations)
+							: []),
+					].map((citation) => citation.path),
+				),
+			];
+			return `- ${slug}: ${candidate.outcome} — ${candidate.summary} (cites ${cited.join(", ")})`;
 		})
 		.join("\n");
 }
 
-interface ReportObservationDetails {
+interface SubmitResultDetails {
 	inserted: number;
 	revised: number;
 	duplicates: number;
 	refused: number;
-	totalObservations: number;
-	remainingPractices: string[];
 }
 
 const MAX_REFUSAL_LOG_CHARS = 500;
 
 function logRefusal(slug: string, reason: string): void {
-	const line = `[pi-runner] observation refused for ${slug}: ${reason}`;
+	const line = `[pi-runner] result refused for ${slug}: ${reason}`;
 	console.error(
 		line.length > MAX_REFUSAL_LOG_CHARS ? `${line.slice(0, MAX_REFUSAL_LOG_CHARS)}…` : line,
 	);
@@ -1561,22 +1882,17 @@ function logRefusal(slug: string, reason: string): void {
 let currentTurnSlugs: readonly string[] = [];
 
 /**
- * The one practice the measuring session in flight assesses, or null outside measurement. Each practice gets
- * a session of its own, and an item for another practice is refused before it can record or revise anything.
+ * The one practice the measuring session in flight assesses, or null outside measurement. Each review gets
+ * a session of its own, and its result is bound to that practice.
  */
 let activePractice: string | null = null;
 
-/** Why an item for this practice falls outside the session's own, or null when it does not. */
-function outsideActivePractice(slug: string): string | null {
-	return activePractice === null || slug === activePractice
-		? null
-		: `this session assesses only '${activePractice}'; '${slug}' is recorded and revised only in its own session`;
-}
-
-/** The given practices, by default the session's, with no recorded result that may still get one. */
+/** The given practices, by default the session's, that still owe the open review a result. */
 function owedPractices(slugs: readonly string[] = currentTurnSlugs): string[] {
-	const observed = new Set(reviewState.observations.map((item) => item.practiceSlug));
-	return slugs.filter((slug) => !observed.has(slug) && !blockedPractices.has(slug));
+	const review = activeReview;
+	return review === null || review.draft !== null || blockedPractices.has(review.slug)
+		? []
+		: slugs.filter((slug) => slug === review.slug);
 }
 
 /** JSON Schema keywords that refuse; what they say is applied per unit instead. */
@@ -1640,112 +1956,70 @@ function documentedShape(schema: unknown): unknown {
 	return out;
 }
 
-function buildReportObservationTool() {
+function buildSubmitResultTool() {
 	return defineTool({
-		name: "report_observation",
+		name: "submit_result",
 		exposure: "model-only",
-		label: "Report Observation",
+		label: "Submit Result",
 		description:
-			"Record one complete evidenced observation for this session’s active practice in local review state, " +
-			"for server admission after measuring. The arguments are that one observation. Its draft reference is " +
-			"the practice slug. Correct it explicitly with revises and a complete observation.",
-		parameters: observationSchema,
-		prepareArguments: prepareObservationArguments,
-		execute: async (toolCallId, params): Promise<AgentToolResult<ReportObservationDetails>> => {
-			if (measurementClosed) {
+			"Submit the one complete evidenced result of this session's practice: its outcome, the explanation, the " +
+			"citations it rests on, and for NOT_MET each problem with its severity, citations and basis. The host adds " +
+			"the coverage it measured from your reads and keeps the result for server admission after measuring. To " +
+			"correct it, submit the complete result again.",
+		parameters: resultSchema,
+		prepareArguments: prepareResultArguments,
+		execute: async (toolCallId, params): Promise<AgentToolResult<SubmitResultDetails>> => {
+			if (measurementClosed || activeReview === null) {
 				const text = "Measurement is closed; this turn may only compose feedback.";
 				return {
 					content: [{ type: "text", text }],
-					details: {
-						inserted: 0,
-						revised: 0,
-						duplicates: 0,
-						refused: 0,
-						totalObservations: reviewState.observations.length,
-						remainingPractices: [],
-					},
+					details: { inserted: 0, revised: 0, duplicates: 0, refused: 0 },
 				};
 			}
-			// The observation is a typed value, never a second JSON document to parse or repair.
+			// The result is a typed value, never a second JSON document to parse or repair.
 			if (!isRecord(params) || Array.isArray(params)) {
-				const reason = "the arguments must be one observation object";
+				const reason = "the arguments must be one result object";
 				logRefusal("(not an object)", reason);
-				return refusal(toolCallId, `observation refused — ${reason}. No draft changed.`);
+				return refusal(toolCallId, `result refused — ${reason}. Nothing changed.`);
 			}
-			const outcomes = [record(params)];
-			const stored = outcomes.filter(
-				(outcome) => outcome.kind === "stored" || outcome.kind === "revised",
-			);
-			for (const outcome of outcomes) {
-				if (outcome.kind === "refused") {
-					logRefusal(outcome.slug, outcome.reason);
-				}
+			const outcome = record(params);
+			const stored = outcome.kind === "stored" || outcome.kind === "revised" ? 1 : 0;
+			if (outcome.kind === "refused") {
+				logRefusal(outcome.slug, outcome.reason);
 			}
 			if (currentTurn) {
-				currentTurn.stored += stored.length;
-				sessionGuards.stored += stored.length;
+				currentTurn.stored += stored;
+				sessionGuards.stored += stored;
 			}
-			if (stored.length > 0) {
-				persistReviewState();
-				maybeWriteResultFile();
-				persistPracticeCoverage();
+			if (stored > 0) {
 				persistRecordedNotes();
 			}
-			// A practice past its refusal limit is not owed any more: listing it as owed invites the resend
-			// it can no longer accept.
-			const remainingPractices = owedPractices();
-			const closed = currentTurnSlugs.filter((slug) => blockedPractices.has(slug));
-			// A practice closed before its first draft is owed nothing and still has no result.
-			const recorded = new Set(reviewState.observations.map((item) => item.practiceSlug));
-			const exhausted = closed.filter((slug) => !recorded.has(slug));
-			const lines = outcomes.map((outcome) => {
-				const head = `${outcome.slug}:`;
-				if (outcome.kind === "stored" || outcome.kind === "revised") {
-					return `${head} ${outcome.kind}${outcome.negative ? " (negative)" : ""}. Draft reference: '${outcome.slug}'.${outcome.filled.map((line) => `\n   ${line}`).join("")}`;
-				}
-				if (outcome.kind === "duplicate") {
-					return `${head} already recorded; this item changed nothing, so do not send it again.`;
-				}
-				return `${head} refused — ${outcome.reason}`;
-			});
-			if (remainingPractices.length > 0) {
-				lines.push(`No recorded result yet for: ${remainingPractices.join(", ")}.`);
+			const head = `${outcome.slug}:`;
+			let text: string;
+			if (outcome.kind === "stored" || outcome.kind === "revised") {
+				text = `${head} ${outcome.kind}${outcome.negative ? " (negative)" : ""}. A later complete submission replaces it.${outcome.filled.map((line) => `\n   ${line}`).join("")}`;
+			} else if (outcome.kind === "duplicate") {
+				text = `${head} already submitted; this result changed nothing, so do not send it again.`;
+			} else {
+				text = `${head} refused — ${outcome.reason}`;
 			}
-			if (exhausted.length > 0) {
-				lines.push(`No recorded result for: ${exhausted.join(", ")}.`);
+			if (blockedPractices.has(outcome.slug) && refusalLimited(outcome.slug)) {
+				text += `\nNo longer accepted (refusal limit): ${outcome.slug}.`;
 			}
-			if (remainingPractices.length === 0 && exhausted.length === 0) {
-				lines.push("Every practice of this turn has a recorded result.");
-			}
-			const limited = closed.filter(refusalLimited);
-			if (limited.length > 0) {
-				lines.push(`No longer accepted (refusal limit): ${limited.join(", ")}.`);
-			}
-			const closedOtherwise = closed.filter((slug) => !refusalLimited(slug));
-			if (closedOtherwise.length > 0) {
-				lines.push(`No longer accepted: ${closedOtherwise.join(", ")}.`);
-			}
-			const text = lines.join("\n");
-			const details: ReportObservationDetails = {
-				inserted: outcomes.filter((outcome) => outcome.kind === "stored").length,
-				revised: outcomes.filter((outcome) => outcome.kind === "revised").length,
-				duplicates: outcomes.filter((outcome) => outcome.kind === "duplicate").length,
-				refused: outcomes.filter((outcome) => outcome.kind === "refused").length,
-				totalObservations: reviewState.observations.length,
-				remainingPractices,
+			const details: SubmitResultDetails = {
+				inserted: outcome.kind === "stored" ? 1 : 0,
+				revised: outcome.kind === "revised" ? 1 : 0,
+				duplicates: outcome.kind === "duplicate" ? 1 : 0,
+				refused: outcome.kind === "refused" ? 1 : 0,
 			};
 			// A call that stored nothing is an error the session must correct — a resend of what is already
-			// recorded included, or it reads as success and is sent again.
-			if (stored.length === 0) {
+			// submitted included, or it reads as success and is sent again.
+			if (stored === 0) {
 				return refusal(toolCallId, text);
 			}
-			// The turn owes nothing more once each of its practices has a result; ending the run here
-			// spares the wrap-up calls a session otherwise makes after its last recording.
-			return {
-				content: [{ type: "text", text }],
-				details,
-				terminate: remainingPractices.length === 0,
-			};
+			// The session owes nothing more once its practice has a result; ending the run here spares the
+			// wrap-up calls a session otherwise makes after its last submission.
+			return { content: [{ type: "text", text }], details, terminate: true };
 		},
 	});
 }
@@ -1764,6 +2038,75 @@ function accumulateUsage(prev: UsageReport | null, curr: UsageReport): void {
 	usageTotals.totalCalls += Math.max(0, curr.totalCalls - (prev?.totalCalls ?? 0));
 }
 
+/**
+ * Derive the change view from the captured checkout and the pinned range, before any program runs. A capture
+ * that fails here fails the review: an empty change is never what a failed capture reads as.
+ */
+function deriveChangeView(): void {
+	const change = readChange(INPUT_PATHS.contextRoot);
+	if (change !== null) {
+		writeChangeView(
+			CWD,
+			INPUT_PATHS.repositoryRoot,
+			change,
+			readDescription(INPUT_PATHS.contextRoot),
+		);
+	}
+}
+
+/** The captured change, parsed from the derived view; null when this work has none. */
+function capturedChange(): { base: string; head: string; files: Map<string, DiffFile> } | null {
+	const change = readChange(INPUT_PATHS.contextRoot);
+	const view = `${CWD}/${CHANGE_ROOT}/diff.patch`;
+	if (change === null || !existsSync(view)) {
+		return null;
+	}
+	return { ...change, files: parseDiff(readFileSync(view, "utf8")) };
+}
+
+/** What the programs of this review read: the pinned checkout, the change and the captured records. */
+function captureSources(): EvidenceSources {
+	const repository = INPUT_PATHS.repositoryRoot;
+	const checkout = existsSync(`${repository}/.git`) ? repository : null;
+	const change = capturedChange();
+	return {
+		repo: checkout,
+		headRevision: change?.head ?? (checkout === null ? null : checkedOutCommit(checkout)),
+		treeArtifact: `${taskEnvelope.paths.repositoryRoot}/.git/HEAD`,
+		contextDir: existsSync(INPUT_PATHS.contextRoot) ? INPUT_PATHS.contextRoot : null,
+		contextReference: taskEnvelope.paths.contextRoot,
+		change,
+		sourceKindOf: (artifactPath) => artifactSources.get(artifactPath),
+	};
+}
+
+/** The files a program of `kind` reads: the pinned tree and the change of a pull request, and none otherwise. */
+function jobFiles(kind: string): JobFiles | null {
+	const sources = capturedChange();
+	const repository = INPUT_PATHS.repositoryRoot;
+	const head =
+		sources?.head ?? (existsSync(`${repository}/.git`) ? checkedOutCommit(repository) : null);
+	if (kind !== "scm.pull_request" || head === null) {
+		return null;
+	}
+	return { head: { revision: head }, change: sources };
+}
+
+/** The direct models the server bound for this job; none when it staged none or they do not parse. */
+function readBoundModels(): BoundModels {
+	if (!existsSync(PRACTICE_SCRIPT_MODELS_PATH)) {
+		return {};
+	}
+	try {
+		return boundModelsSchema.parse(parseJson(readFileSync(PRACTICE_SCRIPT_MODELS_PATH, "utf8")));
+	} catch (error) {
+		console.error(
+			`[pi-runner] the bound models do not parse, so none is bound: ${errorText(error)}`,
+		);
+		return {};
+	}
+}
+
 function loadPracticeSlugs(): string[] {
 	return practiceIndex.map((practice) => practice.slug).filter(Boolean);
 }
@@ -1774,9 +2117,7 @@ function persistPracticeCoverage() {
 	if (practiceCoverageLedger === null) {
 		throw new Error("practice coverage ledger is not initialized");
 	}
-	return practiceCoverageLedger.markEvaluated(
-		reviewState.observations.map((item) => item.practiceSlug),
-	);
+	return practiceCoverageLedger.markEvaluated([...reviewState.keys()]);
 }
 
 function logPracticeCoverage() {
@@ -1790,39 +2131,38 @@ function logPracticeCoverage() {
 
 /** What a private composer that reads instead of writing is told, at the exploration bound and near the budget's end. */
 const COMPOSITION_NUDGE =
-	`Stop reading: the admitted observations and the history are in this turn's prompt and in ` +
-	`work/composition/observations.json, and nothing else decides a unit. Persist the units you have ` +
+	`Stop reading: the admitted results with their observations and the history are in this turn's prompt and in ` +
+	`work/composition/results.json, and nothing else decides a unit. Persist the units you have ` +
 	`with report_feedback now — and a WITHHOLD with its reason for each NOT_MET practice you decided ` +
 	`to stay quiet about. Use tools only from this point onward; no planning prose.`;
 
 /** What the composer of the review on the work is told near its budget's end. */
 const REVIEW_NUDGE =
 	`Everything this review may rest on is in this session. Store the final review now with one report_review call: ` +
-	`first one decision for each NOT_MET observation, RAISE or a withholding reason, then the complete summary and ` +
-	`any line notes, which speak about each raised observation and no withheld one. ` +
-	`When read_practice is available, read a MET practice's complete reference first only if the review acknowledges it and that ` +
-	`reference is not yet in view. No prose outside the calls.`;
+	`first one decision for each NOT_MET result, RAISE or a withholding reason, then the complete summary and ` +
+	`any line notes, which speak about each raised result, itself or through its observations, and no withheld one. ` +
+	`No prose outside the calls.`;
 
 /** Calls a composition may make before its first recording call; at this one it is nudged to persist. */
 const COMPOSITION_EXPLORATION_NUDGE = 12;
 
 const PERSIST_DISCIPLINE =
-	`Record the outcome the evidence supports, MET, NOT_MET, NOT_APPLICABLE, or UNDETERMINED; there is no quota ` +
-	`and no next step to write. Use tools only from this point onward; no planning prose.`;
+	`Submit the outcome the evidence supports, MET, NOT_MET, NOT_APPLICABLE, or UNDETERMINED; there is no quota. ` +
+	`Use tools only from this point onward; no planning prose.`;
 
-/** What a turn is told once its remaining work only pays for recording what it owes. */
-const RECORD_NUDGE = `This turn has the work left to write its observations and no more. Stop exploring. Record what the inspected evidence supports for this session's practice with report_observation. ${PERSIST_DISCIPLINE}`;
+/** What a turn is told once its remaining work only pays for submitting what it owes. */
+const RECORD_NUDGE = `This turn has the work left to write its result and no more. Stop exploring. Submit what the inspected evidence supports for this session's practice with submit_result. ${PERSIST_DISCIPLINE}`;
 
 /**
- * The one request a measuring session gets when it ended on its own with its practice unrecorded. It goes to the
- * same session, which still holds what it read, and leaves a collection gap unrecorded.
+ * The one request a review session gets when it ended on its own with its practice's result unsubmitted. It goes
+ * to the same session, which still holds what it read, and leaves a collection gap unsubmitted.
  */
 function recordOnceMoreText(slug: string): string {
 	return (
-		`## Not recorded\nThis session ended without an observation for ${slug}: text outside a ` +
-		`report_observation call records nothing. Record the outcome its criterion and the evidence you read ` +
-		`support, in one report_observation call. If a required source is missing, truncated or blocked, that ` +
-		`is a collection gap: record nothing.`
+		`## Not recorded\nThis session ended without a result for ${slug}: text outside a ` +
+		`submit_result call records nothing. Submit the outcome its criterion and the evidence you read ` +
+		`support, in one submit_result call. If a required source is missing, truncated or blocked, that ` +
+		`is a collection gap: submit nothing.`
 	);
 }
 
@@ -1885,222 +2225,22 @@ console.error(
 );
 
 const COMPOSITION_REQUEST_PATH = INPUT_PATHS.compositionRequest;
-/**
- * Staged beside the request only when this attempt continues a review an earlier attempt admitted and lost the writer
- * of: what the server admitted then. Such an attempt assesses nothing; it composes the review on the work.
- */
-const CONTINUATION_PATH = nodePath.join(
-	nodePath.dirname(COMPOSITION_REQUEST_PATH),
-	"composition-continuation.json",
-);
 const FEEDBACK_PATH = outputPath(OUTPUT, "feedback.json");
 const COMPOSER_PROMPT_PATH = `${CWD}/feedback-composer.md`;
 const REVIEW_COMPOSER_PROMPT_PATH = `${CWD}/review-composer.md`;
 /** The writing style both compositions share, ahead of each one's own instructions. */
 const FEEDBACK_STYLE_PATH = `${CWD}/feedback-style.md`;
 const PREPARED_FEEDBACK_PATH = INPUT_PATHS.preparedFeedback;
-const COMPOSITION_OBSERVATIONS_PATH = `${CWD}/work/composition/observations.json`;
+const COMPOSITION_RESULTS_PATH = `${CWD}/work/composition/results.json`;
 const IN_APP_SUPPORT_PATH = `${CWD}/work/composition/in-app-support.json`;
 
-/** One occurrence an IN_APP card may cite, as the server selected it after admission. */
-interface InAppSupportOccurrence {
-	observationId: string;
-	artifactKind: string;
-	artifactId: number;
-	outcome: "NOT_MET";
-	origin: "LIVE" | "MANUAL" | "BACKFILL";
-	summary: string;
-	evidenceRationale: string | null;
-	evidence: unknown;
-	practiceRevisionId: number | null;
-	observedAt: string;
-}
-
-/** InAppRoutingDecision as the server decides it from the evidence, before any card is written. */
-const IN_APP_DECISIONS = [
-	"ADMIT",
-	"NO_EVIDENCE",
-	"UNCORROBORATED",
-	"PRACTICE_REQUIRES_APPROVAL",
-	"BACKFILL_HELD",
-	"RECENTLY_SURFACED",
-	"UNATTRIBUTABLE_SUBJECT",
-] as const;
-
-/** ConversationRoutingDecision, per admitted NOT_MET observation. */
-const IN_CHAT_DECISIONS = [
-	"ADMIT",
-	"NOT_DELIVERABLE",
-	"HAS_INLINE_ANCHOR",
-	"ALREADY_DELIVERED_IN_CONTEXT",
-	"REVIEWER_DEFERRED",
-	"PRACTICE_REQUIRES_APPROVAL",
-	"BACKFILL_QUIET",
-] as const;
-
-interface InAppPracticeSupport {
-	practiceSlug: string;
-	decision: (typeof IN_APP_DECISIONS)[number];
-	occurrences: InAppSupportOccurrence[];
-}
-
-/** The server's dated IN_APP support read; null until admission, and null when it arrived malformed. */
-type InAppSupport =
-	| { state: "COMPLETE"; readAt: string; practices: InAppPracticeSupport[] }
-	| { state: "UNAVAILABLE" | "REFUSED"; readAt: string; refusal: string | null };
 let inAppSupport: InAppSupport | null = null;
-
-/** The server's dated IN_CHAT routing read; null until admission, and null when it arrived malformed. */
-type InChatEligibility =
-	| {
-			state: "COMPLETE";
-			readAt: string;
-			observations: { observationId: string; decision: (typeof IN_CHAT_DECISIONS)[number] }[];
-	  }
-	| { state: "UNAVAILABLE" | "REFUSED"; readAt: string };
 let inChatEligibility: InChatEligibility | null = null;
 
 /** The open private lanes each NOT_MET practice is routed to; null until admission routed them. */
 let routedLanes: ReadonlyMap<string, readonly PrivateChannel[]> | null = null;
 
-function readSupportOccurrence(value: unknown): InAppSupportOccurrence | null {
-	if (
-		!isRecord(value) ||
-		typeof value.observationId !== "string" ||
-		value.observationId === "" ||
-		typeof value.artifactKind !== "string" ||
-		value.artifactKind === "" ||
-		typeof value.artifactId !== "number" ||
-		!Number.isSafeInteger(value.artifactId) ||
-		value.artifactId <= 0 ||
-		value.outcome !== "NOT_MET" ||
-		(value.origin !== "LIVE" && value.origin !== "MANUAL" && value.origin !== "BACKFILL") ||
-		typeof value.summary !== "string" ||
-		(value.evidenceRationale !== undefined &&
-			value.evidenceRationale !== null &&
-			typeof value.evidenceRationale !== "string") ||
-		(value.practiceRevisionId !== undefined &&
-			value.practiceRevisionId !== null &&
-			(typeof value.practiceRevisionId !== "number" ||
-				!Number.isSafeInteger(value.practiceRevisionId) ||
-				value.practiceRevisionId <= 0)) ||
-		typeof value.observedAt !== "string" ||
-		!Number.isFinite(Date.parse(value.observedAt))
-	) {
-		return null;
-	}
-	return {
-		observationId: value.observationId,
-		artifactKind: value.artifactKind,
-		artifactId: value.artifactId,
-		outcome: value.outcome,
-		origin: value.origin,
-		summary: value.summary,
-		evidenceRationale: value.evidenceRationale ?? null,
-		evidence: value.evidence ?? null,
-		practiceRevisionId: value.practiceRevisionId ?? null,
-		observedAt: value.observedAt,
-	};
-}
-
-/** Validates the support read beside the admission; anything else is no support context at all. */
-function readInAppSupport(
-	value: unknown,
-	current: readonly AdmittedObservation[],
-): InAppSupport | null {
-	if (
-		!isRecord(value) ||
-		typeof value.readAt !== "string" ||
-		!Number.isFinite(Date.parse(value.readAt))
-	) {
-		return null;
-	}
-	if (value.state === "UNAVAILABLE" || value.state === "REFUSED") {
-		if (
-			value.refusal !== undefined &&
-			value.refusal !== null &&
-			typeof value.refusal !== "string"
-		) {
-			return null;
-		}
-		return { state: value.state, readAt: value.readAt, refusal: value.refusal ?? null };
-	}
-	if (value.state !== "COMPLETE" || !Array.isArray(value.practices)) {
-		return null;
-	}
-	const practices: InAppPracticeSupport[] = [];
-	const expected = new Set(notMetPractices(current));
-	for (const practice of value.practices) {
-		const decision = isRecord(practice)
-			? IN_APP_DECISIONS.find((known) => known === practice.decision)
-			: undefined;
-		if (
-			!isRecord(practice) ||
-			typeof practice.practiceSlug !== "string" ||
-			!expected.delete(practice.practiceSlug) ||
-			decision === undefined ||
-			!Array.isArray(practice.occurrences) ||
-			// A practice the page refuses carries no support.
-			(decision !== "ADMIT" && practice.occurrences.length > 0)
-		) {
-			return null;
-		}
-		const occurrences = practice.occurrences.map(readSupportOccurrence);
-		if (!occurrences.every((occurrence) => occurrence !== null)) {
-			return null;
-		}
-		practices.push({ practiceSlug: practice.practiceSlug, decision, occurrences });
-	}
-	if (expected.size > 0) {
-		return null;
-	}
-	return { state: "COMPLETE", readAt: value.readAt, practices };
-}
-
-/** Validates the IN_CHAT routing beside the admission: one decision for each admitted NOT_MET observation, or none. */
-function readInChatEligibility(
-	value: unknown,
-	current: readonly AdmittedObservation[],
-): InChatEligibility | null {
-	if (
-		!isRecord(value) ||
-		typeof value.readAt !== "string" ||
-		!Number.isFinite(Date.parse(value.readAt)) ||
-		!Array.isArray(value.observations)
-	) {
-		return null;
-	}
-	if (value.state === "UNAVAILABLE" || value.state === "REFUSED") {
-		return value.observations.length === 0 ? { state: value.state, readAt: value.readAt } : null;
-	}
-	if (value.state !== "COMPLETE") {
-		return null;
-	}
-	const expected = new Set(
-		current
-			.filter((observation) => observation.outcome === "NOT_MET")
-			.map((observation) => observation.id),
-	);
-	const observations: { observationId: string; decision: (typeof IN_CHAT_DECISIONS)[number] }[] =
-		[];
-	for (const route of value.observations) {
-		const decision = isRecord(route)
-			? IN_CHAT_DECISIONS.find((known) => known === route.decision)
-			: undefined;
-		if (
-			!isRecord(route) ||
-			typeof route.observationId !== "string" ||
-			!expected.delete(route.observationId) ||
-			decision === undefined
-		) {
-			return null;
-		}
-		observations.push({ observationId: route.observationId, decision });
-	}
-	return expected.size === 0 ? { state: "COMPLETE", readAt: value.readAt, observations } : null;
-}
-
-/** Whether the server's read after admission routes the practice's NOT_MET observations to the lane. */
+/** Whether the server's read after admission routes the practice's NOT_MET result to the lane. */
 function routedTo(channel: PrivateChannel, practiceSlug: string): boolean {
 	if (channel === "IN_APP") {
 		return (
@@ -2114,19 +2254,19 @@ function routedTo(channel: PrivateChannel, practiceSlug: string): boolean {
 		return false;
 	}
 	const admitted = new Set(
-		inChatEligibility.observations
+		inChatEligibility.results
 			.filter((route) => route.decision === "ADMIT")
-			.map((route) => route.observationId),
+			.map((route) => route.practiceResultId),
 	);
-	return admittedObservations.some(
-		(observation) =>
-			observation.practiceSlug === practiceSlug &&
-			observation.outcome === "NOT_MET" &&
-			admitted.has(observation.id),
+	return admittedResults.some(
+		(result) =>
+			result.practiceSlug === practiceSlug &&
+			result.outcome === "NOT_MET" &&
+			admitted.has(result.practiceResultId),
 	);
 }
 
-/** Why the server routes none of the practice's NOT_MET observations to the lane, in its own words. */
+/** Why the server routes none of the practice's NOT_MET results to the lane, in its own words. */
 function laneRefusal(channel: PrivateChannel, practiceSlug: string): string {
 	if (channel === "IN_APP") {
 		const decision =
@@ -2137,14 +2277,14 @@ function laneRefusal(channel: PrivateChannel, practiceSlug: string): string {
 		return decision ?? "not routed";
 	}
 	const ids = new Set(
-		admittedObservations
-			.filter((observation) => observation.practiceSlug === practiceSlug)
-			.map((observation) => observation.id),
+		admittedResults
+			.filter((result) => result.practiceSlug === practiceSlug)
+			.map((result) => result.practiceResultId),
 	);
 	const decisions =
 		inChatEligibility?.state === "COMPLETE"
-			? inChatEligibility.observations
-					.filter((route) => ids.has(route.observationId))
+			? inChatEligibility.results
+					.filter((route) => ids.has(route.practiceResultId))
 					.map((route) => route.decision)
 			: [];
 	return decisions.length > 0 ? [...new Set(decisions)].join(", ") : "not routed";
@@ -2179,11 +2319,14 @@ interface ConversationNotes {
 	alreadySaid?: string;
 }
 
-/** A private-lane unit as read; per-unit validation in readFeedbackUnit/validateUnit. */
-interface FeedbackUnit extends ComposedFeedbackUnit {
+/**
+ * A private-lane unit; per-unit validation in readFeedbackUnit/validateUnit. As read, basedOn holds the ids the
+ * composer named; as stored, the references they resolve to.
+ */
+interface FeedbackUnitOf<Basis> extends ComposedFeedbackUnit {
 	channel: PrivateChannel;
 	practiceSlug: string;
-	basedOn: string[];
+	basedOn: Basis;
 	action: FeedbackAction;
 	supersedesThreadKey?: string;
 	withholdReason?: string;
@@ -2192,8 +2335,10 @@ interface FeedbackUnit extends ComposedFeedbackUnit {
 	nextStep?: string;
 	notes?: ConversationNotes;
 }
+type ReadFeedbackUnit = FeedbackUnitOf<string[]>;
+type FeedbackUnit = FeedbackUnitOf<EvidenceRef[]>;
 
-/** The observation fields the composer is shown: enough to reference one, never enough to author one. */
+/** The admitted fields the server resolves references against: enough to reference one, never enough to author one. */
 interface LeanCitation {
 	index: number;
 	sourceKind: unknown;
@@ -2204,13 +2349,18 @@ interface LeanCitation {
 	anchorable: unknown;
 }
 
-interface LeanObservation {
-	id: string;
+interface LeanResult {
+	practiceResultId: string;
 	practiceSlug: string;
-	outcome: unknown;
+	outcome: Outcome;
 	severity: unknown;
-	anchorable: unknown;
 	citations: LeanCitation[];
+	observations: {
+		observationId: string;
+		severity: unknown;
+		anchorable: unknown;
+		citations: LeanCitation[];
+	}[];
 }
 
 /** What gets written to feedback.json, with the fields the reader resolves references against. */
@@ -2234,7 +2384,7 @@ interface ComposedFeedback extends ComposedFeedbackEnvelope {
 	compositionFailures: CompositionFailure[];
 	contractVersion: number;
 	admissionDigest: string | null;
-	observations: LeanObservation[];
+	results: LeanResult[];
 	preparedTargets: PreparedFeedbackTarget[];
 	units: FeedbackUnit[];
 	review: ComposedReview | null;
@@ -2245,17 +2395,17 @@ const composedFeedback: ComposedFeedback = {
 	compositionFailures: [],
 	contractVersion: REVIEW_CONTRACT_VERSION,
 	admissionDigest: null,
-	observations: [],
+	results: [],
 	preparedTargets: [],
 	units: [],
 	review: null,
 };
 
 /**
- * Admission assigns observation IDs and anchor eligibility. Populate this captured array in place
+ * Admission assigns result and observation IDs and anchor eligibility. Populate this captured array in place
  * because the composer tool is created before admission.
  */
-const admittedObservations: AdmittedObservation[] = [];
+const admittedResults: AdmittedResult[] = [];
 
 function isPlacementKind(value: unknown): value is PlacementKind {
 	return value === "DIFF" || value === "ARTIFACT";
@@ -2386,24 +2536,39 @@ function stagedDeliveredPractices(): Set<string> {
 	}
 }
 
-// Inline placement requires a citation inside the current diff.
-function leanObservations(observations: readonly AdmittedObservation[]): LeanObservation[] {
-	return observations.map((observation) => ({
-		id: observation.id,
-		practiceSlug: observation.practiceSlug,
-		outcome: observation.outcome,
-		severity: observation.severity,
-		anchorable: observation.anchorable,
-		citations: observation.citations.map((citation): LeanCitation => ({
-			index: citation.index,
-			sourceKind: citation.sourceKind,
-			path: citation.path,
-			side: citation.side,
-			startLine: citation.startLine,
-			endLine: citation.endLine,
-			anchorable: citation.anchorable,
+function leanCitation(citation: AdmittedCitation): LeanCitation {
+	return {
+		index: citation.index,
+		sourceKind: citation.sourceKind,
+		path: citation.path,
+		side: citation.side,
+		startLine: citation.startLine,
+		endLine: citation.endLine,
+		anchorable: citation.anchorable,
+	};
+}
+
+// Inline placement requires an observation's citation inside the current diff.
+function leanResults(results: readonly AdmittedResult[]): LeanResult[] {
+	return results.map((result) => ({
+		practiceResultId: result.practiceResultId,
+		practiceSlug: result.practiceSlug,
+		outcome: result.outcome,
+		severity: result.severity,
+		citations: result.citations.map(leanCitation),
+		observations: result.observations.map((observation) => ({
+			observationId: observation.observationId,
+			severity: observation.severity,
+			// The server places a line note only on an observation that admission marked anchorable.
+			anchorable: observation.anchorable,
+			citations: observation.citations.map(leanCitation),
 		})),
 	}));
+}
+
+/** The admitted results by practiceResultId: what an id the composer names is resolved against. */
+function resultsById(results: readonly AdmittedResult[]): Map<string, AdmittedResult> {
+	return new Map(results.map((result) => [result.practiceResultId, result]));
 }
 
 function persistComposedFeedback(): void {
@@ -2424,7 +2589,7 @@ function persistComposedFeedback(): void {
 	writeFileSync(FEEDBACK_PATH, JSON.stringify({ ...composedFeedback, units }, null, 2));
 }
 
-// The composer references admitted observations; it cannot author verdicts, citations, or locations.
+// The composer references admitted results and observations; it cannot author verdicts, citations, or locations.
 /** What report_feedback reports back: a refusal stores nothing and names no lane. */
 interface ReportFeedbackDetails {
 	stored: number;
@@ -2440,7 +2605,7 @@ function skipped(text: string): { stored: boolean; text: string } {
 function buildFeedbackTool(
 	practiceSlugs: string[],
 	request: CompositionRequest,
-	observations: readonly AdmittedObservation[],
+	results: readonly AdmittedResult[],
 	preparedTargets: PreparedFeedbackTarget[],
 	deliveredPractices: ReadonlySet<string>,
 ) {
@@ -2454,15 +2619,13 @@ function buildFeedbackTool(
 	/** One unit stored, or the reason it was not. */
 	const store = (value: unknown): { stored: boolean; text: string } => {
 		const repairs: string[] = [];
-		const read = readFeedbackUnit(withholdBasis(value, observations, repairs), practiceSlugs);
+		const read = readFeedbackUnit(withholdBasis(value, results, repairs), practiceSlugs);
 		if (typeof read === "string") {
 			return { stored: false, text: read };
 		}
 		const unit = read;
-		// Built per call: the tool is defined before admission fills the observations it reads.
-		const observationsById = new Map(
-			observations.map((observation) => [observation.id, observation]),
-		);
+		// Built per call: the tool is defined before admission fills the results it reads.
+		const admitted = resultsById(results);
 		const bounds = request.channels[unit.channel];
 		if (!bounds.enabled) {
 			return skipped(
@@ -2481,7 +2644,7 @@ function buildFeedbackTool(
 				`${unit.channel} holds at most ${bounds.maxUnits} unit(s) and is full: this one does not fit — WITHHOLD it with BELOW_BAR or leave it out. Skipped.`,
 			);
 		}
-		const rejection = validateUnit(unit, observationsById, preparedTargets, deliveredPractices);
+		const rejection = validateUnit(unit, admitted, preparedTargets, deliveredPractices);
 		if (rejection !== null) {
 			return skipped(rejection);
 		}
@@ -2492,7 +2655,7 @@ function buildFeedbackTool(
 					`(${laneRefusal(unit.channel, unit.practiceSlug)}); write no unit for it there, not even a WITHHOLD. Skipped.`,
 			);
 		}
-		// IN_APP pattern feedback requires NOT_MET observations on distinct pieces of work.
+		// IN_APP pattern feedback requires NOT_MET results on distinct pieces of work.
 		if (unit.channel === "IN_APP" && delivers) {
 			const pieces = negativePiecesOfWork(unit.practiceSlug);
 			if (pieces < request.minDistinctArtifacts) {
@@ -2507,7 +2670,10 @@ function buildFeedbackTool(
 		if (delivers) {
 			usedPerChannel[unit.channel] += 1;
 		}
-		composedFeedback.units.push(unit);
+		composedFeedback.units.push({
+			...unit,
+			basedOn: evidenceRefs(unit.basedOn, namedEvidence(admitted)),
+		});
 		return {
 			stored: true,
 			text: `stored a ${unit.channel} unit for ${unit.practiceSlug} (${unit.action}); ${usedPerChannel[unit.channel]}/${bounds.maxUnits} used on that lane.${repairs.map((repair) => ` ${repair}.`).join("")}`,
@@ -2545,14 +2711,14 @@ function buildFeedbackTool(
 									type: "string",
 									enum: practiceSlugs,
 									description:
-										"The primary practice whose intervention this unit advances. Related observations may support it.",
+										"The primary practice whose intervention this unit advances. Related results may support it.",
 								},
 								basedOn: {
 									type: "array",
 									minItems: 1,
 									items: { type: "string", minLength: 1 },
 									description:
-										"What this rests on: admitted observation ids from this run. Include related practices only when they describe the same underlying event.",
+										"What this rests on: admitted ids from this run, a result's practiceResultId or, for one located problem, an observation's observationId. Include related practices only when they describe the same underlying event.",
 								},
 								action: {
 									type: "string",
@@ -2578,7 +2744,7 @@ function buildFeedbackTool(
 									type: "string",
 									maxLength: FEEDBACK_TEXT_BOUNDS.body,
 									description:
-										"IN_APP only: the evidenced pattern across the work and why it matters; the future way of working belongs to nextStep. Grounded in current observations; never quote a line or claim change over time from the pre-run history. Markdown, read verbatim.",
+										"IN_APP only: the evidenced pattern across the work and why it matters; the future way of working belongs to nextStep. Grounded in current results and their observations; never quote a line or claim change over time from the pre-run history. Markdown, read verbatim.",
 								},
 								nextStep: {
 									type: "string",
@@ -2615,7 +2781,7 @@ function buildFeedbackTool(
 											maxLength: FEEDBACK_TEXT_BOUNDS.evidenceSummary,
 											description:
 												"Where the concern occurred, compactly: each supporting work and observation located once. " +
-												"Summarise rather than inventing a quote; the original observation evidence is " +
+												"Summarise rather than inventing a quote; the original result evidence is " +
 												"staged separately for the mentor to inspect.",
 										},
 										inConversationSignal: {
@@ -2645,7 +2811,7 @@ function buildFeedbackTool(
 					content: [
 						{
 							type: "text",
-							text: "Feedback composition opens only after Java admits the completed observations.",
+							text: "Feedback composition opens only after Java admits the completed results.",
 						},
 					],
 					details: { stored: 0 },
@@ -2689,39 +2855,32 @@ interface ReportReviewDetails {
 	stored: number;
 }
 
-interface ReadPracticeDetails {
-	shown: boolean;
-}
-
 /**
- * Once final, both tools refuse every call: one response can carry several calls after the final one.
- * A tool answer reaches a subsequent model decision, never another call in the same batch: what an answer shows is
- * pending until the next turn starts, and a completed compaction takes everything out of view.
+ * Once final, the tool refuses every call: one response can carry several calls after the final one. A completed
+ * compaction takes the opening reference out of view, and the next turn restores it before a review is accepted.
  */
 interface PublicReviewState {
 	final: boolean;
 	reviewContext: "LOST" | "RESTORING" | "HELD";
-	/** Complete MET grounds and standards shown by read_practice, for restoration. */
-	consulted: Map<string, string>;
-	/** The practices whose complete MET reference the model could read when it made its current decision. */
-	inView: Set<string>;
-	/** Shown in the current batch; in view from the next turn. */
-	pending: Set<string>;
 }
 
+/** The public results the review may rest on, by practiceResultId, each with its observations' citations. */
 function reviewableById(
 	reviewable: readonly Record<string, unknown>[],
-): Map<string, ReviewedObservation> {
+): Map<string, ReviewedResult> {
 	return new Map(
-		reviewable.map((observation) => [
-			String(observation.id),
+		reviewable.map((result) => [
+			String(result.practiceResultId),
 			{
-				practiceSlug: String(observation.practiceSlug),
-				summaryOnly: observation.summaryOnly === true,
-				outcome: observation.outcome,
-				citations: Array.isArray(observation.citations)
-					? observation.citations.filter((citation: unknown) => isRecord(citation))
-					: [],
+				practiceSlug: String(result.practiceSlug),
+				summaryOnly: result.summaryOnly === true,
+				outcome: result.outcome,
+				observations: jsonArray(result.observations)
+					.filter(isRecord)
+					.map((observation) => ({
+						observationId: String(observation.observationId),
+						citations: jsonArray(observation.citations).filter(isRecord),
+					})),
 			},
 		]),
 	);
@@ -2730,85 +2889,12 @@ function reviewableById(
 const REVIEW_FINAL = "The review on this work is final; this composition accepts nothing more.";
 
 /**
- * Shows one MET practice's complete reference beside its permitted MET observations, and
- * nothing else: no path, no other practice, nothing private. A read that is missing, fails or is empty shows that
- * and puts nothing in view.
- */
-function buildPracticeTool(
-	reviewable: readonly Record<string, unknown>[],
-	standardOf: (slug: string) => { text: string; whole: boolean },
-	context: {
-		practices: readonly ReviewPractice[];
-		history: readonly OwnPriorFeedback[];
-		reviewedRevision: string | null;
-	},
-	state: PublicReviewState,
-	restore: () => string,
-) {
-	const readable = new Set(readablePractices(reviewable));
-	return defineTool({
-		name: "read_practice",
-		exposure: "model-only",
-		label: "Read Practice",
-		description: READ_PRACTICE_TOOL_DESCRIPTION,
-		parameters: readPracticeParameters([...readable]),
-		execute: async (toolCallId, params): Promise<AgentToolResult<ReadPracticeDetails>> => {
-			if (!compositionAdmitted) {
-				return refusal<ReadPracticeDetails>(
-					toolCallId,
-					"Feedback composition opens only after Java admits the completed observations.",
-				);
-			}
-			if (state.final) {
-				return refusal<ReadPracticeDetails>(toolCallId, REVIEW_FINAL);
-			}
-			const slug =
-				isRecord(params) && typeof params.practiceSlug === "string"
-					? params.practiceSlug.trim()
-					: "";
-			if (!readable.has(slug)) {
-				const offered = readable.size > 0 ? [...readable].join(", ") : "none";
-				return refusal<ReadPracticeDetails>(
-					toolCallId,
-					`${slug === "" ? "practiceSlug is required" : `${slug} is not a practice with a MET observation this review may acknowledge`}; read_practice shows only: ${offered}`,
-				);
-			}
-			const restored = state.reviewContext === "LOST" ? `${restore()}\n\n` : "";
-			const standard = standardOf(slug);
-			const consulted = consultedStandard(
-				standard.text,
-				slug,
-				reviewable,
-				context.practices,
-				context.history,
-				context.reviewedRevision,
-			);
-			if (standard.whole) {
-				state.consulted.set(slug, consulted);
-				state.pending.add(slug);
-			}
-			return {
-				content: [
-					{
-						type: "text",
-						text: standard.whole
-							? `${restored}${STANDARD_REFERENCE}\n${consulted}\nThis standard is in view from your next turn.`
-							: `${restored}${standard.text}\nWithout its standard, no acknowledgement of this practice can be stored.`,
-					},
-				],
-				details: { shown: standard.whole },
-			};
-		},
-	});
-}
-
-/**
- * Reads the review against only the observations admission marked publicEligible, the statements shown as already
- * said, and the standards in view when the model wrote it.
+ * Reads the review against only the NOT_MET results admission marked publicEligible and their observations, and the
+ * statements shown as already said.
  */
 function buildReviewTool(
 	lineNotes: boolean,
-	restable: ReadonlyMap<string, ReviewedObservation>,
+	restable: ReadonlyMap<string, ReviewedResult>,
 	witnesses: ReturnType<typeof priorAdviceWitnesses>,
 	state: PublicReviewState,
 	restore: () => string,
@@ -2830,7 +2916,7 @@ function buildReviewTool(
 			if (!compositionAdmitted) {
 				return refusal<ReportReviewDetails>(
 					toolCallId,
-					"Feedback composition opens only after Java admits the completed observations.",
+					"Feedback composition opens only after Java admits the completed results.",
 				);
 			}
 			if (state.final) {
@@ -2844,10 +2930,7 @@ function buildReviewTool(
 					`review refused, nothing was stored: the session's context was compacted. Use the restored review reference in the next model turn before storing the review.${restored}\nSend the whole review again.`,
 				);
 			}
-			const read = readReview(params, restable, lineNotes, {
-				witnesses,
-				standardsInView: state.inView,
-			});
+			const read = readReview(params, restable, lineNotes, { witnesses });
 			if ("errors" in read) {
 				return refusal<ReportReviewDetails>(
 					toolCallId,
@@ -2870,7 +2953,7 @@ function buildReviewTool(
 			}
 			const { summary, inline, withheld } = read.review;
 			const said = summary
-				? `a summary resting on ${summary.basedOn.length} observation(s)`
+				? `a summary resting on ${summary.basedOn.length} result(s) and observation(s)`
 				: "no summary";
 			return {
 				content: [
@@ -2886,26 +2969,26 @@ function buildReviewTool(
 	});
 }
 
-/** The NOT_MET observations the review may rest on that it neither says nor withholds. */
+/** The NOT_MET results the review may rest on that it neither says nor withholds. */
 function undecidedByReview(reviewable: readonly Record<string, unknown>[]): string[] {
 	const decided = decidedByReview(composedFeedback.review);
 	return reviewable
-		.filter((observation) => observation.outcome === "NOT_MET")
-		.map((observation) => String(observation.id))
+		.filter((result) => result.outcome === "NOT_MET")
+		.map((result) => String(result.practiceResultId))
 		.filter((id) => !decided.has(id));
 }
 
 function finishReviewText(undecided: readonly string[]): string {
 	const owed =
 		undecided.length > 0
-			? `## Undecided\nThe review leaves these NOT_MET observations undecided: ${undecided.join(", ")}.`
+			? `## Undecided\nThe review leaves these NOT_MET results undecided: ${undecided.join(", ")}.`
 			: "## Unfinished\nThe review on this work is not final yet.";
 	return `${owed}\nStore the final review with one report_review call. A review that says nothing is still one final report_review call. No prose outside the calls.`;
 }
 
-/** Explanatory context on each practice the review's observations were measured against, from the staged index. */
-function practiceContext(observations: readonly Record<string, unknown>[]): ReviewPractice[] {
-	const slugs = new Set(observations.map((observation) => String(observation.practiceSlug)));
+/** Explanatory context on each practice the review's results were measured against, from the staged index. */
+function practiceContext(results: readonly Record<string, unknown>[]): ReviewPractice[] {
+	const slugs = new Set(results.map((result) => String(result.practiceSlug)));
 	return practiceIndex
 		.filter((practice) => slugs.has(practice.slug))
 		.map((practice) => ({
@@ -2991,12 +3074,12 @@ function boundedText(
 
 /** Validate one feedback item; the outer tool schema intentionally permits partial batch success. */
 /**
- * A WITHHOLD sent with no basedOn rests on its practice's NOT_MET observations, the only ones it can
- * withhold: they are filled in, and said so.
+ * A WITHHOLD sent with no basedOn rests on its practice's NOT_MET result, the only one it can withhold: it is filled
+ * in, and said so.
  */
 function withholdBasis(
 	value: unknown,
-	observations: readonly AdmittedObservation[],
+	results: readonly AdmittedResult[],
 	repairs: string[],
 ): unknown {
 	if (
@@ -3007,17 +3090,20 @@ function withholdBasis(
 		return value;
 	}
 	const slug = normalizePracticeSlug(value.practiceSlug);
-	const ids = observations
-		.filter((observation) => observation.practiceSlug === slug && observation.outcome === "NOT_MET")
-		.map((observation) => observation.id);
+	const ids = results
+		.filter((result) => result.practiceSlug === slug && result.outcome === "NOT_MET")
+		.map((result) => result.practiceResultId);
 	if (ids.length === 0) {
 		return value;
 	}
-	repairs.push(`basedOn filled in with ${slug}'s NOT_MET observation(s) ${ids.join(", ")}`);
+	repairs.push(`basedOn filled in with ${slug}'s NOT_MET result ${ids.join(", ")}`);
 	return { ...value, basedOn: ids };
 }
 
-function readFeedbackUnit(value: unknown, practiceSlugs: readonly string[]): FeedbackUnit | string {
+function readFeedbackUnit(
+	value: unknown,
+	practiceSlugs: readonly string[],
+): ReadFeedbackUnit | string {
 	if (!isRecord(value)) {
 		return `each item of units is one unit object with channel, practiceSlug, basedOn and action (received ${typeof value}); skipped.`;
 	}
@@ -3046,7 +3132,7 @@ function readFeedbackUnit(value: unknown, practiceSlugs: readonly string[]): Fee
 		return "practiceSlug is required; skipped.";
 	}
 	if (!practiceSlugs.includes(practiceSlug)) {
-		return `practiceSlug '${practiceSlug}' is not a practice with an admitted observation in this run (those are: ${practiceSlugs.join(", ")}); skipped.`;
+		return `practiceSlug '${practiceSlug}' is not a practice with an admitted result in this run (those are: ${practiceSlugs.join(", ")}); skipped.`;
 	}
 	// One id sent bare is the list of one; the reader drops a unit that cites nothing, so admitting an
 	// empty list here would tell the session it succeeded and then deliver nothing.
@@ -3054,7 +3140,7 @@ function readFeedbackUnit(value: unknown, practiceSlugs: readonly string[]): Fee
 		(reference): reference is string => typeof reference === "string" && reference.trim() !== "",
 	);
 	if (basedOn.length === 0) {
-		return "basedOn is required: the admitted observation id(s) this unit rests on; skipped.";
+		return "basedOn is required: the admitted result or observation id(s) this unit rests on; skipped.";
 	}
 	let withholdReason: string | undefined;
 	if (value.withholdReason !== undefined && value.withholdReason !== null) {
@@ -3148,7 +3234,7 @@ function negativePiecesOfWork(practiceSlug: string): number {
 }
 
 /** The IN_CHAT lane: notes to the mentor, and nothing that would be read out. */
-function validateChatUnit(unit: FeedbackUnit): string | null {
+function validateChatUnit(unit: ReadFeedbackUnit): string | null {
 	if (hasText(unit.body) || hasText(unit.nextStep)) {
 		return "IN_CHAT takes notes{situation,capability,evidenceSummary,inConversationSignal}, not body/nextStep - nothing on this lane is read out; skipped.";
 	}
@@ -3166,22 +3252,29 @@ function validateChatUnit(unit: FeedbackUnit): string | null {
 	return null;
 }
 
-/** The IN_APP lane: a body about a pattern across work, never a quote of this work. */
+/**
+ * The IN_APP lane: a body about a pattern across work, never a quote of this work. Every quote of a result the unit
+ * rests on counts, its own and its observations', whichever of its ids the unit names.
+ */
 function validateAppUnit(
-	unit: FeedbackUnit,
-	observationsById: ReadonlyMap<string, AdmittedObservation>,
+	unit: ReadFeedbackUnit,
+	named: ReadonlyMap<string, { result: AdmittedResult }>,
 ): string | null {
 	const { body } = unit;
 	if (!hasText(body?.trim())) {
 		return "IN_APP needs a body; skipped.";
 	}
 	const normalizedBody = normalizeQuotedText(body);
-	const repeatsCurrentEvidence = unit.basedOn.some((id) =>
-		(observationsById.get(id)?.citations ?? []).some((citation) => {
+	const repeatsCurrentEvidence = unit.basedOn.some((id) => {
+		const result = named.get(id)?.result;
+		return [
+			...(result?.citations ?? []),
+			...(result?.observations ?? []).flatMap((observation) => observation.citations),
+		].some((citation) => {
 			const quote = normalizeQuotedText(optionalString(citation.quote) ?? "");
 			return quote.length >= 12 && normalizedBody.includes(quote);
-		}),
-	);
+		});
+	});
 	if (repeatsCurrentEvidence) {
 		return "IN_APP describes a cross-artifact pattern; do not copy a current artifact quote into it. Skipped.";
 	}
@@ -3189,15 +3282,16 @@ function validateAppUnit(
 }
 
 function validateUnit(
-	unit: FeedbackUnit,
-	observationsById: ReadonlyMap<string, AdmittedObservation>,
+	unit: ReadFeedbackUnit,
+	results: ReadonlyMap<string, AdmittedResult>,
 	preparedTargets: readonly PreparedFeedbackTarget[],
 	deliveredPractices: ReadonlySet<string>,
 ): string | null {
-	const evidenceError = validateFeedbackEvidence(unit.practiceSlug, unit.basedOn, observationsById);
+	const evidenceError = validateFeedbackEvidence(unit.practiceSlug, unit.basedOn, results);
 	if (evidenceError !== null) {
 		return evidenceError;
 	}
+	const named = namedEvidence(results);
 	if (unit.action === "WITHHOLD") {
 		const reason = unit.withholdReason;
 		if (!hasText(reason)) {
@@ -3205,10 +3299,7 @@ function validateUnit(
 		}
 		// The withholding settles each NOT_MET practice in basedOn (undecidedPrivatePractices), so each needs a record here.
 		const unrecorded = notMetPractices(
-			unit.basedOn.flatMap((id) => {
-				const observation = observationsById.get(id);
-				return observation === undefined ? [] : [observation];
-			}),
+			unit.basedOn.flatMap((id) => named.get(id)?.result ?? []),
 		).filter((slug) => !deliveredPractices.has(`${unit.channel}:${slug}`));
 		if ([...PRIOR_ADVICE_REASONS].some((prior) => prior === reason) && unrecorded.length > 0) {
 			return (
@@ -3247,7 +3338,7 @@ function validateUnit(
 	if (isBlank(unit.nextStep)) {
 		return `${unit.channel} needs a nextStep; skipped.`;
 	}
-	return validateAppUnit(unit, observationsById);
+	return validateAppUnit(unit, named);
 }
 
 function normalizeQuotedText(value: string): string {
@@ -3260,30 +3351,51 @@ function normalizeQuotedText(value: string): string {
 		.toLowerCase();
 }
 
-/** Omit duplicated quotes and verification digests; the full admission record remains on disk. */
-function composerView(observation: AdmittedObservation): Record<string, unknown> {
-	const citations = observation.citations.map(
-		({ quote: _quote, verification: _verification, ...citation }) => citation,
-	);
-	// An abstention keeps the limit it recorded and its ids; its summary and rationale may assert more than it decided.
-	if (observation.outcome !== "NOT_MET" && observation.outcome !== "MET") {
-		const { id, practiceSlug, outcome } = observation;
-		return { id, practiceSlug, outcome, evidence: qualificationEvidence(observation), citations };
+/** A citation by its coordinates: its quote and verification digests stay in the full admission record on disk. */
+function coordinatesOf(citation: unknown): unknown {
+	if (!isRecord(citation)) {
+		return citation;
+	}
+	const { quote: _quote, verification: _verification, ...coordinates } = citation;
+	return coordinates;
+}
+
+/**
+ * One admitted result as the private composer sees it, with its observations nested: every citation by its
+ * coordinates only. An abstention keeps the limit it recorded and its id; its summary and rationale may assert more
+ * than it decided.
+ */
+function composerView(result: AdmittedResult): Record<string, unknown> {
+	const citations = result.citations.map(coordinatesOf);
+	if (result.outcome !== "NOT_MET" && result.outcome !== "MET") {
+		const { practiceResultId, practiceSlug, outcome } = result;
+		return {
+			practiceResultId,
+			practiceSlug,
+			outcome,
+			evidence: qualificationEvidence(result),
+			citations,
+		};
 	}
 	// MET counterevidence keeps the same qualifications as NOT_MET.
-	const { evidence, citations: _admitted, ...rest } = observation;
-	const { citations: _measured, ...branches } = isRecord(evidence) ? evidence : {};
+	const { citations: _admitted, example, observations, ...rest } = result;
 	return {
 		...rest,
-		...(Object.keys(branches).length > 0 ? { evidence: branches } : {}),
+		...(isRecord(example)
+			? { example: { ...example, citation: coordinatesOf(example.citation) } }
+			: {}),
 		citations,
+		observations: observations.map((observation) => ({
+			...observation,
+			citations: observation.citations.map(coordinatesOf),
+		})),
 	};
 }
 
 const COMPOSITION_BLOCK_LIMIT = 32_000;
 
 /** A staged file as a titled block of the composition turn, or a pointer to it when it is too large. */
-function shown(label: string, file: string, limit = COMPOSITION_BLOCK_LIMIT): string {
+function stagedBlock(label: string, file: string, limit = COMPOSITION_BLOCK_LIMIT): string {
 	if (!existsSync(file)) {
 		return "";
 	}
@@ -3294,15 +3406,15 @@ function shown(label: string, file: string, limit = COMPOSITION_BLOCK_LIMIT): st
 }
 
 /**
- * The complete staged criteria of each practice with a NOT_MET observation: feedback addresses the standard that was
+ * The complete staged criteria of each practice with a NOT_MET result: feedback addresses the standard that was
  * assessed. The measuring leads and source directives belong to assessment and stay out. Each is shown whole, named
  * with where to read it when too large, or named as not staged or not readable; never cut.
  */
 function notMetCriteria(
-	observations: readonly AdmittedObservation[],
+	results: readonly AdmittedResult[],
 	limit = COMPOSITION_BLOCK_LIMIT,
 ): string {
-	return notMetPractices(observations)
+	return notMetPractices(results)
 		.map((slug) => {
 			const file = criteriaPathOf(slug);
 			if (!existsSync(file)) {
@@ -3393,7 +3505,7 @@ function plannedReviewFacts(): string {
 
 function buildCompositionTurn(
 	request: CompositionRequest,
-	observations: readonly AdmittedObservation[],
+	results: readonly AdmittedResult[],
 	notReached: readonly string[] = [],
 ): string {
 	const lanes = PRIVATE_CHANNELS.filter((channel) => request.channels[channel].enabled)
@@ -3411,14 +3523,20 @@ function buildCompositionTurn(
 					.join(", ")}`,
 		)
 		.join("; ");
-	const admitted = JSON.stringify({ observations: observations.map(composerView) }, null, 1);
+	const admitted = JSON.stringify({ results: results.map(composerView) }, null, 1);
 	const onTheWork = plannedReviewFacts();
 	const historyRoot = nodePath.dirname(PREPARED_FEEDBACK_PATH);
 	const context = [
-		shown("The composition request (lanes, caps, placements)", COMPOSITION_REQUEST_PATH),
-		shown("What earlier reviews recorded about this person", `${historyRoot}/observations.json`),
+		stagedBlock("The composition request (lanes, caps, placements)", COMPOSITION_REQUEST_PATH),
+		stagedBlock(
+			"What earlier reviews recorded about this person",
+			`${historyRoot}/observations.json`,
+		),
 		request.channels.IN_APP.enabled
-			? shown("IN_APP support: occurrences a new card may cite at this read", IN_APP_SUPPORT_PATH)
+			? stagedBlock(
+					"IN_APP support: occurrences a new card may cite at this read",
+					IN_APP_SUPPORT_PATH,
+				)
 			: "",
 		priorFeedbackFacts("Recorded delivered feedback", `${historyRoot}/feedback.json`, "feedback"),
 		priorFeedbackFacts(
@@ -3430,9 +3548,9 @@ function buildCompositionTurn(
 		.filter((block) => block !== "")
 		.join("\n");
 	return `## This turn
-The review just finished. The criteria its NOT_MET practices were assessed against come first, as staged; its ${observations.length} admitted measurement(s) follow them. The MET and NOT_MET ones carry their rationale and their citations by coordinates; the abstentions carry the limit they recorded, an open question or why the practice did not apply, and their citations by coordinates. The full record, quoted lines included, is \`work/composition/observations.json\`. The history follows them.
+The review just finished. The criteria its NOT_MET practices were assessed against come first, as staged; its ${results.length} admitted result(s) follow them, one per practice. The MET and NOT_MET ones carry their rationale and their citations by coordinates; each NOT_MET one also carries its observations, the located problems it found, each with its own citations. The abstentions carry the limit they recorded, an open question or why the practice did not apply, and their citations by coordinates. The full record, quoted lines included, is \`work/composition/results.json\`. The history follows them.
 
-${notMetCriteria(observations)}
+${notMetCriteria(results)}
 \`\`\`json
 ${admitted}
 \`\`\`
@@ -3479,7 +3597,7 @@ async function answerText(response: Response): Promise<string> {
 async function postAdmission(): Promise<unknown> {
 	let response: Response;
 	try {
-		response = await fetch(`${LLM_PROXY_URL}/admit-observations`, {
+		response = await fetch(`${LLM_PROXY_URL}/admit-results`, {
 			method: "POST",
 			signal: AbortSignal.timeout(ADMISSION_ATTEMPT_TIMEOUT_MS),
 			headers: {
@@ -3487,30 +3605,29 @@ async function postAdmission(): Promise<unknown> {
 				"content-type": "application/json",
 				...(hasText(process.env.TRACEPARENT) ? { traceparent: process.env.TRACEPARENT } : {}),
 			},
-			body: JSON.stringify({ schemaVersion: 1, observations: reviewState.observations }),
+			body: JSON.stringify(admissionRequest()),
 		});
 	} catch (error) {
 		if (isTimeoutAbort(error)) {
 			// The server is still verifying; a second attempt would only queue the same work behind it.
-			throw new Error(
-				`observation admission did not answer within ${ADMISSION_ATTEMPT_TIMEOUT_MS}ms`,
-				{ cause: error },
-			);
+			throw new Error(`result admission did not answer within ${ADMISSION_ATTEMPT_TIMEOUT_MS}ms`, {
+				cause: error,
+			});
 		}
 		// Node reports every transport failure as `TypeError: fetch failed`; only the cause says which
 		// one it was, and a report that has just the message cannot tell a restart from a wrong URL.
 		throw new AdmissionUnreachableError(
-			`observation admission could not be sent: ${errorText(error)}${causeText(error)}`,
+			`result admission could not be sent: ${errorText(error)}${causeText(error)}`,
 		);
 	}
 	if (isRetryableStatus(response.status)) {
-		throw new AdmissionUnreachableError(`observation admission failed: HTTP ${response.status}`);
+		throw new AdmissionUnreachableError(`result admission failed: HTTP ${response.status}`);
 	}
 	if (!response.ok) {
 		// The server has decided, and it said why. Asking again puts the same question, so the run ends
 		// here — with the reason in the transcript, which is the only place a reader can find it.
 		throw new Error(
-			`observation admission was refused: HTTP ${response.status} — ${await answerText(response)}`,
+			`result admission was refused: HTTP ${response.status} — ${await answerText(response)}`,
 		);
 	}
 	try {
@@ -3519,12 +3636,12 @@ async function postAdmission(): Promise<unknown> {
 		// A server that dies while writing its answer ends the body mid-stream. The admission may well
 		// have been recorded; asking again replays it rather than admitting it twice.
 		throw new AdmissionUnreachableError(
-			`observation admission answer was cut short: ${errorText(error)}${causeText(error)}`,
+			`result admission answer was cut short: ${errorText(error)}${causeText(error)}`,
 		);
 	}
 }
 
-async function admitObservations() {
+async function admitResults() {
 	// Admission retries are idempotent: measurement is frozen and the server replays identical payloads.
 	const admitted: unknown = await retrying(
 		postAdmission,
@@ -3537,11 +3654,11 @@ async function admitObservations() {
 	);
 	const answer = acceptAdmission(admitted);
 	// The support read is checked only after the admission it accompanies; it never changes what was admitted.
-	inAppSupport = readInAppSupport(answer.inAppSupport, admittedObservations);
+	inAppSupport = readInAppSupport(answer.inAppSupport, admittedResults);
 	if (inAppSupport?.state === "COMPLETE") {
 		writeFileSync(IN_APP_SUPPORT_PATH, JSON.stringify(inAppSupport, null, 2));
 	}
-	inChatEligibility = readInChatEligibility(answer.inChatEligibility, admittedObservations);
+	inChatEligibility = readInChatEligibility(answer.inChatEligibility, admittedResults);
 }
 
 /** Hand the complete public decision to its server owner without settling the review or its usage. */
@@ -3577,23 +3694,27 @@ async function completeReviewOnWork(safety: ReturnType<typeof scheduleDeadline>)
 function acceptAdmission(admitted: unknown): Record<string, unknown> {
 	if (
 		!isRecord(admitted) ||
-		admitted.schemaVersion !== 1 ||
+		admitted.schemaVersion !== 2 ||
 		typeof admitted.admissionDigest !== "string" ||
-		!Array.isArray(admitted.observations) ||
-		!admitted.observations.every(isAdmittedObservation)
+		!Array.isArray(admitted.results) ||
+		!admitted.results.every(isAdmittedResult)
 	) {
-		throw new Error("observation admission returned an invalid contract");
+		throw new Error("result admission returned an invalid contract");
 	}
-	admittedObservations.splice(0, admittedObservations.length, ...admitted.observations);
+	for (const withheld of jsonArray(admitted.withheld)) {
+		if (isRecord(withheld)) {
+			console.error(
+				`[pi-runner] admission withheld ${logValue(withheld.practiceSlug)}: ${logValue(withheld.reasonCode)}`,
+			);
+		}
+	}
+	admittedResults.splice(0, admittedResults.length, ...admitted.results);
 	admissionDigest = admitted.admissionDigest;
 	compositionAdmitted = true;
 	composedFeedback.admissionDigest = admissionDigest;
-	composedFeedback.observations = leanObservations(admittedObservations);
+	composedFeedback.results = leanResults(admittedResults);
 	mkdirSync(`${CWD}/work/composition`, { recursive: true });
-	writeFileSync(
-		COMPOSITION_OBSERVATIONS_PATH,
-		JSON.stringify({ observations: admittedObservations }, null, 2),
-	);
+	writeFileSync(COMPOSITION_RESULTS_PATH, JSON.stringify({ results: admittedResults }, null, 2));
 	return admitted;
 }
 
@@ -3603,7 +3724,7 @@ function acceptAdmission(admitted: unknown): Record<string, unknown> {
  * no NOT_MET practice is routed to closes as decided. Other lanes go on, and preparation still routes what is written.
  */
 function closeUnroutedPrivateLanes(request: CompositionRequest): void {
-	const notMet = notMetPractices(admittedObservations);
+	const notMet = notMetPractices(admittedResults);
 	for (const channel of PRIVATE_CHANNELS) {
 		if (!request.channels[channel].enabled || notMet.length === 0) {
 			continue;
@@ -3634,7 +3755,7 @@ function closeUnroutedPrivateLanes(request: CompositionRequest): void {
 
 /** The NOT_MET practices private composition owes a decision on: those routed to an open lane, once routed. */
 function privatelyComposable(): string[] {
-	const notMet = notMetPractices(admittedObservations);
+	const notMet = notMetPractices(admittedResults);
 	const lanes = routedLanes;
 	return lanes === null ? notMet : notMet.filter((slug) => (lanes.get(slug) ?? []).length > 0);
 }
@@ -3762,8 +3883,8 @@ function noteToolCall(turn: TurnTrace, toolName: string, args: unknown, measurin
 		const owed = measuring ? owedPractices() : [];
 		const next =
 			owed.length > 0
-				? `Still owed: ${owed.join(", ")}. Record what the evidence you have read supports for these`
-				: "Record what the evidence you have read supports";
+				? `Still owed: ${owed.join(", ")}. Submit what the evidence you have read supports for these`
+				: "Submit what the evidence you have read supports";
 		// The review's next tool depends on what it still lacks, which REVIEW_NUDGE already says.
 		let correction = `Correct what its answer names and send one ${recording ? toolName : composerTool} call.`;
 		if (composerTool === "report_review") {
@@ -3772,7 +3893,7 @@ function noteToolCall(turn: TurnTrace, toolName: string, args: unknown, measurin
 		void steer(
 			activeSession,
 			measuring
-				? `You have run the same ${toolName} call ${repeats} times; its result will not change. ${next}, in one report_observation call. ${PERSIST_DISCIPLINE}`
+				? `You have run the same ${toolName} call ${repeats} times; its result will not change. ${next}, in one submit_result call. ${PERSIST_DISCIPLINE}`
 				: `You have run the same ${toolName} call ${repeats} times; its result will not change. ${correction}`,
 		);
 	}
@@ -3948,12 +4069,11 @@ function criteriaFileOf(slug: string): string | null {
 	return existsSync(file) ? readFileSync(file, "utf8") : null;
 }
 
-/** The leads the practice's script derived, when it ran; empty when it did not. */
-function practiceScriptSectionOf(slug: string): string {
-	const file = `${CWD}/work/practice-scripts-out/${slug}.md`;
-	const section = existsSync(file) ? readFileSync(file, "utf8").trim() : "";
-	return section
-		? `\n\n#### Leads from the practice script for \`${slug}\` — starting points to check against the criteria, not verdicts\n${section}`
+/** The input a program prepared for this review, as its bounded section; empty for a review without one. */
+function preparedSectionOf(slug: string, section: string): string {
+	const shown = section.trim();
+	return shown
+		? `\n\n#### Leads from the practice script for \`${slug}\` — starting points to check against the criteria, not verdicts\n${shown}`
 		: "";
 }
 
@@ -3993,9 +4113,7 @@ function openingIfNeeded(brief: string, composing = false): string {
 	if (openingInContext) {
 		return "";
 	}
-	const ownDrafts = reviewState.observations.some((observation) =>
-		currentTurnSlugs.includes(observation.practiceSlug),
-	);
+	const ownDrafts = activeReview?.draft != null;
 	return composing
 		? assessmentOpening(brief)
 		: `${assessmentOpening(brief)}${
@@ -4004,54 +4122,61 @@ function openingIfNeeded(brief: string, composing = false): string {
 }
 
 /**
- * Separate single-observation examples with this review's artifact paths. Alternative outcomes keep
- * the call shape consistent with one practice per session without making an outcome the expected one.
+ * Separate single-result examples with this review's artifact paths. Alternative outcomes keep the call
+ * shape consistent with one practice per session without making an outcome the expected one.
  */
-const OBSERVATION_EXAMPLE = (() => {
+const RESULT_EXAMPLE = (() => {
 	const context = taskEnvelope.paths.contextRoot;
 	const example = [
 		{
-			revises: null,
-			practiceSlug: "<the practice's slug>",
-			summary: "Added test asserts that malformed date input is rejected",
 			outcome: "MET",
-			severity: null,
-			evidenceRationale:
+			summary: "Added test asserts that malformed date input is rejected",
+			explanation:
 				'The added assertion passes "not-a-date" to DateParser.parse and expects an error.',
-			evidence: {
-				citations: [
-					{
-						sourceKind: "scm.pull-request.diff",
-						artifactPath: `${context}/change.json`,
-						path: "Tests/DateParserTests.swift",
-						side: "NEW",
-						startLine: 12,
-						endLine: 12,
-						quote: 'XCTAssertThrowsError(try DateParser.parse("not-a-date"))',
-					},
-				],
-			},
+			citations: [
+				{
+					sourceKind: "scm.pull-request.diff",
+					artifactPath: `${context}/change.json`,
+					path: "Tests/DateParserTests.swift",
+					side: "NEW",
+					startLine: 12,
+					endLine: 12,
+					quote: 'XCTAssertThrowsError(try DateParser.parse("not-a-date"))',
+				},
+			],
+			evidence: {},
 		},
 		{
-			revises: null,
-			practiceSlug: "<the practice's slug>",
-			summary: "New error branch of the parser ships without a test",
 			outcome: "NOT_MET",
-			severity: "MINOR",
-			evidenceRationale:
+			summary: "New error branch of the parser ships without a test",
+			explanation:
 				"The change adds a branch that rejects an empty string; no added test feeds the parser one.",
-			evidence: {
-				citations: [
-					{
-						sourceKind: "scm.pull-request.diff",
-						artifactPath: `${context}/change.json`,
-						path: "App/DateParser.swift",
-						side: "NEW",
-						startLine: 30,
-						endLine: 30,
-						quote: "guard !text.isEmpty else { throw ParseError.empty }",
+			citations: [],
+			problems: [
+				{
+					severity: "MINOR",
+					summary: "Empty-string branch of the parser has no test",
+					explanation:
+						"The change adds a guard that throws for an empty string; no added test passes one.",
+					citations: [
+						{
+							sourceKind: "scm.pull-request.diff",
+							artifactPath: `${context}/change.json`,
+							path: "App/DateParser.swift",
+							side: "NEW",
+							startLine: 30,
+							endLine: 30,
+							quote: "guard !text.isEmpty else { throw ParseError.empty }",
+						},
+					],
+					basis: {
+						type: "introduced",
+						head: 0,
+						explanation: "The change adds this branch on the new side.",
 					},
-				],
+				},
+			],
+			evidence: {
 				search: {
 					consulted: ["scm.pull-request.diff"],
 					lookedFor: "an added test that passes an empty string to the parser",
@@ -4060,23 +4185,20 @@ const OBSERVATION_EXAMPLE = (() => {
 			},
 		},
 		{
-			revises: null,
-			practiceSlug: "<the practice's slug>",
-			summary: "No completed merge is recorded",
 			outcome: "NOT_APPLICABLE",
-			severity: null,
-			evidenceRationale: "The captured provider record states that this work has not merged.",
+			summary: "No completed merge is recorded",
+			explanation: "The captured provider record states that this work has not merged.",
+			citations: [
+				{
+					sourceKind: "scm.pull-request.core",
+					artifactPath: `${context}/metadata.json`,
+					path: `${context}/metadata.json`,
+					startLine: 3,
+					endLine: 3,
+					quote: '"is_merged": false',
+				},
+			],
 			evidence: {
-				citations: [
-					{
-						sourceKind: "scm.pull-request.core",
-						artifactPath: `${context}/metadata.json`,
-						path: `${context}/metadata.json`,
-						startLine: 3,
-						endLine: 3,
-						quote: '"is_merged": false',
-					},
-				],
 				inapplicability: {
 					consulted: ["scm.pull-request.core"],
 					subject: "work that has merged",
@@ -4085,34 +4207,30 @@ const OBSERVATION_EXAMPLE = (() => {
 			},
 		},
 	];
-	return `## How report_observation takes observations
-The arguments are one complete observation object for this session's practice, not a list and not a JSON-encoded string. Each block below is a whole alternative call, with an illustrative outcome, not evidence from this work:
-${example
-	.map((observation) => `\`\`\`json\n${JSON.stringify(observation, null, 1)}\n\`\`\``)
-	.join("\n\n")}`;
+	return `## How submit_result takes a result
+The arguments are one complete result object for this session's practice, not a list and not a JSON-encoded string. Each block below is a whole alternative call, with an illustrative outcome, not evidence from this work:
+${example.map((result) => `\`\`\`json\n${JSON.stringify(result, null, 1)}\n\`\`\``).join("\n\n")}`;
 })();
 
 /**
  * A turn of one practice, after the opening when the context does not hold it: its whole criterion first, then
- * the generic illustrations when the context does not hold them, the leads from the practice scripts, and the task. Its work
- * budget is not stated: told its call budget up front, an open model read less and missed more not-met practices.
+ * the generic illustrations when the context does not hold them, the input its program prepared, and the task. Its
+ * work budget is not stated: told its call budget up front, an open model read less and missed more not-met practices.
  */
-function practiceTurnText(heading: string, slug: string, brief: string): string {
-	const illustrations = openingInContext ? "" : `\n\n${OBSERVATION_EXAMPLE}`;
+function practiceTurnText(heading: string, slug: string, brief: string, prepared: string): string {
+	const illustrations = openingInContext ? "" : `\n\n${RESULT_EXAMPLE}`;
 	return `${openingIfNeeded(brief)}${heading}
 
-${criteriaOf([slug])}${illustrations}${practiceScriptSectionOf(slug)}
+${criteriaOf([slug])}${illustrations}${preparedSectionOf(slug, prepared)}
 
-Record one observation for ${slug} with report_observation: the outcome its criterion above decides through its Occasion, Judge and Defer, as the evidence supports it, NOT_APPLICABLE and UNDETERMINED included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session records and revises only this practice.`;
+Submit one result for ${slug} with submit_result: the outcome its criterion above decides through its Occasion, Judge and Defer, as the evidence supports it, NOT_APPLICABLE and UNDETERMINED included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session submits and corrects only this practice's result.`;
 }
 
-/** The practices with an admitted NOT_MET observation: what the composer has a decision to record on. */
-function notMetPractices(observations: readonly AdmittedObservation[]): string[] {
+/** The practices with an admitted NOT_MET result: what the composer has a decision to record on. */
+function notMetPractices(results: readonly { practiceSlug: string; outcome: Outcome }[]): string[] {
 	return [
 		...new Set(
-			observations
-				.filter((observation) => observation.outcome === "NOT_MET")
-				.map((observation) => observation.practiceSlug),
+			results.filter((result) => result.outcome === "NOT_MET").map((result) => result.practiceSlug),
 		),
 	].toSorted();
 }
@@ -4128,12 +4246,12 @@ function compositionBudget(notMet: number): Work {
 /** Private decision obligation: a stored unit or withholding may fold several practices in. */
 function undecidedPrivatePractices(): string[] {
 	const practiceOf = new Map(
-		admittedObservations.map((observation) => [observation.id, observation.practiceSlug]),
+		admittedResults.map((result) => [result.practiceResultId, result.practiceSlug]),
 	);
 	const decided = new Set(
 		composedFeedback.units.flatMap((unit) => [
 			unit.practiceSlug,
-			...unit.basedOn.flatMap((id) => practiceOf.get(id) ?? []),
+			...unit.basedOn.flatMap((ref) => practiceOf.get(ref.practiceResultId) ?? []),
 		]),
 	);
 	return privatelyComposable().filter((slug) => !decided.has(slug));
@@ -4237,10 +4355,10 @@ function finishCompositionText(notMet: readonly string[], request: CompositionRe
 		.join(", ");
 	return (
 		`## Undecided\nThe turn ended with no unit and no WITHHOLD for these practices, each with a ` +
-		`NOT_MET observation: ${notMet.join(", ")}. For each, persist the unit you decided on, or a ` +
+		`NOT_MET result: ${notMet.join(", ")}. For each, persist the unit you decided on, or a ` +
 		`WITHHOLD with its reason (NO_MATERIAL_CHANGE, ALREADY_SAID, BELOW_BAR), in one report_feedback ` +
 		`call. Room left for new units: ${room}; a lane with none left takes only a WITHHOLD. The ` +
-		`admitted observations are in \`work/composition/observations.json\`. Use tools only from this ` +
+		`admitted results and their observations are in \`work/composition/results.json\`. Use tools only from this ` +
 		`point onward; no prose.`
 	);
 }
@@ -4423,10 +4541,11 @@ async function main() {
 		});
 
 	const allSlugs = loadPracticeSlugs();
-	continuing = existsSync(CONTINUATION_PATH);
+	// A continuing writer runs no program and derives no change.
 	// A continuing writer evaluates no practice, so it reports no coverage of its own.
 	if (!continuing) {
 		practiceCoverageLedger = new PracticeCoverageLedger(PRACTICE_COVERAGE_PATH, allSlugs);
+		deriveChangeView();
 	}
 	persistRecordedNotes();
 	const turns = planTurns(practiceIndex, PRACTICES_PER_TURN);
@@ -4447,7 +4566,7 @@ async function main() {
 		);
 	}
 
-	const reportObservationTool = buildReportObservationTool();
+	const submitResultTool = buildSubmitResultTool();
 	if (tooLate) {
 		logPracticeCoverage();
 		finalizeOutput();
@@ -4553,12 +4672,29 @@ async function main() {
 	}, STALL_CHECK_MS);
 	stallWatch.unref();
 
+	const evidenceSources = captureSources();
+	/** The change since each practice's previous review, as its inputs established it. */
+	const changeSinceOf = new Map<string, ReadonlyMap<string, DiffFile>>();
+	const inputReader = new InputReader({
+		practicesDir: INPUT_PATHS.practiceScripts,
+		contextDir: INPUT_PATHS.contextRoot,
+		repo: INPUT_PATHS.repositoryRoot,
+		log: (line) => console.error(`[pi-runner]${line}`),
+	});
+	const boundModels = readBoundModels();
+	const directBudget = new ModelBudget(DIRECT_MODEL_TOKENS, MODEL_CONCURRENCY);
+	/** A review session that did not stop: the run ends with it, and no later session starts. */
+	let sessionStopFailure: Error | null = null;
+	/** Every program's execution ends with the measuring window: at its end, or when the attempt is cancelled. */
+	const measuringEnded = new AbortController();
+
 	/**
-	 * One scope — a catalog group's turn, or the practices no turn recorded — under the one work budget its
-	 * practice count earns, whatever the scopes before it spent. The budget is spent across one fresh session per
-	 * practice, in order: each receives the task, the brief and that practice's complete criteria, and records only
-	 * that practice. Once the budget, the safety line or a stall ends the scope, its remaining practices are not
-	 * reached. Returns why the runner ended it, or null when every session ended on its own.
+	 * One scope — a catalog group's turn, or the practices no turn reached — under the one work budget its
+	 * practice count earns, whatever the scopes before it spent. Each practice's program runs in turn; each review
+	 * it asks for opens a fresh session that receives the task, the brief, the practice's complete criteria and the
+	 * program's prepared input, and submits only that practice's result. Once the budget, the safety line or a stall
+	 * ends the scope, its remaining practices are not reached. Returns why the runner ended it, or null when every
+	 * program ended on its own.
 	 */
 	async function runScope(
 		label: string,
@@ -4572,7 +4708,7 @@ async function main() {
 		}
 		const budget = turnBudget(slugs.length, PER_PRACTICE_WORK);
 		console.error(
-			`[pi-runner] ${label}: ${slugs.length} practice(s), up to ${budget.modelCalls} calls and ${budget.outputTokens} output tokens (${tokensPerObservation} tokens per observation so far)`,
+			`[pi-runner] ${label}: ${slugs.length} practice(s), up to ${budget.modelCalls} calls and ${budget.outputTokens} output tokens (${tokensPerObservation} tokens per result so far)`,
 		);
 		const trace = openTurnTrace(label, budget, {
 			owed: () => owedPractices(slugs).length,
@@ -4584,7 +4720,7 @@ async function main() {
 		// Native events may stop a turn while awaited work settles or another session opens.
 		const stoppedBy = () => trace.stoppedBy;
 		const pastSafety = () => safety.expired() || Date.now() >= measureEnd;
-		/** The model, not the runner, a provider error or the safety line, ended the session with its practice owed. */
+		/** The model, not the runner, a provider error or the safety line, ended the session with its result owed. */
 		const endedUnrecorded = (slug: string) =>
 			owedPractices([slug]).length > 0 &&
 			stoppedBy() === null &&
@@ -4599,7 +4735,7 @@ async function main() {
 				return;
 			}
 			if (prepared === null) {
-				blockedPractices.add(slug);
+				blockedPractices.set(slug, "too-large");
 				console.error(
 					`[pi-runner] ${label}: essential input for ${slug} exceeds the context window — not reached`,
 				);
@@ -4614,9 +4750,9 @@ async function main() {
 			});
 		}
 		/**
-		 * Asks a session that ended on its own with its practice owed to record it, once, in the session that holds
+		 * Asks a session that ended on its own with its result owed to submit it, once, in the session that holds
 		 * what it read and within this scope's budget; a fresh session would read it all again. A second ending on
-		 * its own closes the practice.
+		 * its own closes the review.
 		 */
 		async function askOnceMore(session: AgentSession, text: () => string, slug: string) {
 			if (
@@ -4626,7 +4762,7 @@ async function main() {
 				return;
 			}
 			console.error(
-				`[pi-runner] ${label}: the ${slug} session ended without a recorded result — asking once more`,
+				`[pi-runner] ${label}: the ${slug} session ended without a submitted result — asking once more`,
 			);
 			if (!(await settleSession(session, label, ABORT_SETTLE_MS))) {
 				throw new Error("the session was still busy when it was asked once more");
@@ -4636,10 +4772,209 @@ async function main() {
 				`${openingInContext ? "" : `${text()}\n\n`}${recordOnceMoreText(slug)}`;
 			await Promise.race([promptPractice(session, onceMore, slug), safety.elapsed]);
 			if (endedUnrecorded(slug)) {
-				blockedPractices.add(slug);
+				blockedPractices.set(slug, "off-format");
 				console.error(
-					`[pi-runner] ${label}: the ${slug} session ended again without a recorded result — not reached`,
+					`[pi-runner] ${label}: the ${slug} session ended again without a submitted result — not reached`,
 				);
+			}
+		}
+		/** Why a review that ended without a result gives none: never a statement about the work. */
+		function noResultReason(slug: string, signal: AbortSignal): UnratedReason {
+			if (signal.aborted) {
+				return abortReasonOf(signal);
+			}
+			const stop = stoppedBy();
+			if (stop !== null) {
+				return UNRATED_BY_STOP[stop];
+			}
+			if (pastSafety()) {
+				return "deadline";
+			}
+			if (trace.modelError) {
+				return "unavailable";
+			}
+			return blockedPractices.get(slug) ?? "off-format";
+		}
+		/**
+		 * One review of `slug`, as its program asks for it: a fresh session over the program's prepared input,
+		 * whose submissions go to this call's draft alone. It returns the draft once the session ends, or says
+		 * why there is none.
+		 */
+		async function reviewPractice(
+			slug: string,
+			practiceHeading: string,
+			options: ReviewOptions,
+			signal: AbortSignal,
+			reads: Receipts,
+		): Promise<Candidate> {
+			if (activeReview !== null) {
+				throw new UnratedError("refused", "a review is already running");
+			}
+			if (blockedPractices.has(slug)) {
+				throw new UnratedError(
+					blockedPractices.get(slug) ?? "off-format",
+					`this review asks no more about ${slug}`,
+				);
+			}
+			if (stoppedBy() !== null || pastSafety() || signal.aborted) {
+				throw new UnratedError(noResultReason(slug, signal), "the scope ended before the review");
+			}
+			const leads = await resolveLeads(
+				options.leads ?? [],
+				evidenceSources,
+				changeSinceOf.get(slug),
+			);
+			const fullInput = `${REVIEW_INPUT_ROOT}/${slug}.json`;
+			const preparing =
+				leads.length > 0 ||
+				Object.keys(options.facts ?? {}).length > 0 ||
+				(options.directions ?? []).length > 0 ||
+				(options.context ?? []).length > 0 ||
+				(options.limitations ?? []).length > 0;
+			if (preparing) {
+				mkdirSync(`${CWD}/${REVIEW_INPUT_ROOT}`, { recursive: true });
+				writeFileSync(`${CWD}/${fullInput}`, JSON.stringify({ ...options, leads }, null, 2));
+			}
+			const prepared = preparing
+				? renderReviewInput(
+						options,
+						leads,
+						taskEnvelope.paths.contextRoot,
+						`\`${fullInput}\``,
+						changeSinceOf.get(slug) !== undefined,
+					)
+				: "";
+			const review: ActiveReview = { slug, draft: null, reads: newSessionReads() };
+			activeReview = review;
+			activePractice = slug;
+			currentTurnSlugs = [slug];
+			// The nudge names the session's practice, so a later session may be told again.
+			trace.askedToRecord = false;
+			let opened: Awaited<ReturnType<typeof openSession>>;
+			try {
+				opened = await openSession(
+					"practice",
+					[...PRACTICE_TOOLS, "submit_result"],
+					[submitResultTool],
+				);
+			} catch (error) {
+				activeReview = null;
+				activePractice = null;
+				throw error;
+			}
+			const unsubscribeReads = opened.session.subscribe((event) => {
+				noteSessionRead(review.reads, event);
+			});
+			const stop = () => {
+				void abortSession(opened.session);
+			};
+			signal.addEventListener("abort", stop, { once: true });
+			const text = () => practiceTurnText(practiceHeading, slug, brief, prepared);
+			try {
+				await Promise.race([promptPractice(opened.session, text, slug), safety.elapsed]);
+				await askOnceMore(opened.session, text, slug);
+			} catch (error) {
+				console.error(`[pi-runner] ${label} (${slug}) failed: ${errorText(error)}`);
+			} finally {
+				signal.removeEventListener("abort", stop);
+				const closed = await closeSession(opened).then(
+					() => null,
+					(error: unknown) => (error instanceof Error ? error : new Error(String(error))),
+				);
+				unsubscribeReads();
+				const receipts = sessionReceipts(review.reads);
+				reads.reads += receipts.reads;
+				reads.truncatedReads += receipts.truncatedReads;
+				reads.failedReads += receipts.failedReads;
+				activeReview = null;
+				activePractice = null;
+				// A session that does not stop leaves nothing safe to start after it: the run ends.
+				sessionStopFailure ??= closed;
+			}
+			if (sessionStopFailure !== null) {
+				throw sessionStopFailure;
+			}
+			if (review.draft !== null) {
+				return review.draft;
+			}
+			throw new UnratedError(
+				noResultReason(slug, signal),
+				`the review session of ${slug} ended without a result`,
+			);
+		}
+		/** Run one practice's program to its final result, or to why it has none. */
+		async function runProgram(slug: string, practiceHeading: string): Promise<void> {
+			const program = programOf(slug);
+			const read = await inputReader.read(slug).catch((error: unknown) => ({
+				error: `the host could not read them: ${errorText(error)}`,
+			}));
+			if ("error" in read) {
+				console.error(`[pi-runner] ${slug}: its inputs are not valid: ${read.error}`);
+				executions.set(slug, {
+					...notReachedOutcome(program, "unavailable"),
+					status: "failed",
+					error: `the review's inputs are not valid: ${read.error}`,
+					durationMs: 0,
+				});
+				return;
+			}
+			if (read.changeSince !== undefined) {
+				changeSinceOf.set(slug, read.changeSince);
+			}
+			const programReads = noReceipts();
+			const sessionReads = noReceipts();
+			const stopped = new AbortController();
+			// The safety line stops the program as it stops the session; a scope that ends first clears the timer.
+			const safetyTimer = setTimeout(
+				() => {
+					stopped.abort(new UnratedError("deadline", "the run is near its safety ceiling"));
+				},
+				Math.max(0, measureEnd - Date.now()),
+			);
+			const outcome = await runPracticeProgram(
+				program,
+				{
+					slug,
+					inputs: read.inputs,
+					criteria: criteriaFileOf(slug) ?? "",
+					...(read.changeSince === undefined ? {} : { changeSince: read.changeSince }),
+					files: jobFiles(read.inputs.kind),
+					now: new Date(PROCESS_START_MS).toISOString(),
+					deadline: measureEnd - RETURN_MS,
+				},
+				{
+					reader: new EvidenceReader(evidenceSources, programReads),
+					models: hostModels(boundModels, LLM_PROXY_URL, LLM_PROXY_TOKEN, slug),
+					budget: directBudget,
+					review: async (options, signal) =>
+						reviewPractice(slug, practiceHeading, options, signal, sessionReads),
+					signal: AbortSignal.any([stopped.signal, measuringEnded.signal]),
+					log: (line) => {
+						console.error(`[pi-runner]${line}`);
+					},
+					receipts: programReads,
+				},
+			);
+			const reached: Receipts = {
+				reads: outcome.coverageReached.reads + sessionReads.reads,
+				truncatedReads: outcome.coverageReached.truncatedReads + sessionReads.truncatedReads,
+				failedReads: outcome.coverageReached.failedReads + sessionReads.failedReads,
+			};
+			clearTimeout(safetyTimer);
+			executions.set(slug, { ...outcome, coverageReached: reached });
+			if (sessionStopFailure !== null) {
+				throw sessionStopFailure;
+			}
+			console.error(
+				`[pi-runner] ${slug}: ${program.script === null ? "built-in" : "custom"} program ${outcome.status}` +
+					`${outcome.stopReason === null ? "" : ` (${outcome.stopReason})`}${outcome.error === undefined ? "" : `: ${firstLine(outcome.error)}`}`,
+			);
+			if (outcome.candidate !== undefined) {
+				reviewState.set(slug, outcome.candidate);
+				persistReviewState();
+				maybeWriteResultFile();
+				persistPracticeCoverage();
+				persistRecordedNotes();
 			}
 		}
 		try {
@@ -4647,52 +4982,13 @@ async function main() {
 				if (stoppedBy() !== null || pastSafety()) {
 					break;
 				}
-				if (owedPractices([slug]).length === 0) {
+				if (executions.has(slug)) {
 					continue;
 				}
-				activePractice = slug;
-				currentTurnSlugs = [slug];
-				// The nudge names the session's practice, so a later session may be told again.
-				trace.askedToRecord = false;
-				const opened = await openSession(
-					"practice",
-					[...PRACTICE_TOOLS, "report_observation"],
-					[reportObservationTool],
+				await runProgram(
+					slug,
+					`${heading}\nPractice ${index + 1} of ${slugs.length} in this turn.`,
 				);
-				// A mixed batch can keep Pi running after this practice records. Finish its tools and native
-				// boundary first; a refused correction still gets its answer before the draft is final here.
-				const { finishTurn } = opened.session.agent;
-				let unresolvedReportRefusal = false;
-				opened.session.agent.finishTurn = async (turn, signal) => {
-					const decision = await finishTurn?.(turn, signal);
-					for (const result of turn.toolResults) {
-						if (result.toolName === "report_observation") {
-							unresolvedReportRefusal = result.isError;
-						}
-					}
-					if (
-						!unresolvedReportRefusal &&
-						reviewState.observations.some((item) => item.practiceSlug === slug)
-					) {
-						opened.session.clearQueue();
-						return { action: "end" };
-					}
-					return decision ?? undefined;
-				};
-				const text = () =>
-					practiceTurnText(
-						`${heading}\nPractice ${index + 1} of ${slugs.length} in this turn.`,
-						slug,
-						brief,
-					);
-				try {
-					await Promise.race([promptPractice(opened.session, text, slug), safety.elapsed]);
-					await askOnceMore(opened.session, text, slug);
-				} catch (error) {
-					console.error(`[pi-runner] ${label} (${slug}) failed: ${errorText(error)}`);
-				} finally {
-					await closeSession(opened);
-				}
 			}
 		} finally {
 			clearTimeout(safety.timer);
@@ -4730,11 +5026,10 @@ async function main() {
 				break;
 			}
 		}
-		const missing = missingSlugs(
-			allSlugs,
-			reviewState.observations.map((item) => item.practiceSlug),
+		// A practice whose program ran has its outcome; one that no program reached is run now.
+		const unfinished = allSlugs.filter(
+			(slug) => !executions.has(slug) && !blockedPractices.has(slug),
 		);
-		const unfinished = missing.filter((slug) => !blockedPractices.has(slug));
 		if (unfinished.length > 0 && stalls < 2 && Date.now() < measureEnd) {
 			console.error(
 				`[pi-runner] Finishing ${unfinished.length} practice(s): ${unfinished.join(", ")}`,
@@ -4747,6 +5042,8 @@ async function main() {
 		}
 	} finally {
 		measuring = false;
+		// No program runs past this point: one still running would only be stopped at its deadline.
+		measuringEnded.abort(new UnratedError("deadline", "measuring ended"));
 		const measureDurationMs = Date.now() - startMs;
 		measureUsage = extractUsageFromSession({}, streamUsage);
 		accumulateUsage(null, measureUsage);
@@ -4764,18 +5061,15 @@ async function main() {
 			`[pi-runner] Measured: ${(measureDurationMs / 1000).toFixed(1)}s, calls=${measureUsage.totalCalls}, ` +
 				`stopped=[${runnerDebug.turns
 					.flatMap((turn) => (turn.stoppedBy === null ? [] : [`${turn.label}: ${turn.stoppedBy}`]))
-					.join("; ")}], observations=${reviewState.observations.length}`,
+					.join("; ")}], results=${reviewState.size}`,
 		);
 	}
 
-	const notReached = missingSlugs(
-		allSlugs,
-		reviewState.observations.map((item) => item.practiceSlug),
-	);
+	const notReached = missingSlugs(allSlugs, [...reviewState.keys()]);
 	logPracticeCoverage();
 	if (notReached.length > 0) {
 		console.error(
-			`[pi-runner] PARTIAL: ${notReached.length} of ${allSlugs.length} practice(s) not reached: ${notReached.join(", ")}`,
+			`[pi-runner] PARTIAL: ${notReached.length} of ${allSlugs.length} practice(s) without a result: ${notReached.join(", ")}`,
 		);
 	}
 
@@ -4794,17 +5088,19 @@ async function main() {
 	}
 
 	measurementClosed = true;
-	await admitObservations();
+	// Prepared review input serves measurement only. Composition never receives it, and from here it cannot read it.
+	rmSync(`${CWD}/${REVIEW_INPUT_ROOT}`, { recursive: true, force: true });
+	await admitResults();
 	if (compositionRequest) {
 		closeUnroutedPrivateLanes(compositionRequest);
 	}
 	persistComposedFeedback();
 	maybeWriteResultFile();
-	if (compositionRequest && admittedObservations.length > 0) {
+	if (compositionRequest && admittedResults.length > 0) {
 		const markRemaining = (reason: CompositionFailureReason) => {
 			if (
 				compositionRequest.channels.IN_CONTEXT.enabled &&
-				publicObservations(admittedObservations).length > 0 &&
+				publicResults(admittedResults).length > 0 &&
 				composedFeedback.review === null
 			) {
 				recordCompositionFailure("PUBLIC_REVIEW", reason);
@@ -4816,25 +5112,23 @@ async function main() {
 				recordCompositionFailure("PRIVATE_FEEDBACK", reason);
 			}
 		};
-		// Leads serve measurement only. Composition never receives them, and from here it cannot read them.
-		rmSync(`${CWD}/work/practice-scripts-out`, { recursive: true, force: true });
 		const safetyMs = AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS);
 		if (safetyMs <= 0) {
 			markRemaining("SAFETY");
 			console.error(
-				"[pi-runner] The run reached its safety ceiling before composition — preserving admitted observations",
+				"[pi-runner] The run reached its safety ceiling before composition — preserving admitted results",
 			);
 		} else {
 			const safety = scheduleDeadline(safetyMs, () => {
 				stopTurn(
 					"safety",
-					"the run is near its safety ceiling — preserving observations and composed feedback so far",
+					"the run is near its safety ceiling — preserving results and composed feedback so far",
 				);
 			});
 			try {
-				// Only an observation that decided something can carry a claim about the work; a review of
-				// uncertainty alone has nothing to say there, and opens no session.
-				const reviewable = publicObservations(admittedObservations);
+				// A review on the work is owed only for a public NOT_MET result. MET results and
+				// abstentions alone have nothing to say there, and open no session.
+				const reviewable = publicResults(admittedResults);
 				if (compositionRequest.channels.IN_CONTEXT.enabled && reviewable.length > 0) {
 					await composeReview(compositionRequest, reviewable, notReached, safety);
 					await completeReviewOnWork(safety);
@@ -4858,9 +5152,7 @@ async function main() {
 			}
 		}
 	}
-	console.error(
-		`[pi-runner] SUCCESS: result.json holds ${reviewState.observations.length} observation(s)`,
-	);
+	console.error(`[pi-runner] SUCCESS: result.json holds ${reviewState.size} result(s)`);
 	finalizeOutput();
 	process.exit(0);
 
@@ -4876,10 +5168,10 @@ async function main() {
 		// The original selection, less what was admitted: what that attempt did not reach stays not reached.
 		const unreachedSlugs = missingSlugs(
 			allSlugs,
-			admittedObservations.map((item) => item.practiceSlug),
+			admittedResults.map((item) => item.practiceSlug),
 		);
 		console.error(
-			`[pi-runner] Continuing an admitted review: ${admittedObservations.length} observation(s), ` +
+			`[pi-runner] Continuing an admitted review: ${admittedResults.length} result(s), ` +
 				`${unreachedSlugs.length} practice(s) not reached; composing the review on the work only`,
 		);
 		if (
@@ -4890,7 +5182,7 @@ async function main() {
 			recordCompositionFailure("PRIVATE_FEEDBACK", "PRIVATE_NOT_RECOVERED");
 		}
 		persistComposedFeedback();
-		const reviewable = publicObservations(admittedObservations);
+		const reviewable = publicResults(admittedResults);
 		if (compositionRequest?.channels.IN_CONTEXT.enabled === true && reviewable.length > 0) {
 			const safetyMs = AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS);
 			if (safetyMs <= 0) {
@@ -4925,16 +5217,15 @@ async function main() {
 			}
 		}
 		console.error(
-			`[pi-runner] SUCCESS: result.json holds the ${admittedObservations.length} admitted observation(s)`,
+			`[pi-runner] SUCCESS: composed from the ${admittedResults.length} admitted result(s)`,
 		);
 		finalizeOutput();
 		process.exit(0);
 	}
 
 	/**
-	 * The review on the work, in a fresh session of its own whose only tools show a MET practice's staged standard and
-	 * store the whole review, with every other input inline. Private history is not staged into it, and it can read
-	 * nothing else from the workspace.
+	 * The review on the work, in a fresh session of its own whose only tool stores the whole review, with every input
+	 * inline. Private history is not staged into it, and it can read nothing else from the workspace.
 	 */
 	async function composeReview(
 		request: CompositionRequest,
@@ -4995,80 +5286,18 @@ async function main() {
 		};
 		persistRunnerDebug();
 		const restable = reviewableById(reviewable);
-		const state: PublicReviewState = {
-			final: false,
-			reviewContext: "LOST",
-			consulted: new Map(),
-			inView: new Set(),
-			pending: new Set(),
-		};
-		// One staged read per practice for the whole composition: what a turn shows and what counts as shown agree.
-		const reads = new Map<string, string | null | Error>();
-		const stagedOnce = (slug: string): string | null => {
-			if (!reads.has(slug)) {
-				try {
-					reads.set(slug, criteriaFileOf(slug));
-				} catch (error) {
-					reads.set(slug, error instanceof Error ? error : new Error(String(error)));
-				}
-			}
-			const staged = reads.get(slug);
-			if (staged instanceof Error) {
-				throw staged;
-			}
-			return staged ?? null;
-		};
+		const state: PublicReviewState = { final: false, reviewContext: "LOST" };
 		const practices = practiceContext(reviewable);
-		/** The opening turn and every standard read since, whole: what a compaction removed. */
-		const reference = () => {
-			const consulted = [...state.consulted.values()];
-			return consulted.length === 0
-				? text
-				: `${text}\n\n### Standards read earlier in this session\n${STANDARD_REFERENCE}\n${consulted.join("\n")}`;
-		};
+		/** The opening turn, whole: what a compaction removed. */
 		const restore = () => {
 			state.reviewContext = "RESTORING";
-			for (const slug of state.consulted.keys()) {
-				state.pending.add(slug);
-			}
-			return reference();
+			return text;
 		};
-		// read_practice shows only a public MET reference; with none it could only refuse, so it is not offered.
-		const offersRead = readablePractices(reviewable).length > 0;
 		const { session: reviewSession } = await createAgentSession({
 			cwd: CWD,
 			agentDir: AGENT_DIR,
-			tools: PUBLIC_REVIEW_TOOLS.filter((name) => offersRead || name !== "read_practice"),
+			tools: PUBLIC_REVIEW_TOOLS,
 			customTools: [
-				...(offersRead
-					? [
-							buildPracticeTool(
-								reviewable,
-								(slug) => {
-									const standard = practiceStandard(slug, stagedOnce);
-									const opening = reviewable.some(
-										(entry) =>
-											entry.publicEligible === true &&
-											entry.outcome === "NOT_MET" &&
-											entry.practiceSlug === slug,
-									);
-									return standard.whole && opening
-										? {
-												text: `The whole standard of \`${slug}\` is shown with its concern in the opening reference.\n`,
-												whole: true,
-											}
-										: standard;
-								},
-								{
-									practices,
-									history: alreadySaid.feedback,
-									reviewedRevision: captured.reviewedRevision ?? null,
-								},
-								state,
-								restore,
-							),
-						]
-					: []),
 				buildReviewTool(
 					lineNotes,
 					restable,
@@ -5099,18 +5328,10 @@ async function main() {
 		const unsubscribeContext = reviewSession.subscribe((event) => {
 			if (event.type === "compaction_end" && !event.aborted && !hasText(event.errorMessage)) {
 				state.reviewContext = "LOST";
-				state.inView.clear();
-				state.pending.clear();
-			} else if (event.type === "turn_start") {
+			} else if (event.type === "turn_start" && state.reviewContext === "RESTORING") {
 				// Pi begins the next model turn after the current tool batch has ended: only then can the model read
-				// what that batch's answers showed.
-				if (state.reviewContext === "RESTORING") {
-					state.reviewContext = "HELD";
-				}
-				for (const slug of state.pending) {
-					state.inView.add(slug);
-				}
-				state.pending.clear();
+				// the reference that a refusal restored.
+				state.reviewContext = "HELD";
 			}
 		});
 		activeSession = reviewSession;
@@ -5122,7 +5343,7 @@ async function main() {
 			taskEnvelope.paths.contextRoot,
 			taskEnvelope.paths.repositoryRoot,
 			folderIndex,
-			admittedObservations,
+			admittedResults,
 			{
 				blob: (revision, file, limit) => readPinnedBlob(repository, revision, file, limit),
 				diff: (base, head, limit) => pinnedDiff(repository, base, head, limit),
@@ -5136,8 +5357,8 @@ async function main() {
 			]
 				.filter((part) => part !== "")
 				.join("\n\n"),
-			observations: reviewable,
-			qualifications: publicQualifications(admittedObservations),
+			results: reviewable,
+			qualifications: publicQualifications(admittedResults),
 			alreadySaid: alreadySaid.feedback,
 			ownHistoryOmissions: alreadySaid.omissions,
 			ownHistoryReadAt: read.readAt,
@@ -5145,9 +5366,9 @@ async function main() {
 			practices,
 			notReached: notReachedSlugs,
 			lineNotes,
-			stagedCriteria: stagedOnce,
+			stagedCriteria: criteriaFileOf,
 		});
-		// The composition owes one final review, whatever it decides: an all-MET review is final only when sent.
+		// The composition owes one final review, whatever it decides: a review that withholds every result is final only when sent.
 		const owed = () => (state.final ? 0 : Math.max(1, undecidedByReview(reviewable).length));
 		const budget = compositionBudget(owed());
 		let started = false;
@@ -5201,7 +5422,7 @@ async function main() {
 			) {
 				console.error(
 					left.length > 0
-						? `[pi-runner] the review left ${left.length} NOT_MET observation(s) undecided — asking once more`
+						? `[pi-runner] the review left ${left.length} NOT_MET result(s) undecided — asking once more`
 						: "[pi-runner] the review is not final — asking once more",
 				);
 				const retry = openTurnTrace("review composition once more", budget, {
@@ -5213,13 +5434,13 @@ async function main() {
 				try {
 					await Promise.race([
 						(async () => {
-							// Decided when the prompt is prepared, which may compact: only a prompt that carries the
-							// reference puts its standards back in view.
-							let restoring = false;
-							const prepared = await prepareTurnText(reviewSession, () => {
-								restoring = state.reviewContext !== "HELD";
-								return `${restoring ? `${reference()}\n\n` : ""}${finishReviewText(left)}`;
-							});
+							// Decided when the prompt is prepared, which may compact: a prompt that follows a compaction
+							// carries the reference again.
+							const prepared = await prepareTurnText(
+								reviewSession,
+								() =>
+									`${state.reviewContext === "HELD" ? "" : `${text}\n\n`}${finishReviewText(left)}`,
+							);
 							if (safety.expired()) {
 								return;
 							}
@@ -5230,11 +5451,6 @@ async function main() {
 								preflightResult: (disposition) => {
 									if (disposition === "started") {
 										state.reviewContext = "HELD";
-										if (restoring) {
-											for (const slug of state.consulted.keys()) {
-												state.inView.add(slug);
-											}
-										}
 									}
 								},
 							});
@@ -5272,7 +5488,7 @@ async function main() {
 
 	/**
 	 * The private lanes, in a fresh session opened after measurement ended: it receives the task, the brief, the
-	 * admitted observations and the person's authorized history, reads with the evidence tools, and records only
+	 * admitted results with their observations and the person's authorized history, reads with the evidence tools, and records only
 	 * with report_feedback. No measuring transcript is in its context.
 	 */
 	async function composePrivately(
@@ -5285,7 +5501,7 @@ async function main() {
 		const feedbackTool = buildFeedbackTool(
 			composablePracticeSlugs(),
 			request,
-			admittedObservations,
+			admittedResults,
 			stagedPreparedTargets(),
 			stagedDeliveredPractices(),
 		);
@@ -5338,7 +5554,7 @@ async function main() {
 					trace.stoppedBy = "safety";
 					throw new Error("the run reached its safety ceiling before composition was due");
 				}
-				const compositionTurn = buildCompositionTurn(request, admittedObservations, notReached);
+				const compositionTurn = buildCompositionTurn(request, admittedResults, notReached);
 				await Promise.race([
 					(async () => {
 						const compositionText = await prepareTurnText(
@@ -5390,7 +5606,7 @@ async function main() {
 					() =>
 						openingInContext
 							? ""
-							: `${openingIfNeeded(brief, true)}${buildCompositionTurn(request, admittedObservations, notReached)}`,
+							: `${openingIfNeeded(brief, true)}${buildCompositionTurn(request, admittedResults, notReached)}`,
 					safety,
 				);
 			}
@@ -5426,6 +5642,7 @@ async function run(): Promise<void> {
 		console.error(
 			`[pi-runner] FATAL: ${errorText(error)}\n${error instanceof Error ? (error.stack ?? "") : ""}`,
 		);
+		unreachedReason = "error";
 		finalizeOutputQuietly();
 		// Preserve the retryable exit code for admission transport failures.
 		process.exit(error instanceof AdmissionUnreachableError ? SERVER_UNREACHABLE_EXIT : 2);

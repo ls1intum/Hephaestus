@@ -88,8 +88,25 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
     rm -rf /tmp/abi-check
 
 COPY --from=dependencies /opt/practice-scripts/node_modules /opt/practice-scripts/node_modules
-COPY practice-scripts/package.json practice-scripts/runner.ts practice-scripts/child.ts /opt/practice-scripts/
+COPY practice-scripts/package.json practice-scripts/child.ts /opt/practice-scripts/
 COPY practice-scripts/lib/ /opt/practice-scripts/lib/
+
+# The runner imports the practice program host through a link the runtime creates before Node starts
+# (`PracticeRunnerProfile.setupCommands`): `/workspace/work/practice-scripts/lib` → `/opt/practice-scripts/lib`.
+# Resolving it here, as /workspace/.run-pi.ts does, proves the toolkit and its own dependencies load beside the
+# Pi SDK, and that a program's process starts under the permissions the host gives it.
+RUN mkdir -p /tmp/host-check/work/practice-scripts/practices && \
+    ln -s /opt/pi-sdk/node_modules /tmp/host-check/node_modules && \
+    ln -sfn /opt/practice-scripts/lib /tmp/host-check/work/practice-scripts/lib && \
+    printf '%s\n' \
+      'import { createAgentSession } from "@earendil-works/pi-coding-agent";' \
+      'import { BUILTIN_PROGRAM, runPracticeProgram } from "./work/practice-scripts/lib/program-host.ts";' \
+      'import { parseCandidate } from "./work/practice-scripts/lib/contract.ts";' \
+      'if (typeof createAgentSession !== "function" || typeof runPracticeProgram !== "function") { throw new Error("the host cannot load the Pi SDK and the toolkit together"); }' \
+      'if (typeof BUILTIN_PROGRAM.run !== "function" || parseCandidate({}).ok) { throw new Error("the toolkit contract does not load"); }' \
+      > /tmp/host-check/.run-pi.ts && \
+    node /tmp/host-check/.run-pi.ts && \
+    rm -rf /tmp/host-check
 
 RUN git config --system core.hooksPath /nonexistent && \
     git config --system core.fsmonitor false && \
@@ -141,7 +158,7 @@ RUN mkdir -p /workspace/work /workspace/out /workspace/.pi /workspace/.sessions 
     chown -R 1000:1000 /workspace/work /workspace/out /workspace/.pi /workspace/.sessions && \
     ln -s /opt/pi-sdk/node_modules /workspace/node_modules
 
-LABEL hephaestus.agent.runtime-contract=4
+LABEL hephaestus.agent.runtime-contract=5
 LABEL hephaestus.agent.node-version=${NODE_VERSION}
 LABEL hephaestus.agent.pi-version=${PI_VERSION}
 

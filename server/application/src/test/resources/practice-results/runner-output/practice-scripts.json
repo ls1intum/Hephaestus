@@ -1,0 +1,83 @@
+{
+	"schemaVersion": 2,
+	"truncated": false,
+	"practices": [
+		{
+			"practiceSlug": "auth-review",
+			"program": {
+				"kind": "builtin",
+				"digest": null
+			},
+			"models": [],
+			"status": "ok",
+			"stopReason": null,
+			"calls": {
+				"review": 1,
+				"chat": 0,
+				"decision": 0,
+				"embedding": 0,
+				"reranking": 0
+			},
+			"coverageReached": {
+				"reads": 1,
+				"truncatedReads": 0,
+				"failedReads": 0
+			},
+			"durationMs": 0
+		},
+		{
+			"practiceSlug": "ui-scope",
+			"program": {
+				"kind": "custom",
+				"digest": "d763bcc927a042f9abe1940074662e09814ad5af706f8d94808ffcef505d691b"
+			},
+			"models": [
+				{
+					"slot": "chat",
+					"need": "optional",
+					"bound": false,
+					"notRated": {}
+				}
+			],
+			"status": "ok",
+			"stopReason": null,
+			"calls": {
+				"review": 0,
+				"chat": 0,
+				"decision": 0,
+				"embedding": 0,
+				"reranking": 0
+			},
+			"coverageReached": {
+				"reads": 0,
+				"truncatedReads": 0,
+				"failedReads": 0
+			},
+			"durationMs": 0
+		},
+		{
+			"practiceSlug": "zz-legacy",
+			"program": {
+				"kind": "custom",
+				"digest": "c0ad25ea7f33450cbe4dfa34988d76040c94b2b24ba42e9ffef131417d4262a2"
+			},
+			"models": [],
+			"status": "failed",
+			"stopReason": "invalid-program",
+			"error": "This practice script uses the retired leads contract (meta.version). Accept the practice's catalog update, or rewrite run() to return a result, for example return ctx.review({ leads }).",
+			"calls": {
+				"review": 0,
+				"chat": 0,
+				"decision": 0,
+				"embedding": 0,
+				"reranking": 0
+			},
+			"coverageReached": {
+				"reads": 0,
+				"truncatedReads": 0,
+				"failedReads": 0
+			},
+			"durationMs": 0
+		}
+	]
+}

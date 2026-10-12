@@ -7,8 +7,9 @@ import { factsOf } from "../lib/bounded-text.ts";
 import {
 	definePracticeScript,
 	expectKind,
+	requireChange,
 	type DiffFile,
-	type Lead,
+	type ReviewLead,
 } from "../lib/practice-script.ts";
 import { issueNumberReferences } from "../lib/references.ts";
 import {
@@ -22,6 +23,12 @@ import {
 	reviewerCommentRows,
 } from "../lib/review.ts";
 
+export const LABELS = {
+	"inline-ask":
+		"A comment by someone other than the author that opens a thread on a line of the change.",
+	"conversation-ask": "A comment by someone other than the author in the conversation.",
+};
+
 /** Words a reply uses to put an ask off rather than answer it. */
 const DEFERRAL =
 	/\b(?:later|next (?:mr|pr|merge request|pull request|sprint|iteration)|follow[- ]?up|will (?:do|add|fix|revisit|look)|todo|not (?:in|for) this (?:mr|pr)|separate (?:mr|pr|issue)|future)\b/iu;
@@ -32,36 +39,30 @@ const WAIVER =
 
 /** One ask, with the facts that the record shows beside it. */
 interface Ask {
-	lead: Lead;
+	lead: ReviewLead;
 	authorReplied: boolean;
 	issueNamedInReply: boolean;
 }
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"inline-ask":
-				"A comment by someone other than the author that opens a thread on a line of the change.",
-			"conversation-ask": "A comment by someone other than the author in the conversation.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		// The practice reviews the asks that the work merged with, so a requested review of unmerged
 		// work has none to decide yet.
 		if (ctx.cause.type === "requested" && !ctx.work.is_merged) {
-			return {
+			return ctx.review({
 				leads: [],
 				directions: [
 					"The work is not merged. This practice decides each review ask at the merge, so no ask is listed.",
 				],
-			};
+			});
 		}
+		const change = requireChange(ctx.files);
 		const author = ctx.work.author ?? "";
-		const inline = await readReviewComments(ctx.context.dir);
-		const general = await readGeneralComments(ctx.context.dir);
-		const record = await readReviewThreads(ctx.context.dir);
+		const inline = await readReviewComments(ctx.evidence);
+		const general = await readGeneralComments(ctx.evidence);
+		const record = await readReviewThreads(ctx.evidence);
 		const decisions = record?.decisions ?? [];
 		const asks: Ask[] = [];
 		const byOthers = (comment: { author?: string }) =>
@@ -78,7 +79,7 @@ export default definePracticeScript({
 		);
 		for (const ask of inlineAsks) {
 			asks.push(
-				askOf(ask.comment, ask.replies, ask.followUps, ctx.change, {
+				askOf(ask.comment, ask.replies, ask.followUps, change, {
 					threadResolved: ask.thread?.state === "RESOLVED",
 					approvedAfterAsk: approvedAfter(ask.comment.createdAt),
 				}),
@@ -92,7 +93,7 @@ export default definePracticeScript({
 			const replies = (general ?? []).filter((c) => c.author === author && afterAsk(c));
 			const followUps = (general ?? []).filter((c) => byOthers(c) && afterAsk(c));
 			asks.push(
-				askOf(ask, replies, followUps, ctx.change, {
+				askOf(ask, replies, followUps, change, {
 					threadResolved: false,
 					approvedAfterAsk: approvedAfter(ask.createdAt),
 				}),
@@ -118,7 +119,7 @@ export default definePracticeScript({
 				"A two-part ask is two asks: address one part and the other still stands.",
 			);
 		}
-		return {
+		return ctx.review({
 			leads: asks.slice(0, 200).map((ask) => ask.lead),
 			facts: {
 				asks: asks.length,
@@ -130,7 +131,7 @@ export default definePracticeScript({
 				generalCommentsFileAbsent: general === null ? 1 : 0,
 			},
 			directions,
-		};
+		});
 	},
 });
 
@@ -162,7 +163,7 @@ function askOf(
 		return {
 			lead: {
 				at: { record: "general_comments.json", line: ask.recordLine },
-				kind: "conversation-ask",
+				label: LABELS["conversation-ask"],
 				facts,
 			},
 			authorReplied,
@@ -172,7 +173,7 @@ function askOf(
 	return {
 		lead: {
 			at: { record: "comments.json", line: ask.recordLine },
-			kind: "inline-ask",
+			label: LABELS["inline-ask"],
 			facts:
 				ask.path === ""
 					? facts

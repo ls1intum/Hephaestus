@@ -1,0 +1,1 @@
+This turn has the work left to write its observations and no more. Stop exploring. Record what the inspected evidence supports for this session's practice with report_observation. Record the outcome the evidence supports, MET, NOT_MET, NOT_APPLICABLE, or UNDETERMINED; there is no quota and no next step to write. Use tools only from this point onward; no planning prose.

@@ -5,9 +5,14 @@
 import { noMatchDirections } from "../lib/bounded-text.ts";
 import { isCommentLine } from "../lib/declarations.ts";
 import { languageOf } from "../lib/languages.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 
-const KINDS = {
+export const LABELS = {
 	"try-discards-error": "A Swift `try?` that turns a thrown error into nil.",
 	"empty-catch": "A catch block with an empty body.",
 	"catch-with-only-print": "A Swift catch block whose only statement is a print call.",
@@ -32,7 +37,7 @@ const KINDS = {
 	"rescue-unused-binding": "A Ruby rescue that binds the error and ends the line.",
 	"rescue-end": "A Ruby rescue that ends with no statement.",
 };
-type ErrorKind = keyof typeof KINDS;
+type ErrorKind = keyof typeof LABELS;
 
 // language key -> [kind, regex] of constructs in ADDED code that discard or swallow an error. The `\s`
 // in each regex spans the newlines joined into a window, so multi-line empty bodies match.
@@ -123,14 +128,14 @@ function consecutiveWindows(added: Map<number, string>): { start: number; lines:
 }
 
 export default definePracticeScript({
-	meta: { version: 1, kinds: KINDS },
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const leads: Lead[] = [];
+		const leads: ReviewLead[] = [];
 		const byLang: Record<string, number> = {};
 		let filesScanned = 0;
 		let linesAdded = 0;
-		for (const [path, df] of ctx.change) {
+		for (const [path, df] of requireChange(ctx.files)) {
 			const lang = languageOf(path);
 			if (lang === null) {
 				continue;
@@ -154,7 +159,11 @@ export default definePracticeScript({
 					if (isCommentLine(lineContent, lang)) {
 						continue;
 					}
-					leads.push({ at: { change: path, line: lineNum }, kind, facts: { language: lang } });
+					leads.push({
+						at: { change: path, line: lineNum },
+						label: LABELS[kind],
+						facts: { language: lang },
+					});
 					byLang[lang] = (byLang[lang] ?? 0) + 1;
 					// One lead for each window: the review reads the full diff for the rest.
 					break;
@@ -168,10 +177,10 @@ export default definePracticeScript({
 						"A valid fixed URL has no runtime-dependent parse failure. A later empty-value check does not swallow an error already recorded by its handler.",
 					]
 				: noMatchDirections(linesAdded, filesScanned);
-		return {
+		return ctx.review({
 			leads: leads.slice(0, 40),
 			facts: { errorSwallowCandidates: leads.length, filesScanned, linesAdded, ...byLang },
 			directions,
-		};
+		});
 	},
 });

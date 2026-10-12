@@ -1,28 +1,7 @@
-/** Read-only helpers for a practice script's task-declared context root. */
-
-import { readFile } from "node:fs/promises";
+/** Readers of the project inventory that the server captures beside the reviewed work. */
 
 import { isJsonObject, optionalBoolean, optionalNumber, optionalString } from "./json.ts";
-
-/** A citation path inside the context root declared by task.json. */
-export function contextFile(contextReference: string, name: string): string {
-	return `${contextReference}/${name}`;
-}
-
-/** Returns null for absent, unreadable or invalid JSON; callers validate the shape. */
-export async function readContextJson(
-	contextDir: string | undefined,
-	name: string,
-): Promise<unknown> {
-	if (contextDir === undefined || contextDir === "") {
-		return null;
-	}
-	try {
-		return JSON.parse(await readFile(`${contextDir}/${name}`, "utf8"));
-	} catch {
-		return null;
-	}
-}
+import { readRecordJson, type Evidence } from "./practice-script.ts";
 
 /**
  * Shape of `project_inventory.json`: every permitted repository's issues and pull requests, each row
@@ -104,9 +83,9 @@ function parseProjectInventory(value: unknown): ProjectInventory | null {
 }
 
 export async function readProjectInventory(
-	contextDir: string | undefined,
+	evidence: Pick<Evidence, "record">,
 ): Promise<ProjectInventory | null> {
-	return parseProjectInventory(await readContextJson(contextDir, "project_inventory.json"));
+	return parseProjectInventory(await readRecordJson(evidence, "project_inventory.json"));
 }
 
 /** A repository as the capture identifies it: its own id, or its provider and full name. */

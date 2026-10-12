@@ -1,4 +1,4 @@
-import { isRecord } from "./pi-observation-normalize.ts";
+import { isRecord } from "./pi-result-normalize.ts";
 
 /** Primary readiness is not the file inventory: a folder also holds permitted work from other areas. */
 export function folderCitationIndex(value: unknown): {

@@ -8,6 +8,7 @@ import {
 	isCommentLine,
 } from "./declarations.ts";
 import { isTestPath, languageOf } from "./languages.ts";
+import type { FileTree } from "./practice-script.ts";
 import type { DiffFile } from "./types.ts";
 
 export type SourcePattern = [label: string, test: RegExp];
@@ -74,8 +75,9 @@ function place(decls: Declaration[] | null, line: number, scope: RegExp | undefi
 	};
 }
 
+/** Scan the lines the change adds, placing each in its declaration as the head tree holds it. */
 export async function scanAddedLines(
-	repoPath: string,
+	tree: Pick<FileTree, "read"> | null,
 	diffFiles: ReadonlyMap<string, DiffFile>,
 	options: SourceScanOptions,
 ): Promise<SourceScan> {
@@ -98,7 +100,7 @@ export async function scanAddedLines(
 		}
 		scan.filesScanned += 1;
 		const decls = hasDeclarationSyntax(language)
-			? await declarationsOf(repoPath, path, language)
+			? await declarationsOf(tree, path, language)
 			: null;
 		if (decls === null) {
 			scan.filesWithoutCheckout += 1;

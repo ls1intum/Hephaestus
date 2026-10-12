@@ -1,0 +1,78 @@
+{
+	"schemaVersion": 2,
+	"results": [
+		{
+			"practiceSlug": "auth-review",
+			"candidate": {
+				"summary": "The pull request asks for no checked() sign-in",
+				"explanation": "The record of the pull request names a login change and no checked() call.",
+				"outcome": "NOT_MET",
+				"citations": [],
+				"problems": [
+					{
+						"severity": "MAJOR",
+						"summary": "Sign-in is added without checked()",
+						"explanation": "The criteria ask that an added authentication call use checked().",
+						"citations": [
+							{
+								"sourceKind": "scm.pull-request.core",
+								"artifactPath": "context/metadata.json",
+								"path": "context/metadata.json",
+								"startLine": 13,
+								"endLine": 13,
+								"quote": "  \"title\": \"Add login\","
+							}
+						],
+						"basis": {
+							"type": "duty",
+							"criterionQuote": "Added authentication calls use checked(), not insecure().",
+							"event": 0,
+							"explanation": "The pull request adds a sign-in, which the criteria require to use checked()."
+						},
+						"nextStep": "Call checked(token) before the session starts."
+					}
+				],
+				"coverage": {
+					"source": "host",
+					"reads": 1,
+					"truncatedReads": 0,
+					"failedReads": 0,
+					"complete": true
+				},
+				"evidence": {}
+			}
+		},
+		{
+			"practiceSlug": "ui-scope",
+			"candidate": {
+				"summary": "No user interface changes; note none",
+				"explanation": "The change adds no view, template or component.",
+				"outcome": "NOT_APPLICABLE",
+				"citations": [
+					{
+						"sourceKind": "scm.pull-request.core",
+						"artifactPath": "context/metadata.json",
+						"path": "context/metadata.json",
+						"startLine": 1,
+						"endLine": 1,
+						"quote": "{"
+					}
+				],
+				"coverage": {
+					"source": "claimed",
+					"selected": 1,
+					"checked": 1,
+					"total": 1,
+					"complete": true
+				},
+				"evidence": {
+					"inapplicability": {
+						"consulted": ["scm.pull-request.core"],
+						"subject": "user interface views",
+						"ruledOutBy": "The record names one changed Java file."
+					}
+				}
+			}
+		}
+	]
+}

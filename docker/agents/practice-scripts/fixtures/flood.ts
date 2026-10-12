@@ -1,14 +1,14 @@
-// More requests at once than the runner answers for one script.
+// More requests at once than the host answers for one program.
 import { definePracticeScript, embedMany } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { version: 1, models: { embedding: "required" }, kinds: { unused: "Not used." } },
+	meta: { models: { embedding: "required" } },
 	async run(ctx) {
 		await Promise.all(
 			Array.from({ length: 33 }, async (_, n) =>
 				embedMany({ model: ctx.models.embedding, values: [String(n)] }),
 			),
 		);
-		return { leads: [] };
+		return ctx.review();
 	},
 });

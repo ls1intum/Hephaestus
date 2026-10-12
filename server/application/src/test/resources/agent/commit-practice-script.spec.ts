@@ -1,7 +1,4 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import test from "node:test";
 
 import {
@@ -10,30 +7,36 @@ import {
 	type ChangedFile,
 } from "../../../../../../docker/agents/practice-scripts/lib/change.ts";
 import { subjectFacts } from "../../../../../../docker/agents/practice-scripts/lib/commit-subjects.ts";
-import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
+import {
+	leadKeys,
+	runBundled,
+} from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
+
+/** The captured records of a context folder that holds `source` as `commits.json`, or no record. */
+function evidence(source?: string) {
+	return {
+		record: async (name: string) =>
+			name === "commits.json" && source !== undefined
+				? { status: "FOUND" as const, text: source }
+				: { status: "ABSENT" as const },
+	};
+}
 
 void test("captured commits distinguish empty history from missing or malformed records", async () => {
-	const root = mkdtempSync(path.join(tmpdir(), "captured-commits-"));
-	try {
-		assert.equal(await readCapturedCommits(root), null);
-		for (const source of ["{", '{"commits":[null]}', '{"commits":{}}', '{"commits":[{}]}']) {
-			writeFileSync(path.join(root, "commits.json"), source);
-			assert.equal(await readCapturedCommits(root), null);
-			assert.deepEqual(await readCommits(root), []);
-		}
-		writeFileSync(path.join(root, "commits.json"), '{"commits":[]}');
-		assert.deepEqual(await readCapturedCommits(root), []);
-		writeFileSync(
-			path.join(root, "commits.json"),
+	assert.equal(await readCapturedCommits(evidence()), null);
+	for (const source of ["{", '{"commits":[null]}', '{"commits":{}}', '{"commits":[{}]}']) {
+		assert.equal(await readCapturedCommits(evidence(source)), null);
+		assert.deepEqual(await readCommits(evidence(source)), []);
+	}
+	assert.deepEqual(await readCapturedCommits(evidence('{"commits":[]}')), []);
+	const captured = await readCapturedCommits(
+		evidence(
 			JSON.stringify({
 				commits: [{ sha: "1234567", message: "", parents: [], files: [], authoredAt: "" }],
 			}),
-		);
-		const captured = await readCapturedCommits(root);
-		assert.equal(captured?.[0]?.authoredAt, "");
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+		),
+	);
+	assert.equal(captured?.[0]?.authoredAt, "");
 });
 
 const commit = (sha: string, message: string, parents = ["p"], files: ChangedFile[] = []) => ({
@@ -84,10 +87,11 @@ void test("a subject's shape is a fact — bare, repeated, listed, cut off — a
 
 /** A run of the script on a pull request whose context folder holds `record` as `commits.json`. */
 async function runOnCommitRecord(slug: string, record: unknown) {
-	return runBundled(slug, {
+	const result = await runBundled(slug, {
 		context: { "commits.json": record },
 		contextReference: "areas/changed-work",
 	});
+	return { ...result, leads: result.leads ?? [] };
 }
 
 void test("both commit practices read the subjects from the commit record and state shapes, not verdicts", async () => {
@@ -97,6 +101,7 @@ void test("both commit practices read the subjects from the commit record and st
 		commit("3333333", "Merge branch 'main'\n", ["p1", "p2"]),
 	];
 	for (const slug of ["commit-subjects-explain-each-change", "commits-are-atomic-and-cohesive"]) {
+		const keyOf = await leadKeys(slug);
 		const result = await runOnCommitRecord(slug, { commits });
 		assert.equal(result.facts?.authoredCommits, 2);
 		assert.equal(result.facts.mergeCommits, 1);
@@ -106,7 +111,7 @@ void test("both commit practices read the subjects from the commit record and st
 		);
 		// One lead per authored commit, named by its sha; the merge is set aside.
 		assert.deepEqual(
-			result.leads.map((lead) => [lead.at, lead.kind, lead.facts?.sha]),
+			result.leads.map((lead) => [lead.at, keyOf(lead.label), lead.facts?.sha]),
 			[
 				[{ record: "commits.json" }, "commit", "1111111"],
 				[{ record: "commits.json" }, "commit", "2222222"],

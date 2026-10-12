@@ -5,8 +5,13 @@
 // for each note if it asked something of this change and if the author engaged. The script never does.
 import { factsOf } from "../lib/bounded-text.ts";
 import { type ChangeCommit, readCapturedCommits } from "../lib/change.ts";
-import { contextFile } from "../lib/context.ts";
-import { definePracticeScript, expectKind, type Facts, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type Facts,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 import {
 	type GeneralComment,
 	type ReviewDecision,
@@ -20,6 +25,11 @@ import {
 	readReviewThreads,
 	reviewerCommentRows,
 } from "../lib/review.ts";
+
+export const LABELS = {
+	"reviewer-comment": "An inline comment by someone other than the author.",
+	"conversation-comment": "A conversation comment by someone other than the author.",
+};
 
 /** An instant strictly between two others; false when any is missing. */
 function between(
@@ -66,7 +76,7 @@ function approvalAfter(
 
 /** One note, as a lead, with the facts that the counts read. */
 interface Note {
-	lead: Lead;
+	lead: ReviewLead;
 	bot: boolean;
 	replied: boolean;
 	committedOnFile: boolean;
@@ -74,20 +84,15 @@ interface Note {
 }
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"reviewer-comment": "An inline comment by someone other than the author.",
-			"conversation-comment": "A conversation comment by someone other than the author.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
+		const change = requireChange(ctx.files);
 		const author = ctx.work.author ?? "";
-		const inline = await readReviewComments(ctx.context.dir);
-		const general = await readGeneralComments(ctx.context.dir);
-		const record = await readReviewThreads(ctx.context.dir);
-		const capturedCommits = await readCapturedCommits(ctx.context.dir);
+		const inline = await readReviewComments(ctx.evidence);
+		const general = await readGeneralComments(ctx.evidence);
+		const record = await readReviewThreads(ctx.evidence);
+		const capturedCommits = await readCapturedCommits(ctx.evidence);
 		const commits = capturedCommits ?? [];
 		const decisions = record?.decisions ?? [];
 		const handOff = ctx.work.merged_at ?? ctx.work.closed_at;
@@ -135,8 +140,8 @@ export default definePracticeScript({
 					authorNotes,
 				),
 				afterHandOff,
-				fileInChange: ctx.change.has(comment.path),
-				changeNearLine: changeNear(ctx.change.get(comment.path), comment.line),
+				fileInChange: change.has(comment.path),
+				changeNearLine: changeNear(change.get(comment.path), comment.line),
 				commitsAfter:
 					capturedCommits === null ? "unknown" : commitsAfter(commits, comment.createdAt),
 				commitsAfterTouchingFile,
@@ -147,7 +152,7 @@ export default definePracticeScript({
 			return {
 				lead: {
 					at: { record: "comments.json", line: comment.recordLine },
-					kind: "reviewer-comment",
+					label: LABELS["reviewer-comment"],
 					facts,
 				},
 				bot: comment.bot,
@@ -166,7 +171,7 @@ export default definePracticeScript({
 				return {
 					lead: {
 						at: { record: "general_comments.json", line: note.recordLine },
-						kind: "conversation-comment",
+						label: LABELS["conversation-comment"],
 						facts: factsOf({
 							by: note.author ?? "",
 							bot: note.bot,
@@ -215,10 +220,10 @@ export default definePracticeScript({
 			directions.push(
 				`${String(byPeople.length)} reviewer note(s) (${String(inlineByPeople)} inline, ${String(conversationByPeople)} conversation)${bots > 0 ? `, ${String(bots)} more by bots` : ""}; ${String(replied)} have a later author note.`,
 				`${committedAfter === null ? "How many have a later authored commit touching the commented file is unknown" : `${String(committedAfter)} have a later authored commit touching the commented file`}; ${String(afterHandOff)} were posted after the work merged or closed.`,
-				`Commit capture: ${capturedCommits === null ? "unavailable" : `${String(commits.length)} captured commit(s)`} in ${contextFile(ctx.context.reference, "commits.json")}.`,
+				`Commit capture: ${capturedCommits === null ? "unavailable" : `${String(commits.length)} captured commit(s)`} in commits.json.`,
 			);
 		}
-		return {
+		return ctx.review({
 			leads: notes.slice(0, 200).map((note) => note.lead),
 			facts: {
 				commentsFileAbsent: inline === null ? 1 : 0,
@@ -232,6 +237,6 @@ export default definePracticeScript({
 				commitsFileAbsent: capturedCommits === null ? 1 : 0,
 			},
 			directions,
-		};
+		});
 	},
 });

@@ -2,7 +2,12 @@
 // preferences and Core Data. Each lead tells the type that holds the line. SwiftData's own view-side
 // API (`@Query`, `modelContext.insert`) is not I/O in the view, so the script does not find it.
 import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 import { sampleNote, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
 
 /** A SwiftUI view: a type conforming to `View`, or an `App`/`Scene`, which also declare a body. */
@@ -17,31 +22,32 @@ const IO_IN_VIEW: readonly SourcePattern[] = [
 	["data-contents-of", /\bData\(contentsOf:/u],
 ];
 
+export const LABELS = {
+	"urlsession-request": "An added line that uses URLSession or makes a URLRequest.",
+	"json-coding": "An added line that makes a JSONDecoder or a JSONEncoder.",
+	"core-data-fetch": "An added line that makes or runs an NSFetchRequest.",
+	"user-defaults-access": "An added line that uses UserDefaults.",
+	"file-manager-access": "An added line that uses FileManager.",
+	"data-contents-of": "An added line that reads a file with Data(contentsOf:).",
+};
+const LABEL_OF = new Map<string, string>(Object.entries(LABELS));
+
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"urlsession-request": "An added line that uses URLSession or makes a URLRequest.",
-			"json-coding": "An added line that makes a JSONDecoder or a JSONEncoder.",
-			"core-data-fetch": "An added line that makes or runs an NSFetchRequest.",
-			"user-defaults-access": "An added line that uses UserDefaults.",
-			"file-manager-access": "An added line that uses FileManager.",
-			"data-contents-of": "An added line that reads a file with Data(contentsOf:).",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const scan = await scanAddedLines(ctx.repo, ctx.change, {
+		const scan = await scanAddedLines(ctx.files?.head ?? null, requireChange(ctx.files), {
 			languages: ["swift"],
 			patterns: IO_IN_VIEW,
 			scope: SWIFTUI_VIEW,
 			onlyInScope: true,
 		});
-		const leads: Lead[] = scan.hints.map((hint) => ({
-			at: { change: hint.file, line: hint.line },
-			kind: hint.pattern,
-			facts: factsOf(hint.flags),
-		}));
+		const leads: ReviewLead[] = scan.hints.flatMap((hint) => {
+			const label = LABEL_OF.get(hint.pattern);
+			return label === undefined
+				? []
+				: [{ at: { change: hint.file, line: hint.line }, label, facts: factsOf(hint.flags) }];
+		});
 		const directions: string[] = [...sampleNote(scan)];
 		if (scan.matched > 0) {
 			directions.push(
@@ -57,7 +63,7 @@ export default definePracticeScript({
 		if (leads.length === 0) {
 			directions.push(...noMatchDirections(scan.linesAdded, scan.filesScanned));
 		}
-		return {
+		return ctx.review({
 			leads,
 			facts: {
 				ioCallsInViews: scan.matched,
@@ -68,6 +74,6 @@ export default definePracticeScript({
 				linesAdded: scan.linesAdded,
 			},
 			directions,
-		};
+		});
 	},
 });

@@ -3,13 +3,23 @@
 // of them this change implements. A lead is a candidate, not a claim.
 import { factsOf } from "../lib/bounded-text.ts";
 import { subIssueRollup } from "../lib/issue-classification.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import { definePracticeScript, expectKind, type ReviewLead } from "../lib/practice-script.ts";
 import {
 	branchIssueReferences,
 	closingReferences,
 	issueNumberReferences,
 } from "../lib/references.ts";
 import { checkableItems, readLinkedWorkItems, reviewsMergedWork } from "../lib/review.ts";
+
+export const LABELS = {
+	"checkable-outcome":
+		"A linked issue with a task list, an outcome heading or a positive sub-issue count.",
+	"no-checkable-outcome":
+		"A linked issue with no task list, no outcome heading and a sub-issue count of zero.",
+	"no-task-list-or-outcome-heading":
+		"A linked issue with no task list, no outcome heading, and no count that shows it has no sub-issues.",
+};
+type OutcomeKind = keyof typeof LABELS;
 
 /** Headings under which an issue states what "done" means without a task list. */
 const OUTCOME_HEADING =
@@ -30,26 +40,16 @@ function howLinked(
 }
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"checkable-outcome":
-				"A linked issue with a task list, an outcome heading or a positive sub-issue count.",
-			"no-checkable-outcome":
-				"A linked issue with no task list, no outcome heading and a sub-issue count of zero.",
-			"no-task-list-or-outcome-heading":
-				"A linked issue with no task list, no outcome heading, and no count that shows it has no sub-issues.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		if (!reviewsMergedWork(ctx.cause)) {
-			return {
+			return ctx.review({
 				leads: [],
 				directions: [
 					"The pull request is not merged. This practice reviews the merge, so it has nothing to check yet.",
 				],
-			};
+			});
 		}
 		const { work } = ctx;
 		const body = work.body ?? "";
@@ -59,9 +59,9 @@ export default definePracticeScript({
 			...issueNumberReferences(body),
 			...branchIssueReferences(work.source_branch),
 		]);
-		const captured = await readLinkedWorkItems(ctx.context.dir);
+		const captured = await readLinkedWorkItems(ctx.evidence);
 		const linked = captured ?? [];
-		const leads: Lead[] = [];
+		const leads: ReviewLead[] = [];
 		let untickedItems = 0;
 		for (const item of linked) {
 			const items = checkableItems(item.body);
@@ -74,7 +74,7 @@ export default definePracticeScript({
 			});
 			const subIssues = rollup.total;
 			const checkable = items.length > 0 || heading || (subIssues ?? 0) > 0;
-			let kind = checkable ? "checkable-outcome" : "no-checkable-outcome";
+			let kind: OutcomeKind = checkable ? "checkable-outcome" : "no-checkable-outcome";
 			if (subIssues === undefined || (item.subIssuesSource === "children" && subIssues === 0)) {
 				kind = checkable ? kind : "no-task-list-or-outcome-heading";
 			}
@@ -88,7 +88,7 @@ export default definePracticeScript({
 					: howLinked(item.number, closing, named);
 			leads.push({
 				at: { record: `linked_work_items/${String(item.number)}.md` },
-				kind,
+				label: LABELS[kind],
 				facts: factsOf({
 					number: item.number,
 					how,
@@ -103,7 +103,7 @@ export default definePracticeScript({
 				}),
 			});
 		}
-		const candidates = leads.filter((lead) => lead.kind === "checkable-outcome");
+		const candidates = leads.filter((lead) => lead.label === LABELS["checkable-outcome"]);
 		const directions: string[] = [];
 		if (captured === null) {
 			directions.push(
@@ -127,7 +127,7 @@ export default definePracticeScript({
 				"subIssuesSource=children counts only the child issues stored at capture. That mirror may omit other children, so all of them closed does not show that the whole hierarchy is complete.",
 			);
 		}
-		return {
+		return ctx.review({
 			leads,
 			facts: {
 				linkedItems: linked.length,
@@ -135,6 +135,6 @@ export default definePracticeScript({
 				untickedItems,
 			},
 			directions,
-		};
+		});
 	},
 });

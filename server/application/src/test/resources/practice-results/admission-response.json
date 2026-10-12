@@ -1,0 +1,306 @@
+{
+	"schemaVersion": 2,
+	"admissionDigest": "9d4f1c2b7e6a5038d1b9c4e2f7a6058c3b1d9e4f2a7c6b5081d3e9f4c2b7a6d5e",
+	"results": [
+		{
+			"practiceResultId": "0f3b6d2e-8a41-4c57-b9e2-71d5a3c8e604",
+			"practiceSlug": "handles-errors-instead-of-swallowing-them",
+			"outcome": "NOT_MET",
+			"severity": "MAJOR",
+			"summary": "Two added catch blocks drop export failures",
+			"explanation": "The pull request adds a retry around the invoice export. Two of its new catch blocks end the failure path without logging, rethrowing or recording the failed export, so an operator cannot tell a dropped invoice from a sent one. A third catch in the same change keeps the invoice id and rethrows, which is the shape the criteria ask for.",
+			"summaryOnly": false,
+			"publicEligible": true,
+			"citations": [],
+			"evidence": {
+				"search": {
+					"consulted": ["scm.pull-request.diff", "scm.repository.tree"],
+					"lookedFor": "catch blocks and error callbacks that this pull request adds or changes and that drop the error",
+					"boundary": "every hunk of the three changed files; unchanged code only where a changed line calls it"
+				},
+				"undecidability": [
+					{
+						"openQuestion": "Is an empty result here the documented contract for a missing invoice, or does it hide a failed lookup?",
+						"wouldSettleIt": "The contract of InvoiceRepository.findForExport, or a caller that treats an empty result as an error.",
+						"citation": {
+							"sourceKind": "scm.pull-request.diff",
+							"artifactPath": "context/change.json",
+							"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
+							"side": "NEW",
+							"startLine": 57,
+							"endLine": 57,
+							"quote": "            return Optional.empty();",
+							"revision": "3f9c2a7d5e1b4c8a9f0e6d2b7a1c5e8f4d3b2a10",
+							"verification": {
+								"status": "VERIFIED",
+								"jobId": "5b0e7c1a-3d42-4f6e-9a18-2c7d4e9b1f30",
+								"attempt": 0,
+								"artifactSha256": "a110000000000000000000000000000000000000000000000000000000000000",
+								"quoteSha256": "b220000000000000000000000000000000000000000000000000000000000000",
+								"scope": "EXACT_LOCATION",
+								"citationSha256": "c330000000000000000000000000000000000000000000000000000000000000"
+							}
+						}
+					}
+				]
+			},
+			"example": {
+				"citation": {
+					"sourceKind": "scm.pull-request.diff",
+					"artifactPath": "context/change.json",
+					"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
+					"side": "NEW",
+					"startLine": 52,
+					"endLine": 52,
+					"quote": "            throw new ExportFailedException(invoice.id(), e);",
+					"revision": "3f9c2a7d5e1b4c8a9f0e6d2b7a1c5e8f4d3b2a10",
+					"verification": {
+						"status": "VERIFIED",
+						"jobId": "5b0e7c1a-3d42-4f6e-9a18-2c7d4e9b1f30",
+						"attempt": 0,
+						"artifactSha256": "a1a0000000000000000000000000000000000000000000000000000000000000",
+						"quoteSha256": "b2b0000000000000000000000000000000000000000000000000000000000000",
+						"scope": "EXACT_LOCATION",
+						"citationSha256": "c3c0000000000000000000000000000000000000000000000000000000000000"
+					}
+				},
+				"note": "This catch keeps the invoice id and rethrows the cause. The two catches above can follow the same shape."
+			},
+			"coverage": {
+				"source": "host",
+				"reads": 9,
+				"truncatedReads": 1,
+				"failedReads": 0,
+				"complete": false,
+				"omitted": [
+					{
+						"what": "lines of the export client beyond the read limit",
+						"count": 1,
+						"reason": "truncated",
+						"units": ["src/main/java/com/acme/billing/export/client/ExportClient.java"]
+					}
+				]
+			},
+			"observations": [
+				{
+					"observationId": "c41a9e07-2b5d-4f83-a6c1-9e0d7b3f5a12",
+					"position": 0,
+					"severity": "MAJOR",
+					"summary": "Timeout during export is caught and ignored",
+					"explanation": "The added catch block discards the TimeoutException. The export then returns normally, so the caller records the invoice as sent although the gateway never received it.",
+					"nextStep": "Log the timeout with the invoice id and rethrow it, or record the invoice as a failed export so that the retry policy sees it.",
+					"basis": {
+						"type": "introduced",
+						"head": 0,
+						"explanation": "This pull request adds the catch block on the new side of the change."
+					},
+					"citations": [
+						{
+							"index": 0,
+							"sourceKind": "scm.pull-request.diff",
+							"artifactPath": "context/change.json",
+							"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
+							"side": "NEW",
+							"startLine": 88,
+							"endLine": 88,
+							"quote": "        } catch (TimeoutException ignored) {}",
+							"revision": "3f9c2a7d5e1b4c8a9f0e6d2b7a1c5e8f4d3b2a10",
+							"verification": {
+								"status": "VERIFIED",
+								"jobId": "5b0e7c1a-3d42-4f6e-9a18-2c7d4e9b1f30",
+								"attempt": 0,
+								"artifactSha256": "a140000000000000000000000000000000000000000000000000000000000000",
+								"quoteSha256": "b250000000000000000000000000000000000000000000000000000000000000",
+								"scope": "EXACT_LOCATION",
+								"citationSha256": "c360000000000000000000000000000000000000000000000000000000000000"
+							},
+							"anchorable": true
+						}
+					],
+					"anchorable": true
+				},
+				{
+					"observationId": "e8d27f50-6c19-4a3b-8e45-1b9c0d6a7f23",
+					"position": 1,
+					"severity": "MINOR",
+					"summary": "Retry failure is logged only at debug level",
+					"explanation": "The retry policy logs the final failure at debug level and then returns false. Production runs at info level, so the failure leaves no trace.",
+					"nextStep": "Log the final retry failure at warn level with the invoice id.",
+					"basis": {
+						"type": "introduced",
+						"head": 0,
+						"explanation": "This pull request adds the debug-level log call on the new side of the change."
+					},
+					"citations": [
+						{
+							"index": 0,
+							"sourceKind": "scm.pull-request.diff",
+							"artifactPath": "context/change.json",
+							"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
+							"side": "NEW",
+							"startLine": 41,
+							"endLine": 41,
+							"quote": "            log.debug(\"retry failed\", e);",
+							"revision": "3f9c2a7d5e1b4c8a9f0e6d2b7a1c5e8f4d3b2a10",
+							"verification": {
+								"status": "VERIFIED",
+								"jobId": "5b0e7c1a-3d42-4f6e-9a18-2c7d4e9b1f30",
+								"attempt": 0,
+								"artifactSha256": "a170000000000000000000000000000000000000000000000000000000000000",
+								"quoteSha256": "b280000000000000000000000000000000000000000000000000000000000000",
+								"scope": "EXACT_LOCATION",
+								"citationSha256": "c390000000000000000000000000000000000000000000000000000000000000"
+							},
+							"anchorable": true
+						}
+					],
+					"anchorable": true
+				}
+			]
+		},
+		{
+			"practiceResultId": "7a2c4e91-5f08-4b36-8d1e-3c6b9a0f2e45",
+			"practiceSlug": "leaves-the-code-clean-with-intent-revealing-comments",
+			"outcome": "MET",
+			"severity": null,
+			"summary": "Added comments explain why, not what",
+			"explanation": "The pull request adds two comments. Each states a constraint that the code cannot express: the gateway's batch limit and its behaviour after an idle period. No added comment restates the code, and no commented-out code is added.",
+			"summaryOnly": false,
+			"publicEligible": false,
+			"citations": [
+				{
+					"index": 0,
+					"sourceKind": "scm.pull-request.diff",
+					"artifactPath": "context/change.json",
+					"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
+					"side": "NEW",
+					"startLine": 72,
+					"endLine": 72,
+					"quote": "        // The gateway rejects batches over 500 invoices; split before sending.",
+					"revision": "3f9c2a7d5e1b4c8a9f0e6d2b7a1c5e8f4d3b2a10",
+					"verification": {
+						"status": "VERIFIED",
+						"jobId": "5b0e7c1a-3d42-4f6e-9a18-2c7d4e9b1f30",
+						"attempt": 0,
+						"artifactSha256": "a1d0000000000000000000000000000000000000000000000000000000000000",
+						"quoteSha256": "b2e0000000000000000000000000000000000000000000000000000000000000",
+						"scope": "EXACT_LOCATION",
+						"citationSha256": "c3f0000000000000000000000000000000000000000000000000000000000000"
+					},
+					"anchorable": true
+				}
+			],
+			"evidence": {
+				"search": {
+					"consulted": ["scm.pull-request.diff"],
+					"lookedFor": "added comments that restate the code, mislead, or comment out code",
+					"boundary": "every added line of the three changed files"
+				}
+			},
+			"example": {
+				"citation": {
+					"sourceKind": "scm.pull-request.diff",
+					"artifactPath": "context/change.json",
+					"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
+					"side": "NEW",
+					"startLine": 18,
+					"endLine": 18,
+					"quote": "    // One retry only: the export gateway drops the first call after an idle period.",
+					"revision": "3f9c2a7d5e1b4c8a9f0e6d2b7a1c5e8f4d3b2a10",
+					"verification": {
+						"status": "VERIFIED",
+						"jobId": "5b0e7c1a-3d42-4f6e-9a18-2c7d4e9b1f30",
+						"attempt": 0,
+						"artifactSha256": "a110000000000000000000000000000000000000000000000000000000000000",
+						"quoteSha256": "b211000000000000000000000000000000000000000000000000000000000000",
+						"scope": "EXACT_LOCATION",
+						"citationSha256": "c312000000000000000000000000000000000000000000000000000000000000"
+					}
+				},
+				"note": "This comment states why the retry exists, which the code alone cannot say."
+			},
+			"coverage": {
+				"source": "host",
+				"reads": 6,
+				"truncatedReads": 0,
+				"failedReads": 0,
+				"complete": true
+			},
+			"observations": []
+		},
+		{
+			"practiceResultId": "b9e1d3f7-2a64-4c80-9f5b-6e7d1c2a3b58",
+			"practiceSlug": "makes-ui-accessible-by-default",
+			"outcome": "NOT_APPLICABLE",
+			"severity": null,
+			"summary": "The change adds or changes no user interface",
+			"explanation": "The pull request changes three Java files of the export service and its test. None of them is a view, template, stylesheet or UI component.",
+			"summaryOnly": false,
+			"publicEligible": false,
+			"citations": [
+				{
+					"index": 0,
+					"sourceKind": "scm.pull-request.core",
+					"artifactPath": "context/metadata.json",
+					"path": "context/metadata.json",
+					"startLine": 27,
+					"endLine": 27,
+					"quote": "  \"changed_files\": 3,",
+					"verification": {
+						"status": "VERIFIED",
+						"jobId": "5b0e7c1a-3d42-4f6e-9a18-2c7d4e9b1f30",
+						"attempt": 0,
+						"artifactSha256": "a113000000000000000000000000000000000000000000000000000000000000",
+						"quoteSha256": "b214000000000000000000000000000000000000000000000000000000000000",
+						"scope": "EXACT_LOCATION",
+						"citationSha256": "c315000000000000000000000000000000000000000000000000000000000000"
+					},
+					"anchorable": false
+				}
+			],
+			"evidence": {
+				"inapplicability": {
+					"consulted": ["scm.pull-request.core", "scm.pull-request.diff"],
+					"subject": "user interface views and components that the change adds or changes",
+					"ruledOutBy": "All three changed files are Java sources under src/main/java and src/test/java of the export service; the change adds or changes no view, template, stylesheet or component file."
+				}
+			},
+			"example": null,
+			"coverage": {
+				"source": "claimed",
+				"selected": 3,
+				"checked": 3,
+				"total": 3,
+				"complete": true
+			},
+			"observations": []
+		}
+	],
+	"withheld": [
+		{
+			"practiceSlug": "validates-and-escapes-untrusted-input",
+			"reasonCode": "quote_unverified",
+			"reason": "Quote does not match the cited revision and lines",
+			"verificationFailures": [
+				{
+					"citation": "citations[0]",
+					"status": "REJECTED",
+					"reasonCode": "QUOTE_LOCATION_MISMATCH",
+					"citationSha256": "d416000000000000000000000000000000000000000000000000000000000000",
+					"candidateQuoteSha256": "e517000000000000000000000000000000000000000000000000000000000000"
+				}
+			]
+		}
+	],
+	"inAppSupport": {
+		"state": "UNAVAILABLE",
+		"readAt": "2026-10-12T09:41:07Z",
+		"refusal": null,
+		"practices": []
+	},
+	"inChatEligibility": {
+		"state": "UNAVAILABLE",
+		"readAt": "2026-10-12T09:41:07Z",
+		"results": []
+	}
+}

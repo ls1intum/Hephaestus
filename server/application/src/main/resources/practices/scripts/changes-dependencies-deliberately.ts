@@ -15,15 +15,16 @@
 // A manifest that spreads one dependency over several lines (Maven, XcodeGen) gets no such kind. Its
 // changed dependency lines are raw-manifest-line leads.
 import { DIRECTION_CHARS, factsOf, oneLine } from "../lib/bounded-text.ts";
-import { globFilesSync } from "../lib/files.ts";
 import {
 	definePracticeScript,
 	expectKind,
+	requireChange,
 	type DiffFile,
-	type Lead,
+	type FileTree,
+	type ReviewLead,
 } from "../lib/practice-script.ts";
 
-const KINDS = {
+export const LABELS = {
 	"only-added":
 		"A dependency name that matches only on an added line of a manifest: new, or moved or reformatted.",
 	"only-removed":
@@ -37,7 +38,7 @@ const KINDS = {
 	"raw-manifest-line":
 		"A changed line of a pom.xml or an XcodeGen project.yml that is part of a dependency over several lines.",
 };
-type DependencyKind = keyof typeof KINDS;
+type DependencyKind = keyof typeof LABELS;
 
 // ecosystem key -> how to recognise its manifest + lockfile, and how to read a "name => constraint" line.
 interface Ecosystem {
@@ -338,11 +339,25 @@ function namedPaths(paths: readonly string[]): string {
 	return paths.length > PATHS_NAMED ? `${named} and ${paths.length - PATHS_NAMED} more` : named;
 }
 
+/** The paths of the checkout whose file name is one of `names`; none when the tree is unknown. */
+async function checkoutPaths(tree: FileTree | null, names: ReadonlySet<string>): Promise<string[]> {
+	const found: string[] = [];
+	if (tree === null) {
+		return found;
+	}
+	for (const ext of ["json", "lock", "yaml", "resolved", "lockfile", "sum"]) {
+		const { paths } = await tree.list(`**/*.${ext}`);
+		found.push(...paths.filter((f) => names.has(basenameLower(f))));
+	}
+	return found;
+}
+
 export default definePracticeScript({
-	meta: { version: 1, kinds: KINDS },
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const leads: Lead[] = [];
+		const change = requireChange(ctx.files);
+		const leads: ReviewLead[] = [];
 		const changedManifests = new Set<string>();
 		const touchedLockfiles = new Set<string>();
 		let onlyAdded = 0;
@@ -357,16 +372,9 @@ export default definePracticeScript({
 		const allLockfileNames = new Set(
 			ECOSYSTEMS.flatMap((e) => e.lockfiles.map((l) => l.toLowerCase())),
 		);
-		const checkoutLockfiles: string[] = [];
-		for (const ext of ["json", "lock", "yaml", "resolved", "lockfile", "sum"]) {
-			for (const f of globFilesSync(`**/*.${ext}`, ctx.repo)) {
-				if (allLockfileNames.has(basenameLower(f))) {
-					checkoutLockfiles.push(f);
-				}
-			}
-		}
+		const checkoutLockfiles = await checkoutPaths(ctx.files?.head ?? null, allLockfileNames);
 
-		for (const [path, df] of ctx.change) {
+		for (const [path, df] of change) {
 			const base = basenameLower(path);
 			if (allLockfileNames.has(base)) {
 				touchedLockfiles.add(path);
@@ -386,7 +394,7 @@ export default definePracticeScript({
 						unpairedManifestLines += 1;
 						leads.push({
 							at: { change: path, line: ln, side: side === "added" ? "NEW" : "OLD" },
-							kind: "raw-manifest-line",
+							label: LABELS["raw-manifest-line"],
 							facts: { ecosystem: base, side },
 						});
 					}
@@ -446,7 +454,7 @@ export default definePracticeScript({
 				if (line > 0) {
 					leads.push({
 						at: { change: path, line, side: side === "added" ? "NEW" : "OLD" },
-						kind,
+						label: LABELS[kind],
 						facts: factsOf({
 							ecosystem: base,
 							name,
@@ -460,7 +468,9 @@ export default definePracticeScript({
 
 		const lockfilePresent = checkoutLockfiles.length > 0 || touchedLockfiles.size > 0;
 		const listed = leads.slice(0, 40);
-		const rawLinesListed = listed.filter((lead) => lead.kind === "raw-manifest-line").length;
+		const rawLinesListed = listed.filter(
+			(lead) => lead.label === LABELS["raw-manifest-line"],
+		).length;
 
 		const directions: string[] = [];
 		if (changedManifests.size > 0) {
@@ -499,7 +509,7 @@ export default definePracticeScript({
 			}
 		}
 
-		return {
+		return ctx.review({
 			leads: listed,
 			facts: {
 				manifestsChanged: changedManifests.size,
@@ -514,6 +524,6 @@ export default definePracticeScript({
 				lockfilePresent: lockfilePresent ? 1 : 0,
 			},
 			directions,
-		};
+		});
 	},
 });

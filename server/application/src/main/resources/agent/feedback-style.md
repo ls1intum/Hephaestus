@@ -24,7 +24,7 @@ establishes it, and keep every qualification and uncertainty the evidence carrie
 A recorded outcome identifies the behavior that was assessed. It does not justify communicating a claim that the recorded
 evidence, read with its qualifications, and the assessed standard contradict. Read the three together to decide whether
 a claim is justified and useful, and stay quiet when it is not, with the withholding decisions the channel offers. This
-chooses what to say: it does not assess the work again, and it adds or changes no observation.
+chooses what to say: it does not assess the work again, and it adds or changes no result or observation.
 
 Use the reader's words rather than outcome codes, severity codes, scores or practice slugs.
 

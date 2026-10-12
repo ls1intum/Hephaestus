@@ -1,0 +1,15 @@
+{
+	"leads": [
+		{
+			"at": {
+				"change": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
+				"line": 88
+			},
+			"kind": "empty-catch"
+		}
+	],
+	"facts": {
+		"catches": 3
+	},
+	"directions": ["Check each added catch block."]
+}

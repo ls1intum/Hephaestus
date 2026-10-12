@@ -5,12 +5,12 @@ import { bodyFact, classifyIssue } from "../lib/issue-classification.ts";
 import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { version: 1, kinds: {} },
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.issue");
 		const shape = classifyIssue(ctx.work);
 		const { body, issueType, labels, emptyOrTitleEcho, hasDeliverableType, looksUmbrella } = shape;
-		return {
+		return ctx.review({
 			leads: [],
 			facts: {
 				bodyLength: body.length,
@@ -27,6 +27,6 @@ export default definePracticeScript({
 				),
 				"Judge the standard once over the title, the whole body, the comments and any materialised document the issue delegates to.",
 			],
-		};
+		});
 	},
 });

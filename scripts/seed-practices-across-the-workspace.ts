@@ -188,7 +188,8 @@ async function removeSeed(client: Client, workspaceId: number): Promise<void> {
 	await client.query(`DELETE FROM feedback_approval WHERE feedback_id IN (${feedback})`, [pattern]);
 	await client.query(`DELETE FROM feedback WHERE id IN (${feedback})`, [pattern]);
 	await client.query(
-		`DELETE FROM observation WHERE id::text LIKE $1 OR agent_job_id IN (${jobs})`,
+		// A result's observations cascade from it.
+		`DELETE FROM practice_result WHERE id::text LIKE $1 OR agent_job_id IN (${jobs})`,
 		[pattern],
 	);
 	await client.query(`DELETE FROM agent_job WHERE id IN (${jobs})`, [pattern]);
@@ -376,7 +377,7 @@ async function readerOf(client: Client, workspaceId: number): Promise<number> {
 	return id;
 }
 
-interface ObservationRow {
+interface ResultRow {
 	jobId: string;
 	practice: SeedPractice;
 	artifact: Artifact;
@@ -390,9 +391,13 @@ interface ObservationRow {
 	at: string;
 }
 
-/** Writes jobs and observations under the seed's ids. The first job keeps the appended revisions. */
+/**
+ * Writes jobs, their results and the observations of each NOT_MET result under the seed's ids. The
+ * first job keeps the appended revisions.
+ */
 class SeedWriter {
 	jobs = 0;
+	results = 0;
 	observations = 0;
 	readonly #client: Client;
 	readonly #workspaceId: number;
@@ -453,31 +458,29 @@ class SeedWriter {
 		return jobId;
 	}
 
-	async observation(row: ObservationRow): Promise<string> {
-		this.observations += 1;
-		const id = seedId(TABLE.observation, this.observations);
+	/** One result, as admission records it: a NOT_MET result's citation is its one observation's. */
+	async result(row: ResultRow): Promise<string> {
+		this.results += 1;
+		const id = seedId(TABLE.result, this.results);
 		const { citation, artifact } = row;
-		const evidence = {
-			citations: [
-				{
-					...citation,
-					artifactPath:
-						citation.sourceKind === "scm.pull-request.diff"
-							? "inputs/context/diff.patch"
-							: `${artifact.repository}#${artifact.number}`,
-					quoteRedacted: false,
-				},
-			],
+		const cited = {
+			...citation,
+			artifactPath:
+				citation.sourceKind === "scm.pull-request.diff"
+					? "inputs/context/diff.patch"
+					: `${artifact.repository}#${artifact.number}`,
+			quoteRedacted: false,
 		};
+		const problem = row.outcome === "NOT_MET";
 		await this.#client.query(
-			`INSERT INTO observation (
+			`INSERT INTO practice_result (
 				id, occurrence_key, agent_job_id, practice_id, artifact_kind, artifact_id, about_user_id,
 				summary, outcome, severity, evidence, evidence_rationale, observed_at,
-				practice_revision_id, origin, workspace_id
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'LIVE', $15)`,
+				practice_revision_id, origin, workspace_id, scope_key
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'LIVE', $15, $16)`,
 			[
 				id,
-				`seed-practices-across-${this.observations}`,
+				`seed-practices-across-${this.results}`,
 				row.jobId,
 				row.practice.id,
 				artifact.kind,
@@ -486,13 +489,36 @@ class SeedWriter {
 				row.summary,
 				row.outcome,
 				row.severity ?? null,
-				JSON.stringify(evidence),
+				JSON.stringify({ citations: problem ? [] : [cited] }),
 				row.rationale ?? null,
 				row.at,
 				row.practice.revisionId,
 				this.#workspaceId,
+				`${artifact.kind}:${artifact.id}:AUTHOR`,
 			],
 		);
+		if (problem) {
+			this.observations += 1;
+			await this.#client.query(
+				`INSERT INTO practice_observation (
+					id, workspace_id, practice_result_id, position, severity, summary, explanation, citations, basis
+				) VALUES ($1, $2, $3, 0, $4, $5, $6, $7, $8)`,
+				[
+					seedId(TABLE.observation, this.observations),
+					this.#workspaceId,
+					id,
+					row.severity ?? "MINOR",
+					row.summary,
+					row.rationale ?? row.summary,
+					JSON.stringify([cited]),
+					JSON.stringify({
+						type: "introduced",
+						head: 0,
+						explanation: "Synthetic: the reviewed work introduced this.",
+					}),
+				],
+			);
+		}
 		return id;
 	}
 }
@@ -561,7 +587,7 @@ async function seedDevelopers(
 				const jobId = await writer.job(artifact, at);
 				for (const { practice, bucket } of observed) {
 					const problem = isProblem(bucket, newest);
-					await writer.observation({
+					await writer.result({
 						jobId,
 						practice,
 						artifact,
@@ -616,25 +642,26 @@ async function seed(client: Client, workspaceId: number, appendedRevisionIds: nu
 	const writer = new SeedWriter(client, workspaceId, appendedRevisionIds);
 	await seedDevelopers(writer, pools, await insertDevelopers(client, workspaceId), practices);
 	const jobIds = new Map<string, string>();
-	const observationIds = new Map<string, string>();
+	const resultIds = new Map<string, string>();
 	for (const run of readerRuns) {
 		const jobId = await writer.job(run.artifact, run.at);
 		jobIds.set(run.key, jobId);
 		for (const observation of run.observations) {
-			const id = await writer.observation({
+			const id = await writer.result({
 				...observation,
 				jobId,
 				artifact: run.artifact,
 				developerId: readerId,
 				at: run.at,
 			});
-			observationIds.set(`${run.key}/${observation.practice.slug}`, id);
+			resultIds.set(`${run.key}/${observation.practice.slug}`, id);
 		}
 	}
 	return {
 		jobs: writer.jobs,
+		results: writer.results,
 		observations: writer.observations,
-		cards: readerCards(readerId, jobIds, observationIds),
+		cards: readerCards(readerId, jobIds, resultIds),
 	};
 }
 
@@ -688,7 +715,7 @@ async function main(): Promise<void> {
 		const seeded = await writeOrRewind(client, workspaceId, appendedIds, async () =>
 			seed(client, workspaceId, appendedIds),
 		);
-		// After the commit: the server reads the observations the feedback stands on.
+		// After the commit: the server reads the results the feedback stands on.
 		await postDev(
 			devServer,
 			"/api/dev/in-app-feedback",
@@ -702,7 +729,7 @@ async function main(): Promise<void> {
 			);
 		});
 		console.log(
-			`Seeded ${DEVELOPERS} synthetic developers and the demo of ${READER_LOGIN} in ${WORKSPACE_SLUG}: ${seeded.jobs} agent_job, ${seeded.observations} observation, ${seeded.cards.length} feedback`,
+			`Seeded ${DEVELOPERS} synthetic developers and the demo of ${READER_LOGIN} in ${WORKSPACE_SLUG}: ${seeded.jobs} agent_job, ${seeded.results} practice_result, ${seeded.observations} practice_observation, ${seeded.cards.length} feedback`,
 		);
 	} catch (error) {
 		await client.query("ROLLBACK").catch(() => undefined);

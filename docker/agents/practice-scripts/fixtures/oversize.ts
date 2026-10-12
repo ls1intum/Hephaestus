@@ -1,4 +1,4 @@
-// Calls that hold more items than one call to their model may: the runner refuses them before the
+// Calls that hold more items than one call to their model may: the host refuses them before the
 // proxy. A rerank at the cap reaches the proxy, and `embedMany` splits its values into calls that fit.
 import { MODEL_SLOT_CAPS } from "../lib/contract.ts";
 import {
@@ -6,20 +6,16 @@ import {
 	embedMany,
 	rerank,
 	step,
-	type Reason,
+	type UnratedReason,
 } from "../lib/practice-script.ts";
 
 const items = (count: number) => Array.from({ length: count }, (_, i) => `item ${i}`);
 
-const outcome = (result: { value: unknown } | { unrated: Reason }) =>
+const outcome = (result: { value: unknown } | { unrated: UnratedReason }) =>
 	"unrated" in result ? result.unrated : "rated";
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		models: { decision: "required", embedding: "required", reranking: "required" },
-		kinds: { unused: "Not used." },
-	},
+	meta: { models: { decision: "required", embedding: "required", reranking: "required" } },
 	async run(ctx) {
 		const { decision, embedding, reranking } = ctx.models;
 		const questions = Object.fromEntries(
@@ -43,8 +39,7 @@ export default definePracticeScript({
 				embedMany({ model: embedding, values: items(MODEL_SLOT_CAPS.embedding + 1) }),
 			),
 		]);
-		return {
-			leads: [],
+		return ctx.review({
 			facts: {
 				rerankOver: outcome(rerankOver),
 				rerankAt: outcome(rerankAt),
@@ -52,6 +47,6 @@ export default definePracticeScript({
 				embedOver: outcome(embedOver),
 				embedMany: outcome(embedMany65),
 			},
-		};
+		});
 	},
 });

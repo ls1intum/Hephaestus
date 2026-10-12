@@ -1,0 +1,270 @@
+{
+ "tools": [
+  "read",
+  "grep",
+  "find",
+  "ls",
+  "bash",
+  "codemode",
+  "report_observation"
+ ],
+ "customTools": [
+  {
+   "name": "report_observation",
+   "description": "Record one complete evidenced observation for this session’s active practice in local review state, for server admission after measuring. The arguments are that one observation. Its draft reference is the practice slug. Correct it explicitly with revises and a complete observation.",
+   "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "revises",
+     "practiceSlug",
+     "summary",
+     "outcome",
+     "severity",
+     "evidence",
+     "evidenceRationale"
+    ],
+    "properties": {
+     "revises": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "minLength": 1,
+      "description": "Use null for the first draft. To correct a draft already recorded in this review, copy its returned draft reference here and resend the complete observation. A refused correction leaves the previous draft unchanged."
+     },
+     "practiceSlug": {
+      "type": "string",
+      "minLength": 1
+     },
+     "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "A short phrase of at most 160 characters identifying the specific behavior whose conformance to the practice standard you assess, such as 'Debug print left in the request handler'. Never a single word and never the practice's own name; the reasons, titles and quotes go in evidenceRationale. A longer summary is refused, not shortened."
+     },
+     "outcome": {
+      "type": "string",
+      "enum": [
+       "MET",
+       "NOT_MET",
+       "NOT_APPLICABLE",
+       "UNDETERMINED"
+      ],
+      "description": "MET — The applicable practice standard is met in the captured evidence. Cite the evidence. Claims based on absence require a bounded, complete search; do not infer mastery or unseen work.\nNOT_MET — The applicable practice standard is not met. Cite the contradiction or record a bounded search for the required work. Supply severity and explain the consequence.\nNOT_APPLICABLE — A concrete fact rules out the practice's prerequisite occasion. Record the prerequisite and exclusion in evidence.inapplicability. This is not missing or incomplete evidence.\nUNDETERMINED — Relevant evidence was captured and read, but does not settle whether the applicable standard is met. Record the open question and what would settle it in evidence.undecidability. A capture failure is a review readiness failure, not an observation."
+     },
+     "severity": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "CRITICAL",
+       "MAJOR",
+       "MINOR",
+       "INFO",
+       null
+      ],
+      "description": "Required for a NOT_MET outcome, from the practice's Severity section; null otherwise. CRITICAL — The consequence is expensive or impossible to undo once this merges — a leaked credential, data loss, a security hole. Differs from MAJOR by whether the damage can still be taken back.\nMAJOR — A real defect to fix before merging, whose consequence is contained and correctable. Differs from MINOR by whether a reader of this change would be wrong about how it behaves.\nMINOR — A craft-level improvement worth making that nobody would block a merge on. Differs from INFO by whether there is a specific edit to make.\nINFO — An advisory, low-impact problem. Still a NOT_MET outcome; strengths and unassessed observations require null severity."
+     },
+     "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "citations"
+      ],
+      "description": "citations always: the lines that decide the outcome. Beside them, at most the one branch the outcome takes: search for a MET or NOT_MET that rests on something missing — what you looked for, where, and what the search did not cover; inapplicability for NOT_APPLICABLE; undecidability for UNDETERMINED. Use null for branches that do not apply.",
+      "properties": {
+       "search": {
+        "anyOf": [
+         {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+           "consulted",
+           "lookedFor",
+           "boundary"
+          ],
+          "properties": {
+           "consulted": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+             "type": "string",
+             "enum": [
+              "scm.pull-request.core",
+              "scm.pull-request.diff"
+             ]
+            },
+            "description": "Evidence source kinds you actually searched, e.g. scm.review-threads."
+           },
+           "lookedFor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The specific behavior whose absence you report, matching the behavior assessed in the summary and rationale."
+           },
+           "boundary": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What this search did NOT cover, so a reader can judge how far the absence reaches."
+           }
+          }
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "inapplicability": {
+        "anyOf": [
+         {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+           "consulted",
+           "subject",
+           "ruledOutBy"
+          ],
+          "properties": {
+           "consulted": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+             "type": "string",
+             "enum": [
+              "scm.pull-request.core",
+              "scm.pull-request.diff"
+             ]
+            },
+            "description": "Evidence source kinds you read to reach this conclusion, e.g. scm.pull-request.diff."
+           },
+           "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subject this practice's criteria judge."
+           },
+           "ruledOutBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The fact about THIS work that rules out that subject."
+           }
+          }
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "undecidability": {
+        "anyOf": [
+         {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+           "openQuestion",
+           "wouldSettleIt"
+          ],
+          "properties": {
+           "openQuestion": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The question the evidence you actually read left open, in one sentence."
+           },
+           "wouldSettleIt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The EVIDENCE that would have decided it — something that already exists and you could not read, named concretely: 'the body of issue #7', 'the test file the description says covers this'. NOT what the author should have written: advice belongs to a later step, and answering with it leaves nobody any wiser about which source this practice is missing."
+           }
+          }
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "citations": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "sourceKind",
+          "artifactPath",
+          "path",
+          "startLine"
+         ],
+         "properties": {
+          "sourceKind": {
+           "type": "string",
+           "enum": [
+            "scm.pull-request.core",
+            "scm.pull-request.diff"
+           ]
+          },
+          "artifactPath": {
+           "type": "string",
+           "minLength": 1,
+           "description": "The captured artifact the citation reads, exactly as the capture manifest names it."
+          },
+          "path": {
+           "type": "string",
+           "minLength": 1
+          },
+          "side": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "enum": [
+            "OLD",
+            "NEW",
+            null
+           ],
+           "description": "For a quote of the change: artifactPath names the pinned change (change.json), path is the file as named on that side, and the lines are the [L<n>] coordinates of work/change/diff.patch."
+          },
+          "revision": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+           "description": "For repository text: artifactPath names the captured .git/HEAD, path is repository-relative, and revision optionally selects a full commit SHA; omission means the captured HEAD."
+          },
+          "startLine": {
+           "type": "integer",
+           "minimum": 1,
+           "maximum": 2147483647,
+           "description": "The 1-based line of the quoted text in the artifact; for a quote of the change, the [L<n>] coordinate of work/change/diff.patch."
+          },
+          "endLine": {
+           "type": [
+            "integer",
+            "null"
+           ],
+           "minimum": 1,
+           "maximum": 2147483647,
+           "description": "The last line of the quote, at least startLine; omitted means one line."
+          },
+          "quote": {
+           "type": [
+            "string",
+            "null"
+           ],
+           "description": "The text at those lines, copied as shown; a diff marker, a [L<n>] prefix or a non-breaking space read as a space are tolerated. Omit it to cite the whole of the lines: what was recorded is echoed back."
+          }
+         }
+        }
+       }
+      }
+     },
+     "evidenceRationale": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A concise explanation a developer can read: the source facts that decide whether this work holds this criterion's subject and occasion, then, when it does, how the cited evidence meets or falls short of what this criterion judges, leaving to other practices what it assigns to them. Describe evidence, not advice, intent, confidence, or hidden chain-of-thought."
+     }
+    }
+   }
+  }
+ ]
+}

@@ -1,7 +1,7 @@
 /**
- * Stage practice scripts outside the sandbox, as `pi-practice-scripts.sh` stages them inside it:
- * each script is `<stage>/practices/<slug>.ts` beside a `lib` link, so its `../lib/…` imports
- * resolve, and beside the cause and the previous claim that the server stages for it.
+ * Stage practice programs outside the sandbox, as the server and the runtime stage them inside it:
+ * each program is `<stage>/practices/<slug>.ts` beside a `lib` link, so its `../lib/…` imports
+ * resolve, and beside the cause and the previous result that the server stages for it.
  */
 import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,7 +14,7 @@ interface StagedPracticeScripts {
 	root: string;
 	/** The folder that holds `practices/` and the `lib` link. */
 	stage: string;
-	/** The runner's `--practices` folder. */
+	/** The folder of the staged programs and their inputs: `task.json#practiceScripts`. */
 	practices: string;
 }
 
@@ -31,6 +31,8 @@ export const REQUESTED_PULL_REQUEST: Required<StagedInputs> = {
 	cause: {
 		kind: "scm.pull_request",
 		subject: { role: "AUTHOR" },
+		practice: { revisionId: 1 },
+		scope: { key: "scm.pull_request:1:AUTHOR", mode: "change", description: "the reviewed change" },
 		cause: {
 			type: "requested",
 			origin: "MANUAL",
@@ -41,9 +43,9 @@ export const REQUESTED_PULL_REQUEST: Required<StagedInputs> = {
 	previous: null,
 };
 
-/** Stage each script source under its slug, with the same inputs beside each. */
+/** Stage each program source under its slug, with the same inputs beside each. A null source stages the inputs only: the built-in. */
 export async function stagePracticeScripts(
-	scripts: Record<string, string>,
+	scripts: Record<string, string | null>,
 	inputs: StagedInputs = REQUESTED_PULL_REQUEST,
 ): Promise<StagedPracticeScripts> {
 	const root = await mkdtemp(path.join(tmpdir(), "practice-script-"));
@@ -53,7 +55,9 @@ export async function stagePracticeScripts(
 	await writeFile(path.join(root, "package.json"), '{"type":"module"}\n');
 	await symlink(path.join(import.meta.dirname, "lib"), path.join(stage, "lib"));
 	for (const [slug, source] of Object.entries(scripts)) {
-		await writeFile(path.join(practices, `${slug}.ts`), source);
+		if (source !== null) {
+			await writeFile(path.join(practices, `${slug}.ts`), source);
+		}
 		if ("cause" in inputs) {
 			await writeFile(
 				path.join(practices, `${slug}${CAUSE_FILE_SUFFIX}`),

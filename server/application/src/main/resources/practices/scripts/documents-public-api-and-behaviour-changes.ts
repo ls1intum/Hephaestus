@@ -5,9 +5,21 @@
 // declaration without a modifier is internal, not public. To add a language, add a row.
 import { noMatchDirections } from "../lib/bounded-text.ts";
 import { isCommentLine } from "../lib/declarations.ts";
-import { findFiles, readFileLines } from "../lib/grep.ts";
 import { languageOf } from "../lib/languages.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type FileTree,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
+
+export const LABELS = {
+	"public-declaration":
+		"A declaration that the change adds and that the rules of its language export.",
+	"internal-declaration":
+		"A declaration that the change adds and that the rules of its language keep internal or private.",
+};
 
 // ── (1) Public-product manifest scan ──────────────────────────────────────────────────────────────────────
 // Each manifest filename maps to a predicate over its raw text that answers "does this declare a consumable
@@ -87,15 +99,16 @@ const EXPORT_RULES: Record<string, ExportRule> = {
 };
 
 // (1) Does the repo declare a public library/framework product?
-async function declaresPublicProduct(repoPath: string): Promise<boolean> {
+async function declaresPublicProduct(tree: FileTree): Promise<boolean> {
 	for (const ext of MANIFEST_NAMES) {
-		for (const manifestPath of findFiles(repoPath, ext)) {
+		const { paths } = await tree.list(`**/*.${ext}`);
+		for (const manifestPath of paths) {
 			const matcher = PRODUCT_MANIFESTS.find(([re]) => re.test(manifestPath));
 			if (!matcher) {
 				continue;
 			}
-			const lines = await readFileLines(manifestPath);
-			const text = [...lines.values()].join("\n");
+			const file = await tree.read(manifestPath);
+			const text = file.status === "FOUND" ? file.text : "";
 			if (matcher[1](text)) {
 				return true;
 			}
@@ -105,26 +118,20 @@ async function declaresPublicProduct(repoPath: string): Promise<boolean> {
 }
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"public-declaration":
-				"A declaration that the change adds and that the rules of its language export.",
-			"internal-declaration":
-				"A declaration that the change adds and that the rules of its language keep internal or private.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const hasPublicProduct = await declaresPublicProduct(ctx.repo);
+		const change = requireChange(ctx.files);
+		const head = ctx.files?.head ?? null;
+		const hasPublicProduct = head !== null && (await declaresPublicProduct(head));
 
 		// (2) Classify each declaration ADDED in the diff as public (exported) or internal.
-		const leads: Lead[] = [];
+		const leads: ReviewLead[] = [];
 		let changedPublicSymbols = 0;
 		let changedInternalSymbols = 0;
 		let filesScanned = 0;
 		let linesAdded = 0;
-		for (const [path, df] of ctx.change) {
+		for (const [path, df] of change) {
 			const lang = languageOf(path);
 			if (lang === null) {
 				continue;
@@ -151,7 +158,7 @@ export default definePracticeScript({
 				if (leads.length < 40) {
 					leads.push({
 						at: { change: path, line },
-						kind: isPublic ? "public-declaration" : "internal-declaration",
+						label: LABELS[isPublic ? "public-declaration" : "internal-declaration"],
 						facts: { language: lang, exported: isPublic },
 					});
 				}
@@ -180,7 +187,7 @@ export default definePracticeScript({
 			directions.push(...noMatchDirections(linesAdded, filesScanned));
 		}
 
-		return {
+		return ctx.review({
 			leads,
 			facts: {
 				hasPublicProduct: hasPublicProduct ? 1 : 0,
@@ -190,6 +197,6 @@ export default definePracticeScript({
 				linesAdded,
 			},
 			directions,
-		};
+		});
 	},
 });

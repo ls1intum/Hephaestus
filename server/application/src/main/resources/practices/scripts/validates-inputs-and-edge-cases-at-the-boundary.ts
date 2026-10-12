@@ -7,7 +7,18 @@
 import { DIRECTION_CHARS, factsOf, listWithin } from "../lib/bounded-text.ts";
 import { codeLines, isCommentLine } from "../lib/declarations.ts";
 import { isTestPath, languageOf } from "../lib/languages.ts";
-import { definePracticeScript, expectKind, type Facts, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type Facts,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
+
+export const LABELS = {
+	"edge-construct":
+		"An added line of code with a construct that can fail or mislead on an edge value, with its language and constructs.",
+};
 
 const COMMON: [string, RegExp][] = [
 	// `items[i]`, `cast[0..<2]`; not a lookup already made safe (`dict[k] ?? d`, `[k, default: 0]`,
@@ -100,21 +111,15 @@ function factKey(label: string): string {
 }
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"edge-construct":
-				"An added line of code with a construct that can fail or mislead on an edge value, with its language and constructs.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const leads: Lead[] = [];
+		const leads: ReviewLead[] = [];
 		const byKind = new Map<string, number>();
 		let filesScanned = 0;
 		let linesScanned = 0;
 
-		for (const [path, df] of ctx.change) {
+		for (const [path, df] of requireChange(ctx.files)) {
 			const lang = languageOf(path);
 			const own = lang === null ? undefined : LANG_PATTERNS[lang];
 			// A test's fixtures are not a boundary.
@@ -144,7 +149,7 @@ export default definePracticeScript({
 				}
 				leads.push({
 					at: { change: path, line },
-					kind: "edge-construct",
+					label: LABELS["edge-construct"],
 					facts: factsOf({ language: lang, constructs: labels.join(" + ") }),
 				});
 			}
@@ -165,7 +170,7 @@ export default definePracticeScript({
 					]
 				: [];
 
-		return {
+		return ctx.review({
 			leads: leads.slice(0, 40),
 			facts: {
 				edgeConstructLines: leads.length,
@@ -174,6 +179,6 @@ export default definePracticeScript({
 				...counts,
 			},
 			directions,
-		};
+		});
 	},
 });

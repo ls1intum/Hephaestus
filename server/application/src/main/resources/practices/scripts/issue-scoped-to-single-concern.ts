@@ -6,7 +6,7 @@ import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 import { checkableItems } from "../lib/review.ts";
 
 export default definePracticeScript({
-	meta: { version: 1, kinds: {} },
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.issue");
 		const shape = classifyIssue(ctx.work);
@@ -14,7 +14,7 @@ export default definePracticeScript({
 		const checkboxes = checkableItems(body).length;
 		const issueMentions = new Set((body.match(/(?:^|\s)#\d+\b/gu) ?? []).map((s) => s.trim())).size;
 		const rollup = subIssueRollup(ctx.work);
-		return {
+		return ctx.review({
 			leads: [],
 			facts: {
 				bodyLength: body.length,
@@ -32,6 +32,6 @@ export default definePracticeScript({
 				`Captured: ${rollup.text}.`,
 				"Judge the standard once over the title, whole body and captured discussion; these counts locate text and decide nothing.",
 			],
-		};
+		});
 	},
 });

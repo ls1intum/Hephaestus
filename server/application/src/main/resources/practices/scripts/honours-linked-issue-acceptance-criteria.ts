@@ -1,9 +1,8 @@
 // Finds the issue references in the title, the body and the branch of a pull request, and the
 // acceptance-criteria blocks of the linked issues. It gives facts, never a verdict of compliance.
 import { DIRECTION_CHARS, oneLine } from "../lib/bounded-text.ts";
-import { readContextJson } from "../lib/context.ts";
 import { isJsonObject } from "../lib/json.ts";
-import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
+import { definePracticeScript, expectKind, readRecordJson } from "../lib/practice-script.ts";
 
 const CLOSE_KEYWORD = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b/giu;
 // "closes #12", "fixes GH-12", "resolves group/proj#12" — capture the trailing issue number.
@@ -89,7 +88,7 @@ function acFacts(body: string): { heading: boolean; boxes: number } {
 }
 
 export default definePracticeScript({
-	meta: { version: 1, kinds: {} },
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		const title = ctx.work.title ?? "";
@@ -112,9 +111,7 @@ export default definePracticeScript({
 		const keywordHits = (`${title}\n${body}`.match(CLOSE_KEYWORD) ?? []).length;
 		CLOSE_KEYWORD.lastIndex = 0;
 
-		const linked = unwrapLinkedItems(
-			await readContextJson(ctx.context.dir, "linked_work_items.json"),
-		);
+		const linked = unwrapLinkedItems(await readRecordJson(ctx.evidence, "linked_work_items.json"));
 		const linkedIssueBodyPresent = linked?.some(
 			(i) => (i.body ?? i.description ?? "").trim().length > 0,
 		);
@@ -171,7 +168,7 @@ export default definePracticeScript({
 			);
 		}
 
-		return {
+		return ctx.review({
 			leads: [],
 			facts: {
 				issueReferenceSyntaxCandidateCount: closingRefs.length,
@@ -186,6 +183,6 @@ export default definePracticeScript({
 				acceptanceCriteriaCheckboxes: acBoxes,
 			},
 			directions,
-		};
+		});
 	},
 });

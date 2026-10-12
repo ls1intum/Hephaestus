@@ -1,9 +1,14 @@
 // Finds the added code lines that match a pattern of an insecure default, an over-broad permission or
 // an exposed secret, in all languages. Each lead is a candidate: the review decides if it is real and
 // exploitable on a reachable path.
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 
-const KINDS = {
+export const LABELS = {
 	"credential-named-value-in-url-path-query":
 		"An added line that puts a credential-named value into a URL path or query.",
 	"keychain-write":
@@ -17,7 +22,7 @@ const KINDS = {
 	"credential-named-literal":
 		"An added line that assigns a literal value to a credential-named field.",
 };
-type InsecureKind = keyof typeof KINDS;
+type InsecureKind = keyof typeof LABELS;
 
 // Each pattern fires on an added line. They are tuned to the surface of authentication, transport and
 // secrets that a login or API change touches, where a quick review most often misses an insecure default.
@@ -59,12 +64,12 @@ function countFact(kind: InsecureKind): string {
 }
 
 export default definePracticeScript({
-	meta: { version: 1, kinds: KINDS },
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const leads: Lead[] = [];
+		const leads: ReviewLead[] = [];
 		const byKind: Record<string, number> = {};
-		for (const [path, df] of ctx.change) {
+		for (const [path, df] of requireChange(ctx.files)) {
 			for (const [line, content] of df.addedLines) {
 				if (isComment(content.trimStart())) {
 					continue;
@@ -72,7 +77,7 @@ export default definePracticeScript({
 				const match = PATTERNS.find(([, re]) => re.test(content));
 				if (match !== undefined) {
 					const [kind] = match;
-					leads.push({ at: { change: path, line }, kind });
+					leads.push({ at: { change: path, line }, label: LABELS[kind] });
 					byKind[countFact(kind)] = (byKind[countFact(kind)] ?? 0) + 1;
 				}
 			}
@@ -86,10 +91,10 @@ export default definePracticeScript({
 						"Disabled TLS, wildcard CORS and world-writable permissions are over-broad. Confirm whether each is real and exploitable before deciding.",
 					]
 				: [];
-		return {
+		return ctx.review({
 			leads: leads.slice(0, 40),
 			facts: { insecureDefaultCandidates: leads.length, ...byKind },
 			directions,
-		};
+		});
 	},
 });

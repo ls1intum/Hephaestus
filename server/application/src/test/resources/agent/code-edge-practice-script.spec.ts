@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
-import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
+import {
+	leadKeys,
+	runBundled,
+} from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
 /** A file whose added lines are numbered from 1, with no hunk context. */
 function added(file: string, lines: string[]): [string, DiffFile] {
@@ -81,12 +84,20 @@ void test("the crash practice lists the operators the author wrote, with where e
 			added("AppTests/ParserTests.swift", ["let item = try! parser.parse(fixture)"]),
 		]),
 	});
-	assert.deepEqual(result.leads, [
-		crash("App/Services/Movies.swift", 4, "try!"),
-		crash("App/Services/Movies.swift", 6, "force unwrap"),
-		crash("App/Views/NoteRowView.swift", 41, "try!", true),
-		crash("AppTests/ParserTests.swift", 1, "try!"),
-	]);
+	const keyOf = await leadKeys("avoids-unsafe-panics-and-chosen-crashes");
+	assert.deepEqual(
+		(result.leads ?? []).map((lead) => ({
+			at: lead.at,
+			kind: keyOf(lead.label),
+			facts: lead.facts,
+		})),
+		[
+			crash("App/Services/Movies.swift", 4, "try!"),
+			crash("App/Services/Movies.swift", 6, "force unwrap"),
+			crash("App/Views/NoteRowView.swift", 41, "try!", true),
+			crash("AppTests/ParserTests.swift", 1, "try!"),
+		],
+	);
 	const directions = (result.directions ?? []).join(" ");
 	assert.match(directions, /1 sit inside a preview block and 1 in test files/u);
 	assert.doesNotMatch(directions, /deliberate-crash|investigate whether|should handle/u);
@@ -115,7 +126,7 @@ void test("a preview opener outside the hunk is read from the pinned file", asyn
 			]),
 		]),
 	});
-	assert.deepEqual(result.leads[0]?.facts, {
+	assert.deepEqual(result.leads?.[0]?.facts, {
 		language: "swift",
 		operators: "fatalError",
 		inPreview: true,
@@ -135,8 +146,14 @@ void test("the input practice lists edge constructs in code only, and none the l
 			added("server/routes.ts", ["const id = req.params.id;"]),
 		]),
 	});
+	const keyOf = await leadKeys("validates-inputs-and-edge-cases-at-the-boundary");
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.at, lead.kind, lead.facts?.language, lead.facts?.constructs]),
+		(result.leads ?? []).map((lead) => [
+			lead.at,
+			keyOf(lead.label),
+			lead.facts?.language,
+			lead.facts?.constructs,
+		]),
 		[
 			[
 				{ change: "App/Services/Movies.swift", line: 1 },
@@ -208,10 +225,11 @@ void test("the untrusted-input practice pairs a source with a rendering call, ne
 			]),
 		]),
 	});
+	const keyOf = await leadKeys("validates-and-escapes-untrusted-input");
 	assert.deepEqual(
-		result.leads.map((lead) => [
+		(result.leads ?? []).map((lead) => [
 			lead.at,
-			lead.kind,
+			keyOf(lead.label),
 			lead.facts?.sourceToken,
 			lead.facts?.sinkToken,
 		]),
@@ -246,8 +264,9 @@ void test("the error practice lists the fallbacks and bare returns its criteria 
 			added("App/Plain.swift", ["let total = values.reduce(0, +)"]),
 		]),
 	});
+	const keyOf = await leadKeys("handles-errors-instead-of-swallowing-them");
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.at, lead.kind, lead.facts]),
+		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label), lead.facts]),
 		[
 			[
 				{ change: "App/Parsing.swift", line: 1 },
@@ -267,7 +286,7 @@ void test("a fixed URL remains a lead, not proof of an unhandled runtime failure
 			]),
 		]),
 	});
-	assert.equal(result.leads.length, 1);
+	assert.equal(result.leads?.length, 1);
 	const directions = (result.directions ?? []).join(" ");
 	assert.match(directions, /A valid fixed URL has no runtime-dependent parse failure/u);
 	assert.match(directions, /already recorded by its handler/u);
@@ -288,8 +307,9 @@ void test("public, private and unknown credential-named values remain inspection
 		]),
 	});
 	assert.equal(result.facts?.insecureDefaultCandidates, 7);
+	const keyOf = await leadKeys("avoids-insecure-defaults-and-over-broad-permissions");
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.at, lead.kind]),
+		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label)]),
 		[
 			[{ change: "Client.swift", line: 1 }, "credential-named-literal"],
 			[{ change: "Client.swift", line: 2 }, "credential-named-literal"],

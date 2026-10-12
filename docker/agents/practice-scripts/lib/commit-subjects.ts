@@ -1,7 +1,7 @@
 /** Commit-subject shapes are leads for the review, not practice verdicts. */
 
 import type { ChangeCommit, ChangedFile } from "./change.ts";
-import type { Lead } from "./contract.ts";
+import type { ReviewLead } from "./contract.ts";
 
 interface SubjectFacts {
 	sha: string;
@@ -79,18 +79,15 @@ export function subjectFacts(commits: readonly ChangeCommit[]): SubjectFacts[] {
 }
 
 /**
- * The lead kind of one authored commit. The server writes `commits.json` on one line, so a lead cites
- * the whole record and names the commit by its short `sha`.
+ * Subject clarity uses the words and their shapes, not a commit's code or scope. The server writes
+ * `commits.json` on one line, so a lead cites the whole record and names the commit by its short `sha`.
  */
-export const COMMIT_KIND = "commit";
-
-/** Subject clarity uses the words and their shapes, not a commit's code or scope. */
-export function subjectLeads(facts: readonly SubjectFacts[]): Lead[] {
+export function subjectLeads(facts: readonly SubjectFacts[], label: string): ReviewLead[] {
 	return facts
 		.filter((fact) => !fact.merge)
 		.map((fact) => ({
 			at: { record: "commits.json" },
-			kind: COMMIT_KIND,
+			label,
 			facts: { sha: fact.sha, bare: fact.bare, repeat: fact.repeat, cutOff: fact.cutOff },
 		}));
 }
@@ -113,7 +110,7 @@ function describeFile(file: ChangedFile): string {
  * One lead per authored commit — its subject's shape and what it touched — for the model to read.
  * The files with content changes come first, each with its line counts, then the moves.
  */
-export function commitLeads(facts: readonly SubjectFacts[]): Lead[] {
+export function commitLeads(facts: readonly SubjectFacts[], label: string): ReviewLead[] {
 	return facts
 		.filter((f) => !f.merge)
 		.map((f) => {
@@ -124,7 +121,7 @@ export function commitLeads(facts: readonly SubjectFacts[]): Lead[] {
 			const paths = more > 0 ? `${shown}, +${String(more)} more` : shown;
 			return {
 				at: { record: "commits.json" },
-				kind: COMMIT_KIND,
+				label,
 				facts: {
 					sha: f.sha,
 					bare: f.bare,

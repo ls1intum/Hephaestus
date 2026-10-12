@@ -3,7 +3,21 @@
 // keyed by the file extension, finds the debug output. Each lead is a place to read; the review
 // decides if it is residue or a deliberate line.
 import { languageOf } from "../lib/languages.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
+
+export const LABELS = {
+	"debug-output": "An added call that writes debug output, such as print, console.log or println.",
+	"todo-fixme-marker": "An added line with a TODO, FIXME, XXX or HACK marker.",
+	"editing-process-note":
+		"An added comment that tells about the editing session, such as FIXED: or CHANGED:.",
+	"template-placeholder": "An added template placeholder, such as <your-name> or REPLACE_ME.",
+	"near-empty-new-file": "A new text or Markdown file with one or two lines of content.",
+};
 
 // language key -> [human label, regex] of debug-output / residue constructs that, when ADDED, are worth a look.
 const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
@@ -52,21 +66,10 @@ const TEMPLATE_PLACEHOLDER = /#\s*TODO:\s*Adjust|<your[- ]|REPLACE[_ ]ME|CHANGE[
 const LISTED = 40;
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"debug-output":
-				"An added call that writes debug output, such as print, console.log or println.",
-			"todo-fixme-marker": "An added line with a TODO, FIXME, XXX or HACK marker.",
-			"editing-process-note":
-				"An added comment that tells about the editing session, such as FIXED: or CHANGED:.",
-			"template-placeholder": "An added template placeholder, such as <your-name> or REPLACE_ME.",
-			"near-empty-new-file": "A new text or Markdown file with one or two lines of content.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const leads: Lead[] = [];
+		const leads: ReviewLead[] = [];
 		const byLang: Record<string, number> = {};
 		let debugCandidates = 0;
 		let todoCandidates = 0;
@@ -74,7 +77,7 @@ export default definePracticeScript({
 		let placeholders = 0;
 		let scratchFiles = 0;
 
-		for (const [path, df] of ctx.change) {
+		for (const [path, df] of requireChange(ctx.files)) {
 			const lang = languageOf(path);
 			const patterns = lang === null ? [] : (LANG_PATTERNS[lang] ?? []);
 			// A file added with a line or two of content and no language is a scratch file until read.
@@ -89,7 +92,7 @@ export default definePracticeScript({
 				/\.(?:txt|md)$/iu.test(path) &&
 				!/README|CHANGELOG|LICENSE/iu.test(path)
 			) {
-				leads.push({ at: { change: path, line: firstLine }, kind: "near-empty-new-file" });
+				leads.push({ at: { change: path, line: firstLine }, label: LABELS["near-empty-new-file"] });
 				scratchFiles += 1;
 			}
 			for (const [line, text] of df.addedLines) {
@@ -99,22 +102,22 @@ export default definePracticeScript({
 				// One debug-output lead per added line, as the sibling validates-inputs script does.
 				const debugOutput = isComment ? undefined : patterns.find(([, re]) => re.test(text));
 				if (debugOutput !== undefined) {
-					leads.push({ at, kind: "debug-output", facts: { call: debugOutput[0] } });
+					leads.push({ at, label: LABELS["debug-output"], facts: { call: debugOutput[0] } });
 					debugCandidates += 1;
 					if (lang !== null) {
 						byLang[lang] = (byLang[lang] ?? 0) + 1;
 					}
 				}
 				if (TODO_MARKER.test(text)) {
-					leads.push({ at, kind: "todo-fixme-marker" });
+					leads.push({ at, label: LABELS["todo-fixme-marker"] });
 					todoCandidates += 1;
 				}
 				if (PROCESS_NOTE.test(text)) {
-					leads.push({ at, kind: "editing-process-note" });
+					leads.push({ at, label: LABELS["editing-process-note"] });
 					processNotes += 1;
 				}
 				if (TEMPLATE_PLACEHOLDER.test(text)) {
-					leads.push({ at, kind: "template-placeholder" });
+					leads.push({ at, label: LABELS["template-placeholder"] });
 					placeholders += 1;
 				}
 			}
@@ -136,7 +139,7 @@ export default definePracticeScript({
 				`Found ${String(processNotes)} comment(s) narrating the editing session, ${String(placeholders)} template placeholder(s) and ${String(scratchFiles)} near-empty new file(s) — residue of the writing process unless the surrounding text says otherwise.`,
 			);
 		}
-		return {
+		return ctx.review({
 			leads: leads.slice(0, LISTED),
 			facts: {
 				debugCandidates,
@@ -147,6 +150,6 @@ export default definePracticeScript({
 				...byLang,
 			},
 			directions,
-		};
+		});
 	},
 });

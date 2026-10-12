@@ -3,8 +3,7 @@
 // times beside each other.
 import { factsOf, listWithin } from "../lib/bounded-text.ts";
 import { readCapturedCommits } from "../lib/change.ts";
-import { contextFile } from "../lib/context.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import { definePracticeScript, expectKind, type ReviewLead } from "../lib/practice-script.ts";
 import {
 	branchIssueReferences,
 	closingReferences,
@@ -12,6 +11,11 @@ import {
 	relatedReferences,
 } from "../lib/references.ts";
 import { millisBetween, readLinkedWorkItemCapture } from "../lib/review.ts";
+
+export const LABELS = {
+	"candidate-issue":
+		"An issue that the change names as its own, with when it was opened and when the earliest commit was authored.",
+};
 
 /** The two moments in one sentence, the way the cell reads them. */
 function relationOf(issueToFirstCommit: number | null): string {
@@ -29,21 +33,14 @@ function hours(millis: number): string {
 }
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"candidate-issue":
-				"An issue that the change names as its own, with when it was opened and when the earliest commit was authored.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const { dir: contextDir, reference: contextReference } = ctx.context;
-		const leads: Lead[] = [];
+		const leads: ReviewLead[] = [];
 		const directions: string[] = [];
 		const body = ctx.work.body ?? "";
 		const title = ctx.work.title ?? "";
-		const capture = await readLinkedWorkItemCapture(contextDir);
+		const capture = await readLinkedWorkItemCapture(ctx.evidence);
 		const linked = capture?.items ?? null;
 		const named = new Map<number, string[]>();
 		const name = (how: string, numbers: number[]) => {
@@ -59,7 +56,7 @@ export default definePracticeScript({
 		name("title", issueNumberReferences(title));
 		name("branch", branchIssueReferences(ctx.work.source_branch));
 		name("Related to", relatedReferences(body));
-		const capturedCommits = await readCapturedCommits(contextDir);
+		const capturedCommits = await readCapturedCommits(ctx.evidence);
 		const commitsCaptured = capturedCommits !== null;
 		const commits = capturedCommits ?? [];
 		const authored = commits
@@ -91,7 +88,7 @@ export default definePracticeScript({
 			}
 			leads.push({
 				at: { record: `linked_work_items/${String(item.number)}.md`, line: 0 },
-				kind: "candidate-issue",
+				label: LABELS["candidate-issue"],
 				facts: factsOf({
 					number: item.number,
 					namedBy,
@@ -115,7 +112,7 @@ export default definePracticeScript({
 			);
 		} else if (capture === null) {
 			directions.push(
-				`${contextFile(contextReference, "linked_work_items.json")} was not captured: a collection gap, not a change without an issue.`,
+				"linked_work_items.json was not captured: a collection gap, not a change without an issue.",
 			);
 		} else if (leads.length === 0 && unresolved.length === 0) {
 			directions.push(
@@ -133,7 +130,7 @@ export default definePracticeScript({
 			}
 			if (leads.length > 0) {
 				directions.push(
-					`The cell is decided by the issue's opening time against the earliest authored commit of the change (${contextFile(contextReference, "commits.json")}), never against the pull request's creation.`,
+					"The cell is decided by the issue's opening time against the earliest authored commit of the change (commits.json), never against the pull request's creation.",
 					"A pull request is opened when the work is handed off, and the practice asks whether the plan preceded the work.",
 					"Compare the issue opening and earliest captured authored commit exactly. These dates establish the recorded order, not when all work began or why the issue was written.",
 					...(first === undefined
@@ -156,7 +153,7 @@ export default definePracticeScript({
 				}
 			}
 		}
-		return {
+		return ctx.review({
 			leads,
 			facts: {
 				namedIssues: named.size,
@@ -168,6 +165,6 @@ export default definePracticeScript({
 					: Math.max(0, Math.round(earliestDeltaMinutes)),
 			},
 			directions,
-		};
+		});
 	},
 });

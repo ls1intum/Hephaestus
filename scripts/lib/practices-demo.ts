@@ -15,9 +15,10 @@ export const NATIVE_ID_BASE = 990_000_000;
 export const ID_PREFIX = "5eed0000-ac05-4000";
 export const TABLE = {
 	job: "8000",
-	observation: "8001",
+	result: "8001",
 	feedback: "8002",
 	reaction: "8003",
+	observation: "8004",
 } as const;
 
 export function seedId(table: (typeof TABLE)[keyof typeof TABLE], ordinal: number): string {
@@ -900,13 +901,13 @@ export interface CardPayload {
 
 /**
  * The reader's cards as the server takes them, given the ids the seed wrote: `jobIds` by run key and
- * `observationIds` by run key and practice slug. A card that names a run the reader has no
- * observation on its practice from is a mistake in this file, and fails before anything is sent.
+ * `resultIds` by run key and practice slug. A card that names a run the reader has no result on
+ * its practice from is a mistake in this file, and fails before anything is sent.
  */
 export function readerCards(
 	readerId: number,
 	jobIds: ReadonlyMap<string, string>,
-	observationIds: ReadonlyMap<string, string>,
+	resultIds: ReadonlyMap<string, string>,
 ): CardPayload[] {
 	let responses = 0;
 	return READER_CARDS.map((card, index) => {
@@ -915,7 +916,7 @@ export function readerCards(
 			throw new Error(`The card on ${card.practice} names an unknown run ${card.composedBy}`);
 		}
 		const evidence = card.evidence.map((runKey) => {
-			const id = observationIds.get(`${runKey}/${card.practice}`);
+			const id = resultIds.get(`${runKey}/${card.practice}`);
 			if (id === undefined) {
 				throw new Error(
 					`The card on ${card.practice} cites run ${runKey}, which recorded nothing on it`,

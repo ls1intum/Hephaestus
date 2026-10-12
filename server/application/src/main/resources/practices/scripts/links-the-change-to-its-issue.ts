@@ -4,13 +4,12 @@
 // inventory holds. The review decides if a reference is a link.
 import { DIRECTION_CHARS, factsOf, listWithin, oneLine } from "../lib/bounded-text.ts";
 import {
-	contextFile,
 	isOpenState,
 	readProjectInventory,
 	repositoryIssues,
 	type InventoryItem,
 } from "../lib/context.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import { definePracticeScript, expectKind, type ReviewLead } from "../lib/practice-script.ts";
 import {
 	branchIssueReferences,
 	closingReferences,
@@ -18,6 +17,16 @@ import {
 	withoutHtmlComments,
 } from "../lib/references.ts";
 import { readLinkedWorkItems } from "../lib/review.ts";
+
+export const LABELS = {
+	"closing-reference":
+		"An issue number that the provider records as a closing link, or that a closing keyword in the body names.",
+	"issue-reference":
+		"An issue number that the title, the body or the source branch names without a closing keyword.",
+	"qualified-issue-reference":
+		"An issue number that the title or the body names together with the path of its repository.",
+};
+type ReferenceKind = keyof typeof LABELS;
 
 /**
  * Qualified references cannot become local `#N` candidates. GitLab's `project#N` shortcut needs
@@ -30,24 +39,13 @@ const byNumber = (rows: InventoryItem[] | null) =>
 	rows === null ? null : new Map(rows.map((issue) => [issue.number, issue]));
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"closing-reference":
-				"An issue number that the provider records as a closing link, or that a closing keyword in the body names.",
-			"issue-reference":
-				"An issue number that the title, the body or the source branch names without a closing keyword.",
-			"qualified-issue-reference":
-				"An issue number that the title or the body names together with the path of its repository.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		const { work } = ctx;
-		const { reference } = ctx.context;
 		const focal = work.repository_full_name;
-		const linked = await readLinkedWorkItems(ctx.context.dir);
-		const inventory = await readProjectInventory(ctx.context.dir);
+		const linked = await readLinkedWorkItems(ctx.evidence);
+		const inventory = await readProjectInventory(ctx.evidence);
 		// A plain #N is the admitted repository's, by its id; a qualified path names a repository of the
 		// same provider. A full name alone is unique only within one provider, so no id leaves the scope
 		// unknown.
@@ -64,17 +62,17 @@ export default definePracticeScript({
 				),
 			);
 		const local = byNumber(focalIssues);
-		const rows: { lead: Lead; reference: string; inInventory: boolean | "unknown" }[] = [];
+		const rows: { lead: ReviewLead; reference: string; inInventory: boolean | "unknown" }[] = [];
 		const row = (
 			record: string,
-			kind: string,
+			kind: ReferenceKind,
 			facts: { number: number; target?: string } & Record<string, string | number | boolean>,
 			inInventory: boolean | "unknown",
 		) => {
 			rows.push({
 				reference: `${facts.target ?? focal}#${String(facts.number)}`,
 				inInventory,
-				lead: { at: { record }, kind, facts: factsOf({ ...facts, inInventory }) },
+				lead: { at: { record }, label: LABELS[kind], facts: factsOf({ ...facts, inInventory }) },
 			});
 		};
 		const add = (record: string, where: string, numbers: number[], closing: boolean) => {
@@ -122,7 +120,7 @@ export default definePracticeScript({
 		// reference matches nothing in the text. A candidate may belong to another repository, so it is
 		// placed in the inventory only by its address, never by its number.
 		const providerLinks = (linked ?? []).filter((item) => item.how === "closesOnMerge");
-		const providerWhere = `${contextFile(reference, "linked_work_items.json")} (how: closesOnMerge)`;
+		const providerWhere = "linked_work_items.json (how: closesOnMerge)";
 		for (const item of providerLinks) {
 			const matches =
 				item.url === undefined || providerId === undefined
@@ -151,8 +149,8 @@ export default definePracticeScript({
 		const title = work.title ?? "";
 		const body = work.body ?? "";
 		const branch = work.source_branch;
-		const titleWhere = `${contextFile(reference, "metadata.json")} (title)`;
-		const descriptionWhere = contextFile(reference, "description.md");
+		const titleWhere = "metadata.json (title)";
+		const descriptionWhere = "description.md";
 		add("metadata.json", titleWhere, issueNumberReferences(unqualified(title)), false);
 		qualified("metadata.json", titleWhere, title);
 		const closing = closingReferences(unqualified(body));
@@ -164,19 +162,14 @@ export default definePracticeScript({
 			false,
 		);
 		qualified("description.md", descriptionWhere, body);
-		add(
-			"metadata.json",
-			`${contextFile(reference, "metadata.json")} (source_branch)`,
-			branchIssueReferences(branch),
-			false,
-		);
+		add("metadata.json", "metadata.json (source_branch)", branchIssueReferences(branch), false);
 		const references = new Set(rows.map((r) => r.reference));
 		const facts = {
 			referencesFound: references.size,
 			referencesInInventory: new Set(
 				rows.filter((r) => r.inInventory === true).map((r) => r.reference),
 			).size,
-			closingReferences: rows.filter((r) => r.lead.kind === "closing-reference").length,
+			closingReferences: rows.filter((r) => r.lead.label === LABELS["closing-reference"]).length,
 			providerClosingLinks: providerLinks.length,
 			linkedWorkItems: linked?.length ?? -1,
 			inventoryIssues: focalIssues?.length ?? -1,
@@ -208,13 +201,13 @@ export default definePracticeScript({
 		} else {
 			directions.push(
 				`No #number, closing keyword or branch number in the title, body or branch (${branch}); ${linked === null ? "linked_work_items.json was not captured" : `${String(linked.length)} linked work item(s) captured`}.`,
-				`Read ${contextFile(reference, "commits.json")} for a reference in history, then the inventory (${held("not captured", `${String(facts.inventoryIssues)} issues, ${String(facts.inventoryOpenIssues)} open, in ${focal}`)}) for an open issue that plainly describes this work.`,
+				`Read commits.json for a reference in history, then the inventory (${held("not captured", `${String(facts.inventoryIssues)} issues, ${String(facts.inventoryOpenIssues)} open, in ${focal}`)}) for an open issue that plainly describes this work.`,
 			);
 		}
-		return {
+		return ctx.review({
 			leads: rows.slice(0, 20).map((r) => r.lead),
 			facts,
 			directions: directions.map((direction) => oneLine(direction, DIRECTION_CHARS)),
-		};
+		});
 	},
 });

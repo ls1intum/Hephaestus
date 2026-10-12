@@ -1,6 +1,6 @@
 /**
- * One practice script in its own process. The process may not start a program and holds no
- * credential, so its searches and model calls go to the runner.
+ * One custom practice program in its own process. The process may not start a program, reads nothing
+ * but its own code, and holds no credential, so its reads, model calls and reviews go to the host.
  */
 import { once } from "node:events";
 import { pathToFileURL } from "node:url";
@@ -8,14 +8,13 @@ import { promisify } from "node:util";
 
 import { callLabel } from "./lib/call-label.ts";
 import { RETIRED_FORM_ERROR } from "./lib/contract.ts";
-import { evidenceTools } from "./lib/evidence-tools.ts";
-import { delegateGrep } from "./lib/grep.ts";
 import {
 	MAX_LABEL_CHARS,
-	MAX_LOG_CHARS,
 	type ChildJob,
 	type ChildMessage,
-	type RunnerMessage,
+	type HostMessage,
+	type ReadRequest,
+	type ReadValues,
 } from "./lib/ipc.ts";
 import { isJsonObject } from "./lib/json.ts";
 import { ipcModels } from "./lib/models-ipc.ts";
@@ -23,13 +22,13 @@ import {
 	isPracticeScriptDefinition,
 	UnratedError,
 	type ModelNeeds,
-	type PracticeScriptContext,
 	type PracticeScriptDefinition,
 } from "./lib/practice-script.ts";
+import { programContext } from "./lib/program-context.ts";
 
 const send = process.send?.bind(process);
 if (send === undefined) {
-	throw new Error("child.ts runs only as a process forked by runner.ts");
+	throw new Error("child.ts runs only as a process forked by the program host");
 }
 const post = (message: ChildMessage) => send(message);
 
@@ -38,20 +37,22 @@ const postLast = promisify((message: ChildMessage, sent: (error: Error | null) =
 	send(message, undefined, undefined, sent);
 });
 
-/** Replies the runner owes this child, by request id. */
-const pending = new Map<number, (message: RunnerMessage) => void>();
+/** Replies the host owes this child, by request id. A reply with another id is not this child's. */
+const pending = new Map<number, (message: HostMessage) => void>();
 let nextId = 0;
-const metaReply = Promise.withResolvers<Extract<RunnerMessage, { kind: "meta-accepted" }>>();
+const metaReply = Promise.withResolvers<Extract<HostMessage, { kind: "meta-accepted" }>>();
 let tokensLeft = 0;
+/** Aborts when the host stops this program. */
+const stopped = new AbortController();
 
-/** The runner's own messages are trusted, so only the field that routes them is checked. */
-function isRunnerMessage(value: unknown): value is RunnerMessage {
+/** The host's own messages are trusted, so only the field that routes them is checked. */
+function isHostMessage(value: unknown): value is HostMessage {
 	return isJsonObject(value) && typeof value.kind === "string";
 }
 
 const jobArrived = once(process, "message");
 process.on("message", (message: unknown) => {
-	if (!isRunnerMessage(message) || message.kind === "job") {
+	if (!isHostMessage(message) || message.kind === "job") {
 		return;
 	}
 	if (message.kind === "meta-accepted") {
@@ -59,27 +60,38 @@ process.on("message", (message: unknown) => {
 		metaReply.resolve(message);
 		return;
 	}
+	if (message.kind === "abort") {
+		stopped.abort(
+			new UnratedError(message.reason, `the host stopped this program: ${message.reason}`),
+		);
+		return;
+	}
 	const waiter = pending.get(message.id);
 	pending.delete(message.id);
 	waiter?.(message);
 });
 
-async function request(make: (id: number) => ChildMessage): Promise<RunnerMessage> {
+async function request(make: (id: number) => ChildMessage): Promise<HostMessage> {
 	const id = nextId;
 	nextId += 1;
-	const reply = Promise.withResolvers<RunnerMessage>();
+	const reply = Promise.withResolvers<HostMessage>();
 	pending.set(id, reply.resolve);
 	post(make(id));
 	return reply.promise;
 }
 
-delegateGrep(async (pattern, dir, opts) => {
-	const reply = await request((id) => ({ kind: "grep", id, pattern, dir, opts }));
-	if (reply.kind === "grep") {
-		return reply.matches;
+async function read<R extends ReadRequest>(readRequest: R): Promise<ReadValues[R["op"]]>;
+async function read(readRequest: ReadRequest): Promise<ReadValues[keyof ReadValues]> {
+	stopped.signal.throwIfAborted();
+	const reply = await request((id) => ({ kind: "read", id, request: readRequest }));
+	if (reply.kind === "read-result") {
+		return reply.value;
 	}
-	throw new Error(reply.kind === "grep-failed" ? reply.message : "unexpected reply to a search");
-});
+	if (reply.kind === "read-failed") {
+		throw new UnratedError(reply.reason, reply.message);
+	}
+	throw new Error("unexpected reply to a read");
+}
 
 async function runDefinition(
 	job: ChildJob,
@@ -87,7 +99,10 @@ async function runDefinition(
 ): Promise<unknown> {
 	post({ kind: "meta", meta: definition.meta });
 	const accepted = await metaReply.promise;
-	const deadline = AbortSignal.timeout(Math.max(0, job.deadline - Date.now()));
+	const abortSignal = AbortSignal.any([
+		stopped.signal,
+		AbortSignal.timeout(Math.max(0, job.deadline - Date.now())),
+	]);
 	const models = ipcModels(accepted.models, async (slot, options, signal) => {
 		signal?.throwIfAborted();
 		const answered = new AbortController();
@@ -110,50 +125,38 @@ async function runDefinition(
 		}
 		if (reply.kind === "model-failed") {
 			tokensLeft = reply.tokensLeft;
-			// The AI SDK's `maxRetries` retries only an `APICallError`, so each model call of a practice
-			// script runs once.
+			// The AI SDK's `maxRetries` retries only an `APICallError`, so each direct model call runs once.
 			throw new UnratedError(reply.reason, reply.message);
 		}
 		throw new Error("unexpected reply to a model call");
 	});
-	const { inputs, changeSince } = job;
-	// The runner accepts `meta` only with valid inputs.
-	if (inputs === undefined) {
-		throw new Error("the runner sent no inputs");
-	}
-	const common = {
-		practice: { slug: job.slug },
-		context: { dir: job.contextDir, reference: job.contextReference },
-		now: job.now,
-		models,
-		tools: evidenceTools(job.repoPath),
-		remaining: () => ({ tokens: tokensLeft, ms: Math.max(0, job.deadline - Date.now()) }),
-		abortSignal: deadline,
-		log: (text: string) => {
-			post({ kind: "log", text: text.slice(0, MAX_LOG_CHARS) });
+	const ctx = programContext(job, {
+		read,
+		review: async (options) => {
+			stopped.signal.throwIfAborted();
+			const reply = await request((id) => ({ kind: "review", id, options }));
+			if (reply.kind === "review-result") {
+				return reply.candidate;
+			}
+			if (reply.kind === "review-failed") {
+				throw new UnratedError(reply.reason, reply.message);
+			}
+			throw new Error("unexpected reply to a review");
 		},
-	};
-	const ctx: PracticeScriptContext<ModelNeeds> =
-		inputs.kind === "scm.pull_request"
-			? {
-					...common,
-					...inputs,
-					previous:
-						inputs.previous === null || changeSince === undefined
-							? inputs.previous
-							: { ...inputs.previous, changeSince },
-					repo: job.repoPath,
-					change: job.diffFiles,
-					changeDir: job.changeDir,
-				}
-			: { ...common, ...inputs };
+		models,
+		tokensLeft: () => tokensLeft,
+		log: (text) => {
+			post({ kind: "log", text });
+		},
+		abortSignal,
+	});
 	return definition.run(ctx);
 }
 
 const arrived: readonly unknown[] = await jobArrived;
 const first = arrived[0];
-if (!isRunnerMessage(first) || first.kind !== "job") {
-	throw new Error("the runner sends the job first");
+if (!isHostMessage(first) || first.kind !== "job") {
+	throw new Error("the host sends the job first");
 }
 const { job } = first;
 try {
@@ -164,10 +167,11 @@ try {
 	}
 	await postLast({ kind: "result", value: await runDefinition(job, exported) });
 } catch (error) {
-	// A practice script is foreign code (DB-stored data), so it can throw a non-Error value.
+	// A practice program is foreign code (DB-stored data), so it can throw a non-Error value.
 	await postLast({
 		kind: "failed",
 		message: error instanceof Error ? error.message : String(error),
+		...(error instanceof UnratedError ? { reason: error.reason } : {}),
 	});
 }
 process.disconnect();

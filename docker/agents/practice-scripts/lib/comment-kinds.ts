@@ -3,14 +3,14 @@
  * that judge comments; the kinds follow Pascarella & Bacchelli (MSR 2017) and the inline comment
  * smells of Jabrayilzade et al. (EMSE 2024), cut to what a practice can act on.
  */
-import type { Citation } from "./contract.ts";
+import type { EvidenceLocation } from "./contract.ts";
 import { isCommentLine } from "./declarations.ts";
 import { languageOf } from "./languages.ts";
 import type { QuestionSet } from "./practice-script.ts";
 import type { DiffFile } from "./types.ts";
 
 export interface AddedComment {
-	at: Extract<Citation, { change: string }>;
+	at: Extract<EvidenceLocation, { change: string }>;
 	language: string;
 	/** The comment lines, trimmed and joined. */
 	text: string;

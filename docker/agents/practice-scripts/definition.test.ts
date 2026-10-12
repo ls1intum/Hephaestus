@@ -1,17 +1,26 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { once } from "node:events";
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { after, describe, test } from "node:test";
 
+import { LABELS } from "./fixtures/every-slot.ts";
+import { MODEL_CONCURRENCY } from "./lib/concurrency.ts";
 import {
+	legacyContractError,
 	MODEL_SLOT_CAPS,
 	PRACTICE_SCRIPT_PRACTICE_HEADER,
 	type BoundModels,
+	type Candidate,
+	type EvidenceLocation,
+	type ReviewOptions,
 } from "./lib/contract.ts";
-import { isJsonObject } from "./lib/json.ts";
-import { MAX_OUTPUT_TOKENS } from "./lib/models-host.ts";
+import { parseDiff } from "./lib/diff-parser.ts";
+import { EvidenceReader, noReceipts, type EvidenceSources } from "./lib/evidence-reader.ts";
+import { resolveLeads, type QuotedLead } from "./lib/leads.ts";
+import { hostModels, MAX_OUTPUT_TOKENS, ModelBudget } from "./lib/models-host.ts";
+import { UnratedError } from "./lib/practice-script.ts";
+import { runPracticeProgram, type ProgramOutcome } from "./lib/program-host.ts";
+import { InputReader } from "./lib/script-inputs.ts";
 import { stagePracticeScripts } from "./stage.ts";
 import {
 	chatMessage,
@@ -21,116 +30,210 @@ import {
 	type StandInHandler,
 } from "./test/proxy-stand-in.ts";
 
-const runner = path.join(import.meta.dirname, "runner.ts");
 const fixtures = path.join(import.meta.dirname, "fixtures");
-const pullRequestRecord = path.join(import.meta.dirname, "fixtures", "pull-request-metadata.json");
 const TOKEN = "practice-script-test-token";
+/** The reviewed head: `commit_sha` of the record fixture. */
+const HEAD = "0".repeat(40);
+const BASE = "b".repeat(40);
 
 const roots: string[] = [];
 after(async () =>
 	Promise.all(roots.map(async (root) => rm(root, { recursive: true, force: true }))),
 );
 
-const CHANGE = [
-	"diff --git a/src/cart.ts b/src/cart.ts",
-	"--- a/src/cart.ts",
-	"+++ b/src/cart.ts",
-	"@@ -1,1 +1,8 @@",
-	" export class Cart {",
-	"+  // increment the item count by one",
-	"+  count += 1;",
-	"+  // retry once: the payment API drops the first call after an idle period",
-	"+  await pay(order).catch(() => pay(order));",
-	"+  // TODO clean this up",
-	"+  const legacy = true;",
-	"+}",
-].join("\n");
+const CHANGE = parseDiff(
+	[
+		"diff --git a/src/cart.ts b/src/cart.ts",
+		"--- a/src/cart.ts",
+		"+++ b/src/cart.ts",
+		"@@ -1,1 +1,8 @@",
+		" export class Cart {",
+		"+  // increment the item count by one",
+		"+  count += 1;",
+		"+  // retry once: the payment API drops the first call after an idle period",
+		"+  await pay(order).catch(() => pay(order));",
+		"+  // TODO clean this up",
+		"+  const legacy = true;",
+		"+}",
+	].join("\n"),
+);
 
-interface Staged {
-	output: string;
-	json: (slug: string) => Promise<Record<string, unknown>>;
-	section: (slug: string) => Promise<string>;
-	stderr: string;
+/** What the fake review returns for every review. */
+const REVIEWED: Candidate = {
+	outcome: "UNDETERMINED",
+	summary: "The review leaves the practice open",
+	explanation: "The fake review answers every review with this result.",
+	citations: [
+		{
+			sourceKind: "scm.pull-request.core",
+			artifactPath: "context/metadata.json",
+			path: "context/metadata.json",
+			startLine: 1,
+			endLine: 1,
+			quote: "{",
+		},
+	],
+	evidence: {
+		undecidability: [
+			{ openQuestion: "What would the review decide?", wouldSettleIt: "A review session." },
+		],
+	},
+	coverage: { source: "host", reads: 0, truncatedReads: 0, failedReads: 0, complete: true },
+};
+
+/** One review a program asked for: its input, and its leads as the host quotes them. */
+interface Review {
+	options: ReviewOptions;
+	leads: QuotedLead[];
+}
+
+interface Run {
+	outcome: ProgramOutcome;
+	reviews: Review[];
+}
+
+interface RunOptions {
+	/** The attempt's direct model account, shared by every practice of the run. */
+	budget?: ModelBudget;
+	/** Each practice's time, from its start. */
+	deadlineMs?: number;
+	/** The slugs to run the program under, one practice each. */
+	slugs?: string[];
+}
+
+/** Stage a program, a checkout, the captured record and the captured change. */
+async function stage(slugs: Record<string, string>) {
+	const { root, practices } = await stagePracticeScripts(slugs);
+	roots.push(root);
+	const repo = path.join(root, "repo");
+	await mkdir(path.join(repo, "lib"), { recursive: true });
+	await writeFile(
+		path.join(repo, "lib", "diff-parser.ts"),
+		"// parses unified diffs\nexport function parseDiff(text: string) {\n\treturn text;\n}\n",
+	);
+	const context = path.join(root, "context");
+	await mkdir(context);
+	await writeFile(path.join(context, "comments.json"), '[\n  {"body": "Please split this"}\n]\n');
+	await copyFile(
+		path.join(fixtures, "pull-request-metadata.json"),
+		path.join(context, "metadata.json"),
+	);
+	const sources: EvidenceSources = {
+		repo,
+		headRevision: HEAD,
+		treeArtifact: "repos/reviewed/.git/HEAD",
+		contextDir: context,
+		contextReference: "context",
+		change: { base: BASE, head: HEAD, files: CHANGE },
+		sourceKindOf: () => "scm.pull-request.core",
+	};
+	return {
+		practices,
+		sources,
+		inputs: new InputReader({
+			practicesDir: practices,
+			contextDir: context,
+			repo,
+			log: () => undefined,
+		}),
+	};
 }
 
 /**
- * Stages one fixture as a practice, under each of `slugs`, next to a `lib` link, a change, a repository
- * and captured context, then runs the runner.
+ * Run a program's source as each of `slugs`, in turn, at the host, with the models bound through
+ * the stand-in proxy. The fake review quotes each lead as the host does before a session, and records
+ * the input.
  */
+async function runSource(
+	source: string,
+	bound: BoundModels,
+	standIn: StandIn | undefined,
+	options: RunOptions & { slugs: string[] },
+): Promise<Map<string, Run>> {
+	const staged = await stage(Object.fromEntries(options.slugs.map((slug) => [slug, source])));
+	const budget = options.budget ?? new ModelBudget(200_000, MODEL_CONCURRENCY);
+	const runs = new Map<string, Run>();
+	for (const slug of options.slugs) {
+		const read = await staged.inputs.read(slug);
+		assert.ok("inputs" in read, "error" in read ? read.error : "");
+		const reviews: Review[] = [];
+		const receipts = noReceipts();
+		const outcome = await runPracticeProgram(
+			{ script: { path: path.join(staged.practices, `${slug}.ts`), source: Buffer.from(source) } },
+			{
+				slug,
+				inputs: read.inputs,
+				criteria: "",
+				files: {
+					head: { revision: HEAD },
+					change: { base: BASE, head: HEAD, files: new Map(CHANGE) },
+				},
+				now: "2026-01-01T00:00:00Z",
+				deadline: Date.now() + (options.deadlineMs ?? 30_000),
+			},
+			{
+				reader: new EvidenceReader(staged.sources, receipts),
+				// Nothing listens there: a test without the stand-in binds no model.
+				models: hostModels(bound, standIn?.url ?? "http://127.0.0.1:9", TOKEN, slug),
+				budget,
+				review: async (reviewOptions) => {
+					const leads = await resolveLeads(reviewOptions.leads ?? [], staged.sources);
+					reviews.push({ options: reviewOptions, leads });
+					return REVIEWED;
+				},
+				signal: new AbortController().signal,
+				log: () => undefined,
+				receipts,
+			},
+		);
+		runs.set(slug, { outcome, reviews });
+	}
+	return runs;
+}
+
+/** Run one fixture as one practice under its own name. */
 async function run(
 	fixture: string,
 	bound: BoundModels,
 	standIn?: StandIn,
-	args: string[] = [],
-	slugs: string[] = [fixture],
-): Promise<Staged> {
+	options: RunOptions = {},
+): Promise<Run> {
 	const source = await readFile(path.join(fixtures, `${fixture}.ts`), "utf8");
-	const { root, practices } = await stagePracticeScripts(
-		Object.fromEntries(slugs.map((slug) => [slug, source])),
-	);
-	roots.push(root);
-	const output = path.join(root, "out");
-	await writeFile(path.join(root, "change.diff"), CHANGE);
-	await mkdir(path.join(root, "repo", "lib"), { recursive: true });
-	await writeFile(
-		path.join(root, "repo", "lib", "diff-parser.ts"),
-		"// parses unified diffs\nexport function parseDiff(text: string) {\n\treturn text;\n}\n",
-	);
-	await mkdir(path.join(root, "context"), { recursive: true });
-	await writeFile(
-		path.join(root, "context", "comments.json"),
-		'[\n  {"body": "Please split this"}\n]\n',
-	);
-	await copyFile(pullRequestRecord, path.join(root, "context", "metadata.json"));
-	await writeFile(path.join(root, "models.json"), JSON.stringify(bound));
-	// Asynchronous: the stand-in answers from this process while the runner waits on it.
-	const child = spawn(
-		process.execPath,
-		[
-			runner,
-			"--repo",
-			path.join(root, "repo"),
-			"--diff",
-			path.join(root, "change.diff"),
-			"--context",
-			path.join(root, "context"),
-			"--context-reference",
-			"context",
-			"--practices",
-			practices,
-			"--output",
-			output,
-			"--models",
-			path.join(root, "models.json"),
-			...args,
-		],
-		{
-			env:
-				standIn === undefined
-					? {}
-					: { LLM_PROXY_URL: standIn.url, PRACTICE_SCRIPT_PROXY_TOKEN: TOKEN },
-			stdio: ["ignore", "ignore", "pipe"],
-		},
-	);
-	const chunks: string[] = [];
-	child.stderr.setEncoding("utf8");
-	child.stderr.on("data", (chunk: string) => {
-		chunks.push(chunk);
+	const runs = await runSource(source, bound, standIn, {
+		...options,
+		slugs: options.slugs ?? [fixture],
 	});
-	const closed: readonly unknown[] = await once(child, "close");
-	const stderr = chunks.join("");
-	assert.equal(closed[0], 0, stderr);
-	return {
-		output,
-		stderr,
-		json: async (slug) => {
-			const parsed: unknown = JSON.parse(await readFile(path.join(output, `${slug}.json`), "utf8"));
-			assert.ok(isJsonObject(parsed), `${slug}.json holds an object`);
-			return parsed;
-		},
-		section: async (slug) => readFile(path.join(output, `${slug}.md`), "utf8"),
-	};
+	const first = runs.values().next();
+	assert.ok(first.done !== true);
+	return first.value;
 }
+
+/** The one review the run asked for: the program passed, and returned that review's result. */
+function reviewed({ outcome, reviews }: Run): Review {
+	assert.equal(outcome.status, "ok", outcome.error);
+	assert.deepEqual(outcome.candidate, REVIEWED);
+	const [review, ...more] = reviews;
+	assert.ok(review !== undefined && more.length === 0, `${reviews.length} reviews`);
+	return review;
+}
+
+/** Where a lead points, as `path:line`. */
+function placeOf(at: EvidenceLocation): string {
+	if ("change" in at) {
+		return `${at.change}:${at.line}`;
+	}
+	return "file" in at ? `${at.file}:${at.line}` : at.record;
+}
+
+/** Each lead with that label, as `path:line quote`. */
+function leadsLabelled(review: Review, label: string): string[] {
+	return review.leads
+		.filter((lead) => lead.label === label)
+		.map((lead) => `${placeOf(lead.at)} ${lead.quote}`);
+}
+
+/** A lead at `at`. */
+const leadAt = (at: EvidenceLocation) => ({ at, label: "A lead." });
 
 /**
  * Answers a packed classify call: a comment that starts "// increment" restates the code, and one that
@@ -174,7 +277,7 @@ function decisions(request: { body: Record<string, unknown> }) {
 	};
 }
 
-/** Every request that reached the stand-in names the practice whose script made it. */
+/** Every request that reached the stand-in names the practice whose program made it. */
 function assertAttributed(standIn: StandIn, practice: string) {
 	assert.ok(standIn.requests.length > 0, "a model was called");
 	for (const request of standIn.requests) {
@@ -195,43 +298,44 @@ async function withStandIn(handler: StandInHandler, body: (standIn: StandIn) => 
 	}
 }
 
-void describe("definition scripts", () => {
-	void test("run without any model: rule leads, and each unrated item named with its reason", async () => {
-		const { json, section } = await run("every-slot", {});
-		const result = await json("every-slot");
-		assert.equal(result.contract, "definition");
-		assert.equal(result.status, "ok");
-		assert.deepEqual(result.models, {
-			chat: { need: "optional", bound: false, notRated: {} },
-			decision: { need: "optional", bound: false, notRated: {} },
-			embedding: { need: "optional", bound: false, notRated: {} },
-			reranking: { need: "optional", bound: false, notRated: {} },
-		});
-		assert.ok(typeof result.durationMs === "number" && result.durationMs >= 0);
-		const text = await section("every-slot");
-		assert.match(text, /- untracked-todo at `src\/cart\.ts` \[L6\]: `\/\/ TODO clean this up`/u);
-		assert.match(
-			text,
-			/- Not rated: 2 added comments without a TODO marker \(unavailable\)\. Read those yourself\./u,
-		);
+const never = async () => Promise.withResolvers<never>().promise;
+
+const TODO_LEAD = "src/cart.ts:6   // TODO clean this up";
+
+void describe("practice programs and their direct models at the host", () => {
+	void test("run without any model: code's leads, and each unrated item named with its reason", async () => {
+		const result = await run("every-slot", {});
+		assert.deepEqual(result.outcome.models, [
+			{ slot: "chat", need: "optional", bound: false, notRated: {} },
+			{ slot: "decision", need: "optional", bound: false, notRated: {} },
+			{ slot: "embedding", need: "optional", bound: false, notRated: {} },
+			{ slot: "reranking", need: "optional", bound: false, notRated: {} },
+		]);
+		assert.ok(typeof result.outcome.durationMs === "number" && result.outcome.durationMs >= 0);
+		const review = reviewed(result);
+		assert.deepEqual(leadsLabelled(review, LABELS.untrackedTodo), [TODO_LEAD]);
+		assert.equal(review.leads.length, 1);
+		assert.deepEqual(review.options.limitations, [
+			{ what: "added comments without a TODO marker", count: 2, reason: "unavailable" },
+		]);
+		assert.deepEqual(review.options.facts, { comments: 3 });
 	});
 
-	void test("a script whose required model is not bound does not run, and its section says which model it needs", async () => {
-		const { json, section } = await run("requires-decision", {});
-		const result = await json("requires-decision");
-		assert.equal(result.status, "skipped");
-		assert.deepEqual(result.models, { decision: { need: "required", bound: false, notRated: {} } });
-		assert.match(
-			await section("requires-decision"),
-			/No model is available for a slot that the practice script requires: decision\./u,
-		);
+	void test("a program whose required model is not bound does not run, and its report names the model", async () => {
+		const { outcome, reviews } = await run("requires-decision", {});
+		assert.equal(outcome.status, "skipped");
+		assert.equal(outcome.stopReason, "unavailable");
+		assert.deepEqual(outcome.models, [
+			{ slot: "decision", need: "required", bound: false, notRated: {} },
+		]);
+		assert.deepEqual(reviews, []);
 	});
 
-	void test("rate items through a decision model in one packed call, the quote written by the runner", async () => {
+	void test("rate items through a decision model in one packed call, each lead quoted by the host", async () => {
 		await withStandIn(
 			async (request) => decisions(request),
 			async (standIn) => {
-				const { json, section } = await run(
+				const result = await run(
 					"every-slot",
 					{ decision: { protocol: "openai-decisions", modelId: "jev" } },
 					standIn,
@@ -242,18 +346,22 @@ void describe("definition scripts", () => {
 				assert.equal(call.operation, "decisions");
 				assert.equal(call.body.model, "jev");
 				assertAttributed(standIn, "every-slot");
-				assert.partialDeepStrictEqual(await json("every-slot"), {
-					models: { decision: { need: "optional", bound: true, notRated: {} } },
-				});
-				const text = await section("every-slot");
-				assert.match(
-					text,
-					/- comment-kind \(model-rated\) at `src\/cart\.ts` \[L2\]: `\/\/ increment the item count by one`/u,
+				assert.deepEqual(
+					result.outcome.models.find((model) => model.slot === "decision"),
+					{ slot: "decision", need: "optional", bound: true, notRated: {} },
 				);
-				// Code found the TODO, so the model never rates it, and it has one lead.
-				assert.deepEqual(text.match(/^- .* at `src\/cart\.ts` \[L6\].*$/gmu), [
-					"- untracked-todo at `src/cart.ts` [L6]: `// TODO clean this up`",
+				assert.equal(result.outcome.calls.decision, 1);
+				const review = reviewed(result);
+				assert.deepEqual(leadsLabelled(review, LABELS.commentKind), [
+					"src/cart.ts:2   // increment the item count by one",
 				]);
+				// Code found the TODO, so the model never rates it, and it has one lead.
+				assert.deepEqual(
+					review.leads
+						.filter((lead) => "change" in lead.at && lead.at.line === 6)
+						.map((lead) => lead.label),
+					[LABELS.untrackedTodo],
+				);
 			},
 		);
 	});
@@ -282,7 +390,7 @@ void describe("definition scripts", () => {
 				return chatMessage(ids.map((id) => `${id}: E`).join("\n"), { logprobs: { content } });
 			},
 			async (standIn) => {
-				const { section } = await run(
+				const result = await run(
 					"every-slot",
 					{ decision: { protocol: "openai-completions", modelId: "qwen" } },
 					standIn,
@@ -291,13 +399,12 @@ void describe("definition scripts", () => {
 				assert.equal(standIn.requests[0].slot, "decision");
 				assertAttributed(standIn, "every-slot");
 				// Letter E is the fifth kind, restates-code, for both comments without a TODO marker.
-				const text = await section("every-slot");
-				assert.equal(text.match(/comment-kind \(model-rated\)/gu)?.length, 2);
+				assert.equal(leadsLabelled(reviewed(result), LABELS.commentKind).length, 2);
 			},
 		);
 	});
 
-	void test("an agent reads the repository with tools that run inside the sandbox, and answers through submit", async () => {
+	void test("an agent reads the repository with evidence tools that the host answers, and answers through submit", async () => {
 		let turn = 0;
 		await withStandIn(
 			async (request) => {
@@ -308,7 +415,7 @@ void describe("definition scripts", () => {
 				if (turn === 1) {
 					return chatToolCall("grep", { pattern: "export function parseDiff" });
 				}
-				// The tool result came back from the child: the second turn sees it.
+				// The tool's result came back through the host: the second turn sees it.
 				assert.match(
 					JSON.stringify(request.body.messages),
 					/lib\/diff-parser\.ts:2: export function parseDiff/u,
@@ -316,18 +423,23 @@ void describe("definition scripts", () => {
 				return chatToolCall("submit", { file: "lib/diff-parser.ts", line: 2 }, "call-2");
 			},
 			async (standIn) => {
-				const { json, section } = await run(
+				const result = await run(
 					"every-slot",
 					{ chat: { protocol: "openai-completions", modelId: "qwen" } },
 					standIn,
 				);
 				assert.ok(standIn.requests.every((r) => r.slot === "chat"));
 				assertAttributed(standIn, "every-slot");
-				assert.match(
-					await section("every-slot"),
-					/- declaration at `lib\/diff-parser\.ts:2`: `export function parseDiff\(text: string\) \{` \[agentSteps=2\]/u,
-				);
-				assert.partialDeepStrictEqual(await json("every-slot"), { facts: { changeKind: "code" } });
+				// The agent's grep is a read of the head tree, with its receipt.
+				assert.equal(result.outcome.coverageReached.reads, 1);
+				const review = reviewed(result);
+				assert.deepEqual(leadsLabelled(review, LABELS.declaration), [
+					"lib/diff-parser.ts:2 export function parseDiff(text: string) {",
+				]);
+				assert.partialDeepStrictEqual(review.options, {
+					leads: [{}, { facts: { agentSteps: 2 } }],
+					facts: { changeKind: "code" },
+				});
 			},
 		);
 	});
@@ -344,14 +456,18 @@ void describe("definition scripts", () => {
 							],
 						},
 			async (standIn) => {
-				const { section } = await run(
-					"every-slot",
-					{ chat: { protocol: "openai-completions", modelId: "qwen" } },
-					standIn,
+				const review = reviewed(
+					await run(
+						"every-slot",
+						{ chat: { protocol: "openai-completions", modelId: "qwen" } },
+						standIn,
+					),
 				);
-				const text = await section("every-slot");
-				assert.match(text, /- untracked-todo at `src\/cart\.ts` \[L6\]/u);
-				assert.match(text, /- Not rated: 1 kind of the change \(off-format\)\./u);
+				assert.deepEqual(leadsLabelled(review, LABELS.untrackedTodo), [TODO_LEAD]);
+				assert.deepEqual(
+					review.options.limitations?.filter((item) => item.what === "kind of the change"),
+					[{ what: "kind of the change", count: 1, reason: "off-format" }],
+				);
 			},
 		);
 	});
@@ -376,7 +492,7 @@ void describe("definition scripts", () => {
 				return { results: [{ index: 2, relevance_score: 0.87 }] };
 			},
 			async (standIn) => {
-				const { json, section } = await run(
+				const result = await run(
 					"every-slot",
 					{
 						embedding: { protocol: "openai-embeddings", modelId: "e" },
@@ -389,84 +505,96 @@ void describe("definition scripts", () => {
 					"reranking/rerank",
 				]);
 				assertAttributed(standIn, "every-slot");
-				assert.partialDeepStrictEqual(await json("every-slot"), {
-					facts: { embeddingDimensions: 2 },
-				});
-				assert.match(
-					await section("every-slot"),
-					/- most-unfinished at `src\/cart\.ts` \[L6\]: `\/\/ TODO clean this up`/u,
-				);
+				const review = reviewed(result);
+				assert.partialDeepStrictEqual(review.options, { facts: { embeddingDimensions: 2 } });
+				assert.deepEqual(leadsLabelled(review, LABELS.mostUnfinished), [TODO_LEAD]);
 			},
 		);
 	});
+});
 
+void describe("the attempt's direct model budget", () => {
 	void test("the budget holds when calls run at once: reservations are taken before the calls start", async () => {
 		await withStandIn(
 			async () => chatMessage("ok"),
 			async (standIn) => {
-				const { json } = await run(
-					"parallel-budget",
-					{ chat: { protocol: "openai-completions", modelId: "qwen" } },
-					standIn,
+				const budget = new ModelBudget(2300, MODEL_CONCURRENCY);
+				const review = reviewed(
+					await run(
+						"parallel-budget",
+						{ chat: { protocol: "openai-completions", modelId: "qwen" } },
+						standIn,
+						{
+							budget,
+						},
+					),
 				);
-				const result = await json("parallel-budget");
-				assert.deepEqual(result.facts, { answered: 2, refused: 2 });
+				assert.deepEqual(review.options.facts, { answered: 2, refused: 2 });
 				assert.equal(standIn.requests.length, 2);
+				// Each call that ran settled at the 15 tokens it reported.
+				assert.equal(budget.left, 2300 - 2 * 15);
 			},
 		);
 	});
 
-	void test("a call above the stage's token ceiling is unrated for its budget and never reaches the proxy", async () => {
+	void test("a call above what the attempt has left is unrated for its budget and never reaches the proxy", async () => {
 		await withStandIn(
 			async () => chatMessage("ok"),
 			async (standIn) => {
-				const { json } = await run(
+				const result = await run(
 					"unrated-call",
 					{ embedding: { protocol: "openai-embeddings", modelId: "e" } },
 					standIn,
-					["--tokens", "1"],
+					{ budget: new ModelBudget(1, MODEL_CONCURRENCY) },
 				);
-				const result = await json("unrated-call");
-				assert.deepEqual(result.facts, { reason: "budget", fast: true });
+				assert.deepEqual(reviewed(result).options.facts, { reason: "budget", fast: true });
+				assert.deepEqual(result.outcome.models, [
+					{ slot: "embedding", need: "required", bound: true, notRated: { budget: 1 } },
+				]);
 				assert.equal(standIn.requests.length, 0);
 			},
 		);
 	});
 
-	void test("a call the script cancels stops at once and is unrated for its deadline", async () => {
-		await withStandIn(
-			async () => Promise.withResolvers<never>().promise,
-			async (standIn) => {
-				const { json } = await run(
-					"unrated-call",
-					{ embedding: { protocol: "openai-embeddings", modelId: "e" } },
-					standIn,
-				);
-				const result = await json("unrated-call");
-				assert.deepEqual(result.facts, { reason: "deadline", fast: true });
-			},
-		);
+	void test("a call the program cancels stops at once and is unrated for its deadline", async () => {
+		await withStandIn(never, async (standIn) => {
+			const result = await run(
+				"unrated-call",
+				{ embedding: { protocol: "openai-embeddings", modelId: "e" } },
+				standIn,
+			);
+			assert.deepEqual(reviewed(result).options.facts, { reason: "deadline", fast: true });
+		});
 	});
 
-	void test("a model that never answers leaves its step unrated, and the script still returns its leads", async () => {
-		await withStandIn(
-			async () => Promise.withResolvers<never>().promise,
-			async (standIn) => {
-				const { json } = await run(
-					"slow-model",
-					{ embedding: { protocol: "openai-embeddings", modelId: "e" } },
-					standIn,
-					["--stage-ms", "8000"],
-				);
-				const result = await json("slow-model");
-				assert.partialDeepStrictEqual(result, {
-					status: "ok",
-					facts: { reason: "deadline" },
-					leads: [{ kind: "found" }],
-					models: { embedding: { need: "required", bound: true, notRated: { deadline: 1 } } },
-				});
-			},
-		);
+	void test("a model that never answers is unrated at the practice's deadline, and the program still returns its result", async () => {
+		await withStandIn(never, async (standIn) => {
+			const { outcome } = await run(
+				"slow-model",
+				{ embedding: { protocol: "openai-embeddings", modelId: "e" } },
+				standIn,
+				{ deadlineMs: 1500 },
+			);
+			assert.equal(outcome.status, "ok", outcome.error);
+			assert.partialDeepStrictEqual(outcome.candidate, {
+				outcome: "UNDETERMINED",
+				citations: [
+					{
+						path: "src/cart.ts",
+						side: "NEW",
+						startLine: 2,
+						quote: "  // increment the item count by one",
+					},
+				],
+				coverage: {
+					complete: false,
+					omitted: [{ what: "embedding of the added comments", count: 1, reason: "deadline" }],
+				},
+			});
+			assert.deepEqual(outcome.models, [
+				{ slot: "embedding", need: "required", bound: true, notRated: { deadline: 1 } },
+			]);
+		});
 	});
 
 	for (const [status, refusal, reason] of [
@@ -478,16 +606,15 @@ void describe("definition scripts", () => {
 			await withStandIn(
 				async () => ({ status, error: refusal }),
 				async (standIn) => {
-					const { json } = await run(
+					const result = await run(
 						"unrated-call",
 						{ embedding: { protocol: "openai-embeddings", modelId: "e" } },
 						standIn,
 					);
-					const result = await json("unrated-call");
-					assert.deepEqual(result.facts, { reason, fast: true });
-					assert.partialDeepStrictEqual(result, {
-						models: { embedding: { notRated: { [reason]: 1 } } },
-					});
+					assert.deepEqual(reviewed(result).options.facts, { reason, fast: true });
+					assert.deepEqual(result.outcome.models, [
+						{ slot: "embedding", need: "required", bound: true, notRated: { [reason]: 1 } },
+					]);
 				},
 			);
 		});
@@ -509,7 +636,7 @@ void describe("definition scripts", () => {
 				return { results: [{ index: 0, relevance_score: 0.5 }] };
 			},
 			async (standIn) => {
-				const { json } = await run(
+				const result = await run(
 					"oversize",
 					{
 						decision: { protocol: "openai-decisions", modelId: "d" },
@@ -518,21 +645,21 @@ void describe("definition scripts", () => {
 					},
 					standIn,
 				);
-				const result = await json("oversize");
-				assert.deepEqual(result.facts, {
+				assert.deepEqual(reviewed(result).options.facts, {
 					rerankOver: "too-large",
 					rerankAt: "rated",
 					decideOver: "too-large",
 					embedOver: "too-large",
 					embedMany: "rated",
 				});
-				assert.partialDeepStrictEqual(result, {
-					models: {
-						decision: { notRated: { "too-large": 1 } },
-						embedding: { notRated: { "too-large": 1 } },
-						reranking: { notRated: { "too-large": 1 } },
-					},
-				});
+				assert.deepEqual(
+					result.outcome.models.map(({ slot, notRated }) => ({ slot, notRated })),
+					[
+						{ slot: "decision", notRated: { "too-large": 1 } },
+						{ slot: "embedding", notRated: { "too-large": 1 } },
+						{ slot: "reranking", notRated: { "too-large": 1 } },
+					],
+				);
 				// Only the rerank at the cap and the two calls that `embedMany` split its values into.
 				assert.deepEqual(
 					standIn.requests
@@ -550,7 +677,9 @@ void describe("definition scripts", () => {
 			},
 		);
 	});
+});
 
+void describe("what the host lets a program send", () => {
 	void test("each practice's calls name that practice and no other", async () => {
 		await withStandIn(
 			async () => ({
@@ -564,8 +693,9 @@ void describe("definition scripts", () => {
 					"unrated-call",
 					{ embedding: { protocol: "openai-embeddings", modelId: "e" } },
 					standIn,
-					[],
-					["first-practice", "second-practice"],
+					{
+						slugs: ["first-practice", "second-practice"],
+					},
 				);
 				assert.deepEqual(
 					new Set(standIn.requests.map((r) => r.headers[PRACTICE_SCRIPT_PRACTICE_HEADER])),
@@ -576,46 +706,45 @@ void describe("definition scripts", () => {
 		);
 	});
 
-	void test("a script with more requests in flight than the runner answers is stopped", async () => {
-		await withStandIn(
-			async () => Promise.withResolvers<never>().promise,
-			async (standIn) => {
-				const { section } = await run(
-					"flood",
-					{ embedding: { protocol: "openai-embeddings", modelId: "e" } },
-					standIn,
-				);
-				assert.match(await section("flood"), /- Script failed: more than 32 requests at once/u);
-			},
-		);
+	void test("a program with more requests in flight than the host answers is stopped", async () => {
+		await withStandIn(never, async (standIn) => {
+			const { outcome } = await run(
+				"flood",
+				{ embedding: { protocol: "openai-embeddings", modelId: "e" } },
+				standIn,
+			);
+			assert.equal(outcome.status, "failed");
+			assert.equal(outcome.stopReason, "error");
+			assert.equal(outcome.error, "more than 32 requests at once");
+		});
 	});
 
-	void test("a model call the runner cannot read stops that script, not the runner", async () => {
+	void test("a model call the host cannot read stops that program, not the host", async () => {
 		await withStandIn(
 			async () => chatMessage("never asked"),
 			async (standIn) => {
-				const { section } = await run(
+				const { outcome } = await run(
 					"hostile-call",
 					{ chat: { protocol: "openai-completions", modelId: "qwen" } },
 					standIn,
 				);
-				assert.match(
-					await section("hostile-call"),
-					/- Script failed: the runner could not answer a model request/u,
-				);
+				assert.equal(outcome.status, "failed");
+				assert.equal(outcome.stopReason, "error");
 				assert.equal(standIn.requests.length, 0);
 			},
 		);
 	});
 
-	void test("provider options, headers and oversized outputs never leave the runner", async () => {
+	void test("provider options, headers and oversized outputs never leave the host", async () => {
 		await withStandIn(
 			async () => chatMessage("hi"),
 			async (standIn) => {
-				await run(
-					"allowlist",
-					{ chat: { protocol: "openai-completions", modelId: "qwen" } },
-					standIn,
+				reviewed(
+					await run(
+						"allowlist",
+						{ chat: { protocol: "openai-completions", modelId: "qwen" } },
+						standIn,
+					),
 				);
 				const [call] = standIn.requests;
 				assert.equal(call?.headers["x-sneaky"], undefined);
@@ -647,56 +776,88 @@ void describe("definition scripts", () => {
 				usage: { input_tokens: 1, output_tokens: 1 },
 			}),
 			async (standIn) => {
-				await run("allowlist", { chat: { protocol: "openai-responses", modelId: "m" } }, standIn);
+				reviewed(
+					await run("allowlist", { chat: { protocol: "openai-responses", modelId: "m" } }, standIn),
+				);
 				assert.equal(standIn.requests[0]?.body.store, false);
 				assertAttributed(standIn, "allowlist");
 			},
 		);
 	});
+});
 
-	void test("leads with an undeclared kind or a citation the source does not hold are dropped and counted", async () => {
-		const { json, section } = await run("leads", {});
-		const result = await json("leads");
-		assert.equal(result.dropped, 3);
-		const text = await section("leads");
-		assert.match(
-			text,
-			/- restates-code at `src\/cart\.ts` \[L2\]: `\/\/ increment the item count by one`/u,
+void describe("a program the host refuses", () => {
+	void test("a lead its source does not hold is an error of the program, never dropped", async () => {
+		const { sources } = await stage({});
+		const quoted = await resolveLeads(
+			[
+				leadAt({ change: "src/cart.ts", line: 2, side: "NEW" }),
+				leadAt({ record: "comments.json", line: 2 }),
+			],
+			sources,
 		);
-		assert.match(
-			text,
-			/- record-row at `context\/comments\.json:2`: `\{"body": "Please split this"\}`/u,
+		assert.deepEqual(
+			quoted.map((each) => each.quote),
+			["  // increment the item count by one", '  {"body": "Please split this"}'],
 		);
-		assert.match(
-			text,
-			/- Not rated: 3 lead\(s\) with a kind that the script did not declare or cited lines that the source does not hold \(off-format\)\./u,
+		for (const at of [
+			{ change: "src/cart.ts", line: 400, side: "NEW" as const },
+			{ record: "../../../../../../etc/hostname", line: 1 },
+			{ file: "lib/missing.ts", line: 1 },
+		]) {
+			await assert.rejects(resolveLeads([leadAt(at)], sources), (error: unknown) => {
+				assert.ok(error instanceof UnratedError);
+				assert.equal(error.reason, "error");
+				assert.match(
+					error.message,
+					/^lead 1 \(A lead\.\) points at .*, which its source does not hold$/u,
+				);
+				return true;
+			});
+		}
+		// The review that the lead was for fails, and with it the program.
+		const runs = await runSource(
+			`import { definePracticeScript } from "../lib/practice-script.ts";
+export default definePracticeScript({
+	meta: {},
+	run: async (ctx) => ctx.review({ leads: [{ at: { change: "src/cart.ts", line: 400 }, label: "A lead." }] }),
+});
+`,
+			{},
+			undefined,
+			{ slugs: ["unheld-lead"] },
 		);
+		const outcome = runs.get("unheld-lead")?.outcome;
+		assert.equal(outcome?.status, "failed");
+		assert.equal(outcome.stopReason, "error");
+		assert.match(outcome.error ?? "", /which its source does not hold$/u);
 	});
 
-	void test("a script whose meta is invalid is a failure whose models are unknown, never one that uses no model", async () => {
-		const { json } = await run("invalid-meta", {});
-		assert.partialDeepStrictEqual(await json("invalid-meta"), {
-			contract: "unknown",
-			status: "error",
+	void test("a program whose meta is invalid fails before it says which models it uses", async () => {
+		const { outcome } = await run("invalid-meta", {});
+		assert.equal(outcome.status, "failed");
+		assert.equal(outcome.stopReason, "invalid-program");
+		assert.match(outcome.error ?? "", /^meta: models\.decision /u);
+		assert.deepEqual(outcome.models, []);
+	});
+
+	for (const key of ["version", "kinds", "tokens"] as const) {
+		void test(`a program whose meta names the retired ${key} fails with the legacy contract error`, async () => {
+			const runs = await runSource(
+				`import { definePracticeScript } from "../lib/practice-script.ts";
+export default definePracticeScript({
+	meta: { ${key}: ${key === "kinds" ? "{}" : "1"} },
+	run: async () => ({ leads: [] }),
+});
+`,
+				{},
+				undefined,
+				{ slugs: ["legacy"] },
+			);
+			const outcome = runs.get("legacy")?.outcome;
+			assert.equal(outcome?.status, "failed");
+			assert.equal(outcome.stopReason, "invalid-program");
+			assert.equal(outcome.error, legacyContractError(key));
 		});
-	});
-
-	void test("a script without a contract version fails and says which version to declare", async () => {
-		const { json, section } = await run("missing-version", {});
-		const result = await json("missing-version");
-		assert.partialDeepStrictEqual(result, { contract: "unknown", status: "error" });
-		assert.equal(result.error, "meta: version is missing. Add version: 1, the leads contract.");
-		assert.match(await section("missing-version"), /version is missing\. Add version: 1/u);
-	});
-
-	void test("a result that breaks the contract is a script failure, never leads", async () => {
-		const { json, section } = await run("invalid-result", {});
-		assert.match(
-			await section("invalid-result"),
-			/\*\*Script failed\.\*\*.*\n\n- Script failed: result: leads/su,
-		);
-		const result = await json("invalid-result");
-		assert.partialDeepStrictEqual(result, { contract: "definition", status: "error", leads: [] });
-		assert.match(String(result.error), /^result: leads /u);
-	});
+	}
 });

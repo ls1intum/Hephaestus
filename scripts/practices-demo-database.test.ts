@@ -5,8 +5,8 @@ import { PGlite } from "@electric-sql/pglite";
 
 import { type Queryable, workspaceToSeed, writeOrRewind } from "./lib/practices-demo-database.ts";
 
-// The columns and foreign keys the rewind touches, as the baseline schema declares them. An
-// observation keeps its row when its revision goes (`ON DELETE SET NULL`), so only the rewind's own
+// The columns and foreign keys the rewind touches, as the schema declares them. A practice
+// result keeps its row when its revision goes (`ON DELETE SET NULL`), so only the rewind's own
 // check stops it from unpinning one. The practice's pointer must move before its revision goes.
 const SCHEMA = `
 	CREATE TABLE practice (id bigint PRIMARY KEY, workspace_id bigint NOT NULL, current_revision_id bigint);
@@ -19,7 +19,7 @@ const SCHEMA = `
 		criteria text NOT NULL
 	);
 	ALTER TABLE practice ADD FOREIGN KEY (current_revision_id) REFERENCES practice_revision (id);
-	CREATE TABLE observation (
+	CREATE TABLE practice_result (
 		id bigint PRIMARY KEY,
 		practice_revision_id bigint REFERENCES practice_revision (id) ON DELETE SET NULL
 	);
@@ -53,10 +53,10 @@ async function revisions(db: PGlite) {
 	return rows.map((row) => row.id);
 }
 
-async function pinnedBy(db: PGlite, observation: number) {
+async function pinnedBy(db: PGlite, result: number) {
 	const { rows } = await db.query<{ id: number | null }>(
-		"SELECT practice_revision_id AS id FROM observation WHERE id = $1",
-		[observation],
+		"SELECT practice_revision_id AS id FROM practice_result WHERE id = $1",
+		[result],
 	);
 	return rows[0]?.id;
 }
@@ -67,7 +67,7 @@ void test("a seed that fails midway leaves none of its rows and rewinds the revi
 
 	await assert.rejects(
 		writeOrRewind(db, WORKSPACE, APPENDED, async () => {
-			await db.query("INSERT INTO observation VALUES (1, 11)");
+			await db.query("INSERT INTO practice_result VALUES (1, 11)");
 			throw failure;
 		}),
 		(error) => error === failure,
@@ -78,9 +78,9 @@ void test("a seed that fails midway leaves none of its rows and rewinds the revi
 	assert.deepEqual(await revisions(db), [10]);
 });
 
-void test("a revision that a review pinned is kept, and its observation stays pinned", async (t) => {
+void test("a revision that a review pinned is kept, and its result stays pinned", async (t) => {
 	const db = await database(t);
-	await db.exec("INSERT INTO observation VALUES (2, 11)");
+	await db.exec("INSERT INTO practice_result VALUES (2, 11)");
 
 	await assert.rejects(
 		writeOrRewind(db, WORKSPACE, APPENDED, async () => {
@@ -112,7 +112,7 @@ void test("a seed that succeeds is committed and keeps the appended revision", a
 	const db = await database(t);
 
 	await writeOrRewind(db, WORKSPACE, APPENDED, async () => {
-		await db.query("INSERT INTO observation VALUES (3, 11)");
+		await db.query("INSERT INTO practice_result VALUES (3, 11)");
 	});
 	// One connection reads its own uncommitted rows, so a rollback is what shows the commit.
 	await db.exec("ROLLBACK");

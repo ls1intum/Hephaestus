@@ -21,7 +21,7 @@ const RUNNER = path.resolve(
 	"../../../main/resources/agent/pi-mentor-runner.ts",
 );
 const THREAD = "0f1e2d3c-4b5a-4968-8776-655443322110";
-const HISTORY = "inputs/context/observations_history.json";
+const HISTORY = "inputs/context/results_history.json";
 const SUMMARY = "SUMMARY-CHECKPOINT: the developer asked about their review history.";
 /** Text only the oldest saved answer carries, so a request without it no longer holds that answer. */
 const OLDEST = "OLDEST-ANSWER";
@@ -274,6 +274,13 @@ const isEvent = (type: string) => (frame: Json) => eventOf(frame)?.type === type
 const linkReply = (observationId: string): Reply => ({
 	tool: "link_observation",
 	arguments: { observationId, text: "Who approved !9 before it merged?" },
+	promptTokens: 3000,
+});
+
+/** A model reply that calls `link_result` for `practiceResultId`. */
+const linkResultReply = (practiceResultId: string): Reply => ({
+	tool: "link_result",
+	arguments: { practiceResultId, text: "The review found the description leaves out why." },
 	promptTokens: 3000,
 });
 
@@ -794,7 +801,7 @@ void test("a path built from a pull request number is refused before the server,
 	const refusal =
 		'fetch_context: "inputs/context/merge_readiness/!9.json" is not a context resource. For one item, copy the ' +
 		"`resource` value exactly as a context file gives it: a pull request's from its entry in " +
-		"recent_authored_work.json or merge_readiness.json, an observation's from its row in observations_history.json, " +
+		"recent_authored_work.json or merge_readiness.json, a result's from its row in results_history.json, " +
 		"and a pull request's or issue's reviews from its `reviewsResource`. " +
 		"Never build one from a pull request number or another id.";
 	const ended = runner.events.find((e) => e.type === "tool_execution_end");
@@ -856,6 +863,103 @@ void test("link_observation shows nothing until the server admits that observati
 	assert.match(JSON.stringify(ended[2]?.event.result), /Shown to the developer/u);
 });
 
+void test("link_result shows nothing until the server admits that result by its own id", async (t) => {
+	const invented = "3ec24178-667e-4735-b818-681684324c6f";
+	const owned = "5b1f0c2e-8d4a-4e6b-9f3c-2a7d1e0b9c84";
+	const model = await fakeModel(t, (_kind, index) =>
+		index < 3
+			? linkResultReply(index === 0 ? invented : owned)
+			: { text: "answer", promptTokens: 3000 },
+	);
+	const runner = spawnRealRunner(t, runnerRoot(), model);
+	await openAndPrompt(runner, "what did the review of !9 conclude?");
+
+	const refused = await runner.next((frame) => frame.method === "link_result");
+	assert.deepEqual(refused.params, { threadId: THREAD, practiceResultId: invented });
+	runner.send({
+		jsonrpc: "2.0",
+		id: refused.id,
+		error: { code: -32_602, message: "Nothing was shown: that is not a result of theirs." },
+	});
+	// An answer that admits the same id as an observation does not admit the result.
+	const crossed = await runner.next((frame) => frame.method === "link_result");
+	runner.send({ jsonrpc: "2.0", id: crossed.id, result: { observationId: owned } });
+	const admitted = await runner.next((frame) => frame.method === "link_result");
+	assert.deepEqual(admitted.params, { threadId: THREAD, practiceResultId: owned });
+	runner.send({ jsonrpc: "2.0", id: admitted.id, result: { practiceResultId: owned } });
+	await runner.next(isEvent("agent_end"));
+
+	assert.deepEqual(
+		runner.events.filter((e) => e.type === "link_result").map((e) => e.event),
+		[
+			{
+				type: "link_result",
+				practiceResultId: owned,
+				text: "The review found the description leaves out why.",
+			},
+		],
+	);
+	assert.ok(!typesOf(runner).includes("link_observation"), typesOf(runner).join(", "));
+	const ended = runner.events.filter((e) => e.type === "tool_execution_end");
+	assert.deepEqual(
+		ended.map((e) => e.event.isError),
+		[true, true, false],
+	);
+	assert.match(JSON.stringify(ended[0]?.event.result), /Nothing was shown/u);
+	assert.match(JSON.stringify(ended[1]?.event.result), /did not admit result/u);
+	assert.match(
+		JSON.stringify(ended[2]?.event.result),
+		/Shown to the developer: feedback on result/u,
+	);
+});
+
+void test("a link_observation admitted by its result id instead is not shown", async (t) => {
+	const owned = "3ec24178-2219-4af4-bebf-077c73a0435e";
+	const model = await fakeModel(t, (_kind, index) =>
+		index === 0 ? linkReply(owned) : { text: "answer", promptTokens: 3000 },
+	);
+	const runner = spawnRealRunner(t, runnerRoot(), model);
+	await openAndPrompt(runner, "what did the review of !9 say?");
+	const asked = await runner.next((frame) => frame.method === "link_observation");
+	runner.send({ jsonrpc: "2.0", id: asked.id, result: { practiceResultId: owned } });
+	await runner.next(isEvent("agent_end"));
+
+	assert.ok(!typesOf(runner).includes("link_observation"), typesOf(runner).join(", "));
+	const ended = runner.events.filter((e) => e.type === "tool_execution_end");
+	assert.deepEqual(
+		ended.map((e) => e.event.isError),
+		[true],
+	);
+	assert.match(JSON.stringify(ended[0]?.event.result), /did not admit observation/u);
+});
+
+void test("the history is asked for as results_history.json, and the retired key never reaches the server", async (t) => {
+	const model = await fakeModel(
+		t,
+		(_kind, index) =>
+			[
+				{ toolCall: "inputs/context/observations_history.json", promptTokens: 3000 },
+				{ toolCall: HISTORY, promptTokens: 3000 },
+			][index] ?? { text: "answer", promptTokens: 3000 },
+	);
+	const runner = spawnRealRunner(t, runnerRoot(), model);
+	await openAndPrompt(runner, "how did my reviews go?");
+	const callback = await runner.next((frame) => frame.method === "fetch_context");
+	assert.deepEqual(callback.params, { threadId: THREAD, path: HISTORY });
+	runner.send({ jsonrpc: "2.0", id: callback.id, result: { content: { recentResults: [] } } });
+	await runner.next(isEvent("agent_end"));
+
+	const ended = runner.events.filter((e) => e.type === "tool_execution_end");
+	assert.deepEqual(
+		ended.map((e) => e.event.isError),
+		[true, false],
+	);
+	assert.match(
+		JSON.stringify(ended[0]?.event.result),
+		/observations_history\.json\\" is not a context resource/u,
+	);
+});
+
 void test("a link the server admits only after Stop is neither shown nor reported as shown", async (t) => {
 	const owned = "3ec24178-2219-4af4-bebf-077c73a0435e";
 	const model = await fakeModel(t, (_kind, index) =>
@@ -893,7 +997,7 @@ void test("a link the server admits only after Stop is neither shown nor reporte
 });
 
 /**
- * The question fetches a merge request's detail, then a small observation detail, and the reply that asks for the
+ * The question fetches a merge request's detail, then a small result detail, and the reply that asks for the
  * second crosses the working trigger, so Pi compacts between the two tool batches. What the turn read before that
  * stays verbatim, not only in the summary: the question, and the reviewer's and the student's comments told apart.
  */
@@ -904,8 +1008,7 @@ void test("a compaction during a turn keeps its question and the comments it fet
 	const student =
 		"STUDENT-NOTE: thanks, the generated file stays as it is and the issue is linked.";
 	const mergeRequest = "inputs/context/merge_readiness/4009562523.json";
-	const observation =
-		"inputs/context/observations_history/3ec24178-2219-4af4-bebf-077c73a0435e.json";
+	const result = "inputs/context/results_history/3ec24178-2219-4af4-bebf-077c73a0435e.json";
 	const model = await fakeModel(t, (kind, index) => {
 		if (kind === "summary") {
 			return { text: SUMMARY, promptTokens: 3000 };
@@ -913,7 +1016,7 @@ void test("a compaction during a turn keeps its question and the comments it fet
 		return (
 			[
 				{ toolCall: mergeRequest, promptTokens: 30_000 },
-				{ toolCall: observation, promptTokens: 52_000 },
+				{ toolCall: result, promptTokens: 52_000 },
 				{ toolCall: HISTORY, promptTokens: 31_000 },
 			][index] ?? { text: "answer", promptTokens: 32_000 }
 		);
@@ -943,7 +1046,7 @@ void test("a compaction during a turn keeps its question and the comments it fet
 			},
 		],
 	});
-	await answer({ observation: { evidenceRationale: "r".repeat(2000) } });
+	await answer({ result: { evidenceRationale: "r".repeat(2000) } });
 	await answer({ rows: "h".repeat(2000) });
 	await runner.next(isEvent("agent_end"));
 
@@ -992,7 +1095,7 @@ void test("Heph offers the model only its context and link tools", async (t) => 
 	);
 	assert.deepEqual(
 		names.toSorted((a, b) => a.localeCompare(b)),
-		["fetch_context", "link_observation"],
+		["fetch_context", "link_observation", "link_result"],
 	);
 });
 

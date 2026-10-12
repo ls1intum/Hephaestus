@@ -3,18 +3,22 @@
 // a test file. A lead matches spelling on one line. It does not know the type of the operand, where the
 // value came from, or what bounds it, so the review decides which leads are lapses. The input practice
 // owns implicit traps, such as a subscript or an integer division. To add a language, add a row.
-import { readFile } from "node:fs/promises";
-import nodePath from "node:path";
-
 import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/bounded-text.ts";
 import { blockExtents, codeLines, isCommentLine } from "../lib/declarations.ts";
 import { isTestPath, languageOf } from "../lib/languages.ts";
 import {
 	definePracticeScript,
 	expectKind,
+	requireChange,
 	type DiffFile,
-	type Lead,
+	type FileTree,
+	type ReviewLead,
 } from "../lib/practice-script.ts";
+
+export const LABELS = {
+	"crash-operator":
+		"An added line that spells a crash operator; its facts name the language, the operators, and if it runs in a preview block or a test file.",
+};
 
 // language key -> [label, regex] of crash operators the author writes, matched against the line's code.
 const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
@@ -108,18 +112,26 @@ function newSideOfHunks(file: DiffFile): string {
 	return lines.join("\n");
 }
 
+/** The text of the pinned file, or null when the tree is unknown or does not hold the file as text. */
+async function pinnedText(tree: FileTree | null, path: string): Promise<string | null> {
+	if (tree === null) {
+		return null;
+	}
+	try {
+		const file = await tree.read(path);
+		return file.status === "FOUND" ? file.text : null;
+	} catch {
+		return null;
+	}
+}
+
 /** The lines inside a preview block: read from the pinned file, else from what the hunks show. */
 async function previewLines(
-	repoPath: string,
+	tree: FileTree | null,
 	file: DiffFile,
 	language: string,
 ): Promise<Set<number>> {
-	let source: string;
-	try {
-		source = await readFile(nodePath.join(repoPath, file.path), "utf8");
-	} catch {
-		source = newSideOfHunks(file);
-	}
+	const source = (await pinnedText(tree, file.path)) ?? newSideOfHunks(file);
 	const lines = new Set<number>();
 	for (const { start, end } of blockExtents(language, source, PREVIEW_OPENER) ?? []) {
 		for (let line = start; line <= end; line += 1) {
@@ -140,25 +152,22 @@ interface CrashLine {
 }
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"crash-operator":
-				"An added line that spells a crash operator; its facts name the language, the operators, and if it runs in a preview block or a test file.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		const rows: CrashLine[] = [];
 		const byKind: Record<string, number> = {};
-		for (const [path, df] of ctx.change) {
+		for (const [path, df] of requireChange(ctx.files)) {
 			const lang = languageOf(path);
 			const patterns = lang === null ? undefined : LANG_PATTERNS[lang];
 			if (lang === null || !patterns) {
 				continue;
 			}
 			const code = codeLines(lang, df.addedLines);
-			const preview = lang === "swift" ? await previewLines(ctx.repo, df, lang) : new Set<number>();
+			const preview =
+				lang === "swift"
+					? await previewLines(ctx.files?.head ?? null, df, lang)
+					: new Set<number>();
 			const testFile = isTestPath(path);
 			for (const [line, content] of df.addedLines) {
 				if (isCommentLine(content, lang)) {
@@ -199,9 +208,9 @@ export default definePracticeScript({
 						"A lead matches spelling on one line: it does not know the operand's type, where the value came from, or what bounds it.",
 					]
 				: [];
-		const leads: Lead[] = rows.slice(0, 40).map((row) => ({
+		const leads: ReviewLead[] = rows.slice(0, 40).map((row) => ({
 			at: { change: row.path, line: row.line },
-			kind: "crash-operator",
+			label: LABELS["crash-operator"],
 			facts: {
 				language: row.language,
 				operators: row.operators,
@@ -209,6 +218,10 @@ export default definePracticeScript({
 				testFile: row.testFile,
 			},
 		}));
-		return { leads, facts: { crashOperatorLines: rows.length, inPreview, inTests }, directions };
+		return ctx.review({
+			leads,
+			facts: { crashOperatorLines: rows.length, inPreview, inTests },
+			directions,
+		});
 	},
 });

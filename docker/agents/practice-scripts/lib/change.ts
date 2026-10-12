@@ -1,8 +1,7 @@
 /** Read the captured commit metadata. */
 
-import { readFile } from "node:fs/promises";
-
 import { isJsonObject, text } from "./json.ts";
+import type { Evidence } from "./practice-script.ts";
 
 export interface ChangeCommit {
 	sha: string;
@@ -27,18 +26,6 @@ export interface ChangedFile {
 	/** Changed-line counts, when the record carries them. */
 	additions?: number;
 	deletions?: number;
-}
-
-/** The file's text, or null when the directory or the file is absent. */
-async function readChangeText(dir: string | undefined, name: string): Promise<string | null> {
-	if (dir === undefined || dir === "") {
-		return null;
-	}
-	try {
-		return await readFile(`${dir}/${name}`, "utf8");
-	} catch {
-		return null;
-	}
 }
 
 function parseJson(source: string | null): unknown {
@@ -70,15 +57,16 @@ function changedFiles(value: unknown): ChangedFile[] {
  * The commits from base to head, in no promised order, as the server staged them in the context
  * (`commits.json` in the task-declared context); empty when the record was not captured.
  */
-export async function readCommits(contextDir: string | undefined): Promise<ChangeCommit[]> {
-	return (await readCapturedCommits(contextDir)) ?? [];
+export async function readCommits(evidence: Pick<Evidence, "record">): Promise<ChangeCommit[]> {
+	return (await readCapturedCommits(evidence)) ?? [];
 }
 
 /** Null means missing or malformed capture; an empty array is a captured empty range. */
 export async function readCapturedCommits(
-	contextDir: string | undefined,
+	evidence: Pick<Evidence, "record">,
 ): Promise<ChangeCommit[] | null> {
-	const source = await readChangeText(contextDir, "commits.json");
+	const record = await evidence.record("commits.json");
+	const source = record.status === "FOUND" ? record.text : null;
 	const parsed = parseJson(source);
 	if (
 		!isJsonObject(parsed) ||

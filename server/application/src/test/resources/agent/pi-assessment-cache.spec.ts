@@ -17,11 +17,11 @@ import {
 
 import { SANDBOX_RESOURCE_LOADER_OPTIONS } from "../../../main/resources/agent/pi-agent-sandbox.ts";
 import { assessmentCacheExtension } from "../../../main/resources/agent/pi-assessment-cache.ts";
-import { isRecord } from "../../../main/resources/agent/pi-observation-normalize.ts";
 import {
 	type ProviderConfig,
 	registerHephaestusProvider,
 } from "../../../main/resources/agent/pi-provider.ts";
+import { isRecord } from "../../../main/resources/agent/pi-result-normalize.ts";
 
 const PREFIX = "Review this captured work.\n\nShared work description and diff.\n\n";
 const JOB = "10000000-0000-4000-8000-000000000001";

@@ -7,7 +7,7 @@ import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 import { checkableItems } from "../lib/review.ts";
 
 export default definePracticeScript({
-	meta: { version: 1, kinds: {} },
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.issue");
 		const shape = classifyIssue(ctx.work);
@@ -17,7 +17,7 @@ export default definePracticeScript({
 		const issueMentions = new Set((body.match(/(?:^|\s)#\d+\b/gu) ?? []).map((s) => s.trim())).size;
 		const rollup = subIssueRollup(ctx.work);
 
-		return {
+		return ctx.review({
 			leads: [],
 			facts: {
 				bodyLength: body.length,
@@ -31,6 +31,6 @@ export default definePracticeScript({
 				`Sub-issues: ${rollup.text}.`,
 				"Judge the standard once: whether the work is large and whether these items or mentions break it down is read from what they say, never from how many there are.",
 			],
-		};
+		});
 	},
 });

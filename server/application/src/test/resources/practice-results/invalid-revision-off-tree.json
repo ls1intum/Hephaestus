@@ -1,0 +1,30 @@
+{
+	"outcome": "NOT_APPLICABLE",
+	"summary": "The change adds or changes no user interface",
+	"explanation": "The pull request changes three Java files of the export service and its test. None of them is a view, template, stylesheet or UI component.",
+	"citations": [
+		{
+			"sourceKind": "scm.pull-request.core",
+			"artifactPath": "context/metadata.json",
+			"path": "context/metadata.json",
+			"startLine": 27,
+			"endLine": 27,
+			"quote": "  \"changed_files\": 3,",
+			"revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		}
+	],
+	"evidence": {
+		"inapplicability": {
+			"consulted": ["scm.pull-request.core", "scm.pull-request.diff"],
+			"subject": "user interface views and components that the change adds or changes",
+			"ruledOutBy": "All three changed files are Java sources under src/main/java and src/test/java of the export service; the change adds or changes no view, template, stylesheet or component file."
+		}
+	},
+	"coverage": {
+		"source": "claimed",
+		"selected": 3,
+		"checked": 3,
+		"total": 3,
+		"complete": true
+	}
+}

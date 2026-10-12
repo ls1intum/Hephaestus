@@ -2,7 +2,12 @@
 // icon-only controls, images, fixed-size fonts, height caps and colour-only state. It also finds the
 // accessibility modifiers that the change adds with them. The review reads the view chain.
 import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 import { countLabel, sampleNote, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
 
 // Font.custom(_:size:) scales with the body style, custom(_:size:relativeTo:) with the style it names;
@@ -32,40 +37,40 @@ const INTERFACE_LINES: readonly SourcePattern[] = [
 	["toggle", /\bToggle\s*\(/u],
 ];
 
+export const LABELS = {
+	"accessibility-modifier":
+		"An added accessibility modifier, such as accessibilityLabel or accessibilityHidden.",
+	"label-with-text": "An added Label with a text title.",
+	"symbol-image": "An added Image(systemName:).",
+	"asset-image": "An added Image from an asset or a decorative image.",
+	"fixed-size-custom-font":
+		"An added custom font with fixedSize:, which does not scale with the text size.",
+	"system-font-with-a-point-size": "An added system font with a point size.",
+	"scaled-custom-font": "An added custom font with size:, which scales with the body style.",
+	"semantic-font": "An added semantic font, such as .headline or .body.",
+	"height-cap": "An added frame with a fixed height.",
+	"line-limit": "An added lineLimit with a number.",
+	"colour-by-state": "An added foreground colour that a condition selects, such as red or green.",
+	button: "An added Button.",
+	toggle: "An added Toggle.",
+};
+const LABEL_OF = new Map<string, string>(Object.entries(LABELS));
+
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"accessibility-modifier":
-				"An added accessibility modifier, such as accessibilityLabel or accessibilityHidden.",
-			"label-with-text": "An added Label with a text title.",
-			"symbol-image": "An added Image(systemName:).",
-			"asset-image": "An added Image from an asset or a decorative image.",
-			"fixed-size-custom-font":
-				"An added custom font with fixedSize:, which does not scale with the text size.",
-			"system-font-with-a-point-size": "An added system font with a point size.",
-			"scaled-custom-font": "An added custom font with size:, which scales with the body style.",
-			"semantic-font": "An added semantic font, such as .headline or .body.",
-			"height-cap": "An added frame with a fixed height.",
-			"line-limit": "An added lineLimit with a number.",
-			"colour-by-state":
-				"An added foreground colour that a condition selects, such as red or green.",
-			button: "An added Button.",
-			toggle: "An added Toggle.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const scan = await scanAddedLines(ctx.repo, ctx.change, {
+		const scan = await scanAddedLines(ctx.files?.head ?? null, requireChange(ctx.files), {
 			languages: ["swift"],
 			patterns: INTERFACE_LINES,
 			maxHints: 60,
 		});
-		const leads: Lead[] = scan.hints.map((hint) => ({
-			at: { change: hint.file, line: hint.line },
-			kind: hint.pattern,
-			facts: factsOf(hint.flags),
-		}));
+		const leads: ReviewLead[] = scan.hints.flatMap((hint) => {
+			const label = LABEL_OF.get(hint.pattern);
+			return label === undefined
+				? []
+				: [{ at: { change: hint.file, line: hint.line }, label, facts: factsOf(hint.flags) }];
+		});
 		const count = (label: string) => countLabel(scan, label);
 		const facts = {
 			interfaceLinesAdded: scan.matched,
@@ -106,6 +111,6 @@ export default definePracticeScript({
 		if (leads.length === 0) {
 			directions.push(...noMatchDirections(scan.linesAdded, scan.filesScanned));
 		}
-		return { leads, facts, directions };
+		return ctx.review({ leads, facts, directions });
 	},
 });

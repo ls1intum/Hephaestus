@@ -1,4 +1,4 @@
-/** The contract of a practice script, as the runner parses it. */
+/** The contract of a practice program, as the host parses it, and of the result it returns. */
 import type {
 	EmbeddingModelV4,
 	EmbeddingModelV4CallOptions,
@@ -24,28 +24,31 @@ import { isJsonObject } from "./json.ts";
 export const RETIRED_FORM_ERROR =
 	"This script uses the retired positional form. Rewrite it with definePracticeScript.";
 
+/**
+ * The error of a script written for the retired leads contract: its `meta` names a version, lead kinds
+ * or a token ceiling, or its `run` returns leads. Nothing reads that form any more.
+ */
+export const LEGACY_CONTRACT_ERROR =
+	"This practice script uses the retired leads contract (meta.version). Accept the practice's catalog update, or rewrite run() to return a result, for example return ctx.review({ leads }).";
+
+/** The keys of the retired `meta`, in the order the error names the first one present. */
+const LEGACY_META_KEYS = ["version", "kinds", "tokens"] as const;
+
+/** {@link LEGACY_CONTRACT_ERROR}, naming the retired key that the script used. */
+export function legacyContractError(key: (typeof LEGACY_META_KEYS)[number]): string {
+	return LEGACY_CONTRACT_ERROR.replace("(meta.version)", `(meta.${key})`);
+}
+
 /** A practice slug as the server writes it: `SandboxLayout.PRACTICE_SLUG`, anchored. */
 export const PRACTICE_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
 /**
- * The header that names the practice of every model call of a practice script, so the proxy can
- * attribute its usage.
+ * The header that names the practice of every direct model call of a practice program, so the proxy
+ * can attribute its usage.
  */
 export const PRACTICE_SCRIPT_PRACTICE_HEADER = "x-hephaestus-practice";
 
-/**
- * How a practice's script ended, as `<slug>.json` records it. "skipped": a model that the script
- * requires is not available. "timeout": the script was stopped at its deadline, or the stage deadline
- * came before it started.
- */
-export const RUN_STATUSES = ["ok", "skipped", "error", "timeout"] as const;
-export type RunStatus = (typeof RUN_STATUSES)[number];
-/** How a script that returned no result ended: with an error, or at its deadline. */
-export type FailedStatus = Extract<RunStatus, "error" | "timeout">;
-export const isFailed = (status: RunStatus): status is FailedStatus =>
-	status === "error" || status === "timeout";
-
-/** What a practice script may ask a model to do. One slot, one kind of model. */
+/** What a practice program may ask a model to do directly. One slot, one kind of model. */
 export const MODEL_SLOTS = ["chat", "decision", "embedding", "reranking"] as const;
 export type ModelSlot = (typeof MODEL_SLOTS)[number];
 export const modelSlotSchema = z.enum(MODEL_SLOTS);
@@ -53,7 +56,7 @@ export const modelSlotSchema = z.enum(MODEL_SLOTS);
 /**
  * The most items that one call to a slot's model may hold: decision questions, embedding values and
  * rerank documents. The proxy refuses a larger call on the slot's own API (`LlmProxyService`), so the
- * runner refuses it first, as "too-large", whatever the protocol of the slot's model.
+ * host refuses it first, as "too-large", whatever the protocol of the slot's model.
  */
 export const MODEL_SLOT_CAPS = {
 	decision: 64,
@@ -62,14 +65,14 @@ export const MODEL_SLOT_CAPS = {
 } as const;
 
 /**
- * "required": without a bound model the script does not run, and its section says which model it
- * needs. "optional": the script runs without it and says what it could not rate.
+ * "required": without a bound model the program does not run, and the practice is skipped.
+ * "optional": the program runs without it and says what it could not rate.
  */
 const needSchema = z.enum(["required", "optional"]);
 export type Need = z.infer<typeof needSchema>;
 
-/** Why something was not rated. Never "nothing found". */
-const REASONS = [
+/** Why something was not rated or not reached. Never "nothing found". */
+export const REASONS = [
 	"unavailable",
 	"budget",
 	"deadline",
@@ -81,7 +84,7 @@ const REASONS = [
 const reasonSchema = z.enum(REASONS);
 export type Reason = z.infer<typeof reasonSchema>;
 
-/** One line of text: a newline would let a script write its own headings into the reviewer's turn. */
+/** One line of text: a newline would let a program write its own headings into the reviewer's turn. */
 const line = (max: number) =>
 	z
 		.string()
@@ -89,91 +92,49 @@ const line = (max: number) =>
 		.max(max)
 		.refine((text) => !/[\r\n]/u.test(text), "must be one line");
 
-const LEAD_KIND = /^[a-z][a-z0-9-]{1,47}$/u;
-
 /**
- * The version of the script contract that `meta.version` names. Version 1 is the leads contract: `run`
- * returns leads, facts and directions, and the review decides what each lead means.
+ * A practice program's `meta`: the direct models it needs, and nothing else. A key of the retired
+ * leads contract is refused with {@link LEGACY_CONTRACT_ERROR} before this schema reads it.
  */
-export const CONTRACT_VERSION = 1;
-
 export const metaSchema = z.strictObject({
-	version: z.literal(CONTRACT_VERSION, {
-		error: (issue) =>
-			issue.input === undefined
-				? `version is missing. Add version: ${CONTRACT_VERSION}, the leads contract.`
-				: `version ${JSON.stringify(issue.input)} is not known. Use version: ${CONTRACT_VERSION}, the leads contract.`,
-	}),
 	models: z.partialRecord(modelSlotSchema, needSchema).optional(),
-	/** This practice's token ceiling, inside the stage's own ceiling. */
-	tokens: z.int().positive().max(500_000).optional(),
-	/** Lead kind → the sentence that the reviewer reads for it. */
-	kinds: z.record(z.string().regex(LEAD_KIND), line(300)),
 });
 export type ParsedMeta = z.infer<typeof metaSchema>;
+
+/** The retired key that a `meta` value carries, or undefined. */
+export function legacyMetaKey(meta: unknown): (typeof LEGACY_META_KEYS)[number] | undefined {
+	return isJsonObject(meta) ? LEGACY_META_KEYS.find((key) => Object.hasOwn(meta, key)) : undefined;
+}
+
+/** Parse a program's `meta`, or say why it is not one: a retired key, or a shape the contract does not name. */
+export function parseMeta(
+	meta: unknown,
+): { meta: ParsedMeta } | { error: string; legacy: boolean } {
+	const legacy = legacyMetaKey(meta);
+	if (legacy !== undefined) {
+		return { error: legacyContractError(legacy), legacy: true };
+	}
+	const parsed = metaSchema.safeParse(meta);
+	if (!parsed.success) {
+		const issue = parsed.error.issues[0];
+		return {
+			error: `meta: ${issue ? `${issue.path.join(".")} ${issue.message}`.trim() : "invalid"}`,
+			legacy: false,
+		};
+	}
+	return { meta: parsed.data };
+}
 
 const scalar = z.union([
 	line(200),
 	z.number().refine(Number.isFinite, "must be finite"),
 	z.boolean(),
 ]);
-const factsSchema = z
+/** Scalar facts that a program computed: at most 32, each a short one-line text, a number or a flag. */
+export const factsSchema = z
 	.record(z.string().regex(/^[A-Za-z][A-Za-z0-9]{0,63}$/u), scalar)
 	.refine((facts) => Object.keys(facts).length <= 32, "at most 32 facts");
 export type Facts = z.infer<typeof factsSchema>;
-
-/**
- * Where a lead points, in the coordinates an observation cites: a line the change adds or removes,
- * a repository file, or a captured record under the context folder. The runner writes the quote.
- */
-const citationSchema = z.union([
-	z.strictObject({
-		change: z.string().min(1),
-		line: z.int().positive(),
-		endLine: z.int().positive().optional(),
-		side: z.enum(["OLD", "NEW"]).optional(),
-	}),
-	z.strictObject({
-		file: z.string().min(1),
-		line: z.int().positive(),
-		endLine: z.int().positive().optional(),
-	}),
-	z.strictObject({
-		record: z.string().min(1),
-		line: z.int().nonnegative().optional(),
-	}),
-]);
-export type Citation = z.infer<typeof citationSchema>;
-
-const ratingSchema = z.strictObject({
-	value: z.string().regex(LEAD_KIND),
-	score: z.number().min(0).max(1),
-});
-
-const leadSchema = z.strictObject({
-	at: citationSchema,
-	kind: z.string().regex(LEAD_KIND),
-	facts: factsSchema.optional(),
-	/** A model's answer about the cited place. The reviewer sees that it was rated, never the score. */
-	rating: ratingSchema.optional(),
-});
-export type Lead = z.infer<typeof leadSchema>;
-
-const unratedSchema = z.strictObject({
-	what: line(160),
-	count: z.int().nonnegative(),
-	reason: reasonSchema,
-});
-export type Unrated = z.infer<typeof unratedSchema>;
-
-export const practiceScriptResultSchema = z.strictObject({
-	leads: z.array(leadSchema).max(200),
-	facts: factsSchema.optional(),
-	unrated: z.array(unratedSchema).max(20).optional(),
-	/** Directions to the reviewer. The script's author writes them; model text does not belong here. */
-	directions: z.array(line(300)).max(10).optional(),
-});
-export type PracticeScriptResult = z.infer<typeof practiceScriptResultSchema>;
 
 const PROTOCOLS = [
 	"openai-completions",
@@ -218,7 +179,7 @@ interface SlotTypes {
 	};
 }
 
-/** The provider model of each slot: in the runner, in a script's process, and in `ctx.models`. */
+/** The provider model of each slot: in the host, in a program's process, and in `ctx.models`. */
 export type SlotModels = { [S in ModelSlot]: SlotTypes[S]["model"] };
 
 /** What one slot's model returned, named by its slot. */
@@ -229,7 +190,7 @@ export type SlotAnswer<S extends ModelSlot = ModelSlot> = {
 type CallOptions<S extends ModelSlot> = SlotTypes[S]["options"] & Record<string, unknown>;
 
 export interface SlotCall<S extends ModelSlot> {
-	/** The options a script may set. Provider options and headers stay with the runner. */
+	/** The options a program may set. Provider options and headers stay with the host. */
 	options: readonly string[];
 	/**
 	 * Whether the options hold each field that a call to this slot's model requires, as a list, a record
@@ -295,7 +256,7 @@ function isRerankingCall(options: Record<string, unknown>): options is CallOptio
 		: documents.type === "object" && documents.values.every(isJsonObject);
 }
 
-/** How the runner calls each slot's model for a script. */
+/** How the host calls each slot's model for a program. */
 export const MODEL_SLOT_CALLS = {
 	chat: {
 		options: [
@@ -356,8 +317,9 @@ export const MODEL_SLOT_CALLS = {
 } satisfies { [S in ModelSlot]: SlotCall<S> };
 
 /*
- * What a script reads about its review: the kind of the work, its record, the cause, the role the
- * practice is about, and the previous claim. The server stages them; the runner validates them here.
+ * What a program reads about its review: the kind of the work, its record, the cause, the role the
+ * practice is about, its revision and scope, and the previous claim. The server stages them; the host
+ * validates them here.
  */
 
 /**
@@ -397,7 +359,7 @@ export const REVIEW_STATES = {
 	"docs.document": { state: ["ACTIVE", "ARCHIVED"] },
 } as const satisfies Record<Kind, Record<string, readonly [string, ...string[]]>>;
 
-/** `ObservationOrigin`: the population that the review's observations belong to. */
+/** `ResultOrigin`: the population that the review's results belong to. */
 export const ORIGINS = ["LIVE", "MANUAL", "BACKFILL"] as const;
 export const OUTCOMES = ["MET", "NOT_MET", "NOT_APPLICABLE", "UNDETERMINED"] as const;
 export const SEVERITIES = ["CRITICAL", "MAJOR", "MINOR", "INFO"] as const;
@@ -415,7 +377,7 @@ export const isCommit = (value: string): boolean => COMMIT.test(value);
 
 /*
  * The record of the reviewed work, one for each kind, as the server's content source stages it in the
- * context folder. A field that the server does not write is not in the type: the runner drops an
+ * context folder. A field that the server does not write is not in the type: the host drops an
  * unknown field, and a known field of another shape fails the record. Only a descriptive field with a
  * defined meaning for "not known" falls back to it (`notKnownWhenUnnamed`), so that a value that a
  * provider adds later does not fail the review's script.
@@ -586,6 +548,14 @@ function inputsOf<
 	return z.strictObject({
 		kind: z.literal(kind),
 		subject: z.strictObject({ role: z.enum(SUBJECT_ROLES) }),
+		/** The admitted revision of the practice: its criteria and its program. */
+		practice: z.strictObject({ revisionId: z.int().positive() }),
+		/** The authored scope that the result is about. The key is opaque. */
+		scope: z.strictObject({
+			key: z.string().min(1).max(255),
+			mode: z.literal("change"),
+			description: z.string(),
+		}),
 		cause: z.discriminatedUnion("type", [
 			z.strictObject({
 				type: z.literal("moment"),
@@ -605,6 +575,8 @@ function inputsOf<
 		 */
 		previous: z
 			.strictObject({
+				/** The admitted result that this previous claim is. */
+				practiceResultId: z.string().min(1),
 				reviewedAt: z.iso.datetime(),
 				cause: z.enum(CAUSE_TYPES),
 				signal: signal.optional(),
@@ -620,8 +592,8 @@ function inputsOf<
 }
 
 /**
- * A practice's `<slug>.cause.json` (`kind`, `subject`, `cause`), with its `<slug>.previous.json`
- * as `previous` and the kind's record as `work`.
+ * A practice's `<slug>.cause.json` (`kind`, `subject`, `practice`, `scope`, `cause`), with its
+ * `<slug>.previous.json` as `previous` and the kind's record as `work`.
  */
 export const practiceInputsSchema = z.discriminatedUnion("kind", [
 	inputsOf(
@@ -671,3 +643,779 @@ export type SubjectRole = PracticeInputs["subject"]["role"];
 export type CauseType = PracticeInputs["cause"]["type"];
 /** The record of the reviewed work of each kind. */
 export type Work = { [K in Kind]: InputsOf<K>["work"] };
+
+/*
+ * The result a practice program returns: one candidate per practice. Admission on the server parses
+ * it again with the same rules and the same refusal codes (`CandidateParser`), and checks every quote
+ * against the captured sources; `CandidateContractSyncTest` keeps the bounds equal.
+ */
+
+/** The bounds of a candidate. Counts are integers from 0 to {@link CANDIDATE_LIMITS.maxCount}. */
+export const CANDIDATE_LIMITS = {
+	summaryChars: 160,
+	explanationChars: 10_000,
+	problemExplanationChars: 4000,
+	nextStepChars: 1000,
+	exampleNoteChars: 280,
+	quoteChars: 4000,
+	openQuestionChars: 500,
+	warrantFieldChars: 500,
+	resultCitations: 50,
+	citationsPerProblem: 20,
+	problems: 50,
+	openQuestions: 20,
+	omissions: 20,
+	omissionUnits: 50,
+	consultedSources: 20,
+	candidateBytes: 131_072,
+	maxCount: 1_000_000,
+} as const;
+
+/** Why a candidate is refused, in the order the rules apply: the first failing rule names it. */
+export const CANDIDATE_REFUSALS = [
+	"malformed_candidate",
+	"outcome_problem_mismatch",
+	"severity_outcome_mismatch",
+	"severity_below_worst_problem",
+	"warrant_outcome_mismatch",
+	"result_citations_required",
+	"met_coverage_incomplete",
+	"coverage_inconsistent",
+	"example_outcome_mismatch",
+	"example_overlaps_problem",
+	"basis_citation_out_of_range",
+	"duplicate_problem_key",
+] as const;
+export type CandidateRefusal = (typeof CANDIDATE_REFUSALS)[number];
+
+export type NonEmpty<T> = readonly [T, ...T[]];
+export type Severity = (typeof SEVERITIES)[number];
+export type Outcome = (typeof OUTCOMES)[number];
+
+/** The source kinds whose citations carry a side or a revision. */
+export const DIFF_SOURCE = "scm.pull-request.diff";
+export const TREE_SOURCE = "scm.repository.tree";
+
+/**
+ * A verified place in a captured source, in canonical coordinates. The quote is the exact text at
+ * those lines; admission reads it again from the source.
+ */
+export interface Citation {
+	/** Integration-neutral, e.g. "scm.pull-request.diff", "scm.repository.tree", "scm.pull-request.core". */
+	sourceKind: string;
+	/** The staged artifact, e.g. "context/change.json", "repos/reviewed/.git/HEAD", "context/metadata.json". */
+	artifactPath: string;
+	/** The repository path for code sources; the record path otherwise. */
+	path: string;
+	/** Exactly on scm.pull-request.diff. */
+	side?: "OLD" | "NEW";
+	/** A full commit SHA; only on scm.repository.tree and scm.pull-request.diff. */
+	revision?: string;
+	startLine: number;
+	endLine: number;
+	quote: string;
+}
+/** What a search for something missing consulted, looked for, and did not cover. Consulted names source kinds. */
+export interface SearchWarrant {
+	consulted: NonEmpty<string>;
+	lookedFor: string;
+	boundary: string;
+}
+export interface InapplicabilityWarrant {
+	consulted: NonEmpty<string>;
+	subject: string;
+	ruledOutBy: string;
+}
+/** A real semantic question the evidence leaves open, located where it can be. */
+export interface OpenQuestion {
+	openQuestion: string;
+	wouldSettleIt: string;
+	citation?: Citation;
+}
+/** One place of the work that shows the practice done well. */
+export interface Example {
+	citation: Citation;
+	note: string;
+}
+/** Why a problem is this work's: the indices name the problem's own citations. */
+export type ClaimBasis =
+	| { type: "introduced"; head: number; explanation: string }
+	| { type: "worsened"; base: number; head: number; explanation: string }
+	| { type: "duty"; criterionQuote: string; event: number; explanation: string }
+	| { type: "state"; explanation: string };
+export interface Problem {
+	/** Practice-slug shaped and unique within the candidate. */
+	key?: string;
+	severity: Severity;
+	/** One line. */
+	summary: string;
+	explanation: string;
+	citations: NonEmpty<Citation>;
+	basis: ClaimBasis;
+	nextStep?: string;
+}
+export const OMISSION_REASONS = ["selection", "truncated", ...REASONS, "cancelled"] as const;
+export type OmissionReason = (typeof OMISSION_REASONS)[number];
+/** What a program or a review did not cover, and why. */
+export interface Omission {
+	what: string;
+	count: number;
+	reason: OmissionReason;
+	units?: readonly string[];
+}
+type Completeness =
+	| { complete: true; omitted?: never }
+	| { complete: false; omitted: NonEmpty<Omission> };
+/**
+ * What the result covers. "host": the host derived it from its own read receipts. "claimed": program
+ * code typed it, and it stays a claim.
+ */
+export type Coverage =
+	| ({ source: "host"; reads: number; truncatedReads: number; failedReads: number } & Completeness)
+	| ({ source: "claimed"; selected: number; checked: number; total: number | null } & Completeness);
+
+interface ResultBase {
+	summary: string;
+	explanation: string;
+	coverage: Coverage;
+}
+export type Candidate = ResultBase &
+	(
+		| {
+				outcome: "MET";
+				citations: NonEmpty<Citation>;
+				coverage: { complete: true };
+				example?: Example;
+				evidence: { search?: SearchWarrant };
+		  }
+		| {
+				outcome: "NOT_MET";
+				citations: readonly Citation[];
+				problems: NonEmpty<Problem>;
+				severity?: Severity;
+				example?: Example;
+				evidence: { search?: SearchWarrant; undecidability?: NonEmpty<OpenQuestion> };
+		  }
+		| {
+				outcome: "NOT_APPLICABLE";
+				citations: NonEmpty<Citation>;
+				evidence: { inapplicability: InapplicabilityWarrant };
+		  }
+		| {
+				outcome: "UNDETERMINED";
+				citations: NonEmpty<Citation>;
+				evidence: { search?: SearchWarrant; undecidability: NonEmpty<OpenQuestion> };
+		  }
+	);
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+/** What a review session submits: a candidate without numbers. The host adds the coverage it measured. */
+export type SessionCandidate = DistributiveOmit<Candidate, "coverage">;
+
+const count = z.int().min(0).max(CANDIDATE_LIMITS.maxCount);
+const lineNumber = z.int().min(1).max(2_147_483_647);
+const bounded = (max: number) => z.string().min(1).max(max);
+const listOf = <T extends z.ZodType>(item: T, max: number) => z.array(item).max(max);
+const nonEmptyListOf = <T extends z.ZodType>(item: T, max: number) =>
+	z
+		.array(item)
+		.min(1)
+		.max(max)
+		.transform((items, ctx) => {
+			const listed = nonEmpty(items);
+			if (listed === undefined) {
+				ctx.addIssue({ code: "custom", message: "must list at least one" });
+				return z.NEVER;
+			}
+			return listed;
+		});
+
+/**
+ * A file of a repository as a quote of code names it: relative, with no empty, `.` or `..` part, and outside the
+ * repository's `.git` directory, which holds no reviewed code.
+ */
+export function isRepositoryPath(path: string): boolean {
+	return (
+		!path.includes("\\") &&
+		path.split("/").every((part) => part !== "" && part !== "." && part !== ".." && part !== ".git")
+	);
+}
+
+const citationShape = z
+	.strictObject({
+		sourceKind: z.string().min(1),
+		artifactPath: z.string().min(1),
+		path: z.string().min(1),
+		side: z.enum(["OLD", "NEW"]).optional(),
+		revision: z.string().regex(COMMIT).optional(),
+		startLine: lineNumber,
+		endLine: lineNumber,
+		quote: bounded(CANDIDATE_LIMITS.quoteChars),
+	})
+	.refine(
+		(citation) => citation.endLine >= citation.startLine,
+		"endLine must be at least startLine",
+	)
+	.refine(
+		(citation) => (citation.side !== undefined) === (citation.sourceKind === DIFF_SOURCE),
+		`side is set exactly on a ${DIFF_SOURCE} citation`,
+	)
+	.refine(
+		(citation) =>
+			citation.revision === undefined ||
+			citation.sourceKind === DIFF_SOURCE ||
+			citation.sourceKind === TREE_SOURCE,
+		`revision is set only on a ${TREE_SOURCE} or ${DIFF_SOURCE} citation`,
+	)
+	.refine(
+		(citation) =>
+			(citation.sourceKind !== DIFF_SOURCE && citation.sourceKind !== TREE_SOURCE) ||
+			isRepositoryPath(citation.path),
+		"a quote of code names a file of the repository: a relative path outside .git, with no empty, . or .. part",
+	);
+const consulted = nonEmptyListOf(
+	bounded(CANDIDATE_LIMITS.warrantFieldChars),
+	CANDIDATE_LIMITS.consultedSources,
+);
+const warrantField = bounded(CANDIDATE_LIMITS.warrantFieldChars);
+const searchShape = z.strictObject({ consulted, lookedFor: warrantField, boundary: warrantField });
+const inapplicabilityShape = z.strictObject({
+	consulted,
+	subject: warrantField,
+	ruledOutBy: warrantField,
+});
+const openQuestionShape = z.strictObject({
+	openQuestion: bounded(CANDIDATE_LIMITS.openQuestionChars),
+	wouldSettleIt: bounded(CANDIDATE_LIMITS.openQuestionChars),
+	citation: citationShape.optional(),
+});
+const exampleShape = z.strictObject({
+	citation: citationShape,
+	note: bounded(CANDIDATE_LIMITS.exampleNoteChars),
+});
+const basisExplanation = bounded(CANDIDATE_LIMITS.problemExplanationChars);
+const basisShape = z.discriminatedUnion("type", [
+	z.strictObject({ type: z.literal("introduced"), head: count, explanation: basisExplanation }),
+	z.strictObject({
+		type: z.literal("worsened"),
+		base: count,
+		head: count,
+		explanation: basisExplanation,
+	}),
+	z.strictObject({
+		type: z.literal("duty"),
+		criterionQuote: bounded(CANDIDATE_LIMITS.quoteChars),
+		event: count,
+		explanation: basisExplanation,
+	}),
+	z.strictObject({ type: z.literal("state"), explanation: basisExplanation }),
+]);
+const severityShape = z.enum(SEVERITIES);
+const problemShape = z.strictObject({
+	key: z.string().regex(PRACTICE_SLUG).optional(),
+	severity: severityShape,
+	summary: line(CANDIDATE_LIMITS.summaryChars),
+	explanation: bounded(CANDIDATE_LIMITS.problemExplanationChars),
+	citations: nonEmptyListOf(citationShape, CANDIDATE_LIMITS.citationsPerProblem),
+	basis: basisShape,
+	nextStep: bounded(CANDIDATE_LIMITS.nextStepChars).optional(),
+});
+const omissionShape = z.strictObject({
+	what: line(CANDIDATE_LIMITS.summaryChars),
+	count,
+	reason: z.enum(OMISSION_REASONS),
+	units: listOf(bounded(CANDIDATE_LIMITS.warrantFieldChars), CANDIDATE_LIMITS.omissionUnits)
+		.readonly()
+		.optional(),
+});
+/** Limitations a program declares beside its review input: the omissions that the review is told about. */
+export const omissionSchema = omissionShape;
+const omitted = listOf(omissionShape, CANDIDATE_LIMITS.omissions).optional();
+const coverageShape = z.discriminatedUnion("source", [
+	z.strictObject({
+		source: z.literal("host"),
+		reads: count,
+		truncatedReads: count,
+		failedReads: count,
+		complete: z.boolean(),
+		omitted,
+	}),
+	z.strictObject({
+		source: z.literal("claimed"),
+		selected: count,
+		checked: count,
+		total: count.nullable(),
+		complete: z.boolean(),
+		omitted,
+	}),
+]);
+
+/**
+ * Every key that any outcome may carry. A candidate is read against it first, so that a key in the
+ * wrong outcome is named by its outcome rule, not as an unknown key.
+ */
+const supersetShape = z.strictObject({
+	outcome: z.enum(OUTCOMES),
+	summary: line(CANDIDATE_LIMITS.summaryChars),
+	explanation: bounded(CANDIDATE_LIMITS.explanationChars),
+	citations: listOf(citationShape, CANDIDATE_LIMITS.resultCitations),
+	problems: listOf(problemShape, CANDIDATE_LIMITS.problems).optional(),
+	severity: severityShape.optional(),
+	example: exampleShape.optional(),
+	evidence: z.strictObject({
+		search: searchShape.optional(),
+		inapplicability: inapplicabilityShape.optional(),
+		undecidability: nonEmptyListOf(openQuestionShape, CANDIDATE_LIMITS.openQuestions).optional(),
+	}),
+	coverage: coverageShape,
+});
+type Superset = z.infer<typeof supersetShape>;
+
+const SEVERITY_RANK: Readonly<Record<Severity, number>> = {
+	CRITICAL: 3,
+	MAJOR: 2,
+	MINOR: 1,
+	INFO: 0,
+};
+
+/** The most severe of the problems' severities. */
+export function worstSeverity(problems: readonly { severity: Severity }[]): Severity | undefined {
+	let worst: Severity | undefined;
+	for (const { severity } of problems) {
+		if (worst === undefined || SEVERITY_RANK[severity] > SEVERITY_RANK[worst]) {
+			worst = severity;
+		}
+	}
+	return worst;
+}
+
+function nonEmpty<T>(items: readonly T[]): NonEmpty<T> | undefined {
+	const [first, ...rest] = items;
+	return first === undefined ? undefined : [first, ...rest];
+}
+
+interface Refusal {
+	ok: false;
+	reasonCode: CandidateRefusal;
+	message: string;
+}
+const refuse = (reasonCode: CandidateRefusal, message: string): Refusal => ({
+	ok: false,
+	reasonCode,
+	message,
+});
+
+/** The coverage as typed, or why its counts and its completeness contradict each other. */
+function readCoverage(coverage: Superset["coverage"]): Coverage | string {
+	const omissions = nonEmpty(coverage.omitted ?? []);
+	if (coverage.complete !== (omissions === undefined)) {
+		return coverage.complete
+			? "complete coverage lists no omission"
+			: "incomplete coverage lists what it omitted";
+	}
+	if (coverage.source === "host") {
+		const { reads, truncatedReads, failedReads } = coverage;
+		if (coverage.complete !== (truncatedReads === 0 && failedReads === 0)) {
+			return "host coverage is complete exactly when no read was truncated or failed";
+		}
+		return omissions === undefined
+			? { source: "host", reads, truncatedReads, failedReads, complete: true }
+			: { source: "host", reads, truncatedReads, failedReads, complete: false, omitted: omissions };
+	}
+	const { selected, checked, total } = coverage;
+	if (checked > selected) {
+		return "claimed coverage checked more units than it selected";
+	}
+	if (total !== null && selected > total) {
+		return "claimed coverage selected more units than the total";
+	}
+	if (coverage.complete && (checked !== selected || (total !== null && selected !== total))) {
+		return "complete claimed coverage checks every selected unit of the total";
+	}
+	return omissions === undefined
+		? { source: "claimed", selected, checked, total, complete: true }
+		: { source: "claimed", selected, checked, total, complete: false, omitted: omissions };
+}
+
+const overlaps = (a: Citation, b: Citation) =>
+	a.sourceKind === b.sourceKind &&
+	a.path === b.path &&
+	a.side === b.side &&
+	a.startLine <= b.endLine &&
+	b.startLine <= a.endLine;
+
+function basisIndices(basis: ClaimBasis): number[] {
+	switch (basis.type) {
+		case "introduced": {
+			return [basis.head];
+		}
+		case "worsened": {
+			return [basis.base, basis.head];
+		}
+		case "duty": {
+			return [basis.event];
+		}
+		case "state": {
+			return [];
+		}
+	}
+}
+
+function issueText(error: z.ZodError): string {
+	const issue = error.issues[0];
+	if (issue === undefined) {
+		return "invalid";
+	}
+	const where = issue.path.map(String).join(".");
+	return where === "" ? issue.message : `${where}: ${issue.message}`;
+}
+
+/** The JSON size of a value, or undefined when it is not JSON. */
+function jsonBytes(value: unknown): number | undefined {
+	try {
+		const text: unknown = JSON.stringify(value);
+		return typeof text === "string" ? Buffer.byteLength(text) : 0;
+	} catch {
+		return undefined;
+	}
+}
+
+/** The warrants each outcome may carry, and what a refusal says about a wrong one. */
+const WARRANT_RULES: Readonly<
+	Record<Outcome, { holds: (evidence: Superset["evidence"]) => boolean; message: string }>
+> = {
+	MET: {
+		holds: (e) => e.inapplicability === undefined && e.undecidability === undefined,
+		message: "a MET result may carry a search warrant only",
+	},
+	NOT_MET: {
+		holds: (e) => e.inapplicability === undefined,
+		message: "a NOT_MET result may carry a search warrant and open questions only",
+	},
+	NOT_APPLICABLE: {
+		holds: (e) =>
+			e.inapplicability !== undefined && e.search === undefined && e.undecidability === undefined,
+		message: "a NOT_APPLICABLE result carries its inapplicability warrant only",
+	},
+	UNDETERMINED: {
+		holds: (e) => e.inapplicability === undefined && e.undecidability !== undefined,
+		message: "an UNDETERMINED result carries its open questions, and a search warrant at most",
+	},
+};
+
+/** The first outcome rule the candidate breaks, before its coverage is read. */
+function outcomeRefusal(
+	sent: Superset,
+	problems: NonEmpty<NonNullable<Superset["problems"]>[number]> | undefined,
+): Refusal | undefined {
+	const { outcome } = sent;
+	if (
+		(outcome === "NOT_MET") !== (problems !== undefined) ||
+		(sent.problems !== undefined && problems === undefined)
+	) {
+		return refuse(
+			"outcome_problem_mismatch",
+			outcome === "NOT_MET"
+				? "a NOT_MET result lists its problems"
+				: `a ${outcome} result lists no problem`,
+		);
+	}
+	if (sent.severity !== undefined && outcome !== "NOT_MET") {
+		return refuse("severity_outcome_mismatch", `a ${outcome} result has no severity`);
+	}
+	const worst = problems === undefined ? undefined : worstSeverity(problems);
+	if (
+		sent.severity !== undefined &&
+		worst !== undefined &&
+		SEVERITY_RANK[sent.severity] < SEVERITY_RANK[worst]
+	) {
+		return refuse(
+			"severity_below_worst_problem",
+			`the result severity ${sent.severity} is below its worst problem, ${worst}`,
+		);
+	}
+	if (!WARRANT_RULES[outcome].holds(sent.evidence)) {
+		return refuse("warrant_outcome_mismatch", WARRANT_RULES[outcome].message);
+	}
+	if (outcome !== "NOT_MET" && sent.citations.length === 0) {
+		return refuse("result_citations_required", `a ${outcome} result cites what it rests on`);
+	}
+	if (outcome === "MET" && !sent.coverage.complete) {
+		return refuse("met_coverage_incomplete", "a MET result needs complete coverage");
+	}
+	return undefined;
+}
+
+/** The first rule about the example and the problems that the candidate breaks. */
+function problemRefusal(sent: Superset): Refusal | undefined {
+	const { example, outcome } = sent;
+	const problems = sent.problems ?? [];
+	if (example !== undefined && outcome !== "MET" && outcome !== "NOT_MET") {
+		return refuse("example_outcome_mismatch", `a ${outcome} result has no example`);
+	}
+	if (
+		example !== undefined &&
+		problems.some((problem) => problem.citations.some((cited) => overlaps(cited, example.citation)))
+	) {
+		return refuse("example_overlaps_problem", "the example cites the place of a problem");
+	}
+	for (const [index, problem] of problems.entries()) {
+		const out = basisIndices(problem.basis).find((at) => at >= problem.citations.length);
+		if (out !== undefined) {
+			return refuse(
+				"basis_citation_out_of_range",
+				`problem ${index}: its basis names citation ${out}, and it has ${problem.citations.length}`,
+			);
+		}
+	}
+	const keys = problems.flatMap((problem) => (problem.key === undefined ? [] : [problem.key]));
+	return new Set(keys).size === keys.length
+		? undefined
+		: refuse("duplicate_problem_key", "two problems share a key");
+}
+
+/** The candidate of its outcome, once every rule holds; undefined when the outcome's parts are not there. */
+function candidateOf(sent: Superset, coverage: Coverage): Candidate | undefined {
+	const { outcome, summary, explanation, example } = sent;
+	const { search, inapplicability, undecidability } = sent.evidence;
+	const base = { summary, explanation };
+	const citations = nonEmpty(sent.citations);
+	const problems = sent.problems === undefined ? undefined : nonEmpty(sent.problems);
+	const searched = search === undefined ? {} : { search };
+	const exemplified = example === undefined ? {} : { example };
+	if (outcome === "MET" && citations !== undefined && coverage.complete) {
+		return { ...base, outcome, citations, coverage, ...exemplified, evidence: searched };
+	}
+	if (outcome === "NOT_MET" && problems !== undefined) {
+		return {
+			...base,
+			outcome,
+			citations: sent.citations,
+			problems,
+			...(sent.severity === undefined ? {} : { severity: sent.severity }),
+			...exemplified,
+			coverage,
+			evidence: { ...searched, ...(undecidability === undefined ? {} : { undecidability }) },
+		};
+	}
+	if (outcome === "NOT_APPLICABLE" && citations !== undefined && inapplicability !== undefined) {
+		return { ...base, outcome, citations, coverage, evidence: { inapplicability } };
+	}
+	if (outcome === "UNDETERMINED" && citations !== undefined && undecidability !== undefined) {
+		return { ...base, outcome, citations, coverage, evidence: { ...searched, undecidability } };
+	}
+	return undefined;
+}
+
+/**
+ * Parse a candidate: its shape first, then the outcome rules in the order of
+ * {@link CANDIDATE_REFUSALS}. A value of another shape, such as a leads return, is refused as it is;
+ * nothing guesses what it meant.
+ */
+export function parseCandidate(
+	value: unknown,
+):
+	| { ok: true; candidate: Candidate }
+	| { ok: false; reasonCode: CandidateRefusal; message: string } {
+	const bytes = jsonBytes(value);
+	if (bytes === undefined) {
+		return refuse("malformed_candidate", "the candidate is not JSON");
+	}
+	if (bytes > CANDIDATE_LIMITS.candidateBytes) {
+		return refuse(
+			"malformed_candidate",
+			`the candidate has ${bytes} bytes; at most ${CANDIDATE_LIMITS.candidateBytes}`,
+		);
+	}
+	const parsed = supersetShape.safeParse(value);
+	if (!parsed.success) {
+		return refuse("malformed_candidate", issueText(parsed.error));
+	}
+	const sent = parsed.data;
+	const problems = sent.problems === undefined ? undefined : nonEmpty(sent.problems);
+	const before = outcomeRefusal(sent, problems);
+	if (before !== undefined) {
+		return before;
+	}
+	const coverage = readCoverage(sent.coverage);
+	if (typeof coverage === "string") {
+		return refuse("coverage_inconsistent", coverage);
+	}
+	const after = problemRefusal(sent);
+	if (after !== undefined) {
+		return after;
+	}
+	const candidate = candidateOf(sent, coverage);
+	// Each outcome's parts are there once the rules hold; a value that reaches here broke none of them.
+	return candidate === undefined
+		? refuse("malformed_candidate", "the candidate matches no outcome")
+		: { ok: true, candidate };
+}
+
+/** A candidate as a schema: parses with {@link parseCandidate} and reports its refusal code. */
+export const candidateSchema: z.ZodType<Candidate> = z.unknown().transform((value, ctx) => {
+	const parsed = parseCandidate(value);
+	if (!parsed.ok) {
+		ctx.addIssue({ code: "custom", message: `${parsed.reasonCode}: ${parsed.message}` });
+		return z.NEVER;
+	}
+	return parsed.candidate;
+});
+
+/*
+ * What a program gives `ctx.review()`: prepared leads, scalar facts, authored directions, bounded
+ * context and explicit limitations. It is input to the review session, never another result.
+ */
+
+/** Where a lead points: a line of the change, a repository file, or a captured record. The host quotes it. */
+export const evidenceLocationSchema = z.union([
+	z.strictObject({
+		change: z.string().min(1),
+		line: lineNumber,
+		endLine: lineNumber.optional(),
+		side: z.enum(["OLD", "NEW"]).optional(),
+	}),
+	z.strictObject({
+		file: z.string().min(1),
+		line: lineNumber,
+		endLine: lineNumber.optional(),
+		revision: z.string().regex(COMMIT).optional(),
+	}),
+	z.strictObject({
+		record: z.string().min(1),
+		line: z.int().nonnegative().optional(),
+	}),
+]);
+export type EvidenceLocation = z.infer<typeof evidenceLocationSchema>;
+
+export const MAX_REVIEW_OPTIONS_BYTES = 262_144;
+
+const reviewLeadSchema = z.strictObject({
+	at: evidenceLocationSchema,
+	/** What the lead is, for the reviewer: one line. */
+	label: line(300),
+	facts: factsSchema.optional(),
+});
+export type ReviewLead = z.infer<typeof reviewLeadSchema>;
+
+const preparedContextSchema = z.strictObject({
+	label: line(160),
+	value: z.json(),
+	citations: listOf(citationShape, CANDIDATE_LIMITS.resultCitations).optional(),
+});
+export type PreparedContext = z.infer<typeof preparedContextSchema>;
+
+export const reviewOptionsSchema = z.strictObject({
+	leads: listOf(reviewLeadSchema, 200).readonly().optional(),
+	facts: factsSchema.optional(),
+	/** Directions to the reviewer. The program's author writes them; reviewed text and model text belong in context. */
+	directions: listOf(line(300), 10).readonly().optional(),
+	context: listOf(preparedContextSchema, 20).readonly().optional(),
+	limitations: listOf(omissionShape, CANDIDATE_LIMITS.omissions).readonly().optional(),
+});
+export type ReviewOptions = z.infer<typeof reviewOptionsSchema>;
+
+/** Parse review options, or say why they are not. An invalid lead is an error, never dropped. */
+export function parseReviewOptions(value: unknown): { options: ReviewOptions } | { error: string } {
+	let bytes: number;
+	try {
+		bytes = Buffer.byteLength(JSON.stringify(value ?? {}));
+	} catch {
+		return { error: "review options are not JSON" };
+	}
+	if (bytes > MAX_REVIEW_OPTIONS_BYTES) {
+		return { error: `review options have ${bytes} bytes; at most ${MAX_REVIEW_OPTIONS_BYTES}` };
+	}
+	const parsed = reviewOptionsSchema.safeParse(value ?? {});
+	return parsed.success
+		? { options: parsed.data }
+		: { error: `review options: ${issueText(parsed.error)}` };
+}
+
+/*
+ * The execution report: `out/practice-scripts.json`, one entry for each admitted practice. It records
+ * how each program ran, never the candidate it returned.
+ */
+
+export const RUN_STATUSES = ["ok", "skipped", "failed", "not-reached"] as const;
+export type RunStatus = (typeof RUN_STATUSES)[number];
+export const STOP_REASONS = [
+	...REASONS,
+	"cancelled",
+	"invalid-program",
+	"invalid-candidate",
+] as const;
+export type StopReason = (typeof STOP_REASONS)[number];
+export const PROGRAM_KINDS = ["builtin", "custom"] as const;
+export type ProgramKind = (typeof PROGRAM_KINDS)[number];
+export const EXECUTION_REPORT_SCHEMA_VERSION = 2;
+
+const callsSchema = z.strictObject({
+	review: count,
+	chat: count,
+	decision: count,
+	embedding: count,
+	reranking: count,
+});
+export type ProgramCalls = z.infer<typeof callsSchema>;
+const coverageReachedSchema = z.strictObject({
+	reads: count,
+	truncatedReads: count,
+	failedReads: count,
+});
+export type CoverageReached = z.infer<typeof coverageReachedSchema>;
+
+export const executionEntrySchema = z
+	.strictObject({
+		practiceSlug: z.string().regex(PRACTICE_SLUG),
+		program: z.strictObject({
+			kind: z.enum(PROGRAM_KINDS),
+			digest: z
+				.string()
+				.regex(/^[0-9a-f]{64}$/u)
+				.nullable(),
+		}),
+		models: z.array(
+			z.strictObject({
+				slot: modelSlotSchema,
+				need: needSchema,
+				bound: z.boolean(),
+				notRated: z.partialRecord(reasonSchema, count),
+			}),
+		),
+		status: z.enum(RUN_STATUSES),
+		stopReason: z.enum(STOP_REASONS).nullable(),
+		// 500 code points, as `errorLine` cuts it and the server reads it.
+		error: z
+			.string()
+			.min(1)
+			.refine((text) => (text.match(/./gsu) ?? []).length <= 500, "at most 500 code points")
+			.optional(),
+		calls: callsSchema,
+		coverageReached: coverageReachedSchema,
+		/** How long the program ran: up to the longest attempt, not a count. */
+		durationMs: z.int().min(0).max(2_147_483_647).nullable(),
+	})
+	.refine(
+		(entry) => (entry.status === "ok") === (entry.stopReason === null),
+		"status ok exactly when there is no stop reason",
+	)
+	.refine(
+		(entry) => entry.error === undefined || entry.status === "failed",
+		"an error only on a failed practice",
+	)
+	.refine(
+		(entry) => (entry.status === "not-reached") === (entry.durationMs === null),
+		"no duration exactly for a practice not reached",
+	)
+	.refine(
+		(entry) => (entry.program.kind === "builtin") === (entry.program.digest === null),
+		"a digest exactly for a custom program",
+	);
+export type ExecutionEntry = z.infer<typeof executionEntrySchema>;
+
+export const executionReportSchema = z.strictObject({
+	schemaVersion: z.literal(EXECUTION_REPORT_SCHEMA_VERSION),
+	truncated: z.boolean(),
+	practices: z.array(executionEntrySchema),
+});
+export type ExecutionReport = z.infer<typeof executionReportSchema>;

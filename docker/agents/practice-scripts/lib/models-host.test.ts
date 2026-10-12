@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
+import { setImmediate } from "node:timers/promises";
 
 import { InvalidResponseDataError } from "@ai-sdk/provider";
 
@@ -28,51 +29,85 @@ void test("the models file in the shape the server writes gives every slot a mod
 
 const never = new AbortController().signal;
 
-void describe("the practice script budget", () => {
-	void test("a call that reports no usage keeps its whole reservation", async () => {
+void describe("the attempt's direct model account", () => {
+	void test("a call settles at the tokens it reports, and one that reports no usage keeps its whole reservation", async () => {
 		const budget = new ModelBudget(1000, 1);
-		const practice = { left: 500 };
-		const outcome = await budget.run(practice, 120, never, async () => ({
-			value: "ranked",
-			tokens: undefined,
-		}));
-		assert.deepEqual(outcome, { value: "ranked", tokens: 120 });
-		assert.equal(practice.left, 380);
-		assert.equal(budget.stageLeft, 880);
+		assert.deepEqual(
+			await budget.run(120, never, async () => ({ value: "answered", tokens: 30 })),
+			{ value: "answered", tokens: 30 },
+		);
+		assert.equal(budget.left, 970);
+		assert.deepEqual(
+			await budget.run(120, never, async () => ({ value: "ranked", tokens: undefined })),
+			{ value: "ranked", tokens: 120 },
+		);
+		assert.equal(budget.left, 850);
 	});
 
-	void test("a call that its practice can afford but the stage cannot does not run", async () => {
+	void test("every practice's direct calls spend one account, so a call that it cannot afford does not run", async () => {
+		const budget = new ModelBudget(200, 2);
+		// Two practices, one account: the first practice's call leaves too little for the second's.
+		assert.ok(
+			"value" in (await budget.run(150, never, async () => ({ value: "first", tokens: 150 }))),
+		);
 		let ran = false;
-		const outcome = await new ModelBudget(100, 1).run({ left: 500 }, 120, never, async () => {
+		const outcome = await budget.run(120, never, async () => {
 			ran = true;
 			return { value: "late", tokens: 1 };
 		});
 		assert.deepEqual(outcome, { reason: "budget" });
 		assert.equal(ran, false);
+		assert.equal(budget.left, 50);
 	});
 
-	void test("a call that waits for its turn and reaches its deadline does not run", async () => {
+	void test("a call that fails keeps its reservation, because the provider may have billed it", async () => {
+		const budget = new ModelBudget(1000, 1);
+		const outcome = await budget.run(10, never, async () => {
+			throw new InvalidResponseDataError({ data: {}, message: "no results" });
+		});
+		assert.deepEqual(outcome, { reason: "off-format" });
+		assert.equal(budget.left, 990);
+	});
+
+	void test("a call that waits for its turn and reaches its deadline does not run and holds nothing", async () => {
 		const budget = new ModelBudget(1000, 1);
 		const busy = Promise.withResolvers<{ value: string; tokens: number }>();
-		const first = budget.run({ left: 500 }, 10, never, async () => busy.promise);
+		const first = budget.run(10, never, async () => busy.promise);
 		const deadline = new AbortController();
 		let ran = false;
-		const waiting = budget.run({ left: 500 }, 10, deadline.signal, async () => {
+		const waiting = budget.run(10, deadline.signal, async () => {
 			ran = true;
 			return { value: "late", tokens: 1 };
 		});
 		deadline.abort();
 		assert.deepEqual(await waiting, { reason: "deadline" });
+		assert.equal(budget.left, 990);
 		busy.resolve({ value: "first", tokens: 10 });
 		assert.deepEqual(await first, { value: "first", tokens: 10 });
 		assert.equal(ran, false);
+		// The turn that the abandoned call gave up goes to the next call.
+		assert.ok(
+			"value" in (await budget.run(10, never, async () => ({ value: "next", tokens: 10 }))),
+		);
 	});
 
-	void test("an answer off the format is unrated for that reason", async () => {
-		const outcome = await new ModelBudget(1000, 1).run({ left: 500 }, 10, never, async () => {
-			throw new InvalidResponseDataError({ data: {}, message: "no results" });
-		});
-		assert.deepEqual(outcome, { reason: "off-format" });
+	void test("no more calls than the limit are in flight at once", async () => {
+		const budget = new ModelBudget(1000, 2);
+		let inFlight = 0;
+		let most = 0;
+		await Promise.all(
+			Array.from({ length: 6 }, async () =>
+				budget.run(1, never, async () => {
+					inFlight += 1;
+					most = Math.max(most, inFlight);
+					await setImmediate();
+					inFlight -= 1;
+					return { value: "done", tokens: 1 };
+				}),
+			),
+		);
+		assert.equal(most, 2);
+		assert.equal(budget.left, 994);
 	});
 });
 

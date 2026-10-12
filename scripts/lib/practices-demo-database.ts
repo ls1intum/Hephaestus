@@ -30,8 +30,8 @@ export async function workspaceToSeed(
 
 /**
  * Rewinds the practice revisions that the server appended for the seed. A revision goes back only
- * while it is current, differs from the one before it in its fingerprint alone, and no observation
- * pins it: the next review would append the same revision again.
+ * while it is current, differs from the one before it in its fingerprint alone, and no practice
+ * result pins it: the next review would append the same revision again.
  */
 export async function rewindRevisions(
 	client: Queryable,
@@ -48,7 +48,7 @@ export async function rewindRevisions(
 			WHERE p.workspace_id = $1
 			  AND cur.id = ANY($2::bigint[])
 			  AND to_jsonb(cur) - $3::text[] = to_jsonb(prev) - $3::text[]
-			  AND NOT EXISTS (SELECT 1 FROM observation o WHERE o.practice_revision_id = cur.id)
+			  AND NOT EXISTS (SELECT 1 FROM practice_result r WHERE r.practice_revision_id = cur.id)
 		)
 		UPDATE practice p SET current_revision_id = appended.previous_id
 		FROM appended WHERE p.id = appended.practice_id

@@ -1,9 +1,9 @@
-// Options a script may not set: provider options, headers (another practice's name among them), a huge
-// output. The runner drops or caps them.
+// Options a program may not set: provider options, headers (another practice's name among them), a
+// huge output. The host drops or caps them.
 import { definePracticeScript, generateText } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { version: 1, models: { chat: "required" }, kinds: { unused: "Not used." } },
+	meta: { models: { chat: "required" } },
 	async run(ctx) {
 		await generateText({
 			model: ctx.models.chat,
@@ -12,6 +12,6 @@ export default definePracticeScript({
 			headers: { "x-sneaky": "1", "x-hephaestus-practice": "another-practice" },
 			providerOptions: { hephaestus: { n: 5, logit_bias: { "1": 100 } } },
 		});
-		return { leads: [] };
+		return ctx.review();
 	},
 });

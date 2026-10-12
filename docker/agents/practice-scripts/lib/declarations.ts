@@ -3,8 +3,7 @@
  * comments are skipped. Unsupported languages return null so callers report placement as unknown.
  */
 
-import { readFile } from "node:fs/promises";
-import nodePath from "node:path";
+import type { FileTree } from "./practice-script.ts";
 
 export interface Declaration {
 	/** `struct`, `class`, `enum`, `actor`, `extension`, `protocol`, `interface`, `object`, `record`, `impl`, `trait`, `mod`, `type`. */
@@ -524,14 +523,21 @@ export function enclosingDeclaration(decls: Declaration[], line: number): Declar
 	return best;
 }
 
-/** The declarations of a checkout file, or null when it is unreadable or the language has no row. */
+/**
+ * The declarations of a file of the tree, or null when the file is not there, cannot be read, or the
+ * language has no row: its placement is then unknown, never "file scope".
+ */
 export async function declarationsOf(
-	repoPath: string,
+	tree: Pick<FileTree, "read"> | null,
 	path: string,
 	language: string,
 ): Promise<Declaration[] | null> {
+	if (tree === null) {
+		return null;
+	}
 	try {
-		return declarations(language, await readFile(nodePath.join(repoPath, path), "utf8"));
+		const file = await tree.read(path);
+		return file.status === "FOUND" ? declarations(language, file.text) : null;
 	} catch {
 		return null;
 	}

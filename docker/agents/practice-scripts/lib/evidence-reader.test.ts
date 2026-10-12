@@ -1,0 +1,392 @@
+import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { describe, test, type TestContext } from "node:test";
+
+import { DIFF_SOURCE, TREE_SOURCE } from "./contract.ts";
+import { parseDiff } from "./diff-parser.ts";
+import {
+	EvidenceReader,
+	MAX_READ_BYTES,
+	noReceipts,
+	type EvidenceSources,
+	type Receipts,
+} from "./evidence-reader.ts";
+import { UnratedError } from "./practice-script.ts";
+
+const HEAD = "a".repeat(40);
+const RECORD_SOURCE = "scm.pull-request.core";
+
+const CHANGE = parseDiff(
+	[
+		"diff --git a/src/cart.ts b/src/cart.ts",
+		"--- a/src/cart.ts",
+		"+++ b/src/cart.ts",
+		"@@ -1,2 +1,3 @@",
+		" export class Cart {",
+		"-  count = 0;",
+		"+  // increment the item count by one",
+		"+  count += 1;",
+	].join("\n"),
+);
+
+/** A checkout and a context folder, with a reader over them. */
+async function captures(t: TestContext) {
+	const root = await mkdtemp(path.join(tmpdir(), "evidence-reader-"));
+	t.after(async () => rm(root, { recursive: true, force: true }));
+	const repo = path.join(root, "repo");
+	const contextDir = path.join(root, "context");
+	await mkdir(path.join(repo, "src"), { recursive: true });
+	await mkdir(path.join(repo, ".git"));
+	await mkdir(contextDir);
+	await writeFile(
+		path.join(repo, "src", "cart.ts"),
+		"export class Cart {\n  // increment the item count by one\n  count += 1;\n}\n",
+	);
+	await writeFile(path.join(repo, "empty.txt"), "");
+	await writeFile(path.join(repo, "logo.png"), Buffer.from([0x89, 0x50, 0x00, 0x47]));
+	await writeFile(path.join(repo, ".git", "HEAD"), "ref: refs/heads/main\n");
+	await writeFile(path.join(root, "secret.txt"), "token\n");
+	await symlink(path.join(root, "secret.txt"), path.join(repo, "link.txt"));
+	await writeFile(
+		path.join(contextDir, "metadata.json"),
+		'{\n  "pr_number": 7,\n  "title": "Count"\n}\n',
+	);
+	const sources: EvidenceSources = {
+		repo,
+		headRevision: HEAD,
+		treeArtifact: "repos/reviewed/.git/HEAD",
+		contextDir,
+		contextReference: "context",
+		change: { base: "b".repeat(40), head: HEAD, files: CHANGE },
+		sourceKindOf: (artifactPath) =>
+			artifactPath === "context/metadata.json" ? RECORD_SOURCE : undefined,
+	};
+	const receipts = noReceipts();
+	return {
+		root,
+		repo,
+		contextDir,
+		sources,
+		receipts,
+		reader: new EvidenceReader(sources, receipts),
+	};
+}
+
+/** Rejects with an `UnratedError` of `reason`. */
+async function unrated(promise: Promise<unknown>, reason: string, message?: RegExp): Promise<void> {
+	await assert.rejects(promise, (error: unknown) => {
+		assert.ok(error instanceof UnratedError, String(error));
+		assert.equal(error.reason, reason);
+		if (message !== undefined) {
+			assert.match(error.message, message);
+		}
+		return true;
+	});
+}
+
+void describe("reads of the head tree", () => {
+	void test("a file is FOUND with its text, a binary file is BINARY, and a missing path is ABSENT", async (t) => {
+		const { reader, receipts } = await captures(t);
+		const read = async (file: string) => reader.answer({ op: "read", tree: "head", path: file });
+		assert.deepEqual(await read("src/cart.ts"), {
+			status: "FOUND",
+			text: "export class Cart {\n  // increment the item count by one\n  count += 1;\n}\n",
+			truncated: false,
+		});
+		// Empty text is a file that holds nothing, never an absent one.
+		assert.deepEqual(await read("empty.txt"), { status: "FOUND", text: "", truncated: false });
+		assert.deepEqual(await read("logo.png"), { status: "BINARY" });
+		assert.deepEqual(await read("src/absent.ts"), { status: "ABSENT" });
+		assert.deepEqual(await read("src"), { status: "ABSENT" });
+		assert.deepEqual(receipts, { reads: 5, truncatedReads: 0, failedReads: 0 });
+	});
+
+	void test("a file larger than one read is cut, and the read says so and counts as cut", async (t) => {
+		const { reader, repo, receipts } = await captures(t);
+		await writeFile(path.join(repo, "large.txt"), "x".repeat(MAX_READ_BYTES + 10));
+		const large = await reader.answer({ op: "read", tree: "head", path: "large.txt" });
+		assert.ok(large.status === "FOUND");
+		assert.equal(large.truncated, true);
+		assert.equal(large.text.length, MAX_READ_BYTES);
+		assert.deepEqual(receipts, { reads: 1, truncatedReads: 1, failedReads: 0 });
+	});
+
+	void test("a read that fails is unavailable and counted as failed, never an absent file", async (t) => {
+		const { reader, repo, receipts } = await captures(t);
+		// A link to itself cannot be resolved: the read fails, and the file is not proved absent.
+		await symlink("loop.txt", path.join(repo, "loop.txt"));
+		await unrated(reader.answer({ op: "read", tree: "head", path: "loop.txt" }), "unavailable");
+		assert.deepEqual(receipts, { reads: 1, truncatedReads: 0, failedReads: 1 });
+	});
+
+	void test("a path outside the tree is refused, also through a link", async (t) => {
+		const { reader, receipts } = await captures(t);
+		await unrated(
+			reader.answer({ op: "read", tree: "head", path: "../secret.txt" }),
+			"refused",
+			/outside the captured source/u,
+		);
+		await unrated(reader.answer({ op: "read", tree: "head", path: "link.txt" }), "refused");
+		assert.deepEqual(receipts, { reads: 2, truncatedReads: 0, failedReads: 2 });
+	});
+
+	void test("the base tree is not available yet, and work without a tree has none", async (t) => {
+		const { reader, sources, receipts } = await captures(t);
+		await unrated(
+			reader.answer({ op: "read", tree: "base", path: "src/cart.ts" }),
+			"unavailable",
+			/base tree/u,
+		);
+		await unrated(reader.answer({ op: "list", tree: "base" }), "unavailable");
+		const treeless = new EvidenceReader({ ...sources, repo: null }, noReceipts());
+		await unrated(
+			treeless.answer({ op: "read", tree: "head", path: "src/cart.ts" }),
+			"unavailable",
+			/no captured file tree/u,
+		);
+		assert.deepEqual(receipts, { reads: 2, truncatedReads: 0, failedReads: 2 });
+	});
+});
+
+void describe("listings and searches", () => {
+	void test("a listing leaves out the repository's .git folder, and a long one is cut and says so", async (t) => {
+		const { reader, repo, receipts } = await captures(t);
+		assert.deepEqual(await reader.answer({ op: "list", tree: "head", glob: "src/**" }), {
+			paths: ["src/cart.ts"],
+			truncated: false,
+		});
+		const all = await reader.answer({ op: "list", tree: "head" });
+		assert.equal(
+			all.paths.some((file) => file.startsWith(".git")),
+			false,
+		);
+		await mkdir(path.join(repo, "many"));
+		await Promise.all(
+			Array.from({ length: 5001 }, async (_, i) =>
+				writeFile(path.join(repo, "many", `${i}.txt`), ""),
+			),
+		);
+		const many = await reader.answer({ op: "list", tree: "head", glob: "many/**" });
+		assert.equal(many.truncated, true);
+		assert.equal(many.paths.length, 5000);
+		assert.deepEqual(receipts, { reads: 3, truncatedReads: 1, failedReads: 0 });
+	});
+
+	void test("a search returns its matches, and one that reaches its bound says it may be cut", async (t) => {
+		const { reader, repo, receipts } = await captures(t);
+		await writeFile(path.join(repo, "src", "total.ts"), "count\ncount\n");
+		const found = await reader.answer({
+			op: "grep",
+			tree: "head",
+			pattern: "count \\+=",
+			glob: "*.ts",
+		});
+		assert.deepEqual(found, {
+			matches: [{ file: "src/cart.ts", line: 3, content: "count += 1;" }],
+			truncated: false,
+		});
+		const bounded = await reader.answer({
+			op: "grep",
+			tree: "head",
+			pattern: "count",
+			glob: "*.ts",
+			fixedString: true,
+			maxResults: 2,
+		});
+		assert.equal(bounded.matches.length, 2);
+		assert.equal(bounded.truncated, true);
+		assert.deepEqual(receipts, { reads: 2, truncatedReads: 1, failedReads: 0 });
+	});
+});
+
+void test("a search and a read leave out the repository's .git folder, as a listing does", async (t) => {
+	const { reader, repo } = await captures(t);
+	await writeFile(
+		path.join(repo, ".git", "config"),
+		"url = https://token@example.org/team/project\n",
+	);
+	const found = await reader.answer({ op: "grep", tree: "head", pattern: "token@" });
+	assert.deepEqual(found.matches, []);
+	assert.deepEqual(await reader.answer({ op: "read", tree: "head", path: ".git/config" }), {
+		status: "ABSENT",
+	});
+});
+
+void describe("captured records", () => {
+	void test("a record is FOUND or ABSENT, and a name outside the context folder is refused", async (t) => {
+		const { reader, sources, receipts } = await captures(t);
+		assert.deepEqual(await reader.answer({ op: "record", name: "metadata.json" }), {
+			status: "FOUND",
+			text: '{\n  "pr_number": 7,\n  "title": "Count"\n}\n',
+		});
+		assert.deepEqual(await reader.answer({ op: "record", name: "comments.json" }), {
+			status: "ABSENT",
+		});
+		await unrated(reader.answer({ op: "record", name: "../repo/src/cart.ts" }), "refused");
+		const uncaptured = new EvidenceReader({ ...sources, contextDir: null }, noReceipts());
+		assert.deepEqual(await uncaptured.answer({ op: "record", name: "metadata.json" }), {
+			status: "ABSENT",
+		});
+		assert.deepEqual(receipts, { reads: 3, truncatedReads: 0, failedReads: 1 });
+	});
+});
+
+void describe("citations", () => {
+	void test("a citation of the tree, the change or a record carries the exact quote and the canonical coordinates", async (t) => {
+		const { reader, receipts } = await captures(t);
+		assert.deepEqual(
+			await reader.answer({
+				op: "cite",
+				source: "tree",
+				tree: "head",
+				path: "src/cart.ts",
+				startLine: 2,
+				endLine: 3,
+			}),
+			{
+				sourceKind: TREE_SOURCE,
+				artifactPath: "repos/reviewed/.git/HEAD",
+				path: "src/cart.ts",
+				revision: HEAD,
+				startLine: 2,
+				endLine: 3,
+				quote: "  // increment the item count by one\n  count += 1;",
+			},
+		);
+		assert.deepEqual(
+			await reader.answer({
+				op: "cite",
+				source: "change",
+				path: "src/cart.ts",
+				side: "NEW",
+				startLine: 2,
+			}),
+			{
+				sourceKind: DIFF_SOURCE,
+				artifactPath: "context/change.json",
+				path: "src/cart.ts",
+				side: "NEW",
+				startLine: 2,
+				endLine: 2,
+				quote: "  // increment the item count by one",
+			},
+		);
+		assert.partialDeepStrictEqual(
+			await reader.answer({
+				op: "cite",
+				source: "change",
+				path: "src/cart.ts",
+				side: "OLD",
+				startLine: 2,
+			}),
+			{ side: "OLD", quote: "  count = 0;" },
+		);
+		assert.deepEqual(
+			await reader.answer({ op: "cite", source: "record", name: "metadata.json", startLine: 2 }),
+			{
+				sourceKind: RECORD_SOURCE,
+				artifactPath: "context/metadata.json",
+				path: "context/metadata.json",
+				startLine: 2,
+				endLine: 2,
+				quote: '  "pr_number": 7,',
+			},
+		);
+		// A citation is not a read of new evidence: it quotes what a read already reached.
+		assert.deepEqual(receipts, noReceipts() satisfies Receipts);
+	});
+
+	void test("a citation of lines that the source does not hold is an error, never a quote", async (t) => {
+		const { reader, sources } = await captures(t);
+		await unrated(
+			reader.answer({
+				op: "cite",
+				source: "tree",
+				tree: "head",
+				path: "src/cart.ts",
+				startLine: 3,
+				endLine: 2,
+			}),
+			"error",
+			/ends before it starts/u,
+		);
+		await unrated(
+			reader.answer({
+				op: "cite",
+				source: "tree",
+				tree: "head",
+				path: "src/cart.ts",
+				startLine: 40,
+			}),
+			"error",
+			/has 5 lines, not 40/u,
+		);
+		await unrated(
+			reader.answer({
+				op: "cite",
+				source: "tree",
+				tree: "head",
+				path: "src/absent.ts",
+				startLine: 1,
+			}),
+			"error",
+			/not in the tree/u,
+		);
+		await unrated(
+			reader.answer({
+				op: "cite",
+				source: "tree",
+				tree: "head",
+				path: "src/cart.ts",
+				startLine: 1,
+				endLine: 300,
+			}),
+			"too-large",
+		);
+		await unrated(
+			reader.answer({
+				op: "cite",
+				source: "change",
+				path: "src/cart.ts",
+				side: "NEW",
+				startLine: 1,
+			}),
+			"error",
+			/does not add line 1/u,
+		);
+		await unrated(
+			reader.answer({ op: "cite", source: "change", path: "README.md", side: "NEW", startLine: 1 }),
+			"error",
+			/does not touch that file/u,
+		);
+		await unrated(
+			reader.answer({ op: "cite", source: "record", name: "comments.json", startLine: 1 }),
+			"error",
+			/not a captured source/u,
+		);
+		await unrated(
+			reader.answer({
+				op: "cite",
+				source: "tree",
+				tree: "base",
+				path: "src/cart.ts",
+				startLine: 1,
+			}),
+			"unavailable",
+		);
+		const unchanged = new EvidenceReader({ ...sources, change: null }, noReceipts());
+		await unrated(
+			unchanged.answer({
+				op: "cite",
+				source: "change",
+				path: "src/cart.ts",
+				side: "NEW",
+				startLine: 2,
+			}),
+			"unavailable",
+			/no captured change/u,
+		);
+	});
+});

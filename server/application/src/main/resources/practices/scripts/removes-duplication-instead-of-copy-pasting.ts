@@ -4,28 +4,33 @@
 import { factsOf } from "../lib/bounded-text.ts";
 import { duplicatePairs, MIN_RUN_LINES } from "../lib/duplication.ts";
 import { isTestPath, languageOf } from "../lib/languages.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 
 const MAX_PAIRS = 20;
 
+export const LABELS = {
+	"same-shaped-blocks":
+		"An added block whose lines have the same shape as another added block when names and literals are set aside.",
+};
+
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"same-shaped-blocks":
-				"An added block whose lines have the same shape as another added block when names and literals are set aside.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const sourceFiles = [...ctx.change.values()].filter(
+		const change = requireChange(ctx.files);
+		const sourceFiles = [...change.values()].filter(
 			(file) => languageOf(file.path) !== null && !isTestPath(file.path),
 		);
 		const linesAdded = sourceFiles.reduce((sum, file) => sum + file.addedLines.size, 0);
-		const pairs = duplicatePairs(ctx.change);
-		const leads: Lead[] = pairs.slice(0, MAX_PAIRS).map((pair) => ({
+		const pairs = duplicatePairs(change);
+		const leads: ReviewLead[] = pairs.slice(0, MAX_PAIRS).map((pair) => ({
 			at: { change: pair.a.path, line: pair.a.startLine },
-			kind: "same-shaped-blocks",
+			label: LABELS["same-shaped-blocks"],
 			facts: factsOf({
 				endLine: pair.a.endLine,
 				otherPath: pair.b.path,
@@ -44,10 +49,10 @@ export default definePracticeScript({
 				: [
 						`${String(pairs.length)} pair(s) of added blocks with the same line shapes, one row each with both spans and the names that differ. These are structural candidates, not established copies of maintained knowledge. Assess them under the practice standard.`,
 					];
-		return {
+		return ctx.review({
 			leads,
 			facts: { linesAdded, filesScanned: sourceFiles.length, pairs: pairs.length },
 			directions,
-		};
+		});
 	},
 });

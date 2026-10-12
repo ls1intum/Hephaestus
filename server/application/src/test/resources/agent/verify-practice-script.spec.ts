@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
-import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
+import {
+	leadKeys,
+	runBundled,
+} from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
 const SLUG = "states-how-to-verify-the-change";
 
@@ -178,10 +181,14 @@ void test("a key the code reads at runtime and an ignored secrets file are locat
 		]),
 		work: metadata(""),
 	});
-	assert.deepEqual(result.leads, [
-		{ at: { change: "App/ContentView.swift", line: 1 }, kind: "xcode-placeholder" },
-		{ at: { change: "Intrinsic/FMPClient.swift", line: 2 }, kind: "runtime-secret-read" },
-		{ at: { change: ".gitignore", line: 1 }, kind: "ignored-secret" },
-	]);
+	const keyOf = await leadKeys(SLUG);
+	assert.deepEqual(
+		(result.leads ?? []).map((lead) => ({ at: lead.at, kind: keyOf(lead.label) })),
+		[
+			{ at: { change: "App/ContentView.swift", line: 1 }, kind: "xcode-placeholder" },
+			{ at: { change: "Intrinsic/FMPClient.swift", line: 2 }, kind: "runtime-secret-read" },
+			{ at: { change: ".gitignore", line: 1 }, kind: "ignored-secret" },
+		],
+	);
 	assert.equal(result.facts?.secretReadLines, 1);
 });

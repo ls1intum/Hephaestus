@@ -1,190 +1,166 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import path from "node:path";
-import { after, test } from "node:test";
+import { test } from "node:test";
 
 import {
-	RETIRED_FORM_ERROR,
-	RUN_STATUSES,
+	executionReportSchema,
+	LEGACY_CONTRACT_ERROR,
+	parseCandidate,
+	REASONS,
+	type ExecutionReport,
 } from "../../../../../../docker/agents/practice-scripts/lib/contract.ts";
+import type { ProgramOutcome } from "../../../../../../docker/agents/practice-scripts/lib/program-host.ts";
 import {
+	executionReport,
 	PRACTICE_SCRIPT_ERROR_MAX_CHARS,
 	PRACTICE_SCRIPT_REPORT_MAX_BYTES,
 	PRACTICE_SCRIPT_REPORT_MAX_PRACTICES,
-	practiceScriptReport,
 } from "../../../main/resources/agent/pi-practice-scripts-report.ts";
 
-const roots: string[] = [];
-after(() => {
-	for (const root of roots) {
-		rmSync(root, { recursive: true, force: true });
-	}
-});
-
-/** Stages a script per slug and writes each given result as the practice script runner writes it. */
-function staged(slugs: readonly string[], results: Record<string, unknown> = {}) {
-	const root = mkdtempSync(path.join(tmpdir(), "pi-practice-scripts-report-"));
-	roots.push(root);
-	const scripts = path.join(root, "work/practice-scripts/practices");
-	const output = path.join(root, "work/practice-scripts-out");
-	mkdirSync(scripts, { recursive: true });
-	mkdirSync(output, { recursive: true });
-	for (const slug of slugs) {
-		writeFileSync(path.join(scripts, `${slug}.ts`), "export default {};\n");
-	}
-	for (const [slug, result] of Object.entries(results)) {
-		writeFileSync(
-			path.join(output, `${slug}.json`),
-			typeof result === "string" ? result : JSON.stringify(result),
-		);
-	}
-	return { scripts, output };
+/** The report as the server reads it: it must parse by the contract, or it creates no verdict. */
+function parsed(text: string): ExecutionReport {
+	assert.ok(
+		Buffer.byteLength(text) <= PRACTICE_SCRIPT_REPORT_MAX_BYTES,
+		`${Buffer.byteLength(text)} bytes`,
+	);
+	const report = executionReportSchema.safeParse(JSON.parse(text));
+	assert.ok(report.success, report.error?.message);
+	return report.data;
 }
 
-function report(scripts: string, output: string): unknown {
-	const text = practiceScriptReport(scripts, output);
-	assert.ok(text !== undefined, "a report");
-	return JSON.parse(text);
+const noCalls = { review: 0, chat: 0, decision: 0, embedding: 0, reranking: 0 };
+
+/** A built-in program that ran its one review, with the given changes. */
+function outcome(changes: Partial<ProgramOutcome> = {}): ProgramOutcome {
+	return {
+		program: { kind: "builtin", digest: null },
+		models: [],
+		status: "ok",
+		stopReason: null,
+		calls: { ...noCalls, review: 1 },
+		coverageReached: { reads: 4, truncatedReads: 0, failedReads: 0 },
+		durationMs: 40,
+		...changes,
+	};
 }
 
-const definition = (status: string, extra: object = {}) => ({
-	practice: "x",
-	contract: "definition",
-	status,
-	models: {},
-	leads: [],
-	facts: {},
-	unrated: [],
-	directions: [],
-	kinds: {},
-	dropped: 0,
-	durationMs: 40,
-	...extra,
-});
+const failed = (error: string | undefined) =>
+	outcome({ status: "failed", stopReason: "error", ...(error === undefined ? {} : { error }) });
 
-/** A script that ended before the runner accepted its `meta`, so its models are not known. */
-const unknown = (status: string, extra: object = {}) => ({
-	...definition(status),
-	contract: "unknown",
-	...extra,
-});
+const slugOf = (i: number) => `p-${String(i).padStart(3, "0")}`;
+
+/** A file of the fixtures that the server's tests share: `practice-results/`. */
+const sharedFixture = (name: string): unknown =>
+	JSON.parse(readFileSync(path.join(import.meta.dirname, "../practice-results", name), "utf8"));
 
 /**
- * `PiResultParserPracticeScriptReportTest` parses the same file, so a status word or a field that the
- * writer and the server spell differently fails one of the two tests.
+ * `PiResultParserPracticeScriptReportTest` and `lib/contract.test.ts` read the same shared fixture, so a field
+ * that the writer and the server spell differently fails one of the three.
  */
-void test("the report of every status, slot, need and reason is the one the server parses", () => {
-	const { scripts, output } = staged(
-		["broken", "decides", "needs-a-model", "never-ran", "scans", "slow"],
+void test("the report of the shared fixture's practices is the fixture: every status, program kind and stop", () => {
+	const fixture = executionReportSchema.safeParse(sharedFixture("execution-report.json"));
+	assert.ok(fixture.success, fixture.error?.message);
+	const passed = parseCandidate(sharedFixture("candidate-met-with-example.json"));
+	assert.ok(passed.ok);
+	const outcomes = fixture.data.practices.toReversed().map(({ practiceSlug, ...entry }) => {
+		// A candidate that passed the host's checks never reaches the report.
+		const ran: ProgramOutcome =
+			entry.status === "ok" ? { ...entry, candidate: passed.candidate } : { ...entry };
+		return [practiceSlug, ran] as const;
+	});
+	assert.deepEqual(parsed(executionReport(outcomes)), fixture.data);
+});
+
+void test("one entry for each admitted practice, sorted by slug as Java compares strings", () => {
+	const slugs = ["b-2", "a-10", "a-1", "b", "0-x"];
+	const report = parsed(executionReport(slugs.map((slug) => [slug, outcome()])));
+	assert.deepEqual(
+		report.practices.map((entry) => entry.practiceSlug),
+		["0-x", "a-1", "a-10", "b", "b-2"],
+	);
+	assert.equal(report.truncated, false);
+});
+
+void test("a custom program is reported with the digest of its staged bytes and the models it declared", () => {
+	const digest = createHash("sha256").update("export default {};\n").digest("hex");
+	const report = parsed(
+		executionReport([
+			[
+				"decides",
+				outcome({
+					program: { kind: "custom", digest },
+					models: [
+						{ slot: "chat", need: "optional", bound: true, notRated: {} },
+						{
+							slot: "decision",
+							need: "required",
+							bound: true,
+							notRated: { unavailable: 1, budget: 2, deadline: 3, "too-large": 4 },
+						},
+					],
+					calls: { review: 0, chat: 2, decision: 9, embedding: 0, reranking: 0 },
+				}),
+			],
+		]),
+	);
+	assert.deepEqual(report.practices, [
 		{
-			broken: definition("error", {
-				models: { chat: { need: "optional", bound: true, notRated: {} } },
-				error: "result: leads must be an array\n    at run (practices/broken.ts:4:9)",
-			}),
-			decides: definition("ok", {
-				leads: [{}, {}],
-				models: {
-					chat: { need: "optional", bound: true, notRated: {} },
-					decision: {
-						need: "required",
-						bound: true,
-						notRated: { unavailable: 1, budget: 2, deadline: 3, "too-large": 4 },
-					},
-					embedding: {
-						need: "optional",
-						bound: true,
-						notRated: { "off-format": 5, refused: 6, error: 7 },
-					},
-					reranking: { need: "optional", bound: false, notRated: {} },
-				},
-			}),
-			"needs-a-model": definition("skipped", {
-				models: { decision: { need: "required", bound: false, notRated: {} } },
-			}),
-			scans: definition("ok", { leads: [{}, {}, {}] }),
-			slow: unknown("timeout", { error: "Timeout after 60003ms" }),
-		},
-	);
-	const fixture: unknown = JSON.parse(
-		readFileSync(path.join(import.meta.dirname, "practice-scripts-report.json"), "utf8"),
-	);
-	assert.deepEqual(report(scripts, output), fixture);
-});
-
-void test("a script whose models are not known is reported without models, never as one that uses none", () => {
-	const { scripts, output } = staged(["earlier-runner", "late", "never-ran", "scans"], {
-		// A runner from before the contract field says nothing about the models.
-		"earlier-runner": { practice: "earlier-runner", status: "error", leads: [] },
-		late: unknown("timeout"),
-		scans: definition("ok"),
-	});
-	assert.deepEqual(report(scripts, output), {
-		practices: [
-			{ slug: "earlier-runner", status: "error", leads: 0 },
-			{ slug: "late", status: "timeout", leads: 0, durationMs: 40 },
-			{ slug: "never-ran", status: "not-finished", leads: 0 },
-			{ slug: "scans", status: "ok", leads: 0, models: [], durationMs: 40 },
-		],
-		truncated: false,
-	});
-});
-
-void test("only the runner's own counts reach the server, and a zero count is no fact", () => {
-	const { scripts, output } = staged(["decides"], {
-		decides: definition("ok", {
-			models: {
-				decision: {
+			practiceSlug: "decides",
+			program: { kind: "custom", digest },
+			models: [
+				{ slot: "chat", need: "optional", bound: true, notRated: {} },
+				{
+					slot: "decision",
 					need: "required",
 					bound: true,
-					notRated: { deadline: 5, budget: 0 },
-					// An older runner's counts never reach the server: the proxy owns them.
-					calls: 3,
-					tokens: 900,
+					notRated: { unavailable: 1, budget: 2, deadline: 3, "too-large": 4 },
 				},
-			},
-		}),
-	});
-	assert.deepEqual(report(scripts, output), {
-		practices: [
-			{
-				slug: "decides",
-				status: "ok",
-				leads: 0,
-				models: [{ slot: "decision", need: "required", bound: true, notRated: { deadline: 5 } }],
-				durationMs: 40,
-			},
-		],
-		truncated: false,
-	});
-});
-
-void test("a result that does not parse or carries an unknown status counts as not finished", () => {
-	const { scripts, output } = staged(["cut", "odd"], {
-		cut: '{"practice": "cut", "status": "o',
-		odd: definition("constructor"),
-	});
-	assert.deepEqual(report(scripts, output), {
-		practices: ["cut", "odd"].map((slug) => ({ slug, status: "not-finished", leads: 0 })),
-		truncated: false,
-	});
-});
-
-void test("every status that the practice script runner writes is reported as it is", () => {
-	const { scripts, output } = staged(
-		RUN_STATUSES,
-		Object.fromEntries(RUN_STATUSES.map((status) => [status, definition(status)])),
-	);
-	assert.deepEqual(report(scripts, output), {
-		practices: RUN_STATUSES.toSorted().map((status) => ({
-			slug: status,
-			status,
-			leads: 0,
-			models: [],
+			],
+			status: "ok",
+			stopReason: null,
+			calls: { review: 0, chat: 2, decision: 9, embedding: 0, reranking: 0 },
+			coverageReached: { reads: 4, truncatedReads: 0, failedReads: 0 },
 			durationMs: 40,
-		})),
-		truncated: false,
-	});
+		},
+	]);
+});
+
+void test("an error is reported only for a failed practice", () => {
+	const report = parsed(
+		executionReport([
+			["ok", outcome({ error: "a note the host kept" })],
+			["skipped", outcome({ status: "skipped", stopReason: "unavailable", error: "no model" })],
+			[
+				"not-reached",
+				outcome({ status: "not-reached", stopReason: "deadline", durationMs: null, error: "late" }),
+			],
+			["failed", failed("Cannot read x")],
+		]),
+	);
+	assert.deepEqual(
+		report.practices.map((entry) => [entry.practiceSlug, entry.error]),
+		[
+			["failed", "Cannot read x"],
+			["not-reached", undefined],
+			["ok", undefined],
+			["skipped", undefined],
+		],
+	);
+});
+
+void test("every stop reason of a failed program is reported as it is", () => {
+	const stops = [...REASONS, "cancelled", "invalid-program", "invalid-candidate"] as const;
+	const report = parsed(
+		executionReport(
+			stops.map((stopReason) => [stopReason, outcome({ status: "failed", stopReason })]),
+		),
+	);
+	assert.deepEqual(
+		report.practices.map((entry) => [entry.practiceSlug, entry.status, entry.stopReason]),
+		stops.toSorted().map((stop) => [stop, "failed", stop]),
+	);
 });
 
 interface ErrorLineCase {
@@ -194,11 +170,11 @@ interface ErrorLineCase {
 }
 
 function errorLineCases(): ErrorLineCase[] {
-	const parsed: unknown = JSON.parse(
+	const cases: unknown = JSON.parse(
 		readFileSync(path.join(import.meta.dirname, "practice-script-error-lines.json"), "utf8"),
 	);
-	assert.ok(Array.isArray(parsed));
-	return parsed.map((value: unknown) => {
+	assert.ok(Array.isArray(cases));
+	return cases.map((value: unknown) => {
 		assert.ok(
 			typeof value === "object" &&
 				value !== null &&
@@ -213,201 +189,142 @@ function errorLineCases(): ErrorLineCase[] {
 	});
 }
 
-const caseSlug = (index: number) => `case-${String(index).padStart(2, "0")}`;
-
 /**
- * `PiResultParserPracticeScriptReportTest` reads the same cases, so the writer and the server keep one
- * rule for the error line.
+ * `PiResultParserPracticeScriptReportTest` reads the same cases, so the writer and the server keep one rule for
+ * the error line.
  */
-void test("a failed script's error is reported as the line that the server keeps", () => {
+void test("a failed program's error is reported as the line that the server keeps", () => {
 	const cases = errorLineCases();
-	const { scripts, output } = staged(
-		[...cases.map((_, index) => caseSlug(index)), "odd", "unnamed"],
-		{
-			...Object.fromEntries(
-				cases.map(({ error }, index) => [caseSlug(index), unknown("error", { error })]),
-			),
-			odd: unknown("error", { error: 42 }),
-			unnamed: unknown("error"),
-		},
-	);
-	const reported = report(scripts, output);
-	assert.ok(typeof reported === "object" && reported !== null && "practices" in reported);
-	assert.ok(Array.isArray(reported.practices));
-	const errors = new Map(
-		reported.practices.map((entry: { slug: string; error?: string }) => [entry.slug, entry.error]),
-	);
-	for (const [index, { case: name, line }] of cases.entries()) {
-		assert.equal(errors.get(caseSlug(index)), line ?? undefined, name);
-	}
-	assert.deepEqual([errors.get("odd"), errors.get("unnamed")], [undefined, undefined]);
-});
-
-void test("a script in the retired form is reported with its whole error line and no models", () => {
-	const { scripts, output } = staged(["retired"], {
-		retired: unknown("error", {
-			directions: [`Script failed: ${RETIRED_FORM_ERROR}`],
-			error: RETIRED_FORM_ERROR,
-		}),
-	});
-	assert.ok(RETIRED_FORM_ERROR.length <= PRACTICE_SCRIPT_ERROR_MAX_CHARS);
-	assert.deepEqual(report(scripts, output), {
-		practices: [
-			{ slug: "retired", status: "error", leads: 0, error: RETIRED_FORM_ERROR, durationMs: 40 },
-		],
-		truncated: false,
-	});
-});
-
-void test("how long a script ran is reported only when the runner wrote a count", () => {
-	const { scripts, output } = staged(["negative", "text"], {
-		negative: definition("ok", { durationMs: -1 }),
-		text: definition("ok", { durationMs: "40" }),
-	});
-	assert.deepEqual(report(scripts, output), {
-		practices: [
-			{ slug: "negative", status: "ok", leads: 0, models: [] },
-			{ slug: "text", status: "ok", leads: 0, models: [] },
-		],
-		truncated: false,
-	});
-});
-
-void test("no report when no practice was staged", () => {
-	const { scripts, output } = staged([]);
-	assert.equal(practiceScriptReport(scripts, output), undefined);
-	assert.equal(practiceScriptReport(path.join(scripts, "absent"), output), undefined);
-});
-
-void test("the report keeps the first practices by slug within its practice bound, and says it left the rest out", () => {
-	const slugs = Array.from({ length: 300 }, (_, i) => `p-${String(i).padStart(3, "0")}`);
-	const { scripts, output } = staged(slugs.toReversed());
-	const parsed = report(scripts, output);
-	assert.ok(typeof parsed === "object" && parsed !== null && "practices" in parsed);
-	assert.ok(Array.isArray(parsed.practices));
-	assert.equal(parsed.practices.length, PRACTICE_SCRIPT_REPORT_MAX_PRACTICES);
-	assert.deepEqual(
-		parsed.practices.map((entry: { slug: string }) => entry.slug),
-		slugs.slice(0, PRACTICE_SCRIPT_REPORT_MAX_PRACTICES),
-	);
-	assert.partialDeepStrictEqual(parsed, { truncated: true });
-});
-
-/** Slugs of one length that sort as their numbers do. */
-const slugOf = (i: number) => `p-${String(i).padStart(3, "0")}`;
-
-void test("the report keeps whole entries within its byte bound, and says it left the rest out", async (t) => {
-	const reasons = [
-		"unavailable",
-		"budget",
-		"deadline",
-		"too-large",
-		"off-format",
-		"refused",
-		"error",
-	];
-	const notRated = Object.fromEntries(reasons.map((reason) => [reason, 1_000_000]));
-	const models = Object.fromEntries(
-		["chat", "decision", "embedding", "reranking"].map((slot) => [
-			slot,
-			{ need: "optional", bound: true, notRated },
+	const report = parsed(
+		executionReport([
+			...cases.map(({ error }, index) => [slugOf(index), failed(error)] as const),
+			["unnamed", failed(undefined)],
 		]),
 	);
-	const result = definition("ok", { models });
-	const probe = staged([slugOf(0)], { [slugOf(0)]: result });
-	const probed: unknown = report(probe.scripts, probe.output);
-	assert.ok(typeof probed === "object" && probed !== null && "practices" in probed);
-	assert.ok(Array.isArray(probed.practices));
-	/** The bytes of one entry with a slug of the length that `slugOf` gives. */
-	const entryBytes = Buffer.byteLength(JSON.stringify(probed.practices[0]));
-	// The report as if it were complete: `truncated` is false.
-	const envelopeBytes = Buffer.byteLength('{"practices":[],"truncated":false}');
+	const errors = new Map(report.practices.map((entry) => [entry.practiceSlug, entry.error]));
+	for (const [index, { case: name, line }] of cases.entries()) {
+		assert.equal(errors.get(slugOf(index)), line ?? undefined, name);
+	}
+	assert.equal(errors.get("unnamed"), undefined);
+	assert.equal(errors.size, cases.length + 1);
+});
 
-	// Each case fills the bound to `slack` bytes short. The next entry, with its comma, needs
-	// `entryBytes + 1`: at slack 0 the last entry fits exactly, and at slack `entryBytes` the next
-	// entry is one byte too large.
-	for (const slack of [0, entryBytes]) {
+void test("a program in the retired leads contract is reported with its whole error", () => {
+	assert.ok(LEGACY_CONTRACT_ERROR.length <= PRACTICE_SCRIPT_ERROR_MAX_CHARS);
+	const report = parsed(
+		executionReport([
+			[
+				"retired",
+				outcome({
+					program: { kind: "custom", digest: "0".repeat(64) },
+					status: "failed",
+					stopReason: "invalid-program",
+					error: LEGACY_CONTRACT_ERROR,
+					calls: noCalls,
+				}),
+			],
+		]),
+	);
+	assert.partialDeepStrictEqual(report.practices, [
+		{ status: "failed", stopReason: "invalid-program", error: LEGACY_CONTRACT_ERROR },
+	]);
+});
+
+void test("the report keeps the first practices by slug within its bounds, and says it left the rest out", () => {
+	// An entry takes more than 256 bytes, so 64 KiB holds fewer entries than the practice bound allows.
+	const slugs = Array.from({ length: PRACTICE_SCRIPT_REPORT_MAX_PRACTICES + 44 }, (_, i) =>
+		slugOf(i),
+	);
+	const report = parsed(executionReport(slugs.toReversed().map((slug) => [slug, outcome()])));
+	assert.ok(report.practices.length <= PRACTICE_SCRIPT_REPORT_MAX_PRACTICES);
+	assert.deepEqual(
+		report.practices.map((entry) => entry.practiceSlug),
+		slugs.slice(0, report.practices.length),
+	);
+	assert.equal(report.truncated, true);
+});
+
+/** An entry of many bytes: every slot declared, every reason counted at the most a count may be. */
+const large = outcome({
+	program: { kind: "custom", digest: "f".repeat(64) },
+	models: (["chat", "decision", "embedding", "reranking"] as const).map((slot) => ({
+		slot,
+		need: "optional",
+		bound: true,
+		notRated: Object.fromEntries(REASONS.map((reason) => [reason, 1_000_000])),
+	})),
+});
+
+/** The bytes of the entry that the report writes for `slug`. */
+function entryBytes(slug: string): number {
+	const text = executionReport([[slug, large]]);
+	return Buffer.byteLength(text) - Buffer.byteLength(executionReport([]));
+}
+
+void test("the report keeps whole entries within its byte bound, and says it left the rest out", async (t) => {
+	const entry = entryBytes(slugOf(0));
+	const envelope = Buffer.byteLength(executionReport([]));
+	// Each case fills the bound to `slack` bytes short. The next entry, with its comma, needs `entry + 1`: at slack
+	// 0 the last entry fits exactly, and at slack `entry` the next entry is one byte too large.
+	for (const slack of [0, entry]) {
 		await t.test(`${slack} bytes short of the bound`, () => {
-			const room = PRACTICE_SCRIPT_REPORT_MAX_BYTES - slack - envelopeBytes + 1;
-			const kept = Math.floor(room / (entryBytes + 1));
-			// The first slugs get longer by the bytes that whole entries do not fill. A slug is a file
-			// name, so no slug gets more than 200 of them.
-			let padding = room - kept * (entryBytes + 1);
+			const room = PRACTICE_SCRIPT_REPORT_MAX_BYTES - slack - envelope + 1;
+			const kept = Math.floor(room / (entry + 1));
+			assert.ok(kept < PRACTICE_SCRIPT_REPORT_MAX_PRACTICES, "the byte bound is reached first");
+			// The first slugs get longer by the bytes that whole entries do not fill, up to the 64 characters
+			// of a slug.
+			let padding = room - kept * (entry + 1);
 			const slugs = Array.from({ length: kept + 10 }, (_, i) => {
-				const extra = Math.min(padding, 200);
+				const extra = Math.min(padding, 64 - slugOf(i).length);
 				padding -= extra;
 				return `${slugOf(i)}${"x".repeat(extra)}`;
 			});
 			assert.equal(padding, 0);
-			const { scripts, output } = staged(
-				slugs.toReversed(),
-				Object.fromEntries(slugs.map((slug) => [slug, result])),
-			);
-			const text = practiceScriptReport(scripts, output);
-			assert.ok(text !== undefined);
-			const parsed: unknown = JSON.parse(text);
-			assert.ok(typeof parsed === "object" && parsed !== null && "practices" in parsed);
-			assert.ok(Array.isArray(parsed.practices));
+			const text = executionReport(slugs.toReversed().map((slug) => [slug, large]));
+			const report = parsed(text);
 			assert.deepEqual(
-				parsed.practices.map((entry: { slug: string }) => entry.slug),
+				report.practices.map((item) => item.practiceSlug),
 				slugs.slice(0, kept),
 			);
-			assert.partialDeepStrictEqual(parsed, { truncated: true });
-			// The kept entries are the most that fit: the complete report is `slack` bytes short of
-			// the bound, and the next entry does not fit in it.
+			assert.equal(report.truncated, true);
+			// The kept entries are the most that fit: the complete report is `slack` bytes short of the bound,
+			// and the next entry does not fit in it.
 			const complete = Buffer.byteLength(text.replace('"truncated":true', '"truncated":false'));
 			assert.equal(complete, PRACTICE_SCRIPT_REPORT_MAX_BYTES - slack);
-			assert.ok(complete + 1 + entryBytes > PRACTICE_SCRIPT_REPORT_MAX_BYTES);
+			assert.ok(complete + 1 + entryBytes(slugs[kept] ?? "") > PRACTICE_SCRIPT_REPORT_MAX_BYTES);
 		});
 	}
 });
 
 void test("the report keeps every practice within its bounds and leaves out the errors that do not fit", () => {
-	const slugs = Array.from(
-		{ length: PRACTICE_SCRIPT_REPORT_MAX_PRACTICES },
-		(_, i) => `p-${String(i).padStart(3, "0")}`,
-	);
-	// Each error is 500 characters of 4 UTF-8 bytes, so the errors of 256 practices cannot all fit.
+	const slugs = Array.from({ length: 200 }, (_, i) => slugOf(i));
+	// Each error is 500 characters of 4 UTF-8 bytes, so the errors of 200 practices cannot all fit.
 	const error = "\u{1F642}".repeat(PRACTICE_SCRIPT_ERROR_MAX_CHARS);
-	const { scripts, output } = staged(
-		slugs,
-		Object.fromEntries(slugs.map((slug) => [slug, unknown("error", { error })])),
-	);
-	const text = practiceScriptReport(scripts, output);
-	assert.ok(text !== undefined);
-	assert.ok(
-		Buffer.byteLength(text) <= PRACTICE_SCRIPT_REPORT_MAX_BYTES,
-		`${Buffer.byteLength(text)} bytes`,
-	);
-	const parsed: unknown = JSON.parse(text);
-	assert.ok(typeof parsed === "object" && parsed !== null && "practices" in parsed);
-	assert.ok(Array.isArray(parsed.practices));
-	assert.partialDeepStrictEqual(parsed, { truncated: false });
+	const report = parsed(executionReport(slugs.map((slug) => [slug, failed(error)])));
+	assert.equal(report.truncated, false);
 	assert.deepEqual(
-		parsed.practices.map((entry: { slug: string; status: string }) => [entry.slug, entry.status]),
-		slugs.map((slug) => [slug, "error"]),
+		report.practices.map((entry) => [entry.practiceSlug, entry.status]),
+		slugs.map((slug) => [slug, "failed"]),
 	);
-	const withError = parsed.practices.filter(
-		(entry: { error?: string }) => entry.error !== undefined,
-	);
+	const withError = report.practices.filter((entry) => entry.error !== undefined);
 	assert.ok(withError.length > 0 && withError.length < slugs.length, `${withError.length} errors`);
 	assert.deepEqual(
-		withError.map((entry: { slug: string; error?: string }) => [entry.slug, entry.error]),
+		withError.map((entry) => [entry.practiceSlug, entry.error]),
 		slugs.slice(0, withError.length).map((slug) => [slug, error]),
 	);
 });
 
 void test("an error that does not fit leaves room for a shorter error after it", () => {
 	const long = "\u{1F642}".repeat(PRACTICE_SCRIPT_ERROR_MAX_CHARS);
-	const slugs = Array.from({ length: 40 }, (_, i) => `p-${String(i).padStart(2, "0")}`);
-	const { scripts, output } = staged(slugs, {
-		...Object.fromEntries(slugs.map((slug) => [slug, unknown("error", { error: long })])),
-		"p-39": unknown("error", { error: "Cannot read x" }),
-	});
-	const parsed: unknown = JSON.parse(practiceScriptReport(scripts, output) ?? "");
-	assert.ok(typeof parsed === "object" && parsed !== null && "practices" in parsed);
-	assert.ok(Array.isArray(parsed.practices));
-	assert.equal(parsed.practices.length, slugs.length);
-	const errors = parsed.practices.map((entry: { error?: string }) => entry.error);
-	assert.deepEqual(errors.slice(-2), [undefined, "Cannot read x"]);
+	const slugs = Array.from({ length: 40 }, (_, i) => slugOf(i));
+	const report = parsed(
+		executionReport(
+			slugs.map((slug, i) => [slug, failed(i === slugs.length - 1 ? "Cannot read x" : long)]),
+		),
+	);
+	assert.equal(report.practices.length, slugs.length);
+	assert.deepEqual(
+		report.practices.slice(-2).map((entry) => entry.error),
+		[undefined, "Cannot read x"],
+	);
 });

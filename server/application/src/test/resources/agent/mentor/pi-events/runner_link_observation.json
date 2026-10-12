@@ -1,5 +1,5 @@
 {
   "type": "link_observation",
-  "observationId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-  "text": "Your description names the decision but not why; one sentence on the trade-off would help reviewers."
+  "observationId": "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
+  "text": "The retry on line 42 swallows the IOException; log it before you retry."
 }

@@ -2,25 +2,19 @@
 // files that the commit touched with their line counts and moves. The criteria tell what one logical
 // change is, and the review judges the partition. A fact is a place to look, never a verdict.
 import { readCapturedCommits } from "../lib/change.ts";
-import {
-	COMMIT_KIND,
-	commitLeads,
-	describeCommitCount,
-	subjectFacts,
-} from "../lib/commit-subjects.ts";
+import { commitLeads, describeCommitCount, subjectFacts } from "../lib/commit-subjects.ts";
 import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 
+export const LABELS = {
+	commit:
+		"An authored commit of the reviewed range, with the shape of its subject and the files that it touched.",
+};
+
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			[COMMIT_KIND]:
-				"An authored commit of the reviewed range, with the shape of its subject and the files that it touched.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const captured = await readCapturedCommits(ctx.context.dir);
+		const captured = await readCapturedCommits(ctx.evidence);
 		const facts = subjectFacts(captured ?? []);
 		const authored = facts.filter((f) => !f.merge);
 		let directions = [
@@ -34,8 +28,8 @@ export default definePracticeScript({
 		} else if (authored.length === 0) {
 			directions = ["No authored commit in the reviewed range: only merge commits, or none."];
 		}
-		return {
-			leads: commitLeads(facts).slice(0, 200),
+		return ctx.review({
+			leads: commitLeads(facts, LABELS.commit).slice(0, 200),
 			...(captured === null
 				? {}
 				: {
@@ -46,6 +40,6 @@ export default definePracticeScript({
 						},
 					}),
 			directions,
-		};
+		});
 	},
 });

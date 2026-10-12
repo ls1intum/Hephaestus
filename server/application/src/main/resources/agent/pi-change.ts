@@ -1,12 +1,11 @@
-// Derive work/change/ from the captured repository and pinned inputs/context/change.json range.
+// Derive work/change/ from the captured repository and pinned inputs/context/change.json range. The
+// practice runner calls writeChangeView at its start, before any practice program runs.
 // The server stages commits separately in inputs/context/commits.json for verifiable citations.
 // Hunk lines in diff.patch carry [L<n>]: NEW coordinates for additions/context, OLD for deletions.
 // description.authored.md keeps original description.md line numbers after template removal.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-
-import { SUPPORTED_SCHEMA_VERSION, resolveTaskPaths } from "./pi-task-paths.ts";
 
 export const CHANGE_ROOT = "work/change";
 
@@ -508,20 +507,4 @@ export function writeChangeView(
 export function readDescription(contextRoot: string): string | null {
 	const file = path.resolve(contextRoot, "description.md");
 	return existsSync(file) ? readFileSync(file, "utf8") : null;
-}
-
-if (import.meta.filename === process.argv[1]) {
-	const root = path.resolve(process.argv[2] ?? "/workspace");
-	const envelope: unknown = JSON.parse(readFileSync(path.resolve(root, "task.json"), "utf8"));
-	if (typeof envelope !== "object" || envelope === null) {
-		throw new Error("task.json: expected an envelope");
-	}
-	if (Reflect.get(envelope, "schemaVersion") !== SUPPORTED_SCHEMA_VERSION) {
-		throw new Error("task.json: unsupported schemaVersion");
-	}
-	const paths = resolveTaskPaths(root, envelope);
-	const change = readChange(paths.contextRoot);
-	if (change !== null) {
-		writeChangeView(root, paths.repositoryRoot, change, readDescription(paths.contextRoot));
-	}
 }

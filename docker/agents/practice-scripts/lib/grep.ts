@@ -17,19 +17,6 @@ export interface GrepOptions {
 	fixedString?: boolean;
 }
 
-/** Runs a search for the child process of a script, which may not start programs itself. */
-type GrepRunner = (pattern: string, dir: string, opts: GrepOptions) => Promise<GrepMatch[]>;
-
-let delegate: GrepRunner | undefined;
-
-/**
- * The child process of a script calls this once, before it imports the practice script: every
- * `grep` the script makes then runs in the runner, the only process allowed to start `grep`.
- */
-export function delegateGrep(runner: GrepRunner): void {
-	delegate = runner;
-}
-
 const GLOB_GREP_BATCH_SIZE = 256;
 
 function parseGrepLine(line: string, dir: string): GrepMatch | null {
@@ -152,9 +139,6 @@ export async function grep(
 	dir: string,
 	opts: GrepOptions = {},
 ): Promise<GrepMatch[]> {
-	if (delegate !== undefined) {
-		return delegate(pattern, dir, opts);
-	}
 	const { glob, maxResults = 500, fixedString = false } = opts;
 	if (maxResults <= 0) {
 		return [];

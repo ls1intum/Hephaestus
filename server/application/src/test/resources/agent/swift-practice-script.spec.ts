@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
-import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
+import {
+	leadKeys,
+	runBundled,
+} from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
 const view = `import SwiftUI
 
@@ -43,8 +46,9 @@ void test("an I/O call is placed in the type that encloses it: the view's counts
 		repo: { "App/EventList.swift": view },
 		change: new Map([whole("App/EventList.swift", view)]),
 	});
+	const keyOf = await leadKeys("keeps-views-free-of-networking-and-persistence");
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.at, lead.kind, lead.facts?.enclosing]),
+		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label), lead.facts?.enclosing]),
 		[
 			[{ change: "App/EventList.swift", line: 8 }, "urlsession-request", "struct EventList"],
 			[{ change: "App/EventList.swift", line: 9 }, "json-coding", "struct EventList"],
@@ -59,9 +63,9 @@ void test("without a checkout the placing is unknown, and the lead is still repo
 		change: new Map([whole("App/EventList.swift", view)]),
 	});
 	assert.equal(result.facts?.filesWithoutCheckout, 1);
-	assert.ok(result.leads.every((lead) => lead.facts?.enclosing === "unknown"));
+	assert.ok((result.leads ?? []).every((lead) => lead.facts?.enclosing === "unknown"));
 	// The store's call is a candidate too when nothing says which type it lies in.
-	assert.equal(result.leads.length, 3);
+	assert.equal(result.leads?.length, 3);
 });
 
 void test("a new view without a preview is counted per file, a preview elsewhere in the change is a lead", async () => {
@@ -79,8 +83,9 @@ void test("a new view without a preview is counted per file, a preview elsewhere
 		previewsAdded: 1,
 		filesWithNewViewAndNoPreview: 1,
 	});
+	const keyOf = await leadKeys("ships-a-preview-with-each-new-view");
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.at, lead.kind]),
+		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label)]),
 		[
 			[{ change: "App/EventList.swift", line: 3 }, "new-view-type"],
 			[{ change: "App/EventRow.swift", line: 1 }, "new-view-type"],
@@ -123,7 +128,7 @@ void test("a system picker, an import or an image picker on the library is not p
 		change: new Map([whole("App/Picker.swift", source)]),
 	});
 	assert.equal(result.facts?.permissionReferenceKinds, 0);
-	assert.deepEqual(result.leads, []);
+	assert.deepEqual(result.leads ?? [], []);
 	assert.doesNotMatch((result.directions ?? []).join("\n"), /Permission-related|authorization/u);
 	// Choosing the camera as the picker's source is the access it is.
 	const camera = await runBundled(slug, {
@@ -135,6 +140,7 @@ void test("a system picker, an import or an image picker on the library is not p
 
 void test("a location type named in a delegate signature is a reference to inspect, and only a request call is a request", async () => {
 	const slug = "declares-permissions-truthfully-at-point-of-use";
+	const keyOf = await leadKeys(slug);
 	const delegateOnly = [
 		"import CoreLocation",
 		"final class Preview: NSObject, CLLocationManagerDelegate {",
@@ -145,7 +151,7 @@ void test("a location type named in a delegate signature is a reference to inspe
 		change: new Map([whole("App/Preview.swift", delegateOnly)]),
 	});
 	assert.deepEqual(
-		typeOnly.leads.map((lead) => [lead.at, lead.kind]),
+		(typeOnly.leads ?? []).map((lead) => [lead.at, keyOf(lead.label)]),
 		[[{ change: "App/Preview.swift", line: 3 }, "permission-reference-location"]],
 	);
 	assert.equal(typeOnly.facts?.permissionReferenceKinds, 1);
@@ -162,7 +168,7 @@ void test("a location type named in a delegate signature is a reference to inspe
 		change: new Map([whole("App/Preview.swift", requesting)]),
 	});
 	assert.deepEqual(
-		request.leads.map((lead) => [lead.at, lead.kind]),
+		(request.leads ?? []).map((lead) => [lead.at, keyOf(lead.label)]),
 		[
 			[{ change: "App/Preview.swift", line: 3 }, "permission-reference-location"],
 			[{ change: "App/Preview.swift", line: 4 }, "authorization-request"],
@@ -185,8 +191,9 @@ void test("a custom font given a size scales, one given a fixed size does not, a
 	const result = await runBundled("makes-ui-accessible-by-default", {
 		change: new Map([whole("App/Course.swift", source)]),
 	});
+	const keyOf = await leadKeys("makes-ui-accessible-by-default");
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.at.line, lead.kind]),
+		(result.leads ?? []).map((lead) => [lead.at.line, keyOf(lead.label)]),
 		[
 			[3, "scaled-custom-font"],
 			[4, "fixed-size-custom-font"],
@@ -207,7 +214,7 @@ void test("rows beyond the cap are counted by kind and said to be unlisted", asy
 	const result = await runBundled("makes-ui-accessible-by-default", {
 		change: new Map([whole("App/Stars.swift", source)]),
 	});
-	assert.equal(result.leads.length, 60);
+	assert.equal(result.leads?.length, 60);
 	assert.equal(result.facts?.symbolImages, 65);
 	assert.equal(result.facts.interfaceLinesAdded, 65);
 	assert.match(
@@ -218,6 +225,7 @@ void test("rows beyond the cap are counted by kind and said to be unlisted", asy
 
 void test("detached work needs no written reason, and default isolation text is a lead per target, never the project's", async () => {
 	const slug = "uses-structured-concurrency-safely";
+	const keyOf = await leadKeys(slug);
 	const source = [
 		"struct Feed: View {",
 		"    var body: some View {",
@@ -254,8 +262,8 @@ void test("detached work needs no written reason, and default isolation text is 
 		change,
 	});
 	assert.deepEqual(
-		withSettings.leads
-			.filter((lead) => lead.kind === "default-isolation-setting")
+		(withSettings.leads ?? [])
+			.filter((lead) => keyOf(lead.label) === "default-isolation-setting")
 			.map((lead) => lead.at),
 		[
 			{ file: "project.yml", line: 4 },
@@ -273,6 +281,7 @@ void test("detached work needs no written reason, and default isolation text is 
 
 void test("each state declaration is a lead with its enclosing type, and a plain var in a view is a place to read, not a lapse", async () => {
 	const slug = "owns-state-at-the-right-level";
+	const keyOf = await leadKeys(slug);
 	const source = [
 		"struct Parent: View {",
 		"    @State private var store = Store()",
@@ -293,7 +302,7 @@ void test("each state declaration is a lead with its enclosing type, and a plain
 		change: new Map([whole("App/Parent.swift", source)]),
 	});
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.at.line, lead.kind, lead.facts?.enclosing]),
+		(result.leads ?? []).map((lead) => [lead.at.line, keyOf(lead.label), lead.facts?.enclosing]),
 		[
 			[2, "state-creating-an-object", "struct Parent"],
 			[3, "state-property", "struct Parent"],
@@ -311,7 +320,7 @@ void test("each state declaration is a lead with its enclosing type, and a plain
 	const none = await runBundled(slug, {
 		change: new Map([whole("App/Plain.swift", "let answer = 42")]),
 	});
-	assert.deepEqual(none.leads, []);
+	assert.deepEqual(none.leads ?? [], []);
 	assert.match(none.directions?.[0] ?? "", /^Scanned 1 added lines in 1 files .*none matched\./u);
 });
 
@@ -333,27 +342,29 @@ void test("a change with no reference anywhere says what it scanned and what the
 		},
 	};
 	const reviewed = { repository_id: 1, provider_id: 1 };
-	const result = await runBundled(slug, {
-		work: {
-			...reviewed,
-			title: "Add the map",
-			body: "Shows the events on a map.",
-			source_branch: "map",
-		},
-		context,
+	// The server stages the record of the work and its description beside the inventory; the leads cite them.
+	const run = async (work: { title: string; body: string; source_branch: string }) =>
+		runBundled(slug, {
+			work: { ...reviewed, ...work },
+			context: {
+				...context,
+				"metadata.json": { ...reviewed, ...work },
+				"description.md": work.body,
+			},
+		});
+	const result = await run({
+		title: "Add the map",
+		body: "Shows the events on a map.",
+		source_branch: "map",
 	});
 	assert.equal(result.facts?.referencesFound, 0);
 	assert.equal(result.facts.inventoryOpenIssues, 1);
 	assert.equal(result.facts.linkedWorkItems, -1);
-	const referenced = await runBundled(slug, {
-		work: {
-			...reviewed,
-			title: "Add the map",
-			// The template's commented example is not the author's reference.
-			body: "<!-- Example: Closes #12 -->\nCloses #4",
-			source_branch: "4-add-the-map",
-		},
-		context,
+	const referenced = await run({
+		title: "Add the map",
+		// The template's commented example is not the author's reference.
+		body: "<!-- Example: Closes #12 -->\nCloses #4",
+		source_branch: "4-add-the-map",
 	});
 	assert.equal(referenced.facts?.referencesFound, 1);
 	assert.equal(referenced.facts.closingReferences, 1);
@@ -384,6 +395,7 @@ void test("native platform logging is a logger and standard output a print, a pr
 			whole("scripts/report.py", 'print("done")\n'),
 		]),
 	});
+	const keyOf = await leadKeys("logs-through-the-platform-logger");
 	assert.deepEqual(result.facts, {
 		printsAdded: 5,
 		loggerCallsAdded: 6,
@@ -393,8 +405,8 @@ void test("native platform logging is a logger and standard output a print, a pr
 		linesAdded: 30,
 	});
 	assert.deepEqual(
-		result.leads.map((lead) => [
-			lead.kind,
+		(result.leads ?? []).map((lead) => [
+			keyOf(lead.label),
 			lead.facts?.language,
 			lead.facts?.call,
 			lead.facts?.toolPath,
@@ -424,9 +436,12 @@ void test("a print in another language beyond the shared row cap is counted but 
 			whole("scripts/report.py", 'print("done")\n'),
 		]),
 	});
-	assert.equal(result.leads.length, 40);
+	const keyOf = await leadKeys("logs-through-the-platform-logger");
+	assert.equal(result.leads?.length, 40);
 	assert.ok(
-		result.leads.every((lead) => lead.kind === "print-call" && lead.facts?.language === "swift"),
+		(result.leads ?? []).every(
+			(lead) => keyOf(lead.label) === "print-call" && lead.facts?.language === "swift",
+		),
 	);
 	assert.equal(result.facts?.printsAdded, 41);
 	// The script's own print is past the 40 leads returned, so no listed lead is under a tool path.
@@ -454,8 +469,13 @@ void test("a literal and a named asset color are told apart, and the asset's dar
 	assert.equal(result.facts.systemAdaptiveColors, 0);
 	assert.equal(result.facts.namedAssetColors, 1);
 	assert.equal(result.facts.assetsWithoutDarkAppearance, 0);
+	const keyOf = await leadKeys("uses-adaptive-colors-for-every-appearance");
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.at.line, lead.kind, lead.facts?.hasDarkAppearance ?? null]),
+		(result.leads ?? []).map((lead) => [
+			lead.at.line,
+			keyOf(lead.label),
+			lead.facts?.hasDarkAppearance ?? null,
+		]),
 		[
 			[4, "literal-white-or-black", null],
 			[5, "named-asset", true],
@@ -495,7 +515,7 @@ void test("a colorset's appearances are read as JSON whatever the key order, and
 		change: new Map([whole("App/Card.swift", source)]),
 	});
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.facts?.asset, lead.facts?.hasDarkAppearance]),
+		(result.leads ?? []).map((lead) => [lead.facts?.asset, lead.facts?.hasDarkAppearance]),
 		[
 			["Reordered", true],
 			["Single", false],
@@ -534,7 +554,7 @@ void test("a named color resolves only to one colorset, exact name first; two ca
 		change: new Map([whole("App/Card.swift", source)]),
 	});
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.facts?.asset, lead.facts?.hasDarkAppearance]),
+		(result.leads ?? []).map((lead) => [lead.facts?.asset, lead.facts?.hasDarkAppearance]),
 		[
 			["Brand", true],
 			["brand", "unknown"],
@@ -566,10 +586,11 @@ void test("a named color given a bundle is a named asset; the main bundle resolv
 		},
 		change: new Map([whole("App/Card.swift", source)]),
 	});
+	const keyOf = await leadKeys("uses-adaptive-colors-for-every-appearance");
 	assert.deepEqual(
-		result.leads.map((lead) => [
+		(result.leads ?? []).map((lead) => [
 			lead.at.line,
-			lead.kind,
+			keyOf(lead.label),
 			lead.facts?.bundle ?? null,
 			lead.facts?.hasDarkAppearance,
 		]),
@@ -620,8 +641,9 @@ void test("only spellings that fix the kind are counted literal or adaptive; sta
 		repo: { "App/Card.swift": source },
 		change: new Map([whole("App/Card.swift", source)]),
 	});
+	const keyOf = await leadKeys("uses-adaptive-colors-for-every-appearance");
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.at.line, lead.kind]),
+		(result.leads ?? []).map((lead) => [lead.at.line, keyOf(lead.label)]),
 		[
 			[3, "color-modifier-member"],
 			[4, "color-member"],
@@ -660,6 +682,6 @@ struct Settings: View {
 		change: new Map([whole("App/Settings.swift", source)]),
 	});
 	assert.equal(result.facts?.ioCallsInViews, 0);
-	assert.deepEqual(result.leads, []);
+	assert.deepEqual(result.leads ?? [], []);
 	assert.match(result.directions?.join("\n") ?? "", /^Scanned 9 added lines in 1 files/mu);
 });

@@ -3,8 +3,12 @@
 // language follow the criteria. The review decides from the file if a print is the output of the
 // program, such as a CLI or a script, or a diagnostic that ships.
 import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
-import { grep } from "../lib/grep.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 import { countLabel, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
 
 interface Shapes {
@@ -84,24 +88,25 @@ const TOOL_PATH =
 /** The rows that the script lists, across all languages. */
 const LISTED = 40;
 
+export const LABELS = {
+	"print-call": "An added print-style call, such as print, println, console.log or System.out.",
+	"logger-call":
+		"An added call to a logger, such as Logger, os_log, NSLog, android.util.Log or logging.",
+};
+
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"print-call": "An added print-style call, such as print, println, console.log or System.out.",
-			"logger-call":
-				"An added call to a logger, such as Logger, os_log, NSLog, android.util.Log or logging.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const leads: Lead[] = [];
+		const change = requireChange(ctx.files);
+		const tree = ctx.files?.head ?? null;
+		const leads: ReviewLead[] = [];
 		let prints = 0;
 		let loggers = 0;
 		let filesScanned = 0;
 		let linesAdded = 0;
 		for (const [language, shapes] of Object.entries(DIAGNOSTICS)) {
-			const scan = await scanAddedLines(ctx.repo, ctx.change, {
+			const scan = await scanAddedLines(tree, change, {
 				languages: [language],
 				patterns: [...shapes.print, ...shapes.logger],
 				maxHints: LISTED,
@@ -114,7 +119,7 @@ export default definePracticeScript({
 				const isPrint = shapes.print.some(([label]) => label === hint.pattern);
 				leads.push({
 					at: { change: hint.file, line: hint.line },
-					kind: isPrint ? "print-call" : "logger-call",
+					label: isPrint ? LABELS["print-call"] : LABELS["logger-call"],
 					facts: factsOf({
 						language,
 						call: hint.pattern,
@@ -126,14 +131,16 @@ export default definePracticeScript({
 		}
 		const listed = leads.slice(0, LISTED);
 		const printsInToolPaths = listed.filter(
-			(lead) => lead.kind === "print-call" && lead.facts?.toolPath === true,
+			(lead) => lead.label === LABELS["print-call"] && lead.facts?.toolPath === true,
 		).length;
 		// Whether a bounded lexical search of the checkout matches a logger definition, import or native call.
-		const existing = await grep(
-			String.raw`\bLogger\s*\(|\bos_log|\bNSLogv?\s*\(|import android\.util\.Log\b|\bTimber\b|LoggerFactory|import logging|from 'pino'|from "pino"|winston`,
-			ctx.repo,
-			{ maxResults: 5 },
-		);
+		const { matches: existing } =
+			tree === null
+				? { matches: [] }
+				: await tree.grep(
+						String.raw`\bLogger\s*\(|\bos_log|\bNSLogv?\s*\(|import android\.util\.Log\b|\bTimber\b|LoggerFactory|import logging|from 'pino'|from "pino"|winston`,
+						{ maxResults: 5 },
+					);
 		const directions: string[] =
 			prints + loggers > listed.length
 				? [
@@ -151,7 +158,7 @@ export default definePracticeScript({
 		if (listed.length === 0) {
 			directions.push(...noMatchDirections(linesAdded, filesScanned));
 		}
-		return {
+		return ctx.review({
 			leads: listed,
 			facts: {
 				printsAdded: prints,
@@ -162,6 +169,6 @@ export default definePracticeScript({
 				linesAdded,
 			},
 			directions,
-		};
+		});
 	},
 });

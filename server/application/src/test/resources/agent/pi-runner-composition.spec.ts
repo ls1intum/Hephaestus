@@ -12,21 +12,23 @@ import {
 	type ComposedFeedbackUnit,
 	REVIEW_LIMITS,
 	DISPOSITIONS,
-	consultedStandard,
-	type ReviewedObservation,
+	type ReviewedResult,
 	STANDARD_REFERENCE,
 	WRITE_CONTRACT,
 	buildReviewTurn,
 	decidedByReview,
+	evidenceRefs,
+	namedEvidence,
 	notReachedNote,
 	type PriorAdviceWitness,
 	priorAdviceWitnesses,
 	priorPublicFeedback,
-	publicObservations,
+	publicResults,
 	type ReviewContext,
 	practiceStandard,
+	readInAppSupport,
+	readInChatEligibility,
 	readReview,
-	readablePractices,
 	reviewToolParameters,
 	notMetReference,
 	publicQualifications,
@@ -78,21 +80,142 @@ void test("only the unit naming an unlisted or other-lane thread is undeliverabl
 	assert.deepEqual(undeliverableUnits(undefined), []);
 });
 
-void test("private feedback rests on a problem of its own practice", () => {
-	const observations = new Map([
-		["confirmed-criteria", { practiceSlug: "acceptance-criteria", outcome: "MET" }],
-		["unconfirmed-outcome", { practiceSlug: "issue-outcome", outcome: "NOT_MET" }],
+void test("private feedback rests on a problem of its own practice, named by its result or an observation", () => {
+	const results = new Map([
+		[
+			"confirmed-criteria",
+			{ practiceSlug: "acceptance-criteria", outcome: "MET", observations: [] },
+		],
+		[
+			"unconfirmed-outcome",
+			{
+				practiceSlug: "issue-outcome",
+				outcome: "NOT_MET",
+				observations: [{ observationId: "no-closing-note" }],
+			},
+		],
 	]);
 	const basedOn = ["confirmed-criteria", "unconfirmed-outcome"];
 
 	assert.match(
-		validateFeedbackEvidence("acceptance-criteria", basedOn, observations) ?? "",
-		/NOT_MET for the primary practice 'acceptance-criteria'/u,
+		validateFeedbackEvidence("acceptance-criteria", basedOn, results) ?? "",
+		/must name the NOT_MET result of the primary practice 'acceptance-criteria' or one of its observations/u,
 	);
-	assert.equal(validateFeedbackEvidence("issue-outcome", basedOn, observations), null);
-	assert.match(
-		validateFeedbackEvidence("issue-outcome", ["missing"], observations) ?? "",
-		/does not name an admitted observation/u,
+	assert.equal(validateFeedbackEvidence("issue-outcome", basedOn, results), null);
+	// An observation stands for its result: it is what the unit rests on, and it decides the practice.
+	assert.equal(validateFeedbackEvidence("issue-outcome", ["no-closing-note"], results), null);
+	const missing = validateFeedbackEvidence("issue-outcome", ["missing"], results) ?? "";
+	assert.match(missing, /does not name an admitted result or observation/u);
+	assert.match(missing, /unconfirmed-outcome \(its observations: no-closing-note\)/u);
+});
+
+void test("every id a text or unit names is written as the reference it resolves to, each once", () => {
+	const named = namedEvidence(
+		new Map([
+			["result-1", { observations: [{ observationId: "observation-1" }] }],
+			["result-2", { observations: [] }],
+		]),
+	);
+	assert.deepEqual(
+		evidenceRefs(["observation-1", "result-1", "observation-1", "result-2", "result-1"], named),
+		[
+			{ practiceResultId: "result-1", observationId: "observation-1" },
+			{ practiceResultId: "result-1" },
+			{ practiceResultId: "result-2" },
+		],
+	);
+	// Only checked ids reach this point: an id that names nothing is a defect, never dropped.
+	assert.throws(() => evidenceRefs(["elsewhere"], named), /elsewhere names no admitted result/u);
+});
+
+void test("the routing read after admission is one decision per NOT_MET result, or none", () => {
+	const current = [
+		{ practiceResultId: "r-1", practiceSlug: "one", outcome: "NOT_MET" },
+		{ practiceResultId: "r-2", practiceSlug: "two", outcome: "NOT_MET" },
+		{ practiceResultId: "r-3", practiceSlug: "three", outcome: "MET" },
+	];
+	const readAt = "2026-10-12T09:41:07Z";
+	const routes = [
+		{ practiceResultId: "r-1", decision: "ADMIT" },
+		{ practiceResultId: "r-2", decision: "HAS_INLINE_ANCHOR" },
+	];
+	assert.deepEqual(readInChatEligibility({ state: "COMPLETE", readAt, results: routes }, current), {
+		state: "COMPLETE",
+		readAt,
+		results: routes,
+	});
+	assert.deepEqual(readInChatEligibility({ state: "UNAVAILABLE", readAt, results: [] }, current), {
+		state: "UNAVAILABLE",
+		readAt,
+	});
+	for (const malformed of [
+		// One NOT_MET result left without a decision, a MET result routed, a decision twice.
+		{ state: "COMPLETE", readAt, results: routes.slice(0, 1) },
+		{
+			state: "COMPLETE",
+			readAt,
+			results: [...routes, { practiceResultId: "r-3", decision: "ADMIT" }],
+		},
+		{ state: "COMPLETE", readAt, results: [...routes, routes[0]] },
+		// The retired per-observation shape is no routing at all.
+		{
+			state: "COMPLETE",
+			readAt,
+			observations: routes.map(({ practiceResultId, decision }) => ({
+				observationId: practiceResultId,
+				decision,
+			})),
+		},
+		{ state: "UNAVAILABLE", readAt, results: routes },
+		{ state: "COMPLETE", readAt, results: [{ practiceResultId: "r-1", decision: "MAYBE" }] },
+	]) {
+		assert.equal(readInChatEligibility(malformed, current), null, JSON.stringify(malformed));
+	}
+	const occurrence = {
+		practiceResultId: "r-1",
+		artifactKind: "scm.pull_request",
+		artifactId: 7,
+		outcome: "NOT_MET",
+		origin: "LIVE",
+		summary: "Errors are swallowed.",
+		observedAt: readAt,
+	};
+	const support = readInAppSupport(
+		{
+			state: "COMPLETE",
+			readAt,
+			practices: [
+				{ practiceSlug: "one", decision: "ADMIT", occurrences: [occurrence] },
+				{ practiceSlug: "two", decision: "NO_EVIDENCE", occurrences: [] },
+			],
+		},
+		current,
+	);
+	assert.ok(support?.state === "COMPLETE", JSON.stringify(support));
+	assert.deepEqual(support.practices[0]?.occurrences[0], {
+		...occurrence,
+		evidenceRationale: null,
+		evidence: null,
+		practiceRevisionId: null,
+	});
+	const { practiceResultId, ...legacy } = occurrence;
+	assert.equal(
+		readInAppSupport(
+			{
+				state: "COMPLETE",
+				readAt,
+				practices: [
+					{
+						practiceSlug: "one",
+						decision: "ADMIT",
+						occurrences: [{ ...legacy, observationId: practiceResultId }],
+					},
+					{ practiceSlug: "two", decision: "NO_EVIDENCE", occurrences: [] },
+				],
+			},
+			current,
+		),
+		null,
 	);
 });
 
@@ -110,25 +233,36 @@ void test("negatives that quote the same line each keep their own standard, rati
 	const reference = notMetReference(
 		[
 			{
-				id: "swallowed",
+				practiceResultId: "swallowed",
 				practiceSlug: "handles-errors",
 				outcome: "NOT_MET",
 				publicEligible: true,
-				rationale: "The failure callback drops its error and nothing records it.",
-				citations: [{ ...sharedLine, quote: "func didFail(error: any Error) {}" }],
+				explanation: "The failure callback drops its error and nothing records it.",
+				citations: [],
+				observations: [
+					{
+						observationId: "swallowed-callback",
+						citations: [{ ...sharedLine, quote: "func didFail(error: any Error) {}" }],
+					},
+				],
 			},
 			{
-				id: "unfinished",
+				practiceResultId: "unfinished",
 				practiceSlug: "ready-handoff",
 				outcome: "NOT_MET",
 				publicEligible: true,
-				rationale: "The promised terminal preview state is not reached when this callback fails.",
+				explanation: "The promised terminal preview state is not reached when this callback fails.",
 				citations: [
-					{ ...sharedLine, quote: "func didFail(error: any Error) {}" },
 					{
 						path: "description.md",
 						startLine: 5,
 						quote: "This change completes loading with a ready or failed preview state.",
+					},
+				],
+				observations: [
+					{
+						observationId: "unfinished-callback",
+						citations: [{ ...sharedLine, quote: "func didFail(error: any Error) {}" }],
 					},
 				],
 			},
@@ -147,8 +281,10 @@ void test("negatives that quote the same line each keep their own standard, rati
 		"The failure callback drops its error and nothing records it.",
 		"The promised terminal preview state is not reached when this callback fails.",
 		"This change completes loading with a ready or failed preview state.",
-		'"id": "swallowed"',
-		'"id": "unfinished"',
+		'"practiceResultId": "swallowed"',
+		'"practiceResultId": "unfinished"',
+		'"observationId": "swallowed-callback"',
+		'"observationId": "unfinished-callback"',
 	]) {
 		assert.ok(reference.includes(shown), shown);
 	}
@@ -158,17 +294,28 @@ void test("negatives that quote the same line each keep their own standard, rati
 });
 
 void test("negatives that quote the same line may take separate remedies or one shared one", () => {
-	const sameLine = new Map<string, ReviewedObservation>([
-		["swallowed", { practiceSlug: "handles-errors", outcome: "NOT_MET", citations: [sharedLine] }],
-		["unfinished", { practiceSlug: "ready-handoff", outcome: "NOT_MET", citations: [sharedLine] }],
+	const sameLine = new Map<string, ReviewedResult>([
+		[
+			"swallowed",
+			{
+				practiceSlug: "handles-errors",
+				outcome: "NOT_MET",
+				observations: [{ observationId: "swallowed-callback", citations: [sharedLine] }],
+			},
+		],
+		[
+			"unfinished",
+			{
+				practiceSlug: "ready-handoff",
+				outcome: "NOT_MET",
+				observations: [{ observationId: "unfinished-callback", citations: [sharedLine] }],
+			},
+		],
 	]);
-	const context: ReviewContext = {
-		witnesses: new Map<string, PriorAdviceWitness>(),
-		standardsInView: new Set(),
-	};
+	const context: ReviewContext = { witnesses: new Map<string, PriorAdviceWitness>() };
 	const decisions = [
-		{ observationId: "swallowed", disposition: "RAISE" },
-		{ observationId: "unfinished", disposition: "RAISE" },
+		{ practiceResultId: "swallowed", disposition: "RAISE" },
+		{ practiceResultId: "unfinished", disposition: "RAISE" },
 	];
 
 	// Separate remedies: the handoff ask in the summary, the handler's own repair on its line.
@@ -178,22 +325,47 @@ void test("negatives that quote the same line may take separate remedies or one 
 	};
 	const repair = {
 		body: "This handler drops the failure; record it or establish why safe recovery needs no report.",
-		basedOn: ["swallowed"],
-		anchor: { observationId: "swallowed", citationIndex: 0 },
+		basedOn: ["swallowed-callback"],
+		anchor: { observationId: "swallowed-callback", citationIndex: 0 },
 	};
 	assert.deepEqual(readReview({ decisions, summary, inline: [repair] }, sameLine, true, context), {
-		review: { summary, inline: [repair], withheld: [] },
+		review: {
+			summary: { ...summary, basedOn: [{ practiceResultId: "unfinished" }] },
+			inline: [
+				{
+					...repair,
+					basedOn: [{ practiceResultId: "swallowed", observationId: "swallowed-callback" }],
+				},
+			],
+			withheld: [],
+		},
 	});
 
 	// One remedy that genuinely answers both stays one point resting on both.
 	const shared = {
 		body: "Handle this callback by recording the failure and setting the promised failed preview state.",
 		basedOn: ["swallowed", "unfinished"],
-		anchor: { observationId: "swallowed", citationIndex: 0 },
+		anchor: { observationId: "swallowed-callback", citationIndex: 0 },
 	};
 	assert.deepEqual(
 		readReview({ decisions, summary: null, inline: [shared] }, sameLine, true, context),
-		{ review: { summary: null, inline: [shared], withheld: [] } },
+		{
+			review: {
+				summary: null,
+				inline: [
+					{
+						...shared,
+						// The note sits on swallowed-callback, so it rests on that observation as well as its result.
+						basedOn: [
+							{ practiceResultId: "swallowed" },
+							{ practiceResultId: "unfinished" },
+							{ practiceResultId: "swallowed", observationId: "swallowed-callback" },
+						],
+					},
+				],
+				withheld: [],
+			},
+		},
 	);
 });
 
@@ -208,33 +380,58 @@ const diffCitation = (line: number) => ({
 	anchorable: true,
 });
 
-const observations = new Map<string, ReviewedObservation>([
+/**
+ * One result per practice; each NOT_MET result holds its observations, and only an observation's citations can carry a
+ * line note.
+ */
+const results = new Map<string, ReviewedResult>([
 	[
 		"colors",
 		{
 			practiceSlug: "uses-adaptive-colors",
 			outcome: "NOT_MET",
-			citations: [diffCitation(13), { ...diffCitation(16), index: 1 }],
+			observations: [
+				{
+					observationId: "colors-fill",
+					citations: [diffCitation(13), { ...diffCitation(16), index: 1 }],
+				},
+			],
 		},
 	],
 	[
 		"handoff",
-		{ practiceSlug: "honours-linked-issue-acceptance-criteria", outcome: "NOT_MET", citations: [] },
+		{
+			practiceSlug: "honours-linked-issue-acceptance-criteria",
+			outcome: "NOT_MET",
+			observations: [{ observationId: "handoff-criteria", citations: [] }],
+		},
 	],
-	["why", { practiceSlug: "describe-what-and-why", outcome: "NOT_MET", citations: [] }],
-	["preview", { practiceSlug: "ships-a-preview", outcome: "MET", citations: [] }],
-	["unsure", { practiceSlug: "keeps-tests-honest", outcome: "UNDETERMINED", citations: [] }],
+	[
+		"why",
+		{
+			practiceSlug: "describe-what-and-why",
+			outcome: "NOT_MET",
+			observations: [{ observationId: "why-reason", citations: [] }],
+		},
+	],
+	["preview", { practiceSlug: "ships-a-preview", outcome: "MET", observations: [] }],
+	["unsure", { practiceSlug: "keeps-tests-honest", outcome: "UNDETERMINED", observations: [] }],
 	[
 		"description",
 		{
 			practiceSlug: "states-how-to-verify",
 			outcome: "NOT_MET",
-			citations: [
+			observations: [
 				{
-					index: 0,
-					sourceKind: "scm.pull-request.core",
-					path: "description.md",
-					anchorable: false,
+					observationId: "description-steps",
+					citations: [
+						{
+							index: 0,
+							sourceKind: "scm.pull-request.core",
+							path: "description.md",
+							anchorable: false,
+						},
+					],
 				},
 			],
 		},
@@ -251,40 +448,36 @@ const witnesses = new Map<string, PriorAdviceWitness>([
 	["github:issue-comment:9", { eligibleForPriorAdvice: false, eligibleForAlreadySaid: false }],
 ]);
 
-/** Every standard in view, for the rules that are not about which standard the review was written with. */
-const inView: ReviewContext = {
-	witnesses,
-	standardsInView: new Set(
-		[...observations.values()].map((observation) => observation.practiceSlug),
-	),
-};
+const reviewContext: ReviewContext = { witnesses };
 
-const raise = (observationId: string) => ({ observationId, disposition: "RAISE" });
-const below = (observationId: string) => ({ observationId, disposition: "BELOW_BAR" });
+const raise = (practiceResultId: string) => ({ practiceResultId, disposition: "RAISE" });
+const below = (practiceResultId: string) => ({ practiceResultId, disposition: "BELOW_BAR" });
 const allRaised = [raise("colors"), raise("handoff"), raise("why"), raise("description")];
 
-const errorsOf = (value: unknown, lineNotes = true, context = inView): string[] => {
-	const read = readReview(value, observations, lineNotes, context);
+const errorsOf = (value: unknown, lineNotes = true, context = reviewContext): string[] => {
+	const read = readReview(value, results, lineNotes, context);
 	return "errors" in read ? read.errors : [];
 };
 
 void test("a complete summary is stored exactly as written, resting on exactly what it names", () => {
 	const body =
 		"The description stops at the issue link. Say which of #4's checks this screen covers and why it matters.\n\n" +
-		"    let fill = Color(red: 0.2, green: 0.6, blue: 0.3)\n\n" +
-		"The preview you added makes the layout easy to check in both appearances; keep it with the next screen.\n";
+		"    let fill = Color(red: 0.2, green: 0.6, blue: 0.3)\n";
 	const read = readReview(
 		{
-			summary: { body, basedOn: ["handoff", "why", "preview", "why"] },
+			summary: { body, basedOn: ["handoff", "why-reason", "why-reason"] },
 			decisions: [raise("handoff"), raise("why"), below("colors"), below("description")],
 		},
-		observations,
+		results,
 		true,
-		inView,
+		reviewContext,
 	);
 	assert.ok("review" in read, JSON.stringify(read));
 	assert.equal(read.review.summary?.body, body);
-	assert.deepEqual(read.review.summary.basedOn, ["handoff", "why", "preview"]);
+	assert.deepEqual(read.review.summary.basedOn, [
+		{ practiceResultId: "handoff" },
+		{ practiceResultId: "why", observationId: "why-reason" },
+	]);
 	assert.deepEqual(read.review.inline, []);
 });
 
@@ -295,32 +488,84 @@ void test("a review with only line notes is a whole review: no summary is requir
 				{
 					body: "This explicit RGB fill stays unchanged in Dark Mode; check contrast in both appearances and use an adaptive fill.",
 					basedOn: ["colors"],
-					anchor: { observationId: "colors", citationIndex: 0 },
+					anchor: { observationId: "colors-fill", citationIndex: 0 },
 				},
 			],
 			decisions: [
 				raise("colors"),
-				...["handoff", "why", "description"].map((observationId) => ({
-					observationId,
+				...["handoff", "why", "description"].map((practiceResultId) => ({
+					practiceResultId,
 					disposition: "ALREADY_SAID",
 					witnessIds: ["github:review-comment:7"],
 				})),
 			],
 		},
-		observations,
+		results,
 		true,
-		inView,
+		reviewContext,
 	);
 	assert.ok("review" in read, JSON.stringify(read));
 	assert.equal(read.review.summary, null);
-	assert.deepEqual(read.review.inline[0]?.anchor, { observationId: "colors", citationIndex: 0 });
-	assert.deepEqual(read.review.inline[0].basedOn, ["colors"]);
+	assert.deepEqual(read.review.inline[0]?.anchor, {
+		observationId: "colors-fill",
+		citationIndex: 0,
+	});
+	// The server places a note only on an observation its basedOn names: the anchor's observation joins the result.
+	assert.deepEqual(read.review.inline[0].basedOn, [
+		{ practiceResultId: "colors" },
+		{ practiceResultId: "colors", observationId: "colors-fill" },
+	]);
+});
+
+void test("a stored review is the wire shape: every basedOn a list of references, the anchor an observation's citation", () => {
+	const read = readReview(
+		{
+			decisions: [raise("colors"), raise("why"), below("handoff"), below("description")],
+			summary: { body: "Say why the screen exists.", basedOn: ["why-reason"] },
+			inline: [
+				{
+					body: "Use an adaptive fill.",
+					basedOn: ["colors-fill", "colors"],
+					anchor: { observationId: "colors-fill", citationIndex: 1 },
+				},
+			],
+		},
+		results,
+		true,
+		reviewContext,
+	);
+	assert.ok("review" in read, JSON.stringify(read));
+	// What feedback.json holds is the JSON text of the stored review, not the object in memory.
+	const text = JSON.stringify({ review: read.review });
+	const written: unknown = JSON.parse(text);
+	assert.deepEqual(written, {
+		review: {
+			summary: {
+				body: "Say why the screen exists.",
+				basedOn: [{ practiceResultId: "why", observationId: "why-reason" }],
+			},
+			inline: [
+				{
+					body: "Use an adaptive fill.",
+					basedOn: [
+						{ practiceResultId: "colors", observationId: "colors-fill" },
+						{ practiceResultId: "colors" },
+					],
+					anchor: { observationId: "colors-fill", citationIndex: 1 },
+				},
+			],
+			withheld: [
+				{ basedOn: [{ practiceResultId: "handoff" }], reason: "BELOW_BAR" },
+				{ basedOn: [{ practiceResultId: "description" }], reason: "BELOW_BAR" },
+			],
+		},
+	});
 });
 
 const note = (citationIndex: number) => ({
 	body: `The fill on this line fixes one appearance (${citationIndex}).`,
 	basedOn: ["colors"],
-	anchor: { observationId: "colors", citationIndex },
+	anchor: { observationId: "colors-fill", citationIndex },
 });
 
 void test("one practice may carry several notes about different lines, never two on one line", () => {
@@ -331,41 +576,77 @@ void test("one practice may carry several notes about different lines, never two
 					inline: [note(0), note(1)],
 					decisions: [raise("colors"), below("handoff"), below("why"), below("description")],
 				},
-				observations,
+				results,
 				true,
-				inView,
+				reviewContext,
 			),
 	);
 	assert.match(
 		errorsOf({ inline: [note(0), note(0)] }).join("\n"),
-		/inline #2: another note already sits on citation 0 of colors/u,
+		/inline #2: another note already sits on citation 0 of colors-fill/u,
 	);
 });
 
-void test("an anchor must be a line of this change cited by an observation the note rests on", () => {
+void test("an anchor is a line of this change cited by an observation the note rests on, itself or through its result", () => {
 	const errors = errorsOf({
 		inline: [
-			{ body: "One.", basedOn: ["handoff"], anchor: { observationId: "colors", citationIndex: 0 } },
+			{
+				body: "One.",
+				basedOn: ["handoff"],
+				anchor: { observationId: "colors-fill", citationIndex: 0 },
+			},
 			{
 				body: "Two.",
 				basedOn: ["description"],
-				anchor: { observationId: "description", citationIndex: 0 },
+				anchor: { observationId: "description-steps", citationIndex: 0 },
 			},
 			{
 				body: "Three.",
 				basedOn: ["colors"],
-				anchor: { observationId: "colors", citationIndex: 7 },
+				anchor: { observationId: "colors-fill", citationIndex: 7 },
+			},
+			{ body: "Four.", basedOn: ["colors"], anchor: { observationId: "colors", citationIndex: 0 } },
+			{
+				body: "Five.",
+				basedOn: ["colors"],
+				anchor: { observationId: "elsewhere", citationIndex: 0 },
 			},
 		],
 	}).join("\n");
-	assert.match(errors, /inline #1: anchor names colors, which this note's basedOn does not/u);
-	assert.match(errors, /inline #2: citation 0 of description is not a line of this change/u);
-	assert.match(errors, /inline #3: colors has no citation 7/u);
+	assert.match(errors, /inline #1: anchor names colors-fill, which this note's basedOn does not/u);
+	assert.match(errors, /inline #2: citation 0 of description-steps is not a line of this change/u);
+	assert.match(errors, /inline #3: colors-fill has no citation 7/u);
+	// A result's own citations never anchor: the note names the observation whose citation it sits on.
+	assert.match(errors, /inline #4: anchor names colors, which is a result/u);
+	assert.match(errors, /inline #5: anchor names elsewhere, which is not an observation/u);
+	// Naming the observation itself rests the note on it, as naming its result does.
+	assert.ok(
+		"review" in
+			readReview(
+				{
+					decisions: [raise("colors"), below("handoff"), below("why"), below("description")],
+					inline: [
+						{
+							body: "Adapt.",
+							basedOn: ["colors-fill"],
+							anchor: { observationId: "colors-fill", citationIndex: 0 },
+						},
+					],
+				},
+				results,
+				true,
+				reviewContext,
+			),
+	);
 	assert.match(
 		errorsOf(
 			{
 				inline: [
-					{ body: "x", basedOn: ["colors"], anchor: { observationId: "colors", citationIndex: 0 } },
+					{
+						body: "x",
+						basedOn: ["colors"],
+						anchor: { observationId: "colors-fill", citationIndex: 0 },
+					},
 				],
 			},
 			false,
@@ -374,22 +655,44 @@ void test("an anchor must be a line of this change cited by an observation the n
 	);
 });
 
-void test("a part may rest only on admitted observations that decided something", () => {
+void test("a part may rest only on admitted NOT_MET results or their observations, never on a MET result", () => {
 	const errors = errorsOf({
 		summary: { body: "A sentence.", basedOn: ["why", "unsure", "elsewhere"] },
 	}).join("\n");
-	assert.match(errors, /elsewhere, which is not one of the observations this review may rest on/u);
+	assert.match(
+		errors,
+		/elsewhere, which is not one of the NOT_MET results or observations this review may rest on/u,
+	);
 	assert.match(
 		errorsOf({ summary: { body: "A sentence.", basedOn: ["unsure"] } }).join("\n"),
-		/decided nothing/u,
+		/basedOn names unsure, which is not a NOT_MET result or one of its observations/u,
 	);
+	// The review on the work never acknowledges a MET result: a summary or a note resting on one is refused.
+	const acknowledged = {
+		decisions: [raise("colors"), below("handoff"), below("why"), below("description")],
+		summary: {
+			body: "The preview you added makes the layout easy to check.",
+			basedOn: ["preview"],
+		},
+		inline: [
+			{
+				body: "Adapt this fill; the preview shows it well.",
+				basedOn: ["colors", "preview"],
+				anchor: { observationId: "colors-fill", citationIndex: 0 },
+			},
+		],
+	};
+	assert.deepEqual(errorsOf(acknowledged), [
+		"summary: basedOn names preview, which is not a NOT_MET result or one of its observations. The review on the work speaks only about NOT_MET results and their observations; it never acknowledges a MET result",
+		"inline #1: basedOn names preview, which is not a NOT_MET result or one of its observations. The review on the work speaks only about NOT_MET results and their observations; it never acknowledges a MET result",
+	]);
 	assert.match(
 		errorsOf({ summary: { body: "A sentence.", basedOn: [] } }).join("\n"),
 		/basedOn is required/u,
 	);
 });
 
-void test("an observation is raised or withheld, and only a problem takes a decision", () => {
+void test("a NOT_MET result is raised or withheld whole, and only a NOT_MET result takes a decision", () => {
 	assert.match(
 		errorsOf({
 			decisions: [below("why")],
@@ -397,13 +700,56 @@ void test("an observation is raised or withheld, and only a problem takes a deci
 		}).join("\n"),
 		/why is withheld as BELOW_BAR, and a text speaks about it/u,
 	);
+	// A withheld result stays unsaid through every one of its observations.
 	assert.match(
-		errorsOf({ decisions: [below("preview")] }).join("\n"),
-		/preview is not a NOT_MET observation/u,
+		errorsOf({
+			decisions: [below("why")],
+			summary: { body: "A sentence.", basedOn: ["why-reason"] },
+		}).join("\n"),
+		/why is withheld as BELOW_BAR, and a text speaks about it or its observations/u,
 	);
 	assert.match(
-		errorsOf({ decisions: [{ observationId: "why", disposition: "BORED" }] }).join("\n"),
+		errorsOf({ decisions: [below("preview")] }).join("\n"),
+		/preview is not a NOT_MET result/u,
+	);
+	// The decision is the result's: an observation's id is named back to its result.
+	assert.match(
+		errorsOf({ decisions: [below("why-reason")] }).join("\n"),
+		/why-reason is an observation of why; a decision names its result's practiceResultId/u,
+	);
+	assert.match(
+		errorsOf({ decisions: [{ observationId: "why", disposition: "BELOW_BAR" }] }).join("\n"),
+		/unknown decision field\(s\): observationId[\s\S]*practiceResultId is required/u,
+	);
+	assert.match(
+		errorsOf({ decisions: [{ practiceResultId: "why", disposition: "BORED" }] }).join("\n"),
 		/disposition must be one of RAISE, NO_MATERIAL_CHANGE, ALREADY_SAID, BELOW_BAR/u,
+	);
+});
+
+void test("a raised result is spoken about through any of its observations", () => {
+	const read = readReview(
+		{
+			decisions: [raise("why"), raise("colors"), below("handoff"), below("description")],
+			summary: { body: "Say why, and adapt the fill.", basedOn: ["why-reason", "colors-fill"] },
+		},
+		results,
+		false,
+		reviewContext,
+	);
+	assert.ok("review" in read, JSON.stringify(read));
+	assert.deepEqual([...decidedByReview(read.review)].toSorted(), [
+		"colors",
+		"description",
+		"handoff",
+		"why",
+	]);
+	assert.match(
+		errorsOf({
+			decisions: [raise("why"), raise("colors"), below("handoff"), below("description")],
+			summary: { body: "Say why.", basedOn: ["why-reason"] },
+		}).join("\n"),
+		/colors is decided RAISE, and no text speaks about it or its observations/u,
 	);
 });
 
@@ -418,9 +764,9 @@ void test("a text is refused for what only the server writes, never for its word
 					},
 					decisions: [raise("handoff"), below("colors"), below("why"), below("description")],
 				},
-				observations,
+				results,
 				true,
-				inView,
+				reviewContext,
 			),
 	);
 	assert.match(
@@ -445,7 +791,7 @@ void test("a review over the line-note bound is refused whole, not cut", () => {
 	const notes = Array.from({ length: REVIEW_LIMITS.inlineNotes + 1 }, () => ({
 		body: "x",
 		basedOn: ["colors"],
-		anchor: { observationId: "colors", citationIndex: 0 },
+		anchor: { observationId: "colors-fill", citationIndex: 0 },
 	}));
 	assert.match(
 		errorsOf({ inline: notes }).join("\n"),
@@ -453,15 +799,22 @@ void test("a review over the line-note bound is refused whole, not cut", () => {
 	);
 });
 
-void test("what a review decided covers what it says and what it withholds", () => {
+void test("what a review decided covers the results it says, through any observation, and those it withholds", () => {
 	assert.deepEqual(
 		[
 			...decidedByReview({
-				summary: { body: "x", basedOn: ["why"] },
+				summary: {
+					body: "x",
+					basedOn: [{ practiceResultId: "why", observationId: "why-reason" }],
+				},
 				inline: [
-					{ body: "y", basedOn: ["colors"], anchor: { observationId: "colors", citationIndex: 0 } },
+					{
+						body: "y",
+						basedOn: [{ practiceResultId: "colors" }],
+						anchor: { observationId: "colors-fill", citationIndex: 0 },
+					},
 				],
-				withheld: [{ basedOn: ["handoff"], reason: "ALREADY_SAID" }],
+				withheld: [{ basedOn: [{ practiceResultId: "handoff" }], reason: "ALREADY_SAID" }],
 			}),
 		].toSorted(),
 		["colors", "handoff", "why"],
@@ -480,86 +833,132 @@ const WITHDRAWN = "No CSV download is requested. This work is withdrawn.";
 
 const admitted = [
 	{
-		id: "current",
+		practiceResultId: "current",
 		practiceSlug: "describe-what-and-why",
 		outcome: "NOT_MET",
 		summary: "The description gives no reason for the screen.",
-		evidenceRationale: "The authored description names the screen and nothing about why.",
+		explanation: "The authored description names the screen and nothing about why.",
 		publicEligible: true,
-		citations: [
-			{
-				index: 0,
+		citations: [],
+		example: {
+			citation: {
 				sourceKind: "scm.pull-request.core",
 				path: "description.md",
-				quote: "Closes #4",
-				verification: { status: "VERIFIED", quoteSha256: "abc" },
+				quote: "Adds the login screen.",
+				verification: { status: "VERIFIED", quoteSha256: "fed" },
+			},
+			note: "The first line already names what changed.",
+		},
+		observations: [
+			{
+				observationId: "current-reason",
+				severity: "MINOR",
+				summary: "No reason for the screen",
+				citations: [
+					{
+						index: 0,
+						sourceKind: "scm.pull-request.core",
+						path: "description.md",
+						quote: "Closes #4",
+						verification: { status: "VERIFIED", quoteSha256: "abc" },
+						anchorable: false,
+					},
+				],
 				anchorable: false,
 			},
 		],
 	},
 	{
-		id: "from-history",
+		practiceResultId: "from-history",
 		practiceSlug: "defers-review-asks-into-tracked-work",
 		outcome: "NOT_MET",
 		summary: PRIVATE_SENTENCE,
-		evidenceRationale: PRIVATE_SENTENCE,
+		explanation: PRIVATE_SENTENCE,
 		publicEligible: false,
-		citations: [
-			{ index: 0, sourceKind: "hephaestus.feedback-history", path: "history/feedback.json" },
+		citations: [],
+		observations: [
+			{
+				observationId: "from-history-ask",
+				summary: PRIVATE_SENTENCE,
+				citations: [
+					{ index: 0, sourceKind: "hephaestus.feedback-history", path: "history/feedback.json" },
+				],
+			},
 		],
 	},
 ];
 
-void test("the review composition sees only what admission marked eligible, and that whole", () => {
-	const shown = publicObservations(admitted);
+void test("the review composition sees only the NOT_MET results admission marked eligible, and those whole", () => {
+	// A public MET result is never acknowledged on the work, so the review composition never sees it.
+	const shown = publicResults([
+		...admitted,
+		{
+			practiceResultId: "named",
+			practiceSlug: "names-the-screen",
+			outcome: "MET",
+			summary: "The description names the screen.",
+			publicEligible: true,
+			citations: [],
+			observations: [],
+		},
+	]);
 	assert.deepEqual(
-		shown.map((observation) => observation.id),
+		shown.map((result) => result.practiceResultId),
 		["current"],
 	);
 	assert.equal(
-		shown[0]?.evidenceRationale,
+		shown[0]?.explanation,
 		"The authored description names the screen and nothing about why.",
 	);
-	assert.deepEqual(shown[0].citations, [
+	// Every citation keeps its quoted lines and coordinates, the observations' and the example's too; only digests go.
+	assert.deepEqual(shown[0].observations, [
 		{
-			index: 0,
-			sourceKind: "scm.pull-request.core",
-			path: "description.md",
-			quote: "Closes #4",
+			observationId: "current-reason",
+			severity: "MINOR",
+			summary: "No reason for the screen",
+			citations: [
+				{
+					index: 0,
+					sourceKind: "scm.pull-request.core",
+					path: "description.md",
+					quote: "Closes #4",
+					anchorable: false,
+				},
+			],
 			anchorable: false,
 		},
 	]);
+	assert.deepEqual(shown[0].example, {
+		citation: {
+			sourceKind: "scm.pull-request.core",
+			path: "description.md",
+			quote: "Adds the login screen.",
+		},
+		note: "The first line already names what changed.",
+	});
 	const read: string[] = [];
 	const describeCriteria = "## The standard\nThe description says why the change is made.\n";
 	const turn = buildReviewTurn({
 		sameWork:
 			"A scm.pull_request, captured at 2026-10-01T10:00:00Z. Its title: Add the login screen.",
-		observations: [
-			...shown,
-			{
-				id: "named",
-				practiceSlug: "names-the-screen",
-				outcome: "MET",
-				publicEligible: true,
-				citations: [],
-			},
-		],
+		results: shown,
 		qualifications: publicQualifications([
 			...admitted,
 			{
-				id: "conflict",
+				practiceResultId: "conflict",
 				practiceSlug: "issue-scoped-to-single-concern",
 				outcome: "UNDETERMINED",
 				summary: CONFLICT_SUMMARY,
-				evidenceRationale: CONFLICT_RATIONALE,
+				explanation: CONFLICT_RATIONALE,
 				publicEligible: true,
 				evidence: {
-					citations: [{ sourceKind: "scm.issue.core", path: "description.md", quote: WITHDRAWN }],
-					undecidability: {
-						openQuestion:
-							"Does the withdrawal or the delivery requirement state the current request?",
-						wouldSettleIt: "An authored statement that resolves the two current sections.",
-					},
+					undecidability: [
+						{
+							openQuestion:
+								"Does the withdrawal or the delivery requirement state the current request?",
+							wouldSettleIt: "An authored statement that resolves the two current sections.",
+						},
+					],
 				},
 				citations: [
 					{
@@ -573,11 +972,11 @@ void test("the review composition sees only what admission marked eligible, and 
 				],
 			},
 			{
-				id: "na",
+				practiceResultId: "na",
 				practiceSlug: "ships-tests",
 				outcome: "NOT_APPLICABLE",
 				summary: "No behaviour changed, so no test is owed.",
-				evidenceRationale: "Nothing in this work needs a test.",
+				explanation: "Nothing in this work needs a test.",
 				publicEligible: true,
 				evidence: {
 					inapplicability: {
@@ -589,13 +988,13 @@ void test("the review composition sees only what admission marked eligible, and 
 				citations: [{ index: 0, sourceKind: "scm.pull-request.diff", quote: "+ text" }],
 			},
 			{
-				id: "reviewer-limit",
+				practiceResultId: "reviewer-limit",
 				practiceSlug: "reviews-respectfully-asks-rather-than-demands",
 				outcome: "UNDETERMINED",
 				summary: PRIVATE_SENTENCE,
 				publicEligible: false,
 				evidence: {
-					undecidability: { openQuestion: PRIVATE_SENTENCE, wouldSettleIt: PRIVATE_SENTENCE },
+					undecidability: [{ openQuestion: PRIVATE_SENTENCE, wouldSettleIt: PRIVATE_SENTENCE }],
 				},
 				citations: [],
 			},
@@ -626,16 +1025,19 @@ void test("the review composition sees only what admission marked eligible, and 
 	assert.ok(!turn.includes("from-history"), turn);
 	// The work is named before anything the review may rest on.
 	const record = turn.indexOf("Add the login screen.");
-	assert.ok(record !== -1 && record < turn.indexOf('"id": "current"'), turn);
-	// The whole standard of the NOT_MET practice comes before the observations and the choice; a MET practice's
-	// criteria, and a private practice's, are not read here.
+	assert.ok(record !== -1 && record < turn.indexOf('"practiceResultId": "current"'), turn);
+	// The whole standard of the NOT_MET practice comes before its result; a private practice's criteria are not read.
 	assert.deepEqual(read, ["describe-what-and-why"]);
 	const standard = turn.indexOf(`\`\`\`markdown\n${describeCriteria}\n\`\`\``);
-	assert.ok(record < standard && standard < turn.indexOf('"id": "current"'), turn);
-	assert.ok(standard < turn.indexOf("Before the review acknowledges a MET observation"), turn);
+	assert.ok(record < standard && standard < turn.indexOf('"practiceResultId": "current"'), turn);
+	// Nothing offers recognition: no MET result, no index of one, and no tool to read one.
+	assert.doesNotMatch(turn, /"practiceResultId": "named"|recognition|read_practice/u);
 	// How to write ends the opening turn, after every reference it relies on.
 	assert.ok(turn.endsWith(WRITE_CONTRACT), turn);
-	assert.match(turn, /"id": "current"/u);
+	// The concern carries its result with its observations nested, each by its own id.
+	assert.match(turn, /"practiceResultId": "current"/u);
+	assert.match(turn, /"observationId": "current-reason"/u);
+	assert.doesNotMatch(turn, /"id":/u);
 	assert.match(turn, /"name": "Describe what changed and why"/u);
 	assert.doesNotMatch(turn, /whyItMatters/u);
 	assert.match(turn, /"knownLimitations":/u);
@@ -705,7 +1107,7 @@ void test("the public turn carries captured discussion once, with its locator an
 	} satisfies PublicReviewHistory;
 	const turn = buildReviewTurn({
 		sameWork: "The captured issue asks for a login screen.",
-		observations: [],
+		results: [],
 		qualifications: [],
 		alreadySaid: [],
 		captured,
@@ -721,7 +1123,7 @@ void test("the public turn carries captured discussion once, with its locator an
 	const omitted = "Captured discussion and its omission index exceed the size bound.";
 	const withoutBodies = buildReviewTurn({
 		sameWork: "The captured issue asks for a login screen.",
-		observations: [],
+		results: [],
 		qualifications: [],
 		alreadySaid: [],
 		captured: { ...captured, sources: [], statements: [], omitted },
@@ -733,28 +1135,39 @@ void test("the public turn carries captured discussion once, with its locator an
 	assert.ok(withoutBodies.includes(omitted));
 });
 
-void test("an observation admission did not mark, or one that decided nothing, is left out", () => {
-	assert.deepEqual(publicObservations([{ id: "unmarked", outcome: "NOT_MET", citations: [] }]), []);
+void test("a result admission did not mark, or one that decided nothing, is left out", () => {
 	assert.deepEqual(
-		publicObservations([
-			{ id: "unsure", outcome: "UNDETERMINED", publicEligible: true, citations: [] },
+		publicResults([
+			{ practiceResultId: "unmarked", outcome: "NOT_MET", citations: [], observations: [] },
+		]),
+		[],
+	);
+	assert.deepEqual(
+		publicResults([
+			{
+				practiceResultId: "unsure",
+				outcome: "UNDETERMINED",
+				publicEligible: true,
+				citations: [],
+				observations: [],
+			},
 		]),
 		[],
 	);
 });
 
-void test("a text resting on anything but observation ids is refused whole, never filtered", () => {
+void test("a text resting on anything but result and observation ids is refused whole, never filtered", () => {
 	assert.match(
 		errorsOf({ summary: { body: "A sentence.", basedOn: ["why", 42] } }).join("\n"),
-		/basedOn must be an array of observation id strings/u,
+		/basedOn must be an array of result and observation id strings/u,
 	);
 	assert.match(
 		errorsOf({ summary: { body: "A sentence.", basedOn: "why" } }).join("\n"),
-		/basedOn must be an array of observation id strings/u,
+		/basedOn must be an array of result and observation id strings/u,
 	);
 	assert.match(
 		errorsOf({
-			decisions: [{ observationId: "why", disposition: "ALREADY_SAID", witnessIds: [null] }],
+			decisions: [{ practiceResultId: "why", disposition: "ALREADY_SAID", witnessIds: [null] }],
 		}).join("\n"),
 		/witnessIds must be an array/u,
 	);
@@ -936,7 +1349,7 @@ void test("own history omits whole oversized or over-budget entries without hidi
 	);
 	const input = {
 		sameWork: "The captured work.",
-		observations: [],
+		results: [],
 		qualifications: [],
 		alreadySaid: view.feedback,
 		captured: {
@@ -969,14 +1382,14 @@ void test("own history omits whole oversized or over-budget entries without hidi
 
 // --- The report_review schema of one run ---------------------------------------------------------
 
-const decidedOnly = new Map([...observations].filter(([id]) => id !== "unsure"));
+const decidedOnly = new Map([...results].filter(([id]) => id !== "unsure"));
 
 const eligibleWitnesses = [
 	"github:review-comment:7",
 	"feedback:00000000-0000-4000-8000-000000000001",
 ];
 
-const validatorFor = (reviewable: ReadonlyMap<string, ReviewedObservation>, lineNotes = true) =>
+const validatorFor = (reviewable: ReadonlyMap<string, ReviewedResult>, lineNotes = true) =>
 	new Ajv({ strict: true, allErrors: true }).compile(
 		reviewToolParameters(reviewable, lineNotes, eligibleWitnesses),
 	);
@@ -994,29 +1407,51 @@ void test("the native schema requires complete decisions and each text's fields 
 	assert.ok(
 		valid({
 			decisions: allRaised,
-			summary: { body: "Say why.", basedOn: ["why", "preview", "handoff", "description"] },
+			summary: {
+				body: "Say why.",
+				basedOn: ["why", "handoff-criteria", "description-steps"],
+			},
 			inline: [
 				{
 					body: "Adapt.",
-					basedOn: ["colors"],
-					anchor: { observationId: "colors", citationIndex: 1 },
+					basedOn: ["colors-fill"],
+					anchor: { observationId: "colors-fill", citationIndex: 1 },
 				},
 			],
 		}),
 		JSON.stringify(valid.errors),
 	);
 	for (const malformed of [
-		{ ...quiet, decisions: [{ observationId: "handoff" }] },
+		{ ...quiet, decisions: [{ practiceResultId: "handoff" }] },
+		{ ...quiet, decisions: [{ observationId: "handoff", disposition: "BELOW_BAR" }] },
 		{ ...quiet, decisions: [below("preview"), ...quiet.decisions.slice(1)] },
+		// A decision names the result, never one of its observations.
+		{ ...quiet, decisions: [below("colors-fill"), ...quiet.decisions.slice(1)] },
 		{ ...quiet, summary: { body: "Say why." } },
 		{ ...quiet, summary: { body: "Say why.", basedOn: [] } },
 		{ ...quiet, summary: { body: "Say why.", basedOn: ["why", 42] } },
 		{ ...quiet, summary: { body: "Say why.", basedOn: ["elsewhere"] } },
+		{ ...quiet, summary: { body: "Say why.", basedOn: ["unsure"] } },
+		// A MET result is never acknowledged on the work: the schema offers no MET id to rest on.
+		{ ...quiet, summary: { body: "The preview helps.", basedOn: ["preview"] } },
 		{ ...quiet, summary: { body: "x".repeat(REVIEW_LIMITS.summaryChars + 1), basedOn: ["why"] } },
 		{ ...quiet, inline: [{ body: "Adapt.", basedOn: ["colors"] }] },
+		// A note sits on an observation's citation: neither a result nor an observation without a line takes one.
 		{
 			...quiet,
-			inline: [{ body: "x", basedOn: ["why"], anchor: { observationId: "why", citationIndex: 0 } }],
+			inline: [
+				{ body: "x", basedOn: ["colors"], anchor: { observationId: "colors", citationIndex: 0 } },
+			],
+		},
+		{
+			...quiet,
+			inline: [
+				{
+					body: "x",
+					basedOn: ["why"],
+					anchor: { observationId: "why-reason", citationIndex: 0 },
+				},
+			],
 		},
 		{ ...quiet, inline: Array.from({ length: REVIEW_LIMITS.inlineNotes + 1 }, () => note(0)) },
 	]) {
@@ -1027,7 +1462,7 @@ void test("the native schema requires complete decisions and each text's fields 
 		decisions: [
 			below("colors"),
 			{
-				observationId: "handoff",
+				practiceResultId: "handoff",
 				disposition: "ALREADY_SAID",
 				witnessIds: ["github:review-comment:7"],
 			},
@@ -1042,7 +1477,7 @@ void test("the native schema requires complete decisions and each text's fields 
 			decisions: [
 				below("colors"),
 				{
-					observationId: "handoff",
+					practiceResultId: "handoff",
 					disposition: "ALREADY_SAID",
 					witnessIds: ["github:issue-comment:9"],
 				},
@@ -1056,8 +1491,8 @@ void test("the native schema requires complete decisions and each text's fields 
 void test("native Responses serialization keeps a quiet summary nullable without accepting malformed text", () => {
 	const parameters = reviewToolParameters(decidedOnly, true, []);
 	const quiet = {
-		decisions: ["colors", "handoff", "why", "description"].map((observationId) => ({
-			observationId,
+		decisions: ["colors", "handoff", "why", "description"].map((practiceResultId) => ({
+			practiceResultId,
 			disposition: "BELOW_BAR",
 			witnessIds: [],
 		})),
@@ -1102,24 +1537,17 @@ assert.throws(() => validate(outgoing.parameters, { ...quiet, summary: {} }));
 		{ encoding: "utf8", cwd: process.cwd() },
 	);
 	assert.equal(native.status, 0, native.stderr);
-	assert.ok("review" in readReview(quiet, decidedOnly, true, inView));
+	assert.ok("review" in readReview(quiet, decidedOnly, true, reviewContext));
 });
 
-void test("with no negatives the required decision list is empty, and work without lines accepts no notes", () => {
-	const metOnly = new Map([...observations].filter(([id]) => id === "preview"));
-	const valid = validatorFor(metOnly);
-	assert.ok(
-		valid({ decisions: [], summary: { body: "The preview helps.", basedOn: ["preview"] } }),
-	);
-	assert.ok(!valid({ decisions: [below("preview")] }));
-	assert.ok(
-		!valid({
-			decisions: [],
-			inline: [
-				{ body: "x", basedOn: ["preview"], anchor: { observationId: "preview", citationIndex: 0 } },
-			],
-		}),
-	);
+void test("report_review exists only with a NOT_MET result to rest on, and work without lines accepts no notes", () => {
+	// With only MET results, or only abstentions, no review on the work is composed.
+	for (const id of ["preview", "unsure"]) {
+		assert.throws(
+			() => reviewToolParameters(new Map([...results].filter(([key]) => key === id)), true, []),
+			/report_review needs at least one NOT_MET result to rest on/u,
+		);
+	}
 	const issue = validatorFor(decidedOnly, false);
 	assert.ok(!issue({ decisions: allRaised, inline: [note(0)] }));
 	assert.deepEqual(
@@ -1135,7 +1563,7 @@ void test("with no negatives the required decision list is empty, and work witho
 			decisions: [
 				below("colors"),
 				{
-					observationId: "handoff",
+					practiceResultId: "handoff",
 					disposition: "ALREADY_SAID",
 					witnessIds: ["github:review-comment:7"],
 				},
@@ -1144,18 +1572,14 @@ void test("with no negatives the required decision list is empty, and work witho
 			],
 		}),
 	);
-	assert.throws(() =>
-		reviewToolParameters(new Map([...observations].filter(([id]) => id === "unsure")), true, []),
-	);
 });
 
-void test("an empty or partial public review leaves negatives undecided, while an empty all-MET review is a valid decision", () => {
-	const negative = new Map<string, ReviewedObservation>([
-		["one", { practiceSlug: "one", outcome: "NOT_MET", citations: [] }],
-		["two", { practiceSlug: "two", outcome: "NOT_MET", citations: [] }],
+void test("an empty or partial public review leaves negatives undecided", () => {
+	const negative = new Map<string, ReviewedResult>([
+		["one", { practiceSlug: "one", outcome: "NOT_MET", observations: [] }],
+		["two", { practiceSlug: "two", outcome: "NOT_MET", observations: [] }],
 	]);
-	const nothingRead: ReviewContext = { witnesses, standardsInView: new Set() };
-	const empty = readReview({}, negative, false, nothingRead);
+	const empty = readReview({}, negative, false, reviewContext);
 	assert.ok("errors" in empty);
 	assert.match(empty.errors.join("\n"), /one, two has no decision/u);
 	const partial = readReview(
@@ -1165,31 +1589,26 @@ void test("an empty or partial public review leaves negatives undecided, while a
 		},
 		negative,
 		false,
-		nothingRead,
+		reviewContext,
 	);
 	assert.ok("errors" in partial);
 	assert.match(partial.errors.join("\n"), /two has no decision/u);
-	// A quiet all-MET review needs no standard: it rests on nothing.
-	assert.deepEqual(
-		readReview(
-			{ decisions: [] },
-			new Map([["met", { practiceSlug: "p", outcome: "MET", citations: [] }]]),
-			false,
-			nothingRead,
-		),
-		{
-			review: { summary: null, inline: [], withheld: [] },
-		},
-	);
 });
 
 void test("summary-only support refuses a whole inline body while allowing its summary", () => {
-	const support = new Map<string, ReviewedObservation>([
+	const support = new Map<string, ReviewedResult>([
 		[
 			"summary",
-			{ practiceSlug: "description", outcome: "NOT_MET", citations: [], summaryOnly: true },
+			{ practiceSlug: "description", outcome: "NOT_MET", observations: [], summaryOnly: true },
 		],
-		["line", { practiceSlug: "code", outcome: "NOT_MET", citations: [{ anchorable: true }] }],
+		[
+			"line",
+			{
+				practiceSlug: "code",
+				outcome: "NOT_MET",
+				observations: [{ observationId: "line-1", citations: [{ anchorable: true }] }],
+			},
+		],
 	]);
 	assert.ok(
 		"errors" in
@@ -1199,13 +1618,13 @@ void test("summary-only support refuses a whole inline body while allowing its s
 						{
 							body: "Both concerns.",
 							basedOn: ["summary", "line"],
-							anchor: { observationId: "line", citationIndex: 0 },
+							anchor: { observationId: "line-1", citationIndex: 0 },
 						},
 					],
 				},
 				support,
 				true,
-				inView,
+				reviewContext,
 			),
 	);
 	assert.ok(
@@ -1217,21 +1636,21 @@ void test("summary-only support refuses a whole inline body while allowing its s
 				},
 				support,
 				true,
-				inView,
+				reviewContext,
 			),
 	);
 });
 
-// --- The whole review: decisions, witnesses and standards ------------------------------------------
+// --- The whole review: decisions and witnesses -----------------------------------------------------
 
-/** Every problem raised; the strength acknowledged only when its practice's standard is in view. */
+/** Every problem decided: two raised and spoken about, two withheld. */
 const wholeReview = (summaryBasedOn: string[]) => ({
-	summary: { body: "Say why, and keep the preview.", basedOn: summaryBasedOn },
+	summary: { body: "Say why.", basedOn: summaryBasedOn },
 	inline: [
 		{
 			body: "Use an adaptive color here.",
 			basedOn: ["colors"],
-			anchor: { observationId: "colors", citationIndex: 0 },
+			anchor: { observationId: "colors-fill", citationIndex: 0 },
 		},
 	],
 	decisions: [raise("colors"), raise("why"), below("handoff"), below("description")],
@@ -1242,15 +1661,15 @@ void test("malformed lists and legacy selection or withholding authorities are r
 		decisions: allRaised,
 		summary: { body: "Four concerns.", basedOn: ["colors", "handoff", "why", "description"] },
 	};
-	assert.ok("review" in readReview(spoken, observations, true, inView));
-	assert.ok("review" in readReview({ ...spoken, inline: null }, observations, true, inView));
+	assert.ok("review" in readReview(spoken, results, true, reviewContext));
+	assert.ok("review" in readReview({ ...spoken, inline: null }, results, true, reviewContext));
 	for (const container of [{ basedOn: ["colors"], body: "One note." }, "colors", true]) {
 		assert.deepEqual(errorsOf({ ...spoken, inline: container }), [
 			"inline must be an array of line notes",
 		]);
 	}
 	for (const container of [
-		{ observationId: "handoff", disposition: "BELOW_BAR" },
+		{ practiceResultId: "handoff", disposition: "BELOW_BAR" },
 		"BELOW_BAR",
 		false,
 		null,
@@ -1267,17 +1686,8 @@ void test("malformed lists and legacy selection or withholding authorities are r
 	}
 });
 
-void test("a report decides every negative once, raises only spoken concerns and leaves strengths optional", () => {
-	assert.ok("review" in readReview(wholeReview(["why"]), observations, true, inView));
-	assert.ok(
-		"review" in
-			readReview(
-				{ decisions: [] },
-				new Map([...observations].filter(([id]) => id === "preview")),
-				true,
-				inView,
-			),
-	);
+void test("a report decides every negative once and raises only spoken concerns", () => {
+	assert.ok("review" in readReview(wholeReview(["why"]), results, true, reviewContext));
 	assert.match(
 		errorsOf({ ...wholeReview(["why"]), decisions: [raise("colors"), raise("why")] }).join("\n"),
 		/handoff, description has no decision/u,
@@ -1301,33 +1711,16 @@ void test("a report decides every negative once, raises only spoken concerns and
 			...wholeReview(["why"]),
 			decisions: [raise("colors"), raise("why"), below("elsewhere"), below("description")],
 		}).join("\n"),
-		/elsewhere is not one of the observations/u,
+		/elsewhere is not one of the results/u,
 	);
 });
 
-void test("a strength is acknowledged only with its practice's whole standard in view when the review was written", () => {
-	const notMetOnly: ReviewContext = {
-		witnesses,
-		standardsInView: new Set(
-			[...observations.values()]
-				.filter((observation) => observation.outcome === "NOT_MET")
-				.map((observation) => observation.practiceSlug),
-		),
-	};
-	// The opening standards of the problems cover the problems; the strength's practice was never shown.
-	assert.ok("review" in readReview(wholeReview(["why"]), observations, true, notMetOnly));
-	const unread = readReview(wholeReview(["why", "preview"]), observations, true, notMetOnly);
-	assert.ok("errors" in unread);
-	assert.deepEqual(unread.errors, [
-		"summary: it rests on a MET observation of ships-a-preview, whose complete MET reference this review was not written with; read it with read_practice, and send the review in a later turn",
+void test("a whole review that also rests on a MET result is refused, with that one reason", () => {
+	const acknowledged = readReview(wholeReview(["why", "preview"]), results, true, reviewContext);
+	assert.ok("errors" in acknowledged);
+	assert.deepEqual(acknowledged.errors, [
+		"summary: basedOn names preview, which is not a NOT_MET result or one of its observations. The review on the work speaks only about NOT_MET results and their observations; it never acknowledges a MET result",
 	]);
-	// Once that standard is in view, the same whole review is stored.
-	const read = readReview(wholeReview(["why", "preview"]), observations, true, {
-		witnesses,
-		standardsInView: new Set([...notMetOnly.standardsInView, "ships-a-preview"]),
-	});
-	assert.ok("review" in read);
-	assert.deepEqual(read.review.summary?.basedOn, ["why", "preview"]);
 });
 
 /** The whole review with one decision about handoff in place of the given one. */
@@ -1339,14 +1732,14 @@ const withholding = (decision: Record<string, unknown>) => ({
 void test("a withholding that says the advice was given names a statement that may stand as that advice", () => {
 	for (const reason of ["ALREADY_SAID", "NO_MATERIAL_CHANGE"]) {
 		assert.match(
-			errorsOf(withholding({ observationId: "handoff", disposition: reason })).join("\n"),
+			errorsOf(withholding({ practiceResultId: "handoff", disposition: reason })).join("\n"),
 			new RegExp(`decisions #4: ${reason} names in witnessIds`, "u"),
 		);
 	}
 	assert.match(
 		errorsOf(
 			withholding({
-				observationId: "handoff",
+				practiceResultId: "handoff",
 				disposition: "ALREADY_SAID",
 				witnessIds: ["github:issue-comment:9"],
 			}),
@@ -1356,7 +1749,7 @@ void test("a withholding that says the advice was given names a statement that m
 	assert.match(
 		errorsOf(
 			withholding({
-				observationId: "handoff",
+				practiceResultId: "handoff",
 				disposition: "ALREADY_SAID",
 				witnessIds: ["github:review-comment:8"],
 			}),
@@ -1364,35 +1757,35 @@ void test("a withholding that says the advice was given names a statement that m
 		/github:review-comment:8, which is not a statement shown under what was already said/u,
 	);
 	// A human reviewer's request and Hephaestus's own delivered comment can each stand as the advice. The witness is
-	// checked and not stored: the stored decision is its observations and reason.
+	// checked and not stored: the stored decision is its result and reason.
 	for (const witness of [
 		"github:review-comment:7",
 		"feedback:00000000-0000-4000-8000-000000000001",
 	]) {
 		const read = readReview(
 			withholding({
-				observationId: "handoff",
+				practiceResultId: "handoff",
 				disposition: "NO_MATERIAL_CHANGE",
 				witnessIds: [witness],
 			}),
-			observations,
+			results,
 			true,
-			inView,
+			reviewContext,
 		);
 		assert.ok("review" in read, JSON.stringify(read));
 		assert.deepEqual(read.review.withheld, [
-			{ basedOn: ["description"], reason: "BELOW_BAR" },
-			{ basedOn: ["handoff"], reason: "NO_MATERIAL_CHANGE" },
+			{ basedOn: [{ practiceResultId: "description" }], reason: "BELOW_BAR" },
+			{ basedOn: [{ practiceResultId: "handoff" }], reason: "NO_MATERIAL_CHANGE" },
 		]);
 	}
 	// Below the bar is a judgement about this reader, not a claim about what was said before.
 	assert.ok(
 		"review" in
 			readReview(
-				withholding({ observationId: "handoff", disposition: "BELOW_BAR" }),
-				observations,
+				withholding({ practiceResultId: "handoff", disposition: "BELOW_BAR" }),
+				results,
 				true,
-				inView,
+				reviewContext,
 			),
 	);
 });
@@ -1408,7 +1801,7 @@ void test("a raised decision names no witness and unknown decision fields are re
 				below("description"),
 			],
 		}).join("\n"),
-		/a raised observation names no witness/u,
+		/a raised result names no witness/u,
 	);
 	assert.match(
 		errorsOf({
@@ -1422,55 +1815,6 @@ void test("a raised decision names no witness and unknown decision fields are re
 		}).join("\n"),
 		/unknown decision field\(s\): selected/u,
 	);
-});
-
-void test("a consulted full standard carries only its original permitted MET grounds beside it", () => {
-	const original = [
-		{
-			id: "positive",
-			practiceSlug: "preview",
-			outcome: "MET",
-			publicEligible: true,
-			summary: "The example covers an empty state.",
-			evidenceRationale: "Source only, not an executed preview.",
-			citations: [{ path: "Screen.swift", startLine: 40 }],
-		},
-		{
-			id: "negative",
-			practiceSlug: "preview",
-			outcome: "NOT_MET",
-			publicEligible: true,
-			summary: "Different gap",
-		},
-		{
-			id: "private",
-			practiceSlug: "preview",
-			outcome: "MET",
-			publicEligible: false,
-			summary: PRIVATE_SENTENCE,
-		},
-		{
-			id: "other",
-			practiceSlug: "other",
-			outcome: "MET",
-			publicEligible: true,
-			summary: "Another practice",
-		},
-	];
-	const standard = "### Criteria of `preview`\nFull standard\n";
-	const before = JSON.stringify(original);
-	const text = consultedStandard(standard, "preview", original);
-	assert.ok(text.startsWith(standard));
-	const grounded = /```json\n(?<body>[\s\S]*?)\n```/u.exec(text);
-	assert.ok(grounded !== null);
-	const decoded: unknown = JSON.parse(grounded.groups?.body ?? "");
-	assert.deepEqual(decoded, {
-		reviewedRevision: null,
-		observations: [original[0]],
-		candidatePriorWitnesses: [],
-	});
-	assert.equal(JSON.stringify(original), before);
-	assert.ok(!text.includes(PRIVATE_SENTENCE));
 });
 
 void test("concern projection preserves new same-practice grounds and wrong old advice without deciding their match", () => {
@@ -1505,23 +1849,30 @@ void test("concern projection preserves new same-practice grounds and wrong old 
 	).feedback;
 	const current = [
 		{
-			id: "new-status",
+			practiceResultId: "new-status",
 			practiceSlug: "handles-errors",
 			outcome: "NOT_MET",
 			publicEligible: true,
 			summary: "The added request accepts a non-success response with a valid typed array.",
-			evidenceRationale:
-				"Conditional typed-array case, not an ordinary error-object decoder claim.",
-			citations: [{ path: "Loader.swift", startLine: 51, anchorable: true }],
+			explanation: "Conditional typed-array case, not an ordinary error-object decoder claim.",
+			citations: [],
+			observations: [
+				{
+					observationId: "new-status-check",
+					summary: "A non-success status is accepted",
+					citations: [{ path: "Loader.swift", startLine: 51, anchorable: true }],
+				},
+			],
 		},
 		{
-			id: "caught-decode",
+			practiceResultId: "caught-decode",
 			practiceSlug: "handles-errors",
 			outcome: "MET",
 			publicEligible: true,
 			summary: "Required fields are decoded inside a throwing try/catch.",
-			evidenceRationale: "Required id, name and URL have no defaults; errors reach failed.",
+			explanation: "Required id, name and URL have no defaults; errors reach failed.",
 			citations: [{ path: "Loader.swift", startLine: 63, anchorable: true }],
+			observations: [],
 		},
 	];
 	const [negative, positive] = current;
@@ -1536,7 +1887,7 @@ void test("concern projection preserves new same-practice grounds and wrong old 
 	];
 	const turn = buildReviewTurn({
 		sameWork: "Explain failed requests to the user.",
-		observations: current,
+		results: current,
 		alreadySaid: history,
 		captured: {
 			capturedAt: null,
@@ -1554,9 +1905,9 @@ void test("concern projection preserves new same-practice grounds and wrong old 
 		turn.split(old.body).length,
 		history.filter((entry) => entry.body === old.body).length + 1,
 	);
-	assert.ok(turn.indexOf(old.body) < turn.indexOf('"id": "new-status"'));
+	assert.ok(turn.indexOf(old.body) < turn.indexOf('"practiceResultId": "new-status"'));
 	assert.ok(!turn.includes(PRIVATE_SENTENCE));
-	assert.ok(!turn.includes(positive.evidenceRationale));
+	assert.ok(!turn.includes(positive.explanation));
 	assert.ok(!turn.includes("Survey prose is not needed."));
 	const cases = [...turn.matchAll(/```json\n(?<body>[\s\S]*?)\n```/gu)].map((match): unknown =>
 		JSON.parse(match.groups?.body ?? "null"),
@@ -1568,7 +1919,7 @@ void test("concern projection preserves new same-practice grounds and wrong old 
 			Reflect.get(entry, "candidatePriorWitnesses") !== undefined,
 	);
 	assert.ok(typeof concern === "object" && concern !== null);
-	assert.deepEqual(Reflect.get(concern, "observations"), [negative]);
+	assert.deepEqual(Reflect.get(concern, "results"), [negative]);
 	assert.deepEqual(Reflect.get(concern, "candidatePriorWitnesses"), [
 		{
 			witnessId: `feedback:${historyFeedbackId(1)}`,
@@ -1578,31 +1929,28 @@ void test("concern projection preserves new same-practice grounds and wrong old 
 			eligibleForPriorAdvice: true,
 		},
 	]);
-	const read = consultedStandard(
-		"Whole error standard.\n",
-		"handles-errors",
-		current,
-		practices,
-		history,
-	);
-	assert.ok(read.includes(positive.evidenceRationale));
-	assert.ok(read.includes("No execution was captured."));
-	assert.ok(!read.includes(negative.evidenceRationale));
 	// Same-practice history grants a witness, not an automatic suppression of materially new supported advice.
-	const currentById = new Map<string, ReviewedObservation>([
-		["new-status", { practiceSlug: "handles-errors", outcome: "NOT_MET", citations: [] }],
+	const currentById = new Map<string, ReviewedResult>([
+		[
+			"new-status",
+			{
+				practiceSlug: "handles-errors",
+				outcome: "NOT_MET",
+				observations: [{ observationId: "new-status-check", citations: [] }],
+			},
+		],
 	]);
 	const decision = readReview(
 		{
-			decisions: [{ observationId: "new-status", disposition: "RAISE" }],
+			decisions: [{ practiceResultId: "new-status", disposition: "RAISE" }],
 			summary: {
 				body: "Check the added response status before accepting a typed array.",
-				basedOn: ["new-status"],
+				basedOn: ["new-status-check"],
 			},
 		},
 		currentById,
 		false,
-		{ witnesses: priorAdviceWitnesses(history, []), standardsInView: new Set() },
+		{ witnesses: priorAdviceWitnesses(history, []) },
 	);
 	assert.ok(!("errors" in decision));
 });
@@ -1612,12 +1960,13 @@ void test("practice references pair recorded assessment coordinates without infe
 	const artifact = { kind: "scm.pull_request", url: "https://example.test/pull/1" };
 	const current = [
 		{
-			id: "current",
+			practiceResultId: "current",
 			practiceSlug: "subjects",
-			outcome: "MET",
+			outcome: "NOT_MET",
 			publicEligible: true,
-			summary: "The unchanged subjects identify the changes.",
+			summary: "The unchanged subjects do not identify the changes.",
 			citations: [],
+			observations: [],
 		},
 	];
 	const priorSupport = {
@@ -1646,10 +1995,9 @@ void test("practice references pair recorded assessment coordinates without infe
 			`${artifact.kind}:${artifact.url}`,
 			"2026-10-06T09:00:00Z",
 		).feedback;
-		const text = consultedStandard(
-			"The whole subject standard.\n",
-			"subjects",
+		const text = notMetReference(
 			current,
+			() => "The whole subject standard.",
 			[{ slug: "subjects", name: "Commit subjects", revisionId: 11, knownLimitations: [] }],
 			history,
 			head,
@@ -1660,7 +2008,7 @@ void test("practice references pair recorded assessment coordinates without infe
 		assert.deepEqual(shown, {
 			reviewedRevision: head,
 			practice: { slug: "subjects", name: "Commit subjects", revisionId: 11, knownLimitations: [] },
-			observations: current,
+			results: current,
 			candidatePriorWitnesses: [
 				{
 					witnessId: `feedback:${historyFeedbackId(1)}`,
@@ -1680,38 +2028,42 @@ const ENGAGEMENT_CRITERIA =
 	"## Judge\n- MET: each request has one of those responses.\n- NOT_MET: a request has none.\n\n" +
 	"```swift\n// a staged example stays inside its own fence\n```";
 
-void test("the opening carries each NOT_MET practice's whole criteria once, and only a MET practice can be read", () => {
-	const reviewable = publicObservations([
+void test("the opening carries each NOT_MET practice's whole criteria once, and never a MET practice's", () => {
+	const reviewable = publicResults([
 		{
-			id: "unanswered",
+			practiceResultId: "unanswered",
 			practiceSlug: "engages-with-review",
 			outcome: "NOT_MET",
 			publicEligible: true,
 			summary: "A design request has no reply",
 			citations: [],
+			observations: [],
 		},
 		{
-			id: "unanswered-again",
+			practiceResultId: "unanswered-again",
 			practiceSlug: "engages-with-review",
 			outcome: "NOT_MET",
 			publicEligible: true,
 			summary: "A second request has no reply",
 			citations: [],
+			observations: [],
 		},
 		{
-			id: "held",
+			practiceResultId: "held",
 			practiceSlug: "describe-what-and-why",
 			outcome: "NOT_MET",
 			publicEligible: true,
 			summary: "The description gives no reason",
 			citations: [],
+			observations: [],
 		},
 		{
-			id: "routine",
+			practiceResultId: "routine",
 			practiceSlug: "ships-a-preview",
 			outcome: "MET",
 			publicEligible: true,
 			citations: [],
+			observations: [],
 		},
 	]);
 	const read: string[] = [];
@@ -1720,7 +2072,8 @@ void test("the opening carries each NOT_MET practice's whole criteria once, and 
 		return slug === "engages-with-review" ? ENGAGEMENT_CRITERIA : `Whole criteria of ${slug}.`;
 	};
 
-	// Every NOT_MET practice's criterion opens the review, once and whole; a MET practice's stays unread there.
+	// Every NOT_MET practice's criterion opens the review, once and whole; a MET practice's is never read.
+	assert.ok(!reviewable.some((result) => result.practiceResultId === "routine"));
 	const opening = notMetReference(reviewable, staged);
 	assert.deepEqual(read, ["engages-with-review", "describe-what-and-why"]);
 	const criteria = `\`\`\`\`markdown\n${ENGAGEMENT_CRITERIA}\n\`\`\`\``;
@@ -1730,13 +2083,7 @@ void test("the opening carries each NOT_MET practice's whole criteria once, and 
 	assert.equal(opening.split(STANDARD_REFERENCE).length, 2, opening);
 	assert.ok(opening.indexOf(STANDARD_REFERENCE) < opening.indexOf(criteria), opening);
 	assert.ok(opening.includes("Whole criteria of describe-what-and-why."), opening);
-
-	// Only a MET practice can be read; its standard is shown whole and fenced like the opening's.
-	assert.deepEqual(readablePractices(reviewable), ["ships-a-preview"]);
-	assert.deepEqual(practiceStandard("ships-a-preview", staged), {
-		text: "### Criteria of `ships-a-preview`\n```markdown\nWhole criteria of ships-a-preview.\n```\n",
-		whole: true,
-	});
+	assert.ok(!opening.includes("ships-a-preview"), opening);
 });
 
 const unreadableCriteria = (): string | null => {
@@ -1744,33 +2091,39 @@ const unreadableCriteria = (): string | null => {
 };
 
 void test("a missing, unreadable, empty or blank criterion is shown as such and never counts as a standard", () => {
-	const reviewable = publicObservations([
+	const reviewable = publicResults([
 		{
-			id: "held",
+			practiceResultId: "held",
 			practiceSlug: "describe-what-and-why",
 			outcome: "NOT_MET",
 			publicEligible: true,
 			summary: "The description gives no reason",
 			citations: [],
+			observations: [],
 		},
 		{
-			id: "shared",
+			practiceResultId: "shared",
 			practiceSlug: "describe-what-and-why",
 			outcome: "MET",
 			publicEligible: true,
 			citations: [],
+			observations: [],
 		},
 		{
-			id: "kept",
+			practiceResultId: "kept",
 			practiceSlug: "private-practice",
 			outcome: "MET",
 			publicEligible: false,
 			citations: [],
+			observations: [],
 		},
 	]);
-	// A practice with both outcomes is shown in the opening; a practice admission kept private is never readable.
+	// Only the public NOT_MET result of a practice with both outcomes is shown; a private result never is.
+	assert.deepEqual(
+		reviewable.map((result) => result.practiceResultId),
+		["held"],
+	);
 	assert.equal(practiceStandard("describe-what-and-why", () => "Whole.").whole, true);
-	assert.deepEqual(readablePractices(reviewable), ["describe-what-and-why"]);
 	for (const stagedCriteria of [() => null, () => "", () => " \n\t ", unreadableCriteria]) {
 		assert.equal(practiceStandard("describe-what-and-why", stagedCriteria).whole, false);
 	}
@@ -1846,15 +2199,15 @@ void test("a delivery after work capture informs novelty without becoming advice
 	assert.equal(late.eligibleForAlreadySaid, true);
 	assert.equal(late.eligibleForPriorAdvice, false);
 	const proof = priorAdviceWitnesses(said, []);
-	const currentRows = new Map<string, ReviewedObservation>([
-		["current", { practiceSlug: "errors", outcome: "NOT_MET", citations: [] }],
+	const currentRows = new Map<string, ReviewedResult>([
+		["current", { practiceSlug: "errors", outcome: "NOT_MET", observations: [] }],
 	]);
 	const selected = (reason: string) =>
 		readReview(
 			{
 				decisions: [
 					{
-						observationId: "current",
+						practiceResultId: "current",
 						disposition: reason,
 						witnessIds: [`feedback:${historyFeedbackId(1)}`],
 					},
@@ -1862,7 +2215,7 @@ void test("a delivery after work capture informs novelty without becoming advice
 			},
 			currentRows,
 			false,
-			{ witnesses: proof, standardsInView: new Set() },
+			{ witnesses: proof },
 		);
 	assert.ok(!("errors" in selected("ALREADY_SAID")));
 	assert.ok("errors" in selected("NO_MATERIAL_CHANGE"));
@@ -1880,7 +2233,7 @@ void test("a delivery after work capture informs novelty without becoming advice
 	assert.equal(unknownCutoff.eligibleForPriorAdvice, false);
 	const turn = buildReviewTurn({
 		sameWork: "Captured work without a known capture time.",
-		observations: [],
+		results: [],
 		qualifications: [],
 		alreadySaid: unknownCapture,
 		ownHistoryReadAt: "2026-10-07T11:00:00Z",
@@ -1982,15 +2335,15 @@ void test("STALE delivered words permit ALREADY_SAID by the read time, not NO_MA
 		[["STALE", stale.body, true, false]],
 	);
 	const proof = priorAdviceWitnesses(said, []);
-	const currentRows = new Map<string, ReviewedObservation>([
-		["current", { practiceSlug: "errors", outcome: "NOT_MET", citations: [] }],
+	const currentRows = new Map<string, ReviewedResult>([
+		["current", { practiceSlug: "errors", outcome: "NOT_MET", observations: [] }],
 	]);
 	const selected = (reason: string) =>
 		readReview(
 			{
 				decisions: [
 					{
-						observationId: "current",
+						practiceResultId: "current",
 						disposition: reason,
 						witnessIds: [`feedback:${historyFeedbackId(1)}`],
 					},
@@ -1998,7 +2351,7 @@ void test("STALE delivered words permit ALREADY_SAID by the read time, not NO_MA
 			},
 			currentRows,
 			false,
-			{ witnesses: proof, standardsInView: new Set() },
+			{ witnesses: proof },
 		);
 	assert.ok(!("errors" in selected("ALREADY_SAID")));
 	assert.ok("errors" in selected("NO_MATERIAL_CHANGE"));

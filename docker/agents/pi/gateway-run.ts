@@ -127,8 +127,7 @@ const TOOL_NAMES = new Set([
 	"ls",
 	"bash",
 	"codemode",
-	"read_practice",
-	"report_observation",
+	"submit_result",
 	"report_feedback",
 	"report_review",
 ]);

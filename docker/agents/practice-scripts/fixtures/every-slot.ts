@@ -1,5 +1,5 @@
-// A definition script that uses every model slot, each optional. Steps that do not depend on each
-// other start together, so a slow model costs only its own part.
+// A program that uses every model slot, each optional, to prepare one review. Steps that do not
+// depend on each other start together, so a slow model costs only its own part.
 import {
 	addedComments,
 	agent,
@@ -11,15 +11,25 @@ import {
 	expectKind,
 	generateText,
 	Output,
+	requireChange,
 	rerank,
 	step,
 	z,
 	type AddedComment,
+	type DiffFile,
 	type Facts,
-	type Lead,
+	type Omission,
 	type PracticeScriptContext,
-	type Unrated,
+	type ReviewLead,
 } from "../lib/practice-script.ts";
+
+/** The label of each kind of lead, as the reviewer reads it. */
+export const LABELS = {
+	untrackedTodo: "A TODO without a tracking reference.",
+	commentKind: "An added comment that a model rated as one that may need a second look.",
+	declaration: "Where an agent found the declaration that the change relies on.",
+	mostUnfinished: "The added comment that a reranker ranked closest to unfinished work.",
+} as const;
 
 // The comment kinds that deserve a look. Code finds the marked open work, so `untracked-todo` is
 // code's kind here.
@@ -49,29 +59,21 @@ function similarPairs(vectors: readonly number[][]): number {
 }
 
 const meta = {
-	version: 1,
 	models: {
 		chat: "optional",
 		decision: "optional",
 		embedding: "optional",
 		reranking: "optional",
 	},
-	tokens: 80_000,
-	kinds: {
-		"untracked-todo": "A TODO without a tracking reference.",
-		"comment-kind": "An added comment that a model rated as one that may need a second look.",
-		declaration: "Where an agent found the declaration that the change relies on.",
-		"most-unfinished": "The added comment that a reranker ranked closest to unfinished work.",
-	},
 } as const;
 
-/** The script reads the change of a pull request. */
+/** The program reads the change of a pull request. */
 type Context = PracticeScriptContext<typeof meta.models, "scm.pull_request">;
 
-/** What one part of the script found. */
+/** What one part of the program prepared for the review. */
 interface Part {
-	leads?: Lead[];
-	unrated?: Unrated[];
+	leads?: ReviewLead[];
+	unrated?: Omission[];
 	facts?: Facts;
 }
 
@@ -82,13 +84,13 @@ async function commentKindLeads(ctx: Context, unmarked: AddedComment[]): Promise
 		items: unmarked,
 		what: "added comments without a TODO marker",
 	});
-	const leads: Lead[] = [];
+	const leads: ReviewLead[] = [];
 	for (const [comment, rating] of ratings) {
 		if (NEEDS_A_LOOK.has(rating.value)) {
 			leads.push({
 				at: comment.at,
-				kind: "comment-kind",
-				rating: { value: rating.value, score: rating.score },
+				label: LABELS.commentKind,
+				facts: { kind: rating.value, score: rating.score },
 			});
 		}
 	}
@@ -115,7 +117,7 @@ async function mostUnfinished(ctx: Context, comments: AddedComment[]): Promise<P
 	}
 	const top = ranked.value.ranking[0];
 	const comment = top === undefined ? undefined : comments[top.originalIndex];
-	return comment === undefined ? {} : { leads: [{ at: comment.at, kind: "most-unfinished" }] };
+	return comment === undefined ? {} : { leads: [{ at: comment.at, label: LABELS.mostUnfinished }] };
 }
 
 async function similarComments(ctx: Context, comments: AddedComment[]): Promise<Part> {
@@ -146,7 +148,7 @@ async function similarComments(ctx: Context, comments: AddedComment[]): Promise<
 	};
 }
 
-async function changeKind(ctx: Context): Promise<Part> {
+async function changeKind(ctx: Context, change: ReadonlyMap<string, DiffFile>): Promise<Part> {
 	const { chat } = ctx.models;
 	if (chat === undefined) {
 		return {};
@@ -156,7 +158,7 @@ async function changeKind(ctx: Context): Promise<Part> {
 		const { output } = await generateText({
 			model: chat,
 			output: Output.choice({ options: ["code", "documentation", "configuration", "mixed"] }),
-			prompt: `Which kind of change adds these files: ${[...ctx.change.keys()].join(", ")}?`,
+			prompt: `Which kind of change adds these files: ${[...change.keys()].join(", ")}?`,
 		});
 		return output;
 	});
@@ -173,7 +175,7 @@ async function declaration(ctx: Context): Promise<Part> {
 	const found = await step("locate", async () =>
 		agent({
 			model: chat,
-			tools: ctx.tools,
+			tools: ctx.evidence.tools,
 			instructions: "You locate code in a repository. Use the tools to look; do not guess.",
 			prompt:
 				"Find where the function parseDiff is declared. Submit the file path relative to the repository root and the 1-based line of the declaration.",
@@ -192,7 +194,7 @@ async function declaration(ctx: Context): Promise<Part> {
 		leads: [
 			{
 				at: { file: output.file, line: output.line },
-				kind: "declaration",
+				label: LABELS.declaration,
 				facts: { agentSteps: steps },
 			},
 		],
@@ -203,32 +205,37 @@ export default definePracticeScript({
 	meta,
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const comments = addedComments(ctx.change);
-		const untrackedTodos: Lead[] = [];
+		const change = requireChange(ctx.files);
+		const comments = addedComments(change);
+		const untrackedTodos: ReviewLead[] = [];
 		const unmarked: AddedComment[] = [];
 		for (const comment of comments) {
 			if (!OPEN_WORK.test(comment.text)) {
 				unmarked.push(comment);
 			} else if (!TRACKING.test(comment.text)) {
-				untrackedTodos.push({ at: comment.at, kind: "untracked-todo" });
+				untrackedTodos.push({ at: comment.at, label: LABELS.untrackedTodo });
 			}
 		}
 		const parts = await Promise.all([
 			commentKindLeads(ctx, unmarked),
 			mostUnfinished(ctx, comments),
 			similarComments(ctx, comments),
-			changeKind(ctx),
+			changeKind(ctx, change),
 			declaration(ctx),
 		]);
 		const facts: Facts = { comments: comments.length };
 		for (const part of parts) {
 			Object.assign(facts, part.facts);
 		}
-		return {
+		return ctx.review({
 			leads: [...untrackedTodos, ...parts.flatMap((p) => p.leads ?? [])],
 			facts,
-			unrated: parts.flatMap((p) => p.unrated ?? []),
+			// `ReviewOptions` types `units` as a mutable list and `Omission` as a readonly one; these
+			// omissions name no units.
+			limitations: parts
+				.flatMap((p) => p.unrated ?? [])
+				.map(({ what, count, reason }) => ({ what, count, reason })),
 			directions: ["Check each lead against the criterion before you cite it."],
-		};
+		});
 	},
 });

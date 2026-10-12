@@ -28,6 +28,10 @@ import {
 	FETCH_CONTEXT_ALLOWED,
 	isFetchContextKey,
 	type JsonRpcId,
+	type LinkObservationEvent,
+	type LinkObservationRequest,
+	type LinkResultEvent,
+	type LinkResultRequest,
 	MENTOR_PROTOCOL_VERSION,
 	MENTOR_TOOL_NAMES,
 	type MentorErrorCode,
@@ -266,7 +270,7 @@ interface FetchContextDetails {
 
 type FetchContextToolResult = AgentToolResult<FetchContextDetails>;
 
-/** One in-flight server callback (`fetch_context`, `link_observation`), keyed by its JSON-RPC id in `ThreadState`. */
+/** One in-flight server callback (`fetch_context`, `link_result`, `link_observation`), keyed by its JSON-RPC id in `ThreadState`. */
 interface PendingCallback {
 	resolve: (result: unknown) => void;
 	reject: (reason: Error) => void;
@@ -388,7 +392,7 @@ async function createPiRuntime(sdk: PiSdk, agentDir: string): Promise<MentorRunt
 	} = sdk;
 
 	const fetchContextTool = defineFetchContextTool(sdk);
-	const linkObservationTool = defineLinkObservationTool(sdk);
+	const linkTools = LINK_TOOLS.map((link) => defineLinkTool(sdk, link));
 	// Same sandbox posture as the practice runner: this runner shares the image, the SDK and the
 	// working directory with it, so the SDK's ancestor-walking discovery hits the same denied read
 	// (pi-agent-sandbox.ts) unless a mentor session opts out of it too.
@@ -475,7 +479,7 @@ async function createPiRuntime(sdk: PiSdk, agentDir: string): Promise<MentorRunt
 			services,
 			sessionManager,
 			sessionStartEvent,
-			customTools: [fetchContextTool, linkObservationTool],
+			customTools: [fetchContextTool, ...linkTools],
 			tools: [...MENTOR_TOOL_NAMES],
 			model,
 			thinkingLevel,
@@ -574,7 +578,7 @@ async function ensureRuntime(): Promise<MentorRuntime> {
 
 const ITEM_RESOURCES =
 	"For one item, copy the `resource` value exactly as a context file gives it: a pull request's from its entry in " +
-	"recent_authored_work.json or merge_readiness.json, an observation's from its row in observations_history.json, " +
+	"recent_authored_work.json or merge_readiness.json, a result's from its row in results_history.json, " +
 	"and a pull request's or issue's reviews from its `reviewsResource`. " +
 	"Never build one from a pull request number or another id.";
 
@@ -653,21 +657,75 @@ async function askServer(
 	return { threadId, result: await promise };
 }
 
-function defineLinkObservationTool(sdk: PiSdk) {
-	const { defineTool } = sdk;
-	return defineTool({
+/**
+ * What a link names. A result is a practice's verdict on one piece of reviewed work; an observation is one located
+ * problem of a `NOT_MET` result. Each has its own tool, callback and event, so the server never has to tell the two
+ * ids apart.
+ */
+interface LinkTool {
+	name: "link_result" | "link_observation";
+	label: string;
+	idKey: "practiceResultId" | "observationId";
+	noun: string;
+	purpose: string;
+	request: (
+		threadId: string,
+		id: string,
+		linkedId: string,
+	) => LinkResultRequest | LinkObservationRequest;
+	event: (linkedId: string, text: string) => LinkResultEvent | LinkObservationEvent;
+}
+
+const LINK_TOOLS = [
+	{
+		name: "link_result",
+		label: "Link Result",
+		idKey: "practiceResultId",
+		noun: "result",
+		purpose:
+			"one Hephaestus practice result: a practice's verdict on one piece of their work. Use it when you discuss " +
+			"the verdict.",
+		request: (threadId, id, practiceResultId) => ({
+			jsonrpc: JSONRPC_VERSION,
+			id,
+			method: "link_result",
+			params: { threadId, practiceResultId },
+		}),
+		event: (practiceResultId, text) => ({ type: "link_result", practiceResultId, text }),
+	},
+	{
 		name: "link_observation",
 		label: "Link Observation",
+		idKey: "observationId",
+		noun: "observation",
+		purpose:
+			"one observation: one located problem of a NOT_MET practice result. Use it when you discuss that one problem.",
+		request: (threadId, id, observationId) => ({
+			jsonrpc: JSONRPC_VERSION,
+			id,
+			method: "link_observation",
+			params: { threadId, observationId },
+		}),
+		event: (observationId, text) => ({ type: "link_observation", observationId, text }),
+	},
+] as const satisfies readonly LinkTool[];
+
+function defineLinkTool(sdk: PiSdk, link: LinkTool) {
+	const { defineTool } = sdk;
+	const { name, idKey, noun } = link;
+	return defineTool({
+		name,
+		label: link.label,
 		description:
-			"Give the developer your feedback about one Hephaestus practice observation. `text` is shown to them " +
-			"as part of your reply, exactly where you call this, so write it to them in your own words and do not " +
-			"repeat it in your answer. Only feedback shown this way counts as raised with them.",
+			`Give the developer your feedback about ${link.purpose} \`text\` is shown to them as part of your reply, ` +
+			"exactly where you call this, so write it to them in your own words and do not repeat it in your answer. " +
+			"Only feedback shown this way counts as raised with them.",
 		parameters: {
 			type: "object",
 			additionalProperties: false,
-			required: ["observationId", "text"],
+			required: [idKey, "text"],
 			properties: {
-				observationId: { type: "string", minLength: 1 },
+				[idKey]: { type: "string", minLength: 1 },
 				text: { type: "string", minLength: 1 },
 			},
 		},
@@ -675,41 +733,31 @@ function defineLinkObservationTool(sdk: PiSdk) {
 			_toolCallId,
 			params,
 			signal,
-		): Promise<AgentToolResult<{ observationId: string }>> => {
-			const observationId = jsonText(params.observationId).trim();
+		): Promise<AgentToolResult<Record<string, string>>> => {
+			const linkedId = jsonText(params[idKey]).trim();
 			const text = jsonText(params.text).trim();
-			if (!observationId || !text) {
-				throw new Error("link_observation: observationId and text are required");
+			if (!linkedId || !text) {
+				throw new Error(`${name}: ${idKey} and text are required`);
 			}
-			// The server decides which observation a reply may show feedback about: nothing is shown or reported
-			// as shown until it admits this one, and a refusal fails the call.
+			// The server decides which result or observation a reply may show feedback about: nothing is shown or
+			// reported as shown until it admits this one, and a refusal fails the call.
 			const { threadId, result } = await askServer(
-				(thread, id) => ({
-					jsonrpc: JSONRPC_VERSION,
-					id,
-					method: "link_observation",
-					params: { threadId: thread, observationId },
-				}),
-				observationId,
+				(thread, id) => link.request(thread, id, linkedId),
+				linkedId,
 			);
 			if (signal?.aborted === true) {
-				throw new Error("link_observation: the turn was stopped, so nothing was shown");
+				throw new Error(`${name}: the turn was stopped, so nothing was shown`);
 			}
-			// Only an answer admitting this very observation is an admission.
-			if (!isRecord(result) || result.observationId !== observationId) {
-				throw new Error(
-					`link_observation: nothing was shown, the server did not admit observation ${observationId}`,
-				);
+			// Only an answer admitting this very id is an admission.
+			if (!isRecord(result) || result[idKey] !== linkedId) {
+				throw new Error(`${name}: nothing was shown, the server did not admit ${noun} ${linkedId}`);
 			}
-			sendEvent(threadId, { type: "link_observation", observationId, text });
+			sendEvent(threadId, link.event(linkedId, text));
 			return {
 				content: [
-					{
-						type: "text",
-						text: `Shown to the developer: feedback on observation ${observationId}`,
-					},
+					{ type: "text", text: `Shown to the developer: feedback on ${noun} ${linkedId}` },
 				],
-				details: { observationId },
+				details: { [idKey]: linkedId },
 			};
 		},
 	});
@@ -1167,7 +1215,7 @@ async function handleShutdown(id: JsonRpcId | undefined) {
 }
 
 // Max characters of context surfaced to the LLM per fetch_context call. Context JSONs
-// occasionally balloon (e.g. `observations.json` for a heavy reviewer); without a cap, a single
+// occasionally balloon (e.g. `results_history.json` for a heavy reviewer); without a cap, a single
 // tool call can blow the model's context window. 200 K chars ≈ 50 K tokens at ~4 chars/token —
 // comfortably below the configured model's context window. Counted in JS string length (UTF-16 code
 // units), not bytes; context JSONs are ASCII-dominant so the variance is small.

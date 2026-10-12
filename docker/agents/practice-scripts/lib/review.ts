@@ -1,13 +1,14 @@
-/** Missing captures return null, distinct from captured records with no items. */
-
-import { readFile } from "node:fs/promises";
+/**
+ * Readers of the captured review records. A record that was not captured returns null, distinct from
+ * a captured record with no items; a read that fails throws `UnratedError("unavailable")`.
+ */
 
 import { factsOf } from "./bounded-text.ts";
 import type { ChangeCommit } from "./change.ts";
-import { readContextJson } from "./context.ts";
-import type { Cause, Lead, Work } from "./contract.ts";
+import type { Cause, ReviewLead, Work } from "./contract.ts";
 import { subIssueSource, type SubIssueSource } from "./issue-classification.ts";
 import { isJsonObject, optionalNumber, optionalString, text } from "./json.ts";
+import { readRecordJson, type Evidence } from "./practice-script.ts";
 import type { DiffFile } from "./types.ts";
 
 export interface LinkedWorkItem {
@@ -98,9 +99,9 @@ interface LinkedWorkItemCapture {
 
 /** The linked-work-item capture; null when not captured. */
 export async function readLinkedWorkItemCapture(
-	contextDir: string | undefined,
+	evidence: Pick<Evidence, "record">,
 ): Promise<LinkedWorkItemCapture | null> {
-	const parsed = await readContextJson(contextDir, "linked_work_items.json");
+	const parsed = await readRecordJson(evidence, "linked_work_items.json");
 	if (parsed === null) {
 		return null;
 	}
@@ -134,9 +135,9 @@ export async function readLinkedWorkItemCapture(
 
 /** The issues the change names, as `linked_work_items.json` records them; null when not captured. */
 export async function readLinkedWorkItems(
-	contextDir: string | undefined,
+	evidence: Pick<Evidence, "record">,
 ): Promise<LinkedWorkItem[] | null> {
-	const capture = await readLinkedWorkItemCapture(contextDir);
+	const capture = await readLinkedWorkItemCapture(evidence);
 	return capture?.items ?? null;
 }
 
@@ -146,16 +147,16 @@ export async function readLinkedWorkItems(
  * do not pair one to one, each line is 0.
  */
 async function readCommentRecord(
-	contextDir: string | undefined,
+	evidence: Pick<Evidence, "record">,
 	name: string,
 ): Promise<{ comments: Record<string, unknown>[]; bodyLines: number[] } | null> {
-	if (contextDir === undefined || contextDir === "") {
+	const record = await evidence.record(name);
+	if (record.status === "ABSENT") {
 		return null;
 	}
-	let source: string;
+	const source = record.text;
 	let parsed: unknown;
 	try {
-		source = await readFile(`${contextDir}/${name}`, "utf8");
 		parsed = JSON.parse(source);
 	} catch {
 		return null;
@@ -172,9 +173,9 @@ async function readCommentRecord(
 
 /** The inline comments, oldest first; null when `comments.json` was not captured. */
 export async function readReviewComments(
-	contextDir: string | undefined,
+	evidence: Pick<Evidence, "record">,
 ): Promise<ReviewComment[] | null> {
-	const record = await readCommentRecord(contextDir, "comments.json");
+	const record = await readCommentRecord(evidence, "comments.json");
 	if (record === null) {
 		return null;
 	}
@@ -196,9 +197,9 @@ export async function readReviewComments(
 
 /** The conversation comments, oldest first; null when `general_comments.json` was not captured. */
 export async function readGeneralComments(
-	contextDir: string | undefined,
+	evidence: Pick<Evidence, "record">,
 ): Promise<GeneralComment[] | null> {
-	const record = await readCommentRecord(contextDir, "general_comments.json");
+	const record = await readCommentRecord(evidence, "general_comments.json");
 	if (record === null) {
 		return null;
 	}
@@ -213,9 +214,9 @@ export async function readGeneralComments(
 
 /** The threads and submitted decisions; null when `review_threads.json` was not captured. */
 export async function readReviewThreads(
-	contextDir: string | undefined,
+	evidence: Pick<Evidence, "record">,
 ): Promise<{ threads: ReviewThread[]; decisions: ReviewDecision[] } | null> {
-	const parsed = await readContextJson(contextDir, "review_threads.json");
+	const parsed = await readRecordJson(evidence, "review_threads.json");
 	if (parsed === null) {
 		return null;
 	}
@@ -401,10 +402,10 @@ export function mergeFacts(record: MergeRecord): MergeFacts {
 }
 
 /** The merge as one lead on the record: who merged, when, with the provider's own decision fields. */
-export function mergeLead(record: MergeRecord, merge: MergeFacts): Lead {
+export function mergeLead(record: MergeRecord, merge: MergeFacts, label: string): ReviewLead {
 	return {
 		at: { record: "metadata.json" },
-		kind: "merge",
+		label,
 		facts: factsOf({
 			mergedBy: merge.mergedBy ?? "",
 			mergedByIsAuthor: merge.mergedByIsAuthor,
@@ -418,10 +419,14 @@ export function mergeLead(record: MergeRecord, merge: MergeFacts): Lead {
 }
 
 /** One lead per submitted decision, oldest first, placed against the merge and the author. */
-export function decisionLeads(decisions: readonly ReviewDecision[], merge: MergeFacts): Lead[] {
+export function decisionLeads(
+	decisions: readonly ReviewDecision[],
+	merge: MergeFacts,
+	label: string,
+): ReviewLead[] {
 	return decisions.map((d) => ({
 		at: { record: "review_threads.json" },
-		kind: "review-decision",
+		label,
 		facts: factsOf({
 			state: d.state,
 			author: d.author ?? "",
@@ -480,7 +485,15 @@ export function candidateThreads(
 	);
 }
 
-function threadKind(t: ReviewThread, merge: MergeFacts): string {
+/** What a candidate thread is against the merge, each told to the reviewer by its own label. */
+export type ThreadKind =
+	| "unresolved-thread"
+	| "thread-resolved-after-the-merge"
+	| "resolved-thread-resolution-time-unknown"
+	| "resolved-thread-merge-time-unknown"
+	| "resolved-thread-both-times-unknown";
+
+function threadKind(t: ReviewThread, merge: MergeFacts): ThreadKind {
 	if (t.state !== "RESOLVED") {
 		return "unresolved-thread";
 	}
@@ -495,10 +508,14 @@ function threadKind(t: ReviewThread, merge: MergeFacts): string {
 }
 
 /** A candidate thread as a lead on the threads record, with where the thread is anchored. */
-export function threadLead(t: ReviewThread, merge: MergeFacts): Lead {
+export function threadLead(
+	t: ReviewThread,
+	merge: MergeFacts,
+	labels: Readonly<Record<ThreadKind, string>>,
+): ReviewLead {
 	return {
 		at: { record: "review_threads.json" },
-		kind: threadKind(t, merge),
+		label: labels[threadKind(t, merge)],
 		facts: factsOf({
 			id: t.id ?? 0,
 			state: t.state,

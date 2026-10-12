@@ -2,13 +2,13 @@
 // reads from the diff if a test covers the changed behaviour.
 import { DIRECTION_CHARS, listWithin } from "../lib/bounded-text.ts";
 import { isTestPath, languageOf } from "../lib/languages.ts";
-import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
+import { definePracticeScript, expectKind, requireChange } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { version: 1, kinds: {} },
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const source = [...ctx.change.keys()].filter((path) => languageOf(path) !== null);
+		const source = [...requireChange(ctx.files).keys()].filter((path) => languageOf(path) !== null);
 		const tests = source.filter((path) => isTestPath(path));
 		const production = source.filter((path) => !isTestPath(path));
 
@@ -22,13 +22,13 @@ export default definePracticeScript({
 				"Whether the repository already has a test target does not decide this practice: judge the changed behaviour against the tests in this diff.",
 			);
 		}
-		return {
+		return ctx.review({
 			leads: [],
 			facts: {
 				diffProductionFiles: production.length,
 				diffTestFiles: tests.length,
 			},
 			directions,
-		};
+		});
 	},
 });

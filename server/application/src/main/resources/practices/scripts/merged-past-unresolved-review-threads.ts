@@ -13,36 +13,35 @@ import {
 	threadLead,
 } from "../lib/review.ts";
 
+export const LABELS = {
+	merge:
+		"The merge of the pull request: who merged it, when, and the review decision of the provider.",
+	"unresolved-thread": "A review thread that the record does not show as resolved.",
+	"thread-resolved-after-the-merge":
+		"A review thread that the record shows as resolved after the merge.",
+	"resolved-thread-resolution-time-unknown":
+		"A resolved review thread with no usable resolution time.",
+	"resolved-thread-merge-time-unknown":
+		"A resolved review thread of a merge with no usable merge time.",
+	"resolved-thread-both-times-unknown":
+		"A resolved review thread with no usable resolution time and no usable merge time.",
+};
+
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			merge:
-				"The merge of the pull request: who merged it, when, and the review decision of the provider.",
-			"unresolved-thread": "A review thread that the record does not show as resolved.",
-			"thread-resolved-after-the-merge":
-				"A review thread that the record shows as resolved after the merge.",
-			"resolved-thread-resolution-time-unknown":
-				"A resolved review thread with no usable resolution time.",
-			"resolved-thread-merge-time-unknown":
-				"A resolved review thread of a merge with no usable merge time.",
-			"resolved-thread-both-times-unknown":
-				"A resolved review thread with no usable resolution time and no usable merge time.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		if (!reviewsMergedWork(ctx.cause)) {
-			return {
+			return ctx.review({
 				leads: [],
 				directions: [
 					"The pull request is not merged. This practice reviews the merge, so it has nothing to check yet.",
 				],
-			};
+			});
 		}
 		const merge = mergeFacts(ctx.work);
 		const mergeUndated = !dated(merge.mergedAt);
-		const record = await readReviewThreads(ctx.context.dir);
+		const record = await readReviewThreads(ctx.evidence);
 		const threads = record?.threads ?? [];
 		const candidates = candidateThreads(threads, merge);
 		const directions: string[] = [];
@@ -63,8 +62,11 @@ export default definePracticeScript({
 				"Read each thread's comments in comments.json by its id (the comments' `thread`) before deciding what it asked.",
 			);
 		}
-		return {
-			leads: [mergeLead(ctx.work, merge), ...candidates.map((thread) => threadLead(thread, merge))],
+		return ctx.review({
+			leads: [
+				mergeLead(ctx.work, merge, LABELS.merge),
+				...candidates.map((thread) => threadLead(thread, merge, LABELS)),
+			],
 			facts: {
 				mergedByIsAuthor: merge.mergedByIsAuthor ? 1 : 0,
 				threads: threads.length,
@@ -83,6 +85,6 @@ export default definePracticeScript({
 				threadsFileAbsent: record === null ? 1 : 0,
 			},
 			directions,
-		};
+		});
 	},
 });

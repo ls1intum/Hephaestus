@@ -6,14 +6,14 @@ import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 import { checkableItems } from "../lib/review.ts";
 
 export default definePracticeScript({
-	meta: { version: 1, kinds: {} },
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.issue");
 		const shape = classifyIssue(ctx.work);
 		const { body, issueType, labels, emptyOrTitleEcho, hasDeliverableType, looksUmbrella } = shape;
 		const items = checkableItems(body);
 		const checkedBoxes = items.filter((item) => item.checked).length;
-		return {
+		return ctx.review({
 			leads: [],
 			facts: {
 				bodyLength: body.length,
@@ -32,6 +32,6 @@ export default definePracticeScript({
 				),
 				"Judge the standard once over the title, the whole body, the comments and any materialised document; these counts locate text and decide nothing.",
 			],
-		};
+		});
 	},
 });

@@ -1,12 +1,28 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 
+import { KINDS, type Kind } from "./lib/contract.ts";
+import { isJsonObject } from "./lib/json.ts";
+import { isPracticeScriptDefinition } from "./lib/practice-script.ts";
 import type { DiffFile } from "./lib/types.ts";
-import { moment, runBundled } from "./run-bundled.ts";
+import {
+	moment,
+	requested,
+	runBundled,
+	runBundledProgram,
+	runBundledReview,
+	type RunInputs,
+} from "./run-bundled.ts";
+import { stagePracticeScripts } from "./stage.ts";
+
+const SCRIPTS_DIR = path.resolve(
+	import.meta.dirname,
+	"../../../server/application/src/main/resources/practices/scripts",
+);
 
 /** A path the diff touched. The scripts under test read the changed paths, not the hunk bodies. */
 function changedFile(file: string): DiffFile {
@@ -386,4 +402,83 @@ void it("the readiness practice script leaves every title to the model and keeps
 		assert.match(directions, /#42/u);
 		assert.doesNotMatch(directions, /draft-style|Readiness fact/u);
 	}
+});
+
+/** The smallest valid inputs of each kind: a pull request with a captured empty change, and empty records. */
+const MINIMAL_INPUTS: Record<Kind, RunInputs> = {
+	"scm.pull_request": { cause: requested("scm.pull_request"), change: new Map() },
+	"scm.issue": { cause: requested("scm.issue") },
+	"chat.conversation_thread": {
+		cause: requested("chat.conversation_thread"),
+		work: { channel: "C1", threadTs: "1.0", messages: [], messageCount: 0, truncated: false },
+	},
+	"docs.document": {
+		cause: requested("docs.document"),
+		work: {
+			title: null,
+			collection: null,
+			collectionSlug: null,
+			slug: null,
+			createdBy: null,
+			updatedBy: null,
+			createdAt: null,
+			updatedAt: null,
+			archived: false,
+		},
+	},
+};
+
+/** The kind that a bundled program reads: a program for another kind names its kind when it throws. */
+async function kindOf(slug: string): Promise<Kind> {
+	const { outcome } = await runBundledProgram(slug, MINIMAL_INPUTS["scm.pull_request"]);
+	const message = "error" in outcome && outcome.error instanceof Error ? outcome.error.message : "";
+	const read = /^the script reads (?<kind>\S+),/u.exec(message)?.groups?.kind;
+	return KINDS.find((kind) => kind === read) ?? "scm.pull_request";
+}
+
+/** The `meta` of a bundled program, imported from its staged source. */
+async function stagedMeta(slug: string): Promise<unknown> {
+	const source = await readFile(path.join(SCRIPTS_DIR, `${slug}.ts`), "utf8");
+	const { root, practices } = await stagePracticeScripts({ [slug]: source }, {});
+	try {
+		const mod: unknown = await import(path.join(practices, `${slug}.ts`));
+		const definition: unknown = isJsonObject(mod) ? mod.default : undefined;
+		assert.ok(isPracticeScriptDefinition(definition), `${slug} exports no definition`);
+		return definition.meta;
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+}
+
+void describe("every bundled practice script", async () => {
+	const names = await readdir(SCRIPTS_DIR);
+	const slugs = names
+		.filter((name) => name.endsWith(".ts"))
+		.map((name) => name.slice(0, -".ts".length))
+		.toSorted();
+
+	void it("covers the whole bundled set", () => {
+		assert.equal(slugs.length, 34);
+	});
+
+	for (const slug of slugs) {
+		void it(`${slug} asks exactly one review on minimal inputs of its kind`, async () => {
+			// runBundledReview fails unless the program asks one review and returns its result unchanged.
+			await runBundledReview(slug, MINIMAL_INPUTS[await kindOf(slug)]);
+		});
+
+		void it(`${slug} declares an empty meta: no models, version, kinds or tokens`, async () => {
+			assert.deepEqual(await stagedMeta(slug), {});
+		});
+	}
+
+	void it("a change that was not captured stops a program that reads the change before any review", async () => {
+		const { reviews, outcome } = await runBundledProgram("ships-tests-with-the-change", {
+			change: null,
+		});
+		assert.equal(reviews.length, 0);
+		assert.ok("error" in outcome);
+		assert.ok(outcome.error instanceof Error);
+		assert.equal(outcome.error.name, "UnratedError");
+	});
 });

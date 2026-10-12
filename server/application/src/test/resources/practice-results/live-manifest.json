@@ -1,0 +1,88 @@
+{
+	"artifactKind": "scm.pull_request",
+	"sources": [
+		{
+			"kind": "scm.pull-request.core",
+			"state": {
+				"availability": "AVAILABLE",
+				"content": "NON_EMPTY"
+			},
+			"artifacts": [
+				{
+					"path": "context/metadata.json"
+				}
+			]
+		},
+		{
+			"kind": "scm.pull-request.diff",
+			"state": {
+				"availability": "AVAILABLE",
+				"content": "NON_EMPTY"
+			},
+			"artifacts": [
+				{
+					"path": "context/change.json"
+				}
+			]
+		},
+		{
+			"kind": "scm.pull-request.comments",
+			"state": {
+				"availability": "AVAILABLE",
+				"content": "NON_EMPTY"
+			},
+			"artifacts": [
+				{
+					"path": "context/comments.json"
+				}
+			]
+		},
+		{
+			"kind": "scm.repository.tree",
+			"state": {
+				"availability": "AVAILABLE",
+				"content": "NON_EMPTY"
+			},
+			"artifacts": [
+				{
+					"path": "repos/reviewed/.git/HEAD"
+				},
+				{
+					"path": "repos/reviewed/.git/hephaestus-captured-refs"
+				}
+			]
+		}
+	],
+	"artifacts": [
+		{
+			"kind": "scm.pull-request.core",
+			"artifact": {
+				"path": "context/metadata.json"
+			}
+		},
+		{
+			"kind": "scm.pull-request.diff",
+			"artifact": {
+				"path": "context/change.json"
+			}
+		},
+		{
+			"kind": "scm.pull-request.comments",
+			"artifact": {
+				"path": "context/comments.json"
+			}
+		},
+		{
+			"kind": "scm.repository.tree",
+			"artifact": {
+				"path": "repos/reviewed/.git/HEAD"
+			}
+		},
+		{
+			"kind": "scm.repository.tree",
+			"artifact": {
+				"path": "repos/reviewed/.git/hephaestus-captured-refs"
+			}
+		}
+	]
+}

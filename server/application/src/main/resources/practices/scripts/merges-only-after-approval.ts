@@ -12,36 +12,36 @@ import {
 	reviewsMergedWork,
 } from "../lib/review.ts";
 
+export const LABELS = {
+	merge:
+		"The merge of the pull request: who merged it, when, and the review decision of the provider.",
+	"review-decision":
+		"A review decision that the record holds, placed against the time of the merge.",
+	"last-decision-by-reviewer":
+		"The last decision of a reviewer whose decision times are all known.",
+};
+
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			merge:
-				"The merge of the pull request: who merged it, when, and the review decision of the provider.",
-			"review-decision":
-				"A review decision that the record holds, placed against the time of the merge.",
-			"last-decision-by-reviewer":
-				"The last decision of a reviewer whose decision times are all known.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		if (!reviewsMergedWork(ctx.cause)) {
-			return {
+			return ctx.review({
 				leads: [],
 				directions: [
 					"The pull request is not merged. This practice reviews the merge, so it has nothing to check yet.",
 				],
-			};
+			});
 		}
 		const merge = mergeFacts(ctx.work);
-		const record = await readReviewThreads(ctx.context.dir);
+		const record = await readReviewThreads(ctx.evidence);
 		const decisions = record?.decisions ?? [];
-		const rows = decisionLeads(decisions, merge);
-		const last = decisionLeads(lastDecisionPerReviewer(decisions), merge).map((lead) => ({
-			...lead,
-			kind: "last-decision-by-reviewer",
-		}));
+		const rows = decisionLeads(decisions, merge, LABELS["review-decision"]);
+		const last = decisionLeads(
+			lastDecisionPerReviewer(decisions),
+			merge,
+			LABELS["last-decision-by-reviewer"],
+		);
 		const approvalsBeforeMergeByOthers = rows.filter(
 			({ facts }) =>
 				facts?.state === "APPROVED" &&
@@ -73,8 +73,8 @@ export default definePracticeScript({
 				"Read decisionHistoryComplete in review_threads.json: the order of the leads does not establish complete historical coverage. Apply the practice criteria to that qualification.",
 			);
 		}
-		return {
-			leads: [mergeLead(ctx.work, merge), ...rows, ...last],
+		return ctx.review({
+			leads: [mergeLead(ctx.work, merge, LABELS.merge), ...rows, ...last],
 			facts: {
 				mergedByIsAuthor: merge.mergedByIsAuthor ? 1 : 0,
 				decisions: decisions.length,
@@ -84,6 +84,6 @@ export default definePracticeScript({
 				threadsFileAbsent: record === null ? 1 : 0,
 			},
 			directions,
-		};
+		});
 	},
 });

@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { isJsonObject } from "../../../../../../docker/agents/practice-scripts/lib/json.ts";
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
 import {
+	leadKeys,
 	moment,
 	requested,
 	runBundled,
+	type Files,
 	type RunInputs,
 } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
@@ -60,9 +63,36 @@ function commitsRecord(commits: CapturedCommit[]) {
 	};
 }
 
+/**
+ * The records that the server stages beside the given ones and that the leads cite: the record of the
+ * work, its description, and one file for each linked work item.
+ */
+function stagedRecords(work: Record<string, unknown>, given: Files): Files {
+	const linked = given["linked_work_items.json"];
+	const items: unknown[] =
+		isJsonObject(linked) && Array.isArray(linked.workItems) ? linked.workItems : [];
+	const files: Files = {
+		"metadata.json": work,
+		"description.md": typeof work.body === "string" ? work.body : "",
+	};
+	for (const item of items) {
+		if (isJsonObject(item) && typeof item.number === "number") {
+			files[`linked_work_items/${String(item.number)}.md`] = `# ${String(item.title)}\n`;
+		}
+	}
+	return files;
+}
+
 /** A run of `slug` with the context folder at the reference that the server gives it. */
 async function review(slug: string, inputs: RunInputs) {
-	return runBundled(slug, { contextReference: "areas/changed-work", ...inputs });
+	const given = inputs.context ?? {};
+	const result = await runBundled(slug, {
+		contextReference: "areas/changed-work",
+		...inputs,
+		context:
+			typeof given === "string" ? given : { ...stagedRecords(inputs.work ?? {}, given), ...given },
+	});
+	return { ...result, leads: result.leads ?? [] };
 }
 
 /** A review at the merge, the only moment of the merge practices. */
@@ -94,11 +124,12 @@ void test("plans-first puts the issue's opening beside the earliest commit, neve
 			]),
 		},
 	});
+	const keyOf = await leadKeys("plans-the-work-in-an-issue-first");
 	assert.equal(result.leads.length, 1);
 	const [lead] = result.leads;
 	assert.ok(lead);
 	assert.deepEqual(lead.at, { record: "linked_work_items/18.md", line: 0 });
-	assert.equal(lead.kind, "candidate-issue");
+	assert.equal(keyOf(lead.label), "candidate-issue");
 	assert.equal(lead.facts?.number, 18);
 	assert.equal(lead.facts.firstCommit, "f46a897");
 	assert.equal(lead.facts.hoursFromIssueToFirstCommit, "-16.4");
@@ -375,6 +406,7 @@ void test("deferred asks are one lead each, with the record's facts and none of 
 		change: new Map([diffFile("App/AddIngredientView.swift", [12, 13])]),
 		context,
 	});
+	const keyOf = await leadKeys("defers-review-asks-into-tracked-work");
 	assert.equal(result.facts?.asks, 3);
 	assert.equal(result.facts.inlineAsks, 2);
 	assert.equal(result.facts.conversationAsks, 1);
@@ -382,7 +414,7 @@ void test("deferred asks are one lead each, with the record's facts and none of 
 	assert.ok(stock && capitalisation && emptyState);
 	// The stock ask: the file is in the change but nothing near line 55 changed, no reply,
 	// resolved — and the reviewer's own later word on the thread drops it.
-	assert.equal(stock.kind, "inline-ask");
+	assert.equal(keyOf(stock.label), "inline-ask");
 	assert.deepEqual(stock.at, { record: "comments.json", line: 0 });
 	assert.equal(stock.facts?.path, "App/AddIngredientView.swift");
 	assert.equal(stock.facts.line, 55);
@@ -400,7 +432,7 @@ void test("deferred asks are one lead each, with the record's facts and none of 
 	assert.equal(capitalisation.facts.waiverWordsInFollowUp, false);
 	// The conversation ask: the reply names an issue and defers in words, and the approval
 	// followed it — a fact the review weighs, not a waiver by itself.
-	assert.equal(emptyState.kind, "conversation-ask");
+	assert.equal(keyOf(emptyState.label), "conversation-ask");
 	assert.deepEqual(emptyState.at, { record: "general_comments.json", line: 0 });
 	assert.equal(emptyState.facts?.issueNamedInReply, true);
 	assert.equal(emptyState.facts.deferralWordsInReply, true);
@@ -531,6 +563,7 @@ void test("every captured linked issue is a row, and those with a checkable outc
 		cause: atMerge,
 		context,
 	});
+	const keyOf = await leadKeys("merge-confirms-the-linked-issue-outcome");
 	assert.equal(result.facts?.linkedItems, 10);
 	assert.equal(result.facts.checkableItems, 7);
 	assert.equal(result.facts.untickedItems, 1);
@@ -560,10 +593,10 @@ void test("every captured linked issue is a row, and those with a checkable outc
 	);
 	assert.deepEqual(story.at, { record: "linked_work_items/18.md" });
 	// An unreported rollup is unknown: neither a checkable outcome nor proof there is none.
-	assert.equal(story.kind, "no-task-list-or-outcome-heading");
+	assert.equal(keyOf(story.label), "no-task-list-or-outcome-heading");
 	assert.equal(Object.hasOwn(story.facts ?? {}, "subIssuesTotal"), false);
 	assert.equal(story.facts?.how, "named with a closing keyword in the body");
-	assert.equal(tasks.kind, "checkable-outcome");
+	assert.equal(keyOf(tasks.label), "checkable-outcome");
 	assert.equal(tasks.facts?.ticked, 1);
 	assert.equal(tasks.facts.unticked, 1);
 	assert.equal(tasks.facts.how, "linked through a commit or another item");
@@ -571,7 +604,7 @@ void test("every captured linked issue is a row, and those with a checkable outc
 	assert.equal(subIssues.facts.subIssuesCompleted, 1);
 	assert.equal(totalOnly.facts?.subIssuesTotal, 2);
 	assert.equal(Object.hasOwn(totalOnly.facts ?? {}, "subIssuesCompleted"), false);
-	assert.equal(none.kind, "no-checkable-outcome");
+	assert.equal(keyOf(none.label), "no-checkable-outcome");
 	assert.equal(none.facts?.subIssuesTotal, 0);
 	// A capture that recorded no source, or one this reader does not recognize, claims neither.
 	for (const legacy of [story, subIssues, totalOnly, none, unrecognized]) {
@@ -583,9 +616,9 @@ void test("every captured linked issue is a row, and those with a checkable outc
 	for (const stored of [someOpen, allClosed, emptyMirror]) {
 		assert.equal(stored.facts?.subIssuesSource, "children");
 	}
-	assert.equal(someOpen.kind, "checkable-outcome");
+	assert.equal(keyOf(someOpen.label), "checkable-outcome");
 	assert.equal(allClosed.facts?.subIssuesTotal, 2);
-	assert.equal(emptyMirror.kind, "no-task-list-or-outcome-heading");
+	assert.equal(keyOf(emptyMirror.label), "no-task-list-or-outcome-heading");
 	assert.equal(emptyMirror.facts?.subIssuesTotal, 0);
 	const said = (result.directions ?? []).join("\n");
 	assert.match(result.directions?.[0] ?? "", /Each is a candidate: the criteria decide which/u);
@@ -656,16 +689,14 @@ void test("an open issue that an open merge request may close stays open, its cl
 		work: openMergeRequest,
 		context: closingLink,
 	});
+	const keyOf = await leadKeys("links-the-change-to-its-issue");
 	const provider = result.leads[0];
 	assert.ok(provider);
 	assert.deepEqual(provider.at, { record: "linked_work_items.json" });
-	assert.equal(provider.kind, "closing-reference");
+	assert.equal(keyOf(provider.label), "closing-reference");
 	assert.equal(provider.facts?.number, 1);
 	assert.equal(provider.facts.state, "OPEN");
-	assert.equal(
-		provider.facts.where,
-		"areas/changed-work/linked_work_items.json (how: closesOnMerge)",
-	);
+	assert.equal(provider.facts.where, "linked_work_items.json (how: closesOnMerge)");
 	assert.equal(result.facts?.providerClosingLinks, 1);
 	assert.match(
 		result.directions?.[2] ?? "",
@@ -693,9 +724,10 @@ void test("a merge request stored closed by its merge is merged, while its linke
 		cause: atMerge,
 		context: closingLink,
 	});
+	const keyOf = await leadKeys("merge-confirms-the-linked-issue-outcome");
 	const [issue] = result.leads;
 	assert.ok(issue);
-	assert.equal(issue.kind, "checkable-outcome");
+	assert.equal(keyOf(issue.label), "checkable-outcome");
 	assert.equal(issue.facts?.how, "a provider closing candidate");
 	assert.equal(issue.facts.state, "OPEN");
 	assert.match(
@@ -744,6 +776,7 @@ void test("every authored commit is one lead, however many there are", async () 
 			work: metadata,
 			context: { "commits.json": commitsRecord(commits) },
 		});
+		const keyOf = await leadKeys(slug);
 		assert.equal(result.leads.length, 12);
 		assert.equal(result.directions?.length, 2);
 		const [first] = result.leads;
@@ -751,7 +784,7 @@ void test("every authored commit is one lead, however many there are", async () 
 		assert.ok(first && bare);
 		// The server writes the commit record on one line, so a lead cites it whole and names its sha.
 		assert.deepEqual(first.at, { record: "commits.json" });
-		assert.equal(first.kind, "commit");
+		assert.equal(keyOf(first.label), "commit");
 		assert.deepEqual(
 			first.facts,
 			slug === "commit-subjects-explain-each-change"
@@ -815,7 +848,7 @@ void test("an issue reference is resolved against the inventory and the linked i
 	);
 	assert.deepEqual(byNumber.get(18), {
 		number: 18,
-		where: "areas/changed-work/metadata.json (title)",
+		where: "metadata.json (title)",
 		inInventory: true,
 		title: "Add ingredients",
 		state: "OPEN",
@@ -932,9 +965,10 @@ void test("a qualified reference stays an issue of the repository it names, on G
 		},
 	);
 	assert.equal(result.rows.get("#7")?.facts?.title, "Show the map");
+	const keyOf = await leadKeys("links-the-change-to-its-issue");
 	const other = result.rows.get("group/sub/other#8");
 	assert.ok(other);
-	assert.equal(other.kind, "qualified-issue-reference");
+	assert.equal(keyOf(other.label), "qualified-issue-reference");
 	assert.equal(other.facts?.title, "Share the map");
 	assert.equal(other.facts.inInventory, true);
 	// owner/repo has no #7, and the reviewed repository's #7 is not it.
@@ -1057,7 +1091,8 @@ void test("a URL match without provider custody keeps a closing candidate outsid
 			],
 		},
 	);
-	const closing = result.leads.find((lead) => lead.kind === "closing-reference");
+	const keyOf = await leadKeys("links-the-change-to-its-issue");
+	const closing = result.leads.find((lead) => keyOf(lead.label) === "closing-reference");
 	assert.ok(closing);
 	assert.equal(closing.facts?.inInventory, "unknown");
 	assert.equal(closing.facts.title, "Captured candidate");
@@ -1097,11 +1132,12 @@ void test("a foreign provider closing candidate does not supply a plain referenc
 			],
 		},
 	);
-	const closing = result.leads.find((lead) => lead.kind === "closing-reference");
+	const keyOf = await leadKeys("links-the-change-to-its-issue");
+	const closing = result.leads.find((lead) => keyOf(lead.label) === "closing-reference");
 	assert.ok(closing);
 	assert.equal(closing.facts?.title, "Rename the app");
 	assert.equal(closing.facts.state, "CLOSED");
-	const local = result.leads.find((lead) => lead.kind === "issue-reference");
+	const local = result.leads.find((lead) => keyOf(lead.label) === "issue-reference");
 	assert.ok(local);
 	assert.equal(local.facts?.title, "Show the map");
 	assert.equal(local.facts.state, undefined);
@@ -1135,7 +1171,8 @@ void test("an unmatched closing candidate keeps its own URL instead of an unrela
 			],
 		},
 	);
-	const closing = result.leads.find((lead) => lead.kind === "closing-reference");
+	const keyOf = await leadKeys("links-the-change-to-its-issue");
+	const closing = result.leads.find((lead) => keyOf(lead.label) === "closing-reference");
 	assert.ok(closing);
 	assert.equal(closing.facts?.target, foreign);
 	assert.equal(closing.facts.inInventory, "unknown");
@@ -1216,10 +1253,11 @@ void test("every reviewer comment is one lead with the reply, the thread and the
 			]),
 		},
 	});
+	const keyOf = await leadKeys("engaging-with-inline-review-comments");
 	assert.equal(result.leads.length, 2);
 	const [stock, rename] = result.leads;
 	assert.ok(stock && rename);
-	assert.equal(stock.kind, "reviewer-comment");
+	assert.equal(keyOf(stock.label), "reviewer-comment");
 	assert.deepEqual(stock.at, { record: "comments.json", line: 0 });
 	// An empty text is no fact: no later note by the reviewer, no approval after it.
 	assert.deepEqual(stock.facts, {
@@ -1305,6 +1343,7 @@ void test("a conversation note is a lead, with the reviewer's approval, their se
 			]),
 		},
 	});
+	const keyOf = await leadKeys("engaging-with-inline-review-comments");
 	const [nitpick, advice, thanks, afterMerge] = result.leads;
 	assert.ok(nitpick && advice && thanks && afterMerge);
 	// The reviewer's own next note stands beside the resolution of the inline nitpick.
@@ -1314,7 +1353,7 @@ void test("a conversation note is a lead, with the reviewer's approval, their se
 		"3600s later; 1 commit(s) and 0 author note(s) between",
 	);
 	// Advice posted with the reviewer's own approval, nothing between them.
-	assert.equal(advice.kind, "conversation-comment");
+	assert.equal(keyOf(advice.label), "conversation-comment");
 	assert.deepEqual(advice.at, { record: "general_comments.json", line: 0 });
 	assert.equal(
 		advice.facts?.reviewerApprovedAfter,
@@ -1437,10 +1476,16 @@ void test("a resolution the record does not date by the merge, or a merge it doe
 		cause: atMerge,
 		context,
 	});
+	const keyOf = await leadKeys("merged-past-unresolved-review-threads");
 	assert.deepEqual(
 		result.leads
-			.filter((lead) => lead.kind !== "merge")
-			.map((lead) => [lead.facts?.id, lead.kind, lead.facts?.createdAt, lead.facts?.resolvedAt]),
+			.filter((lead) => keyOf(lead.label) !== "merge")
+			.map((lead) => [
+				lead.facts?.id,
+				keyOf(lead.label),
+				lead.facts?.createdAt,
+				lead.facts?.resolvedAt,
+			]),
 		[
 			[21, "thread-resolved-after-the-merge", "2026-04-13T14:00:00Z", "2026-04-13T15:30:00Z"],
 			[22, "resolved-thread-resolution-time-unknown", "2026-04-13T14:00:00Z", undefined],
@@ -1472,8 +1517,8 @@ void test("a resolution the record does not date by the merge, or a merge it doe
 	for (const undated of [missing, invalid]) {
 		assert.deepEqual(
 			undated.leads
-				.filter((lead) => lead.kind !== "merge")
-				.map((lead) => [lead.facts?.id, lead.kind]),
+				.filter((lead) => keyOf(lead.label) !== "merge")
+				.map((lead) => [lead.facts?.id, keyOf(lead.label)]),
 			[
 				[20, "resolved-thread-merge-time-unknown"],
 				[21, "resolved-thread-merge-time-unknown"],
@@ -1547,18 +1592,19 @@ void test("the merge practices read the threads and decisions as rows against th
 		cause: atMerge,
 		context: record,
 	});
+	const threadKey = await leadKeys("merged-past-unresolved-review-threads");
 	assert.equal(unresolved.facts?.candidateThreads, 2);
 	assert.equal(unresolved.facts.resolvedBeforeMerge, 1);
 	assert.equal(unresolved.facts.mergedByIsAuthor, 1);
 	assert.equal(unresolved.facts.threadsFileAbsent, 0);
 	const [merge, thread] = unresolved.leads;
 	assert.ok(merge && thread);
-	assert.equal(merge.kind, "merge");
+	assert.equal(threadKey(merge.label), "merge");
 	assert.deepEqual(merge.at, { record: "metadata.json" });
 	assert.equal(merge.facts?.mergedBy, "ada");
 	assert.equal(merge.facts.mergedByIsAuthor, true);
 	assert.equal(merge.facts.reviewDecision, "APPROVED");
-	assert.equal(thread.kind, "unresolved-thread");
+	assert.equal(threadKey(thread.label), "unresolved-thread");
 	assert.deepEqual(thread.at, { record: "review_threads.json" });
 	assert.deepEqual(thread.facts, {
 		id: 11,
@@ -1570,7 +1616,7 @@ void test("the merge practices read the threads and decisions as rows against th
 	});
 	const late = unresolved.leads[2];
 	assert.ok(late);
-	assert.equal(late.kind, "thread-resolved-after-the-merge");
+	assert.equal(threadKey(late.label), "thread-resolved-after-the-merge");
 	assert.equal(late.facts?.resolvedAt, "2026-04-13T16:00:00Z");
 	assert.match(
 		unresolved.directions?.[0] ?? "",
@@ -1582,11 +1628,12 @@ void test("the merge practices read the threads and decisions as rows against th
 		cause: atMerge,
 		context: record,
 	});
+	const decisionKey = await leadKeys("merges-only-after-approval");
 	assert.equal(decisions.facts?.decisions, 5);
 	// Jennifer's approval at 15:00 is before the 15:06 merge and by someone else; Ada's is the author's, the bot's is
 	// no person's, Tom's is after.
 	assert.equal(decisions.facts.approvalsBeforeMergeByOthers, 1);
-	const rows = decisions.leads.filter((lead) => lead.kind === "review-decision");
+	const rows = decisions.leads.filter((lead) => decisionKey(lead.label) === "review-decision");
 	assert.deepEqual(
 		rows.map((lead) => [
 			lead.facts?.author,
@@ -1604,7 +1651,9 @@ void test("the merge practices read the threads and decisions as rows against th
 	);
 	assert.equal(rows[3]?.facts?.bot, true);
 	assert.deepEqual(rows[0]?.at, { record: "review_threads.json" });
-	const last = decisions.leads.filter((lead) => lead.kind === "last-decision-by-reviewer");
+	const last = decisions.leads.filter(
+		(lead) => decisionKey(lead.label) === "last-decision-by-reviewer",
+	);
 	assert.deepEqual(
 		last.map((lead) => [lead.facts?.author, lead.facts?.state]),
 		[
@@ -1657,6 +1706,7 @@ void test("an approval by an account marked bot is kept as a row but counted as 
 			approvals: 1,
 		},
 	];
+	const keyOf = await leadKeys("merges-only-after-approval");
 	for (const { name, decisions, approvals } of cases) {
 		const result = await review("merges-only-after-approval", {
 			work: merged,
@@ -1667,7 +1717,7 @@ void test("an approval by an account marked bot is kept as a row but counted as 
 		assert.equal(result.facts.decisionsByBots, 1, name);
 		const botLeads = result.leads.filter((lead) => lead.facts?.bot === true);
 		assert.deepEqual(
-			botLeads.map((lead) => lead.kind),
+			botLeads.map((lead) => keyOf(lead.label)),
 			["review-decision", "last-decision-by-reviewer"],
 			name,
 		);
@@ -1697,9 +1747,10 @@ void test("unknown approval times establish neither before-merge absence nor a l
 			},
 		},
 	});
+	const keyOf = await leadKeys("merges-only-after-approval");
 	const unknown = result.leads.find(
 		(lead) =>
-			lead.kind === "review-decision" &&
+			keyOf(lead.label) === "review-decision" &&
 			lead.facts?.author === "jennifer" &&
 			lead.facts.state === "APPROVED",
 	);
@@ -1709,7 +1760,7 @@ void test("unknown approval times establish neither before-merge absence nor a l
 	assert.equal(result.facts.approvalsBeforeMergeByOthers, 1);
 	assert.deepEqual(
 		result.leads
-			.filter((lead) => lead.kind === "last-decision-by-reviewer")
+			.filter((lead) => keyOf(lead.label) === "last-decision-by-reviewer")
 			.map((lead) => lead.facts?.author),
 		["tom"],
 	);

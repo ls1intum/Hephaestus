@@ -32,6 +32,9 @@
 
 	"env": { "node": true, "es2023": true },
 
+	// The toolkit link beside the runner (`tsconfig.agents.json#rootDirs`) is linted once, at home.
+	"ignorePatterns": ["server/application/src/main/resources/agent/work/**"],
+
 	"rules": {
 		// -- One way to write it ---------------------------------------------------------------------
 		// Declarations, because they hoist — a helper can sit below its first use — and because that

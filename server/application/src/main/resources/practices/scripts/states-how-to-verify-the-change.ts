@@ -5,8 +5,9 @@ import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/bounded-text.ts";
 import {
 	definePracticeScript,
 	expectKind,
+	requireChange,
 	type DiffFile,
-	type Lead,
+	type ReviewLead,
 } from "../lib/practice-script.ts";
 import {
 	branchIssueReferences,
@@ -15,6 +16,13 @@ import {
 	withoutHtmlComments,
 } from "../lib/references.ts";
 import { readLinkedWorkItemCapture } from "../lib/review.ts";
+
+export const LABELS = {
+	"xcode-placeholder": "An added line that keeps an Xcode placeholder token.",
+	"runtime-secret-read": "An added line that reads a key or secret at runtime.",
+	"ignored-secret":
+		"A line that the change adds to an ignore file and that names a secret or a configuration file.",
+};
 
 const IMAGE = /\.(?:png|jpe?g|gif|svg|webp|pdf)$/iu;
 const DIAGRAM_PATH = /(?:^|\/)(?:diagrams?|uml|models?|architecture)\//iu;
@@ -69,13 +77,13 @@ const HEADING_CHARS = 100;
 /** A lead for each added line that matches. */
 function addedLinesMatching(
 	change: ReadonlyMap<string, DiffFile>,
-	kind: string,
+	kind: keyof typeof LABELS,
 	matches: (path: string, line: string) => boolean,
-): Lead[] {
+): ReviewLead[] {
 	return [...change.values()].flatMap((file) =>
 		[...file.addedLines]
 			.filter(([, line]) => matches(file.path, line))
-			.map(([line]): Lead => ({ at: { change: file.path, line }, kind })),
+			.map(([line]): ReviewLead => ({ at: { change: file.path, line }, label: LABELS[kind] })),
 	);
 }
 
@@ -85,18 +93,11 @@ function listed(opening: string, items: readonly string[], separator = ", "): st
 }
 
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"xcode-placeholder": "An added line that keeps an Xcode placeholder token.",
-			"runtime-secret-read": "An added line that reads a key or secret at runtime.",
-			"ignored-secret":
-				"A line that the change adds to an ignore file and that names a secret or a configuration file.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const { change, work } = ctx;
+		const { work } = ctx;
+		const change = requireChange(ctx.files);
 		const paths = [...change.keys()];
 		// A move, a rename or a binary file changes no line; an image among them is still content.
 		const unchanged = [...change.values()]
@@ -148,7 +149,7 @@ export default definePracticeScript({
 		const screenshots = body.match(SCREENSHOT)?.length ?? 0;
 		// Only the author's own words adopt an issue: a closing keyword in their prose, the title, the
 		// branch, or the provider's closing link. A template's example in code or a comment names nothing.
-		const capture = await readLinkedWorkItemCapture(ctx.context.dir);
+		const capture = await readLinkedWorkItemCapture(ctx.evidence);
 		const captured = capture?.items.map((item) => item.number) ?? [];
 		const named = new Map<number, string[]>();
 		const name = (how: string, numbers: number[]) => {
@@ -250,7 +251,7 @@ export default definePracticeScript({
 				`The description embeds ${screenshots} image(s); read their captions and the sentences around them — the image bytes are not available to you.`,
 			);
 		}
-		return {
+		return ctx.review({
 			leads: [...placeholders, ...secretReads, ...ignoredSecrets].slice(0, 40),
 			facts: {
 				changedFiles: paths.length,
@@ -273,6 +274,6 @@ export default definePracticeScript({
 				secretReadLines: secretReads.length,
 			},
 			directions,
-		};
+		});
 	},
 });

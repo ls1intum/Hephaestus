@@ -9,14 +9,14 @@ import { branchIssueReferences, issueNumberReferences } from "../lib/references.
 const BRANCH_CHARS = 80;
 
 export default definePracticeScript({
-	meta: { version: 1, kinds: {} },
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		const description = ctx.work.body ?? "";
 		const directions: string[] = [];
 
 		// Traceability: does the handoff reference a motivating issue at all?
-		const commits = await readCommits(ctx.context.dir);
+		const commits = await readCommits(ctx.evidence);
 		const body = `${description}\n${commits.map((c) => c.message).join("\n")}`;
 		const branch = ctx.work.source_branch;
 		const quotedBranch = oneLine(branch, BRANCH_CHARS);
@@ -52,7 +52,7 @@ export default definePracticeScript({
 			);
 		}
 
-		return {
+		return ctx.review({
 			leads: [],
 			facts: {
 				issueMentionSyntaxCandidateCount: allRefs.size,
@@ -61,6 +61,6 @@ export default definePracticeScript({
 				checklistUnticked: unticked,
 			},
 			directions,
-		};
+		});
 	},
 });

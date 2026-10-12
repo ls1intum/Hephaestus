@@ -7,8 +7,9 @@ import { after, describe, test } from "node:test";
 
 import { parseDiff } from "./diff-parser.ts";
 import { isJsonObject } from "./json.ts";
+import { addedSince } from "./leads.ts";
 import { expectKind } from "./practice-script.ts";
-import { addedSince, changeSince, parseInputs } from "./script-inputs.ts";
+import { changeSince, parseInputs } from "./script-inputs.ts";
 
 const roots: string[] = [];
 after(async () =>
@@ -24,16 +25,33 @@ const parsedRecord: unknown = JSON.parse(
 assert.ok(isJsonObject(parsedRecord));
 const pullRequest = parsedRecord;
 
+/** The practice revision and authored scope that the server stages in each cause file. */
+const BOUND = {
+	practice: { revisionId: 12 },
+	scope: {
+		key: "scm.pull_request:91234:AUTHOR",
+		mode: "change",
+		description: "the reviewed change",
+	},
+};
+
 /** The cause file of a pull request review admitted under `cause`. */
-function staged(cause: Record<string, unknown>) {
+function staged(cause: Record<string, unknown>, fields: Record<string, unknown> = {}) {
 	return {
 		kind: "scm.pull_request",
 		subject: { role: "AUTHOR" },
+		...BOUND,
 		cause: { origin: "LIVE", state: {}, admittedAt: "2026-01-02T03:04:05.123456Z", ...cause },
+		...fields,
 	};
 }
 
-/** The record of the work, as the runner gives it to a script. */
+/** A previous result, in the form the server stages it. */
+function previousResult(fields: Record<string, unknown>) {
+	return { practiceResultId: "5d2f7a8e-0c1b-4f3a-9e6d-2b8c4a1f0e77", ...fields };
+}
+
+/** The record of the work, as the host gives it to a program. */
 function workOf(cause: unknown, work: unknown) {
 	const parsed = parseInputs("p", cause, null, work);
 	assert.ok("inputs" in parsed, JSON.stringify(parsed));
@@ -44,8 +62,8 @@ type Context = { kind: "scm.pull_request"; change: number } | { kind: "scm.issue
 /** A context of an issue, typed as either kind. */
 const issueContext = (): Context => ({ kind: "scm.issue" });
 
-void describe("the inputs of a definition script", () => {
-	void test("a pull request cause, its previous claim and its record parse into one typed value", () => {
+void describe("the inputs of a practice program", () => {
+	void test("a pull request cause, its previous result and its record parse into one typed value", () => {
 		const parsed = parseInputs(
 			"cites-tests",
 			staged({
@@ -53,7 +71,7 @@ void describe("the inputs of a definition script", () => {
 				signal: "scm.pull_request.synchronized",
 				state: { draftStatus: "NOT_DRAFT", state: "OPEN" },
 			}),
-			{
+			previousResult({
 				reviewedAt: "2026-01-01T00:00:00Z",
 				cause: "moment",
 				signal: "scm.pull_request.opened",
@@ -69,14 +87,19 @@ void describe("the inputs of a definition script", () => {
 					},
 				],
 				head: "1".repeat(40),
-			},
+			}),
 			{ ...pullRequest, unknownField: "dropped" },
 		);
 		assert.ok("inputs" in parsed, JSON.stringify(parsed));
 		const { inputs } = parsed;
 		assert.equal(inputs.kind, "scm.pull_request");
 		assert.equal(inputs.cause.type, "moment");
-		assert.equal(inputs.previous?.outcome, "NOT_MET");
+		assert.deepEqual(inputs.practice, { revisionId: 12 });
+		assert.deepEqual(inputs.scope, BOUND.scope);
+		assert.partialDeepStrictEqual(inputs.previous, {
+			practiceResultId: "5d2f7a8e-0c1b-4f3a-9e6d-2b8c4a1f0e77",
+			outcome: "NOT_MET",
+		});
 		assert.equal(inputs.work.title, "Count the items in the cart");
 		// A field the server does not write stays out of the record.
 		assert.equal("unknownField" in inputs.work, false);
@@ -88,6 +111,7 @@ void describe("the inputs of a definition script", () => {
 			{
 				kind: "chat.conversation_thread",
 				subject: { role: "AUTHOR" },
+				...BOUND,
 				cause: {
 					type: "moment",
 					signal: "chat.conversation_thread.settled",
@@ -112,6 +136,7 @@ void describe("the inputs of a definition script", () => {
 			{
 				kind: "docs.document",
 				subject: { role: "AUTHOR" },
+				...BOUND,
 				cause: {
 					type: "requested",
 					origin: "MANUAL",
@@ -139,6 +164,7 @@ void describe("the inputs of a definition script", () => {
 			{
 				kind: "scm.issue",
 				subject: { role: "AUTHOR" },
+				...BOUND,
 				cause: {
 					type: "moment",
 					signal: "scm.pull_request.merged",
@@ -173,27 +199,71 @@ void describe("the inputs of a definition script", () => {
 			],
 			[
 				staged({ type: "requested" }),
-				{
+				previousResult({
 					reviewedAt: "2026-01-01T00:00:00Z",
 					cause: "moment",
 					outcome: "NOT_MET",
 					citations: [],
 					summary: "model text",
-				},
+				}),
 				pullRequest,
 				/^p\.previous\.json: previous /u,
 			],
 			[
 				staged({ type: "requested" }),
-				{
+				previousResult({
 					reviewedAt: "2026-01-01T00:00:00Z",
 					cause: "moment",
 					outcome: "MET",
 					citations: [],
 					head: "main",
-				},
+				}),
 				pullRequest,
 				/^p\.previous\.json: previous\.head /u,
+			],
+			// The previous result names the admitted result that it is.
+			[
+				staged({ type: "requested" }),
+				{ reviewedAt: "2026-01-01T00:00:00Z", cause: "moment", outcome: "MET", citations: [] },
+				pullRequest,
+				/^p\.previous\.json: previous\.practiceResultId /u,
+			],
+			// The cause names the practice revision and the authored scope.
+			[
+				staged({ type: "requested" }, { practice: undefined }),
+				null,
+				pullRequest,
+				/^p\.cause\.json: practice /u,
+			],
+			[
+				staged({ type: "requested" }, { practice: { revisionId: 0 } }),
+				null,
+				pullRequest,
+				/^p\.cause\.json: practice\.revisionId /u,
+			],
+			[
+				staged({ type: "requested" }, { scope: undefined }),
+				null,
+				pullRequest,
+				/^p\.cause\.json: scope /u,
+			],
+			[
+				staged({ type: "requested" }, { scope: { ...BOUND.scope, mode: "whole" } }),
+				null,
+				pullRequest,
+				/^p\.cause\.json: scope\.mode /u,
+			],
+			[
+				staged({ type: "requested" }, { scope: { ...BOUND.scope, key: "" } }),
+				null,
+				pullRequest,
+				/^p\.cause\.json: scope\.key /u,
+			],
+			[
+				staged({ type: "requested" }, { scope: { ...BOUND.scope, owner: "ada" } }),
+				null,
+				pullRequest,
+				/^p\.cause\.json: scope /u,
 			],
 			[
 				staged({ type: "requested" }),
@@ -277,6 +347,7 @@ void describe("the inputs of a definition script", () => {
 		const issueCause = {
 			kind: "scm.issue",
 			subject: { role: "AUTHOR" },
+			...BOUND,
 			cause: { type: "requested", origin: "MANUAL", state: {}, admittedAt: "2026-01-01T00:00:00Z" },
 		};
 		assert.partialDeepStrictEqual(workOf(staged({ type: "requested" }), mergeRequest), {

@@ -1,13 +1,13 @@
-// A model call that the library never sends: its options have no JSON form. The script then waits
-// for the runner to stop it.
+// A model call that the library never sends: its options have no JSON form. The program then waits
+// for the host to stop it.
 import { definePracticeScript } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { version: 1, models: { chat: "required" }, kinds: { unused: "Not used." } },
+	meta: { models: { chat: "required" } },
 	async run() {
 		process.send?.({
 			kind: "model",
-			id: -1,
+			id: 0,
 			slot: "chat",
 			label: "",
 			options: { prompt: [{ role: "user", content: 1n }] },

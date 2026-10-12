@@ -1,7 +1,7 @@
 /**
- * The runner's side of a model call of a practice script. A call arrives from a child as the
- * options of one `do*` method. The runner keeps only the allowed fields, reserves budget, and calls
- * the proxy under `/practice-script/<slot>` with the practice script token and the practice's slug.
+ * The host's side of a direct model call of a practice program. A call arrives from a child as the
+ * options of one `do*` method. The host keeps only the allowed fields, reserves budget, and calls the
+ * proxy under `/practice-script/<slot>` with the job's proxy token and the practice's slug.
  */
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
@@ -223,35 +223,40 @@ export function modelCall<S extends ModelSlot>(
 
 /** Why a started call failed. A call that fails after its signal aborts failed at the deadline. */
 function failureOf(signal: AbortSignal, error: unknown): Reason {
-	return signal.aborted ? "deadline" : reasonOf(error);
+	if (signal.aborted) {
+		return "deadline";
+	}
+	const reason = reasonOf(error);
+	return reason === "cancelled" ? "deadline" : reason;
 }
 
 /**
- * The practice script budget: token ceilings per practice and for the stage, and a limit on calls
- * in flight. Tokens are reserved before a call starts and settled when it ends. A call that fails,
- * is cancelled, or reports no usage keeps its reservation, because the provider may have billed it.
+ * The attempt's account for direct model calls: one token ceiling for every practice's direct calls,
+ * and a limit on calls in flight. Tokens are reserved before a call starts and settled when it ends.
+ * A call that fails, is cancelled, or reports no usage keeps its reservation, because the provider may
+ * have billed it. A review session's own calls are not direct calls: the proxy bounds them.
  */
 export class ModelBudget {
-	#stageLeft: number;
+	#left: number;
 	#free: number;
 	#waiting: ((turn: undefined) => void)[] = [];
 
-	constructor(stageTokens: number, concurrency: number) {
-		this.#stageLeft = stageTokens;
+	constructor(tokens: number, concurrency: number) {
+		this.#left = tokens;
 		this.#free = concurrency;
 	}
 
-	get stageLeft(): number {
-		return this.#stageLeft;
+	/** The tokens that direct calls of this attempt may still spend. */
+	get left(): number {
+		return this.#left;
 	}
 
 	/**
-	 * Run `call` when fewer calls than the limit are in flight and both ceilings hold `reserve` tokens.
-	 * The practice's account is updated in place. The result is the call's value and the tokens
-	 * charged, or the reason it did not run or failed.
+	 * Run `call` when fewer calls than the limit are in flight and the account holds `reserve` tokens.
+	 * A call waiting for its turn holds nothing. The result is the call's value and the tokens charged,
+	 * or the reason it did not run or failed.
 	 */
 	async run<T>(
-		practice: { left: number },
 		reserve: number,
 		signal: AbortSignal,
 		call: () => Promise<{ value: T; tokens: number | undefined }>,
@@ -278,16 +283,14 @@ export class ModelBudget {
 			if (signal.aborted) {
 				return { reason: "deadline" };
 			}
-			if (reserve > practice.left || reserve > this.#stageLeft) {
+			if (reserve > this.#left) {
 				return { reason: "budget" };
 			}
-			practice.left -= reserve;
-			this.#stageLeft -= reserve;
+			this.#left -= reserve;
 			try {
 				const { value, tokens = reserve } = await call();
 				// Settle: give back what the call did not use, take what it used beyond the estimate.
-				practice.left += reserve - tokens;
-				this.#stageLeft += reserve - tokens;
+				this.#left += reserve - tokens;
 				return { value, tokens };
 			} catch (error) {
 				return { reason: failureOf(signal, error) };

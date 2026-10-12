@@ -5,13 +5,15 @@
 // defines is what its definition says. Only the shapes whose spelling fixes the kind are counted as
 // literal or adaptive. The review classifies the rest, and reads the role of each color from the
 // modifier chain.
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
 import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
-import { globFilesSync } from "../lib/files.ts";
 import { isJsonObject } from "../lib/json.ts";
-import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	requireChange,
+	type FileTree,
+	type ReviewLead,
+} from "../lib/practice-script.ts";
 import { countLabel, sampleNote, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
 
 const SWIFTUI_VIEW = /\b(?:View|App|Scene)\b/u;
@@ -135,10 +137,11 @@ function appearanceOf({ paths, read }: AssetColors, name: string): DarkAppearanc
 	return candidates.length === 1 && only !== undefined ? (read.get(only) ?? "unknown") : "unknown";
 }
 
-async function assetColors(repoPath: string): Promise<AssetColors> {
-	let all: string[] = [];
+async function assetColors(tree: FileTree | null): Promise<AssetColors> {
+	let all: readonly string[] = [];
 	try {
-		all = globFilesSync("**/*.xcassets/**/*.colorset/Contents.json", repoPath);
+		const listed = await tree?.list("**/*.xcassets/**/*.colorset/Contents.json");
+		all = listed?.paths ?? [];
 	} catch {
 		// no readable checkout: no colorset read
 	}
@@ -149,45 +152,40 @@ async function assetColors(repoPath: string): Promise<AssetColors> {
 	}
 	const read = new Map<string, DarkAppearance>();
 	for (const file of all.slice(0, COLORSETS_READ)) {
-		let dark: DarkAppearance = "unknown";
-		try {
-			dark = darkAppearanceOf(await readFile(path.join(repoPath, file), "utf8"));
-		} catch {
-			// an unreadable colorset is not a fact about its appearances
-		}
-		read.set(file, dark);
+		// An unreadable colorset is not a fact about its appearances.
+		const source = await tree?.read(file).catch(() => null);
+		read.set(file, source?.status === "FOUND" ? darkAppearanceOf(source.text) : "unknown");
 	}
 	return { paths, read };
 }
 
+export const LABELS = {
+	"fixed-components":
+		"An added color made from fixed components, such as RGB, white or hex values.",
+	"literal-white-or-black": "An added literal white or black color.",
+	"uikit-color": "An added UIKit color, which can be dynamic or fixed.",
+	"named-asset":
+		"An added color from a named asset, with the facts that tell if its colorset has a dark appearance.",
+	"color-from-a-value": "An added Color(.name) that converts another color value.",
+	"semantic-style": "An added semantic style, such as .primary or .secondary.",
+	material: "An added material, such as .regularMaterial.",
+	accent: "An added accent color or tint.",
+	"color-member": "An added Color member, such as Color.green, that SwiftUI or the app can define.",
+	"color-modifier-member": "An added member, such as .pink, that a color modifier gets.",
+};
+const LABEL_OF = new Map<string, string>(Object.entries(LABELS));
+
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			"fixed-components":
-				"An added color made from fixed components, such as RGB, white or hex values.",
-			"literal-white-or-black": "An added literal white or black color.",
-			"uikit-color": "An added UIKit color, which can be dynamic or fixed.",
-			"named-asset":
-				"An added color from a named asset, with the facts that tell if its colorset has a dark appearance.",
-			"color-from-a-value": "An added Color(.name) that converts another color value.",
-			"semantic-style": "An added semantic style, such as .primary or .secondary.",
-			material: "An added material, such as .regularMaterial.",
-			accent: "An added accent color or tint.",
-			"color-member":
-				"An added Color member, such as Color.green, that SwiftUI or the app can define.",
-			"color-modifier-member": "An added member, such as .pink, that a color modifier gets.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const scan = await scanAddedLines(ctx.repo, ctx.change, {
+		const scan = await scanAddedLines(ctx.files?.head ?? null, requireChange(ctx.files), {
 			languages: ["swift"],
 			patterns: COLORS,
 			scope: SWIFTUI_VIEW,
 			onlyInScope: true,
 		});
-		const assets = await assetColors(ctx.repo);
+		const assets = await assetColors(ctx.files?.head ?? null);
 		const colorsetsFound = [...assets.paths.values()].reduce((sum, files) => sum + files.length, 0);
 		const hints = scan.hints.map((hint) => {
 			if (hint.pattern !== "named-asset" && hint.pattern !== "color-from-a-value") {
@@ -209,11 +207,12 @@ export default definePracticeScript({
 				},
 			};
 		});
-		const leads: Lead[] = hints.map((hint) => ({
-			at: { change: hint.file, line: hint.line },
-			kind: hint.pattern,
-			facts: factsOf(hint.flags),
-		}));
+		const leads: ReviewLead[] = hints.flatMap((hint) => {
+			const label = LABEL_OF.get(hint.pattern);
+			return label === undefined
+				? []
+				: [{ at: { change: hint.file, line: hint.line }, label, facts: factsOf(hint.flags) }];
+		});
 		const inOtherBundles = hints.filter((hint) => hint.flags.bundle !== undefined).length;
 		const literals =
 			countLabel(scan, "fixed-components") + countLabel(scan, "literal-white-or-black");
@@ -262,7 +261,7 @@ export default definePracticeScript({
 				`The checkout holds ${String(colorsetsFound)} colorsets and the first ${String(COLORSETS_READ)} were read: a named color whose colorset was not read is unknown, not missing.`,
 			);
 		}
-		return {
+		return ctx.review({
 			leads,
 			facts: {
 				literalColors: literals,
@@ -276,6 +275,6 @@ export default definePracticeScript({
 				linesAdded: scan.linesAdded,
 			},
 			directions,
-		};
+		});
 	},
 });

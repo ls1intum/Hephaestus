@@ -2,9 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
-import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
+import {
+	leadKeys,
+	runBundled,
+} from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
 const SLUG = "changes-dependencies-deliberately";
+const keyOf = await leadKeys(SLUG);
 
 function diffFile(file: string, added: string[], removed: string[] = []): DiffFile {
 	return {
@@ -35,7 +39,7 @@ void test("an XcodeGen project.yml edit lists its changed package lines without 
 	});
 	// The url may be unchanged and merely re-added beside the new bound: nothing here says the package is new.
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.kind, lead.at, lead.facts?.side]),
+		(result.leads ?? []).map((lead) => [keyOf(lead.label), lead.at, lead.facts?.side]),
 		[
 			["raw-manifest-line", { change: "project.yml", line: 10, side: "OLD" }, "removed"],
 			["raw-manifest-line", { change: "project.yml", line: 11, side: "NEW" }, "added"],
@@ -100,9 +104,9 @@ void test("a pom.xml version moved away from its artifactId is not a dropped pin
 	assert.equal(result.facts?.unpairedManifestLines, 4);
 	assert.equal(result.facts.pinsDropped, 1);
 	assert.deepEqual(
-		result.leads
+		(result.leads ?? [])
 			.filter((lead) => "change" in lead.at && lead.at.change === "requirements.txt")
-			.map((lead) => [lead.kind, lead.at, lead.facts]),
+			.map((lead) => [keyOf(lead.label), lead.at, lead.facts]),
 		[
 			[
 				"pin-dropped",
@@ -133,8 +137,8 @@ void test("raw manifest lines beyond the lead cap are counted but reported as no
 			["pom.xml", diffFile("pom.xml", artifacts)],
 		]),
 	});
-	const raw = result.leads.filter((lead) => lead.kind === "raw-manifest-line");
-	assert.equal(result.leads.length, 40);
+	const raw = (result.leads ?? []).filter((lead) => keyOf(lead.label) === "raw-manifest-line");
+	assert.equal(result.leads?.length, 40);
 	assert.equal(result.facts?.onlyAdded, 3);
 	assert.equal(result.facts.unpairedManifestLines, 45);
 	assert.equal(result.facts.rawLinesListed, 37);
@@ -152,7 +156,7 @@ void test("metadata lines shaped like dependencies stay candidates with their co
 	});
 	// An engines entry and a toolchain floor: the delta is real, the dependency identity is not established.
 	assert.deepEqual(
-		result.leads.map((lead) => [lead.at, lead.kind, lead.facts]),
+		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label), lead.facts]),
 		[
 			[
 				{ change: "package.json", line: 10, side: "NEW" },

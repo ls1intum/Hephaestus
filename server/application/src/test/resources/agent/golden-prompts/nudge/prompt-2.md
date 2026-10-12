@@ -1,0 +1,2 @@
+## Not recorded
+This session ended without an observation for test-practice: text outside a report_observation call records nothing. Record the outcome its criterion and the evidence you read support, in one report_observation call. If a required source is missing, truncated or blocked, that is a collection gap: record nothing.

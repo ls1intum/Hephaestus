@@ -1,8 +1,8 @@
 /**
- * The runner's side of what a script reads about its review: the files that the server
- * stages beside the script, the record of the work, and the change since the previous review. The
- * runner validates them once, before the script's process starts. The script's process cannot start
- * git, so the runner computes the change.
+ * The host's side of what a program reads about its review: the files that the server stages for
+ * each admitted practice, the record of the work, and the change since the previous review. The host
+ * validates them once, before the program starts. A program cannot start git, so the host computes
+ * the change.
  */
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
@@ -16,7 +16,6 @@ import {
 	practiceInputsSchema,
 	PREVIOUS_FILE_SUFFIX,
 	WORK_RECORDS,
-	type Citation,
 	type Kind,
 	type PracticeInputs,
 } from "./contract.ts";
@@ -24,12 +23,12 @@ import { parseDiff } from "./diff-parser.ts";
 import { isJsonObject } from "./json.ts";
 import type { DiffFile } from "./types.ts";
 
-/** What the runner gives a script, or why it cannot. */
+/** What the host gives a program, or why it cannot. */
 export type ScriptInputs =
 	| { inputs: PracticeInputs; changeSince?: Map<string, DiffFile> }
 	| { error: string };
 
-/** The bytes of a change since the previous review that the runner reads; a larger one is not known. */
+/** The bytes of a change since the previous review that the host reads; a larger one is not known. */
 const MAX_CHANGE_BYTES = 64 * 1024 * 1024;
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -130,30 +129,8 @@ export async function changeSince(
 	}
 }
 
-/**
- * Whether a lead cites a line that the change since the previous review added: a citation of the
- * change on its new side, with at least one line of its range added since.
- */
-export function addedSince(at: Citation, since: ReadonlyMap<string, DiffFile>): boolean {
-	if (!("change" in at) || at.side === "OLD") {
-		return false;
-	}
-	const file = since.get(at.change);
-	if (file === undefined) {
-		return false;
-	}
-	const { addedLines } = file;
-	const { line: first, endLine: last = first } = at;
-	for (let line = first; line <= last; line += 1) {
-		if (addedLines.has(line)) {
-			return true;
-		}
-	}
-	return false;
-}
-
 interface InputReaderOptions {
-	/** The folder of the staged scripts, which holds each script's cause and previous claim. */
+	/** The folder of the staged programs, which holds each practice's cause and previous result. */
 	practicesDir: string;
 	contextDir: string;
 	repo: string;
@@ -161,7 +138,7 @@ interface InputReaderOptions {
 }
 
 /**
- * Reads and validates the inputs of each practice for one runner, each file once. The record of the
+ * Reads and validates the inputs of each practice for one host, each file once. The record of the
  * work and each change since a previous head are shared by every practice that reads them.
  */
 export class InputReader {

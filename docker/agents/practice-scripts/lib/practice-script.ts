@@ -1,8 +1,9 @@
 /**
- * The one import for a practice script:
- * `export default definePracticeScript({ meta, run })`. It exports the primitives, `addedComments`
- * with its question set `commentKinds`, and the types. `docs/admin/practice-scripts.mdx` explains
- * how to write a script.
+ * The one import for a practice program:
+ * `export default definePracticeScript({ meta, run })`. `run` returns the practice's result: one it
+ * builds, or the one `ctx.review()` returns. It exports the primitives, `addedComments` with its
+ * question set `commentKinds`, and the types. `docs/admin/practice-scripts.mdx` explains how to write
+ * a program.
  */
 import {
 	APICallError,
@@ -22,46 +23,65 @@ import {
 import { callLabel } from "./call-label.ts";
 import { eachBounded, MODEL_CONCURRENCY } from "./concurrency.ts";
 import type {
+	Candidate,
+	Cause,
+	Citation,
 	Kind,
 	ModelSlot,
 	Need,
-	Cause,
-	ParsedMeta,
-	PracticeScriptResult,
+	Omission,
 	Reason,
+	ReviewOptions,
 	SlotModels,
 	StagedPrevious,
 	SubjectRole,
-	Unrated,
 	Work,
 } from "./contract.ts";
+import type { GrepMatch } from "./grep.ts";
 import { isJsonObject } from "./json.ts";
 import type { DiffFile } from "./types.ts";
 
 export type {
+	Candidate,
 	CauseType,
 	Citation,
+	ClaimBasis,
+	Coverage,
+	EvidenceLocation,
+	Example,
 	Facts,
+	InapplicabilityWarrant,
 	Kind,
-	Lead,
 	ModelSlot,
 	Moment,
 	Need,
 	Cause,
-	PracticeScriptResult,
+	NonEmpty,
+	Omission,
+	OpenQuestion,
+	Outcome,
+	PreparedContext,
 	PreviousCitation,
+	Problem,
 	Reason,
+	ReviewLead,
+	ReviewOptions,
 	ReviewState,
+	SearchWarrant,
+	SessionCandidate,
+	Severity,
 	SubjectRole,
-	Unrated,
 	Work,
 } from "./contract.ts";
 export type { DiffFile } from "./types.ts";
+export type { GrepMatch } from "./grep.ts";
 
 export type ModelNeeds = Partial<Record<ModelSlot, Need>>;
 
-/** `meta` as `lib/contract.ts` validates it, with the literal model needs that type `ctx.models`. */
-type PracticeScriptMeta<M extends ModelNeeds> = Omit<ParsedMeta, "models"> & { models?: M };
+/** `meta` as `lib/contract.ts` validates it: the direct models the program needs, with literal needs that type `ctx.models`. */
+export interface PracticeScriptMeta<M extends ModelNeeds> {
+	models?: M;
+}
 
 /** A required slot is always a model; an optional slot may be absent; an undeclared slot does not exist. */
 export type Models<M extends ModelNeeds> = {
@@ -71,8 +91,8 @@ export type Models<M extends ModelNeeds> = {
 };
 
 /**
- * The latest current claim of this practice about the same person on the same work. It holds no model
- * text and no delivery state.
+ * The latest current result of this practice about the same person on the same work. It holds no
+ * model text and no delivery state. Its citations are the result's and every problem's, in that order.
  */
 export type Previous<K extends Kind = Kind> = StagedPrevious<K> &
 	(K extends "scm.pull_request"
@@ -85,30 +105,97 @@ export type Previous<K extends Kind = Kind> = StagedPrevious<K> &
 			}
 		: unknown);
 
-/** The fields of the context that do not depend on the kind of the work. */
-interface Common<M extends ModelNeeds> {
-	practice: { slug: string };
-	/** The role that the practice is about. */
-	subject: { role: SubjectRole };
-	context: { dir: string; reference: string };
-	/** The time of the review. Use it instead of the clock, so that one review gives the same leads. */
-	now: string;
-	models: Models<M>;
-	tools: ToolSet;
-	remaining: () => { tokens: number; ms: number };
-	/** Aborts when this practice's model calls end, a few seconds before its process is stopped. */
-	abortSignal: AbortSignal;
-	log: (text: string) => void;
+/** Why a read, a model call or a review gave no answer. Never a statement about the work. */
+export type UnratedReason = Reason | "cancelled";
+
+export interface GrepOptions {
+	/** A file glob such as "*.ts". */
+	glob?: string;
+	maxResults?: number;
+	fixedString?: boolean;
 }
 
-/** The change of a pull request: the only kind of work that has one. */
-interface ChangeFields {
-	/** The absolute path of the repository checkout at the reviewed head. */
-	repo: string;
-	/** The parsed change: path → added and removed lines, keyed by line number. */
-	change: ReadonlyMap<string, DiffFile>;
-	/** The folder of the change view: `diff.patch`, `diff_stat.txt` and `files.json`. */
-	changeDir: string;
+/**
+ * One pinned tree of the reviewed repository. ABSENT is proved absence; a read that fails throws
+ * `UnratedError("unavailable")`, so a capture failure never reads as an empty file.
+ */
+export interface FileTree {
+	/** The pinned full commit SHA. */
+	readonly revision: string;
+	read: (
+		path: string,
+	) => Promise<
+		| { status: "FOUND"; text: string; truncated: boolean }
+		| { status: "BINARY" }
+		| { status: "ABSENT" }
+	>;
+	list: (glob?: string) => Promise<{ paths: readonly string[]; truncated: boolean }>;
+	grep: (
+		pattern: string,
+		options?: GrepOptions,
+	) => Promise<{ matches: readonly GrepMatch[]; truncated: boolean }>;
+	/** A verified citation of lines of a file in this tree, its quote read from the tree. */
+	cite: (path: string, startLine: number, endLine?: number) => Promise<Citation>;
+}
+
+/** The captured change: its base and head commits and its parsed files. */
+export interface ChangeView {
+	readonly base: string;
+	readonly head: string;
+	/** Path → added and removed lines, keyed by line number. */
+	readonly files: ReadonlyMap<string, DiffFile>;
+	/** A verified citation of lines that the change adds (NEW) or removes (OLD). */
+	cite: (
+		path: string,
+		side: "OLD" | "NEW",
+		startLine: number,
+		endLine?: number,
+	) => Promise<Citation>;
+}
+
+/** The file trees of the reviewed work. Base reads arrive later; `base` is null for now. */
+export interface Files {
+	head: FileTree;
+	base: FileTree | null;
+	change: ChangeView | null;
+}
+
+/** The captured records under the context folder, and read tools for an agent. */
+export interface Evidence {
+	/** readFile, listFiles and grep over `files.head`; none when the work has no files. */
+	tools: ToolSet;
+	/** A captured record by its name in the context folder, such as "metadata.json". */
+	record: (name: string) => Promise<{ status: "FOUND"; text: string } | { status: "ABSENT" }>;
+	/** A verified citation of lines of a captured record. */
+	citeRecord: (name: string, startLine: number, endLine?: number) => Promise<Citation>;
+}
+
+/** The fields of the context that do not depend on the kind of the work. */
+interface Common<M extends ModelNeeds> {
+	/** The role that the practice is about. */
+	subject: { role: SubjectRole };
+	practice: { slug: string; revisionId: number; criteria: string };
+	/** The authored scope that the result is about. The key is opaque. */
+	scope: { key: string; mode: "change" | "whole"; description: string };
+	/** Null for work without a captured file tree: an issue, a conversation or a document. */
+	files: Files | null;
+	evidence: Evidence;
+	/** The direct models that `meta.models` declared. A review's own model calls are the host's. */
+	models: Models<M>;
+	/** What is left: tokens of direct model calls for this attempt, and milliseconds for this practice. */
+	budget: { remaining: () => { tokens: number; ms: number } };
+	/** The time of the review. Use it instead of the clock, so that one review gives the same result. */
+	now: string;
+	/** Aborts when this practice's execution ends: at its deadline, at the attempt's budget, or on cancellation. */
+	abortSignal: AbortSignal;
+	/** Progress for the log only. */
+	log: (text: string) => void;
+	/**
+	 * Review this practice in a fresh native session with the prepared input, and return its result.
+	 * One review at a time: a concurrent or nested call is refused. A review that ends without a result
+	 * rejects with `UnratedError` and its reason.
+	 */
+	review: (options?: ReviewOptions) => Promise<Candidate>;
 }
 
 /**
@@ -118,15 +205,15 @@ interface ChangeFields {
 export type PracticeScriptContext<M extends ModelNeeds, K extends Kind = Kind> = {
 	[P in K]: Common<M> & {
 		kind: P;
-		work: Work[P];
-		cause: Cause<P>;
+		work: Readonly<Work[P]>;
+		cause: Readonly<Cause<P>>;
 		previous: Previous<P> | null;
-	} & (P extends "scm.pull_request" ? ChangeFields : unknown);
+	};
 }[K];
 
 export interface PracticeScriptDefinition<M extends ModelNeeds> {
 	meta: PracticeScriptMeta<M>;
-	run: (ctx: PracticeScriptContext<M>) => Promise<PracticeScriptResult>;
+	run: (ctx: PracticeScriptContext<M>) => Promise<Candidate>;
 }
 
 /** Whether a module's default export is a definition: `meta` and `run`, as `definePracticeScript` takes them. */
@@ -136,7 +223,7 @@ export function isPracticeScriptDefinition(
 	return isJsonObject(value) && typeof value.run === "function" && isJsonObject(value.meta);
 }
 
-/** The literal types of `meta.models` decide which models `run` can use. */
+/** The literal types of `meta.models` decide which direct models `run` can use. */
 export function definePracticeScript<const M extends ModelNeeds>(
 	definition: PracticeScriptDefinition<M>,
 ): PracticeScriptDefinition<M> {
@@ -144,8 +231,8 @@ export function definePracticeScript<const M extends ModelNeeds>(
 }
 
 /**
- * Narrows `ctx` to the kind of work that the script reads. A practice reviews one kind of work, so a
- * mismatch is an error of the script, never a review that found nothing.
+ * Narrows `ctx` to the kind of work that the program reads. A practice reviews one kind of work, so a
+ * mismatch is an error of the program, never a review that found nothing.
  */
 export function expectKind<C extends { kind: Kind }, K extends C["kind"]>(
 	ctx: C,
@@ -156,19 +243,49 @@ export function expectKind<C extends { kind: Kind }, K extends C["kind"]>(
 	}
 }
 
-/** A model call the runner refused or could not finish. It is never a statement about the work. */
+/** A read, model call or review that the host refused or could not finish. It is never a statement about the work. */
 export class UnratedError extends Error {
-	readonly reason: Reason;
+	readonly reason: UnratedReason;
 
-	constructor(reason: Reason, message?: string) {
+	constructor(reason: UnratedReason, message?: string) {
 		super(message ?? `not rated: ${reason}`);
 		this.name = "UnratedError";
 		this.reason = reason;
 	}
 }
 
+/**
+ * The captured change, or an `UnratedError("unavailable")` when the work has none. A program that
+ * needs the change stops here: a missing capture is never an empty change.
+ */
+export function requireChange(files: Files | null): ReadonlyMap<string, DiffFile> {
+	if (files?.change == null) {
+		throw new UnratedError("unavailable", "the change of this work was not captured");
+	}
+	return files.change.files;
+}
+
+/**
+ * The text of a captured record parsed as JSON, or null when the record was not captured or is not
+ * JSON. A read that fails throws `UnratedError("unavailable")`.
+ */
+export async function readRecordJson(
+	evidence: Pick<Evidence, "record">,
+	name: string,
+): Promise<unknown> {
+	const record = await evidence.record(name);
+	if (record.status === "ABSENT") {
+		return null;
+	}
+	try {
+		return JSON.parse(record.text);
+	} catch {
+		return null;
+	}
+}
+
 /** The reason a failed model call leaves its items unrated. */
-export function reasonOf(error: unknown): Reason {
+export function reasonOf(error: unknown): UnratedReason {
 	if (error instanceof UnratedError) {
 		return error.reason;
 	}
@@ -183,8 +300,8 @@ export function reasonOf(error: unknown): Reason {
 		return "deadline";
 	}
 	// The proxy answers 402 when a spending limit is reached, the workspace's or the attempt's, and
-	// 413 when a body holds more items than one model call of a practice script may send. A 429 is a
-	// rate limit, an error like any other.
+	// 413 when a body holds more items than one direct model call may send. A 429 is a rate limit, an
+	// error like any other.
 	if (APICallError.isInstance(error) && error.statusCode === 402) {
 		return "budget";
 	}
@@ -201,7 +318,7 @@ export function reasonOf(error: unknown): Reason {
 export async function step<T>(
 	label: string,
 	run: () => Promise<T>,
-): Promise<{ value: T } | { unrated: Reason }> {
+): Promise<{ value: T } | { unrated: UnratedReason }> {
 	const outer = callLabel.getStore();
 	try {
 		return {
@@ -253,11 +370,11 @@ export async function classify<I>(options: {
 	items: readonly I[];
 	/** How unrated items are named to the reviewer, e.g. "added comments". */
 	what: string;
-}): Promise<{ ratings: Map<I, Rating>; unrated: Unrated[] }> {
+}): Promise<{ ratings: Map<I, Rating>; unrated: Omission[] }> {
 	const { model, set, items, what } = options;
 	const ratings = new Map<I, Rating>();
-	const missed = new Map<Reason, number>();
-	const miss = (reason: Reason, count: number) => {
+	const missed = new Map<UnratedReason, number>();
+	const miss = (reason: UnratedReason, count: number) => {
 		if (count > 0) {
 			missed.set(reason, (missed.get(reason) ?? 0) + count);
 		}

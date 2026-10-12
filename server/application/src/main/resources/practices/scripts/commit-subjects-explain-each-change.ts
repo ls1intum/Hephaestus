@@ -1,25 +1,19 @@
 // Finds each authored commit subject in the commit record, with its shapes: bare, repeated or cut off.
 // A shape is a place to check, not a lapse.
 import { readCapturedCommits } from "../lib/change.ts";
-import {
-	COMMIT_KIND,
-	describeCommitCount,
-	subjectFacts,
-	subjectLeads,
-} from "../lib/commit-subjects.ts";
+import { describeCommitCount, subjectFacts, subjectLeads } from "../lib/commit-subjects.ts";
 import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 
+export const LABELS = {
+	commit:
+		"An authored commit of the reviewed range, with the shapes of its subject: bare, repeated or cut off.",
+};
+
 export default definePracticeScript({
-	meta: {
-		version: 1,
-		kinds: {
-			[COMMIT_KIND]:
-				"An authored commit of the reviewed range, with the shapes of its subject: bare, repeated or cut off.",
-		},
-	},
+	meta: {},
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const captured = await readCapturedCommits(ctx.context.dir);
+		const captured = await readCapturedCommits(ctx.evidence);
 		const facts = subjectFacts(captured ?? []);
 		const authored = facts.filter((f) => !f.merge);
 		let directions = [
@@ -33,8 +27,8 @@ export default definePracticeScript({
 		} else if (authored.length === 0) {
 			directions = ["No authored commit in the reviewed range: only merge commits, or none."];
 		}
-		return {
-			leads: subjectLeads(facts).slice(0, 200),
+		return ctx.review({
+			leads: subjectLeads(facts, LABELS.commit).slice(0, 200),
 			...(captured === null
 				? {}
 				: {
@@ -47,6 +41,6 @@ export default definePracticeScript({
 						},
 					}),
 			directions,
-		};
+		});
 	},
 });
