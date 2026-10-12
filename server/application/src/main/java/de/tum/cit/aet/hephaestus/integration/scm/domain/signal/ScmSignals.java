@@ -72,6 +72,20 @@ public final class ScmSignals {
     public static final Set<String> REVIEWABLE_ISSUE_FIELDS = Set.of(
             "title", "body", "state", "stateReason", "issueType", "milestone", "relationships", ISSUE_DISCUSSION_FIELD);
 
+    /** The field a pull-request update names when the issues it closes changed. */
+    public static final String CLOSING_ISSUES_FIELD = "closingIssues";
+
+    /**
+     * Issue fields the linked-issue material of a merged pull request reads ({@code LinkedWorkItemContentSource}):
+     * a change to any of them is a new {@link #PULL_REQUEST_LINKED_ISSUE_UPDATED} occasion, whatever the state.
+     */
+    public static final Set<String> LINKED_ISSUE_MATERIAL_FIELDS =
+            Set.of("title", "body", "state", "createdAt", "closedAt");
+
+    /** Pull-request fields the same material reads: the head, the text and the issues it closes. */
+    public static final Set<String> LINKED_PULL_REQUEST_MATERIAL_FIELDS =
+            Set.of("headRefOid", "title", "body", CLOSING_ISSUES_FIELD);
+
     private static final Map<String, SignalName> BY_TRIGGER_EVENT = Map.of(
             TriggerEventNames.PULL_REQUEST_CREATED,
             PULL_REQUEST_OPENED,

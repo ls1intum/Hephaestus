@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
@@ -47,6 +48,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Import(DeferredIssueEventIntegrationTest.Configuration.class)
 class DeferredIssueEventIntegrationTest extends BaseIntegrationTest {
+
+    @Autowired
+    private ReviewRepositoryPreparer repositoryPreparer;
+
     private static final long PULL_REQUEST_ID = 4242L;
 
     @Autowired
@@ -150,7 +155,8 @@ class DeferredIssueEventIntegrationTest extends BaseIntegrationTest {
                 fixture.resolver(),
                 recorder,
                 revisions,
-                transactionManager);
+                transactionManager,
+                repositoryPreparer);
         var updated = event();
 
         listener.onIssueCreated(new ScmDomainEvent.IssueCreated(updated.issue(), updated.context()));
@@ -237,14 +243,18 @@ class DeferredIssueEventIntegrationTest extends BaseIntegrationTest {
     static class Configuration {
         @Bean
         AgentJobEventListener deferredPullRequestListener(
-                Fixture fixture, SignalRecorder recorder, IntegrationManifestRegistry manifests) {
+                Fixture fixture,
+                SignalRecorder recorder,
+                IntegrationManifestRegistry manifests,
+                ReviewRepositoryPreparer repositoryPreparer) {
             return new AgentJobEventListener(
                     mock(AgentJobService.class),
                     fixture.pullRequests(),
                     mock(ReviewGate.class),
                     fixture.resolver(),
                     recorder,
-                    manifests);
+                    manifests,
+                    repositoryPreparer);
         }
 
         @Bean
@@ -262,7 +272,8 @@ class DeferredIssueEventIntegrationTest extends BaseIntegrationTest {
                 IssueRepository issues,
                 SignalRecorder recorder,
                 IssueEvidenceRevision revisions,
-                PlatformTransactionManager transactionManager) {
+                PlatformTransactionManager transactionManager,
+                ReviewRepositoryPreparer repositoryPreparer) {
             return new IssueAgentJobEventListener(
                     mock(AgentJobService.class),
                     issues,
@@ -271,7 +282,8 @@ class DeferredIssueEventIntegrationTest extends BaseIntegrationTest {
                     fixture.resolver(),
                     recorder,
                     revisions,
-                    transactionManager);
+                    transactionManager,
+                    repositoryPreparer);
         }
     }
 }

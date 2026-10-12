@@ -277,6 +277,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         if (!Objects.equals(oldIssue.getClosedAt(), newIssue.getClosedAt())) {
             changedFields.add("closedAt");
         }
+        if (!Objects.equals(oldIssue.getCreatedAt(), newIssue.getCreatedAt())) {
+            changedFields.add("createdAt");
+        }
         if (!Objects.equals(oldIssue.getMilestone(), newIssue.getMilestone())) {
             changedFields.add("milestone");
         }

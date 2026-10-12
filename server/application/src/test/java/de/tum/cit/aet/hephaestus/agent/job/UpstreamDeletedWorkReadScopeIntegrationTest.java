@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextQueryRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
@@ -82,6 +83,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * tier mocks these repositories and would pass either way.
  */
 class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceIntegrationTest {
+
+    @Autowired
+    private ReviewRepositoryPreparer repositoryPreparer;
 
     private static final int PR_NUMBER = 42;
     private static final int ISSUE_NUMBER = 43;
@@ -308,7 +312,13 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
         var jobs = mock(AgentJobService.class);
         var reviewGate = mock(ReviewGate.class);
         var listener = new AgentJobEventListener(
-                jobs, pullRequestRepository, reviewGate, workspaceResolver, signalRecorder, manifests);
+                jobs,
+                pullRequestRepository,
+                reviewGate,
+                workspaceResolver,
+                signalRecorder,
+                manifests,
+                repositoryPreparer);
         tombstonePullRequest();
 
         transactionTemplate.executeWithoutResult(status -> listener.onPullRequestCreated(event));
@@ -362,7 +372,8 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
                 workspaceResolver,
                 signalRecorder,
                 issueEvidenceRevision,
-                Objects.requireNonNull(transactionTemplate.getTransactionManager()));
+                Objects.requireNonNull(transactionTemplate.getTransactionManager()),
+                repositoryPreparer);
         tombstoneIssue();
 
         transactionTemplate.executeWithoutResult(status -> listener.onIssueCreated(event));

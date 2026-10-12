@@ -154,7 +154,8 @@ public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessage
                 return;
             }
             if (closing != null) {
-                mergeRequestProcessor.replaceClosingIssues(repository, iid, closing, stored.version());
+                mergeRequestProcessor.replaceClosingIssues(
+                        repository, iid, closing, stored.version(), stored.context());
             }
             if (threads != null && scopeId != null) {
                 discussionSyncService.applyThreadResolutions(repository, iid, threads, scopeId);

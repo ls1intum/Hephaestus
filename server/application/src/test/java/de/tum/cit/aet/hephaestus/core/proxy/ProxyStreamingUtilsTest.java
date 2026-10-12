@@ -609,8 +609,7 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             var usage = pooled(factory, "data: {\"usage\":{\"prompt_tokens\":3}}\n\n");
             var cancelled = new AtomicBoolean();
             var subscriptions = new AtomicInteger();
-            Flux<DataBuffer> body = Flux.<DataBuffer>just(content)
-                    .concatWith(Flux.<DataBuffer>just(usage).concatWith(Flux.never()))
+            Flux<DataBuffer> body = Flux.<DataBuffer>just(content, usage)
                     .doOnSubscribe(s -> subscriptions.incrementAndGet())
                     .doOnCancel(() -> cancelled.set(true));
             var response = mock(HttpServletResponse.class);

@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.context.providers.LinkedWorkItemContentSource;
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
@@ -27,7 +27,6 @@ import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.util.Collections;
-import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +60,7 @@ public class IssueAgentJobEventListener {
     private final AgentJobService agentJobService;
 
     private final IssueRepository issueRepository;
-    private final PullRequestRepository pullRequestRepository;
+    private final LinkedIssueOccasions linkedIssueOccasions;
     private final ReviewGate reviewGate;
     private final WorkspaceResolver workspaceResolver;
     private final SignalRecorder signalRecorder;
@@ -76,10 +75,12 @@ public class IssueAgentJobEventListener {
             WorkspaceResolver workspaceResolver,
             SignalRecorder signalRecorder,
             IssueEvidenceRevision revisions,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            ReviewRepositoryPreparer repositoryPreparer) {
         this.agentJobService = agentJobService;
         this.issueRepository = issueRepository;
-        this.pullRequestRepository = pullRequestRepository;
+        this.linkedIssueOccasions =
+                new LinkedIssueOccasions(pullRequestRepository, workspaceResolver, signalRecorder, repositoryPreparer);
         this.reviewGate = reviewGate;
         this.workspaceResolver = workspaceResolver;
         this.signalRecorder = signalRecorder;
@@ -102,36 +103,38 @@ public class IssueAgentJobEventListener {
      */
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void onIssueUpdated(ScmDomainEvent.IssueUpdated event) {
-        if (event.issue().isPullRequest()
-                || Collections.disjoint(event.changedFields(), ScmSignals.REVIEWABLE_ISSUE_FIELDS)) {
+        if (event.issue().isPullRequest()) {
             return;
         }
-        if (event.issue().state() == Issue.State.CLOSED
-                && !Collections.disjoint(event.changedFields(), Set.of("title", "body"))) {
-            for (Long pullRequestId : pullRequestRepository.findMergedClosingPullRequestIdsByIssueId(
-                    event.issue().id())) {
-                var pullRequest = pullRequestRepository
-                        .findByIdWithAllForGate(pullRequestId)
-                        .orElse(null);
-                if (pullRequest == null || pullRequest.getRepository() == null) continue;
-                var closing = pullRequestRepository.findClosingIssuesById(pullRequestId);
-                for (Workspace workspace : workspaceResolver.resolveAllForRepository(
-                        pullRequest.getRepository().getNameWithOwner())) {
-                    LinkedWorkItemContentSource.currentClosingMaterialKey(workspace.getId(), pullRequest, closing)
-                            .ifPresent(key -> {
-                                if (event.context().isSync()) {
-                                    signalRecorder.record(key, event.context().occurredAt(), DiscoveredVia.SYNC);
-                                } else {
-                                    signalRecorder.defer(
-                                            key,
-                                            event.context().occurredAt(),
-                                            event.context().actorUserId());
-                                }
-                            });
-                }
-            }
+        // Before the review-field guard: a closing date alone changes the linked material, not the issue's review.
+        if (!Collections.disjoint(event.changedFields(), ScmSignals.LINKED_ISSUE_MATERIAL_FIELDS)) {
+            linkedIssueOccasions.forIssue(event.issue().id(), event.context());
+        }
+        if (Collections.disjoint(event.changedFields(), ScmSignals.REVIEWABLE_ISSUE_FIELDS)) {
+            return;
         }
         recordUpdate(event, revisions.of(event.issue()));
+    }
+
+    /**
+     * A live close or reopen, which a provider may raise without an {@link ScmDomainEvent.IssueUpdated}: GitHub's
+     * close and GitLab's close raise only this. A sync finds the same transition as an update, and replays every
+     * close it sees.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void onIssueClosedLinkedMaterial(ScmDomainEvent.IssueClosed event) {
+        recordLinkedMaterial(event.issue(), event.context());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void onIssueReopened(ScmDomainEvent.IssueReopened event) {
+        recordLinkedMaterial(event.issue(), event.context());
+    }
+
+    private void recordLinkedMaterial(ScmEventPayload.IssueData issue, EventContext context) {
+        if (!issue.isPullRequest() && !context.isSync()) {
+            linkedIssueOccasions.forIssue(issue.id(), context);
+        }
     }
 
     void recordUpdate(ScmDomainEvent.IssueUpdated event, SignalRevision revision) {

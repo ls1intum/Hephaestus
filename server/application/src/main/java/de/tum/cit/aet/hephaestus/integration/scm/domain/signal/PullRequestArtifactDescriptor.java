@@ -53,10 +53,11 @@ public class PullRequestArtifactDescriptor implements ArtifactDescriptor {
                     ScmSignals.PULL_REQUEST_EDITED,
                     "Title or description edited",
                     Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
+            // An issue edit, close or reopen, or a merged pull request's own edit, head or closing issues.
             declareInternal(
                     ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED,
                     "Linked issue outcome updated",
-                    Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
+                    Set.of(GITHUB_ISSUES, GITLAB_ISSUE, GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
             // GitHub has a dedicated review event; GitLab splits the same fact across an approval on the
             // merge request and a review note.
             declare(

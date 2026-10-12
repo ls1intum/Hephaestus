@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.BaseGitLabProcessor;
@@ -130,17 +131,28 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
      * the closes-issues route after a webhook: the sync compares {@code updatedAt} against the value
      * that webhook stored, so it would not read the links for this change. A statement read for {@code readFor}
      * changes nothing once another event or a sync stored a newer version, which reads the links itself.
+     *
+     * <p>The accepted local update retains the initiating delivery's source and actor. Its event time follows
+     * {@link EventContext#from}, and its stored version still fences a late read.
      */
     @Transactional
     public void replaceClosingIssues(
-            Repository repository, int iid, List<Integer> closingIssueNumbers, StoredVersion readFor) {
+            Repository repository,
+            int iid,
+            List<Integer> closingIssueNumbers,
+            StoredVersion readFor,
+            ProcessingContext context) {
         pullRequestRepository
                 .findForUpdateByRepositoryIdAndNumber(repository.getId(), iid)
                 .filter(pr -> Objects.equals(pr.getHeadRefOid(), readFor.head())
                         && Objects.equals(pr.getUpdatedAt(), readFor.updatedAt()))
                 .ifPresent(pr -> {
                     if (pr.replaceClosingIssues(resolveLocalIssues(repository, closingIssueNumbers))) {
-                        pullRequestRepository.save(pr);
+                        PullRequest stored = pullRequestRepository.save(pr);
+                        eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
+                                ScmEventPayload.PullRequestData.from(stored),
+                                Set.of("relationships", ScmSignals.CLOSING_ISSUES_FIELD),
+                                EventContext.from(context)));
                     }
                 });
     }
@@ -1081,9 +1093,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         if (headCaptured || data.headPipeline().kind() == GitLabHeadPipeline.Kind.REPORTED) {
             changed |= data.headPipeline().observeOn(pr, context.observedAt());
         }
-        if (data.closingIssueNumbers() != null) {
-            changed |= pr.replaceClosingIssues(resolveLocalIssues(repository, data.closingIssueNumbers()));
-        }
+        boolean closingIssuesChanged = data.closingIssueNumbers() != null
+                && pr.replaceClosingIssues(resolveLocalIssues(repository, data.closingIssueNumbers()));
+        changed |= closingIssuesChanged;
         if (changed) {
             pr = pullRequestRepository.save(pr);
         }
@@ -1109,8 +1121,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
             log.debug("Created merge request from sync: nativeId={}, iid={}", nativeId, data.iid());
         } else {
-            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
-                    prData, authoredChanges(previousTitle, previousBody, pr), eventCtx));
+            // The sync also names a moved head and changed closing issues, which merged work has no other event for.
+            Set<String> changedFields = authoredChanges(previousTitle, previousBody, pr);
+            if (headMoved) changedFields.add("headRefOid");
+            if (closingIssuesChanged) {
+                changedFields.add("relationships");
+                changedFields.add(ScmSignals.CLOSING_ISSUES_FIELD);
+            }
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(prData, changedFields, eventCtx));
             // A merge the webhook missed is recorded as the sync found it, so a later delivery of it can still
             // claim it; a sync records it without starting a review.
             if (isMerged && previousState != Issue.State.MERGED) {

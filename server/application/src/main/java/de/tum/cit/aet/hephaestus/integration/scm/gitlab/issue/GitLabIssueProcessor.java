@@ -181,8 +181,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
     /**
      * Handles an {@code action=update} issue event. Persists the issue, publishes one
-     * {@link ScmDomainEvent.IssueUpdated} carrying what the webhook's {@code changes} diff says moved,
-     * then one {@link ScmDomainEvent.IssueLabeled} per newly-added label — GitLab has no native
+     * {@link ScmDomainEvent.IssueUpdated} carrying what the webhook's {@code changes} diff says moved and
+     * which stored dates it refined, then one {@link ScmDomainEvent.IssueLabeled} per newly-added label — GitLab has no native
      * "labeled" action, so this is how the activity feed reaches parity with GitHub. An update that
      * moved only attributes the shared domain has no field name for (due date, weight, time tracking)
      * publishes nothing: the mirror is refreshed either way, and an event with an empty diff would tell
@@ -192,10 +192,23 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     @Nullable
     public Issue processUpdated(GitLabIssueEventDTO event, ProcessingContext context) {
         List<GitLabWebhookLabel> addedLabels = event.addedLabels();
-        Set<String> changedFields = event.changedFields();
+        Set<String> changedFields = new HashSet<>(event.changedFields());
+        var attributes = event.objectAttributes();
+        Repository repository = context.repository();
+        Integer iid = attributes == null ? null : attributes.iid();
+        ScmEventPayload.@Nullable IssueData previous = repository == null || iid == null
+                ? null
+                : issueRepository
+                        .findByRepositoryIdAndNumber(repository.getId(), iid)
+                        .map(ScmEventPayload.IssueData::from)
+                        .orElse(null);
         Issue issue = processInternal(event, context);
         if (issue == null) {
             return issue;
+        }
+        // GitLab's diff names no date; the stored row says whether this delivery refined one.
+        if (previous != null) {
+            changedFields.addAll(changedDates(previous, ScmEventPayload.IssueData.from(issue)));
         }
         if (!changedFields.isEmpty()) {
             eventPublisher.publishEvent(new ScmDomainEvent.IssueUpdated(
@@ -407,10 +420,19 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         if (!Objects.equals(previous.stateReason(), current.stateReason())) changed.add("stateReason");
         if (!Objects.equals(previous.issueType(), current.issueType())) changed.add("issueType");
         if (!Objects.equals(previous.milestone(), current.milestone())) changed.add("milestone");
+        changed.addAll(changedDates(previous, current));
         if (!new HashSet<>(previous.labels()).equals(new HashSet<>(current.labels()))
                 || !new HashSet<>(previous.assignees()).equals(new HashSet<>(current.assignees()))) {
             changed.add("relationships");
         }
+        return changed;
+    }
+
+    /** The opening and closing dates as stored; a refinement can arrive without a change of state. */
+    private static Set<String> changedDates(ScmEventPayload.IssueData previous, ScmEventPayload.IssueData current) {
+        Set<String> changed = new HashSet<>();
+        if (!Objects.equals(previous.createdAt(), current.createdAt())) changed.add("createdAt");
+        if (!Objects.equals(previous.closedAt(), current.closedAt())) changed.add("closedAt");
         return changed;
     }
 

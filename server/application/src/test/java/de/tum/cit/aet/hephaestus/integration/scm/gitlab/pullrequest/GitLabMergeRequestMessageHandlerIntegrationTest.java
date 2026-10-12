@@ -15,6 +15,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobEventListener;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
@@ -124,6 +125,9 @@ import tools.jackson.databind.node.ObjectNode;
 @Tag("integration")
 @DisplayName("GitLab Merge Request Message Handler")
 class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTest {
+
+    @Autowired
+    private ReviewRepositoryPreparer repositoryPreparer;
 
     private static final long NATIVE_AUTHOR_ID = 18024L;
     private static final String FIXTURE_AUTHOR_LOGIN = "ga84xah";
@@ -2783,7 +2787,13 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
         private AgentJobEventListener listener() {
             return new AgentJobEventListener(
-                    jobs, pullRequestRepository, gate, workspaceResolver, signalRecorder, manifests);
+                    jobs,
+                    pullRequestRepository,
+                    gate,
+                    workspaceResolver,
+                    signalRecorder,
+                    manifests,
+                    repositoryPreparer);
         }
 
         private PullRequestSignalResubmitter resubmitter() {
@@ -2849,7 +2859,13 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             var jobs = mock(AgentJobService.class);
             var gate = mock(ReviewGate.class);
             var listener = new AgentJobEventListener(
-                    jobs, pullRequestRepository, gate, workspaceResolver, signalRecorder, manifests);
+                    jobs,
+                    pullRequestRepository,
+                    gate,
+                    workspaceResolver,
+                    signalRecorder,
+                    manifests,
+                    repositoryPreparer);
             transactionTemplate.executeWithoutResult(status -> listener.onPullRequestCreated(created));
 
             ArtifactSignal held = artifactSignalRepository

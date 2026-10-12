@@ -16,6 +16,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
@@ -60,6 +61,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 class IssueAgentJobEventListenerTest extends BaseUnitTest {
+
+    @Mock
+    private ReviewRepositoryPreparer repositoryPreparer;
 
     private static final RepositoryRef REPO_REF = new RepositoryRef(100L, "owner/repo", "main");
     private static final Long ISSUE_ID = 789L;
@@ -106,7 +110,8 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
                 signalRecorder,
                 new IssueEvidenceRevision(
                         issueCommentRepository, new IssueCommentProvenance(mock(DeliveredIssueCommentLookup.class))),
-                transactionManager);
+                transactionManager,
+                repositoryPreparer);
         lenient()
                 .when(transactionManager.getTransaction(any()))
                 .thenAnswer(invocation -> new SimpleTransactionStatus());
@@ -617,6 +622,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             Issue closing = createIssue(Issue.State.CLOSED);
             PullRequest merged = new PullRequest();
             merged.setId(99L);
+            merged.setMerged(true);
             merged.setRepository(closing.getRepository());
             merged.setTitle("Implement the outcome");
             merged.setBody("Closes #7");
@@ -625,6 +631,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
                     .thenReturn(List.of(99L));
             when(pullRequestRepository.findByIdWithAllForGate(99L)).thenReturn(Optional.of(merged));
             when(pullRequestRepository.findClosingIssuesById(99L)).thenReturn(List.of(closing));
+            when(repositoryPreparer.permittedRepositories(WORKSPACE_ID)).thenReturn(List.of(closing.getRepository()));
             var context = webhookContext(1L);
 
             listener.onIssueUpdated(
@@ -637,6 +644,58 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
                     .containsExactly(ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED, ScmSignals.ISSUE_UPDATED);
             assertThat(keys.getAllValues()).extracting(SignalKey::artifactId).containsExactly(99L, ISSUE_ID);
             verifyNoInteractions(agentJobService);
+        }
+
+        /** The material reads the closing date and the state; neither is the issue's own review, nor needs CLOSED. */
+        @ParameterizedTest
+        @EnumSource(
+                value = Issue.State.class,
+                names = {"OPEN", "CLOSED"})
+        void shouldRecordOnlyTheLinkedOccasionWhenAClosingDateAloneIsRefined(Issue.State state) {
+            closedByMergedRequest(state);
+            var context = webhookContext(1L);
+
+            listener.onIssueUpdated(
+                    new ScmDomainEvent.IssueUpdated(createIssueData(state), Set.of("closedAt"), context));
+
+            var key = ArgumentCaptor.forClass(SignalKey.class);
+            verify(signalRecorder).defer(key.capture(), eq(context.occurredAt()), eq(null));
+            assertThat(key.getValue().signalName()).isEqualTo(ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED);
+            assertThat(key.getValue().artifactId()).isEqualTo(99L);
+            verifyNoInteractions(agentJobService);
+        }
+
+        @Test
+        void shouldRecordTheLinkedOccasionOfALiveCloseOrReopenButNotOfASyncReplay() {
+            closedByMergedRequest(Issue.State.CLOSED);
+            var live = webhookContext(1L);
+
+            listener.onIssueClosedLinkedMaterial(
+                    new ScmDomainEvent.IssueClosed(createIssueData(Issue.State.CLOSED), "completed", live));
+            listener.onIssueReopened(new ScmDomainEvent.IssueReopened(createIssueData(Issue.State.OPEN), live));
+            listener.onIssueClosedLinkedMaterial(
+                    new ScmDomainEvent.IssueClosed(createIssueData(Issue.State.CLOSED), "completed", syncContext()));
+
+            verify(signalRecorder, times(2)).defer(any(), eq(live.occurredAt()), eq(null));
+            verify(signalRecorder, never()).record(any(), any(), any());
+            verify(pullRequestRepository, times(2)).findMergedClosingPullRequestIdsByIssueId(ISSUE_ID);
+        }
+
+        /** Merged request 99 closes this issue, stored in the given state. */
+        private void closedByMergedRequest(Issue.State state) {
+            Issue closing = createIssue(state);
+            PullRequest merged = new PullRequest();
+            merged.setId(99L);
+            merged.setMerged(true);
+            merged.setRepository(closing.getRepository());
+            merged.setTitle("Implement the outcome");
+            merged.setBody("Closes #7");
+            merged.setHeadRefOid("abc123");
+            when(pullRequestRepository.findMergedClosingPullRequestIdsByIssueId(ISSUE_ID))
+                    .thenReturn(List.of(99L));
+            when(pullRequestRepository.findByIdWithAllForGate(99L)).thenReturn(Optional.of(merged));
+            when(pullRequestRepository.findClosingIssuesById(99L)).thenReturn(List.of(closing));
+            when(repositoryPreparer.permittedRepositories(WORKSPACE_ID)).thenReturn(List.of(closing.getRepository()));
         }
     }
 }

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
@@ -64,6 +65,7 @@ public class AgentJobEventListener {
     private final WorkspaceResolver workspaceResolver;
     private final SignalRecorder signalRecorder;
     private final IntegrationManifestRegistry manifests;
+    private final LinkedIssueOccasions linkedIssueOccasions;
 
     public AgentJobEventListener(
             AgentJobService agentJobService,
@@ -71,13 +73,16 @@ public class AgentJobEventListener {
             ReviewGate reviewGate,
             WorkspaceResolver workspaceResolver,
             SignalRecorder signalRecorder,
-            IntegrationManifestRegistry manifests) {
+            IntegrationManifestRegistry manifests,
+            ReviewRepositoryPreparer repositoryPreparer) {
         this.agentJobService = agentJobService;
         this.pullRequestRepository = pullRequestRepository;
         this.reviewGate = reviewGate;
         this.workspaceResolver = workspaceResolver;
         this.signalRecorder = signalRecorder;
         this.manifests = manifests;
+        this.linkedIssueOccasions =
+                new LinkedIssueOccasions(pullRequestRepository, workspaceResolver, signalRecorder, repositoryPreparer);
     }
 
     @Async
@@ -105,6 +110,11 @@ public class AgentJobEventListener {
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void onPullRequestSynchronized(ScmDomainEvent.PullRequestSynchronized event) {
         ScmEventPayload.PullRequestData prData = event.pullRequest();
+        // A merged head can still move; GitLab names that move only with this event.
+        if (isMerged(prData)) {
+            linkedIssueOccasions.forPullRequest(prData.id(), event.context());
+            return;
+        }
         if (event.context().isSync() || isClosedOrMerged(prData.state(), prData.isMerged())) {
             return;
         }
@@ -128,10 +138,17 @@ public class AgentJobEventListener {
      * same head, title and body and therefore the same ledger key. A live edit settles with pushes in
      * {@link PullRequestPushCoalescer}, committed with the mirror for the reason
      * {@link #onPullRequestSynchronized} gives; a reconciled one is recorded, not reviewed.
+     *
+     * <p>Merged work is not edited for review; a change to the material its linked-issue occasion reads is that
+     * occasion instead. A label or assignee change, or a redelivery, leaves the material key where it was.
      */
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void onPullRequestUpdated(ScmDomainEvent.PullRequestUpdated event) {
         ScmEventPayload.PullRequestData prData = event.pullRequest();
+        if (isMerged(prData)
+                && !Collections.disjoint(event.changedFields(), ScmSignals.LINKED_PULL_REQUEST_MATERIAL_FIELDS)) {
+            linkedIssueOccasions.forPullRequest(prData.id(), event.context());
+        }
         if (Collections.disjoint(event.changedFields(), Set.of("title", "body"))
                 || isClosedOrMerged(prData.state(), prData.isMerged())) {
             return;
@@ -363,6 +380,10 @@ public class AgentJobEventListener {
 
     private static boolean isClosedOrMerged(Issue.State state, boolean merged) {
         return state == Issue.State.CLOSED || state == Issue.State.MERGED || merged;
+    }
+
+    private static boolean isMerged(ScmEventPayload.PullRequestData prData) {
+        return prData.isMerged() || prData.state() == Issue.State.MERGED;
     }
 
     private boolean hasBranchInfo(PullRequest pr, Long prId) {
