@@ -2,6 +2,4 @@
 "hephaestus": minor
 ---
 
-The Practice profile overview response no longer includes its top-level `holdingUp` and `reviewedWork` fields after removal of the summary cards. Standing and practice-group responses retain their separate reviewed-work counts.
-
-**Operators:** Update custom API clients that read the removed overview fields before upgrading. The bundled web app is updated with this release.
+The Practice profile overview response's top-level `holdingUp` and `reviewedWork` fields are deprecated. Both fields continue to carry their full calculated values, so existing clients keep working. A future removal will follow the published deprecation policy. The separate reviewed-work counts in standing and practice-group responses remain supported.

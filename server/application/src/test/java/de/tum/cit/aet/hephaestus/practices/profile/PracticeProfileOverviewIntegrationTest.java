@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.AbstractPracticeReviewIntegrationTest;
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
+import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalogLoader;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
@@ -66,6 +67,9 @@ class PracticeProfileOverviewIntegrationTest extends AbstractPracticeReviewInteg
     private PracticeProfileOverviewService overviewService;
 
     @Autowired
+    private BundledPracticeCatalogLoader catalog;
+
+    @Autowired
     private TransactionTemplate transactionTemplate;
 
     @Autowired
@@ -96,7 +100,7 @@ class PracticeProfileOverviewIntegrationTest extends AbstractPracticeReviewInteg
         group.setName("Packaging work for review");
         group = groupRepository.save(group);
 
-        // Renamed in the workspace.
+        // Renamed in the workspace; the catalog phrase still follows the source slug.
         describeWhatAndWhy =
                 persistPractice(workspace, group, "explain-changes", "Explain each change", "describe-what-and-why");
         reviewableDiffSize =
@@ -149,6 +153,21 @@ class PracticeProfileOverviewIntegrationTest extends AbstractPracticeReviewInteg
 
     @Test
     @WithUser
+    void shouldShowNoPhraseWhenTheCatalogWithdrewThePracticeFromAutomatedReview() {
+        // Earlier positives of a copy whose catalogue entry now needs human review.
+        jdbc.update(
+                "UPDATE practice SET source_curated_slug = 'issue-closed-with-unmet-outcome' WHERE id = ?",
+                describeWhatAndWhy.getId());
+
+        readOverview()
+                .jsonPath("$.holdingUp[0].practiceSlug")
+                .isEqualTo("explain-changes")
+                .jsonPath("$.holdingUp[0].holdsAs")
+                .doesNotExist();
+    }
+
+    @Test
+    @WithUser
     @DisplayName("the window opens at the previous run and reports what the latest one changed")
     void shouldReportWhatTheLatestRunChangedWhenTheWindowOpensAtThePreviousRun() {
         readOverview()
@@ -162,6 +181,29 @@ class PracticeProfileOverviewIntegrationTest extends AbstractPracticeReviewInteg
                 .isEqualTo("#22")
                 .jsonPath("$.latestRun.reviewedWork.url")
                 .isEqualTo("https://github.com/acme/api/pull/22")
+                .jsonPath("$.reviewedWork.length()")
+                .isEqualTo(1)
+                .jsonPath("$.reviewedWork[0].label")
+                .isEqualTo("#22")
+                .jsonPath("$.reviewedWork[0].kind")
+                .isEqualTo("scm.pull_request")
+                .jsonPath("$.reviewedWork[0].container")
+                .isEqualTo("acme/api")
+                // Holding: clean on all three pull requests, and named by the catalog's phrase.
+                .jsonPath("$.holdingUp.length()")
+                .isEqualTo(1)
+                .jsonPath("$.holdingUp[0].practiceSlug")
+                .isEqualTo("explain-changes")
+                .jsonPath("$.holdingUp[0].holdsAs")
+                .isEqualTo(catalog.holdsAs("describe-what-and-why").orElseThrow())
+                .jsonPath("$.holdingUp[0].cleanWork")
+                .isEqualTo(3)
+                .jsonPath("$.holdingUp[0].workKind")
+                .isEqualTo("scm.pull_request")
+                .jsonPath("$.holdingUp[0].workProvider")
+                .isEqualTo("GITHUB")
+                .jsonPath("$.holdingUp[0].since")
+                .isEqualTo(FIRST_RUN_AT.toString())
                 // The second slip on #22 pulled the practice down and the group with it.
                 .jsonPath("$.changes[?(@.type == 'STANDING_MOVED')].practiceSlug")
                 .isEqualTo("reviewable-diff-size")
@@ -220,6 +262,10 @@ class PracticeProfileOverviewIntegrationTest extends AbstractPracticeReviewInteg
                 .isEqualTo(LATEST_RUN_AT.toString())
                 .jsonPath("$.latestRun.reviewId")
                 .isEqualTo(recoveryRun.getId().toString())
+                .jsonPath("$.reviewedWork.length()")
+                .isEqualTo(1)
+                .jsonPath("$.reviewedWork[0].label")
+                .isEqualTo("#23")
                 // #23 lifted the diff practice out of the slip on #22, and the group with it.
                 .jsonPath("$.changes[?(@.type == 'STANDING_MOVED')].practiceSlug")
                 .isEqualTo("reviewable-diff-size")
@@ -240,7 +286,14 @@ class PracticeProfileOverviewIntegrationTest extends AbstractPracticeReviewInteg
                 .jsonPath("$.changes[?(@.type == 'FEEDBACK_RESOLVED')].feedbackId")
                 .isEqualTo(olderFeedback.getId().toString())
                 .jsonPath("$.changes.length()")
-                .isEqualTo(3);
+                .isEqualTo(3)
+                // Descriptions are clean on all four pull requests; the diff is not.
+                .jsonPath("$.holdingUp.length()")
+                .isEqualTo(1)
+                .jsonPath("$.holdingUp[0].practiceSlug")
+                .isEqualTo("explain-changes")
+                .jsonPath("$.holdingUp[0].cleanWork")
+                .isEqualTo(4);
     }
 
     /**
@@ -491,10 +544,18 @@ class PracticeProfileOverviewIntegrationTest extends AbstractPracticeReviewInteg
                 .isEqualTo(PREVIOUS_RUN_AT.toString())
                 .jsonPath("$.latestRun.reviewId")
                 .isEqualTo(latestRun.getId().toString())
+                .jsonPath("$.reviewedWork.length()")
+                .isEqualTo(1)
+                .jsonPath("$.reviewedWork[0].label")
+                .isEqualTo("#22")
                 .jsonPath("$.changes.length()")
                 .isEqualTo(4)
                 .jsonPath("$.changes[?(@.feedbackId == '" + foreignFeedback.getId() + "')]")
-                .isEmpty();
+                .isEmpty()
+                .jsonPath("$.holdingUp.length()")
+                .isEqualTo(1)
+                .jsonPath("$.holdingUp[0].cleanWork")
+                .isEqualTo(3);
     }
 
     /**

@@ -2269,6 +2269,35 @@ export type GroupAutonomyRollup = {
     overriddenCount: number;
 };
 
+/**
+ * A practice the developer's newest work keeps meeting
+ */
+export type HeldPractice = {
+    /**
+     * How many of the newest pieces of work in a row came back clean
+     */
+    cleanWork: number;
+    groupSlug?: string;
+    /**
+     * What the developer keeps doing, in the catalog's words; absent for a practice the catalog does not ship
+     */
+    holdsAs?: string;
+    practiceName: string;
+    practiceSlug: string;
+    /**
+     * When the oldest piece of work of the clean run was reviewed
+     */
+    since: string;
+    /**
+     * Artifact kind id most of that work is
+     */
+    workKind: string;
+    /**
+     * The provider most of that work lives at, which decides its noun: a GitLab scm.pull_request is a merge request; absent when no run that reviewed the work is left
+     */
+    workProvider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+};
+
 export type Identity = {
     providerId: number;
     subject: string;
@@ -3891,7 +3920,7 @@ export type PracticePreconditionClause = {
 };
 
 /**
- * What changed over a window of the developer's reviews
+ * What was met, what changed and which work was reviewed over a window of the developer's reviews
  */
 export type PracticeProfileOverview = {
     /**
@@ -3899,9 +3928,21 @@ export type PracticeProfileOverview = {
      */
     changes: Array<ProfileChange>;
     /**
+     * Practices standing as a strength whose newest pieces of work are all clean, longest run first
+     *
+     * @deprecated
+     */
+    holdingUp?: Array<HeldPractice>;
+    /**
      * The newest review run on the developer's work; absent before any ran
      */
     latestRun?: ReviewRunRef;
+    /**
+     * The pieces of work whose runs fall in the window, deduplicated, newest first
+     *
+     * @deprecated
+     */
+    reviewedWork?: Array<ReviewedWorkRef>;
     /**
      * The span every change below was measured over
      */

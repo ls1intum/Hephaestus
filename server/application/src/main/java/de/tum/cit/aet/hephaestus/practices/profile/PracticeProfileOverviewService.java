@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.profile;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupService;
+import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalogLoader;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeGroupStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -18,10 +20,13 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.Fir
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeGroupStandingService;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService.StandingSnapshot;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService.StandingSnapshot.PracticeStanding;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.AddressedFeedbackProjection;
+import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrend;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.WorkResolution.Work;
+import de.tum.cit.aet.hephaestus.practices.profile.dto.HeldPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.OverviewWindowDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.PracticeProfileOverviewDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileChangeDTO;
@@ -42,6 +47,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -72,6 +78,7 @@ public class PracticeProfileOverviewService {
     private final InAppFeedbackEvidence feedbackEvidence;
     private final ReactionRepository reactionRepository;
     private final ReviewRunLookup reviewRunLookup;
+    private final BundledPracticeCatalogLoader bundledCatalog;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -81,7 +88,8 @@ public class PracticeProfileOverviewService {
         Optional<Long> currentDeveloperId = currentDeveloperLookup.currentDeveloperId();
         if (currentDeveloperId.isEmpty()) {
             OverviewWindow window = OverviewWindow.sincePreviousRun(null, now);
-            return new PracticeProfileOverviewDTO(OverviewWindowDTO.from(window), null, List.of());
+            return new PracticeProfileOverviewDTO(
+                    OverviewWindowDTO.from(window), null, List.of(), List.of(), List.of());
         }
         long developerId = currentDeveloperId.get();
 
@@ -114,10 +122,13 @@ public class PracticeProfileOverviewService {
         Map<UUID, Target> targets = reviewRunLookup.findTargets(
                 workspaceId,
                 Stream.of(
+                                windowRuns.stream().map(DeveloperReviewRunRow::getJobId),
                                 Stream.ofNullable(latest).map(DeveloperReviewRunRow::getJobId),
                                 windowWorkByPractice.values().stream()
                                         .flatMap(List::stream)
                                         .map(Work::jobId),
+                                after.practices().values().stream()
+                                        .flatMap(practice -> practice.trend().cleanWork().jobIds().stream()),
                                 feedback.citedJobIds())
                         .flatMap(ids -> ids)
                         .collect(Collectors.toSet()));
@@ -139,7 +150,9 @@ public class PracticeProfileOverviewService {
         return new PracticeProfileOverviewDTO(
                 OverviewWindowDTO.from(window),
                 latest == null ? null : runRef(workspaceId, latest, targets),
-                newestFeedbackChangePerPractice(changes));
+                holdingUp(after, targets),
+                newestFeedbackChangePerPractice(changes),
+                reviewedWork(windowRuns, targets));
     }
 
     /** The work the window's observations were on, per practice: one entry per piece of work, newest first. */
@@ -415,6 +428,57 @@ public class PracticeProfileOverviewService {
                 .toList();
     }
 
+    /** Strengths whose newest pieces of work all came back clean, longest run first. */
+    private List<HeldPracticeDTO> holdingUp(StandingSnapshot after, Map<UUID, Target> targets) {
+        List<HeldPracticeDTO> held = new ArrayList<>();
+        for (PracticeStanding practice : after.practices().values()) {
+            if (practice.evidence().isEmpty()) {
+                continue;
+            }
+            PracticeTrend.CleanWork cleanWork = practice.trend().cleanWork();
+            ArtifactKind kind = cleanWork.kind();
+            Instant since = cleanWork.since();
+            if (kind == null || since == null || !practice.isHolding(practiceStandingService.standingWindow())) {
+                continue;
+            }
+            held.add(new HeldPracticeDTO(
+                    practice.dto().slug(),
+                    practice.dto().name(),
+                    practice.dto().groupSlug(),
+                    holdsAs(practice.evidence().getFirst().getPractice()),
+                    cleanWork.count(),
+                    kind.value(),
+                    workProvider(cleanWork, targets),
+                    since));
+        }
+        held.sort(Comparator.comparingInt(HeldPracticeDTO::cleanWork)
+                .reversed()
+                .thenComparing(HeldPracticeDTO::practiceName));
+        return held;
+    }
+
+    /**
+     * The provider most of the clean work lives at, like {@code kind} is the kind most of it is — the two
+     * are the noun's parts. A piece whose run is gone names no provider and is left out of the count.
+     */
+    private static @Nullable IntegrationKind workProvider(
+            PracticeTrend.CleanWork cleanWork, Map<UUID, Target> targets) {
+        return PracticeTrend.CleanWork.mostOf(cleanWork.jobIds().stream()
+                .map(targets::get)
+                .filter(Objects::nonNull)
+                .map(Target::provider)
+                .filter(Objects::nonNull));
+    }
+
+    /**
+     * The catalog's phrase for a workspace practice copied from it, found by the bundled slug it came from
+     * whatever it was renamed to since. A practice created in the workspace has none.
+     */
+    private @Nullable String holdsAs(Practice practice) {
+        String sourceSlug = practice.getSourceCuratedSlug();
+        return sourceSlug == null ? null : bundledCatalog.holdsAs(sourceSlug).orElse(null);
+    }
+
     private ReviewRunRefDTO runRef(long workspaceId, DeveloperReviewRunRow run, Map<UUID, Target> targets) {
         ReviewRunFacts facts =
                 reviewRunLookup.findFacts(workspaceId, List.of(run.getJobId())).get(run.getJobId());
@@ -424,5 +488,18 @@ public class PracticeProfileOverviewService {
                 ReviewedWorkLabels.ref(
                         ArtifactKind.of(run.getArtifactKind()), run.getArtifactId(), targets.get(run.getJobId())),
                 facts == null ? null : facts.status());
+    }
+
+    /** The window's runs as pieces of work: a piece reviewed twice in the window is listed once, at its newest. */
+    private static List<ReviewedWorkRefDTO> reviewedWork(
+            List<DeveloperReviewRunRow> windowRuns, Map<UUID, Target> targets) {
+        return ProfileChangeDetector.refs(
+                Work.newestFirst(windowRuns.stream()
+                        .map(run -> new Work(
+                                ArtifactKind.of(run.getArtifactKind()),
+                                run.getArtifactId(),
+                                run.getJobId(),
+                                run.getReviewedAt()))),
+                targets);
     }
 }
