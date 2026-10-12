@@ -863,7 +863,7 @@ describe("practices turned off today", () => {
 		screen.getByRole("link", { name: "Open practice Errors carry their context" });
 
 		await userEvent.click(show);
-		await screen.findByRole("link", { name: "Open practice Thin controllers" });
+		await screen.findByRole("link", { name: "Open practice Thin controllers" }, ROUTE_RENDER_WAIT);
 	});
 
 	/** The table's switch is in the address, so a reload or Back keeps what the reader asked for. */
