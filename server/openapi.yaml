@@ -15095,47 +15095,6 @@ components:
       - autonomy
       - counts
       - overriddenCount
-    HeldPractice:
-      type: object
-      description: A practice the developer's newest work keeps meeting
-      properties:
-        cleanWork:
-          type: integer
-          format: int32
-          description: How many of the newest pieces of work in a row came back clean
-        groupSlug:
-          type: string
-        holdsAs:
-          type: string
-          description: "What the developer keeps doing, in the catalog's words; absent\
-            \ for a practice the catalog does not ship"
-        practiceName:
-          type: string
-        practiceSlug:
-          type: string
-        since:
-          type: string
-          format: date-time
-          description: When the oldest piece of work of the clean run was reviewed
-        workKind:
-          type: string
-          description: Artifact kind id most of that work is
-        workProvider:
-          type: string
-          description: "The provider most of that work lives at, which decides its\
-            \ noun: a GitLab scm.pull_request is a merge request; absent when no run\
-            \ that reviewed the work is left"
-          enum:
-          - GITHUB
-          - GITLAB
-          - SLACK
-          - OUTLINE
-      required:
-      - cleanWork
-      - practiceName
-      - practiceSlug
-      - since
-      - workKind
     Identity:
       type: object
       properties:
@@ -17502,8 +17461,7 @@ components:
           - scm.general-review-comments
     PracticeProfileOverview:
       type: object
-      description: "What was met, what changed and which work was reviewed over a\
-        \ window of the developer's reviews"
+      description: What changed over a window of the developer's reviews
       properties:
         changes:
           type: array
@@ -17511,29 +17469,15 @@ components:
             \ per practice and type"
           items:
             $ref: "#/components/schemas/ProfileChange"
-        holdingUp:
-          type: array
-          description: "Practices standing as a strength whose newest pieces of work\
-            \ are all clean, longest run first"
-          items:
-            $ref: "#/components/schemas/HeldPractice"
         latestRun:
           $ref: "#/components/schemas/ReviewRunRef"
           description: The newest review run on the developer's work; absent before
             any ran
-        reviewedWork:
-          type: array
-          description: "The pieces of work whose runs fall in the window, deduplicated,\
-            \ newest first"
-          items:
-            $ref: "#/components/schemas/ReviewedWorkRef"
         window:
           $ref: "#/components/schemas/OverviewWindow"
           description: The span every change below was measured over
       required:
       - changes
-      - holdingUp
-      - reviewedWork
       - window
     PracticeReleaseField:
       type: object

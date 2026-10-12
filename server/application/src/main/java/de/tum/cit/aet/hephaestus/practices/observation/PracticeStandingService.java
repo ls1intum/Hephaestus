@@ -306,11 +306,6 @@ public class PracticeStandingService {
                 .toList();
     }
 
-    /** How many of a practice's newest opportunities its standing is read from. */
-    public int standingWindow() {
-        return practiceTrendService.standingWindow();
-    }
-
     /**
      * How positive this practice's recent evidence was, in {@code [0,1]}. The standing label is a rendering of
      * this number, and the level above consumes the number rather than the label.
@@ -419,21 +414,7 @@ public class PracticeStandingService {
                 List<Observation> evidence,
                 List<Observation> liveRuns,
                 PracticeTrend trend,
-                @Nullable Double share) {
-
-            /**
-             * Whether a practice at {@code STRENGTH} is holding: every one of the newest opportunities its
-             * standing was read off came back clean, not merely enough of them. The standing's window is the
-             * bar, so a strength carried by an old slip that has decayed out of weight does not read as held.
-             *
-             * @param window how many of the newest opportunities a standing is read from
-             */
-            public boolean isHolding(int window) {
-                PracticeTrend.CleanWork cleanWork = trend.cleanWork();
-                return dto.standing() == PracticeStandingDTO.Standing.STRENGTH
-                        && cleanWork.count() >= Math.min(window, cleanWork.decidedWork());
-            }
-        }
+                @Nullable Double share) {}
 
         public List<PracticeStandingDTO> dtos() {
             return practices.values().stream().map(PracticeStanding::dto).toList();

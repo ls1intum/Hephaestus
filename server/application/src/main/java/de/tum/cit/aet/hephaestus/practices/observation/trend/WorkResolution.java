@@ -22,8 +22,8 @@ import org.jspecify.annotations.Nullable;
  * of work's latest run said changes the answer with it. The unit is a piece of reviewed work, bundled as the
  * trend bundles it: one opportunity per piece of work, read off its newest live run
  * ({@link LatestRun#perLiveClaim}), so a pull request reviewed three times is one piece of work, not three. An
- * opportunity that produced no verdict is skipped rather than counted as either side, exactly as
- * {@link PracticeTrend#cleanWork()} skips it; one that raised a problem starts the count over. The first run of
+ * opportunity that produced no verdict is skipped rather than counted as either side, exactly as the
+ * standing skips it; one that raised a problem starts the count over. The first run of
  * {@link #CLEAN_NEEDED} clean opportunities resolves the feedback, and what came after it does not un-resolve it:
  * a later slip is new feedback's business.
  *

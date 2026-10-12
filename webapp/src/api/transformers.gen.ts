@@ -1147,11 +1147,6 @@ const profileChangeSchemaResponseTransformer = (data: any) => {
     return data;
 };
 
-const heldPracticeSchemaResponseTransformer = (data: any) => {
-    data.since = new Date(data.since);
-    return data;
-};
-
 const reviewRunRefSchemaResponseTransformer = (data: any) => {
     data.at = new Date(data.at);
     return data;
@@ -1165,7 +1160,6 @@ const overviewWindowSchemaResponseTransformer = (data: any) => {
 
 const practiceProfileOverviewSchemaResponseTransformer = (data: any) => {
     data.changes = data.changes.map((item: any) => profileChangeSchemaResponseTransformer(item));
-    data.holdingUp = data.holdingUp.map((item: any) => heldPracticeSchemaResponseTransformer(item));
     if (data.latestRun) {
         data.latestRun = reviewRunRefSchemaResponseTransformer(data.latestRun);
     }
