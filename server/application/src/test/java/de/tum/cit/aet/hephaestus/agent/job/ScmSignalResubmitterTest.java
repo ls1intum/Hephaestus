@@ -284,7 +284,8 @@ class ScmSignalResubmitterTest extends BaseUnitTest {
                 gate,
                 signalRecorder,
                 reviewRepository,
-                new IntegrationManifestRegistry(List.of(new GitHubManifest(true), new GitLabManifest(true))));
+                new IntegrationManifestRegistry(List.of(new GitHubManifest(true), new GitLabManifest(true))),
+                mock(LinkedRepairFollowups.class));
     }
 
     private GateDecision.Run admission() {

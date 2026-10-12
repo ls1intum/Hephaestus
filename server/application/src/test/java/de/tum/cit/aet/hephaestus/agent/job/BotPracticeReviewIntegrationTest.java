@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
@@ -154,7 +155,8 @@ class BotPracticeReviewIntegrationTest extends AbstractWorkspaceIntegrationTest 
                 .orElseThrow();
         assertThat(row.getStateReason()).isEqualTo(SignalStateReason.BOT_REVIEWER);
         assertThat(row.getJobId()).isNull();
-        var retry = new PullRequestSignalResubmitter(jobs, pullRequests, gate, recorder, reviews, manifests);
+        var retry = new PullRequestSignalResubmitter(
+                jobs, pullRequests, gate, recorder, reviews, manifests, mock(LinkedRepairFollowups.class));
         transactions.executeWithoutResult(status -> retry.resubmit(row));
         var after = signals.findById(row.getId()).orElseThrow();
         assertThat(after.getStateReason()).isEqualTo(SignalStateReason.BOT_REVIEWER);

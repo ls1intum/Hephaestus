@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -84,6 +85,10 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
             actor_user_id = EXCLUDED.actor_user_id
         WHERE (artifact_signal.state = 'RECORDED' AND artifact_signal.discovered_via = 'SYNC')
            OR (artifact_signal.state = 'SUPPRESSED' AND artifact_signal.state_reason = 'COALESCED')
+           OR (artifact_signal.artifact_kind = 'scm.pull_request'
+               AND artifact_signal.signal_name = 'scm.pull_request.linked_issue_updated'
+               AND artifact_signal.discovered_via = 'SYNC' AND artifact_signal.job_id IS NULL
+               AND artifact_signal.state IN ('DEFERRED', 'PENDING'))
         """, nativeQuery = true)
     int insertDeferred(
             @Param("key") SignalKey key,
@@ -282,6 +287,38 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
             + " AND COALESCE(s.lastAttemptedAt, s.stateChangedAt) < :retryBefore"
             + " ORDER BY COALESCE(s.lastAttemptedAt, s.stateChangedAt) ASC, s.id ASC")
     List<ArtifactSignal> findRetryablePending(@Param("retryBefore") Instant retryBefore, Pageable pageable);
+
+    @Query(value = """
+        SELECT * FROM artifact_signal WHERE workspace_id = :#{#key.workspaceId()}
+          AND artifact_kind = :#{#key.artifactKind().value()} AND artifact_id = :#{#key.artifactId()}
+          AND signal_name = :#{#key.signalName().value()} AND revision = :#{#key.revision().value()}
+        FOR UPDATE
+        """, nativeQuery = true)
+    Optional<ArtifactSignal> lockByKey(@Param("key") SignalKey key);
+
+    /** A discovered revision may serve an admitted event obligation without changing its discovery origin. */
+    @Modifying
+    @Query(value = """
+        UPDATE artifact_signal SET state = 'DEFERRED', state_reason = NULL,
+          state_changed_at = :now, last_attempted_at = NULL
+        WHERE workspace_id = :#{#key.workspaceId()} AND artifact_kind = :#{#key.artifactKind().value()}
+          AND artifact_id = :#{#key.artifactId()} AND signal_name = :#{#key.signalName().value()}
+          AND revision = :#{#key.revision().value()} AND discovered_via = 'SYNC'
+          AND state = 'RECORDED' AND job_id IS NULL
+        """, nativeQuery = true)
+    int deferRecordedSyncFollowup(@Param("key") SignalKey key, @Param("now") Instant now);
+
+    @Query(value = """
+        SELECT * FROM artifact_signal WHERE workspace_id = :workspaceId
+          AND artifact_kind = 'scm.pull_request' AND artifact_id = :artifactId
+          AND signal_name = 'scm.pull_request.linked_issue_updated' AND revision = :revision
+          AND state = 'TRIGGERED' AND discovered_via = 'EVENT' AND job_id = :jobId
+        """, nativeQuery = true)
+    Optional<ArtifactSignal> findTriggeredLinkedRepairEvent(
+            @Param("workspaceId") long workspaceId,
+            @Param("artifactId") long artifactId,
+            @Param("jobId") UUID jobId,
+            @Param("revision") String revision);
 
     /** @return how many signals lapsed */
     @WorkspaceAgnostic("The reaper re-offers refused signals for every workspace on one instance")

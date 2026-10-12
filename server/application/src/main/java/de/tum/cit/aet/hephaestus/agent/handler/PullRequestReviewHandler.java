@@ -98,9 +98,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     @Override
     public JobSubmission createSubmission(JobSubmissionRequest request) {
-        if (!(request instanceof PullRequestReviewSubmissionRequest submissionRequest)) {
+        LinkedRepairFollowupRequest followup = request instanceof LinkedRepairFollowupRequest value ? value : null;
+        JobSubmissionRequest selected = followup != null ? followup.request() : request;
+        if (!(selected instanceof PullRequestReviewSubmissionRequest submissionRequest)) {
             throw new IllegalArgumentException("Expected PullRequestReviewSubmissionRequest, got: "
-                    + request.getClass().getSimpleName());
+                    + selected.getClass().getSimpleName());
         }
 
         ScmEventPayload.PullRequestData pullRequestData = submissionRequest.pullRequest();
@@ -109,6 +111,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         metadata.put(
                 ReviewOutputService.ORIGIN_METADATA_KEY,
                 Objects.requireNonNull(submissionRequest.observationOrigin()).name());
+        if (followup != null) {
+            metadata.put(
+                    LinkedRepairFollowupRequest.PREDECESSOR_JOB,
+                    followup.predecessorJobId().toString());
+            metadata.put(
+                    LinkedRepairFollowupRequest.ROOT_JOB, followup.rootJobId().toString());
+        }
         metadata.put("repository_id", pullRequestData.repository().id());
         metadata.put("repository_full_name", pullRequestData.repository().nameWithOwner());
         metadata.put("pull_request_id", pullRequestData.id());

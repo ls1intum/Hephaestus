@@ -108,7 +108,7 @@ The **door** is what a person or a provider did. `DiscoveredVia` is how we came 
 | Door                                            | Recorded as (`DiscoveredVia`) | UI label                   | Observation origin | Starts a review                      |
 | ----------------------------------------------- | ----------------------------- | -------------------------- | ------------------ | ------------------------------------ |
 | A provider event on connected work              | `EVENT`                       | Live event                 | `LIVE`             | yes                                  |
-| Reconciling with the provider                   | `SYNC`                        | Noticed during a sync      | `LIVE`             | **no**, for pull requests and issues |
+| Reconciling with the provider                   | `SYNC`                        | Noticed during a sync      | `LIVE`             | **no** on its own, for pull requests and issues |
 | `/hephaestus review` in a merge request comment | `MANUAL`                      | Requested                  | `MANUAL`           | yes                                  |
 | The *Request review* button                     | `MANUAL`                      | Requested                  | `MANUAL`           | yes                                  |
 | A confirmed campaign over past work             | `BACKFILL`                    | Backfilled                 | `BACKFILL`         | yes                                  |
@@ -116,9 +116,13 @@ The **door** is what a person or a provider did. `DiscoveredVia` is how we came 
 
 - **The comment command and the button are indistinguishable afterwards.** Both record `MANUAL`. Nothing
   downstream can tell them apart. (A third path, the dev trigger, records `MANUAL` too.)
-- **`SYNC` is a dead end for connected project work** — the SCM listeners return before submitting, leaving
-  the row `RECORDED`. The exception is the Slack thread sweep, which records `SYNC` and does submit. Never
-  write "reconciliation never starts a review" without saying which artifact kind you mean.
+- **`SYNC` does not authorize a review of connected project work on its own.**
+  The SCM listeners return before submitting.
+  They leave the row `RECORDED`.
+  An authorized event can continue on newer sync-discovered linked material through the
+  [linked-issue repair follow-up](./practice-review-pipeline.mdx#linked-issue-repair-follow-ups).
+  The Slack thread sweep records `SYNC` and does submit.
+  Never write "reconciliation never starts a review" without saying which artifact kind you mean.
 - **Asking by hand is a door, never an occasion.** A hand-requested review reviews every practice on that kind of work, whatever its state.
   Thus, there is nothing for a practice to opt into.
   `PracticeDefinitionValidator` refuses a practice that names a manual-request signal. Do not present it as

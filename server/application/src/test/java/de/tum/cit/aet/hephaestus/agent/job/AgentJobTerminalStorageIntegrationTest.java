@@ -167,7 +167,8 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
                 admission,
                 mock(ArtifactSourceCatalogRegistry.class),
                 Optional.empty(),
-                Optional.empty());
+                Optional.empty(),
+                mock(LinkedRepairFollowups.class));
     }
 
     @Test

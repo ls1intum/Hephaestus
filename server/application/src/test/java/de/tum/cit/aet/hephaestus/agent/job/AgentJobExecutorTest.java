@@ -141,6 +141,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
     private ReviewMemberAiPolicy memberAiPolicy;
 
     @Mock
+    private LinkedRepairFollowups linkedRepairFollowups;
+
+    @Mock
     private LlmUsageRecorder usageRecorder;
 
     @Mock
@@ -212,7 +215,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 NO_LIVE_ADMISSION,
                 SOURCE_CATALOGS,
                 Optional.empty(),
-                Optional.empty());
+                Optional.empty(),
+                linkedRepairFollowups);
 
         jobId = UUID.randomUUID();
 
@@ -381,7 +385,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("test-worker")));
+                    Optional.of(workerProps("test-worker")),
+                    mock(LinkedRepairFollowups.class));
 
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
@@ -815,6 +820,29 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             verify(jobRepository, never()).updateProvenanceDigests(any(), any(), anyInt(), any());
             verify(sandboxManager, never()).execute(any());
+        }
+
+        @Test
+        void shouldRefuseStaleLinkedMaterialBeforeStartingTheSandbox() {
+            stubClaimableJob();
+            job.setMetadata(objectMapper.createObjectNode().put("pull_request_id", 42L));
+            stubCapture(HEAD_SHA);
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any()))
+                    .thenReturn(1);
+            when(linkedRepairFollowups.refuseStale(any(), isNull())).thenReturn(LinkedRepairFollowups.Decision.REFUSED);
+
+            executor.processJob(jobId);
+
+            verify(jobRepository, never()).markExecutionStarted(any(), any(), any());
+            verify(sandboxManager, never()).execute(any());
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never()).record(any(), any());
+            assertThat(meterRegistry
+                            .get("practice.review.refused")
+                            .tag("reason", "linked_issue_capture_stale")
+                            .counter()
+                            .count())
+                    .isEqualTo(1.0);
         }
 
         @Test
@@ -1651,7 +1679,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("infra-retry-worker")));
+                    Optional.of(workerProps("infra-retry-worker")),
+                    mock(LinkedRepairFollowups.class));
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
             when(memberAiPolicy.binding(eq(99L), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
@@ -1737,7 +1766,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("unreachable-worker")));
+                    Optional.of(workerProps("unreachable-worker")),
+                    mock(LinkedRepairFollowups.class));
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
             when(memberAiPolicy.binding(eq(99L), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
@@ -1799,7 +1829,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("unreachable-worker")));
+                    Optional.of(workerProps("unreachable-worker")),
+                    mock(LinkedRepairFollowups.class));
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
             when(memberAiPolicy.binding(eq(99L), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
@@ -1854,7 +1885,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("unreachable-worker")));
+                    Optional.of(workerProps("unreachable-worker")),
+                    mock(LinkedRepairFollowups.class));
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
             when(memberAiPolicy.binding(eq(99L), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
@@ -1916,7 +1948,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("unreachable-worker")));
+                    Optional.of(workerProps("unreachable-worker")),
+                    mock(LinkedRepairFollowups.class));
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
             when(memberAiPolicy.binding(eq(99L), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
@@ -1975,7 +2008,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("infra-retry-worker")));
+                    Optional.of(workerProps("infra-retry-worker")),
+                    mock(LinkedRepairFollowups.class));
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
             when(memberAiPolicy.binding(eq(99L), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
@@ -2032,7 +2066,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("infra-retry-worker-2")));
+                    Optional.of(workerProps("infra-retry-worker-2")),
+                    mock(LinkedRepairFollowups.class));
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
             when(memberAiPolicy.binding(eq(99L), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
@@ -2077,7 +2112,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("infra-retry-worker-3")));
+                    Optional.of(workerProps("infra-retry-worker-3")),
+                    mock(LinkedRepairFollowups.class));
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
             when(memberAiPolicy.binding(eq(99L), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
@@ -2545,7 +2581,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("test-worker")));
+                    Optional.of(workerProps("test-worker")),
+                    mock(LinkedRepairFollowups.class));
 
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
@@ -2624,7 +2661,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.of(capacityState),
-                    Optional.empty());
+                    Optional.empty(),
+                    mock(LinkedRepairFollowups.class));
             // Mirror the two claimReview() calls above by populating localRunningJobs directly —
             // computeCapacity reads localRunningJobs.size(), not the capacity state's own counter.
             Set<UUID> localRunningJobs = heldJobs();
@@ -2672,7 +2710,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.of(capacityState),
-                    Optional.empty());
+                    Optional.empty(),
+                    mock(LinkedRepairFollowups.class));
 
             assertThat(executor.computeCapacity()).isEqualTo(2);
         }
@@ -2733,7 +2772,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                         NO_LIVE_ADMISSION,
                         SOURCE_CATALOGS,
                         Optional.of(capacityState),
-                        Optional.empty());
+                        Optional.empty(),
+                        mock(LinkedRepairFollowups.class));
 
                 // Nothing active yet: bounded by the pool's max size (2), not reviewMax (10) or
                 // claimBatchSize (5, AGENT_PROPS's default).
@@ -2779,7 +2819,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                         NO_LIVE_ADMISSION,
                         SOURCE_CATALOGS,
                         Optional.of(capacityState),
-                        Optional.empty());
+                        Optional.empty(),
+                        mock(LinkedRepairFollowups.class));
 
                 Set<UUID> localRunningJobs = heldJobs();
 
@@ -2822,7 +2863,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("rejecting-worker")));
+                    Optional.of(workerProps("rejecting-worker")),
+                    mock(LinkedRepairFollowups.class));
 
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
@@ -2866,7 +2908,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("rejecting-worker")));
+                    Optional.of(workerProps("rejecting-worker")),
+                    mock(LinkedRepairFollowups.class));
 
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
                     .thenReturn(Optional.of(job));
@@ -2927,7 +2970,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("draining-worker")));
+                    Optional.of(workerProps("draining-worker")),
+                    mock(LinkedRepairFollowups.class));
             addToLocalRunningJobs(executor, jobId);
 
             when(jobRepository.requeueOrphan(
@@ -2965,7 +3009,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("draining-worker")));
+                    Optional.of(workerProps("draining-worker")),
+                    mock(LinkedRepairFollowups.class));
             job.setStatus(AgentJobStatus.RUNNING);
             job.setRetryCount(2);
             job.setExecutionStartedAt(Instant.now());
@@ -3048,7 +3093,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("draining-worker")));
+                    Optional.of(workerProps("draining-worker")),
+                    mock(LinkedRepairFollowups.class));
             addToLocalRunningJobs(executor, jobId);
 
             when(jobRepository.requeueOrphan(
@@ -3269,7 +3315,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     NO_LIVE_ADMISSION,
                     SOURCE_CATALOGS,
                     Optional.empty(),
-                    Optional.of(workerProps("draining-worker")));
+                    Optional.of(workerProps("draining-worker")),
+                    mock(LinkedRepairFollowups.class));
         }
 
         @SuppressWarnings("unchecked")
