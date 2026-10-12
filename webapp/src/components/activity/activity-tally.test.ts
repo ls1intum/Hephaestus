@@ -4,7 +4,51 @@ import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import type { ActivityPersonDetail } from "@/api/types.gen";
 
 import { bucketLabel } from "./activity-buckets";
-import { overviewOf, weekStarts } from "./activity-tally";
+import { contributionWeekRows, overviewOf, weekStarts } from "./activity-tally";
+
+/** Each row's local day and count; a row starts at local midnight, so its day is the same anywhere. */
+function days(rows: { start: number; count: number }[]): [string, number][] {
+	return rows.map(({ start, count }) => [format(start, "EEEE d MMMM yyyy"), count]);
+}
+
+describe("contributionWeekRows", () => {
+	afterEach(() => vi.unstubAllEnvs());
+	it.each(["America/New_York", "Europe/Berlin"])(
+		"keeps quiet weeks and Monday labels in %s",
+		(timeZone) => {
+			vi.stubEnv("TZ", timeZone);
+			const rows = contributionWeekRows(
+				[
+					{ start: new Date("2026-09-14T00:00:00Z"), contributions: 2 },
+					{ start: new Date("2026-08-31T00:00:00Z"), contributions: 5 },
+				],
+				{ from: new Date("2026-09-03T15:00:00Z"), to: new Date("2026-09-21T00:00:00Z") },
+			);
+
+			expect(days(rows)).toStrictEqual([
+				["Monday 31 August 2026", 5],
+				["Monday 7 September 2026", 0],
+				["Monday 14 September 2026", 2],
+			]);
+		},
+	);
+
+	it("counts no week outside the span, and ends before the week its end starts", () => {
+		const rows = contributionWeekRows(
+			[
+				{ start: new Date("2026-12-21T00:00:00Z"), contributions: 9 },
+				{ start: new Date("2027-01-04T00:00:00Z"), contributions: 3 },
+				{ start: new Date("2027-01-11T00:00:00Z"), contributions: 7 },
+			],
+			{ from: new Date("2026-12-28T00:00:00Z"), to: new Date("2027-01-11T00:00:00Z") },
+		);
+
+		expect(days(rows)).toStrictEqual([
+			["Monday 28 December 2026", 0],
+			["Monday 4 January 2027", 3],
+		]);
+	});
+});
 
 describe("weekStarts", () => {
 	it("starts at the UTC Monday of the first day and lists every week up to the end", () => {
