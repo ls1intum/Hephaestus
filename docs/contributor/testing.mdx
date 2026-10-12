@@ -79,6 +79,11 @@ Checklist for a new read path:
 - **Query keyed on anything but `workspace_id`** is a warning sign.
   Examples are an org login, a login string, or an external native id.
   Before shipment, scope by `workspace_id` or add the provider/workspace predicate.
+- **SCM work scoped through `repository_to_monitor`?** A monitor stores only the repository name, and another provider can host the same name.
+  Match the name, then call `monitor_covers_repository(...) = true` in JPQL or append `MonitoredRepositoryScope.NATIVE_RTM_R` in native SQL.
+  Test two workspaces on different instances of the same provider kind.
+  Give both monitors the same name and native id.
+  Include the unconnected inverse and verify that removal preserves the other instance's repository.
 - **`@WorkspaceAgnostic` repository?** The SQL statement inspector is **off** for it.
   Thus, the integration test is the only automated guard.
   Do not skip it.

@@ -35,9 +35,11 @@ In the practice editor, shorten **practice visual** to **Visual** and **practice
 | **Marked incorrect**                | An observation a workspace admin [invalidated](./practice-review-glossary.mdx#invalidated-observations) because it was wrong when made. It stays in history  | deleted, retracted, superseded                                       |
 | **Withdrawn**                       | A Practice profile card a workspace admin [withdrew](./practice-review-glossary.mdx#withdrawn-feedback) because its words were wrong. Its observations are unchanged | deleted, retracted, invalidated                                      |
 | **Disputed**                        | Feedback the developer answered as wrong, with an explanation workspace admins read on its observations. A later review of the same work holds the same claim back while it stands ([ADR 0022](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md)) | rejected, contested, flagged                                         |
+| **Requested**                       | A practice review that someone asked for with the *Request review* button or a comment command, not one that the work started. The tag on a review and the origin of its observations. Its observations stay apart from live ones ([how a review was occasioned](./practice-review-glossary.mdx#how-a-review-was-occasioned)) | manual, on demand, by hand |
 | **Practice feedback**               | Guidance written from observations and addressed to a developer — both the whole and the countable unit                                                    | message, AI feedback, feedback item, ledger unit                     |
 | **Delivery**                        | Whether one piece of feedback was prepared, delivered, withheld, failed, or replaced                                                                       | placement, surface                                                   |
 | **Channel**                         | Where one piece of feedback is intended to appear — a fact about that piece, not a workspace setting. The destinations are the `FeedbackChannel` constants | destination, surface, reach                                          |
+| **Location**                        | Where one piece of feedback appears, by the provider that shows it. It splits a channel by provider: **On GitHub**, **On GitLab**, **With Heph in the app**, **With Heph in Slack**. **On the work**, **In conversation** and **On their practice pages** are the channel's own words. The values are the `FeedbackLocation` constants | destination, surface, provider channel                               |
 | **Practice feedback about a way of working** | Practice feedback prepared for one developer about what recurs across their work, readable by nobody else — the `IN_APP` channel                           | my feedback, private view, profile, reflection, reflection dashboard |
 | **Reviewed work**                   | A pull request, merge request, issue, conversation, or document being reviewed                                                                             | artifact, target                                                     |
 | **Developer**                       | The person an observation is about                                                                                                                         | learner                                                              |
@@ -122,6 +124,13 @@ The mentor also renders inside the app, so the line between the last two is *dia
 The three match the levels of Hattie & Timperley's model ([which is which](./practice-review-glossary.mdx#the-three-channels-are-three-levels)).
 But a level is a claim about content that a destination cannot enforce.
 Do not use the level as the name.
+
+A **location** answers the same question as the channel, more exactly.
+On the work, the provider is the one the review read the work from.
+In conversation, it is where the turn that raised the feedback ran: the app or a Slack direct message.
+Conversation feedback that no turn has raised yet has no provider, so its location is **In conversation**.
+A row shows the location or the channel, never both.
+Its sentence names the work where there is one: "Comment on GitHub pull request #12", "Conversation with Heph in Slack", "Card on their practice pages".
 
 `IN_APP` is the code noun — the enum constant and the `chk_feedback_channel` value.
 Do not call it a *profile* or *reflection* channel: those words name a different surface or an outcome the system cannot observe. [ADR 0029](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md) records the naming decision.

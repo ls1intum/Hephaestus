@@ -153,7 +153,20 @@ Controllers define who may see each projection:
 - the pull-request observation projection shows workspace members every relevant observation for that pull
   request.
 - the workspace-admin practice-review endpoints expose observations and feedback across that workspace.
-- developer-facing practice projections omit review rules by construction.
+- developer-facing practice projections omit practice criteria by construction.
+
+Workspace-admin response projections use the recipient's latest response snapshot.
+Only a snapshot with an explicit answer exposes occurrence and time metadata.
+A rating alone and an empty retraction expose neither.
+Only a current dispute exposes its explanation.
+Ratings and other notes remain private.
+
+Workspace-admin job reads expose typed execution, readiness, outcome, and usage facts, not the retained runtime result.
+The job `output` property remains nullable in the API contract.
+Administrative detail and list reads no longer return its retained value.
+Derive permitted facts from the internal result before projecting the response.
+The stored result remains available to its delivery and retention owners.
+Removing it from a response must not erase or rewrite it.
 
 Keep these rules enforceable in controller authorization, repository predicates, DTO shape, and tests.
 Do not add a field matrix here: the [OpenAPI specification](https://github.com/hephaestus-build/Hephaestus/blob/main/server/openapi.yaml) is the authoritative contract for fields exposed by each endpoint.

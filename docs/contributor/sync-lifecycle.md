@@ -112,6 +112,22 @@ It delegates each repository to `WorkspaceRepositoryMonitorService#deleteReposit
 **Only** if no monitor anywhere points to the repository, this method deletes the local clone.
 It then publishes `RepositoryAboutToBeDeletedEvent` and drops the row.
 
+Reads scope SCM work to a workspace the same way: through its `repository_to_monitor` rows.
+A monitor stores the repository name, but a name is unique only per provider.
+So a monitor covers a repository only when `MonitoredRepositoryScope` also agrees.
+The monitor's native id, once known, must be the repository's.
+
+The repository's provider must be the instance registered for the workspace's SCM connection.
+Its kind and server URL must match.
+When no URL is configured, the registered default URL for that kind applies.
+Only active or suspended SCM connections authorize this scope.
+A pause preserves retained-source reads.
+Pending and uninstalled connections authorize none.
+
+Without an eligible SCM connection, the monitor covers no repository.
+Repository removal captures the exact covered repository IDs before removing the monitor.
+It then applies the same scope to check whether another workspace still monitors each repository.
+
 The org tier (`team`, `team_membership`, `organization_membership`) has its own guard.
 No repository cascade reaches it.
 Erasure occurs only when no other non-purged workspace binds to the same `Organization`. The `Organization` row itself is global: unlinked, never deleted.
