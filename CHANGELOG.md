@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.91.1
+
+### Patch Changes
+
+- In the people table on activity pages, a sort button you reach with the keyboard now scrolls into view beside the pinned names, instead of staying hidden under them after you scroll the table sideways.
+- Feedback from a review of a closed issue can now reach that issue while it stays closed and unchanged. If the issue is reopened or edited, the older feedback is still not posted.
+- Feedback cards label their linked examples "Seen on" without implying they are your newest reviewed work.
+- Practice reviews keep issue references and captured issue counts tied to the reviewed repository, so an issue with the same number in another connected repository cannot replace it. References to other projects retain their target, and unavailable repository identity stays unknown. Existing practice scripts leave ambiguous inventory lookups to manual inspection instead of borrowing another repository's issue.
+- Changes to an issue that merged work closes, or to that merged work’s closing references, can now occasion a follow-up check of existing problems. Hephaestus keeps your workspace’s practice-review settings and does not start checks for repeated deliveries, unrelated relationship changes or sync-only discoveries.
+- AI usage without reported tokens remains unpriced when model prices change. Streamed usage already received is retained if a client disconnects, and operators can monitor served responses without usage through the `llm.proxy.usage.missing` counter.
+- Practice feedback is prepared only for channels that can use it, avoiding repeated page guidance and conversation notes that belong on changed lines.
+- In workspace settings, when the list of people hidden from public activity cannot load, the page now says so and offers a retry, instead of looking as if nobody is hidden. The public activity settings stay usable.
+- Review lists keep their feedback counts up to date while completed reviews process their results.
+
 ## 0.91.0
 
 ### Minor Changes
