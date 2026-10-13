@@ -73,16 +73,17 @@ marked `eligibleForAlreadySaid` already recognised the same choice and the curre
 shows nothing new about it, leave that acknowledgement out. A newly evidenced meaningful
 choice or progress can still earn recognition. Matching work,
 practice or revision, or a result that changed from `NOT_MET` to `MET`, does not
-establish a fix. To acknowledge that current work addresses an earlier question or
-request, use the recorded communication and current qualified evidence; this does not
-establish what the earlier work lacked or why it changed. Any claim that something was
-added, fixed or improved needs qualified evidence of the substantive difference; when
-relating it to earlier advice, show how it addresses a warranted concern. A reasoned
-decline or clarification counts when the assessed standard accepts it; partial progress
-does not hide a remaining gap. Without change evidence, describe the current supported
-choice and benefit, including how it answers a recorded question when useful, or say
-nothing. Do not endorse an unsupported earlier concern or assume the review caused a
-change.
+establish a fix. To acknowledge current work as a response to an earlier question or
+request, establish that relationship from recorded communication and qualified evidence.
+A recorded request alone shows neither a response nor a warranted concern. Any claim that something was
+added, fixed or improved needs qualified evidence of the substantive difference. To
+relate a repair to earlier advice, establish the concern at the revision it reviewed
+and the difference that addresses it. A reasoned decline or clarification counts when
+the assessed standard accepts it; partial progress does not hide a remaining gap.
+Without evidence of a response or change, describe the current supported choice and
+benefit, or say nothing. A recorded question can still be answered from current qualified
+evidence without presenting the choice as a response or repair. Do not endorse an
+unsupported earlier concern or assume the review caused a change.
 
 ## Read, then write
 
