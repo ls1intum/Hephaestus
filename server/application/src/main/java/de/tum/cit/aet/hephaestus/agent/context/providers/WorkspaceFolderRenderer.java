@@ -30,8 +30,12 @@ import java.io.Serial;
 import java.io.UncheckedIOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
@@ -256,7 +260,7 @@ public class WorkspaceFolderRenderer implements EvidenceSource {
                                 personCopies.recordRepository(id);
                                 files.addDirectory(snapshot.stagingDir());
                                 Path target = root.resolve("repos/" + repo);
-                                copy(snapshot.stagingDir(), target);
+                                transfer(snapshot.stagingDir(), target);
                                 directories.add(new EvidenceDirectory("repos/" + repo + "/", target));
                                 files.put("repos/" + repo + "/.git/HEAD", target.resolve(".git/HEAD"));
                                 files.put(
@@ -384,6 +388,38 @@ public class WorkspaceFolderRenderer implements EvidenceSource {
                 exception.addSuppressed(cleanup);
             }
             throw exception;
+        }
+    }
+
+    /**
+     * Hands the fresh snapshot, which only this capture holds, to the folder. On one file system a rename moves it
+     * whole, and the snapshot's close then finds nothing left to delete. Another file system gets a copy. Either way
+     * the snapshot holds only directories and regular files, and an existing target is refused: a rename would
+     * replace an empty directory there.
+     */
+    private static void transfer(Path source, Path target) {
+        try {
+            if (!Files.isDirectory(source, LinkOption.NOFOLLOW_LINKS))
+                throw new NotDirectoryException(source.toString());
+            if (Files.exists(target, LinkOption.NOFOLLOW_LINKS))
+                throw new FileAlreadyExistsException(target.toString());
+            Files.walkFileTree(source, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                    if (!attributes.isRegularFile())
+                        throw new IOException("Repository snapshot contains a non-regular file");
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+            Files.createDirectories(target.getParent());
+            try {
+                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException otherFileSystem) {
+                // The source is untouched; the copy validates every file again as it copies.
+                copy(source, target);
+            }
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
         }
     }
 
