@@ -899,6 +899,8 @@ A local summary write failure does not change the verdict.
 
 After CI finishes, `CI diagnostics` reads that run's exact attempt with read-only Actions permissions.
 It reports the completed verdict, job times, and step times in a separate workflow summary.
+
+Attempt-to-gate time starts when that attempt starts, so it excludes earlier attempts.
 Creation-to-start time includes dependency waiting.
 Missing timestamps remain unavailable.
 A reporting failure cannot change CI, Version PR maintenance, or release eligibility.

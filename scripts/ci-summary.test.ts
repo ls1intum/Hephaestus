@@ -25,11 +25,11 @@ const run = {
 	name: "CI/CD",
 	status: "completed",
 	html_url: "https://github.com/owner/repo/actions/runs/42/attempts/2",
-	created_at: "2026-10-13T20:00:00Z",
+	created_at: "2026-10-13T18:00:00Z",
+	run_started_at: "2026-10-13T20:00:00Z",
 };
 const job = {
 	run_id: run.id,
-	run_attempt: run.run_attempt,
 	status: "completed",
 	name: "CI Status Gate",
 	conclusion: "success",
@@ -140,6 +140,7 @@ void test("diagnostics cannot change or delay the required workflow verdict", ()
 		String(script),
 		/createCommitStatus|createCheckRun|secrets\.|exec\(|require\(|downloadArtifact/u,
 	);
+	assert.doesNotMatch(String(script), /\$\{\{/u);
 });
 
 void test("release consumers remain bound to required CI, not diagnostics", async () => {
@@ -149,11 +150,12 @@ void test("release consumers remain bound to required CI, not diagnostics", asyn
 	}
 });
 
-void test("the report selects the upstream attempt, never its own run or a newer attempt", async () => {
+void test("the report selects the upstream attempt with jobs that omit an attempt field", async () => {
 	const text = await report();
 	assert.ok(text.includes("Upstream run 42, attempt 2"));
-	assert.ok(text.includes("Workflow-to-gate time"));
-	assert.ok(text.includes("2m 0s"));
+	assert.ok(text.includes("Attempt-to-gate time"));
+	assert.ok(text.includes('["Attempt-to-gate time","2m 0s"]'));
+	assert.ok(!text.includes("122m 0s"));
 	assert.ok(text.includes("Evaluate CI results"));
 	assert.ok(text.includes("does not publish or change"));
 	for (const invalid of [
@@ -169,7 +171,6 @@ void test("the report selects the upstream attempt, never its own run or a newer
 	}
 	for (const invalid of [
 		{ ...job, run_id: 999 },
-		{ ...job, run_attempt: 1 },
 		{ ...job, status: "in_progress" },
 		{ ...job, name: "Other" },
 	]) {
@@ -194,6 +195,8 @@ void test("failed and cancelled gates remain distinct from success and unavailab
 	const text = await report({ jobs: [{ ...job, started_at: null, completed_at: null }] });
 	assert.ok(text.includes("Unavailable"));
 	assert.ok(!text.includes("0m 0s"));
+	const missingAttemptStart = await report({ run: { ...run, run_started_at: null } });
+	assert.ok(missingAttemptStart.includes('["Attempt-to-gate time","Unavailable"]'));
 });
 
 void test("job and step names are escaped and skips are not assigned invented timing", async () => {

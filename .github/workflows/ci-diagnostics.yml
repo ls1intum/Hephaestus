@@ -1,7 +1,7 @@
 name: CI diagnostics
 
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers] Read-only run metadata; no upstream source, artifacts, secrets, or status writes.
     workflows: ["CI/CD"]
     types: [completed]
 
@@ -40,8 +40,9 @@ jobs:
               ...identity,
               per_page: 100,
             });
+            // The attempt endpoint selects jobs; the job response need not expose run_attempt.
             if (jobs.length === 0 || jobs.some((job) => job.run_id !== run.id
-              || job.run_attempt !== run.run_attempt || job.status !== 'completed')) {
+              || job.status !== 'completed')) {
               throw new Error('Expected completed jobs from the upstream attempt');
             }
             const gate = jobs.find((job) => job.name === 'CI Status Gate');
@@ -64,7 +65,7 @@ jobs:
               .addTable([
                 [{ data: 'Metric', header: true }, { data: 'Value', header: true }],
                 ['Required gate conclusion', text(gate.conclusion)],
-                ['Workflow-to-gate time', format(duration(run.created_at, gate.completed_at))],
+                ['Attempt-to-gate time', format(duration(run.run_started_at, gate.completed_at))],
                 ['Completed runner time', format(runnerSeconds)],
               ])
               .addHeading('Job timing', 3)
