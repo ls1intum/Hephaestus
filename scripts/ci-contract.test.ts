@@ -9,6 +9,7 @@ import { runInNewContext } from "node:vm";
 
 import { data, Evaluator, Lexer, Parser } from "@actions/expressions";
 import { parse as parseJsonc } from "jsonc-parser";
+import { minimatch } from "minimatch";
 import { type Document, isMap, isScalar, isSeq, parseDocument, visit, type YAMLMap } from "yaml";
 
 import { evaluate as evaluateVulnerabilityPolicy } from "./check-release-vulnerabilities.ts";
@@ -2834,14 +2835,44 @@ void describe("CI contract", () => {
 		);
 	});
 
-	void test("dependency reporting excludes only documentation prose and defaults to running", async () => {
+	void test("dependency reporting excludes documentation and release-note prose and defaults to running", async () => {
 		const orchestrator = parseDocument(await readFile(".github/workflows/cicd.yml", "utf8"));
 		const filter = step(orchestrator, ["jobs", "detect-changes"], "dorny/paths-filter");
 		assert.equal(filter.get("predicate-quantifier"), "some-with-excludes");
 		const filters = parseDocument(String(filter.get("filters")));
 		const patterns = filters.get("dependency-review");
 		assert.ok(isSeq(patterns));
-		assert.deepEqual(patterns.toJSON(), ["**", "!docs/**/*.md", "!docs/**/*.mdx"]);
+		const globs = asArray(patterns.toJSON(), "dependency review patterns").map((pattern) =>
+			asString(pattern, "dependency review pattern"),
+		);
+		const included = globs.filter((pattern) => !pattern.startsWith("!"));
+		const excluded = globs.filter((pattern) => pattern.startsWith("!"));
+		// The action uses dot matching: any inclusion and no exclusion must match each file.
+		const requiresReview = (files: readonly string[]) =>
+			files.some(
+				(file) =>
+					included.some((pattern) => minimatch(file, pattern, { dot: true })) &&
+					!excluded.some((pattern) => minimatch(file, pattern.slice(1), { dot: true })),
+			);
+		for (const [files, expected] of [
+			[[".changeset/review-progress.md"], false],
+			[[".changeset/review-progress.md", "docs/user/reviews.mdx"], false],
+			[[".changeset/review-progress.md", "package.json"], true],
+			[[".changeset/review-progress.md", "pnpm-lock.yaml"], true],
+			[[".changeset/review-progress.md", "server/build.gradle.kts"], true],
+			[
+				[".changeset/review-progress.md", "server/application/src/main/resources/application.yml"],
+				true,
+			],
+			[[".changeset/review-progress.md", ".github/workflows/cicd.yml"], true],
+			[[".changeset/config.json"], true],
+			[[".changeset/tool.ts"], true],
+			[[".changeset/nested/review-progress.md"], true],
+			[["docs/config.json"], true],
+			[["unknown-file"], true],
+		] as const) {
+			assert.equal(requiresReview(files), expected, files.join(", "));
+		}
 
 		const caller = asString(
 			orchestrator.getIn(["jobs", "Security", "with", "dependency_review_changed"]),
@@ -2854,6 +2885,7 @@ void describe("CI contract", () => {
 			["false", false],
 			["true", true],
 			["", true],
+			["unknown", true],
 		] as const) {
 			const context: unknown = JSON.parse(
 				JSON.stringify({
