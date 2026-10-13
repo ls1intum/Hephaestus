@@ -21,6 +21,14 @@ self.MonacoEnvironment = {
 	},
 };
 loader.config({ monaco });
+// The editor holds one file without the modules it imports, so a type check would mark every import,
+// such as a practice script's `../lib/practice-script.ts`, as an error. Syntax errors still show.
+// Monaco keeps these options per language, so they apply to every TypeScript model.
+monaco.typescript.typescriptDefaults.setDiagnosticsOptions({
+	...monaco.typescript.typescriptDefaults.getDiagnosticsOptions(),
+	noSemanticValidation: true,
+	noSuggestionDiagnostics: true,
+});
 
 export interface CodeEditorProps {
 	value: string;

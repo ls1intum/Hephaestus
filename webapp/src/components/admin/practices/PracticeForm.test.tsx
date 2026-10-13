@@ -63,16 +63,16 @@ describe("workspace practice scope", () => {
 	it("saves the edited static-analysis script with the workspace practice", async () => {
 		const onSubmit = vi.fn();
 		await renderPractice(mockPullRequestReviewFields, onSubmit, {
-			precomputeScript: "export const original = true;",
+			practiceScript: "export const original = true;",
 		});
-		fireEvent.change(screen.getByRole("textbox", { name: "Static analysis script" }), {
+		fireEvent.change(screen.getByRole("textbox", { name: "Practice script" }), {
 			target: { value: "export const edited = true;" },
 		});
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		await waitFor(() =>
 			expect(onSubmit).toHaveBeenCalledWith(
 				"review-swift",
-				expect.objectContaining({ precomputeScript: "export const edited = true;" }),
+				expect.objectContaining({ practiceScript: "export const edited = true;" }),
 				null,
 			),
 		);

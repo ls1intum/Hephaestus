@@ -86,13 +86,13 @@ function moment(signal: string) {
 describe("CuratedPracticeForm", () => {
 	it("saves the edited static-analysis script with the instance practice", async () => {
 		const onSubmit = submitSpy();
-		await renderForm({ precomputeScript: "export const original = true;" }, onSubmit);
-		fireEvent.change(screen.getByRole("textbox", { name: "Static analysis script" }), {
+		await renderForm({ practiceScript: "export const original = true;" }, onSubmit);
+		fireEvent.change(screen.getByRole("textbox", { name: "Practice script" }), {
 			target: { value: "export const edited = true;" },
 		});
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onSubmit).toHaveBeenCalledWith(
-			expect.objectContaining({ precomputeScript: "export const edited = true;" }),
+			expect.objectContaining({ practiceScript: "export const edited = true;" }),
 		);
 	});
 
