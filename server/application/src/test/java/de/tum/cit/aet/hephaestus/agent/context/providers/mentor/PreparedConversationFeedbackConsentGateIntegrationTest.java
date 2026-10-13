@@ -55,7 +55,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGateIntegrationTest {
 
@@ -476,22 +475,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     }
 
     private AgentJob saveWithCopyReceipt(AgentJob job) {
-        AgentJob saved = agentJobRepository.saveAndFlush(job);
-        ObjectNode payload = objectMapper.createObjectNode().put("attempt", 0).put("dependencies", "COMPLETE");
-        payload.putArray("identities")
-                .addObject()
-                .put("providerType", recipient.getProvider().getType().name())
-                .put("providerOrigin", recipient.getProvider().getServerUrl())
-                .put("subject", Long.toString(recipient.getNativeId()));
-        payload.putArray("repositories");
-        jdbc.update(
-                "INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload) VALUES (?,?,?,?,'READY',CAST(? AS jsonb))",
-                UUID.randomUUID(),
-                workspace.getId(),
-                saved.getId(),
-                UUID.randomUUID(),
-                objectMapper.writeValueAsString(payload));
-        return saved;
+        return captureCopiedPeople(job, recipient);
     }
 
     private PullRequest persistPullRequest(long nativeId, int number) {
