@@ -464,6 +464,35 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         fence.holdForCapture();
     }
 
+    /**
+     * The still-owning admitting attempt may finish from the capture it received. Incomplete copied-job lineage
+     * prevents retaining or recovering its inputs, not this live writer. Its local READY receipt must still be unique
+     * and name no suppressed identity. The caller holds copy admission before its job lock.
+     */
+    public boolean vouchesForLiveAttempt(UUID jobId, long workspaceId, int attempt) {
+        if (!Files.exists(layout.root().resolve(".person-evidence-store-id"))) return false;
+        var payloads = jdbc.query(
+                """
+            SELECT payload::text FROM person_evidence_copy
+            WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY'
+              AND payload->>'attempt'=?
+            """,
+                (rs, row) -> mapper.readTree(Objects.requireNonNull(rs.getString(1))),
+                jobId,
+                workspaceId,
+                storeId().toString(),
+                Integer.toString(attempt));
+        if (payloads.size() != 1 || !payloads.getFirst().path("identities").isArray()) return false;
+        List<PersonCopyIdentity> identities;
+        try {
+            identities =
+                    List.of(mapper.convertValue(payloads.getFirst().path("identities"), PersonCopyIdentity[].class));
+        } catch (RuntimeException malformedIdentities) {
+            return false;
+        }
+        return !isSuppressed(identities, jdbc);
+    }
+
     /** A durable original receipt can vouch for retained inputs independently of the mounted worker store. */
     public boolean vouchesForOriginalCopy(UUID copyId, UUID jobId, long workspaceId, int attempt) {
         return vouchingReceipt(jdbc, copyId, jobId, workspaceId, attempt, false) != null;

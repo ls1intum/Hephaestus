@@ -131,6 +131,9 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
     private PublicReviewCompletionService completionService;
 
     @Autowired
+    private ObservationAdmissionService observationAdmission;
+
+    @Autowired
     private PublicReviewCompletionRepository completions;
 
     @Autowired
@@ -345,6 +348,160 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
                 .resolve(workspace.getId().toString())
                 .resolve(job.getId().toString())
                 .toFile());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldAcceptTheLiveAdmittingWriterWithoutRetainedRecoveryInputs(boolean unknownLineage) {
+        if (unknownLineage) leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        assertThat(bases.findOriginalCopy(workspace.getId(), job.getId())).isEmpty();
+
+        var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+
+        assertThat(outcome.accepted()).isTrue();
+        assertThat(completion().getAdmissionAttempt()).isZero();
+        assertThat(automaticPackage().getState()).isEqualTo(FeedbackDispatchState.SENT);
+        assertThat(reload().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        verify(commentPoster, times(1)).post(any());
+        if (unknownLineage)
+            assertThat(evidenceFiles.completeReceipt(identity())).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "absent",
+                "revoked",
+                "foreign-store",
+                "wrong-attempt",
+                "wrong-workspace",
+                "ambiguous",
+                "malformed-identities"
+            })
+    void shouldRefuseTheLiveWriterWithoutItsExactReadyCapture(String invalidation) {
+        leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        switch (invalidation) {
+            case "absent" -> jdbc.update("DELETE FROM person_evidence_copy WHERE job_id=?", job.getId());
+            case "revoked" ->
+                jdbc.update("UPDATE person_evidence_copy SET state='ERASE_REQUESTED' WHERE job_id=?", job.getId());
+            case "foreign-store" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET store_id=? WHERE job_id=?", UUID.randomUUID(), job.getId());
+            case "wrong-attempt" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET payload=jsonb_set(payload,'{attempt}','1'::jsonb) WHERE job_id=?",
+                        job.getId());
+            case "wrong-workspace" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET workspace_id=? WHERE job_id=?",
+                        workspace.getId() + 1,
+                        job.getId());
+            case "ambiguous" ->
+                jdbc.update(
+                        "INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload) SELECT ?,workspace_id,job_id,store_id,state,payload FROM person_evidence_copy WHERE job_id=?",
+                        UUID.randomUUID(),
+                        job.getId());
+            case "malformed-identities" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET payload=jsonb_set(payload,'{identities}','[\"invalid\"]'::jsonb) WHERE job_id=?",
+                        job.getId());
+            default -> throw new IllegalArgumentException("Unknown capture invalidation");
+        }
+
+        var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+
+        assertThat(outcome.accepted()).isFalse();
+        assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+        assertThat(PublicReviewCompletionService.wasRefused(reload())).isTrue();
+        assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                .isFalse();
+        assertThat(jobFeedback()).isEmpty();
+        verify(commentPoster, never()).post(any());
+    }
+
+    @Test
+    void shouldRefuseTheLiveWriterWhenACopiedPersonIsSuppressedAfterAdmission() {
+        leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        Observation about = observation(Outcome.MET);
+        evidenceFiles.indexLateRead(
+                identity(), () -> Set.of(about.getId()), ids -> new JobEvidenceFiles.LateCopies(ids, Set.of()));
+        UUID suppression = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO person_suppression(id,provider_id,subject,team_key) SELECT ?,provider_id,native_id::text,'' FROM \"user\" WHERE id=?",
+                suppression,
+                about.getAboutUserId());
+        try {
+            var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+            assertThat(outcome.accepted()).isFalse();
+            assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+            assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                    .isFalse();
+            assertThat(jobFeedback()).isEmpty();
+            verify(commentPoster, never()).post(any());
+        } finally {
+            jdbc.update("DELETE FROM person_suppression WHERE id=?", suppression);
+        }
+    }
+
+    @Test
+    void shouldRefuseTheLiveWriterWhileItsJobIsSelectedByAnUnfinishedErasure() {
+        leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        UUID request = UUID.randomUUID();
+        ObjectNode selections = MAPPER.createObjectNode();
+        selections
+                .putObject("agent_job")
+                .putArray("rows")
+                .addObject()
+                .putObject("columns")
+                .put("id", job.getId().toString());
+        jdbc.update(
+                "INSERT INTO person_data_request(id,state,selections_json,counts_json,completed_json,created_at,expires_at,version) VALUES (?,'FAILED',?,'{}','{}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+INTERVAL '1 day',0)",
+                request,
+                MAPPER.writeValueAsString(selections));
+        try {
+            var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+            assertThat(outcome.accepted()).isFalse();
+            assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+            assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                    .isFalse();
+            assertThat(jobFeedback()).isEmpty();
+            verify(commentPoster, never()).post(any());
+        } finally {
+            jdbc.update("DELETE FROM person_data_request WHERE id=?", request);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"unknown-lineage", "expired", "absent"})
+    void shouldRefuseAContinuedWriterWithoutVouchingUnexpiredOriginalInputs(String invalidation) {
+        admit(BOTH_OBSERVATIONS);
+        switch (invalidation) {
+            case "unknown-lineage" -> leaveCaptureLineageUnknown();
+            case "expired" ->
+                jdbc.update(
+                        "UPDATE review_composition_basis SET expires_at=? WHERE job_id=?",
+                        Timestamp.from(Instant.EPOCH),
+                        job.getId());
+            case "absent" -> jdbc.update("DELETE FROM review_composition_basis WHERE job_id=?", job.getId());
+            default -> throw new IllegalArgumentException("Unknown recovery invalidation");
+        }
+        jdbc.update("UPDATE agent_job SET retry_count=1 WHERE id=?", job.getId());
+
+        var outcome = completionService.complete(
+                new AdmissionIdentity(job.getId(), workspace.getId(), 1, WORKER),
+                ADMISSION_DIGEST,
+                summaryOn(SUMMARY, all()));
+
+        assertThat(outcome.accepted()).isFalse();
+        assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+        assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                .isFalse();
+        assertThat(jobFeedback()).isEmpty();
+        verify(commentPoster, never()).post(any());
     }
 
     @Test
@@ -772,6 +929,20 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
               {"practiceSlug": "pr-description-quality", "summary": "Good PR description", "outcome": "MET",
                "severity": null, "evidenceRationale": "The description names what changed."}
             ]}""";
+
+    private void leaveCaptureLineageUnknown() {
+        // A returned late-read row absent from its lookup makes the native receipt UNKNOWN, not erased.
+        evidenceFiles.indexLateRead(
+                identity(), () -> Set.of(UUID.randomUUID()), ids -> new JobEvidenceFiles.LateCopies(ids, Set.of()));
+        assertThat(evidenceFiles.completeReceipt(identity())).isEmpty();
+    }
+
+    private String admitLive() {
+        JsonNode response = observationAdmission.admit(
+                identity(), MAPPER.readTree(withEvidence(BOTH_OBSERVATIONS)).path("observations"));
+        job = reload();
+        return response.path("admissionDigest").asString();
+    }
 
     private AdmissionIdentity identity() {
         return new AdmissionIdentity(job.getId(), workspace.getId(), 0, WORKER);

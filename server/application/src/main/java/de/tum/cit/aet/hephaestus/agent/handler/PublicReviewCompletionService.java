@@ -163,12 +163,19 @@ public class PublicReviewCompletionService {
             if (!accepted.equals(reviewDigest)) throw new Refused(CHANGED, false);
             return new Accepted(job, accepted, null);
         }
-        var copy = bases.findOriginalCopy(workspaceId, job.getId()).orElse(null);
-        if (copy == null
-                || copy.admissionAttempt() != ObservationAdmissionService.citationAttempt(job)
-                || !evidenceFiles.vouchesForOriginalCopy(
-                        copy.copyId(), job.getId(), workspaceId, copy.admissionAttempt())
-                || personSuppression.isReviewJobSuppressed(job.getId())) throw new Refused(COPY_GONE, true);
+        int admittedAttempt = ObservationAdmissionService.citationAttempt(job);
+        boolean authorized;
+        if (admittedAttempt == identity.attempt()) {
+            authorized = evidenceFiles.vouchesForLiveAttempt(identity);
+        } else {
+            var copy = bases.findOriginalCopy(workspaceId, job.getId()).orElse(null);
+            authorized = copy != null
+                    && copy.admissionAttempt() == admittedAttempt
+                    && copy.expiresAt().isAfter(Instant.now())
+                    && evidenceFiles.vouchesForOriginalCopy(
+                            copy.copyId(), job.getId(), workspaceId, copy.admissionAttempt());
+        }
+        if (!authorized || personSuppression.isReviewJobSuppressed(job.getId())) throw new Refused(COPY_GONE, true);
         if (!PullRequestReviewHandler.reviewOwed(job, persisted, publicIds, channels)) {
             throw new Refused(NOT_OWED, true);
         }
