@@ -17,6 +17,7 @@ import { NoWorkspace } from "@/components/common/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { hasText } from "@/lib/text";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/members")({
 	head: workspaceAdminHead("Members"),
@@ -47,31 +48,24 @@ function AdminMembersContainer() {
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
 
+	// The members are the page; the teams are only the filter's options, read and retried on their own.
 	const usersQueryOptions = getUsersWithTeamsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
 	});
-	const {
-		data: usersData,
-		isLoading: usersLoading,
-		error: usersError,
-		refetch: refetchUsers,
-	} = useQuery({
+	const usersQuery = useQuery({
 		...usersQueryOptions,
 		enabled: Boolean(workspaceSlug) && (usersQueryOptions.enabled ?? true),
 	});
+	useQueryReadRefusal(usersQueryOptions.queryKey, usersQuery.isError, usersQuery.error);
 
 	const teamsQueryOptions = getAllTeamsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
 	});
-	const {
-		data: teamsData,
-		isLoading: teamsLoading,
-		error: teamsError,
-		refetch: refetchTeams,
-	} = useQuery({
+	const teamsQuery = useQuery({
 		...teamsQueryOptions,
 		enabled: Boolean(workspaceSlug) && (teamsQueryOptions.enabled ?? true),
 	});
+	useQueryReadRefusal(teamsQueryOptions.queryKey, teamsQuery.isError, teamsQuery.error);
 
 	const queryClient = useQueryClient();
 	const toggleHidden = useMutation({
@@ -98,18 +92,25 @@ function AdminMembersContainer() {
 		});
 	};
 
-	const users = (usersData?.map(adaptApiUserTeams) ?? [])
+	const users = (usersQuery.data?.map(adaptApiUserTeams) ?? [])
 		.map((user) => ({
 			...user,
 			teams: [...user.teams].sort((a, b) => a.name.localeCompare(b.name)),
 		}))
 		.sort((a, b) => a.user.name.localeCompare(b.user.name));
-	const teams = [...(teamsData ?? [])].sort((a, b) => a.name.localeCompare(b.name));
-	const isLoading = isWorkspaceLoading || usersLoading || teamsLoading;
-	const selectedTeam =
-		hasText(search.team) && teams.some((team) => team.id.toString() === search.team)
-			? search.team
-			: "all";
+	// A failed read offers no options: what it last returned is not what the reader may see now.
+	const teams = teamsQuery.isError
+		? []
+		: [...(teamsQuery.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+	const isLoading = isWorkspaceLoading || usersQuery.isLoading;
+	// Only a team list that loaded can say the address names no team; until then its team still
+	// narrows the members, by the teams each member carries.
+	const teamUnknown =
+		hasText(search.team) &&
+		teamsQuery.isSuccess &&
+		!teamsQuery.isFetching &&
+		!teams.some((team) => team.id.toString() === search.team);
+	const selectedTeam = hasText(search.team) && !teamUnknown ? search.team : "all";
 	const view: WorkspaceMembersTableView = {
 		q: search.q ?? "",
 		team: selectedTeam,
@@ -120,10 +121,10 @@ function AdminMembersContainer() {
 	};
 
 	useEffect(() => {
-		if (teamsData && !teamsError && hasText(search.team) && selectedTeam === "all") {
+		if (teamUnknown) {
 			void navigate({ search: (previous) => ({ ...previous, team: undefined }), replace: true });
 		}
-	}, [navigate, search.team, selectedTeam, teamsData, teamsError]);
+	}, [navigate, teamUnknown]);
 
 	if (!hasText(workspaceSlug) && !isWorkspaceLoading) {
 		return <NoWorkspace />;
@@ -134,10 +135,14 @@ function AdminMembersContainer() {
 			users={users}
 			teams={teams}
 			isLoading={isLoading || !hasText(workspaceSlug)}
-			error={workspaceError ?? usersError ?? teamsError}
+			error={workspaceError ?? usersQuery.error}
 			onRetry={() => {
-				void refetchUsers();
-				void refetchTeams();
+				void usersQuery.refetch();
+			}}
+			teamsError={teamsQuery.error}
+			teamsRetrying={teamsQuery.isFetching}
+			onRetryTeams={() => {
+				void teamsQuery.refetch();
 			}}
 			onToggleHidden={handleToggleHidden}
 			view={view}

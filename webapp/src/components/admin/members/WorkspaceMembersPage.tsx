@@ -17,6 +17,10 @@ interface WorkspaceMembersPageProps {
 	isLoading: boolean;
 	error?: unknown;
 	onRetry?: () => void;
+	/** Why the team filter has no options; the members still list without it. */
+	teamsError?: unknown;
+	teamsRetrying?: boolean;
+	onRetryTeams?: () => void;
 	onToggleHidden?: (userId: number, hidden: boolean) => void;
 	view: WorkspaceMembersTableView;
 	onViewChange: (patch: Partial<WorkspaceMembersTableView>) => void;
@@ -29,6 +33,9 @@ export function WorkspaceMembersPage({
 	isLoading,
 	error,
 	onRetry,
+	teamsError,
+	teamsRetrying = false,
+	onRetryTeams,
 	onToggleHidden,
 	view,
 	onViewChange,
@@ -42,15 +49,25 @@ export function WorkspaceMembersPage({
 				description="Browse workspace members and filter by team."
 			/>
 			{error == null ? (
-				<WorkspaceMembersTable
-					users={users}
-					teams={teams}
-					isLoading={isLoading}
-					onToggleHidden={onToggleHidden}
-					view={view}
-					onViewChange={onViewChange}
-					renderPageLink={renderPageLink}
-				/>
+				<div className="space-y-4">
+					{teamsError != null && (
+						<QueryErrorAlert
+							error={teamsError}
+							title="We could not load teams"
+							onRetry={onRetryTeams}
+							pending={teamsRetrying}
+						/>
+					)}
+					<WorkspaceMembersTable
+						users={users}
+						teams={teams}
+						isLoading={isLoading}
+						onToggleHidden={onToggleHidden}
+						view={view}
+						onViewChange={onViewChange}
+						renderPageLink={renderPageLink}
+					/>
+				</div>
 			) : (
 				<QueryErrorAlert error={error} title="We could not load members" onRetry={onRetry} />
 			)}

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { expect, fn } from "storybook/test";
 
 import type { TeamInfo } from "@/api/types.gen";
 import type { ExtendedUserTeams } from "@/components/admin/members/user-teams";
@@ -140,6 +140,10 @@ export const Loading: Story = {
 		teams: [],
 		isLoading: true,
 	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Loading members…")).toBeVisible();
+		await expect(canvas.queryByText("No members found")).not.toBeInTheDocument();
+	},
 };
 
 export const EmptyUsers: Story = {
@@ -147,6 +151,58 @@ export const EmptyUsers: Story = {
 		users: [],
 		teams: mockTeams,
 		isLoading: false,
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("This workspace has no members yet.")).toBeVisible();
+	},
+};
+
+/** The members could not be read: the page says so and shows no rows. */
+export const MembersUnavailable: Story = {
+	args: {
+		users: [],
+		teams: mockTeams,
+		isLoading: false,
+		error: { status: 503 },
+		onRetry: fn(),
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not load members")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeVisible();
+		await expect(canvas.queryByRole("table")).not.toBeInTheDocument();
+	},
+};
+
+/** Only the team filter failed: the members still list, and the teams are retried on their own. */
+export const TeamsUnavailable: Story = {
+	args: {
+		users: mockUsers,
+		teams: [],
+		isLoading: false,
+		teamsError: { status: 503 },
+		onRetryTeams: fn(),
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not load teams")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeVisible();
+		await expect(canvas.getByText("Alice Smith")).toBeVisible();
+		await expect(canvas.getByText("David Brown")).toBeVisible();
+	},
+};
+
+/** The teams were refused: nothing to retry, and the members still list. */
+export const TeamsRefused: Story = {
+	args: {
+		users: mockUsers,
+		teams: [],
+		isLoading: false,
+		teamsError: { status: 403 },
+		onRetryTeams: fn(),
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("You do not have access to teams")).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+		await expect(canvas.getByText("Alice Smith")).toBeVisible();
 	},
 };
 
