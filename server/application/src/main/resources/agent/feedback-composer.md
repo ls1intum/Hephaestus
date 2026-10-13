@@ -22,8 +22,8 @@ admitted observations. This turn writes nothing but feedback: it cannot add or c
   concern. The notes say what the mentor needs to know, never a line for it to say.
 
 Each channel is read on its own and must be useful on its own. A point may appear on more than one channel. This
-turn shows the review on the work as a planned draft. It is not delivered, so it is not a record of earlier delivery,
-and it is not by itself a reason to withhold.
+turn shows the review composed for the work. It is not a receipt of provider delivery or a record of earlier
+communication, and it is not by itself a reason to withhold.
 
 ## What you are given
 

@@ -33,7 +33,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { reviewedWorkName } from "@/lib/artifact-kinds";
 import { copyToClipboard } from "@/lib/clipboard";
-import { durationText } from "@/lib/dates";
+import { asDate, durationText } from "@/lib/dates";
 import { formatCostUsd } from "@/lib/money";
 import { hasText } from "@/lib/text";
 
@@ -416,6 +416,16 @@ export function reviewHistory(job: AgentJob): SheetEvent[] {
 			detail: preparing === undefined ? undefined : `after ${preparing} preparing`,
 		});
 	}
+	const publicReviewAcceptedAt = asDate(job.publicReviewAcceptedAt);
+	if (publicReviewAcceptedAt !== undefined) {
+		events.push({
+			key: "public-accepted",
+			at: publicReviewAcceptedAt,
+			title: "Review on the work accepted",
+			detail:
+				"The public decision is recorded. Each piece of feedback records its own delivery state.",
+		});
+	}
 	if (job.completedAt !== undefined) {
 		const withModel = between(job.executionStartedAt, job.completedAt);
 		const cancellation =
@@ -447,11 +457,17 @@ export function reviewHistory(job: AgentJob): SheetEvent[] {
 	}
 	const posted = between(job.completedAt, job.firstFeedbackPostedAt);
 	if (job.firstFeedbackPostedAt !== undefined) {
+		let detail: string | undefined;
+		if (job.completedAt !== undefined && job.firstFeedbackPostedAt < job.completedAt) {
+			detail = "while the review was still running";
+		} else if (posted !== undefined) {
+			detail = `${posted} after it finished`;
+		}
 		events.push({
 			key: "posted",
 			at: job.firstFeedbackPostedAt,
 			title: "First comment posted",
-			detail: posted === undefined ? undefined : `${posted} after it finished`,
+			detail,
 		});
 	}
 	const merged = job.workMergedAt;

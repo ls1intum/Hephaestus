@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	appendFileSync,
 	existsSync,
@@ -557,7 +558,34 @@ if (scenario !== undefined && scenario !== "") {
 		}
 	};
 	let publicHistoryReads = 0;
+	let publicCompletionAttempts = 0;
 	mock.method(globalThis, "fetch", async (input: unknown, init?: RequestInit) => {
+		if (String(input).endsWith("/complete-public-review")) {
+			publicCompletionAttempts += 1;
+			const mode = process.env.PI_PUBLIC_COMPLETION_MODE;
+			if (mode !== undefined) {
+				const body = init?.body;
+				assert.ok(typeof body === "string");
+				record(
+					`public-completion:${publicCompletionAttempts}:${createHash("sha256").update(body).digest("hex")}`,
+				);
+				const submitted: unknown = JSON.parse(body);
+				assert.ok(isRecord(submitted));
+				assert.equal(submitted.schemaVersion, 1);
+				assert.equal(submitted.admissionDigest, "admitted-digest");
+				assert.ok(isRecord(submitted.review));
+			}
+			if (mode === "refused") {
+				return Response.json(
+					{ schemaVersion: 1, accepted: false, reasons: ["Refused"] },
+					{ status: 422 },
+				);
+			}
+			if (mode === "lost-ack" && publicCompletionAttempts === 1) {
+				throw new TypeError("fetch failed");
+			}
+			return Response.json({ schemaVersion: 1, accepted: true, reviewDigest: "a".repeat(64) });
+		}
 		if (String(input).endsWith("/public-feedback-history")) {
 			const mode = process.env.PI_PUBLIC_HISTORY_MODE;
 			publicHistoryReads += 1;
@@ -1866,7 +1894,7 @@ if (scenario !== undefined && scenario !== "") {
 								}
 								// The private composition sees the person's history, and the review planned for the work as a draft.
 								record(
-									`private-turn history=${String(text.includes(PRIVATE_HISTORY_SENTENCE))} review=${String(text.includes("The review planned for this work (a draft, not delivered)"))}`,
+									`private-turn history=${String(text.includes(PRIVATE_HISTORY_SENTENCE))} review=${String(text.includes("The review composed for this work"))}`,
 								);
 								const card = {
 									channel: "IN_APP",
@@ -2738,6 +2766,9 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-support-inline",
 		"compose-support-routing-missing",
 		"compose",
+		"compose-completion-accepted",
+		"compose-completion-refused",
+		"compose-completion-lost-ack",
 		"compose-continuation",
 		"compose-fresh-history",
 		"compose-history-invalid",
@@ -2771,6 +2802,9 @@ if (scenario !== undefined && scenario !== "") {
 	]) {
 		const stage =
 			new Map([
+				["compose-completion-accepted", "compose"],
+				["compose-completion-refused", "compose"],
+				["compose-completion-lost-ack", "compose"],
 				["compose-support-selected", "compose-support"],
 				["compose-support-empty", "compose-support"],
 				["compose-support-duplicate", "compose-support"],
@@ -3223,6 +3257,9 @@ if (scenario !== undefined && scenario !== "") {
 							env: {
 								...process.env,
 								PI_ORCHESTRATION_SCENARIO: stage,
+								PI_PUBLIC_COMPLETION_MODE: fixture.startsWith("compose-completion-")
+									? fixture.slice("compose-completion-".length)
+									: undefined,
 								PI_IN_APP_SUPPORT_MODE: fixture.startsWith("compose-support-")
 									? fixture.slice("compose-support-".length)
 									: new Map([["compose-already-said-inline", "first-inline"]]).get(fixture),
@@ -3283,6 +3320,37 @@ if (scenario !== undefined && scenario !== "") {
 							readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
 						);
 						assert.ok(isRecord(payload));
+						if (fixture.startsWith("compose-completion-")) {
+							assert.equal(child.status, 0, child.stderr);
+							const attempts = events.filter((event) => event.startsWith("public-completion:"));
+							assert.equal(attempts.length, fixture === "compose-completion-lost-ack" ? 2 : 1);
+							const privateIndex = events.findIndex((event) => event.startsWith("private-turn"));
+							const lastAttempt = attempts.at(-1);
+							assert.ok(lastAttempt !== undefined);
+							assert.ok(privateIndex > events.indexOf(lastAttempt));
+							assert.ok(
+								Array.isArray(payload.units) && payload.units.length > 0,
+								"Private feedback still completes",
+							);
+							if (fixture === "compose-completion-refused") {
+								assert.equal(payload.review, null);
+								assert.deepEqual(payload.compositionFailures, [
+									{ phase: "PUBLIC_REVIEW", reason: "SERVER_REFUSED" },
+								]);
+								assert.ok(events.includes("private-turn history=true review=false"));
+							} else {
+								assert.ok(isRecord(payload.review));
+								assert.deepEqual(payload.compositionFailures, []);
+								assert.ok(events.includes("private-turn history=true review=true"));
+							}
+							if (attempts.length === 2) {
+								const [first, second] = attempts;
+								assert.ok(first !== undefined && second !== undefined);
+								assert.equal(first.split(":")[2], second.split(":")[2]);
+							}
+							return;
+						}
+
 						if (
 							[
 								"compose-private-budget",

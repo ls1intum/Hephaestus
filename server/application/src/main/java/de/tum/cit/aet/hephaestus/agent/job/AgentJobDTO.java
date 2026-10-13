@@ -176,7 +176,13 @@ public record AgentJobDTO(
                                 + "the same code; available on review detail after evidence capture. Empty when every ready "
                                 + "practice was asked.")
         @Nullable
-        List<AnsweredPracticeDTO> answeredPractices) {
+        List<AnsweredPracticeDTO> answeredPractices,
+
+        @Schema(
+                description =
+                        "When the whole review on the work was accepted. Independent of delivery and job/private completion; absent when no acceptance was recorded.")
+        @Nullable
+        Instant publicReviewAcceptedAt) {
     /**
      * What a review's detail adds to the job: when it first posted on the work, when a developer first read its
      * feedback, and when its work was merged.
@@ -184,8 +190,9 @@ public record AgentJobDTO(
     public record ReviewMoments(
             @Nullable Instant firstFeedbackPostedAt,
             @Nullable Instant firstFeedbackReadAt,
-            @Nullable Instant workMergedAt) {
-        public static final ReviewMoments NONE = new ReviewMoments(null, null, null);
+            @Nullable Instant workMergedAt,
+            @Nullable Instant publicReviewAcceptedAt) {
+        public static final ReviewMoments NONE = new ReviewMoments(null, null, null, null);
     }
 
     public static AgentJobDTO from(AgentJob job, Target target, ReviewMoments moments) {
@@ -226,7 +233,8 @@ public record AgentJobDTO(
                 job.getLlmCacheReadTokens(),
                 job.getLlmCacheWriteTokens(),
                 generatedPaths(job.getEvidenceSnapshot()),
-                answeredPractices(job.getEvidenceSnapshot()));
+                answeredPractices(job.getEvidenceSnapshot()),
+                moments.publicReviewAcceptedAt());
     }
 
     /**
@@ -272,7 +280,8 @@ public record AgentJobDTO(
                 row.getLlmCacheReadTokens(),
                 row.getLlmCacheWriteTokens(),
                 null,
-                null);
+                null,
+                row.getPublicReviewAcceptedAt());
     }
 
     private static @Nullable List<AnsweredPracticeDTO> answeredPractices(@Nullable JsonNode snapshot) {

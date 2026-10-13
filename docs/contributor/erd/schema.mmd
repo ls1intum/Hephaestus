@@ -1300,6 +1300,19 @@ erDiagram
         VARCHAR(255) subject UK "NOT NULL"
     }
 
+    PublicReviewCompletion {
+        UUID job_id PK,FK
+        TIMESTAMPTZ accepted_at "NOT NULL"
+        INTEGER accepted_attempt "NOT NULL"
+        VARCHAR(255) accepted_worker_id "NOT NULL"
+        INTEGER admission_attempt "NOT NULL"
+        VARCHAR(64) admission_digest "NOT NULL"
+        INTEGER contract_version "NOT NULL"
+        JSONB review
+        VARCHAR(64) review_digest "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
+    }
+
     PullRequestClosingIssue {
         BIGINT pull_request_id PK,FK
         BIGINT issue_id PK,FK
@@ -1825,6 +1838,7 @@ erDiagram
     PracticeRevision ||--|| Practice : references
     Workspace ||--|| PracticeCatalogInstallation : has
     WorkspaceMembership ||--|| PracticeReviewPersonTarget : reviewed
+    AgentJob ||--|| PublicReviewCompletion : reviewed
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     AgentJob ||--|| ReviewCompositionBasi : reviewed
     User ||--|| UserPreference : has

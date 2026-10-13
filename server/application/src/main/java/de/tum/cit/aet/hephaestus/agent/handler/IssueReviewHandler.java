@@ -207,6 +207,7 @@ public class IssueReviewHandler implements JobTypeHandler {
                 .toList();
         feedbackDeliveryService.requestPrivatePreparation(job);
         if (feedbackDeliveryService.recoverAutomaticPackageIfPresent(job)) return;
+        if (PullRequestReviewHandler.settledWhileRunning(feedbackDeliveryService, job)) return;
         Set<UUID> publicIds = publicReviewEligibility.publicObservationIds(job, persisted);
         ComposedReview review = PullRequestReviewHandler.reviewToDeliver(
                 compositionResultParser, job, persisted, publicIds, ISSUE_REVIEW_CHANNELS);
@@ -272,14 +273,11 @@ public class IssueReviewHandler implements JobTypeHandler {
             if (decision.suppressionReason() != null) recordSuppressed(job, delivery, decision.suppressionReason());
             return;
         }
-        String sanitized = PullRequestCommentPoster.sanitize(delivery.mrNote());
-        if (sanitized.isBlank()) {
+        var providerPackage = FeedbackDeliveryService.issuePackage(commentFormatter, job, delivery);
+        if (providerPackage == null) {
             recordSuppressed(job, delivery, FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
             return;
         }
-        String formatted = commentFormatter.format(sanitized, job);
-        var providerPackage = new ReviewResultParser.DeliveryContent(
-                formatted, delivery.diffNotes(), delivery.withheld(), delivery.summaryContributors());
         PracticeFeedbackDispatchService.Result result =
                 dispatchService.dispatchAutomaticPackage(job, providerPackage, contributingPracticeSlugs);
         var dispatch = dispatchService.automaticPackage(job);

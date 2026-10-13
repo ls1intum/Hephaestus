@@ -178,8 +178,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             + "j.llmModelVersion AS llmModelVersion, j.llmTotalCalls AS llmTotalCalls, "
             + "j.llmTotalInputTokens AS llmTotalInputTokens, j.llmTotalOutputTokens AS llmTotalOutputTokens, "
             + "j.llmTotalReasoningTokens AS llmTotalReasoningTokens, j.llmCacheReadTokens AS llmCacheReadTokens, "
-            + "j.llmCacheWriteTokens AS llmCacheWriteTokens "
-            + "FROM AgentJob j WHERE j.workspace.id = :workspaceId "
+            + "j.llmCacheWriteTokens AS llmCacheWriteTokens, c.acceptedAt AS publicReviewAcceptedAt "
+            + "FROM AgentJob j LEFT JOIN PublicReviewCompletion c ON c.jobId = j.id AND c.workspaceId = j.workspace.id "
+            + "WHERE j.workspace.id = :workspaceId "
             + "AND (:status IS NULL OR j.status = :status)")
     Page<AgentJobListRow> findListRows(
             @Param("workspaceId") Long workspaceId,
@@ -625,8 +626,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * {@link #findReviewRunSummaries} filters by, with what each delivered as {@code delivered}, how long each waited
      * to be asked for as {@code asked}, and two sets of whole reviews, each stage of a review clamped at zero since a
      * retry can move a start past the end before it: {@code commented}, the reviews that posted a comment on the work
-     * by themselves, with all five stages, and {@code finished}, the completed reviews, with the four stages until
-     * their end. A run splits into preparation and model at {@code execution_started_at}; a review without it, such
+     * by themselves, with all five stages ending public execution at accepted_at (or completed_at for legacy
+     * reviews), including reviews whose private composition is still running; and {@code finished}, the completed reviews, with the four stages until
+     * their end. The whole-run model timing still ends at completed_at. A run splits into preparation and model at {@code execution_started_at}; a review without it, such
      * as one recorded before that moment was, counts its whole run as {@code unsplit}, so it stays in both sets and
      * its stages still add up to its time. {@code asked} runs from the first moment on the work that names the review, the one that started
      * it as the review's trace reads it, to the request; it is zero for a review no moment started, such as one an
@@ -638,8 +640,10 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     String REVIEW_SPANS = """
         jobs AS (
-            SELECT j.id, j.status, j.created_at, j.started_at, j.execution_started_at, j.completed_at
+            SELECT j.id, j.status, j.created_at, j.started_at, j.execution_started_at, j.completed_at,
+                   COALESCE(p.accepted_at, j.completed_at) AS public_completed_at
             FROM agent_job j
+            LEFT JOIN public_review_completion p ON p.job_id = j.id AND p.workspace_id = j.workspace_id
             WHERE j.workspace_id = :workspaceId
               AND j.purpose = :#{#purpose.name()}
               AND j.created_at >= :from
@@ -681,11 +685,18 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         ), commented AS (
             SELECT a.asked,
                    GREATEST(extract(epoch from jobs.started_at - jobs.created_at), 0) AS queue,
-                   r.preparation, r.model, r.unsplit,
-                   GREATEST(extract(epoch from d.first_posted_at - jobs.completed_at), 0) AS posted
+                   COALESCE(GREATEST(extract(epoch from jobs.execution_started_at - jobs.started_at), 0), 0)
+                       AS preparation,
+                   COALESCE(GREATEST(extract(epoch from jobs.public_completed_at - jobs.execution_started_at), 0), 0)
+                       AS model,
+                   CASE WHEN jobs.execution_started_at IS NULL
+                        THEN GREATEST(extract(epoch from jobs.public_completed_at - jobs.started_at), 0)
+                        ELSE 0 END AS unsplit,
+                   GREATEST(extract(epoch from d.first_posted_at - jobs.public_completed_at), 0) AS posted,
+                   a.asked + GREATEST(extract(epoch from d.first_posted_at - jobs.created_at), 0) AS total
             FROM jobs JOIN delivered d ON d.agent_job_id = jobs.id JOIN asked a ON a.id = jobs.id
-            JOIN runs r ON r.id = jobs.id
             WHERE d.first_posted_at IS NOT NULL
+              AND jobs.started_at IS NOT NULL AND jobs.public_completed_at IS NOT NULL
         ), finished AS (
             SELECT a.asked,
                    GREATEST(extract(epoch from jobs.started_at - jobs.created_at), 0) AS queue,
@@ -722,11 +733,11 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             SELECT 'MODEL', extract(epoch from completed_at - execution_started_at)
             FROM jobs WHERE execution_started_at IS NOT NULL AND completed_at IS NOT NULL
             UNION ALL
-            SELECT 'POSTED', extract(epoch from d.first_posted_at - jobs.completed_at)
+            SELECT 'POSTED', extract(epoch from d.first_posted_at - jobs.public_completed_at)
             FROM jobs JOIN delivered d ON d.agent_job_id = jobs.id
-            WHERE jobs.completed_at IS NOT NULL AND d.first_posted_at IS NOT NULL
+            WHERE jobs.public_completed_at IS NOT NULL AND d.first_posted_at IS NOT NULL
             UNION ALL
-            SELECT 'TOTAL', asked + queue + preparation + model + unsplit + posted FROM commented
+            SELECT 'TOTAL', total FROM commented
             UNION ALL
             SELECT 'FINISHED', asked + queue + preparation + model + unsplit FROM finished
             UNION ALL
@@ -893,7 +904,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
                ) AS "firstFeedbackReadAt",
                (SELECT pr.merged_at FROM issue pr WHERE
         """ + REVIEWED_PULL_REQUEST + """
-               ) AS "workMergedAt"
+               ) AS "workMergedAt",
+               (SELECT c.accepted_at FROM public_review_completion c
+                WHERE c.job_id = j.id AND c.workspace_id = j.workspace_id) AS "publicReviewAcceptedAt"
         FROM agent_job j
         WHERE j.id = :id AND j.workspace_id = :workspaceId
         """,
@@ -901,6 +914,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     Optional<ReviewRunMomentsRow> findReviewRunMoments(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
 
     interface ReviewRunMomentsRow {
+        @Nullable
+        Instant getPublicReviewAcceptedAt();
+
         @Nullable
         Instant getFirstFeedbackPostedAt();
 
@@ -1715,11 +1731,17 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             @Param("status") DeliveryStatus status,
             @Param("commentId") @Nullable String commentId);
 
+    /**
+     * The job's delivery status describes the whole run, so a package settled while its job still runs (an accepted
+     * review on the work) leaves it to the terminal delivery.
+     */
     @WorkspaceAgnostic("Dispatch recovery carries both the tenant id and job id")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query("UPDATE AgentJob j SET j.deliveryStatus = :status, j.deliveryCommentId = :commentId "
-            + "WHERE j.id = :id AND j.workspace.id = :workspaceId")
+            + "WHERE j.id = :id AND j.workspace.id = :workspaceId "
+            + "AND j.status NOT IN (de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.QUEUED, "
+            + "de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.RUNNING)")
     int reconcileDispatchDeliveryStatus(
             @Param("id") UUID id,
             @Param("workspaceId") Long workspaceId,
@@ -1933,6 +1955,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * entity say the same thing about what may be absent.
      */
     interface AgentJobListRow extends ReviewRunTargetRow {
+        @Nullable
+        Instant getPublicReviewAcceptedAt();
+
         AgentJobStatus getStatus();
 
         @Nullable

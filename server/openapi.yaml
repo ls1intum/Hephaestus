@@ -8161,6 +8161,7 @@ paths:
             - BACKFILL_QUIET
             - OBSERVATION_INVALIDATED
             - REVIEWED_REVISION_CHANGED
+            - REVIEW_CANCELLED
       - in: query
         name: channel
         required: false
@@ -8338,6 +8339,7 @@ paths:
             - BACKFILL_QUIET
             - OBSERVATION_INVALIDATED
             - REVIEWED_REVISION_CHANGED
+            - REVIEW_CANCELLED
       - in: query
         name: channel
         required: false
@@ -8525,6 +8527,7 @@ paths:
             - BACKFILL_QUIET
             - OBSERVATION_INVALIDATED
             - REVIEWED_REVISION_CHANGED
+            - REVIEW_CANCELLED
       - in: query
         name: channel
         required: false
@@ -12029,6 +12032,12 @@ components:
         output:
           description: Raw output is not returned by administrative job reads; use
             the authorized observation and feedback endpoints
+        publicReviewAcceptedAt:
+          type: string
+          format: date-time
+          description: When the whole review on the work was accepted. Independent
+            of delivery and job/private completion; absent when no acceptance was
+            recorded.
         retryCount:
           type: integer
           format: int32
@@ -14511,6 +14520,7 @@ components:
           - BACKFILL_QUIET
           - OBSERVATION_INVALIDATED
           - REVIEWED_REVISION_CHANGED
+          - REVIEW_CANCELLED
         evaluatedAt:
           type: string
           format: date-time
@@ -18172,9 +18182,9 @@ components:
             \ and timed-out runs included"
         posted:
           $ref: "#/components/schemas/ReviewStageTiming"
-          description: From the end of the review until it first posted feedback on
-            the work by itself; feedback that waited for an admin's approval is left
-            out
+          description: From acceptance of the review on the work (the end of the review
+            for legacy runs) until it first posted feedback by itself; feedback that
+            waited for an admin's approval is left out
         preparation:
           $ref: "#/components/schemas/ReviewStageTiming"
           description: "From the claim until the model started, while the evidence\
@@ -18200,8 +18210,9 @@ components:
             \ one figure per review over the reviews that did"
         totalShares:
           $ref: "#/components/schemas/ReviewTimeShares"
-          description: Each stage's part of the time of the reviews that total measures;
-            absent when no review posted a comment
+          description: "Each stage's part of the time of the reviews that total measures;\
+            \ public execution ends at acceptance, even while private composition\
+            \ continues; absent when no review posted a comment"
         waitingLong:
           type: integer
           format: int64
@@ -18527,6 +18538,7 @@ components:
             - BACKFILL_QUIET
             - OBSERVATION_INVALIDATED
             - REVIEWED_REVISION_CHANGED
+            - REVIEW_CANCELLED
       required:
       - autonomy
       - deliveredCount
@@ -19836,6 +19848,7 @@ components:
           - BACKFILL_QUIET
           - OBSERVATION_INVALIDATED
           - REVIEWED_REVISION_CHANGED
+          - REVIEW_CANCELLED
       required:
       - agentJobId
       - channel
@@ -20036,6 +20049,7 @@ components:
           - BACKFILL_QUIET
           - OBSERVATION_INVALIDATED
           - REVIEWED_REVISION_CHANGED
+          - REVIEW_CANCELLED
       required:
       - agentJobId
       - bodyTruncated
@@ -20244,6 +20258,7 @@ components:
           - BACKFILL_QUIET
           - OBSERVATION_INVALIDATED
           - REVIEWED_REVISION_CHANGED
+          - REVIEW_CANCELLED
         threadKey:
           type: string
           description: Cross-run continuity key tying successive deliveries together
@@ -20342,6 +20357,7 @@ components:
           - BACKFILL_QUIET
           - OBSERVATION_INVALIDATED
           - REVIEWED_REVISION_CHANGED
+          - REVIEW_CANCELLED
         updatedAt:
           type: string
           format: date-time
@@ -20412,6 +20428,7 @@ components:
           - BACKFILL_QUIET
           - OBSERVATION_INVALIDATED
           - REVIEWED_REVISION_CHANGED
+          - REVIEW_CANCELLED
       required:
       - count
     ReviewLineage:
@@ -20606,6 +20623,7 @@ components:
           - BACKFILL_QUIET
           - OBSERVATION_INVALIDATED
           - REVIEWED_REVISION_CHANGED
+          - REVIEW_CANCELLED
         withdrawnAt:
           type: string
           format: date-time

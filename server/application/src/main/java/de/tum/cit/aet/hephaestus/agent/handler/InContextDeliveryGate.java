@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -74,6 +75,21 @@ class InContextDeliveryGate {
     /** The subset of {@code observations} that may be placed on the artifact, in the order given. */
     @Transactional(readOnly = true)
     public List<ValidatedObservation> admitInContext(AgentJob job, List<ValidatedObservation> observations) {
+        return admitInContext(job, observations, false);
+    }
+
+    /**
+     * {@link #admitInContext(AgentJob, List)} whose withheld rows commit or roll back with the caller's transaction,
+     * as an accepted review on the work commits its whole outcome at once.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public List<ValidatedObservation> admitInContextInCurrentTransaction(
+            AgentJob job, List<ValidatedObservation> observations) {
+        return admitInContext(job, observations, true);
+    }
+
+    private List<ValidatedObservation> admitInContext(
+            AgentJob job, List<ValidatedObservation> observations, boolean inCurrentTransaction) {
         if (observations.isEmpty()
                 || job.getWorkspace() == null
                 || job.getWorkspace().getId() == null) {
@@ -83,7 +99,7 @@ class InContextDeliveryGate {
         FeedbackSuppressionReason rolloutRefusal =
                 refusalIfRolloutRevisionMoved(job.getPracticeRolloutRevision(), workspaceId);
         if (rolloutRefusal != null) {
-            recordWithheld(job, observations, rolloutRefusal);
+            recordWithheld(job, observations, rolloutRefusal, inCurrentTransaction);
             return List.of();
         }
         ObservationOrigin origin = ReviewOutputService.originOf(job.getMetadata());
@@ -93,7 +109,7 @@ class InContextDeliveryGate {
                     observations.size(),
                     origin,
                     job.getId());
-            recordWithheld(job, observations, FeedbackSuppressionReason.BACKFILL_QUIET);
+            recordWithheld(job, observations, FeedbackSuppressionReason.BACKFILL_QUIET, inCurrentTransaction);
             return List.of();
         }
 
@@ -128,7 +144,7 @@ class InContextDeliveryGate {
                 withheld.size(),
                 observations.size(),
                 job.getId());
-        recordWithheld(job, withheld, FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL);
+        recordWithheld(job, withheld, FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL, inCurrentTransaction);
         return admitted;
     }
 
@@ -153,7 +169,11 @@ class InContextDeliveryGate {
                 .toList();
     }
 
-    private void recordWithheld(AgentJob job, List<ValidatedObservation> withheld, FeedbackSuppressionReason reason) {
+    private void recordWithheld(
+            AgentJob job,
+            List<ValidatedObservation> withheld,
+            FeedbackSuppressionReason reason,
+            boolean inCurrentTransaction) {
         Map<String, Observation> byOccurrence = new HashMap<>();
         for (Observation observation : observationRepository.findByAgentJobId(
                 job.getId(), job.getWorkspace().getId())) {
@@ -176,6 +196,11 @@ class InContextDeliveryGate {
             }
             Observation observation = byOccurrence.get(occurrenceKey);
             if (observation == null) {
+                continue;
+            }
+            if (inCurrentTransaction) {
+                // Part of the caller's whole outcome: a failed row fails it rather than leaving it incomplete.
+                feedbackLedgerRecorder.recordWithheldInCurrentTransaction(job, observation, reason, index++);
                 continue;
             }
             try {

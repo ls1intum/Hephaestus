@@ -163,6 +163,32 @@ class ProductionSchemaContractIntegrationTest {
                 .isEqualTo(1);
     }
 
+    @Test
+    void shouldScopeAndCascadeAcceptedPublicReviewsToTheirJob() {
+        DispatchOwner owner = insertDispatchOwner("completion-a-" + UUID.randomUUID());
+        DispatchOwner other = insertDispatchOwner("completion-b-" + UUID.randomUUID());
+        assertThatThrownBy(() -> insertPublicCompletion(new DispatchOwner(other.workspaceId(), owner.jobId())))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("sfk_public_review_completion_job");
+        insertPublicCompletion(owner);
+        insertPublicCompletion(other);
+        jdbcTemplate.update("DELETE FROM agent_job WHERE id=? AND workspace_id=?", owner.jobId(), owner.workspaceId());
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM public_review_completion WHERE job_id=?", Integer.class, owner.jobId()))
+                .isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT workspace_id FROM public_review_completion WHERE job_id=?", Long.class, other.jobId()))
+                .isEqualTo(other.workspaceId());
+    }
+
+    private void insertPublicCompletion(DispatchOwner owner) {
+        jdbcTemplate.update("""
+                INSERT INTO public_review_completion(job_id,workspace_id,contract_version,admission_attempt,
+                    admission_digest,accepted_attempt,accepted_worker_id,review_digest,review,accepted_at)
+                VALUES (?,?,1,0,?,0,'schema-fixture',?,'{}'::jsonb,now())
+                """, owner.jobId(), owner.workspaceId(), "a".repeat(64), "b".repeat(64));
+    }
+
     private void insertCompositionBasis(DispatchOwner owner) {
         jdbcTemplate.update("""
                 INSERT INTO review_composition_basis

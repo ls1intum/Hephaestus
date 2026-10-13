@@ -35,6 +35,7 @@ describe("withheld classes", () => {
 		expect(withheldClass("COMPOSER_WITHHELD")).toBe("HELD_BY_REVIEW");
 		expect(withheldClass("RECIPIENT_OPTED_OUT")).toBe("DEVELOPER_CHOICE");
 		expect(withheldClass("OBSERVATION_INVALIDATED")).toBe("OTHER");
+		expect(withheldClass("REVIEW_CANCELLED")).toBe("OTHER");
 	});
 });
 

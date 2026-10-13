@@ -71,9 +71,15 @@ public class JobTypeHandlerConfiguration {
             FeedbackLedgerRecorder feedbackLedgerRecorder,
             PracticeFeedbackCommentFormatter commentFormatter,
             PracticeFeedbackDispatchService dispatchService,
-            AgentJobRepository agentJobRepository) {
+            AgentJobRepository agentJobRepository,
+            PublicReviewCompletionRepository completions) {
         return new FeedbackDeliveryService(
-                deliveryPolicy, feedbackLedgerRecorder, commentFormatter, dispatchService, agentJobRepository);
+                deliveryPolicy,
+                feedbackLedgerRecorder,
+                commentFormatter,
+                dispatchService,
+                agentJobRepository,
+                completions);
     }
 
     @Bean

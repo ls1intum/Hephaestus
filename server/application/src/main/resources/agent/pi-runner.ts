@@ -58,6 +58,7 @@ import {
 } from "./pi-observation-normalize.ts";
 import { PracticeCoverageLedger } from "./pi-practice-coverage.ts";
 import { loadProviderConfig, reasoningSetting, registerHephaestusProvider } from "./pi-provider.ts";
+import { completePublicReview } from "./pi-public-completion.ts";
 import {
 	buildBrief,
 	buildPrimarySourceReference,
@@ -2209,6 +2210,7 @@ type CompositionFailureReason =
 	| "SAFETY"
 	| "LOOP"
 	| "NO_DECISION"
+	| "SERVER_REFUSED"
 	| "PRIVATE_NOT_RECOVERED";
 interface CompositionFailure {
 	phase: CompositionPhase;
@@ -3356,7 +3358,7 @@ function priorFeedbackFacts(label: string, file: string, key: "feedback" | "prep
 		: `### ${label} — bodies remain at their \`bodyAt\` in the unchanged file; read them when earlier wording matters\n\`\`\`json\n${text}\n\`\`\`\n`;
 }
 
-/** The accepted public draft is persisted here, but has not passed delivery and is not prior advice. */
+/** The composed public decision is not a delivery receipt or prior advice for the private writer. */
 function plannedReviewFacts(): string {
 	const { review } = composedFeedback;
 	if (!review) {
@@ -3373,7 +3375,7 @@ function plannedReviewFacts(): string {
 		})),
 		withheld: review.withheld,
 	};
-	return `### The review planned for this work (a draft, not delivered)\nThis accepted draft may still be withheld at delivery. It is not prior communication. Private channels remain independently useful and may make the same supported point. ${stored ? "Read the located bodies if their wording matters." : "Its wording is not available as a staged file here."}\n\`\`\`json\n${JSON.stringify(facts, null, 1)}\n\`\`\`\n`;
+	return `### The review composed for this work\nThis decision is not a receipt of provider delivery. It may have entered public handling, whose final gates can still withhold it. Only delivered-history records establish prior communication. Private channels remain independently useful and may make the same supported point. ${stored ? "Read the located bodies if their wording matters." : "Its wording is not available as a staged file here."}\n\`\`\`json\n${JSON.stringify(facts, null, 1)}\n\`\`\`\n`;
 }
 
 function buildCompositionTurn(
@@ -3527,6 +3529,32 @@ async function admitObservations() {
 		writeFileSync(IN_APP_SUPPORT_PATH, JSON.stringify(inAppSupport, null, 2));
 	}
 	inChatEligibility = readInChatEligibility(answer.inChatEligibility, admittedObservations);
+}
+
+/** Hand the complete public decision to its server owner without settling the review or its usage. */
+async function completeReviewOnWork(safety: ReturnType<typeof scheduleDeadline>): Promise<void> {
+	if (composedFeedback.review === null || admissionDigest === null || safety.expired()) {
+		return;
+	}
+	const result = await completePublicReview({
+		url: `${LLM_PROXY_URL}/complete-public-review`,
+		token: LLM_PROXY_TOKEN,
+		admissionDigest,
+		review: composedFeedback.review,
+		timeoutMs: Math.min(
+			ADMISSION_ATTEMPT_TIMEOUT_MS,
+			AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS),
+		),
+	});
+	if (result.state === "REFUSED") {
+		// The server made a final decision: returning this package at terminal must not bypass it.
+		composedFeedback.review = null;
+		recordCompositionFailure("PUBLIC_REVIEW", "SERVER_REFUSED");
+		persistComposedFeedback();
+	}
+	// An unavailable acknowledgement may follow a committed acceptance. The server reconciles the
+	// unchanged terminal package against that immutable completion; it never authorizes another writer.
+	console.error(`[pi-runner] public completion: ${result.state}`);
 }
 
 /**
@@ -4774,6 +4802,7 @@ async function main() {
 				const reviewable = publicObservations(admittedObservations);
 				if (compositionRequest.channels.IN_CONTEXT.enabled && reviewable.length > 0) {
 					await composeReview(compositionRequest, reviewable, notReached, safety);
+					await completeReviewOnWork(safety);
 				}
 				if (privatelyComposable().length > 0 && !safety.expired()) {
 					await composePrivately(compositionRequest, safety);
@@ -4845,6 +4874,7 @@ async function main() {
 				};
 				try {
 					await composeReview(compositionRequest, reviewable, unreachedSlugs, safety);
+					await completeReviewOnWork(safety);
 				} catch (error) {
 					unfinished(safety.expired() ? "SAFETY" : "RUNTIME_ERROR");
 					throw error;

@@ -70,7 +70,8 @@ public class FeedbackCompositionResultParser {
                 "SAFETY",
                 "LOOP",
                 "NO_DECISION",
-                "PRIVATE_NOT_RECOVERED");
+                "PRIVATE_NOT_RECOVERED",
+                "SERVER_REFUSED");
         for (JsonNode failure : failures) {
             JsonNode phase = failure.get("phase");
             JsonNode reason = failure.get("reason");
@@ -83,6 +84,8 @@ public class FeedbackCompositionResultParser {
                     || !Set.of("PUBLIC_REVIEW", "PRIVATE_FEEDBACK").contains(phase.asString())
                     || !phases.add(phase.asString())
                     || !reasons.contains(reason.asString())
+                    || (reason.asString().equals("SERVER_REFUSED")
+                            && !phase.asString().equals("PUBLIC_REVIEW"))
                     || (reason.asString().equals("PRIVATE_NOT_RECOVERED")
                             && !phase.asString().equals("PRIVATE_FEEDBACK"))) {
                 return CompositionStatus.INVALID;
@@ -147,11 +150,18 @@ public class FeedbackCompositionResultParser {
     public @Nullable ComposedReview review(@Nullable JsonNode jobOutput) {
         JsonNode payload = payloadOf(jobOutput);
         if (payload == null) return null;
-        JsonNode review = payload.get("review");
+        return review(payload.get("review"), payload.get("observations"));
+    }
+
+    /**
+     * {@link #review(JsonNode)} for a review submitted on its own, read against observations the server staged: the
+     * admission's own projection of its persisted rows, never the submitter's copy of them.
+     */
+    public @Nullable ComposedReview review(@Nullable JsonNode review, @Nullable JsonNode stagedObservations) {
         if (review == null || !review.isObject() || !onlyFields(review, "summary", "inline", "withheld")) {
             return null;
         }
-        Map<String, StagedObservation> observations = readObservations(payload.get("observations"));
+        Map<String, StagedObservation> observations = readObservations(stagedObservations);
         try {
             ComposedReview.Summary summary = null;
             JsonNode summaryNode = review.get("summary");

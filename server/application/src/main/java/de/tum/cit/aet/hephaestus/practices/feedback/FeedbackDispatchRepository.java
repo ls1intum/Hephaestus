@@ -18,6 +18,15 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
 
     Optional<FeedbackDispatch> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
+    /**
+     * The status of the review this package belongs to, holding its job row until the caller's reservation commits, so
+     * a cancellation is ordered before or after it. Empty when the job no longer exists.
+     */
+    @Query(value = """
+            SELECT j.status FROM agent_job j WHERE j.id = :jobId AND j.workspace_id = :workspaceId FOR SHARE OF j
+            """, nativeQuery = true)
+    List<String> lockReviewStatus(@Param("jobId") UUID jobId, @Param("workspaceId") Long workspaceId);
+
     /** The packages a review posted without approval, oldest first; one per review in practice. */
     @Query("""
             SELECT dispatch FROM FeedbackDispatch dispatch

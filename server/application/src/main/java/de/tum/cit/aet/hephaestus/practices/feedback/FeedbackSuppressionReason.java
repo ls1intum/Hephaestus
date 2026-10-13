@@ -45,4 +45,9 @@ public enum FeedbackSuppressionReason {
      * comparison leaves delivery waiting for a retry.
      */
     REVIEWED_REVISION_CHANGED,
+    /**
+     * The review was cancelled after its review on the work was accepted and before that review was written to the
+     * work, so nothing new was written. Copies already posted stay.
+     */
+    REVIEW_CANCELLED,
 }

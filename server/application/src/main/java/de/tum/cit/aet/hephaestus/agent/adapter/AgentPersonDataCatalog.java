@@ -28,6 +28,7 @@ import tools.jackson.databind.ObjectMapper;
     "agent_job",
     "agent_job_evidence_copy",
     "review_composition_basis",
+    "public_review_completion",
     "llm_usage_event",
     "instance_llm_settings",
     "review_backfill_run",
@@ -79,6 +80,18 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
                         "job_id",
                         "",
                         -82),
+                // An accepted review on the work speaks about the same people as its job: removed outright, before
+                // the job is redacted. What it put on the work is erased through the feedback ledger's own store.
+                new JdbcPersonDataStore(
+                        jdbc,
+                        mapper,
+                        "public_review_completion",
+                        "public_review_completion",
+                        "t.job_id IN (" + SUBJECT_JOBS + ") OR t.job_id IN (" + COPYING_JOBS + ")",
+                        "job_id,workspace_id,admission_attempt,accepted_attempt,accepted_at",
+                        "job_id",
+                        "",
+                        -81),
                 new AgentJobStore(
                         "agent_job",
                         "t.id IN (" + SUBJECT_JOBS + ")",
