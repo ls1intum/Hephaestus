@@ -872,6 +872,10 @@ The shared writing guide and each channel's prompt define those purposes:
 - `IN_APP` is private process-level feedback about a pattern in the recipient's work.
 - `IN_CHAT` prepares `situation`, `capability`, `evidenceSummary` and `inConversationSignal` as private notes,
   not dialogue. A later conversational turn may adapt, defer or discard them.
+  Eligibility and preparation both require an available Mentor binding for the recipient's current AI choice.
+  This check leaves the other channels unchanged.
+  Configuring Mentor permits later reviews.
+  It does not reopen a run whose conversation lane completed empty.
 
 Public eligibility uses the author of the mirrored work and the subject of the observation's recorded practice revision.
 Author observations qualify, as do merger observations when the author merged the work.

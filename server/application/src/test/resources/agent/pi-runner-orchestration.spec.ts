@@ -738,6 +738,7 @@ if (scenario !== undefined && scenario !== "") {
 			scenario === "compose" ||
 			scenario === "compose-foreign-provider" ||
 			supportMode === "selected" ||
+			supportMode === "mentor-unavailable" ||
 			supportMode === "routing-missing"
 		) {
 			selected = [supportOccurrence("scm.pull_request", 3), supportOccurrence("scm.issue", 3)];
@@ -785,7 +786,13 @@ if (scenario !== undefined && scenario !== "") {
 							const inline =
 								supportMode === "inline" ||
 								(supportMode === "first-inline" && row.practiceSlug === "test-practice");
-							return [{ observationId: row.id, decision: inline ? "HAS_INLINE_ANCHOR" : "ADMIT" }];
+							let decision = "ADMIT";
+							if (supportMode === "mentor-unavailable") {
+								decision = "MENTOR_UNAVAILABLE";
+							} else if (inline) {
+								decision = "HAS_INLINE_ANCHOR";
+							}
+							return [{ observationId: row.id, decision }];
 						}),
 					};
 		let support: unknown = complete;
@@ -2952,6 +2959,7 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-recovered-error",
 		"compose-complete-error",
 		"compose-support-selected",
+		"compose-support-mentor-unavailable",
 		"compose-support-empty",
 		"compose-support-duplicate",
 		"compose-support-missing",
@@ -3004,6 +3012,7 @@ if (scenario !== undefined && scenario !== "") {
 				["compose-completion-refused", "compose"],
 				["compose-completion-lost-ack", "compose"],
 				["compose-support-selected", "compose-support"],
+				["compose-support-mentor-unavailable", "compose-support"],
 				["compose-support-empty", "compose-support"],
 				["compose-support-duplicate", "compose-support"],
 				["compose-support-missing", "compose-support"],
@@ -4547,7 +4556,7 @@ for (const item of nullableCases) {
 									(unit: unknown) =>
 										isRecord(unit) && unit.channel === "IN_CHAT" && unit.action === "NEW",
 								),
-								!["refused-only", "inline", "routing-missing"].includes(mode),
+								!["refused-only", "inline", "routing-missing", "mentor-unavailable"].includes(mode),
 							);
 							assert.deepEqual(
 								payload.units
@@ -4558,6 +4567,7 @@ for (const item of nullableCases) {
 									}),
 								new Map<string, string[]>([
 									["selected", ["NEW"]],
+									["mentor-unavailable", ["NEW"]],
 									["routing-missing", ["NEW"]],
 									["empty", ["WITHHOLD"]],
 									["duplicate", ["WITHHOLD"]],
@@ -4597,6 +4607,13 @@ for (const item of nullableCases) {
 								assert.match(
 									child.stderr,
 									/IN_CHAT closed for this run: routing missing or malformed/u,
+								);
+							}
+							if (mode === "mentor-unavailable") {
+								assert.match(unitReply, /#2: IN_CHAT is not a lane this run may write for/u);
+								assert.match(
+									child.stderr,
+									/IN_CHAT closed for this run: no practice is routed to it/u,
 								);
 							}
 							if (mode === "inline") {

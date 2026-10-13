@@ -126,6 +126,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
@@ -790,8 +792,9 @@ class PracticeReviewPipelineIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ConversationalDeliveryListener conversationLane;
 
-    @Test
-    void shouldPrepareBothPrivateChannelsWhenTheIssueClosedAfterAdmission() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldPrepareAvailablePrivateChannelsWhenTheIssueClosedAfterAdmission(boolean mentorStillAvailable) {
         Practice practice = createPractice("record-issue-outcome", "Record the issue outcome");
         PracticeTestEvidence.configure(practice, ArtifactKinds.ISSUE);
         practice = practiceRepository.saveAndFlush(practice);
@@ -853,6 +856,16 @@ class PracticeReviewPipelineIntegrationTest extends BaseIntegrationTest {
             current = run;
             currentObservation = observationId;
         }
+        var admitted = observationRepository.findByAgentJobId(current.getId(), workspace.getId());
+        assertThat(conversationLane.eligibility(current, admitted).observations())
+                .extracting(route -> route.decision().name())
+                .containsOnly("MENTOR_UNAVAILABLE");
+        var mentor = AdmittedReviewJobFixtures.mentorBinding(workspace, workspaceAgentBindingRepository);
+        assertThat(conversationLane.eligibility(current, admitted).observations())
+                .extracting(route -> route.decision().name())
+                .containsOnly("ADMIT");
+        mentor.setEnabled(mentorStillAvailable);
+        workspaceAgentBindingRepository.saveAndFlush(mentor);
         current.setOutput(OBJECT_MAPPER.readTree("""
                 {"feedback":{"admissionDigest":"private-lifecycle-digest","observations":[{"id":"%s","practiceSlug":"%s","outcome":"NOT_MET"}],
                 "units":[
@@ -877,6 +890,10 @@ class PracticeReviewPipelineIntegrationTest extends BaseIntegrationTest {
                         currentObservation)));
         current = agentJobRepository.saveAndFlush(current);
         UUID jobId = current.getId();
+        var expected = new ArrayList<>(List.of(
+                tuple(FeedbackChannel.IN_CONTEXT, FeedbackDeliveryState.SUPPRESSED),
+                tuple(FeedbackChannel.IN_APP, FeedbackDeliveryState.PREPARED)));
+        if (mentorStillAvailable) expected.add(tuple(FeedbackChannel.IN_CHAT, FeedbackDeliveryState.PREPARED));
         handlerRegistry.getHandler(AgentJobType.ISSUE_REVIEW).deliver(current);
         await().untilAsserted(() -> {
             AgentJob routed = agentJobRepository.findById(jobId).orElseThrow();
@@ -886,10 +903,7 @@ class PracticeReviewPipelineIntegrationTest extends BaseIntegrationTest {
                             .filter(row -> jobId.equals(row.getAgentJobId()))
                             .toList())
                     .extracting(Feedback::getChannel, Feedback::getDeliveryState)
-                    .containsExactlyInAnyOrder(
-                            tuple(FeedbackChannel.IN_CONTEXT, FeedbackDeliveryState.SUPPRESSED),
-                            tuple(FeedbackChannel.IN_APP, FeedbackDeliveryState.PREPARED),
-                            tuple(FeedbackChannel.IN_CHAT, FeedbackDeliveryState.PREPARED));
+                    .containsExactlyInAnyOrderElementsOf(expected);
         });
         assertThat(feedbackRepository.findAll().stream()
                         .filter(row ->
@@ -907,7 +921,7 @@ class PracticeReviewPipelineIntegrationTest extends BaseIntegrationTest {
         assertThat(feedbackRepository.findAll().stream()
                         .filter(row -> jobId.equals(row.getAgentJobId()))
                         .toList())
-                .hasSize(3);
+                .hasSize(mentorStillAvailable ? 3 : 2);
     }
 
     private void setJobOutput(String rawOutput) {

@@ -576,6 +576,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
     }
 
     private void addPrivateBrief(AgentJob job, UUID observation) {
+        AdmittedReviewJobFixtures.mentorBinding(workspace, workspaceAgentBindingRepository);
         job.setStatus(AgentJobStatus.COMPLETED);
         ObjectNode feedback =
                 (ObjectNode) Objects.requireNonNull(job.getOutput()).path("feedback");

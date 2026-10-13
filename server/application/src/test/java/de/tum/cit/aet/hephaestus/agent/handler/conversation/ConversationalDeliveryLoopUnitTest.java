@@ -15,6 +15,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ConversationConsentGate;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackSupersession;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
@@ -47,6 +50,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -91,6 +95,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @Mock
     private OutboundEgressGuard egressGuard;
 
+    @Mock
+    private MemberAiRoutingAdapter memberAiRouting;
+
     /**
      * Never asked to claim anything here: these cases compose nothing, and a move that is not a SUPERSEDE
      * never reaches it. Present so the preparer can be built.
@@ -119,6 +126,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
      */
     @BeforeEach
     void authorizeEvidenceDelivery() {
+        lenient()
+                .when(memberAiRouting.binding(anyLong(), eq(AgentPurpose.MENTOR), anyLong()))
+                .thenReturn(Optional.of(new WorkspaceAgentBinding()));
         lenient()
                 .when(observationRepository.findAllByIdInAndWorkspaceId(any(), anyLong()))
                 .thenAnswer(invocation -> {
@@ -270,6 +280,36 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         });
     }
 
+    @Test
+    void unavailableMentorClosesOnlyOtherwiseRoutedProblemsAndCanBecomeAvailable() {
+        PracticeFeedbackDeliveryPolicy policy = mock(PracticeFeedbackDeliveryPolicy.class);
+        AgentJob job = job();
+        ObjectNode onTheDiff = MAPPER.createObjectNode();
+        onTheDiff.putArray("citations").addObject().put("sourceKind", "scm.pull-request.diff");
+        Observation anchored = problem(onTheDiff, null);
+        Observation first = problem(null, null);
+        Observation second = problem(null, null);
+        automatic(anchored, first, second);
+        when(egressGuard.deliveryAllowed(any())).thenReturn(true);
+        when(policy.allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).thenReturn(true);
+        when(memberAiRouting.binding(WS, AgentPurpose.MENTOR, RECIPIENT)).thenReturn(Optional.empty());
+        var lane = listener(policy);
+
+        assertThat(lane.eligibility(job, List.of(anchored, first, second)).observations())
+                .extracting(ConversationEligibility.ObservationRoute::decision)
+                .containsExactly(
+                        ConversationRoutingDecision.HAS_INLINE_ANCHOR,
+                        ConversationRoutingDecision.MENTOR_UNAVAILABLE,
+                        ConversationRoutingDecision.MENTOR_UNAVAILABLE);
+        verify(memberAiRouting, times(1)).binding(WS, AgentPurpose.MENTOR, RECIPIENT);
+
+        when(memberAiRouting.binding(WS, AgentPurpose.MENTOR, RECIPIENT))
+                .thenReturn(Optional.of(new WorkspaceAgentBinding()));
+        assertThat(lane.eligibility(job, List.of(first)).observations())
+                .extracting(ConversationEligibility.ObservationRoute::decision)
+                .containsExactly(ConversationRoutingDecision.ADMIT);
+    }
+
     private ConversationalDeliveryListener listener(PracticeFeedbackDeliveryPolicy policy) {
         return new ConversationalDeliveryListener(
                 observationRepository,
@@ -278,7 +318,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
                 egressGuard,
                 mock(AgentJobRepository.class),
                 mock(FeedbackCompositionResultParser.class),
-                policy);
+                policy,
+                memberAiRouting);
     }
 
     private static AgentJob job() {
