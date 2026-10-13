@@ -30,10 +30,6 @@ const cancel = (
 	</Link>
 );
 
-vi.mock("@/components/common/CodeEditor", () => ({
-	CodeEditor: () => <div />,
-}));
-
 const initialData: CuratedPracticeFormInitialValue = {
 	slug: "clear-pr-description",
 	name: "Write a clear pull request description",
@@ -88,6 +84,18 @@ function moment(signal: string) {
 }
 
 describe("CuratedPracticeForm", () => {
+	it("saves the edited static-analysis script with the instance practice", async () => {
+		const onSubmit = submitSpy();
+		await renderForm({ precomputeScript: "export const original = true;" }, onSubmit);
+		fireEvent.change(screen.getByRole("textbox", { name: "Static analysis script" }), {
+			target: { value: "export const edited = true;" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		expect(onSubmit).toHaveBeenCalledWith(
+			expect.objectContaining({ precomputeScript: "export const edited = true;" }),
+		);
+	});
+
 	it.each([
 		[
 			"gate",

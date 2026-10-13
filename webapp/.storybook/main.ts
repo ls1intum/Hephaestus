@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 
 import type { StorybookConfig } from "@storybook/react-vite";
+import { mergeConfig } from "vite";
 
 import { storybookChunkBudgets } from "./chunk-budgets.ts";
 
@@ -61,7 +62,17 @@ const config: StorybookConfig = {
 			"ai",
 			"uuid",
 		];
-		return viteConfig;
+		// Stories render the form contract; the production runtime check exercises Monaco itself.
+		return mergeConfig(viteConfig, {
+			resolve: {
+				alias: [
+					{
+						find: /^@\/components\/common\/CodeEditor$/u,
+						replacement: path.resolve(import.meta.dirname, "../src/test/code-editor.mock.tsx"),
+					},
+				],
+			},
+		});
 	},
 };
 export default config;

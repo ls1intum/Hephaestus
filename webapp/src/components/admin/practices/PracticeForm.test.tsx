@@ -15,8 +15,6 @@ import { renderWithRouter } from "@/test/router-harness";
 import type { PracticeReviewFields } from "@/components/admin/practice-editor/review-settings";
 import { PracticeForm } from "./PracticeForm";
 
-vi.mock("@/components/common/CodeEditor", () => ({ CodeEditor: () => <div /> }));
-
 const gate = {
 	skipReason: "the change has no Swift code",
 	anyOf: [{ changedPathMatches: ["**/*.swift"] }],
@@ -62,6 +60,24 @@ async function renderPractice(
 }
 
 describe("workspace practice scope", () => {
+	it("saves the edited static-analysis script with the workspace practice", async () => {
+		const onSubmit = vi.fn();
+		await renderPractice(mockPullRequestReviewFields, onSubmit, {
+			precomputeScript: "export const original = true;",
+		});
+		fireEvent.change(screen.getByRole("textbox", { name: "Static analysis script" }), {
+			target: { value: "export const edited = true;" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		await waitFor(() =>
+			expect(onSubmit).toHaveBeenCalledWith(
+				"review-swift",
+				expect.objectContaining({ precomputeScript: "export const edited = true;" }),
+				null,
+			),
+		);
+	});
+
 	it("sends declared feedback delivery choices from the shared editor", async () => {
 		const onSubmit =
 			vi.fn<(slug: string, request: UpdatePracticeRequest, group: string | null) => void>();

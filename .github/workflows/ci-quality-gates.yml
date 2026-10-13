@@ -144,7 +144,7 @@ jobs:
         id: tests
         continue-on-error: true
         run: |
-          timeout --kill-after=30s 15m vp run --filter webapp test:storybook
+          timeout --kill-after=30s 15m vp run test:webapp:stories
           vp run --filter webapp export:assets
           BRAND_ASSETS=(webapp/brand webapp/public extension/public/icon docs/images/readme docs/static/img/brand docs/static/img/favicon.png docs/static/img/hephaestus-social-card.png docker/compose.proxy.yaml)
           if [[ -n "$(git status --porcelain --untracked-files=all -- "${BRAND_ASSETS[@]}")" ]]; then

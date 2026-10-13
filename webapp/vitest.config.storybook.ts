@@ -19,19 +19,16 @@ export default defineConfig({
 	],
 	resolve: {
 		tsconfigPaths: true,
-		alias: [
-			{
-				find: "@monaco-editor/react",
-				replacement: path.resolve(import.meta.dirname, "./src/test/monaco-editor-react.mock.tsx"),
-			},
-		],
 	},
 	optimizeDeps: {
 		noDiscovery: true,
 		include: [
 			// `@shadcn/react` has no root export; only the subpath the app imports can be pre-bundled.
 			...runtimeDeps.filter(
-				(dependency) => dependency !== "@monaco-editor/react" && dependency !== "@shadcn/react",
+				(dependency) =>
+					dependency !== "@monaco-editor/react" &&
+					dependency !== "monaco-editor" &&
+					dependency !== "@shadcn/react",
 			),
 			"@shadcn/react/questionnaire",
 			"use-sync-external-store/shim",
