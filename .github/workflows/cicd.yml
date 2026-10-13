@@ -1196,6 +1196,7 @@ jobs:
         env:
           JOB_STATUS: ${{ job.status }}
         with:
+          retries: 3
           script: |
             const sha = context.payload.pull_request?.head?.sha || context.sha;
             const outcome = process.env.JOB_STATUS || 'failure';
