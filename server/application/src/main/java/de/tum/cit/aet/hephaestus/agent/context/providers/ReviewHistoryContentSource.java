@@ -506,18 +506,24 @@ public class ReviewHistoryContentSource implements EvidenceSource {
 
     /**
      * The words of a row whose evidence is still current; a stale row is staged without them unless the projection
-     * records delivered communication. A row a workspace admin withdrew never carries them: its evidence may be sound
-     * while its words are not, so only the fact is staged.
+     * records delivered communication. Claim currentness and withdrawal remain facts when copy authority withholds
+     * words. A row a workspace admin withdrew never carries words: its evidence may be sound while its words are not.
      */
     private static void putBody(
-            ObjectNode node, Feedback f, Map<UUID, ReviewClaimCurrentness> shown, Set<UUID> withdrawn, Words words) {
+            ObjectNode node,
+            Feedback f,
+            Map<UUID, ReviewClaimCurrentness> shown,
+            Set<UUID> withdrawn,
+            Words words,
+            boolean includeWords) {
         ReviewClaimCurrentness currentness = Objects.requireNonNull(shown.get(f.getId()));
         node.put("recordedClaimCurrentness", currentness.name());
         boolean isWithdrawn = withdrawn.contains(f.getId());
         if (isWithdrawn) {
             node.put("withdrawn", true);
         }
-        if (!isWithdrawn
+        if (includeWords
+                && !isWithdrawn
                 && (currentness == ReviewClaimCurrentness.CURRENT
                         || (currentness == ReviewClaimCurrentness.STALE && words == Words.DELIVERED_COMMUNICATION))) {
             node.put("body", f.getBody());
@@ -608,8 +614,9 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             // situation, coaching goal, evidence summary and success signal, and the turn itself is still written live.
             // Null when the run that queued it composed nothing,
             // which leaves only the fact that something is queued.
-            if (vouched.contains(f.getAgentJobId())) putBody(node, f, shown, withdrawn, Words.CURRENT_CLAIMS);
-            else unavailableWords(root, node);
+            boolean includeWords = vouched.contains(f.getAgentJobId());
+            putBody(node, f, shown, withdrawn, Words.CURRENT_CLAIMS, includeWords);
+            if (!includeWords) unavailableWords(root, node);
         }
         return root;
     }
@@ -697,11 +704,11 @@ public class ReviewHistoryContentSource implements EvidenceSource {
                     "publicEligible",
                     publicReviewEligibility.permitsPublicHistory(
                             f, shown.basedOn().getOrDefault(f.getId(), List.of())));
-            if (vouched.contains(f.getAgentJobId())
+            boolean includeWords = vouched.contains(f.getAgentJobId())
                     && shown.basedOn().getOrDefault(f.getId(), List.of()).stream()
-                            .allMatch(row -> vouched.contains(row.getAgentJobId())))
-                putBody(node, f, shown.currentness(), withdrawn, words);
-            else unavailableWords(root, node);
+                            .allMatch(row -> vouched.contains(row.getAgentJobId()));
+            putBody(node, f, shown.currentness(), withdrawn, words, includeWords);
+            if (!includeWords) unavailableWords(root, node);
         }
         return root;
     }
