@@ -47,6 +47,7 @@ export const PRACTICE_REVIEW_READS: ReadonlySet<string> = new Set([
 	"getPracticeReviewOverview",
 	"listPracticeReviews",
 	"listPracticeReviewResults",
+	"listPracticeReviewObservations",
 	"getPracticeReviewResult",
 	"listPracticeReviewFeedback",
 	"getPracticeReviewFeedback",
@@ -145,6 +146,17 @@ export const resultsSearchSchema = z
 	})
 	.transform(canonicalDateRange);
 
+export const observationsSearchSchema = z
+	.object({
+		...scope,
+		practiceSlug: multiValue,
+
+		severity: enumValues(statusValues(SEVERITY_DEFS)),
+		subjectUserId: positiveId,
+		origin: enumValues(statusValues(RESULT_ORIGIN_DEFS)),
+	})
+	.transform(canonicalDateRange);
+
 /**
  * `from`/`to` window when a review was *requested*. The status "No review started" lists the work on
  * which no review started instead of the reviews. An address from before, with `withoutReview=true`,
@@ -214,6 +226,7 @@ export const reviewPageSearchSchema = z
 
 export type FeedbackSearch = z.infer<typeof feedbackSearchSchema>;
 export type ResultsSearch = z.infer<typeof resultsSearchSchema>;
+export type ObservationsSearch = z.infer<typeof observationsSearchSchema>;
 export type RunsSearch = z.infer<typeof runsSearchSchema>;
 
 /**
@@ -335,5 +348,19 @@ export function resultsQuery(search: Partial<ResultsSearch>, size: number) {
 		subjectUserId: search.subjectUserId,
 		origin: search.origin,
 		sort: search.order,
+	};
+}
+
+export function observationsQuery(search: Partial<ObservationsSearch>, size: number) {
+	return {
+		...scopeQuery(search),
+		practiceResultId: search.practiceResultId,
+		size,
+		groupSlug:
+			search.groupSlug !== undefined && search.groupSlug.length > 0 ? search.groupSlug : undefined,
+		practiceSlug: practiceQuery(search),
+		severity: search.severity,
+		subjectUserId: search.subjectUserId,
+		origin: search.origin,
 	};
 }

@@ -24,7 +24,7 @@ export interface ResultOutcomeProps {
 }
 
 /**
- * The outcome and, for a shortfall, its severity, as words beside their icons. A verdict is not an
+ * The outcome and, for a not met result, its severity, as words beside their icons. A verdict is not an
  * exception, so neither is a badge: the badges on a level are kept for what went wrong.
  */
 export function ResultOutcome({ result, problems }: ResultOutcomeProps) {
@@ -51,8 +51,8 @@ export function ReviewStatusMark({ def }: { def: StatusDef }) {
 }
 
 /**
- * Severity is only ever read alongside a shortfall — a "Minor" beside a met result would be
- * a cost for something that cost nothing.
+ * Severity is only ever read alongside a not met result — a "Minor" beside a met result would
+ * be a cost for something that cost nothing.
  */
 export function resultSeverity(
 	result: Pick<ReviewResult, "outcome" | "severity">,

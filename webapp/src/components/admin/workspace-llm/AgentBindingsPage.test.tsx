@@ -276,7 +276,7 @@ describe("AgentBindingsPage rows", () => {
 		expect(expanded("Decision model")).toBe("true");
 		expect(expanded("Embedding model")).toBe("false");
 		expect(screen.getByRole("note").textContent).toBe(
-			"1 practice needs a decision model for In-house and Cloud members and members who have not chosen. Until you assign one, its practice script does not run, and the review checks the practice without its help.",
+			"1 practice needs a decision model for In-house and Cloud members and members who have not chosen. Until you assign one, reviews of their work record no result for this practice.",
 		);
 		expect(
 			screen.getByRole("button", { name: "Decision model" }).getAttribute("aria-describedby"),

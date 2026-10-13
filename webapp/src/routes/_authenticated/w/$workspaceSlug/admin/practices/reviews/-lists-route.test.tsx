@@ -39,13 +39,15 @@ function isTabCount(url: URL): boolean {
 }
 
 /**
- * Every request the list routes make, with the work, review, result and feedback URLs recorded.
+ * Every request the list routes make, with the work, review, result, observation and feedback URLs
+ * recorded.
  * The screens they feed take their rows as props, so a story mounts them without ever issuing the
  * request — this route test is the only place that can see what went on the wire.
  */
 function recordRequests() {
 	const reviewUrls: URL[] = [];
 	const resultUrls: URL[] = [];
+	const observationUrls: URL[] = [];
 	const feedbackUrls: URL[] = [];
 	const workUrls: URL[] = [];
 	const locationCountUrls: URL[] = [];
@@ -60,6 +62,13 @@ function recordRequests() {
 			const url = new URL(request.url);
 			if (!isTabCount(url)) {
 				resultUrls.push(url);
+			}
+			return HttpResponse.json(emptyPage);
+		}),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", ({ request }) => {
+			const url = new URL(request.url);
+			if (!isTabCount(url)) {
+				observationUrls.push(url);
 			}
 			return HttpResponse.json(emptyPage);
 		}),
@@ -86,7 +95,7 @@ function recordRequests() {
 			return HttpResponse.json(emptyPage);
 		}),
 	);
-	return { reviewUrls, resultUrls, feedbackUrls, workUrls, locationCountUrls };
+	return { reviewUrls, resultUrls, observationUrls, feedbackUrls, workUrls, locationCountUrls };
 }
 
 function processingReviewsHandler(getReview: () => ReviewRunSummary, polls: URL[], reads: URL[]) {
@@ -246,6 +255,45 @@ describe("practice review list routes", () => {
 		await screen.findByText("No results match these filters", undefined, ROUTE_RENDER_WAIT);
 
 		expect(values(resultUrls.at(-1), "origin")).toStrictEqual(["MANUAL", "BACKFILL"]);
+	});
+
+	it("sends the severity, origin and scope filters to the observations endpoint", async () => {
+		const { observationUrls } = recordRequests();
+
+		renderRouteAtWithRouter(
+			'/w/acme/admin/practices/reviews/observations?severity=["MAJOR"]&origin=["MANUAL"]&subjectUserId=7&practiceSlug=["thin-controllers"]&groupSlug=["design"]&from=2026-09-01&to=2026-09-10&practiceResultId=3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84',
+		);
+		await screen.findByText("No problems match these filters", undefined, ROUTE_RENDER_WAIT);
+
+		const requested = observationUrls.at(-1);
+		expect(values(requested, "severity")).toStrictEqual(["MAJOR"]);
+		expect(values(requested, "origin")).toStrictEqual(["MANUAL"]);
+		expect(requested?.searchParams.get("subjectUserId")).toBe("7");
+		expect(values(requested, "practiceSlug")).toStrictEqual(["thin-controllers"]);
+		expect(values(requested, "groupSlug")).toStrictEqual(["design"]);
+		expect(requested?.searchParams.get("from")).not.toBeNull();
+		expect(requested?.searchParams.get("to")).not.toBeNull();
+		// A filter to one result lists only its problems.
+		expect(requested?.searchParams.get("practiceResultId")).toBe(
+			"3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84",
+		);
+	});
+
+	it("asks for the problems of the severity chosen, and for all of them once it is cleared", async () => {
+		const { observationUrls } = recordRequests();
+
+		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices/reviews/observations");
+		const severity = await screen.findByRole("combobox", { name: "Severity" }, ROUTE_RENDER_WAIT);
+		await userEvent.click(severity);
+		await userEvent.click(await screen.findByRole("option", { name: /Major/u }));
+		await waitFor(() => expect(router.state.location.searchStr).toContain("severity=MAJOR"));
+		await waitFor(() =>
+			expect(values(observationUrls.at(-1), "severity")).toStrictEqual(["MAJOR"]),
+		);
+
+		await userEvent.click(await screen.findByRole("option", { name: /Major/u }));
+		await waitFor(() => expect(router.state.location.searchStr).not.toContain("severity"));
+		await waitFor(() => expect(values(observationUrls.at(-1), "severity")).toStrictEqual([]));
 	});
 
 	/**
@@ -527,6 +575,7 @@ describe("practice review list routes", () => {
 	it.each([
 		["runs", "Created", "Status"],
 		["results", "Recorded", "Outcome"],
+		["observations", "Recorded", "Severity"],
 		["feedback", "Composed", "Channel"],
 	])(
 		"puts the scope above the tabs and the %s tab's own filters below them",

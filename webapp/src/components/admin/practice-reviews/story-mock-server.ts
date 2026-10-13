@@ -1,6 +1,6 @@
 import { HttpResponse, http } from "msw";
 
-import type { ReviewFeedback, ReviewResult } from "@/api/types.gen";
+import type { PracticeReviewObservationRow, ReviewFeedback, ReviewResult } from "@/api/types.gen";
 import { artifactTrace, tracedArtifacts } from "@/components/practice-trace/fixtures";
 import { hasText } from "@/lib/text";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
@@ -21,6 +21,7 @@ import {
 	reasonCounts,
 	reviewFeedback,
 	reviewJob,
+	reviewObservations,
 	reviewResults,
 	reviewRuns,
 	workspaceMembers,
@@ -110,6 +111,21 @@ function filterResults(rows: ReviewResult[], url: URL) {
 			matches(values(url, "outcome"), row.outcome) &&
 			(invalidated === undefined || invalidated === String(row.invalidatedAt !== undefined)) &&
 			(disputed === undefined || disputed === String(row.disputedAt !== undefined)) &&
+			matches(values(url, "severity"), row.severity) &&
+			(!hasText(subjectUserId) || String(row.subject?.id) === subjectUserId),
+	);
+}
+
+function filterObservations(rows: PracticeReviewObservationRow[], url: URL) {
+	const subjectUserId = single(url, "subjectUserId");
+	const practiceResultId = single(url, "practiceResultId");
+	return rows.filter(
+		(row) =>
+			withinScope(url, row) &&
+			(!hasText(practiceResultId) || row.practiceResultId === practiceResultId) &&
+			withinDates(url, row.observedAt) &&
+			matches(values(url, "groupSlug"), row.group?.slug) &&
+			matches(values(url, "practiceSlug"), row.practiceSlug) &&
 			matches(values(url, "severity"), row.severity) &&
 			(!hasText(subjectUserId) || String(row.subject?.id) === subjectUserId),
 	);
@@ -206,6 +222,10 @@ export function reviewHandlers({ results, feedback, requireResultSort }: ReviewM
 			"*/workspaces/:workspaceSlug/practices/reviews/results/:practiceResultId",
 			({ params }) => HttpResponse.json(resultDetail(String(params.practiceResultId))),
 		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", ({ request }) => {
+			const url = new URL(request.url);
+			return page(filterObservations(reviewObservations, url), url);
+		}),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", ({ request }) => {
 			const url = new URL(request.url);
 			const rows = filterFeedback(feedbackRows, url);

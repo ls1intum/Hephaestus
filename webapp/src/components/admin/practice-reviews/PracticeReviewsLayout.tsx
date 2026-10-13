@@ -13,11 +13,18 @@ const SECTIONS = [
 	{ to: "/w/$workspaceSlug/admin/practices/reviews", label: "Overview", tab: "overview" },
 	{ to: "/w/$workspaceSlug/admin/practices/reviews/runs", label: "Reviews", tab: "runs" },
 	{ to: "/w/$workspaceSlug/admin/practices/reviews/results", label: "Results", tab: "results" },
+	{
+		to: "/w/$workspaceSlug/admin/practices/reviews/observations",
+		label: "Problems",
+		tab: "observations",
+	},
 	{ to: "/w/$workspaceSlug/admin/practices/reviews/feedback", label: "Feedback", tab: "feedback" },
 ] as const;
 
 /** How many each list tab holds under the shared scope; a tab whose count is not known yet is left out. */
-export type ReviewTabCounts = Partial<Record<"runs" | "results" | "feedback", number>>;
+export type ReviewTabCounts = Partial<
+	Record<"runs" | "results" | "observations" | "feedback", number>
+>;
 
 const COUNT_FORMAT = new Intl.NumberFormat("en-US");
 
@@ -39,8 +46,8 @@ export interface PracticeReviewsLayoutProps {
 }
 
 /**
- * Practice reviews: an overview, then the lists behind it — the reviews, the results they recorded and
- * the feedback written from them. A review opens on its own page; a result or a piece of feedback
+ * Practice reviews: an overview, then the lists behind it — the reviews, the results they recorded, the
+ * problems those results name, and the feedback written from them. A review opens on its own page; a result or a piece of feedback
  * opens as one level over whichever list the reader is on, so a list is never left to read it.
  *
  * The scope and the tracked record sit above the tabs, because they apply to every tab. Each tab

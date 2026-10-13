@@ -139,6 +139,28 @@ export function byActionability(
 	return groups;
 }
 
+export interface ResultExceptionsProps {
+	result: Pick<ReviewResult, "claimCurrentness" | "invalidatedAt" | "disputedAt">;
+}
+
+/** What went wrong with a result: a claim that is no longer current, a correction, a dispute. */
+export function ResultExceptions({ result }: ResultExceptionsProps) {
+	if (
+		result.claimCurrentness === "CURRENT" &&
+		result.invalidatedAt === undefined &&
+		result.disputedAt === undefined
+	) {
+		return null;
+	}
+	return (
+		<span className="flex flex-wrap items-center gap-1.5">
+			<ClaimCurrentnessBadge currentness={result.claimCurrentness} />
+			{result.invalidatedAt !== undefined && <StatusBadge def={MARKED_INCORRECT_DEF} />}
+			{result.disputedAt !== undefined && <StatusBadge def={DEVELOPER_RESPONSE_DEFS.DISPUTED} />}
+		</span>
+	);
+}
+
 export interface ResultRowProps {
 	result: ReviewResult;
 	/** The row names its day, in a table without day headings. */
@@ -146,8 +168,8 @@ export interface ResultRowProps {
 }
 
 /**
- * Only a costly shortfall names its severity in the row: a minor or informational one is the
- * ordinary case, and the result's sheet says it.
+ * Only a costly not met result names its severity in the row: a minor or trivial one is the ordinary
+ * case, and the result's sheet says it.
  */
 function costlySeverity(result: ReviewResult) {
 	return result.outcome === "NOT_MET" &&
@@ -167,10 +189,6 @@ export function ResultRow({ result, withDay = false }: ResultRowProps) {
 	const today = new Date(useNow());
 	const tracked = useTracked({ kind: "result", id: result.id });
 	const severity = costlySeverity(result);
-	const hasException =
-		result.claimCurrentness !== "CURRENT" ||
-		result.invalidatedAt !== undefined ||
-		result.disputedAt !== undefined;
 	return (
 		<PracticeTableRow
 			link={{
@@ -204,15 +222,7 @@ export function ResultRow({ result, withDay = false }: ResultRowProps) {
 						{severity && <StatusLabel def={severity} className="text-xs" />}
 						<ResultOriginNote origin={result.origin} />
 					</span>
-					{hasException && (
-						<span className="flex flex-wrap items-center gap-1.5">
-							<ClaimCurrentnessBadge currentness={result.claimCurrentness} />
-							{result.invalidatedAt !== undefined && <StatusBadge def={MARKED_INCORRECT_DEF} />}
-							{result.disputedAt !== undefined && (
-								<StatusBadge def={DEVELOPER_RESPONSE_DEFS.DISPUTED} />
-							)}
-						</span>
-					)}
+					<ResultExceptions result={result} />
 				</span>
 			</TableCell>
 			<ReviewRunWorkCell work={result.reviewedWork} linked={false} />

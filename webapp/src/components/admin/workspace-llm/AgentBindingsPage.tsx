@@ -916,8 +916,8 @@ function unmetNeedSentence(purpose: AgentPurpose, unmet: UsedBy[]): string {
 			: `${unmet.length} practices need ${withArticle} for ${members}.`;
 	const consequence =
 		unmet.length === 1
-			? "Until you assign one, its practice script does not run, and the review checks the practice without its help."
-			: "Until you assign one, their practice scripts do not run, and the reviews check those practices without their help.";
+			? "Until you assign one, reviews of their work record no result for this practice."
+			: "Until you assign one, reviews of their work record no result for these practices.";
 	return `${needs} ${consequence}`;
 }
 

@@ -9,6 +9,7 @@ const PURPOSES: Record<ReviewTab, string> = {
 	runs: "See what happened in each review. Open a review to follow it from start to end.",
 	unreviewed: "Find out why no review ran on a piece of work.",
 	results: "Check whether the reviews judged each practice correctly.",
+	observations: "See each problem that the reviews recorded, and where it is in the work.",
 	feedback: "See what feedback went out, what did not, and why.",
 };
 

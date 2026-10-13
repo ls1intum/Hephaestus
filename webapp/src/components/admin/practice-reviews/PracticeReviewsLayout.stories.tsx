@@ -13,7 +13,7 @@ import { ReviewSelectionBar } from "./ReviewSelectionBar";
 import { STORY_GROUPS, STORY_PEOPLE, STORY_PRACTICES } from "./story-scope-sources";
 
 /**
- * The page's header and its four sections, drawn as line tabs but made of links, since each changes
+ * The page's header and its five sections, drawn as line tabs but made of links, since each changes
  * the URL. The scope and the tracked record are in one row above the tabs, because they apply to
  * every tab; a tab's own filters stay below the tabs. Which scope a section link carries is read
  * from the URL, so it is proved by the route's tests.
@@ -90,6 +90,7 @@ export const Default: Story = {
 			"Overview",
 			"Reviews",
 			"Results",
+			"Problems",
 			"Feedback",
 		]);
 		await expect(sections.getByRole("link", { name: "Reviews" })).toHaveAttribute(
@@ -184,7 +185,7 @@ export const OverviewKeepsTheScope: Story = {
 	},
 };
 
-/** At 320px the row above the tabs wraps, and four sections share the track, with no sideways scroll. */
+/** At 320px the row above the tabs wraps, and five sections share the track, with no sideways scroll. */
 export const Reflow: Story = {
 	args: { children: <ReviewsTab search={SCOPED} />, selection: TRACKING },
 	parameters: {
@@ -213,7 +214,7 @@ export const CurrentSection: Story = {
 		);
 		// Overview's address is a prefix of every other section's, so it is the one a fuzzy match would
 		// also mark.
-		for (const name of ["Overview", "Reviews", "Results"]) {
+		for (const name of ["Overview", "Reviews", "Results", "Problems"]) {
 			await expect(sections.getByRole("link", { name })).not.toHaveAttribute("aria-current");
 		}
 		await expect(sections.queryByRole("tab")).not.toBeInTheDocument();
@@ -228,7 +229,7 @@ export const CurrentSection: Story = {
 export const TabCounts: Story = {
 	args: {
 		children: <ReviewsTab search={SCOPED} />,
-		counts: { runs: 1688, results: 13_308, feedback: 1951 },
+		counts: { runs: 1688, results: 13_308, observations: 4210, feedback: 1951 },
 	},
 	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/runs" } },
 	play: async ({ canvas }) => {
@@ -237,6 +238,7 @@ export const TabCounts: Story = {
 			"Overview",
 			"Reviews1,688",
 			"Results13,308",
+			"Problems4,210",
 			"Feedback1,951",
 		]);
 		await expect(sections.getByRole("link", { name: "Reviews, 1,688" })).toHaveAttribute(
@@ -244,6 +246,7 @@ export const TabCounts: Story = {
 			"page",
 		);
 		sections.getByRole("link", { name: "Results, 13,308" });
+		sections.getByRole("link", { name: "Problems, 4,210" });
 		sections.getByRole("link", { name: "Feedback, 1,951" });
 		await expect(sections.getByText("13,308")).toHaveClass("tabular-nums");
 	},
@@ -268,7 +271,7 @@ export const TabCountsLoading: Story = {
 export const TabCountsReflow: Story = {
 	args: {
 		children: <ReviewsTab search={SCOPED} />,
-		counts: { runs: 1688, results: 13_308, feedback: 1951 },
+		counts: { runs: 1688, results: 13_308, observations: 4210, feedback: 1951 },
 	},
 	parameters: {
 		viewport: { defaultViewport: "reflow" },

@@ -43,6 +43,8 @@ import { ReviewPracticeName } from "./ReviewPracticeLink";
 
 type ResultRecord = GetPracticeReviewResultResponse;
 
+const HIDDEN_EVIDENCE = "The evidence of this result is hidden.";
+
 export interface ResultLevelProps {
 	nested?: boolean;
 	path: LevelPath;
@@ -210,11 +212,17 @@ export function ResultLevel({
 						)}
 						{/* A not met result's passages are its problems'. Its own section stands only when it
 						    cites something of its own, or when nothing else on the sheet would say that
-						    nothing was quoted. */}
-						{(citations.length > 0 || problems.length === 0) && (
+						    nothing was quoted. Hidden evidence is neither: the server sends none of it. */}
+						{record.evidenceHidden ? (
 							<Section level={4} size="sm" title="Evidence">
-								<ResultEvidence citations={citations} />
+								<p className="text-sm text-muted-foreground">{HIDDEN_EVIDENCE}</p>
 							</Section>
+						) : (
+							(citations.length > 0 || problems.length === 0) && (
+								<Section level={4} size="sm" title="Evidence">
+									<ResultEvidence citations={citations} />
+								</Section>
+							)
 						)}
 					</div>
 				</SheetSection>

@@ -9,9 +9,10 @@ import type {
 	Observation,
 	OpenQuestion,
 	Practice,
+	PracticeResultExample,
 	PracticeReviewBucket,
 	PracticeReviewCounts,
-	PracticeResultExample,
+	PracticeReviewObservationRow,
 	PracticeReviewOverview,
 	PracticeReviewQueue,
 	PracticeReviewQueueItem,
@@ -23,10 +24,10 @@ import type {
 	ReviewFeedbackDetail,
 	ReviewFeedbackLocationCounts,
 	ReviewFeedbackReasonCount,
+	ReviewPracticeScripts,
 	ReviewResult,
 	ReviewResultCounts,
 	ReviewResultDetail,
-	ReviewPracticeScripts,
 	ReviewRunSummary,
 	ReviewRunTarget,
 	ReviewSubject,
@@ -1301,6 +1302,41 @@ export const reviewResults: ReviewResult[] = allResultSpecs
 	.map(({ run, result }) => toResult(run, result))
 	.sort((a, b) => b.observedAt.getTime() - a.observedAt.getTime());
 
+/**
+ * The problems of the not met results, newest first as the list endpoint returns them, each placed
+ * at its first citation.
+ */
+export const reviewObservations: PracticeReviewObservationRow[] = allResultSpecs
+	.flatMap(({ run, result: spec }) => {
+		const result = toResult(run, spec);
+		return (spec.problems ?? []).map((problem, index) => {
+			const [place] = problem.citations;
+			return {
+				id: `${result.id.slice(0, -2)}${String(index).padStart(2, "0")}`,
+				practiceResultId: result.id,
+				practiceSlug: result.practiceSlug,
+				practiceName: result.practiceName,
+				group: result.group,
+				severity: problem.severity,
+				summary: problem.summary,
+				sourceKind: place?.sourceKind,
+				path: place?.path,
+				startLine: place?.startLine,
+				endLine: place?.endLine,
+				side: place?.side,
+				evidenceHidden: false,
+				claimCurrentness: result.claimCurrentness,
+				invalidatedAt: result.invalidatedAt,
+				disputedAt: result.disputedAt,
+				reviewedWork: result.reviewedWork,
+				subject: result.subject,
+				observedAt: result.observedAt,
+				agentJobId: result.agentJobId,
+			};
+		});
+	})
+	.sort((a, b) => b.observedAt.getTime() - a.observedAt.getTime());
+
 /** Newest first, as the list endpoint returns them. */
 export const reviewFeedback: ReviewFeedback[] = allFeedbackSpecs
 	.map(({ run, item }) => toFeedback(run, item))
@@ -1466,6 +1502,7 @@ export function resultDetail(practiceResultId: string): ReviewResultDetail {
 			suppressionReason: item.withheldFor,
 		})),
 		evidenceRationale: result.evidenceRationale,
+		evidenceHidden: false,
 		invalidations: [],
 		disputes: [],
 	};

@@ -288,6 +288,23 @@ export const NoLongerCurrent: Story = {
 	},
 };
 
+/** The server hides the evidence: the sheet says so, and never that nothing was quoted. */
+export const EvidenceHidden: Story = {
+	args: {
+		result: ready({
+			...reviewResultDetail,
+			evidenceHidden: true,
+			evidence: undefined,
+			observations: [],
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText("The evidence of this result is hidden.");
+		await expect(panel.queryByText(/Nothing was quoted/u)).toBeNull();
+	},
+};
+
 /** The reason is required: an invalidation without one is not something the developer could read. */
 export const MarkAsIncorrect: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },

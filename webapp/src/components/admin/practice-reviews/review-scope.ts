@@ -5,7 +5,13 @@ import { hasText } from "@/lib/text";
  * The tabs under Practice reviews, each of which keeps the shared scope in its URL, and the Reviews
  * tab's second list, the work no review started on (`unreviewed`), which applies less of it.
  */
-export type ReviewTab = "overview" | "runs" | "unreviewed" | "results" | "feedback";
+export type ReviewTab =
+	| "overview"
+	| "runs"
+	| "unreviewed"
+	| "results"
+	| "observations"
+	| "feedback";
 
 /**
  * The narrowing that follows the reader from tab to tab: one person, a set of practices and groups, a
@@ -56,6 +62,7 @@ export const SCOPE_APPLIES: Record<ReviewTab, readonly ScopeFacet[]> = {
 	unreviewed: ["dates", "work"],
 	runs: ["person", "group", "practice", "dates", ...SELECTION],
 	results: ["person", "group", "practice", "dates", ...SELECTION],
+	observations: ["person", "group", "practice", "dates", ...SELECTION],
 	feedback: ["person", "group", "practice", "dates", ...SELECTION],
 };
 

@@ -17,6 +17,7 @@ import {
 	practiceReviewOverview,
 	reviewFeedbackDetail,
 	reviewJob,
+	reviewObservations,
 	reviewResults,
 	reviewRuns,
 	workspacePractices,
@@ -114,6 +115,34 @@ describe("practice review levels", () => {
 		expect(router.state.location.searchStr).toBe("?severity=MAJOR");
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 		screen.getByRole("link", openRow("result", result.summary));
+	});
+
+	/** A problem has no sheet of its own: its row opens the result it belongs to, which holds the evidence. */
+	it("opens the result a problem belongs to over the problems list", async () => {
+		// The second problem of a result, so its line is not the result's own summary.
+		const problem = reviewObservations.find(
+			(row) => row.summary === "The guard’s 403 never reaches this endpoint",
+		);
+		assert(problem);
+		const result = reviewResults.find((row) => row.id === problem.practiceResultId);
+		assert(result);
+		assert(problem.summary !== undefined);
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}/observations`);
+
+		await userEvent.click(
+			await screen.findByRole("link", openRow("result", problem.summary), ROUTE_RENDER_WAIT),
+		);
+
+		await screen.findByRole("dialog", { name: result.summary }, ROUTE_RENDER_WAIT);
+		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
+			`result:${result.id}`,
+		]);
+		fireEvent.keyDown(document.body, { key: "Escape" });
+		await waitFor(
+			() => expect(router.state.location.search).not.toHaveProperty("detail"),
+			ROUTE_RENDER_WAIT,
+		);
+		expect(router.state.location.pathname).toBe(`${REVIEWS}/observations`);
 	});
 
 	/** Closing the level gives focus back to the row it was opened from, so the reader goes on there. */

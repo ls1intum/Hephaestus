@@ -10,7 +10,7 @@ import { USER_VIEW_STORAGE_KEY } from "@/runtime/user-view/session";
 import { useReviewTabCounts } from "./use-review-tab-counts";
 
 const MINUTE = 60_000;
-const initial = { runs: 10, results: 20, feedback: 30 };
+const initial = { runs: 10, results: 20, observations: 25, feedback: 30 };
 
 function countReads(status = 200) {
 	let totals = initial;
@@ -18,6 +18,7 @@ function countReads(status = 200) {
 	const endpoints = [
 		["runs", ""],
 		["results", "/results"],
+		["observations", "/observations"],
 		["feedback", "/feedback"],
 	] as const;
 	server.use(
@@ -34,7 +35,7 @@ function countReads(status = 200) {
 	return {
 		reads,
 		change: () => {
-			totals = { runs: 11, results: 22, feedback: 33 };
+			totals = { runs: 11, results: 22, observations: 27, feedback: 33 };
 		},
 	};
 }
@@ -74,9 +75,14 @@ describe("practice review tab totals", () => {
 				await vi.advanceTimersByTimeAsync(MINUTE);
 			});
 			await waitFor(() =>
-				expect(result.current).toStrictEqual({ runs: 11, results: 22, feedback: 33 }),
+				expect(result.current).toStrictEqual({
+					runs: 11,
+					results: 22,
+					observations: 27,
+					feedback: 33,
+				}),
 			);
-			expect(wire.reads).toHaveLength(6);
+			expect(wire.reads).toHaveLength(8);
 			for (const url of wire.reads) {
 				expect(url.pathname).toContain("/workspaces/demo/practices/reviews");
 				expect(url.searchParams.get("size")).toBe("1");
@@ -91,7 +97,7 @@ describe("practice review tab totals", () => {
 				wire.reads
 					.filter((url) => !url.pathname.endsWith("/feedback"))
 					.map((url) => url.searchParams.get("subjectUserId")),
-			).toStrictEqual(["7", "7", "7", "7"]);
+			).toStrictEqual(["7", "7", "7", "7", "7", "7"]);
 		} finally {
 			cleanup();
 			client.clear();
@@ -108,7 +114,7 @@ describe("practice review tab totals", () => {
 			await act(async () => {
 				await vi.advanceTimersByTimeAsync(MINUTE);
 			});
-			expect(wire.reads).toHaveLength(3);
+			expect(wire.reads).toHaveLength(4);
 			expect(result.current).toStrictEqual(initial);
 			focusManager.setFocused(true);
 			await act(async () => {
@@ -123,7 +129,15 @@ describe("practice review tab totals", () => {
 
 	it.each([
 		{ status: 200, expected: initial },
-		{ status: 500, expected: { runs: undefined, results: undefined, feedback: undefined } },
+		{
+			status: 500,
+			expected: {
+				runs: undefined,
+				results: undefined,
+				observations: undefined,
+				feedback: undefined,
+			},
+		},
 	])(
 		"does not repeat audited user-view reads after a $status response",
 		async ({ status, expected }) => {
@@ -143,13 +157,13 @@ describe("practice review tab totals", () => {
 			const wire = countReads(status);
 			const { result, client } = mountCounts();
 			try {
-				await waitFor(() => expect(wire.reads).toHaveLength(3));
+				await waitFor(() => expect(wire.reads).toHaveLength(4));
 				await waitFor(() => expect(client.isFetching()).toBe(0));
 				expect(result.current).toStrictEqual(expected);
 				await act(async () => {
 					await vi.advanceTimersByTimeAsync(MINUTE * 2);
 				});
-				expect(wire.reads).toHaveLength(3);
+				expect(wire.reads).toHaveLength(4);
 			} finally {
 				cleanup();
 				client.clear();
