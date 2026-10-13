@@ -58,6 +58,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -571,11 +572,26 @@ class ReviewLineageIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void shouldTraceTheNewestReviewOfAPieceOfWork() {
-        observe(practice, job, "Older review", "NOT_MET", Instant.now().minus(1, ChronoUnit.DAYS));
+        PullRequest work = pullRequest(workspace, null);
+        observe(practice, job, "Older review", "NOT_MET", Instant.now().minus(1, ChronoUnit.DAYS), work.getId());
         AgentJob newest = persistJob(workspace);
-        observe(practice, newest, "Newest review", "MET", Instant.now());
+        UUID observation = observe(practice, newest, "Newest review", "MET", Instant.now(), work.getId());
+        var evidence = OBJECT_MAPPER.createObjectNode();
+        evidence.putArray("citations")
+                .addObject()
+                .put("sourceKind", "scm.pull-request.core")
+                .put("artifactPath", "context/metadata.json")
+                .putObject("sourceReference")
+                .putArray("records")
+                .addObject()
+                .put("type", "repository")
+                .put("id", Objects.requireNonNull(work.getRepository()).getId());
+        jdbcTemplate.update(
+                "UPDATE observation SET evidence=CAST(? AS jsonb) WHERE id=?",
+                OBJECT_MAPPER.writeValueAsString(evidence),
+                observation);
 
-        getOk("?kind=WORK&artifactKind=scm.pull_request&artifactId=7")
+        getOk("?kind=WORK&artifactKind=scm.pull_request&artifactId={id}", work.getId())
                 .jsonPath("$.review.id")
                 .isEqualTo(newest.getId().toString())
                 .jsonPath("$.observations[0].summary")

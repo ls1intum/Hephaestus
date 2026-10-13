@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery.AccountSummary;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -21,7 +20,6 @@ import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewBoundFeedbackD
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewSubjectDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup.Target;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkLabels;
@@ -48,7 +46,7 @@ class ReviewObservationQueryService {
     private final FeedbackRepository feedbackRepository;
     private final ReviewSubjectResolver subjectResolver;
     private final ReviewRunLookup reviewRunLookup;
-    private final EvidenceAuthorization evidenceAuthorization;
+    private final ReviewObservationWords observationWords;
     private final ObservationInvalidationRepository invalidationRepository;
     private final AccountSummaryQuery accountSummaryQuery;
     private final ReactionRepository reactionRepository;
@@ -76,12 +74,16 @@ class ReviewObservationQueryService {
                 rows.getContent().stream()
                         .map(OperatorObservationRow::getAgentJobId)
                         .toList());
+        var permittedWords = observationWords.permitted(
+                workspaceId,
+                rows.getContent().stream().map(OperatorObservationRow::getId).toList());
         return rows.map(row -> ReviewObservationDTO.from(
                 row,
                 feedbackCounts.get(row.getId()),
                 ReviewedWorkLabels.ref(
                         ArtifactKind.of(row.getArtifactKind()), row.getArtifactId(), targets.get(row.getAgentJobId())),
-                subjects));
+                subjects,
+                permittedWords.contains(row.getId())));
     }
 
     @Transactional(readOnly = true)
@@ -101,8 +103,7 @@ class ReviewObservationQueryService {
                 reviewRunLookup
                         .findTargets(workspaceId, List.of(observation.getAgentJobId()))
                         .get(observation.getAgentJobId()));
-        boolean includeEvidence =
-                evidenceAuthorization.permits(workspaceId, observation, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW);
+        boolean includeEvidence = observationWords.permits(workspaceId, observation);
         List<ObservationInvalidation> history = invalidationRepository.findHistory(workspaceId, observationId);
         Map<Long, AccountSummary> accounts = accountSummaryQuery.findAllByIds(history.stream()
                 .flatMap(invalidation ->

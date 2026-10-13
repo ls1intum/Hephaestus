@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackLocation;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackQueryFilter;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -59,7 +58,6 @@ import tools.jackson.databind.ObjectMapper;
 class ReviewFeedbackQueryService {
 
     private final FeedbackRepository feedbackRepository;
-    private final FeedbackObservationRepository feedbackObservationRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
     private final FeedbackDispatchRepository dispatchRepository;
     private final ReviewSubjectResolver subjectResolver;
@@ -70,6 +68,7 @@ class ReviewFeedbackQueryService {
     private final AccountSummaryQuery accountSummaryQuery;
     private final ReactionRepository reactionRepository;
     private final ObjectMapper objectMapper;
+    private final ReviewObservationWords observationWords;
 
     @Transactional(readOnly = true)
     public Page<ReviewFeedbackDTO> list(
@@ -156,10 +155,7 @@ class ReviewFeedbackQueryService {
         Feedback feedback = feedbackRepository
                 .findByIdAndWorkspaceId(feedbackId, workspaceId)
                 .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
-        List<ReviewBoundObservationDTO> observations =
-                feedbackObservationRepository.findBoundObservations(workspaceId, feedbackId).stream()
-                        .map(ReviewBoundObservationDTO::from)
-                        .toList();
+        List<ReviewBoundObservationDTO> observations = observationWords.boundToFeedback(workspaceId, feedbackId);
         List<ReviewPlacementDTO> placements =
                 feedbackPlacementRepository.findByFeedbackIdInDisplayOrder(feedbackId).stream()
                         .map(ReviewPlacementDTO::from)

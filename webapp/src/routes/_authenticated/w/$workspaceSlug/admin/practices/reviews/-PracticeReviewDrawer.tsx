@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { observationSummary } from "@/components/admin/practice-reviews/observation-words";
 
 import {
 	getAgentJobOptions,
@@ -273,10 +274,10 @@ function traceTitle(
 			return `Review of ${work}`;
 		}
 		case "observation": {
-			return (
-				lineage?.observations.find((observation) => observation.id === record.id)?.summary ??
-				PRACTICE_REVIEW_LEVEL_LABELS.observation
-			);
+			const observation = lineage?.observations.find((item) => item.id === record.id);
+			return observation === undefined
+				? PRACTICE_REVIEW_LEVEL_LABELS.observation
+				: observationSummary(observation);
 		}
 		case "feedback": {
 			return `Feedback on ${work}`;

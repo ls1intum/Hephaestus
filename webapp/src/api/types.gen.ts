@@ -5238,7 +5238,10 @@ export type ReviewBoundObservation = {
      * Severity band (null unless outcome is NOT_MET)
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    summary: string;
+    /**
+     * Observation text; absent when source access cannot be verified
+     */
+    summary?: string;
 };
 
 /**
@@ -5666,7 +5669,10 @@ export type ReviewLineageObservation = {
      * Severity band (null unless outcome is NOT_MET)
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    summary: string;
+    /**
+     * Observation text; absent when source access cannot be verified
+     */
+    summary?: string;
 };
 
 /**
@@ -5777,7 +5783,10 @@ export type ReviewObservation = {
      * Whose work the observation is about; null when the identity is no longer resolvable
      */
     subject?: ReviewSubject;
-    summary: string;
+    /**
+     * Observation text; absent when source access cannot be verified
+     */
+    summary?: string;
 };
 
 /**
@@ -5852,7 +5861,10 @@ export type ReviewObservationDetail = {
      * Whose work the observation is about; null when the identity is no longer resolvable
      */
     subject?: ReviewSubject;
-    summary: string;
+    /**
+     * Observation text; absent when source access cannot be verified
+     */
+    summary?: string;
     /**
      * When a later review of the same work superseded this observation; null while current
      */

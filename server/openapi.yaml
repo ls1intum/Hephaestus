@@ -19913,6 +19913,7 @@ components:
           - INFO
         summary:
           type: string
+          description: Observation text; absent when source access cannot be verified
       required:
       - claimCurrentness
       - observationId
@@ -19922,7 +19923,6 @@ components:
       - practiceName
       - practiceSlug
       - role
-      - summary
     ReviewContext:
       type: object
       description: "The piece of reviewed work a provider page shows, and what the\
@@ -20732,6 +20732,7 @@ components:
           - INFO
         summary:
           type: string
+          description: Observation text; absent when source access cannot be verified
       required:
       - agentJobId
       - feedbackCount
@@ -20743,7 +20744,6 @@ components:
       - ownFeedbackCount
       - practiceName
       - practiceSlug
-      - summary
     ReviewLineageResponse:
       type: object
       description: "Whether the developer answered a piece of feedback, whether that\
@@ -20914,6 +20914,7 @@ components:
             is no longer resolvable
         summary:
           type: string
+          description: Observation text; absent when source access cannot be verified
       required:
       - agentJobId
       - claimCurrentness
@@ -20925,7 +20926,6 @@ components:
       - practiceName
       - practiceSlug
       - reviewedWork
-      - summary
     ReviewObservationCounts:
       type: object
       description: Counts of observations by assessment
@@ -21044,6 +21044,7 @@ components:
             is no longer resolvable
         summary:
           type: string
+          description: Observation text; absent when source access cannot be verified
         supersededAt:
           type: string
           format: date-time
@@ -21062,7 +21063,6 @@ components:
       - practiceName
       - practiceSlug
       - reviewedWork
-      - summary
     ReviewPlacement:
       type: object
       description: A recorded message placement

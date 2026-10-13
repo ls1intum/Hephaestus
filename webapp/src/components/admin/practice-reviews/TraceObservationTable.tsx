@@ -1,5 +1,6 @@
 import { ChevronRightIcon } from "lucide-react";
 import { use } from "react";
+import { observationSummary } from "./observation-words";
 
 import { cn } from "cn";
 import type { ReviewLineage, ReviewLineageObservation } from "@/api/types.gen";
@@ -294,7 +295,7 @@ function ObservationDot({
 		disputed ? "disputed" : undefined,
 		observation.invalidated ? "marked incorrect" : undefined,
 	].filter(hasText);
-	const title = `${number} · ${facts.join(", ")}: ${observation.summary}`;
+	const title = `${number} · ${facts.join(", ")}: ${observationSummary(observation)}`;
 	if (open === undefined) {
 		return (
 			<span title={title} className="flex size-6 items-center justify-center rounded-full">
@@ -379,7 +380,7 @@ function ObservationRow({
 								observation.invalidated && "line-through",
 							)}
 						>
-							{observation.summary}
+							{observationSummary(observation)}
 						</span>
 						{flagged && (
 							<span className="flex flex-wrap items-center gap-x-2 text-muted-foreground">

@@ -1,5 +1,6 @@
 import { CircleSlashIcon, Undo2Icon } from "lucide-react";
 import type { ReactNode } from "react";
+import { observationSummary, OBSERVATION_WORDS_UNAVAILABLE } from "./observation-words";
 
 import { cn } from "cn";
 import type { GetPracticeReviewObservationResponse } from "@/api/types.gen";
@@ -113,7 +114,7 @@ export function ObservationLevel({
 					/>
 				)
 			}
-			title={observation?.summary}
+			title={observation === undefined ? undefined : observationSummary(observation)}
 			description={observation && <ReviewArtifactLink reviewedWork={observation.reviewedWork} />}
 		/>
 	);
@@ -182,7 +183,11 @@ export function ObservationLevel({
 							</Section>
 						)}
 						<Section level={4} size="sm" title="Evidence">
-							<ObservationEvidence evidence={record.evidence} />
+							{record.summary === undefined ? (
+								<p className="text-sm text-muted-foreground">{OBSERVATION_WORDS_UNAVAILABLE}</p>
+							) : (
+								<ObservationEvidence evidence={record.evidence} />
+							)}
 						</Section>
 					</div>
 				</SheetSection>

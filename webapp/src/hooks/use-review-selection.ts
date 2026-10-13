@@ -1,4 +1,5 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
+import { observationSummary } from "@/components/admin/practice-reviews/observation-words";
 
 import {
 	getAgentJobOptions,
@@ -178,7 +179,7 @@ function useRecordRead(
 				picked,
 				name: panelState(observationQuery, (observation) => ({
 					status: "ready" as const,
-					name: observation.summary,
+					name: observationSummary(observation),
 				})),
 				trace,
 				work: panelState(observationQuery, (observation) => ({

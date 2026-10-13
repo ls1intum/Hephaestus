@@ -38,8 +38,13 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasis;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
+import de.tum.cit.aet.hephaestus.core.privacy.PersonDataRequest;
+import de.tum.cit.aet.hephaestus.core.privacy.PersonDataService;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig.GitHubAppConfig;
@@ -64,14 +69,18 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatch;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalDecision;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackProposalRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
@@ -238,6 +247,18 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     private PersonDataCopyRecorder personCopies;
+
+    @Autowired
+    private PersonDataService personData;
+
+    @Autowired
+    private AccountRepository accounts;
+
+    @Autowired
+    private InAppFeedbackEvidence inAppEvidence;
+
+    @Autowired
+    private FeedbackObservationRepository feedbackObservations;
 
     private final Map<String, byte[]> capturedFiles = new LinkedHashMap<>();
     private final List<PreparedJobInputs> preparedEvidence = new ArrayList<>();
@@ -472,6 +493,160 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
         } finally {
             jdbc.update("DELETE FROM person_suppression WHERE id=?", suppression);
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @WithAdminUser
+    void shouldRespectOperatorWordAuthorityAfterParticipantErasure(boolean missingReceipt) {
+        String quotedWords = "split persistence out so each unit is testable";
+        var pr = pullRequestRepository.findByIdWithAuthorAndRepository(prId).orElseThrow();
+        var repo = Objects.requireNonNull(pr.getRepository());
+        var provider = repo.getProvider();
+        Long authorId = Objects.requireNonNull(pr.getAuthor()).getId();
+        User reviewer = userRepository.save(TestUserFactory.createUser(511L, "earlier-reviewer", provider));
+        IssueComment comment = new IssueComment();
+        comment.setNativeId(9011L);
+        comment.setProvider(provider);
+        comment.setIssue(pr);
+        comment.setAuthor(reviewer);
+        comment.setBody(quotedWords);
+        comment.setHtmlUrl(pr.getHtmlUrl() + "#issuecomment-9011");
+        comment.setAuthorAssociation(AuthorAssociation.NONE);
+        comment.setCreatedAt(Instant.now());
+        comment.setUpdatedAt(Instant.now());
+        issueComments.saveAndFlush(comment);
+
+        AgentJob captured = new AgentJob();
+        captured.setWorkspace(workspace);
+        captured.setWorkerId(WORKER);
+        captured.setPurpose(job.getPurpose());
+        captured.setJobType(job.getJobType());
+        captured.setArtifactKind(job.getArtifactKind());
+        captured.setStatus(AgentJobStatus.RUNNING);
+        captured.setConfigSnapshot(job.getConfigSnapshot());
+        captured.setMetadata(Objects.requireNonNull(job.getMetadata()).deepCopy());
+        captured.setEvidenceSnapshot(job.getEvidenceSnapshot());
+        job = agentJobRepository.saveAndFlush(captured);
+        evidenceFiles.beginPersonCapture(job);
+        var previousFiles = new LinkedHashMap<>(capturedFiles);
+        previousFiles.putAll(generalComments
+                .capture(new ContextRequest.PracticeReviewRequest(job), generalComments.sourceKinds())
+                .files());
+        assertThat(new String(previousFiles.get("context/general_comments.json"), StandardCharsets.UTF_8))
+                .contains(quotedWords);
+        personCopies.recordUser(reviewer.getId());
+        personCopies.recordUser(authorId);
+        preparedEvidence.add(evidenceFiles.prepare(job, new PreparedEvidence(previousFiles, null), null));
+        var submitted = MAPPER.readTree(withEvidence(BOTH_OBSERVATIONS));
+        var first = (ObjectNode) submitted.path("observations").get(0);
+        first.put("summary", "The description explains the boundary discussed by the reviewer: " + quotedWords);
+        first.put(
+                "evidenceRationale",
+                "The description names the change; the captured discussion asks to " + quotedWords);
+        observationAdmission.admit(identity(), submitted.path("observations"));
+        job = reload();
+        Observation kept = observation(Outcome.MET);
+        String privateBody = "A private practice-page note quotes: " + quotedWords;
+        Feedback card = feedbackRepository.saveAndFlush(Feedback.builder()
+                .agentJobId(job.getId())
+                .workspaceId(workspace.getId())
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(prId)
+                .recipientUserId(authorId)
+                .aboutUserId(authorId)
+                .channel(FeedbackChannel.IN_APP)
+                .position(9000)
+                .deliveryState(FeedbackDeliveryState.PREPARED)
+                .body(privateBody)
+                .source(FeedbackSource.AGENT)
+                .createdAt(Instant.now())
+                .build());
+        feedbackObservations.insertIfAbsent(card.getId(), kept.getId(), "SUPPORTING", 0);
+        assertThat(inAppEvidence.visibleEvidence(workspace.getId(), List.of(card.getId())))
+                .containsKey(card.getId());
+        commentProcessor.delete(
+                comment.getNativeId(), ProcessingContext.forWebhook(workspace.getId(), repo, "deleted"));
+        assertThat(issueComments.findByNativeIdAndProviderId(9011L, Objects.requireNonNull(provider.getId())))
+                .isEmpty();
+        preparedEvidence.forEach(PreparedJobInputs::close);
+        preparedEvidence.clear();
+        if (missingReceipt) jdbc.update("DELETE FROM person_evidence_copy WHERE job_id=?", job.getId());
+        jdbc.update("UPDATE agent_job SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE id=?", job.getId());
+        Account administrator = new Account("Synthetic privacy administrator");
+        administrator.setAppRole(Account.AppRole.APP_ADMIN);
+        administrator = accounts.saveAndFlush(administrator);
+        long administratorId = Objects.requireNonNull(administrator.getId());
+        var preview = personData.preview(
+                administratorId,
+                null,
+                List.of(new PersonIdentity(
+                        Objects.requireNonNull(provider.getId()),
+                        reviewer.getNativeId().toString(),
+                        null)));
+        personData.requestErasure(preview.request().getId(), administratorId, true);
+        personData.run(preview.request().getId());
+        assertThat(personData.get(preview.request().getId()).request().getState())
+                .isEqualTo(PersonDataRequest.State.COMPLETE);
+        assertThat(observationRepository.findById(kept.getId())).isPresent();
+        assertThat(inAppEvidence
+                        .visibleEvidence(workspace.getId(), List.of(card.getId()))
+                        .containsKey(card.getId()))
+                .isEqualTo(missingReceipt);
+        JsonNode admin = MAPPER.readTree(Objects.requireNonNull(webTestClient
+                .get()
+                .uri(
+                        "/workspaces/{slug}/practices/reviews/observations/{id}",
+                        workspace.getWorkspaceSlug(),
+                        kept.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .returnResult()
+                .getResponseBody()));
+        assertThat(admin.path("id").asString()).isEqualTo(kept.getId().toString());
+        assertThat(admin.path("outcome").asString()).isEqualTo("MET");
+        assertThat(!admin.path("evidence").isNull() && !admin.path("evidence").isMissingNode())
+                .isEqualTo(missingReceipt);
+        JsonNode privateAdmin = MAPPER.readTree(Objects.requireNonNull(webTestClient
+                .get()
+                .uri("/workspaces/{slug}/practices/reviews/feedback/{id}", workspace.getWorkspaceSlug(), card.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .returnResult()
+                .getResponseBody()));
+        assertThat(privateAdmin.toString()).doesNotContain(privateBody);
+        for (String uri : List.of(
+                "/workspaces/" + workspace.getWorkspaceSlug() + "/practices/reviews/observations",
+                "/workspaces/" + workspace.getWorkspaceSlug() + "/practices/reviews/lineage?kind=OBSERVATION&id="
+                        + kept.getId())) {
+            String content = new String(
+                    Objects.requireNonNull(webTestClient
+                            .get()
+                            .uri(uri)
+                            .headers(TestAuthUtils.withCurrentUser())
+                            .exchange()
+                            .expectStatus()
+                            .isOk()
+                            .expectBody()
+                            .returnResult()
+                            .getResponseBody()),
+                    StandardCharsets.UTF_8);
+            assertThat(content.contains(quotedWords)).isEqualTo(missingReceipt);
+        }
+        assertThat(privateAdmin.toString().contains(quotedWords)).isEqualTo(missingReceipt);
+        boolean summaryWords = admin.path("summary").asString().contains(quotedWords);
+        boolean rationaleWords = admin.path("evidenceRationale").asString().contains(quotedWords);
+        assertThat(summaryWords || rationaleWords)
+                .as(
+                        "erased participant words: missingReceipt=%s summary=%s rationale=%s ownEvidenceVisible=%s",
+                        missingReceipt, summaryWords, rationaleWords, missingReceipt)
+                .isEqualTo(missingReceipt);
     }
 
     private void suppressReviewer(UUID request, User reviewer) {
