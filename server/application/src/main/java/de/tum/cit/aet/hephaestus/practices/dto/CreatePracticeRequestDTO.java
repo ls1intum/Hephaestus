@@ -64,14 +64,14 @@ public record CreatePracticeRequestDTO(
         @Size(
                 max = PracticeDefinition.MAX_PRACTICE_SCRIPT_LENGTH,
                 message = "Practice script must be at most 100,000 characters")
-        @Schema(description = "TypeScript practice script that runs before the review and points it at places to check")
+        @Schema(description = PracticeDefinition.PRACTICE_SCRIPT_DESCRIPTION)
         @Nullable
         String practiceScript,
 
         @Valid
         @Schema(
-                description =
-                        "Versioned review settings; omit to use the recommended ones for the work type the signals name")
+                description = "Versioned review settings; omit to use the recommended ones for the work type the"
+                        + " signals name")
         @Nullable
         PracticeAutomatedReviewPolicy automatedReviewPolicy,
 

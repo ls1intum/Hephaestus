@@ -67,10 +67,10 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
     private CuratedPracticeReleaseService instanceReleases;
 
     @Test
-    void doesNothingWhenDisabled() {
+    void shouldNotSeedTheCatalogWhenDisabled() {
         manager(false).repairIncompleteInstallations();
 
-        verifyNoInteractions(workspaceRepository, catalogService, installationRepository);
+        verifyNoInteractions(workspaceRepository, catalogService, groupService, practiceService);
     }
 
     @Test

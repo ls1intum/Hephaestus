@@ -283,7 +283,8 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         return new JobEvidenceFiles.QuoteMatch(text.toString().equals(citation.quote()), BLOB_DIGEST);
     }
 
-    // --- Candidates as the runner submits them -------------------------------------------------------------------
+    // --- Candidates as the runner submits them
+    // -------------------------------------------------------------------
 
     /** A quote of the change at {@code src/Auth.java}. */
     private ObjectNode change(String side, int startLine, int endLine, String quote) {
@@ -478,7 +479,8 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         }
     }
 
-    // --- What admission asked the repositories to write ----------------------------------------------------------
+    // --- What admission asked the repositories to write
+    // ----------------------------------------------------------
 
     /** One {@code PracticeResultRepository.insertIfAbsent} call, by its arguments. */
     private record StoredResult(
@@ -904,8 +906,8 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName(
-                "the old name of a renamed file no longer exists at the head, so a NEW-side quote of it is withheld")
+        @DisplayName("the old name of a renamed file no longer exists at the head, so a NEW-side quote of it is"
+                + " withheld")
         void withholdsTheOldPathOfARenamedFileOnTheNewSide() {
             changedPaths = Set.of("src/Old.java", "src/New.java");
             captured(HEAD, "src/New.java", 10, "insecure();");
@@ -1019,8 +1021,8 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName(
-                "a side selects a revision of the change, and a revision a commit of the checkout; no record has one")
+        @DisplayName("a side selects a revision of the change, and a revision a commit of the checkout; no"
+                + " record has one")
         void rejectsARecordCitationWithASideOrARevision() {
             ObjectNode withSide = met(
                     record("scm.pull-request.core", "context/pull_request.json", "pull_request.json", 1, "\"title\""));
@@ -1148,7 +1150,7 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("a citation to an unstaged source still fails the whole delivery, even beside a sound claim")
+        @DisplayName("a citation to an unstaged source still fails the whole delivery, even beside a sound" + " claim")
         void anEvidenceFailureThatIsNotAQuoteMismatchStillFailsEverything() {
             admitSecondPractice();
             ObjectNode unstaged =
@@ -1164,7 +1166,7 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("a batch in which no quote verifies is refused rather than retried as an unavailable server")
+        @DisplayName("a batch in which no quote verifies is refused rather than retried as an unavailable" + " server")
         void shouldRefuseResultsWhenNoQuotedEvidenceVerifies() {
             ObjectNode misquoted = met();
             firstCitation(misquoted).put("quote", "fabricated quote");
@@ -1278,7 +1280,8 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("a bounded corpus still has to have been searched whole")
         void stillRejectsAPartialSearchBehindACleanStrength() {
-            // Declaring the stance is what makes the claim admissible, not what makes it true: the search must
+            // Declaring the stance is what makes the claim admissible, not what makes it true: the search
+            // must
             // still cover every source held exhaustive, or the strength is a universal over unread bytes.
             exhaustiveOverTheDiff(testPractice);
             ObjectNode candidate = cleanStrength();
@@ -1556,6 +1559,132 @@ class ReviewOutputServiceTest extends BaseUnitTest {
                             ResultsRefusedException.class,
                             refused -> assertThat(refused.reasonCode()).isEqualTo("no_admissible_results"));
             verifyNoInteractions(practiceResultRepository);
+        }
+
+        @ParameterizedTest
+        @CsvSource({"introduced,false", "introduced,true", "worsened,false", "worsened,true"})
+        void shouldWithholdTheWholeCandidateWhenItsHeadBasisCitesTheOldRevision(String type, boolean tree) {
+            admitSecondPractice();
+            captured(BASE, "src/Auth.java", 8, "requireAdmin();");
+            ObjectNode citation = tree
+                    ? record("scm.repository.tree", HEAD_PATH, "src/Auth.java", 8, "requireAdmin();")
+                            .put("revision", BASE)
+                    : change("OLD", 8, 8, "requireAdmin();");
+            ObjectNode child = problem(Severity.MAJOR, citation);
+            ObjectNode basis = child.putObject("basis")
+                    .put("type", type)
+                    .put("head", 0)
+                    .put("explanation", "The change introduced the problem.");
+            if (type.equals("worsened")) {
+                basis.put("base", 0);
+            }
+            var prepared = service.prepare(
+                    testJob,
+                    results(
+                            entry("pr-description-quality", notMet(child, problem(Severity.MINOR, insecure()))),
+                            entry("pr-scope", met())));
+
+            assertThat(withheld(prepared, "pr-description-quality")
+                            .path("reasonCode")
+                            .asString())
+                    .isEqualTo("basis_state_unsupported");
+            assertThat(service.publish(testJob, prepared).recorded())
+                    .extracting(ValidatedResult::practiceSlug)
+                    .containsExactly("pr-scope");
+        }
+
+        @ParameterizedTest
+        @ValueSource(booleans = {false, true})
+        void shouldAdmitAWorsenedProblemWhenItsBasisNamesTheEarlierAndReviewedRevisions(boolean tree) {
+            captured(BASE, "src/Auth.java", 8, "requireAdmin();");
+            ObjectNode head =
+                    tree ? record("scm.repository.tree", HEAD_PATH, "src/Auth.java", 10, "insecure();") : insecure();
+            ObjectNode base = tree
+                    ? record("scm.repository.tree", HEAD_PATH, "src/Auth.java", 8, "requireAdmin();")
+                            .put("revision", BASE)
+                    : change("OLD", 8, 8, "requireAdmin();");
+            ObjectNode child = problem(Severity.MAJOR, head);
+            ((ArrayNode) child.path("citations")).add(base);
+            child.putObject("basis")
+                    .put("type", "worsened")
+                    .put("base", 1)
+                    .put("head", 0)
+                    .put("explanation", "The change weakens the access check.");
+
+            var prepared = service.prepare(testJob, submit("pr-description-quality", notMet(child)));
+
+            assertThat(prepared.withheld()).isEmpty();
+            assertThat(service.publish(testJob, prepared).recorded())
+                    .extracting(ValidatedResult::practiceSlug)
+                    .containsExactly("pr-description-quality");
+        }
+
+        @ParameterizedTest
+        @ValueSource(booleans = {false, true})
+        void shouldWithholdTheCandidateWhenItsEarlierBasisCitesTheNewRevision(boolean tree) {
+            admitSecondPractice();
+            ObjectNode citation = tree
+                    ? record("scm.repository.tree", HEAD_PATH, "src/Auth.java", 10, "insecure();")
+                            .put("revision", HEAD)
+                    : insecure();
+            ObjectNode child = problem(Severity.MAJOR, citation);
+            child.putObject("basis")
+                    .put("type", "worsened")
+                    .put("base", 0)
+                    .put("head", 0)
+                    .put("explanation", "The change worsened the problem.");
+            var prepared = service.prepare(
+                    testJob, results(entry("pr-description-quality", notMet(child)), entry("pr-scope", met())));
+            assertThat(withheld(prepared, "pr-description-quality")
+                            .path("reasonCode")
+                            .asString())
+                    .isEqualTo("basis_state_unsupported");
+        }
+
+        @ParameterizedTest
+        @ValueSource(booleans = {false, true})
+        void shouldWithholdTheWholeCandidateWhenItsExampleAliasesTheCodeOfAProblem(boolean treeProblem) {
+            admitSecondPractice();
+            ObjectNode tree = record("scm.repository.tree", HEAD_PATH, "src/Auth.java", 10, "insecure();")
+                    .put("revision", HEAD);
+            ObjectNode negative = notMet(problem(Severity.MAJOR, treeProblem ? tree : insecure()));
+            negative.putObject("example")
+                    .put("note", "The access check shows this practice.")
+                    .set("citation", treeProblem ? insecure() : tree);
+
+            var prepared = service.prepare(
+                    testJob, results(entry("pr-description-quality", negative), entry("pr-scope", met())));
+
+            assertThat(withheld(prepared, "pr-description-quality")
+                            .path("reasonCode")
+                            .asString())
+                    .isEqualTo("example_overlaps_problem");
+            assertThat(service.publish(testJob, prepared).recorded())
+                    .extracting(ValidatedResult::practiceSlug)
+                    .containsExactly("pr-scope");
+            assertThat(storedObservations()).isEmpty();
+        }
+
+        @Test
+        void shouldAdmitAnExampleAtAnotherRevisionOfTheProblemsCodeLocation() {
+            captured(BASE, "src/Auth.java", 10, "requireAdmin();");
+            ObjectNode negative = notMet(problem(
+                    Severity.MAJOR,
+                    record("scm.repository.tree", HEAD_PATH, "src/Auth.java", 10, "insecure();")
+                            .put("revision", HEAD)));
+            negative.putObject("example")
+                    .put("note", "The earlier guard checks access before the action.")
+                    .set(
+                            "citation",
+                            record("scm.repository.tree", HEAD_PATH, "src/Auth.java", 10, "requireAdmin();")
+                                    .put("revision", BASE));
+
+            var prepared = service.prepare(testJob, submit("pr-description-quality", negative));
+
+            assertThat(prepared.withheld()).isEmpty();
+            assertThat(service.publish(testJob, prepared).recorded())
+                    .extracting(ValidatedResult::practiceSlug)
+                    .containsExactly("pr-description-quality");
         }
 
         @Test
@@ -1998,19 +2127,19 @@ class ReviewOutputServiceTest extends BaseUnitTest {
 
         /** Written as the content source writes it, with the default pretty printer. */
         private static final String THREAD_JSON = """
-                {
-                  "channel" : "C123",
-                  "messages" : [ {
-                    "ts" : "1700000000.100000",
-                    "text" : "Can someone look at the failing build?",
-                    "underReview" : false
-                  }, {
-                    "ts" : "1700000000.200000",
-                    "text" : "It is broken. Fix it.",
-                    "underReview" : true
-                  } ]
-                }
-                """;
+            {
+              "channel" : "C123",
+              "messages" : [ {
+                "ts" : "1700000000.100000",
+                "text" : "Can someone look at the failing build?",
+                "underReview" : false
+              }, {
+                "ts" : "1700000000.200000",
+                "text" : "It is broken. Fix it.",
+                "underReview" : true
+              } ]
+            }
+            """;
 
         @BeforeEach
         void conversationReview() {

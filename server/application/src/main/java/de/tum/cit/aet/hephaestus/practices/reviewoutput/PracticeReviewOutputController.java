@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackP
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.FeedbackApprovalDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.FeedbackWithdrawalService;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationService;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.PracticeReviewObservationRowDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackLocationCountsDTO;
@@ -152,6 +153,32 @@ public class PracticeReviewOutputController {
         invalidationService.setValidity(
                 workspaceContext.id(), practiceResultId, actorAccountId, request.valid(), request.reason());
         return ResponseEntity.ok(practiceResultQueryService.get(workspaceContext.id(), practiceResultId));
+    }
+
+    @GetMapping("/observations")
+    @Operation(
+            summary = "List the observations of practice review results across the workspace",
+            description = "Newest result first, then each result's display order. Where the result's detail hides"
+                    + " its evidence, the row leaves out its summary and place and sets evidenceHidden.",
+            operationId = "listPracticeReviewObservations")
+    @ApiResponse(responseCode = "200", description = "Paginated observations returned")
+    @ApiResponse(
+            responseCode = "400",
+            description = "Invalid filter or pagination",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    public ResponseEntity<PagedModel<PracticeReviewObservationRowDTO>> listObservations(
+            WorkspaceContext workspaceContext,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "50") @Min(1) @Max(100) int size,
+            @Valid @ParameterObject ReviewObservationFilterParams filter) {
+        return ResponseEntity.ok(new PagedModel<>(practiceResultQueryService.listObservations(
+                workspaceContext.id(),
+                filter.toResultFilter(),
+                filter.toObservationFilter(),
+                PageRequest.of(page, size))));
     }
 
     @GetMapping("/feedback")

@@ -333,6 +333,41 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
+    @Test
+    void shouldPersistUsageCompletenessWhenReportedAndUnknownCallsShareAnAggregate() throws Exception {
+        try (MockWebServer upstream = new MockWebServer()) {
+            upstream.start();
+            upstream.enqueue(json("{\"data\":[],\"usage\":{\"prompt_tokens\":10}}"));
+            upstream.enqueue(json("{\"data\":[]}"));
+            AgentJob job = practiceScriptJob(upstream.url("/v1").toString());
+            String path = "/internal/llm/practice-script/embedding/embeddings";
+
+            assertThat(callPracticeScript(job, path, "{}").status()).isEqualTo(200);
+            assertThat(callPracticeScript(job, path, "{}").status()).isEqualTo(200);
+
+            var totals = jobRepository.sumPracticeScriptUsageByKind(workspace.getId(), job.getId(), 0);
+            assertThat(totals).containsExactly(new PracticeScriptKindTotal(ModelKind.EMBEDDING, 2, 10, 0, 0, 0, 0, 1));
+            assertThat(totals.getFirst().hasCompleteUsage()).isFalse();
+        }
+    }
+
+    @Test
+    void shouldPersistReportedZeroWhenTheProviderReportsZeroUsage() throws Exception {
+        try (MockWebServer upstream = new MockWebServer()) {
+            upstream.start();
+            upstream.enqueue(json("{\"data\":[],\"usage\":{\"prompt_tokens\":0}}"));
+            AgentJob job = practiceScriptJob(upstream.url("/v1").toString());
+
+            assertThat(callPracticeScript(job, "/internal/llm/practice-script/embedding/embeddings", "{}")
+                            .status())
+                    .isEqualTo(200);
+
+            var totals = jobRepository.sumPracticeScriptUsageByKind(workspace.getId(), job.getId(), 0);
+            assertThat(totals).containsExactly(new PracticeScriptKindTotal(ModelKind.EMBEDDING, 1, 0, 0, 0, 0, 0, 1));
+            assertThat(totals.getFirst().hasCompleteUsage()).isTrue();
+        }
+    }
+
     /** Each practice keeps its own row, and the cap judges the attempt over all of them. */
     @Test
     void shouldCountEachPracticeApartAndCapThemTogetherWhenTwoPracticesCallOneModel() throws Exception {
@@ -357,7 +392,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                             new UsageRow(ModelKind.EMBEDDING, PRACTICE, 1, 60, 0),
                             new UsageRow(ModelKind.EMBEDDING, "test-coverage", 1, 60, 0));
             assertThat(jobRepository.sumPracticeScriptUsageByKind(workspace.getId(), job.getId(), 0))
-                    .containsExactly(new PracticeScriptKindTotal(ModelKind.EMBEDDING, 2, 120, 0, 0, 0, 0));
+                    .containsExactly(new PracticeScriptKindTotal(ModelKind.EMBEDDING, 2, 120, 0, 0, 0, 0, 2));
         }
     }
 

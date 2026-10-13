@@ -181,4 +181,9 @@ public class LlmUsageEvent {
     @ColumnDefault("0")
     @Column(name = "search_units", nullable = false)
     private long searchUnits;
+
+    /** Calls with no usage receipt, retained after the source job and its counters are deleted. */
+    @ColumnDefault("0")
+    @Column(name = "unreported_calls", nullable = false, updatable = false)
+    private long unreportedCalls;
 }

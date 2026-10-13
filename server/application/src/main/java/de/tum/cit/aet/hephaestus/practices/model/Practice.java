@@ -225,8 +225,7 @@ public class Practice {
     private @Nullable PracticeGuide guide;
 
     /**
-     * Optional Node/TypeScript practice script that runs before the review and produces leads (not
-     * results) as starting points; {@code null} means no practice script runs.
+     * The practice's review program, which returns one result. Null selects the built-in program.
      */
     @Column(name = "practice_script", columnDefinition = "TEXT")
     @ToString.Exclude

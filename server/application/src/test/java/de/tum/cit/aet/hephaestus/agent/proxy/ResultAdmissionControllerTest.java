@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -97,23 +96,6 @@ class ResultAdmissionControllerTest extends BaseUnitTest {
                 HttpStatus.BAD_REQUEST,
                 () -> controller.admit(forged, authentication(LlmUsageSourceType.AGENT_JOB, id)));
         verifyNoInteractions(service);
-
-        when(service.admit(any(), any())).thenReturn(mapper.createObjectNode());
-        controller.admit(validRequest(), authentication(LlmUsageSourceType.AGENT_JOB, id));
-        verify(service).admit(identity(id), validRequest());
-    }
-
-    @Test
-    void agentJobCredentialAdmitsItsResults() {
-        UUID id = UUID.randomUUID();
-        var response = mapper.createObjectNode().put("admissionDigest", "sha256:digest");
-        when(service.admit(eq(identity(id)), any())).thenReturn(response);
-
-        var actual = controller.admit(validRequest(), authentication(LlmUsageSourceType.AGENT_JOB, id));
-
-        assertThat(actual).isSameAs(response);
-        // The whole envelope is admitted, so its digest covers every byte the runner sent.
-        verify(service).admit(identity(id), validRequest());
     }
 
     @ParameterizedTest

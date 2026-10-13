@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * tokens but lacked a usable rate, the tokens are the measurement and the missing rate prevents their
  * multiplication. Once the missing rate exists, applying it recovers
  * the number the row was always supposed to carry. Nothing else about the row is touched — never the
- * tokens, never the source key, never {@code occurred_at}. A row with no billable token is unknown spend,
+ * tokens, never the source key, never {@code occurred_at}. A row with unreported calls or no billable token is unknown spend,
  * not a gap, and no rate repairs it.
  *
  * <p><b>Why it has to exist at all.</b> A single UNPRICED row funded from a capped purse makes the whole
@@ -63,7 +63,7 @@ public class LlmUsageRepricer {
     public enum Outcome {
         /** A rate was found and applied; the row now counts toward its purse's total. */
         REPRICED,
-        /** The catalogue still has no usable rate for this row's model. Nothing was written. */
+        /** The row lacks complete usage or a usable rate, or another pass already priced it. Nothing was written. */
         STILL_UNPRICEABLE,
         /** The row named no model, or named one this instance can no longer identify. Nothing was written. */
         UNIDENTIFIABLE,
@@ -97,7 +97,6 @@ public class LlmUsageRepricer {
         }
         int updated = usageRepository.applyResolvedPrice(row.id(), computed.usd(), price);
         if (updated == 0) {
-            // Another pass, or another pod, got there first.
             return Outcome.STILL_UNPRICEABLE;
         }
         log.info(

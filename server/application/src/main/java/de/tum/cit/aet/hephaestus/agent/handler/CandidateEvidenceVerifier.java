@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.context.providers.PullRequestContentSourc
 import de.tum.cit.aet.hephaestus.agent.context.providers.RepositoryTreeContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.candidate.Candidate;
 import de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateProblem;
+import de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ResultsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -249,7 +250,7 @@ class CandidateEvidenceVerifier {
                 || !revision.matches(CitationVerification.GIT_OBJECT_ID)) {
             throw new ResultsRefusedException(
                     UNAUTHORIZED_SOURCE,
-                    "Invalid code citation: name the captured artifact, a relative path and an exact line range");
+                    "Invalid code citation: name the captured artifact, a relative path and an exact line" + " range");
         }
         CitationVerification.quoteDigest(quote);
         return new HistoricalGitEvidence.Citation(revision, path, quote, start, end);
@@ -286,6 +287,20 @@ class CandidateEvidenceVerifier {
         for (Located cited : located(candidate)) {
             verifyCitation(slug, cited, captured, job, codeQuotes);
         }
+        ObjectNode example = candidate.example();
+        if (example != null) {
+            JsonNode exampleCitation = example.path("citation");
+            for (CandidateProblem problem : candidate.problems()) {
+                for (ObjectNode citation : problem.citations()) {
+                    if (codeLocationsOverlap(citation, exampleCitation)) {
+                        throw new Unverified(
+                                CandidateRefusal.EXAMPLE_OVERLAPS_PROBLEM.code(),
+                                "The example cites the place of a problem",
+                                null);
+                    }
+                }
+            }
+        }
         for (CandidateProblem problem : candidate.problems()) {
             switch (problem.basisType()) {
                 case "state" ->
@@ -300,6 +315,22 @@ class CandidateEvidenceVerifier {
                         throw new Unverified(
                                 DUTY_NOT_IN_CRITERIA,
                                 "A problem rests on a duty that the practice's criteria do not state",
+                                null);
+                    }
+                }
+                case "introduced", "worsened" -> {
+                    ObjectNode head =
+                            problem.citations().get(problem.basis().path("head").asInt());
+                    boolean contradictory = contradictsCodeBasis(head, captured, true);
+                    if (problem.basisType().equals("worsened")) {
+                        ObjectNode base = problem.citations()
+                                .get(problem.basis().path("base").asInt());
+                        contradictory |= contradictsCodeBasis(base, captured, false);
+                    }
+                    if (contradictory) {
+                        throw new Unverified(
+                                BASIS_STATE_UNSUPPORTED,
+                                "The problem's basis cites another repository or revision than the reviewed change",
                                 null);
                     }
                 }
@@ -320,6 +351,23 @@ class CandidateEvidenceVerifier {
                 }
             }
         }
+    }
+
+    private static boolean contradictsCodeBasis(JsonNode citation, CapturedEvidence captured, boolean head) {
+        if (!isCodeSource(new SourceKind(citation.path("sourceKind").asString()))) return false;
+        String expectedRevision = head ? captured.pinnedHead() : captured.reviewRange()[0];
+        return !SandboxLayout.REPO_MOUNT_RELATIVE.equals(repositoryRoot(citation))
+                || !expectedRevision.equals(citation.path("revision").asString());
+    }
+
+    private static boolean codeLocationsOverlap(JsonNode a, JsonNode b) {
+        return isCodeSource(new SourceKind(a.path("sourceKind").asString()))
+                && isCodeSource(new SourceKind(b.path("sourceKind").asString()))
+                && repositoryRoot(a).equals(repositoryRoot(b))
+                && a.path("revision").asString().equals(b.path("revision").asString())
+                && a.path("path").asString().equals(b.path("path").asString())
+                && a.path("startLine").asInt() <= b.path("endLine").asInt()
+                && b.path("startLine").asInt() <= a.path("endLine").asInt();
     }
 
     private static String normalized(@Nullable String text) {
@@ -497,7 +545,8 @@ class CandidateEvidenceVerifier {
             Set<SourceKind> unsearched = new HashSet<>(exhaustive);
             unsearched.removeAll(searched);
             throw new JobDeliveryException(
-                    "An absence claim did not search the sources its practice asserts absence over " + unsearched
+                    "An absence claim did not search the sources its practice asserts absence over "
+                            + unsearched
                             + ": slug="
                             + slug
                             + ", jobId="

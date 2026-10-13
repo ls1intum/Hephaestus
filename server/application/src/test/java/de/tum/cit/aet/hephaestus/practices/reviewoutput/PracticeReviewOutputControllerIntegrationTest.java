@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluation;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
@@ -41,6 +42,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
@@ -72,6 +74,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -79,7 +82,8 @@ import tools.jackson.databind.ObjectMapper;
 class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final String OBSERVATIONS = "/workspaces/{slug}/practices/reviews/results";
+    private static final String RESULTS = "/workspaces/{slug}/practices/reviews/results";
+    private static final String OBSERVATIONS = "/workspaces/{slug}/practices/reviews/observations";
     private static final String FEEDBACK = "/workspaces/{slug}/practices/reviews/feedback";
 
     @Autowired
@@ -87,6 +91,12 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
     @Autowired
     private PracticeResultRepository practiceResultRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -235,8 +245,9 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
     private static String diffCitation(String path, int line) {
         return """
-                {"sourceKind":"scm.pull-request.diff","artifactPath":"context/diff.patch","path":"%s",\
-                "side":"NEW","startLine":%d,"endLine":%d,"quote":"catch (Exception e) {}","quoteRedacted":false}""".formatted(path, line, line);
+            {"sourceKind":"scm.pull-request.diff","artifactPath":"context/diff.patch","path":"%s",\
+            "side":"NEW","startLine":%d,"endLine":%d,"quote":"catch (Exception e) {}","quoteRedacted":false}\
+            """.formatted(path, line, line);
     }
 
     /** Files one located problem under a NOT_MET result, as admission writes it. */
@@ -322,6 +333,17 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 .exchange();
     }
 
+    private WebTestClient.ResponseSpec patchValidity(
+            Workspace ws, UUID practiceResultId, boolean valid, String reason) {
+        return webTestClient
+                .patch()
+                .uri(RESULTS + "/{id}/validity", ws.getWorkspaceSlug(), practiceResultId)
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("valid", valid, "reason", reason))
+                .exchange();
+    }
+
     private WebTestClient.BodyContentSpec getOk(String uri, Object... uriVariables) {
         return get(uri, uriVariables).expectStatus().isOk().expectBody();
     }
@@ -356,7 +378,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         void anonymousCallerCannotReadReviewOutput() {
             webTestClient
                     .get()
-                    .uri(OBSERVATIONS, workspace.getWorkspaceSlug())
+                    .uri(RESULTS, workspace.getWorkspaceSlug())
                     .exchange()
                     .expectStatus()
                     .isUnauthorized()
@@ -366,7 +388,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         @Test
         @WithUser
         void workspaceMemberCannotReadReviewOutput() {
-            get(OBSERVATIONS, workspace.getWorkspaceSlug())
+            get(RESULTS, workspace.getWorkspaceSlug())
                     .expectStatus()
                     .isForbidden()
                     .expectBody(Void.class);
@@ -375,10 +397,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         @Test
         @WithMentorUser
         void workspaceAdminWithoutInstanceAuthorityIsAdmitted() {
-            get(OBSERVATIONS, workspace.getWorkspaceSlug())
-                    .expectStatus()
-                    .isOk()
-                    .expectBody(Void.class);
+            get(RESULTS, workspace.getWorkspaceSlug()).expectStatus().isOk().expectBody(Void.class);
         }
     }
 
@@ -392,7 +411,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             insertProblem(practiceA, job, alice, "Alice problem", "MAJOR");
             insertProblem(practiceB, job, bob, "Bob problem", "MINOR");
 
-            getOk(OBSERVATIONS, workspace.getWorkspaceSlug())
+            getOk(RESULTS, workspace.getWorkspaceSlug())
                     .jsonPath("$.page.totalElements")
                     .isEqualTo(2)
                     .jsonPath("$.content[?(@.summary == 'Alice problem')].subject.login")
@@ -409,7 +428,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             insertProblem(practiceA, job, alice, "Mine", "MAJOR");
             insertProblem(otherPractice, otherJob, bob, "Theirs", "MAJOR");
 
-            getOk(OBSERVATIONS, workspace.getWorkspaceSlug())
+            getOk(RESULTS, workspace.getWorkspaceSlug())
                     .jsonPath("$.page.totalElements")
                     .isEqualTo(1)
                     .jsonPath("$.content[0].summary")
@@ -421,7 +440,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         void detailOfAnotherWorkspaceIsNotFound() {
             UUID theirs = insertProblem(otherPractice, otherJob, bob, "Theirs", "MAJOR");
 
-            get(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), theirs)
+            get(RESULTS + "/{id}", workspace.getWorkspaceSlug(), theirs)
                     .expectStatus()
                     .isNotFound()
                     .expectBody(Void.class);
@@ -434,11 +453,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             insertResult(practiceA, job, alice, "No occasion", "NOT_APPLICABLE", null, 7L, Instant.now());
             insertResult(practiceA, job, alice, "Criterion unresolved", "UNDETERMINED", null, 7L, Instant.now());
             for (String status : List.of("NOT_APPLICABLE", "UNDETERMINED")) {
-                getOk(
-                                OBSERVATIONS + "?agentJobId={id}&outcome={status}",
-                                workspace.getWorkspaceSlug(),
-                                job.getId(),
-                                status)
+                getOk(RESULTS + "?agentJobId={id}&outcome={status}", workspace.getWorkspaceSlug(), job.getId(), status)
                         .jsonPath("$.page.totalElements")
                         .isEqualTo(1)
                         .jsonPath("$.content[0].outcome")
@@ -450,7 +465,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                         .jsonPath("$.content[0].severity")
                         .doesNotExist();
             }
-            getOk(OBSERVATIONS + "?agentJobId={id}&outcome=MET", workspace.getWorkspaceSlug(), job.getId())
+            getOk(RESULTS + "?agentJobId={id}&outcome=MET", workspace.getWorkspaceSlug(), job.getId())
                     .jsonPath("$.page.totalElements")
                     .isEqualTo(1)
                     .jsonPath("$.content[0].summary")
@@ -467,7 +482,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             insertProblem(practiceB, job, bob, "B major", "MAJOR");
 
             getOk(
-                            OBSERVATIONS + "?practiceSlug={slug}&severity=MAJOR&subjectUserId={uid}",
+                            RESULTS + "?practiceSlug={slug}&severity=MAJOR&subjectUserId={uid}",
                             workspace.getWorkspaceSlug(),
                             practiceA.getSlug(),
                             alice.getId())
@@ -486,7 +501,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             UUID practiceResultId = insertProblem(practiceA, job, alice, "In group", "MAJOR");
             insertProblem(practiceB, job, bob, "Ungrouped", "MAJOR");
 
-            getOk(OBSERVATIONS + "?groupSlug=communication", workspace.getWorkspaceSlug())
+            getOk(RESULTS + "?groupSlug=communication", workspace.getWorkspaceSlug())
                     .jsonPath("$.page.totalElements")
                     .isEqualTo(1)
                     .jsonPath("$.content[0].summary")
@@ -500,7 +515,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .jsonPath("$.content[0].group.color")
                     .isEqualTo("blue");
 
-            getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), practiceResultId)
+            getOk(RESULTS + "/{id}", workspace.getWorkspaceSlug(), practiceResultId)
                     .jsonPath("$.group.slug")
                     .isEqualTo("communication");
         }
@@ -512,7 +527,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             insertProblem(practiceA, job, alice, "Major", "MAJOR");
             insertProblem(practiceA, job, alice, "Info", "INFO");
 
-            getOk(OBSERVATIONS + "?severity=CRITICAL&severity=MAJOR", workspace.getWorkspaceSlug())
+            getOk(RESULTS + "?severity=CRITICAL&severity=MAJOR", workspace.getWorkspaceSlug())
                     .jsonPath("$.page.totalElements")
                     .isEqualTo(2);
         }
@@ -524,13 +539,13 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             AgentJob second = persistJob(workspace);
             insertResult(practiceA, second, alice, "Other run", "NOT_MET", "MAJOR", 9L, Instant.now());
 
-            getOk(OBSERVATIONS + "?agentJobId={id}", workspace.getWorkspaceSlug(), job.getId())
+            getOk(RESULTS + "?agentJobId={id}", workspace.getWorkspaceSlug(), job.getId())
                     .jsonPath("$.page.totalElements")
                     .isEqualTo(1)
                     .jsonPath("$.content[0].summary")
                     .isEqualTo("This run");
 
-            getOk(OBSERVATIONS + "?artifactKind=scm.pull_request&artifactId=9", workspace.getWorkspaceSlug())
+            getOk(RESULTS + "?artifactKind=scm.pull_request&artifactId=9", workspace.getWorkspaceSlug())
                     .jsonPath("$.page.totalElements")
                     .isEqualTo(1)
                     .jsonPath("$.content[0].summary")
@@ -566,10 +581,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                         base.plusSeconds(i));
             }
 
-            getOk(
-                            OBSERVATIONS + "?agentJobId={id}&sort=ACTIONABILITY&size=5",
-                            workspace.getWorkspaceSlug(),
-                            job.getId())
+            getOk(RESULTS + "?agentJobId={id}&sort=ACTIONABILITY&size=5", workspace.getWorkspaceSlug(), job.getId())
                     .jsonPath("$.content[0].summary")
                     .isEqualTo("Critical problem")
                     .jsonPath("$.content[1].summary")
@@ -581,7 +593,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .jsonPath("$.content[4].summary")
                     .isEqualTo("Strength");
 
-            getOk(OBSERVATIONS + "?agentJobId={id}&size=5", workspace.getWorkspaceSlug(), job.getId())
+            getOk(RESULTS + "?agentJobId={id}&size=5", workspace.getWorkspaceSlug(), job.getId())
                     .jsonPath("$.content[0].summary")
                     .isEqualTo("Not applicable")
                     .jsonPath("$.content[4].summary")
@@ -597,7 +609,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             insertResult(practiceA, job, alice, "Inside", "NOT_MET", "MAJOR", 8L, from);
             insertResult(practiceA, job, alice, "At end", "NOT_MET", "MAJOR", 9L, to);
 
-            getOk(OBSERVATIONS + "?from={from}&to={to}", workspace.getWorkspaceSlug(), from, to)
+            getOk(RESULTS + "?from={from}&to={to}", workspace.getWorkspaceSlug(), from, to)
                     .jsonPath("$.page.totalElements")
                     .isEqualTo(1)
                     .jsonPath("$.content[0].summary")
@@ -614,7 +626,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 })
         @WithAdminUser
         void rejectsInvalidResultQuery(String query) {
-            get(OBSERVATIONS + query, workspace.getWorkspaceSlug())
+            get(RESULTS + query, workspace.getWorkspaceSlug())
                     .expectStatus()
                     .isBadRequest()
                     .expectHeader()
@@ -649,7 +661,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     persistUnit(workspace, job, alice, 4, FeedbackDeliveryState.FAILED, null, "Failed body"),
                     practiceResultId);
 
-            getOk(OBSERVATIONS, workspace.getWorkspaceSlug())
+            getOk(RESULTS, workspace.getWorkspaceSlug())
                     .jsonPath("$.content[0].feedback.prepared")
                     .isEqualTo(1)
                     .jsonPath("$.content[0].feedback.delivered")
@@ -674,7 +686,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     persistUnit(workspace, job, alice, 1, FeedbackDeliveryState.DISCARDED, null, "Rejected"),
                     practiceResultId);
 
-            getOk(OBSERVATIONS, workspace.getWorkspaceSlug())
+            getOk(RESULTS, workspace.getWorkspaceSlug())
                     .jsonPath("$.content[0].id")
                     .isEqualTo(practiceResultId.toString())
                     .jsonPath("$.content[0].feedback.awaitingApproval")
@@ -744,7 +756,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
             expectListed("?disputed=true", disputed);
             expectListed("?disputed=false", withdrawn, undisputed);
-            getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), disputed)
+            getOk(RESULTS + "/{id}", workspace.getWorkspaceSlug(), disputed)
                     .jsonPath("$.disputes.length()")
                     .isEqualTo(1)
                     .jsonPath("$.disputes[0].feedbackId")
@@ -753,7 +765,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .isEqualTo("IN_CONTEXT")
                     .jsonPath("$.disputes[0].explanation")
                     .isEqualTo("The caller retries the export.");
-            getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), withdrawn)
+            getOk(RESULTS + "/{id}", workspace.getWorkspaceSlug(), withdrawn)
                     .jsonPath("$.disputes.length()")
                     .isEqualTo(0);
             getOk(FEEDBACK + "/{id}", workspace.getWorkspaceSlug(), standing.getId())
@@ -821,7 +833,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         }
 
         private void expectListed(String query, UUID... ids) {
-            getOk(OBSERVATIONS + query, workspace.getWorkspaceSlug())
+            getOk(RESULTS + query, workspace.getWorkspaceSlug())
                     .jsonPath("$.content[*].id")
                     .value(listed -> assertThat(listed)
                             .asInstanceOf(InstanceOfAssertFactories.LIST)
@@ -830,7 +842,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         }
 
         private void expectTotal(String query, int total) {
-            getOk(OBSERVATIONS + query, workspace.getWorkspaceSlug())
+            getOk(RESULTS + query, workspace.getWorkspaceSlug())
                     .jsonPath("$.page.totalElements")
                     .isEqualTo(total);
         }
@@ -850,7 +862,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         void reportsZeroFeedbackCountsWhenNeverBound() {
             insertProblem(practiceA, job, alice, "Orphan", "MAJOR");
 
-            getOk(OBSERVATIONS, workspace.getWorkspaceSlug())
+            getOk(RESULTS, workspace.getWorkspaceSlug())
                     .jsonPath("$.content[0].feedback.prepared")
                     .isEqualTo(0)
                     .jsonPath("$.content[0].feedback.delivered")
@@ -871,11 +883,11 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     otherWorkspace, otherJob, bob, 0, FeedbackDeliveryState.DELIVERED, null, "Foreign body");
             bind(foreignUnit, practiceResultId);
 
-            getOk(OBSERVATIONS, workspace.getWorkspaceSlug())
+            getOk(RESULTS, workspace.getWorkspaceSlug())
                     .jsonPath("$.content[0].feedback.delivered")
                     .isEqualTo(0);
 
-            getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), practiceResultId)
+            getOk(RESULTS + "/{id}", workspace.getWorkspaceSlug(), practiceResultId)
                     .jsonPath("$.feedback.length()")
                     .isEqualTo(0);
         }
@@ -895,7 +907,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                             "Would have said this"),
                     id);
 
-            getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), id)
+            getOk(RESULTS + "/{id}", workspace.getWorkspaceSlug(), id)
                     .jsonPath("$.evidence.citations[0].path")
                     .isEqualTo("src/Main.java")
                     .jsonPath("$.evidenceRationale")
@@ -922,7 +934,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             addProblem(twoProblems, 1, "MINOR", "src/Player.java", 40);
             UUID strength = insertResult(practiceB, run, bob, "A strength", "MET", null, 7L, Instant.now());
 
-            getOk(OBSERVATIONS + "?agentJobId={id}", workspace.getWorkspaceSlug(), run.getId())
+            getOk(RESULTS + "?agentJobId={id}", workspace.getWorkspaceSlug(), run.getId())
                     .jsonPath("$.content[?(@.id == '%s')].problemCount".formatted(twoProblems))
                     .isEqualTo(2)
                     .jsonPath("$.content[?(@.id == '%s')].problemCount".formatted(strength))
@@ -971,11 +983,11 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     "The recorder swallows its error",
                     "The catch block drops the error the recorder reports.",
                     "[" + problemPlace + "]",
-                    "{\"type\":\"worsened\",\"head\":0,\"base\":0,\"explanation\":\"The catch now drops more.\"}",
+                    "{\"type\":\"worsened\",\"head\":0,\"base\":0,\"explanation\":\"The catch now drops" + " more.\"}",
                     "Log the error and rethrow it.",
                     "recurrence-recorder");
 
-            getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), id)
+            getOk(RESULTS + "/{id}", workspace.getWorkspaceSlug(), id)
                     .jsonPath("$.evidence.citations.length()")
                     .isEqualTo(1)
                     .jsonPath("$.evidence.citations[0].path")
@@ -1023,7 +1035,9 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         void shouldShowNoProblemExampleCoverageOrProvenanceWhenAResultRecordedNone() {
             UUID id = insertResult(practiceA, job, alice, "Historical strength", "MET", null, 7L, Instant.now());
 
-            getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), id)
+            getOk(RESULTS + "/{id}", workspace.getWorkspaceSlug(), id)
+                    .jsonPath("$.evidenceHidden")
+                    .isEqualTo(false)
                     .jsonPath("$.observations")
                     .isEmpty()
                     .jsonPath("$.evidence.citations[0].path")
@@ -1034,6 +1048,286 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .doesNotExist()
                     .jsonPath("$.provenance")
                     .doesNotExist();
+        }
+    }
+
+    @Nested
+    @DisplayName("Observations")
+    class Observations {
+
+        @Test
+        @WithAdminUser
+        void shouldListEachObservationNewestResultFirstWithItsPlaceResultAndDeveloper() {
+            PracticeGroup group = persistGroup(workspace, "reliability", "Reliability");
+            practiceA.setGroup(group);
+            practiceRepository.save(practiceA);
+            AgentJob run = persistJob(workspace);
+            Instant now = Instant.now();
+            UUID older = insertResult(
+                    practiceA, run, alice, "Errors are swallowed", "NOT_MET", "MAJOR", 7L, now.minusSeconds(60));
+            addProblem(older, 1, "MINOR", "src/Player.java", 40);
+            addProblem(older, 0, "MAJOR", "src/Recorder.java", 212);
+            UUID newer = insertResult(practiceB, run, bob, "No tests", "NOT_MET", "MINOR", 7L, now);
+            addProblem(newer, 0, "MINOR", "src/Cache.java", 9);
+            insertResult(practiceB, run, alice, "A strength", "MET", null, 7L, now);
+
+            getOk(OBSERVATIONS + "?agentJobId={id}", workspace.getWorkspaceSlug(), run.getId())
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(3)
+                    .jsonPath("$.content[*].path")
+                    .isEqualTo(List.of("src/Cache.java", "src/Recorder.java", "src/Player.java"))
+                    .jsonPath("$.content[1].id")
+                    .isNotEmpty()
+                    .jsonPath("$.content[1].practiceResultId")
+                    .isEqualTo(older.toString())
+                    .jsonPath("$.content[1].agentJobId")
+                    .isEqualTo(run.getId().toString())
+                    .jsonPath("$.content[1].practiceSlug")
+                    .isEqualTo("pr-description-quality")
+                    .jsonPath("$.content[1].group.slug")
+                    .isEqualTo("reliability")
+                    .jsonPath("$.content[1].severity")
+                    .isEqualTo("MAJOR")
+                    .jsonPath("$.content[1].summary")
+                    .isEqualTo("Problem at src/Recorder.java")
+                    .jsonPath("$.content[1].sourceKind")
+                    .isEqualTo("scm.pull-request.diff")
+                    .jsonPath("$.content[1].side")
+                    .isEqualTo("NEW")
+                    .jsonPath("$.content[1].startLine")
+                    .isEqualTo(212)
+                    .jsonPath("$.content[1].endLine")
+                    .isEqualTo(212)
+                    .jsonPath("$.content[1].evidenceHidden")
+                    .isEqualTo(false)
+                    .jsonPath("$.content[1].reviewedWork.kind")
+                    .isEqualTo("scm.pull_request")
+                    .jsonPath("$.content[1].subject.login")
+                    .isEqualTo("alice")
+                    .jsonPath("$.content[0].subject.login")
+                    .isEqualTo("bob")
+                    .jsonPath("$.content[0].group")
+                    .doesNotExist();
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldKeepTheFirstCitationsSourceAndSideForCodeSlackAndDocumentPlaces() {
+            UUID result = insertProblem(practiceA, job, alice, "Located problems", "MAJOR");
+            List<String> citations = List.of(
+                    "[" + diffCitation("src/Before.java", 8).replace("\"NEW\"", "\"OLD\"") + "]", """
+                    [{"sourceKind":"slack.conversation.thread","artifactPath":"context/conversation_thread.json",
+                      "path":"thread","startLine":3,"endLine":3,"quote":"Please explain the change."}]
+                    """, """
+                    [{"sourceKind":"docs.document.core","artifactPath":"context/document.json",
+                      "path":"document","startLine":6,"endLine":6,"quote":"Document the decision."}]
+                    """, "[]");
+            for (int position = 0; position < citations.size(); position++) {
+                assertThat(observationRepository.insert(
+                                UUID.randomUUID(),
+                                workspace.getId(),
+                                result,
+                                position,
+                                null,
+                                "MINOR",
+                                "A located problem",
+                                "The practice is not met here.",
+                                citations.get(position),
+                                null,
+                                null,
+                                null))
+                        .isOne();
+            }
+
+            getOk(OBSERVATIONS + "?practiceResultId={id}", workspace.getWorkspaceSlug(), result)
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(4)
+                    .jsonPath("$.content[0].sourceKind")
+                    .isEqualTo("scm.pull-request.diff")
+                    .jsonPath("$.content[0].side")
+                    .isEqualTo("OLD")
+                    .jsonPath("$.content[1].sourceKind")
+                    .isEqualTo("slack.conversation.thread")
+                    .jsonPath("$.content[1].side")
+                    .doesNotExist()
+                    .jsonPath("$.content[2].sourceKind")
+                    .isEqualTo("docs.document.core")
+                    .jsonPath("$.content[2].side")
+                    .doesNotExist()
+                    .jsonPath("$.content[3].sourceKind")
+                    .doesNotExist()
+                    .jsonPath("$.content[3].side")
+                    .doesNotExist()
+                    .jsonPath("$.content[3].path")
+                    .doesNotExist();
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldShowTheParentResultsCorrectionAndCurrentnessOnItsObservations() {
+            PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practiceA, 1));
+            practiceA.setCurrentRevision(revision);
+            practiceRepository.save(practiceA);
+            UUID result = insertProblem(practiceA, job, alice, "A problem", "MAJOR");
+            jdbcTemplate.update(
+                    "UPDATE practice_result SET practice_revision_id = ? WHERE id = ?", revision.getId(), result);
+            addProblem(result, 0, "MAJOR", "src/Problem.java", 1);
+            String slug = workspace.getWorkspaceSlug();
+            String list = OBSERVATIONS + "?practiceResultId={id}";
+            getOk(list, slug, result)
+                    .jsonPath("$.content[0].claimCurrentness")
+                    .isEqualTo("CURRENT")
+                    .jsonPath("$.content[0].invalidatedAt")
+                    .doesNotExist()
+                    .jsonPath("$.content[0].disputedAt")
+                    .doesNotExist();
+
+            patchValidity(workspace, result, false, "Wrong location")
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(Void.class);
+            getOk(list, slug, result).jsonPath("$.content[0].invalidatedAt").isNotEmpty();
+            patchValidity(workspace, result, true, "The location was correct")
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(Void.class);
+            getOk(list, slug, result).jsonPath("$.content[0].invalidatedAt").doesNotExist();
+
+            Feedback feedback =
+                    persistUnit(workspace, job, alice, 0, FeedbackDeliveryState.DELIVERED, null, "Check this place.");
+            bind(feedback, result);
+            reactionRepository.save(Reaction.builder()
+                    .feedback(feedback)
+                    .reactorUserId(alice.getId())
+                    .resolution(FeedbackResolution.DISPUTED)
+                    .explanation("This is expected.")
+                    .createdAt(Instant.now())
+                    .build());
+            getOk(list, slug, result).jsonPath("$.content[0].disputedAt").isNotEmpty();
+
+            jdbcTemplate.update("UPDATE practice_result SET superseded_at = now() WHERE id = ?", result);
+            getOk(list, slug, result).jsonPath("$.content[0].claimCurrentness").isEqualTo("STALE");
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldFilterBySeverityPracticePersonResultAndRange() {
+            AgentJob run = persistJob(workspace);
+            Instant now = Instant.now();
+            UUID aliceResult = insertResult(practiceA, run, alice, "Alice", "NOT_MET", "MAJOR", 7L, now);
+            addProblem(aliceResult, 0, "MAJOR", "src/Major.java", 1);
+            addProblem(aliceResult, 1, "MINOR", "src/Minor.java", 2);
+            UUID bobResult =
+                    insertResult(practiceB, run, bob, "Bob", "NOT_MET", "CRITICAL", 7L, now.minusSeconds(7200));
+            addProblem(bobResult, 0, "CRITICAL", "src/Critical.java", 3);
+            String slug = workspace.getWorkspaceSlug();
+
+            // A MINOR observation of a MAJOR result is listed: the filter weighs the observation, not its
+            // result.
+            getOk(OBSERVATIONS + "?agentJobId={id}&severity=MINOR&severity=CRITICAL", slug, run.getId())
+                    .jsonPath("$.content[*].path")
+                    .isEqualTo(List.of("src/Minor.java", "src/Critical.java"));
+            getOk(OBSERVATIONS + "?agentJobId={id}&practiceSlug=test-coverage", slug, run.getId())
+                    .jsonPath("$.content[*].path")
+                    .isEqualTo(List.of("src/Critical.java"));
+            getOk(OBSERVATIONS + "?agentJobId={id}&subjectUserId={user}", slug, run.getId(), alice.getId())
+                    .jsonPath("$.content[*].path")
+                    .isEqualTo(List.of("src/Major.java", "src/Minor.java"));
+            getOk(OBSERVATIONS + "?practiceResultId={id}", slug, bobResult)
+                    .jsonPath("$.content[*].path")
+                    .isEqualTo(List.of("src/Critical.java"));
+            getOk(OBSERVATIONS + "?agentJobId={id}&from={from}", slug, run.getId(), now.minusSeconds(60))
+                    .jsonPath("$.content[*].path")
+                    .isEqualTo(List.of("src/Major.java", "src/Minor.java"));
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldPageThroughObservationsInOrder() {
+            AgentJob run = persistJob(workspace);
+            UUID result = insertResult(practiceA, run, alice, "Three", "NOT_MET", "MAJOR", 7L, Instant.now());
+            addProblem(result, 0, "MAJOR", "src/A.java", 1);
+            addProblem(result, 1, "MINOR", "src/B.java", 2);
+            addProblem(result, 2, "MINOR", "src/C.java", 3);
+
+            getOk(OBSERVATIONS + "?agentJobId={id}&page=1&size=2", workspace.getWorkspaceSlug(), run.getId())
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(3)
+                    .jsonPath("$.page.totalPages")
+                    .isEqualTo(2)
+                    .jsonPath("$.content[*].path")
+                    .isEqualTo(List.of("src/C.java"));
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldListAnObservationWithoutItsSummaryOrPlaceWhenItsResultDetailHidesTheEvidence() {
+            // A run of another workspace authorizes no evidence here: the result detail shows no
+            // observations.
+            UUID hidden = insertProblem(practiceA, otherJob, alice, "Hidden", "MAJOR");
+            addProblem(hidden, 0, "MINOR", "src/Hidden.java", 1);
+
+            getOk(RESULTS + "/{id}", workspace.getWorkspaceSlug(), hidden)
+                    .jsonPath("$.evidenceHidden")
+                    .isEqualTo(true)
+                    .jsonPath("$.observations")
+                    .isEmpty();
+            getOk(OBSERVATIONS + "?practiceResultId={id}", workspace.getWorkspaceSlug(), hidden)
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].practiceResultId")
+                    .isEqualTo(hidden.toString())
+                    .jsonPath("$.content[0].severity")
+                    .isEqualTo("MINOR")
+                    .jsonPath("$.content[0].evidenceHidden")
+                    .isEqualTo(true)
+                    .jsonPath("$.content[0].summary")
+                    .doesNotExist()
+                    .jsonPath("$.content[0].sourceKind")
+                    .doesNotExist()
+                    .jsonPath("$.content[0].side")
+                    .doesNotExist()
+                    .jsonPath("$.content[0].path")
+                    .doesNotExist()
+                    .jsonPath("$.content[0].startLine")
+                    .doesNotExist()
+                    .jsonPath("$.content[0].endLine")
+                    .doesNotExist();
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldNotListAnotherWorkspacesObservations() {
+            UUID theirs = insertProblem(otherPractice, otherJob, bob, "Theirs", "MAJOR");
+            assertThat(observationRepository.insert(
+                            UUID.randomUUID(),
+                            otherWorkspace.getId(),
+                            theirs,
+                            0,
+                            null,
+                            "MAJOR",
+                            "Their problem",
+                            "Not for this workspace.",
+                            "[" + diffCitation("src/Theirs.java", 1) + "]",
+                            null,
+                            null,
+                            null))
+                    .isOne();
+
+            getOk(OBSERVATIONS + "?practiceResultId={id}", workspace.getWorkspaceSlug(), theirs)
+                    .jsonPath("$.content")
+                    .isEmpty()
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(0);
+        }
+
+        @Test
+        @WithUser
+        void shouldForbidAWorkspaceMember() {
+            get(OBSERVATIONS, workspace.getWorkspaceSlug())
+                    .expectStatus()
+                    .isForbidden()
+                    .expectBody(Void.class);
         }
     }
 
@@ -1073,12 +1367,12 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     artifactId);
 
             expectResolvedPullRequestArtifact(
-                    OBSERVATIONS + "?artifactKind=scm.pull_request&artifactId={id}",
+                    RESULTS + "?artifactKind=scm.pull_request&artifactId={id}",
                     "$.content[0].reviewedWork",
                     workspace.getWorkspaceSlug(),
                     artifactId);
             expectResolvedPullRequestArtifact(
-                    OBSERVATIONS + "/{id}", "$.reviewedWork", workspace.getWorkspaceSlug(), practiceResultId);
+                    RESULTS + "/{id}", "$.reviewedWork", workspace.getWorkspaceSlug(), practiceResultId);
             expectResolvedPullRequestArtifact(
                     FEEDBACK + "?artifactKind=scm.pull_request&artifactId={id}",
                     "$.content[0].reviewedWork",
@@ -1103,7 +1397,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             UUID practiceResultId = insertResult(
                     practiceA, otherJob, alice, "Foreign artifact reference", "NOT_MET", "MAJOR", 812L, Instant.now());
 
-            getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), practiceResultId)
+            getOk(RESULTS + "/{id}", workspace.getWorkspaceSlug(), practiceResultId)
                     .jsonPath("$.reviewedWork.kind")
                     .isEqualTo("scm.pull_request")
                     .jsonPath("$.reviewedWork.id")
@@ -1161,7 +1455,8 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
     @DisplayName("Feedback ledger")
     class Ledger {
 
-        // The group filter keeps the feedback bound to an observation of a practice in the group, and intersects with
+        // The group filter keeps the feedback bound to an observation of a practice in the group, and
+        // intersects with
         // the practice filter.
         @Test
         @WithAdminUser
@@ -1929,19 +2224,6 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
     @DisplayName("Result validity")
     class ResultValidity {
 
-        private static final String VALIDITY = OBSERVATIONS + "/{id}/validity";
-
-        private WebTestClient.ResponseSpec patchValidity(
-                Workspace ws, UUID practiceResultId, boolean valid, String reason) {
-            return webTestClient
-                    .patch()
-                    .uri(VALIDITY, ws.getWorkspaceSlug(), practiceResultId)
-                    .headers(TestAuthUtils.withCurrentUser())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(Map.of("valid", valid, "reason", reason))
-                    .exchange();
-        }
-
         @Test
         @WithAdminUser
         void shouldInvalidateOnlyTheSelectedResultWithItsActorAndReason() {
@@ -1973,7 +2255,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                             .orElseThrow()
                             .getSummary())
                     .isEqualTo("Closed issue #1 already");
-            getOk(OBSERVATIONS + "?agentJobId=" + job.getId(), workspace.getWorkspaceSlug())
+            getOk(RESULTS + "?agentJobId=" + job.getId(), workspace.getWorkspaceSlug())
                     .jsonPath("$.content[?(@.id == '%s')].invalidatedAt".formatted(wrong))
                     .isNotEmpty()
                     .jsonPath("$.content[?(@.id == '%s')].invalidatedAt".formatted(sibling))

@@ -51,7 +51,7 @@ public record UpdatePracticeRequestDTO(
         @Size(
                 max = PracticeDefinition.MAX_PRACTICE_SCRIPT_LENGTH,
                 message = "Practice script must be at most 100,000 characters")
-        @Schema(description = "TypeScript practice script that runs before the review and points it at places to check")
+        @Schema(description = PracticeDefinition.PRACTICE_SCRIPT_DESCRIPTION)
         @Nullable
         String practiceScript,
 

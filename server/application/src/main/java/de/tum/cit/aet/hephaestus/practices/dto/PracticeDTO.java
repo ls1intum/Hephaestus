@@ -52,8 +52,7 @@ public record PracticeDTO(
         @NonNull @Schema(description = "Practice review criteria")
         String criteria,
 
-        @Nullable
-        @Schema(description = "TypeScript practice script that runs before the review and points it at places to check")
+        @Nullable @Schema(description = PracticeDefinition.PRACTICE_SCRIPT_DESCRIPTION)
         String practiceScript,
 
         @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
@@ -98,8 +97,9 @@ public record PracticeDTO(
 
         @Nullable
         @Schema(
-                description = "Why Hephaestus never reviews this practice whatever its own policy says: the catalogue"
-                        + " entry it was copied from withdrew automated review. Absent when its own policy decides.")
+                description = "Why Hephaestus never reviews this practice whatever its own policy says: the"
+                        + " catalogue entry it was copied from withdrew automated review. Absent when its"
+                        + " own policy decides.")
         PracticeEvidenceLimitation automatedReviewWithdrawal) {
     /**
      * @param automatedReviewWithdrawal why the catalogue withdrew automated review from this copy, or null

@@ -33,16 +33,15 @@ record TerminalUsage(
      * @param proxyCounts the {@code agent_job} row's proxy accumulators, read BEFORE any requeue
      *     (which zeroes them) and BEFORE the runner's totals are written over them
      * @param practiceScript the attempt's practice script totals by model kind. Its chat total is added to the
-     *     runner's report: the practice script stage runs before the runner, in another process, so the report
-     *     never contains those calls, while the proxy's counters do. Its buckets are those of the proxy's
-     *     counters, so its cache reads and writes keep their own rates.
+     *     runner's report: its session events contain no direct calls, while the proxy's counters do.
+     *     Its buckets are those of the proxy's counters, so its cache reads and writes keep their own rates.
      */
     static TerminalUsage resolve(
             @Nullable LlmUsage runnerUsage,
             @Nullable AgentJobLlmUsage proxyCounts,
             List<PracticeScriptKindTotal> practiceScript) {
         boolean fromRunner = hasTokens(runnerUsage);
-        boolean fromProxy = proxyCounts != null && proxyCounts.hasBillableUsage();
+        boolean fromProxy = proxyCounts != null && proxyCounts.hasReportedUsage();
         if (!fromRunner && !fromProxy) {
             // Neither record has tokens: keep whichever call count exists as telemetry, but report the
             // spend as unknown.
@@ -73,7 +72,7 @@ record TerminalUsage(
                 // Call counts are telemetry, not coverage. Clamped rather than cast: the count is an int on the
                 // row, and an absurd report should store the ceiling rather than wrap to a negative one.
                 (int) Math.min(Integer.MAX_VALUE, Math.max(runner.calls, proxy.calls)),
-                proxyCovers || runnerCovers,
+                (proxyCovers || runnerCovers) && chatUsageReported(practiceScript),
                 runnerCovers ? UsageProvenance.RUNNER : UsageProvenance.PROXY);
     }
 
@@ -117,6 +116,8 @@ record TerminalUsage(
             LlmPriceSnapshot price) {
         // One instant for every row of the attempt, so midnight on the 1st cannot split it across two months.
         Instant occurredAt = Instant.now();
+        List<PracticeScriptKindTotal> practiceScript =
+                jobs.sumPracticeScriptUsageByKind(workspaceId, job.getId(), job.getRetryCount());
         boolean billed = append(
                 recorder,
                 workspaceId,
@@ -136,9 +137,8 @@ record TerminalUsage(
                         price,
                         provenance,
                         occurredAt),
-                verifiable);
-        for (PracticeScriptKindTotal total :
-                jobs.sumPracticeScriptUsageByKind(workspaceId, job.getId(), job.getRetryCount())) {
+                verifiable && chatUsageReported(practiceScript));
+        for (PracticeScriptKindTotal total : practiceScript) {
             if (total.modelKind() == ModelKind.CHAT) {
                 continue;
             }
@@ -163,9 +163,7 @@ record TerminalUsage(
                             frozen != null ? frozen : LlmPriceSnapshot.unpricedInstance(),
                             UsageProvenance.PROXY,
                             occurredAt),
-                    // Search units are observed usage too. The recorder appends them UNPRICED, because no price has
-                    // a rate for them; a model with no metered cost still records its confirmed zero.
-                    total.tokens() > 0 || total.searchUnits() > 0);
+                    total.hasCompleteUsage());
         }
         return billed;
     }
@@ -203,6 +201,12 @@ record TerminalUsage(
 
     private static long nullToZero(@Nullable Integer value) {
         return value != null ? value : 0L;
+    }
+
+    private static boolean chatUsageReported(List<PracticeScriptKindTotal> totals) {
+        return totals.stream()
+                .filter(total -> total.modelKind() == ModelKind.CHAT)
+                .allMatch(PracticeScriptKindTotal::hasCompleteUsage);
     }
 
     /** One source's buckets, so the two can be compared without writing each bucket name five times. */

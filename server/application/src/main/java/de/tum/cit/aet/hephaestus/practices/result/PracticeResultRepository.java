@@ -67,8 +67,8 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
     @Modifying(flushAutomatically = true)
     @Transactional
     @Query(
-            value =
-                    "UPDATE practice_result SET superseded_at = :at WHERE id = :id AND workspace_id = :workspaceId AND superseded_at IS NULL",
+            value = "UPDATE practice_result SET superseded_at = :at WHERE id = :id AND workspace_id = :workspaceId AND"
+                    + " superseded_at IS NULL",
             nativeQuery = true)
     int supersedeById(@Param("workspaceId") long workspaceId, @Param("id") UUID id, @Param("at") Instant at);
     /**
@@ -131,6 +131,10 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
     List<PracticeResult> findAllByIdInAndWorkspaceId(
             @Param("ids") Collection<UUID> ids, @Param("workspaceId") Long workspaceId);
 
+    @Query("SELECT f FROM PracticeResult f WHERE f.id IN :ids AND f.workspaceId = :workspaceId")
+    List<PracticeResult> findForEvidenceAuthorization(
+            @Param("ids") Collection<UUID> ids, @Param("workspaceId") Long workspaceId);
+
     /**
      * All results a given agent job produced — the source set the feedback ledger recorder binds to.
      * Ordered by id so {@code get(0)} is deterministic across retries: the recorder derives the recipient,
@@ -138,8 +142,8 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      * a re-run of a multi-subject / multi-artifact job.
      */
     @EntityGraph(attributePaths = {"practice", "practiceRevision"})
-    @Query(
-            "SELECT f FROM PracticeResult f WHERE f.agentJobId = :agentJobId AND f.workspaceId = :workspaceId ORDER BY f.id ASC")
+    @Query("SELECT f FROM PracticeResult f WHERE f.agentJobId = :agentJobId AND f.workspaceId = :workspaceId ORDER BY"
+            + " f.id ASC")
     List<PracticeResult> findByAgentJobId(@Param("agentJobId") UUID agentJobId, @Param("workspaceId") Long workspaceId);
 
     String MET_OUTCOME = "o.outcome = 'MET'";
@@ -185,9 +189,9 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
     /** Results counted by assessment, as native select columns over {@code o}. */
     String ASSESSMENT_COUNTS = "COUNT(*) FILTER (WHERE " + MET_OUTCOME + ") AS \"met\","
             + " COUNT(*) FILTER (WHERE " + NOT_MET_OUTCOME + ") AS \"notMet\"," + """
-               COUNT(*) FILTER (WHERE o.outcome = 'NOT_APPLICABLE') AS "notApplicable",
-               COUNT(*) FILTER (WHERE o.outcome = 'UNDETERMINED') AS "undetermined"
-        """;
+                   COUNT(*) FILTER (WHERE o.outcome = 'NOT_APPLICABLE') AS "notApplicable",
+                   COUNT(*) FILTER (WHERE o.outcome = 'UNDETERMINED') AS "undetermined"
+            """;
 
     /** Results recorded in {@code [from, to)}, the window the operator result list filters by. */
     String OBSERVED_IN_RANGE = """
@@ -198,13 +202,13 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
     /** The results each run recorded, by assessment. One an admin marked incorrect counts as never made. */
     @Query(
             value = "SELECT o.agent_job_id AS \"jobId\"," + ASSESSMENT_COUNTS + """
-        FROM practice_result o
-        WHERE o.workspace_id = :workspaceId
-          AND o.agent_job_id IN :jobIds
-          AND NOT
-        """ + INVALIDATED + """
-        GROUP BY o.agent_job_id
-        """,
+                FROM practice_result o
+                WHERE o.workspace_id = :workspaceId
+                  AND o.agent_job_id IN :jobIds
+                  AND NOT
+                """ + INVALIDATED + """
+                GROUP BY o.agent_job_id
+                """,
             nativeQuery = true)
     List<ReviewResultCounts> summarizeReviewResults(
             @Param("workspaceId") Long workspaceId, @Param("jobIds") Collection<UUID> jobIds);
@@ -261,24 +265,24 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      */
     @Query(
             value = """
-        SELECT p.id AS "practiceId",
-               p.slug AS "practiceSlug",
-               p.name AS "practiceName",
-               pa.slug AS "groupSlug",
-               pa.name AS "groupName",
-               pa.icon AS "groupIcon",
-               pa.color AS "groupColor",
-        """ + "COUNT(*) FILTER (WHERE " + INVALIDATED + ") AS \"invalidated\"," + ASSESSMENT_COUNTS + """
-        FROM practice p
-        LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
-        LEFT JOIN practice_result o ON o.practice_id = p.id AND o.workspace_id = :workspaceId
-        """
+                    SELECT p.id AS "practiceId",
+                           p.slug AS "practiceSlug",
+                           p.name AS "practiceName",
+                           pa.slug AS "groupSlug",
+                           pa.name AS "groupName",
+                           pa.icon AS "groupIcon",
+                           pa.color AS "groupColor",
+                    """ + "COUNT(*) FILTER (WHERE " + INVALIDATED + ") AS \"invalidated\"," + ASSESSMENT_COUNTS + """
+                    FROM practice p
+                    LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
+                    LEFT JOIN practice_result o ON o.practice_id = p.id AND o.workspace_id = :workspaceId
+                    """
                     + OBSERVED_IN_RANGE + """
-        WHERE p.workspace_id = :workspaceId
-        GROUP BY p.id, pa.id
-        HAVING COUNT(o.id) > 0 OR p.id = ANY(CAST(:practiceIds AS bigint[]))
-        ORDER BY COUNT(o.id) DESC, p.name ASC, p.id ASC
-        """,
+                    WHERE p.workspace_id = :workspaceId
+                    GROUP BY p.id, pa.id
+                    HAVING COUNT(o.id) > 0 OR p.id = ANY(CAST(:practiceIds AS bigint[]))
+                    ORDER BY COUNT(o.id) DESC, p.name ASC, p.id ASC
+                    """,
             nativeQuery = true)
     List<PracticeResultCounts> summarizeResultsByPractice(
             @Param("workspaceId") Long workspaceId,
@@ -543,22 +547,22 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
         AND (:displayableOnly = FALSE OR f.outcome <> de.tum.cit.aet.hephaestus.practices.model.Outcome.NOT_APPLICABLE)
         AND NOT EXISTS (SELECT 1 FROM PracticeResultInvalidation oi WHERE oi.practiceResultId = f.id AND oi.restoredAt IS NULL)
         """, countQuery = """
-        SELECT COUNT(f) FROM PracticeResult f
-        JOIN f.practice p
-        LEFT JOIN p.group a
-        WHERE f.aboutUserId = :aboutUserId
-        AND f.workspaceId = :workspaceId
-        AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-        AND (:groupSlug IS NULL OR a.slug = :groupSlug)
-        AND (:outcome IS NULL OR f.outcome = :outcome)
+            SELECT COUNT(f) FROM PracticeResult f
+            JOIN f.practice p
+            LEFT JOIN p.group a
+            WHERE f.aboutUserId = :aboutUserId
+            AND f.workspaceId = :workspaceId
+            AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+            AND (:groupSlug IS NULL OR a.slug = :groupSlug)
+            AND (:outcome IS NULL OR f.outcome = :outcome)
 
-        AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
-        AND (:artifactKind IS NULL OR f.artifactKind = :artifactKind)
-        AND (:artifactId IS NULL OR f.artifactId = :artifactId)
-        AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
-        AND (:displayableOnly = FALSE OR f.outcome <> de.tum.cit.aet.hephaestus.practices.model.Outcome.NOT_APPLICABLE)
-        AND NOT EXISTS (SELECT 1 FROM PracticeResultInvalidation oi WHERE oi.practiceResultId = f.id AND oi.restoredAt IS NULL)
-        """)
+            AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
+            AND (:artifactKind IS NULL OR f.artifactKind = :artifactKind)
+            AND (:artifactId IS NULL OR f.artifactId = :artifactId)
+            AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
+            AND (:displayableOnly = FALSE OR f.outcome <> de.tum.cit.aet.hephaestus.practices.model.Outcome.NOT_APPLICABLE)
+            AND NOT EXISTS (SELECT 1 FROM PracticeResultInvalidation oi WHERE oi.practiceResultId = f.id AND oi.restoredAt IS NULL)
+            """)
     Page<PracticeResult> findByAboutUserAndWorkspace(
             @Param("aboutUserId") Long aboutUserId,
             @Param("workspaceId") Long workspaceId,
@@ -610,22 +614,22 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
             ELSE 4
         END) * :severitySign, f.observedAt DESC
         """, countQuery = """
-        SELECT COUNT(f) FROM PracticeResult f
-        JOIN f.practice p
-        LEFT JOIN p.group a
-        WHERE f.aboutUserId = :aboutUserId
-        AND f.workspaceId = :workspaceId
-        AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-        AND (:groupSlug IS NULL OR a.slug = :groupSlug)
-        AND (:outcome IS NULL OR f.outcome = :outcome)
+            SELECT COUNT(f) FROM PracticeResult f
+            JOIN f.practice p
+            LEFT JOIN p.group a
+            WHERE f.aboutUserId = :aboutUserId
+            AND f.workspaceId = :workspaceId
+            AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+            AND (:groupSlug IS NULL OR a.slug = :groupSlug)
+            AND (:outcome IS NULL OR f.outcome = :outcome)
 
-        AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
-        AND (:artifactKind IS NULL OR f.artifactKind = :artifactKind)
-        AND (:artifactId IS NULL OR f.artifactId = :artifactId)
-        AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
-        AND (:displayableOnly = FALSE OR f.outcome <> de.tum.cit.aet.hephaestus.practices.model.Outcome.NOT_APPLICABLE)
-        AND NOT EXISTS (SELECT 1 FROM PracticeResultInvalidation oi WHERE oi.practiceResultId = f.id AND oi.restoredAt IS NULL)
-        """)
+            AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
+            AND (:artifactKind IS NULL OR f.artifactKind = :artifactKind)
+            AND (:artifactId IS NULL OR f.artifactId = :artifactId)
+            AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
+            AND (:displayableOnly = FALSE OR f.outcome <> de.tum.cit.aet.hephaestus.practices.model.Outcome.NOT_APPLICABLE)
+            AND NOT EXISTS (SELECT 1 FROM PracticeResultInvalidation oi WHERE oi.practiceResultId = f.id AND oi.restoredAt IS NULL)
+            """)
     Page<PracticeResult> findByAboutUserAndWorkspaceSeverityFirst(
             @Param("aboutUserId") Long aboutUserId,
             @Param("workspaceId") Long workspaceId,
@@ -652,24 +656,24 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      * artifact, so a run dropped here takes its results with it.
      */
     @Query(value = """
-                    SELECT f.agent_job_id AS "jobId",
-                           MAX(f.observed_at) AS "reviewedAt"
-                    FROM practice_result f
-                    JOIN practice p ON p.id = f.practice_id
-                    LEFT JOIN practice_group a ON a.id = p.practice_group_id
-                    WHERE f.about_user_id = :aboutUserId
-                      AND f.workspace_id = :workspaceId
-                      AND (CAST(:groupSlug AS text) IS NULL OR a.slug = :groupSlug)
-                      AND (CAST(:artifactId AS bigint) IS NULL
-                           OR (f.artifact_kind = :artifactKind AND f.artifact_id = CAST(:artifactId AS bigint)))
-                      AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-                      AND (:artifactKinds IS NULL OR f.artifact_kind = ANY(string_to_array(:artifactKinds, ',')))
-                      AND (:severities IS NULL OR f.severity = ANY(string_to_array(:severities, ',')))
-                      AND f.outcome <> 'NOT_APPLICABLE'
-            """ + HIDDEN_REPOSITORY_GUARD + """
-            GROUP BY f.agent_job_id
-            ORDER BY MAX(f.observed_at) DESC, f.agent_job_id DESC
-            """, nativeQuery = true)
+                SELECT f.agent_job_id AS "jobId",
+                       MAX(f.observed_at) AS "reviewedAt"
+                FROM practice_result f
+                JOIN practice p ON p.id = f.practice_id
+                LEFT JOIN practice_group a ON a.id = p.practice_group_id
+                WHERE f.about_user_id = :aboutUserId
+                  AND f.workspace_id = :workspaceId
+                  AND (CAST(:groupSlug AS text) IS NULL OR a.slug = :groupSlug)
+                  AND (CAST(:artifactId AS bigint) IS NULL
+                       OR (f.artifact_kind = :artifactKind AND f.artifact_id = CAST(:artifactId AS bigint)))
+                  AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+                  AND (:artifactKinds IS NULL OR f.artifact_kind = ANY(string_to_array(:artifactKinds, ',')))
+                  AND (:severities IS NULL OR f.severity = ANY(string_to_array(:severities, ',')))
+                  AND f.outcome <> 'NOT_APPLICABLE'
+        """ + HIDDEN_REPOSITORY_GUARD + """
+        GROUP BY f.agent_job_id
+        ORDER BY MAX(f.observed_at) DESC, f.agent_job_id DESC
+        """, nativeQuery = true)
     Slice<ReviewRunRow> findPracticeGroupReviewRuns(
             @Param("aboutUserId") Long aboutUserId,
             @Param("workspaceId") Long workspaceId,
@@ -731,42 +735,43 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      */
     @Query(
             value = """
-                    SELECT p.slug AS "practiceSlug",
-                           p.name AS "practiceName",
-                           COUNT(f.id) AS "totalResults",
-                           SUM(CASE WHEN f.outcome = 'MET' THEN 1 ELSE 0 END) AS "met",
-                           SUM(CASE WHEN f.outcome = 'NOT_MET' THEN 1 ELSE 0 END) AS "notMet",
-                           SUM(CASE WHEN f.outcome = 'NOT_APPLICABLE' THEN 1 ELSE 0 END) AS "notApplicable",
-                           SUM(CASE WHEN f.outcome = 'UNDETERMINED' THEN 1 ELSE 0 END) AS "undetermined",
-                           MAX(f.observed_at) AS "lastObservedAt"
-                    FROM practice_result f
-                    JOIN practice p ON p.id = f.practice_id
-                    JOIN practice_revision evaluated_revision ON evaluated_revision.id = f.practice_revision_id
-                    JOIN practice_revision current_revision ON current_revision.id = p.current_revision_id
-                    WHERE f.about_user_id = :aboutUserId
-                      AND f.workspace_id = :workspaceId
-            """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
-              AND evaluated_revision.review_rule_fingerprint = current_revision.review_rule_fingerprint
-              AND evaluated_revision.review_rule_fingerprint LIKE '""" + ReviewRuleFingerprint.SCHEME + "%'\n"
+                            SELECT p.slug AS "practiceSlug",
+                                   p.name AS "practiceName",
+                                   COUNT(f.id) AS "totalResults",
+                                   SUM(CASE WHEN f.outcome = 'MET' THEN 1 ELSE 0 END) AS "met",
+                                   SUM(CASE WHEN f.outcome = 'NOT_MET' THEN 1 ELSE 0 END) AS "notMet",
+                                   SUM(CASE WHEN f.outcome = 'NOT_APPLICABLE' THEN 1 ELSE 0 END) AS "notApplicable",
+                                   SUM(CASE WHEN f.outcome = 'UNDETERMINED' THEN 1 ELSE 0 END) AS "undetermined",
+                                   MAX(f.observed_at) AS "lastObservedAt"
+                            FROM practice_result f
+                            JOIN practice p ON p.id = f.practice_id
+                            JOIN practice_revision evaluated_revision ON evaluated_revision.id = f.practice_revision_id
+                            JOIN practice_revision current_revision ON current_revision.id = p.current_revision_id
+                            WHERE f.about_user_id = :aboutUserId
+                              AND f.workspace_id = :workspaceId
+                    """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
+                    AND evaluated_revision.review_rule_fingerprint = current_revision.review_rule_fingerprint
+                    AND evaluated_revision.review_rule_fingerprint LIKE '\
+                    """ + ReviewRuleFingerprint.SCHEME + "%'\n"
                     + """
-              AND f.superseded_at IS NULL
-              AND f.origin <> 'BACKFILL'
-              AND f.agent_job_id = (
-                  SELECT f2.agent_job_id FROM practice_result f2
-                  JOIN practice p2 ON p2.id = f2.practice_id
-                  WHERE f2.workspace_id = f.workspace_id
-                    AND f2.practice_id = f.practice_id
-                    AND f2.about_user_id = f.about_user_id
-                    AND f2.artifact_kind = f.artifact_kind
-                    AND f2.artifact_id = f.artifact_id
-                    AND f2.origin <> 'BACKFILL'
-                    AND f2.superseded_at IS NULL
-            """ + VALID_LATEST_RUN_GUARD + LATEST_RUN_ORDER + """
-                  LIMIT 1
-              )
-            GROUP BY p.slug, p.name
-            ORDER BY p.name ASC
-            """,
+                      AND f.superseded_at IS NULL
+                      AND f.origin <> 'BACKFILL'
+                      AND f.agent_job_id = (
+                          SELECT f2.agent_job_id FROM practice_result f2
+                          JOIN practice p2 ON p2.id = f2.practice_id
+                          WHERE f2.workspace_id = f.workspace_id
+                            AND f2.practice_id = f.practice_id
+                            AND f2.about_user_id = f.about_user_id
+                            AND f2.artifact_kind = f.artifact_kind
+                            AND f2.artifact_id = f.artifact_id
+                            AND f2.origin <> 'BACKFILL'
+                            AND f2.superseded_at IS NULL
+                    """ + VALID_LATEST_RUN_GUARD + LATEST_RUN_ORDER + """
+                          LIMIT 1
+                      )
+                    GROUP BY p.slug, p.name
+                    ORDER BY p.name ASC
+                    """,
             nativeQuery = true)
     List<DeveloperPracticeSummaryProjection> findSummaryByDeveloperAndWorkspace(
             @Param("aboutUserId") Long aboutUserId, @Param("workspaceId") Long workspaceId);
@@ -791,9 +796,10 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      * completion, then job id.
      */
     String LATEST_RUN_ORDER = """
-                   ORDER BY COALESCE((SELECT j.created_at FROM agent_job j
-                       WHERE j.id = f2.agent_job_id AND j.workspace_id = f2.workspace_id
-                         AND f2.origin <> 'BACKFILL' AND""" + " " + PracticeResult.OCCASION_SCOPE + """
+        ORDER BY COALESCE((SELECT j.created_at FROM agent_job j
+            WHERE j.id = f2.agent_job_id AND j.workspace_id = f2.workspace_id
+              AND f2.origin <> 'BACKFILL' AND\
+        """ + " " + PracticeResult.OCCASION_SCOPE + """
                    ), f2.observed_at) DESC, f2.observed_at DESC, f2.agent_job_id DESC
         """;
 
@@ -843,17 +849,18 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      */
     @Query(
             value = OBSERVATION_SELECT + """
-                    JOIN practice p ON p.id = f.practice_id
-                    WHERE f.about_user_id = :aboutUserId
-                      AND f.workspace_id = :workspaceId
-            """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
-              AND f.superseded_at IS NULL
-              AND f.observed_at >= :since
-              AND f.outcome IN (:outcomes)
-              AND f.agent_job_id =""" + LATEST_RUN_OF_CLAIM
+                            JOIN practice p ON p.id = f.practice_id
+                            WHERE f.about_user_id = :aboutUserId
+                              AND f.workspace_id = :workspaceId
+                    """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
+                    AND f.superseded_at IS NULL
+                    AND f.observed_at >= :since
+                    AND f.outcome IN (:outcomes)
+                    AND f.agent_job_id =\
+                    """ + LATEST_RUN_OF_CLAIM
                     + """
-            ORDER BY f.observed_at DESC
-            """,
+                    ORDER BY f.observed_at DESC
+                    """,
             nativeQuery = true)
     List<PracticeResult> findRecentByDeveloperAndWorkspace(
             @Param("aboutUserId") Long aboutUserId,
@@ -869,15 +876,16 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      */
     @Query(
             value = OBSERVATION_SELECT + """
-                    WHERE f.about_user_id = :aboutUserId
-                      AND f.workspace_id = :workspaceId
-            """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
-              AND f.superseded_at IS NULL
-              AND f.observed_at >= :since
-              AND f.agent_job_id <>""" + LATEST_RUN_OF_CLAIM
+                            WHERE f.about_user_id = :aboutUserId
+                              AND f.workspace_id = :workspaceId
+                    """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
+                    AND f.superseded_at IS NULL
+                    AND f.observed_at >= :since
+                    AND f.agent_job_id <>\
+                    """ + LATEST_RUN_OF_CLAIM
                     + """
-            ORDER BY f.observed_at DESC, f.agent_job_id DESC, f.id DESC
-            """,
+                    ORDER BY f.observed_at DESC, f.agent_job_id DESC, f.id DESC
+                    """,
             nativeQuery = true)
     List<PracticeResult> findEarlierRunsByDeveloperAndWorkspace(
             @Param("aboutUserId") Long aboutUserId,
@@ -887,11 +895,11 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
 
     /** Full person history for a job folder, with the existing repository and claim visibility guards. */
     @Query(value = OBSERVATION_SELECT + """
-            WHERE f.about_user_id = :aboutUserId AND f.workspace_id = :workspaceId
-            """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
-              AND f.superseded_at IS NULL AND f.outcome IN ('MET', 'NOT_MET')
-            ORDER BY f.observed_at DESC, f.id DESC
-            """, nativeQuery = true)
+        WHERE f.about_user_id = :aboutUserId AND f.workspace_id = :workspaceId
+        """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
+          AND f.superseded_at IS NULL AND f.outcome IN ('MET', 'NOT_MET')
+        ORDER BY f.observed_at DESC, f.id DESC
+        """, nativeQuery = true)
     List<PracticeResult> findForPersonHistory(
             @Param("aboutUserId") Long aboutUserId, @Param("workspaceId") Long workspaceId);
 
@@ -904,14 +912,14 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      * surface does.
      */
     @Query(value = OBSERVATION_SELECT + """
-                    WHERE f.about_user_id = :aboutUserId
-                      AND f.workspace_id = :workspaceId
-            """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
-              AND f.superseded_at IS NULL
-              AND f.observed_at >= :since
-              AND f.observed_at <= :until
-            ORDER BY f.observed_at DESC
-            """, nativeQuery = true)
+                WHERE f.about_user_id = :aboutUserId
+                  AND f.workspace_id = :workspaceId
+        """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
+          AND f.superseded_at IS NULL
+          AND f.observed_at >= :since
+          AND f.observed_at <= :until
+        ORDER BY f.observed_at DESC
+        """, nativeQuery = true)
     List<PracticeResult> findByDeveloperAndWorkspaceBetween(
             @Param("aboutUserId") Long aboutUserId,
             @Param("workspaceId") Long workspaceId,
@@ -923,14 +931,14 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      * guards, for the caller to partition by {@code about_user_id}. The caller passes at least one developer.
      */
     @Query(value = OBSERVATION_SELECT + """
-                    WHERE f.workspace_id = :workspaceId
-                      AND f.about_user_id IN (:developerIds)
-            """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
-              AND f.superseded_at IS NULL
-              AND f.observed_at >= :since
-              AND f.observed_at <= :until
-            ORDER BY f.observed_at DESC
-            """, nativeQuery = true)
+                WHERE f.workspace_id = :workspaceId
+                  AND f.about_user_id IN (:developerIds)
+        """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
+          AND f.superseded_at IS NULL
+          AND f.observed_at >= :since
+          AND f.observed_at <= :until
+        ORDER BY f.observed_at DESC
+        """, nativeQuery = true)
     List<PracticeResult> findByWorkspaceBetween(
             @Param("workspaceId") Long workspaceId,
             @Param("developerIds") Collection<Long> developerIds,
@@ -945,18 +953,20 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      */
     @Query(
             value = OBSERVATION_SELECT + """
-                    WHERE f.workspace_id = :workspaceId
-                      AND f.about_user_id IN (:developerIds)
-            """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
-              AND f.superseded_at IS NULL
-              AND f.observed_at >= :since
-              AND (f.agent_job_id =""" + LATEST_RUN_OF_CLAIM
+                            WHERE f.workspace_id = :workspaceId
+                              AND f.about_user_id IN (:developerIds)
+                    """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
+                    AND f.superseded_at IS NULL
+                    AND f.observed_at >= :since
+                    AND (f.agent_job_id =\
+                    """ + LATEST_RUN_OF_CLAIM
                     + """
-                   OR (f.origin = 'LIVE' AND f.agent_job_id ="""
+                    OR (f.origin = 'LIVE' AND f.agent_job_id =\
+                    """
                     + LATEST_LIVE_RUN_OF_CLAIM + """
-                  ))
-            ORDER BY f.observed_at DESC
-            """,
+                          ))
+                    ORDER BY f.observed_at DESC
+                    """,
             nativeQuery = true)
     List<PracticeResult> findLatestRunsByWorkspaceSince(
             @Param("workspaceId") Long workspaceId,
@@ -980,20 +990,20 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      * nullable group, which hides the difference instead of stating it.
      */
     @Query(value = """
-                    SELECT f.agent_job_id AS "jobId",
-                           MAX(f.observed_at) AS "reviewedAt",
-                           (ARRAY_AGG(f.artifact_kind ORDER BY f.observed_at DESC, f.id DESC))[1] AS "artifactKind",
-                           (ARRAY_AGG(f.artifact_id ORDER BY f.observed_at DESC, f.id DESC))[1] AS "artifactId"
-                    FROM practice_result f
-                    WHERE f.about_user_id = :aboutUserId
-                      AND f.workspace_id = :workspaceId
-            """ + HIDDEN_REPOSITORY_GUARD + """
-              AND (CAST(:since AS timestamptz) IS NULL OR f.observed_at > CAST(:since AS timestamptz))
-              AND (CAST(:artifactKind AS text) IS NULL OR f.artifact_kind = CAST(:artifactKind AS text))
-            GROUP BY f.agent_job_id
-            HAVING (CAST(:until AS timestamptz) IS NULL OR MAX(f.observed_at) <= CAST(:until AS timestamptz))
-            ORDER BY MAX(f.observed_at) DESC, f.agent_job_id DESC
-            """, nativeQuery = true)
+                SELECT f.agent_job_id AS "jobId",
+                       MAX(f.observed_at) AS "reviewedAt",
+                       (ARRAY_AGG(f.artifact_kind ORDER BY f.observed_at DESC, f.id DESC))[1] AS "artifactKind",
+                       (ARRAY_AGG(f.artifact_id ORDER BY f.observed_at DESC, f.id DESC))[1] AS "artifactId"
+                FROM practice_result f
+                WHERE f.about_user_id = :aboutUserId
+                  AND f.workspace_id = :workspaceId
+        """ + HIDDEN_REPOSITORY_GUARD + """
+          AND (CAST(:since AS timestamptz) IS NULL OR f.observed_at > CAST(:since AS timestamptz))
+          AND (CAST(:artifactKind AS text) IS NULL OR f.artifact_kind = CAST(:artifactKind AS text))
+        GROUP BY f.agent_job_id
+        HAVING (CAST(:until AS timestamptz) IS NULL OR MAX(f.observed_at) <= CAST(:until AS timestamptz))
+        ORDER BY MAX(f.observed_at) DESC, f.agent_job_id DESC
+        """, nativeQuery = true)
     Slice<DeveloperReviewRunRow> findDeveloperReviewRuns(
             @Param("aboutUserId") Long aboutUserId,
             @Param("workspaceId") Long workspaceId,
@@ -1015,11 +1025,11 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
     }
 
     @Query(value = """
-                    SELECT f.id FROM practice_result f
-                    WHERE f.agent_job_id IN :jobIds
-                      AND f.about_user_id = :aboutUserId
-                      AND f.workspace_id = :workspaceId
-            """ + HIDDEN_REPOSITORY_GUARD, nativeQuery = true)
+                SELECT f.id FROM practice_result f
+                WHERE f.agent_job_id IN :jobIds
+                  AND f.about_user_id = :aboutUserId
+                  AND f.workspace_id = :workspaceId
+        """ + HIDDEN_REPOSITORY_GUARD, nativeQuery = true)
     List<UUID> findDeveloperReviewRunResultIds(
             @Param("jobIds") Collection<UUID> jobIds,
             @Param("aboutUserId") Long aboutUserId,
@@ -1049,14 +1059,14 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      * fact behind "first observed", which the look-back-bounded lists above cannot answer.
      */
     @Query(value = """
-                    SELECT p.slug AS "practiceSlug", MIN(f.observed_at) AS "firstObservedAt"
-                    FROM practice_result f
-                    JOIN practice p ON p.id = f.practice_id
-                    WHERE f.about_user_id = :aboutUserId
-                      AND f.workspace_id = :workspaceId
-            """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
-            GROUP BY p.slug
-            """, nativeQuery = true)
+                SELECT p.slug AS "practiceSlug", MIN(f.observed_at) AS "firstObservedAt"
+                FROM practice_result f
+                JOIN practice p ON p.id = f.practice_id
+                WHERE f.about_user_id = :aboutUserId
+                  AND f.workspace_id = :workspaceId
+        """ + HIDDEN_REPOSITORY_GUARD + VALID_CLAIM_GUARD + """
+        GROUP BY p.slug
+        """, nativeQuery = true)
     List<FirstObservedRow> findFirstObservedAtByPractice(
             @Param("aboutUserId") Long aboutUserId, @Param("workspaceId") Long workspaceId);
 
@@ -1115,43 +1125,43 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
 
     @Query(
             value = """
-            SELECT o.id AS "id",
-                   o.agent_job_id AS "agentJobId",
-                   p.slug AS "practiceSlug",
-                   p.name AS "practiceName",
-                   pa.slug AS "groupSlug",
-                   pa.name AS "groupName",
-                   pa.icon AS "groupIcon",
-                   pa.color AS "groupColor",
-                   o.artifact_kind AS "artifactKind",
-                   o.artifact_id AS "artifactId",
-                   o.about_user_id AS "aboutUserId",
-                   o.summary AS "summary",
-                   o.outcome AS "outcome",
-                   o.severity AS "severity",
-                   (SELECT count(*) FROM practice_observation c WHERE c.practice_result_id = o.id) AS "problemCount",
-                   o.origin AS "origin",
-                   o.practice_revision_id AS "practiceRevisionId",
-                   evaluated_revision.review_rule_fingerprint AS "practiceRevisionFingerprint",
-                   current_revision.review_rule_fingerprint AS "currentPracticeRevisionFingerprint",
-                   o.superseded_at AS "supersededAt",
-            """ + INVALIDATED_AT + " AS \"invalidatedAt\"," + DISPUTED_AT + " AS \"disputedAt\"," + """
-                   o.observed_at AS "observedAt"
-            FROM practice_result o
-            JOIN practice p ON p.id = o.practice_id
-            LEFT JOIN practice_revision evaluated_revision ON evaluated_revision.id = o.practice_revision_id
-            LEFT JOIN practice_revision current_revision ON current_revision.id = p.current_revision_id
-            LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
-            WHERE o.workspace_id = :workspaceId
-            """
+                    SELECT o.id AS "id",
+                           o.agent_job_id AS "agentJobId",
+                           p.slug AS "practiceSlug",
+                           p.name AS "practiceName",
+                           pa.slug AS "groupSlug",
+                           pa.name AS "groupName",
+                           pa.icon AS "groupIcon",
+                           pa.color AS "groupColor",
+                           o.artifact_kind AS "artifactKind",
+                           o.artifact_id AS "artifactId",
+                           o.about_user_id AS "aboutUserId",
+                           o.summary AS "summary",
+                           o.outcome AS "outcome",
+                           o.severity AS "severity",
+                           (SELECT count(*) FROM practice_observation c WHERE c.practice_result_id = o.id) AS "problemCount",
+                           o.origin AS "origin",
+                           o.practice_revision_id AS "practiceRevisionId",
+                           evaluated_revision.review_rule_fingerprint AS "practiceRevisionFingerprint",
+                           current_revision.review_rule_fingerprint AS "currentPracticeRevisionFingerprint",
+                           o.superseded_at AS "supersededAt",
+                    """ + INVALIDATED_AT + " AS \"invalidatedAt\"," + DISPUTED_AT + " AS \"disputedAt\"," + """
+                           o.observed_at AS "observedAt"
+                    FROM practice_result o
+                    JOIN practice p ON p.id = o.practice_id
+                    LEFT JOIN practice_revision evaluated_revision ON evaluated_revision.id = o.practice_revision_id
+                    LEFT JOIN practice_revision current_revision ON current_revision.id = p.current_revision_id
+                    LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
+                    WHERE o.workspace_id = :workspaceId
+                    """
                     + OPERATOR_PREDICATES + OPERATOR_ORDER,
             countQuery = """
-            SELECT count(*)
-            FROM practice_result o
-            JOIN practice p ON p.id = o.practice_id
-            LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
-            WHERE o.workspace_id = :workspaceId
-            """ + OPERATOR_PREDICATES,
+                SELECT count(*)
+                FROM practice_result o
+                JOIN practice p ON p.id = o.practice_id
+                LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
+                WHERE o.workspace_id = :workspaceId
+                """ + OPERATOR_PREDICATES,
             nativeQuery = true)
     Page<OperatorResultRow> findForWorkspace(
             @Param("workspaceId") Long workspaceId,
@@ -1358,8 +1368,8 @@ public interface PracticeResultRepository extends JpaRepository<PracticeResult, 
      * <p>Ordered, because callers hand each recipient a slice of a fixed ordinal band and a re-run has to
      * assign the same slices for its idempotency guard to recognise what it already wrote.
      */
-    @Query(
-            "SELECT DISTINCT o.aboutUserId FROM PracticeResult o WHERE o.agentJobId = :agentJobId AND o.workspaceId = :workspaceId ORDER BY o.aboutUserId")
+    @Query("SELECT DISTINCT o.aboutUserId FROM PracticeResult o WHERE o.agentJobId = :agentJobId AND o.workspaceId ="
+            + " :workspaceId ORDER BY o.aboutUserId")
     List<Long> findSubjectUserIdsByAgentJobId(
             @Param("agentJobId") UUID agentJobId, @Param("workspaceId") Long workspaceId);
 }

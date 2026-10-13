@@ -77,6 +77,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -346,6 +348,47 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         assertThat(row.get("pricing_state")).isEqualTo("NO_CHARGE");
     }
 
+    @ParameterizedTest
+    @CsvSource({"40,false,UNPRICED", "0,true,PRICED"})
+    void shouldPreserveUsageCompletenessInTheLedgerWhenAnAttemptCompletes(
+            long tokens, boolean secondReported, String pricingState) {
+        var embedding =
+                binding(AgentPurpose.PRACTICE_EMBEDDING, LlmApiProtocol.OPENAI_EMBEDDINGS, priced("2", "4", null));
+        when(policy.practiceScriptBinding(anyLong(), eq(AgentPurpose.PRACTICE_EMBEDDING), any(), any()))
+                .thenReturn(Optional.of(embedding));
+        AgentJob job = queued(Map.of(ModelKind.EMBEDDING, FrozenModel.from(embedding, resolver)));
+        when(runner.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
+        when(sandbox.execute(any())).thenAnswer(invocation -> {
+            transactions.executeWithoutResult(status -> {
+                jobs.accumulatePracticeScriptUsage(
+                        job.getId(),
+                        0,
+                        new PracticeScriptCallUsage(ModelKind.EMBEDDING, "comment-quality", null, tokens, 0, 0, 0, 0));
+                jobs.accumulatePracticeScriptUsage(
+                        job.getId(),
+                        0,
+                        new PracticeScriptCallUsage(
+                                ModelKind.EMBEDDING, "comment-quality", null, 0, 0, 0, 0, 0, secondReported));
+            });
+            return new SandboxResult(0, Map.of(), "transcript", false, Duration.ofSeconds(1));
+        });
+
+        executor.processJob(job.getId());
+
+        var row = jdbc.queryForMap(
+                "SELECT total_calls, input_tokens, pricing_state, cost_usd FROM llm_usage_event "
+                        + "WHERE source_id = ? AND source_type = 'PRACTICE_SCRIPT_EMBEDDING'",
+                job.getId());
+        assertThat(number(row, "total_calls").intValue()).isEqualTo(2);
+        assertThat(number(row, "input_tokens").longValue()).isEqualTo(tokens);
+        assertThat(row.get("pricing_state")).isEqualTo(pricingState);
+        if (secondReported) {
+            assertThat((BigDecimal) row.get("cost_usd")).isEqualByComparingTo(BigDecimal.ZERO);
+        } else {
+            assertThat(row.get("cost_usd")).isNull();
+        }
+    }
+
     @Test
     @DisplayName("a decision row prices its cache reads at the cache rate that its slot froze, like the review row")
     void shouldPriceThePracticeScriptCacheReadsAtTheCacheRateWhenTheAttemptCompletes() {
@@ -426,12 +469,13 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
                                     .getId());
         }
         byte[] report = """
-                {"schemaVersion":2,"truncated":false,"practices":[{"practiceSlug":"comment-quality",
-                  "program":{"kind":"custom","digest":"%s"},
-                  "models":[{"slot":"decision","need":"required","bound":true,"notRated":{"deadline":2}}],
-                  "status":"ok","stopReason":null,
-                  "calls":{"review":1,"chat":0,"decision":3,"embedding":0,"reranking":0},
-                  "coverageReached":{"reads":2,"truncatedReads":0,"failedReads":0},"durationMs":40}]}""".formatted("ab".repeat(32)).getBytes(StandardCharsets.UTF_8);
+            {"schemaVersion":2,"truncated":false,"practices":[{"practiceSlug":"comment-quality",
+              "program":{"kind":"custom","digest":"%s"},
+              "models":[{"slot":"decision","need":"required","bound":true,"notRated":{"deadline":2}}],
+              "status":"ok","stopReason":null,
+              "calls":{"review":1,"chat":0,"decision":3,"embedding":0,"reranking":0},
+              "coverageReached":{"reads":2,"truncatedReads":0,"failedReads":0},"durationMs":40}]}\
+            """.formatted("ab".repeat(32)).getBytes(StandardCharsets.UTF_8);
         when(runner.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
         when(sandbox.execute(any())).thenAnswer(invocation -> {
             // The practices the attempt admitted, as its preparation records them before the sandbox runs.
@@ -450,9 +494,9 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         executor.processJob(job.getId());
 
         var runs = jdbc.queryForList(
-                "SELECT practice_slug, attempt, status, program_kind, program_digest, stop_reason, practice_revision_id, "
-                        + "CAST(models AS text) AS models, CAST(calls AS text) AS calls "
-                        + "FROM agent_job_practice_script_run WHERE job_id = ? ORDER BY practice_slug",
+                "SELECT practice_slug, attempt, status, program_kind, program_digest, stop_reason,"
+                        + " practice_revision_id, CAST(models AS text) AS models, CAST(calls AS text) AS calls FROM"
+                        + " agent_job_practice_script_run WHERE job_id = ? ORDER BY practice_slug",
                 job.getId());
         assertThat(runs).hasSize(2);
         assertThat(runs.get(0))
@@ -466,10 +510,12 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
                         "practice_revision_id",
                         Objects.requireNonNull(decides.getCurrentRevision()).getId());
         assertThat(mapper.readTree(String.valueOf(runs.get(0).get("models")))).isEqualTo(mapper.readTree("""
-                        [{"purpose":"PRACTICE_DECISION","need":"REQUIRED","bound":true,
-                          "notRated":[{"reason":"DEADLINE","count":2}]}]"""));
+            [{"purpose":"PRACTICE_DECISION","need":"REQUIRED","bound":true,
+              "notRated":[{"reason":"DEADLINE","count":2}]}]\
+            """));
         assertThat(mapper.readTree(String.valueOf(runs.get(0).get("calls")))).isEqualTo(mapper.readTree("""
-                        {"review":1,"chat":0,"decision":3,"embedding":0,"reranking":0}"""));
+            {"review":1,"chat":0,"decision":3,"embedding":0,"reranking":0}\
+            """));
         assertThat(runs.get(1))
                 .containsEntry("practice_slug", "error-handling")
                 .containsEntry("status", "NOT_FINISHED")

@@ -10,7 +10,9 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.ResultFeedbackCounts;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationQueryFilter;
 import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository.OperatorObservationRow;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository.OperatorResultRow;
@@ -18,6 +20,7 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultQueryFilter;
 import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.FeedbackDisputeDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.PracticeResultInvalidationDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.PracticeReviewObservationRowDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewBoundFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewResultDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewResultDetailDTO;
@@ -30,6 +33,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkRefDTO;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -79,6 +83,40 @@ class ReviewResultQueryService {
         return rows.map(row -> ReviewResultDTO.from(
                 row,
                 feedbackCounts.get(row.getId()),
+                ReviewedWorkLabels.ref(
+                        ArtifactKind.of(row.getArtifactKind()), row.getArtifactId(), targets.get(row.getAgentJobId())),
+                subjects));
+    }
+
+    /**
+     * One page of the workspace's observations. Each row carries its summary and place only where its result's
+     * detail would show them ({@link EvidenceAuthorization} for operator review); elsewhere it is flagged instead.
+     */
+    @Transactional(readOnly = true)
+    public Page<PracticeReviewObservationRowDTO> listObservations(
+            Long workspaceId, ResultQueryFilter resultFilter, ObservationQueryFilter filter, Pageable pageable) {
+        Page<OperatorObservationRow> rows =
+                observationRepository.findForWorkspace(workspaceId, resultFilter, filter, pageable);
+        Set<UUID> resultIds = rows.getContent().stream()
+                .map(OperatorObservationRow::getPracticeResultId)
+                .collect(Collectors.toSet());
+        Set<UUID> shown = resultIds.isEmpty()
+                ? Set.of()
+                : evidenceAuthorization.permitsAll(
+                        workspaceId,
+                        practiceResultRepository.findForEvidenceAuthorization(resultIds, workspaceId),
+                        SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW);
+        Map<Long, ReviewSubjectDTO> subjects = subjectResolver.resolve(rows.getContent().stream()
+                .map(OperatorObservationRow::getAboutUserId)
+                .toList());
+        Map<UUID, Target> targets = reviewRunLookup.findTargets(
+                workspaceId,
+                rows.getContent().stream()
+                        .map(OperatorObservationRow::getAgentJobId)
+                        .toList());
+        return rows.map(row -> PracticeReviewObservationRowDTO.from(
+                row,
+                shown.contains(row.getPracticeResultId()),
                 ReviewedWorkLabels.ref(
                         ArtifactKind.of(row.getArtifactKind()), row.getArtifactId(), targets.get(row.getAgentJobId())),
                 subjects));

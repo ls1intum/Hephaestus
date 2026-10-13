@@ -34,7 +34,10 @@ public record PracticeDefinition(
 
         @Nullable PracticePrecondition precondition,
         @NonNull String criteria,
-        @Nullable String practiceScript,
+
+        @Schema(description = PracticeDefinition.PRACTICE_SCRIPT_DESCRIPTION) @Nullable
+        String practiceScript,
+
         @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
         @Nullable String whyItMatters,
         @Nullable String whatGoodLooksLike,
@@ -43,6 +46,9 @@ public record PracticeDefinition(
         @Nullable PracticeVisual visual,
         @Nullable PracticeGuide guide)
         implements CatalogDefinition, ClosedPracticeInput {
+    public static final String PRACTICE_SCRIPT_DESCRIPTION =
+            "TypeScript review program for this practice that returns one result";
+
     public static final int MAX_PRACTICE_SCRIPT_LENGTH = 100_000;
 
     public PracticeDefinition {

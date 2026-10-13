@@ -48,10 +48,16 @@ public record ReviewResultDetailDTO(
 
         @NonNull
         @Schema(
-                description = "How the review that recorded it came about: LIVE from the work itself, MANUAL"
-                        + " requested by a person, BACKFILL over work that predates the connection. A recurring sweep records"
-                        + " LIVE.")
+                description =
+                        "How the review that recorded it came about: LIVE from the work itself, MANUAL requested by a"
+                                + " person, BACKFILL over work that predates the connection. A recurring sweep records"
+                                + " LIVE.")
         ResultOrigin origin,
+
+        @Schema(
+                description = "Whether access to the result's evidence is withheld",
+                requiredMode = Schema.RequiredMode.REQUIRED)
+        boolean evidenceHidden,
 
         @Nullable PracticeResultEvidenceDTO evidence,
         @Nullable String evidenceRationale,
@@ -118,6 +124,7 @@ public record ReviewResultDetailDTO(
                 practiceResult.getOutcome(),
                 practiceResult.getSeverity(),
                 practiceResult.getOrigin(),
+                !includeEvidence,
                 includeEvidence ? PracticeResultEvidenceDTO.from(practiceResult.getEvidence(), problems) : null,
                 practiceResult.getEvidenceRationale(),
                 includeEvidence ? problems.stream().map(ObservationDTO::from).toList() : List.of(),

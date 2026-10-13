@@ -127,9 +127,13 @@ public class PracticeReleaseService {
         EffectiveCatalog catalog = instanceReleases.catalogForDecision();
         Practice practice =
                 practices.findByWorkspaceIdAndSlug(workspaceId, slug).orElse(null);
-        PracticeReleaseProposalDTO proposal = practice == null ? null : proposal(practice, catalog);
         if (practice == null
-                || proposal == null
+                || practice.getAdoptedBaseSource() == null
+                || practice.getAdoptedBaseSource() == AdoptedBaseSource.CURRENT_DEFINITION) {
+            return false;
+        }
+        PracticeReleaseProposalDTO proposal = proposal(practice, catalog);
+        if (proposal == null
                 || !Objects.equals(
                         proposal.base().practiceScript(), proposal.current().practiceScript())
                 || Objects.equals(
@@ -140,9 +144,10 @@ public class PracticeReleaseService {
         try {
             validator.validate(proposal.current().withPracticeScript(script));
         } catch (IllegalArgumentException invalid) {
-            // Thrown past this method, it would roll back every other copy of the workspace on each start.
+            // Thrown past this method, it would roll back every other copy of the workspace on each
+            // start.
             log.warn(
-                    "Kept a practice script the shipped program cannot replace: workspaceId={} slug={} reason={}",
+                    "Kept a practice script the shipped program cannot replace: workspaceId={} slug={}" + " reason={}",
                     workspaceId,
                     slug,
                     invalid.getMessage());

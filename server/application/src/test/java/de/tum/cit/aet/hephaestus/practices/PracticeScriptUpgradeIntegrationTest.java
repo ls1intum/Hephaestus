@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 
 /**
  * The one-shot practice script upgrade as the server runs it after startup: an unchanged copy of a bundled practice
@@ -33,6 +34,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * diverged copy keeps its own.
  */
 @Tag("integration")
+@TestPropertySource(properties = "hephaestus.practices.seed-default-catalog=false")
 class PracticeScriptUpgradeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     /** Two bundled practices of one group, both shipping a practice script. */
@@ -78,7 +80,7 @@ class PracticeScriptUpgradeIntegrationTest extends AbstractWorkspaceIntegrationT
     private JdbcTemplate jdbc;
 
     @Test
-    void shouldMoveAnUnchangedCopyToTheOfferedScriptWhenTheWorkspaceAwaitsTheUpgrade() {
+    void shouldUpgradeAnUnchangedCopyAtStartupWhenCatalogSeedingIsDisabled() {
         WorkspaceContext ctx = pendingWorkspace("script-upgrade-unchanged");
         PracticeDefinition offered = catalog.practice(SLUG).effective();
         String offeredScript = Objects.requireNonNull(offered.practiceScript());
@@ -86,7 +88,7 @@ class PracticeScriptUpgradeIntegrationTest extends AbstractWorkspaceIntegrationT
         Practice before = practice(ctx, SLUG);
         int oldRevision = before.getCurrentRevision().getRevisionNumber();
 
-        manager.upgradePracticeScripts();
+        manager.repairIncompleteInstallations();
 
         Practice upgraded = practice(ctx, SLUG);
         assertThat(upgraded.getPracticeScript()).isEqualTo(offeredScript);
@@ -138,6 +140,50 @@ class PracticeScriptUpgradeIntegrationTest extends AbstractWorkspaceIntegrationT
     }
 
     @Test
+    void shouldKeepTheWorkspaceScriptAndOfferWhenItsOriginalBaseIsUnknown() {
+        WorkspaceContext ctx = pendingWorkspace("script-upgrade-unknown-workspace-base");
+        PracticeDefinition current = catalog.practice(SLUG).effective().withPracticeScript(EDITED_SCRIPT);
+        adopt(ctx, SLUG, current);
+        Practice recovered = practice(ctx, SLUG);
+        recovered.setAdoptedBase(current);
+        recovered.setAdoptedBaseSource(AdoptedBaseSource.CURRENT_DEFINITION);
+        practices.save(recovered);
+        PracticeReleaseProposalDTO offerBefore = releases.get(ctx, SLUG);
+        int oldRevision = recovered.getCurrentRevision().getRevisionNumber();
+
+        manager.upgradePracticeScripts();
+
+        Practice kept = practice(ctx, SLUG);
+        assertThat(kept.getPracticeScript()).isEqualTo(EDITED_SCRIPT);
+        assertThat(kept.getAdoptedBase()).isEqualTo(current);
+        assertThat(kept.getAdoptedBaseSource()).isEqualTo(AdoptedBaseSource.CURRENT_DEFINITION);
+        assertThat(kept.getCurrentRevision().getRevisionNumber()).isEqualTo(oldRevision);
+        assertThat(releases.get(ctx, SLUG).etag()).isEqualTo(offerBefore.etag());
+    }
+
+    @Test
+    void shouldKeepTheInstanceScriptAndOfferWhenItsOriginalBaseIsUnknown() {
+        PracticeDefinition shipped =
+                Objects.requireNonNull(catalog.practice(SLUG).shipped());
+        PracticeDefinition current = shipped.withPracticeScript(EDITED_SCRIPT);
+        CuratedPracticeOverride recovered = new CuratedPracticeOverride(SLUG, Instant.now());
+        recovered.write(current, "unknown-digest", Instant.now());
+        recovered.backfillBase(shipped);
+        overrides.save(recovered);
+        PracticeReleaseProposalDTO offerBefore = instanceReleases.practiceRelease(SLUG);
+        pendingWorkspace("script-upgrade-unknown-instance-base");
+
+        manager.upgradePracticeScripts();
+
+        CuratedPracticeOverride kept = overrides.findBySlug(SLUG).orElseThrow();
+        assertThat(Objects.requireNonNull(kept.definition()).practiceScript()).isEqualTo(EDITED_SCRIPT);
+        assertThat(kept.getAdoptedBase()).isEqualTo(current);
+        assertThat(kept.getAdoptedBaseSource()).isEqualTo(AdoptedBaseSource.CURRENT_DEFINITION);
+        assertThat(catalog.practice(SLUG).effective().practiceScript()).isEqualTo(EDITED_SCRIPT);
+        assertThat(instanceReleases.practiceRelease(SLUG).etag()).isEqualTo(offerBefore.etag());
+    }
+
+    @Test
     void shouldAdoptOnlyTheScriptAndLeaveTheRestOfTheOfferWhenTheOfferChangedOtherFieldsToo() {
         WorkspaceContext ctx = pendingWorkspace("script-upgrade-partial");
         PracticeDefinition offered = catalog.practice(SLUG).effective();
@@ -167,7 +213,8 @@ class PracticeScriptUpgradeIntegrationTest extends AbstractWorkspaceIntegrationT
         manager.upgradePracticeScripts();
         Timestamp firstUpgrade = Objects.requireNonNull(upgradedAt(ctx));
         int upgradedRevision = practice(ctx, SLUG).getCurrentRevision().getRevisionNumber();
-        // An unchanged copy of the retired script that appears after the mark is no longer the upgrade's to move.
+        // An unchanged copy of the retired script that appears after the mark is no longer the
+        // upgrade's to move.
         adopt(ctx, OTHER, catalog.practice(OTHER).effective().withPracticeScript(RETIRED_SCRIPT));
         int otherRevision = practice(ctx, OTHER).getCurrentRevision().getRevisionNumber();
 
@@ -277,7 +324,7 @@ class PracticeScriptUpgradeIntegrationTest extends AbstractWorkspaceIntegrationT
 
     private @Nullable Timestamp upgradedAt(WorkspaceContext ctx) {
         return jdbc.queryForObject(
-                "SELECT practice_scripts_upgraded_at FROM practice_catalog_installation WHERE workspace_id = ?",
+                "SELECT practice_scripts_upgraded_at FROM practice_catalog_installation WHERE workspace_id" + " = ?",
                 Timestamp.class,
                 ctx.id());
     }

@@ -11,13 +11,8 @@ public record AgentJobLlmUsage(
         int reasoningTokens,
         int cacheReadTokens,
         int cacheWriteTokens) {
-    /** A call alone is not spend: there must also be a non-zero token bucket to price. */
-    public boolean hasBillableUsage() {
-        return (totalCalls > 0
-                && (inputTokens > 0
-                        || outputTokens > 0
-                        || reasoningTokens > 0
-                        || cacheReadTokens > 0
-                        || cacheWriteTokens > 0));
+    /** The proxy increments the call count only for reported usage, including a reported zero. */
+    public boolean hasReportedUsage() {
+        return totalCalls > 0;
     }
 }

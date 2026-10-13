@@ -50,6 +50,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
+import org.hibernate.Hibernate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -161,6 +162,23 @@ class PracticeResultRepositoryIntegrationTest extends BaseIntegrationTest {
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
         practice.setCurrentRevision(revision);
         return practiceRepository.save(practice);
+    }
+
+    @Test
+    @Transactional
+    void shouldLoadEvidenceWithoutPracticeRevisionsWhenAuthorizingResults() {
+        UUID id = insertSummaryResult(agentJob, Objects.requireNonNull(practice.getCurrentRevision()), Instant.now());
+        entityManager.flush();
+        entityManager.clear();
+
+        var loaded = practiceResultRepository.findForEvidenceAuthorization(List.of(id), workspace.getId());
+
+        assertThat(loaded).singleElement().satisfies(result -> {
+            assertThat(result.getId()).isEqualTo(id);
+            assertThat(Hibernate.isInitialized(result.getPractice().getCurrentRevision()))
+                    .isFalse();
+            assertThat(Hibernate.isInitialized(result.getPracticeRevision())).isFalse();
+        });
     }
 
     @ParameterizedTest
@@ -612,13 +630,16 @@ class PracticeResultRepositoryIntegrationTest extends BaseIntegrationTest {
         void shouldStoreTheScopeExampleCoverageAndProvenanceWhenInserted() {
             UUID id = UUID.randomUUID();
             String example = """
-                    {"citation":{"sourceKind":"scm.pull-request.core","artifactPath":"context/pull_request.json",\
-                    "path":"pull_request.json","startLine":1,"endLine":1,"quote":"## Testing"},\
-                    "note":"The description says how the change was tested."}""";
+                {"citation":{"sourceKind":"scm.pull-request.core","artifactPath":"context/pull_request.json",\
+                "path":"pull_request.json","startLine":1,"endLine":1,"quote":"## Testing"},\
+                "note":"The description says how the change was tested."}\
+                """;
             String coverage = """
-                    {"source":"host","complete":true,"reads":3,"truncatedReads":0,"failedReads":0,"omitted":[]}""";
+                {"source":"host","complete":true,"reads":3,"truncatedReads":0,"failedReads":0,"omitted":[]}\
+                """;
             String provenance = """
-                    {"jobId":"%s","attempt":1,"program":{"kind":"BUILTIN","digest":null}}""".formatted(agentJob.getId());
+                {"jobId":"%s","attempt":1,"program":{"kind":"BUILTIN","digest":null}}\
+                """.formatted(agentJob.getId());
 
             assertThat(practiceResultRepository.insertIfAbsent(
                             id,
@@ -725,8 +746,9 @@ class PracticeResultRepositoryIntegrationTest extends BaseIntegrationTest {
 
         private static String citations(String path, int line) {
             return """
-                    [{"sourceKind":"scm.pull-request.diff","artifactPath":"context/diff.patch","path":"%s",\
-                    "side":"NEW","startLine":%d,"endLine":%d,"quote":"catch (Exception e) {}"}]""".formatted(path, line, line);
+                [{"sourceKind":"scm.pull-request.diff","artifactPath":"context/diff.patch","path":"%s",\
+                "side":"NEW","startLine":%d,"endLine":%d,"quote":"catch (Exception e) {}"}]\
+                """.formatted(path, line, line);
         }
 
         @Test
@@ -1278,10 +1300,10 @@ class PracticeResultRepositoryIntegrationTest extends BaseIntegrationTest {
             Workspace other = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("invalidation-other"));
 
             assertThatThrownBy(() -> jdbcTemplate.update("""
-                            INSERT INTO practice_result_invalidation (id, workspace_id, practice_result_id, reason,
-                                invalidated_by_account_id, invalidated_at, provider_copy)
-                            VALUES (?, ?, ?, 'Wrong', 1, now(), 'PENDING')
-                            """, UUID.randomUUID(), other.getId(), practiceResultId))
+                INSERT INTO practice_result_invalidation (id, workspace_id, practice_result_id, reason,
+                    invalidated_by_account_id, invalidated_at, provider_copy)
+                VALUES (?, ?, ?, 'Wrong', 1, now(), 'PENDING')
+                """, UUID.randomUUID(), other.getId(), practiceResultId))
                     .isInstanceOf(DataIntegrityViolationException.class);
         }
 

@@ -10,6 +10,8 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import liquibase.Contexts;
 import liquibase.LabelExpression;
@@ -17,10 +19,13 @@ import liquibase.Liquibase;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
+import org.awaitility.Awaitility;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Runs the practice result cutover from the released schema over populated rows: {@code master.xml} up to the
@@ -40,46 +45,46 @@ class PracticeResultCutoverMigrationTest {
 
     /** The rows as the released server wrote them. */
     private static final String RELEASED_ROWS = """
-            INSERT INTO workspace(id,account_login,account_type,display_name,slug,status)
-            VALUES (992101,'cutover','ORG','Cutover','result-cutover','ACTIVE'),
-                   (992201,'other','ORG','Other','result-cutover-other','ACTIVE');
-            INSERT INTO identity_provider(id,type,server_url) VALUES (992102,'GITHUB','https://result-cutover.example');
-            INSERT INTO "user"(id,native_id,provider_id,login) VALUES (992103,992103,992102,'developer'), (992104,992104,992102,'reviewer');
-            INSERT INTO agent_job(id,workspace_id,job_type,status,config_snapshot,job_token,retry_count,created_at,available_at,trace_id,metadata)
-            VALUES ('00000000-0000-0000-0000-000000992111',992101,'PRACTICE_REVIEW','COMPLETED','{}','t1',0,now(),now(),repeat('a',32),'{}'),
-                   ('00000000-0000-0000-0000-000000992112',992101,'PRACTICE_REVIEW','COMPLETED','{}','t2',0,now(),now(),repeat('b',32),'{"review_id": 4242}');
-            INSERT INTO practice(id,workspace_id,slug,name,criteria,created_at,automated_review_policy,delivery_behavior,signals,evidence_requirements,review_when,subject)
-            VALUES (992121,992101,'explains-why','Explains why','The change explains why.',now(),'{}','{}','["scm.pull_request.created"]','[]','{}','AUTHOR');
-            INSERT INTO practice_revision(id,practice_id,revision_number,created_at,slug,name,applies_to,signals,evidence_requirements,review_when,subject,criteria,automated_review_policy,delivery_behavior)
-            SELECT 992131,id,1,now(),slug,name,applies_to,signals,evidence_requirements,review_when,subject,criteria,automated_review_policy,delivery_behavior FROM practice WHERE id=992121;
-            UPDATE practice SET current_revision_id=992131 WHERE id=992121;
-            INSERT INTO practice(id,workspace_id,slug,name,criteria,created_at,automated_review_policy,delivery_behavior,signals,evidence_requirements,review_when,subject)
-            VALUES (992122,992101,'reviews-risk','Reviews risk','The review weighs the risk.',now(),'{}','{}','["scm.pull_request.reviewed"]','[]','{}','REVIEWER');
-            INSERT INTO practice_revision(id,practice_id,revision_number,created_at,slug,name,applies_to,signals,evidence_requirements,review_when,subject,criteria,automated_review_policy,delivery_behavior)
-            SELECT 992132,id,1,now(),slug,name,applies_to,signals,evidence_requirements,review_when,subject,criteria,automated_review_policy,delivery_behavior FROM practice WHERE id=992122;
-            UPDATE practice SET current_revision_id=992132 WHERE id=992122;
-            INSERT INTO observation(id,occurrence_key,agent_job_id,workspace_id,practice_id,practice_revision_id,artifact_kind,artifact_id,about_user_id,summary,outcome,severity,evidence,evidence_rationale,recurrence_key,observed_at)
-            VALUES
-             ('00000000-0000-0000-0000-000000992141','occ-met','00000000-0000-0000-0000-000000992111',992101,992121,992131,'scm.pull_request',77,992103,'Explains the motivation','MET',NULL,
-              '{"citations":[{"sourceKind":"scm.pull-request.core","artifactPath":"context/metadata.json","path":"metadata.json","startLine":3,"endLine":3,"quote":"Why: retries"}]}','The body says why.',NULL,now()),
-             ('00000000-0000-0000-0000-000000992142','occ-not-met','00000000-0000-0000-0000-000000992111',992101,992121,992131,'scm.pull_request',77,992103,'No reason given','NOT_MET','MAJOR',
-              '{"citations":[{"sourceKind":"scm.pull-request.diff","artifactPath":"context/diff.patch","path":"src/App.java","side":"NEW","startLine":9,"endLine":9,"quote":"retry();"}]}','The change adds a retry without saying why.','rk-legacy',now()),
-             ('00000000-0000-0000-0000-000000992143','occ-not-met-bare','00000000-0000-0000-0000-000000992112',992101,992122,992132,'scm.pull_request',77,992104,'Review skipped the risk','NOT_MET','MINOR',
-              NULL,NULL,NULL,now()),
-             ('00000000-0000-0000-0000-000000992144','occ-undetermined','00000000-0000-0000-0000-000000992111',992101,992121,992131,'scm.pull_request',78,992103,'Cannot tell','UNDETERMINED',NULL,
-              '{"citations":[],"undecidability":{"question":"Was the retry discussed elsewhere?"}}',NULL,NULL,now());
-            INSERT INTO observation_invalidation(id,invalidated_at,observation_id,provider_copy,provider_copy_retry_at,reason,workspace_id)
-            VALUES ('00000000-0000-0000-0000-000000992151',now(),'00000000-0000-0000-0000-000000992142','NONE',now(),'Wrong file',992101);
-            INSERT INTO feedback(id,agent_job_id,workspace_id,recipient_user_id,about_user_id,channel,"position",delivery_state,source,created_at,delivered_at,body)
-            VALUES ('00000000-0000-0000-0000-000000992161','00000000-0000-0000-0000-000000992111',992101,992103,992103,'IN_CONTEXT',0,'DELIVERED','AGENT',now(),now(),'Say why.');
-            INSERT INTO feedback_observation(feedback_id,observation_id,role,ordinal)
-            VALUES ('00000000-0000-0000-0000-000000992161','00000000-0000-0000-0000-000000992142','PRIMARY',0),
-                   ('00000000-0000-0000-0000-000000992161','00000000-0000-0000-0000-000000992141','SUPPORTING',1);
-            INSERT INTO agent_job_practice_script_run(job_id,attempt,practice_slug,workspace_id,practice_revision_id,status,leads,models,finished_at,duration_ms,error)
-            VALUES ('00000000-0000-0000-0000-000000992111',0,'explains-why',992101,992131,'OK',2,'[]',now(),10,NULL),
-                   ('00000000-0000-0000-0000-000000992112',0,'explains-why',992101,992131,'TIMED_OUT',0,NULL,now(),60000,'Timed out');
-            INSERT INTO practice_catalog_installation(workspace_id,installed_at) VALUES (992101, now());
-            """;
+        INSERT INTO workspace(id,account_login,account_type,display_name,slug,status)
+        VALUES (992101,'cutover','ORG','Cutover','result-cutover','ACTIVE'),
+               (992201,'other','ORG','Other','result-cutover-other','ACTIVE');
+        INSERT INTO identity_provider(id,type,server_url) VALUES (992102,'GITHUB','https://result-cutover.example');
+        INSERT INTO "user"(id,native_id,provider_id,login) VALUES (992103,992103,992102,'developer'), (992104,992104,992102,'reviewer');
+        INSERT INTO agent_job(id,workspace_id,job_type,status,config_snapshot,job_token,retry_count,created_at,available_at,trace_id,metadata)
+        VALUES ('00000000-0000-0000-0000-000000992111',992101,'PRACTICE_REVIEW','COMPLETED','{}','t1',0,now(),now(),repeat('a',32),'{}'),
+               ('00000000-0000-0000-0000-000000992112',992101,'PRACTICE_REVIEW','COMPLETED','{}','t2',0,now(),now(),repeat('b',32),'{"review_id": 4242}');
+        INSERT INTO practice(id,workspace_id,slug,name,criteria,created_at,automated_review_policy,delivery_behavior,signals,evidence_requirements,review_when,subject)
+        VALUES (992121,992101,'explains-why','Explains why','The change explains why.',now(),'{}','{}','["scm.pull_request.created"]','[]','{}','AUTHOR');
+        INSERT INTO practice_revision(id,practice_id,revision_number,created_at,slug,name,applies_to,signals,evidence_requirements,review_when,subject,criteria,automated_review_policy,delivery_behavior)
+        SELECT 992131,id,1,now(),slug,name,applies_to,signals,evidence_requirements,review_when,subject,criteria,automated_review_policy,delivery_behavior FROM practice WHERE id=992121;
+        UPDATE practice SET current_revision_id=992131 WHERE id=992121;
+        INSERT INTO practice(id,workspace_id,slug,name,criteria,created_at,automated_review_policy,delivery_behavior,signals,evidence_requirements,review_when,subject)
+        VALUES (992122,992101,'reviews-risk','Reviews risk','The review weighs the risk.',now(),'{}','{}','["scm.pull_request.reviewed"]','[]','{}','REVIEWER');
+        INSERT INTO practice_revision(id,practice_id,revision_number,created_at,slug,name,applies_to,signals,evidence_requirements,review_when,subject,criteria,automated_review_policy,delivery_behavior)
+        SELECT 992132,id,1,now(),slug,name,applies_to,signals,evidence_requirements,review_when,subject,criteria,automated_review_policy,delivery_behavior FROM practice WHERE id=992122;
+        UPDATE practice SET current_revision_id=992132 WHERE id=992122;
+        INSERT INTO observation(id,occurrence_key,agent_job_id,workspace_id,practice_id,practice_revision_id,artifact_kind,artifact_id,about_user_id,summary,outcome,severity,evidence,evidence_rationale,recurrence_key,observed_at)
+        VALUES
+         ('00000000-0000-0000-0000-000000992141','occ-met','00000000-0000-0000-0000-000000992111',992101,992121,992131,'scm.pull_request',77,992103,'Explains the motivation','MET',NULL,
+          '{"citations":[{"sourceKind":"scm.pull-request.core","artifactPath":"context/metadata.json","path":"metadata.json","startLine":3,"endLine":3,"quote":"Why: retries"}]}','The body says why.',NULL,now()),
+         ('00000000-0000-0000-0000-000000992142','occ-not-met','00000000-0000-0000-0000-000000992111',992101,992121,992131,'scm.pull_request',77,992103,'No reason given','NOT_MET','MAJOR',
+          '{"citations":[{"sourceKind":"scm.pull-request.diff","artifactPath":"context/diff.patch","path":"src/App.java","side":"NEW","startLine":9,"endLine":9,"quote":"retry();"}]}','The change adds a retry without saying why.','rk-legacy',now()),
+         ('00000000-0000-0000-0000-000000992143','occ-not-met-bare','00000000-0000-0000-0000-000000992112',992101,992122,992132,'scm.pull_request',77,992104,'Review skipped the risk','NOT_MET','MINOR',
+          NULL,NULL,NULL,now()),
+         ('00000000-0000-0000-0000-000000992144','occ-undetermined','00000000-0000-0000-0000-000000992111',992101,992121,992131,'scm.pull_request',78,992103,'Cannot tell','UNDETERMINED',NULL,
+          '{"citations":[],"undecidability":{"question":"Was the retry discussed elsewhere?"}}',NULL,NULL,now());
+        INSERT INTO observation_invalidation(id,invalidated_at,observation_id,provider_copy,provider_copy_retry_at,reason,workspace_id)
+        VALUES ('00000000-0000-0000-0000-000000992151',now(),'00000000-0000-0000-0000-000000992142','NONE',now(),'Wrong file',992101);
+        INSERT INTO feedback(id,agent_job_id,workspace_id,recipient_user_id,about_user_id,channel,"position",delivery_state,source,created_at,delivered_at,body)
+        VALUES ('00000000-0000-0000-0000-000000992161','00000000-0000-0000-0000-000000992111',992101,992103,992103,'IN_CONTEXT',0,'DELIVERED','AGENT',now(),now(),'Say why.');
+        INSERT INTO feedback_observation(feedback_id,observation_id,role,ordinal)
+        VALUES ('00000000-0000-0000-0000-000000992161','00000000-0000-0000-0000-000000992142','PRIMARY',0),
+               ('00000000-0000-0000-0000-000000992161','00000000-0000-0000-0000-000000992141','SUPPORTING',1);
+        INSERT INTO agent_job_practice_script_run(job_id,attempt,practice_slug,workspace_id,practice_revision_id,status,leads,models,finished_at,duration_ms,error)
+        VALUES ('00000000-0000-0000-0000-000000992111',0,'explains-why',992101,992131,'OK',2,'[]',now(),10,NULL),
+               ('00000000-0000-0000-0000-000000992112',0,'explains-why',992101,992131,'TIMED_OUT',0,NULL,now(),60000,'Timed out');
+        INSERT INTO practice_catalog_installation(workspace_id,installed_at) VALUES (992101, now());
+        """;
 
     @BeforeAll
     static void migrateFromTheReleasedSchema() throws Exception {
@@ -102,14 +107,14 @@ class PracticeResultCutoverMigrationTest {
         assertThat(column("SELECT id::text FROM practice_result ORDER BY id"))
                 .containsExactly(MET, NOT_MET, BARE_NOT_MET, UNDETERMINED);
         assertThat(column("""
-                SELECT table_name::text FROM information_schema.tables
-                WHERE table_schema = 'public'
-                  AND table_name IN ('observation', 'observation_invalidation', 'feedback_observation')
-                """)).isEmpty();
+            SELECT table_name::text FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name IN ('observation', 'observation_invalidation', 'feedback_observation')
+            """)).isEmpty();
         assertThat(column("""
-                SELECT column_name::text FROM information_schema.columns
-                WHERE table_schema = 'public' AND table_name = 'practice_result' AND column_name = 'recurrence_key'
-                """)).isEmpty();
+            SELECT column_name::text FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'practice_result' AND column_name = 'recurrence_key'
+            """)).isEmpty();
         assertThat(column("SELECT practice_result_id::text FROM practice_result_invalidation"))
                 .containsExactly(NOT_MET);
     }
@@ -117,18 +122,20 @@ class PracticeResultCutoverMigrationTest {
     @Test
     void shouldGiveEveryNegativeOneProblemUnderANewIdWhenMigrated() throws Exception {
         assertThat(column("""
-                SELECT practice_result_id || '|' || position || '|' || severity || '|' || summary || '|' || explanation
-                       || '|' || jsonb_array_length(citations) || '|' || coalesce(recurrence_key, '-')
-                FROM practice_observation ORDER BY practice_result_id
-                """))
+            SELECT practice_result_id || '|' || position || '|' || severity || '|' || summary || '|' || explanation
+                   || '|' || jsonb_array_length(citations) || '|' || coalesce(recurrence_key, '-')
+            FROM practice_observation ORDER BY practice_result_id
+            """))
                 .containsExactly(
-                        NOT_MET + "|0|MAJOR|No reason given|The change adds a retry without saying why.|1|rk-legacy",
+                        NOT_MET
+                                + "|0|MAJOR|No reason given|The change adds a retry without saying"
+                                + " why.|1|rk-legacy",
                         BARE_NOT_MET + "|0|MINOR|Review skipped the risk|Review skipped the risk|0|-");
         assertThat(column("""
-                SELECT (o.citations = r.evidence->'citations')::text
-                FROM practice_observation o JOIN practice_result r ON r.id = o.practice_result_id
-                WHERE o.practice_result_id = '%s'
-                """.formatted(NOT_MET))).containsExactly("true");
+            SELECT (o.citations = r.evidence->'citations')::text
+            FROM practice_observation o JOIN practice_result r ON r.id = o.practice_result_id
+            WHERE o.practice_result_id = '%s'
+            """.formatted(NOT_MET))).containsExactly("true");
         assertThat(column("SELECT count(*) FROM practice_observation WHERE id::text IN ('%s', '%s')"
                         .formatted(NOT_MET, BARE_NOT_MET)))
                 .containsExactly("0");
@@ -153,9 +160,9 @@ class PracticeResultCutoverMigrationTest {
     @Test
     void shouldKeepTheDeliveredEvidenceWithoutDeliveringItAgainWhenMigrated() throws Exception {
         assertThat(column("""
-                SELECT practice_result_id || '|' || workspace_id || '|' || role || '|' || (observation_id IS NULL)
-                FROM feedback_evidence ORDER BY ordinal
-                """)).containsExactly(NOT_MET + "|992101|PRIMARY|true", MET + "|992101|SUPPORTING|true");
+            SELECT practice_result_id || '|' || workspace_id || '|' || role || '|' || (observation_id IS NULL)
+            FROM feedback_evidence ORDER BY ordinal
+            """)).containsExactly(NOT_MET + "|992101|PRIMARY|true", MET + "|992101|SUPPORTING|true");
         assertThat(column("SELECT count(DISTINCT id) FROM feedback_evidence")).containsExactly("2");
         assertThat(column("SELECT id || '|' || delivery_state FROM feedback")).containsExactly(FEEDBACK + "|DELIVERED");
         assertThat(column("SELECT count(*) FROM agent_job")).containsExactly("2");
@@ -164,13 +171,13 @@ class PracticeResultCutoverMigrationTest {
     @Test
     void shouldCloseTheReleasedScriptRunsInTheNewVocabularyWhenMigrated() throws Exception {
         assertThat(column("""
-                SELECT status || '|' || coalesce(stop_reason, '-') || '|' || program_kind
-                FROM agent_job_practice_script_run ORDER BY job_id
-                """)).containsExactly("OK|-|CUSTOM", "FAILED|DEADLINE|CUSTOM");
+            SELECT status || '|' || coalesce(stop_reason, '-') || '|' || program_kind
+            FROM agent_job_practice_script_run ORDER BY job_id
+            """)).containsExactly("OK|-|CUSTOM", "FAILED|DEADLINE|CUSTOM");
         assertThat(column("""
-                SELECT column_name::text FROM information_schema.columns
-                WHERE table_schema = 'public' AND table_name = 'agent_job_practice_script_run' AND column_name = 'leads'
-                """)).isEmpty();
+            SELECT column_name::text FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'agent_job_practice_script_run' AND column_name = 'leads'
+            """)).isEmpty();
         // The one-shot script upgrade still owes this workspace its pass.
         assertThat(column("SELECT (practice_scripts_upgraded_at IS NULL)::text FROM practice_catalog_installation"
                         + " WHERE workspace_id = 992101"))
@@ -209,25 +216,149 @@ class PracticeResultCutoverMigrationTest {
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("fk_practice_observation_result");
         assertThatThrownBy(() -> execute("""
-                        INSERT INTO feedback_evidence(id, feedback_id, practice_result_id, workspace_id, role, ordinal)
-                        VALUES (gen_random_uuid(), '%s', '%s', 992201, 'PRIMARY', 3)
-                        """.formatted(FEEDBACK, UNDETERMINED)))
+            INSERT INTO feedback_evidence(id, feedback_id, practice_result_id, workspace_id, role, ordinal)
+            VALUES (gen_random_uuid(), '%s', '%s', 992201, 'PRIMARY', 3)
+            """.formatted(FEEDBACK, UNDETERMINED)))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("sfk_feedback_evidence_feedback_workspace");
         assertThatThrownBy(() -> execute("""
-                        INSERT INTO feedback_evidence(id, feedback_id, practice_result_id, observation_id, workspace_id,
-                                                      role, ordinal)
-                        SELECT gen_random_uuid(), '%s', '%s', id, 992101, 'PRIMARY', 2
-                        FROM practice_observation WHERE practice_result_id = '%s'
-                        """.formatted(FEEDBACK, MET, NOT_MET)))
+            INSERT INTO feedback_evidence(id, feedback_id, practice_result_id, observation_id, workspace_id,
+                                          role, ordinal)
+            SELECT gen_random_uuid(), '%s', '%s', id, 992101, 'PRIMARY', 2
+            FROM practice_observation WHERE practice_result_id = '%s'
+            """.formatted(FEEDBACK, MET, NOT_MET)))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("sfk_feedback_evidence_observation");
         assertThatThrownBy(() -> execute("""
-                        INSERT INTO feedback_evidence(id, feedback_id, practice_result_id, workspace_id, role, ordinal)
-                        VALUES (gen_random_uuid(), '%s', '%s', 992101, 'PRIMARY', 4)
-                        """.formatted(FEEDBACK, MET)))
+            INSERT INTO feedback_evidence(id, feedback_id, practice_result_id, workspace_id, role, ordinal)
+            VALUES (gen_random_uuid(), '%s', '%s', 992101, 'PRIMARY', 4)
+            """.formatted(FEEDBACK, MET)))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("uk_feedback_evidence_ref");
+    }
+
+    @Test
+    void shouldRefuseTheLastChildDeletionWhenTheTransactionCommits() {
+        assertThatThrownBy(() ->
+                        execute("DELETE FROM practice_observation WHERE practice_result_id = '%s'".formatted(NOT_MET)))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("has 0 observations");
+    }
+
+    @Test
+    void shouldRefuseReparentingThatLeavesANegativeEmptyWhenTheTransactionCommits() {
+        assertThatThrownBy(() -> execute(
+                        "UPDATE practice_observation SET practice_result_id = '%s', position = 1 WHERE practice_result_id = '%s'"
+                                .formatted(BARE_NOT_MET, NOT_MET)))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("has 0 observations");
+        String extraId = "00000000-0000-0000-0000-000000992193";
+        assertThatThrownBy(() -> execute(
+                        problem(extraId, NOT_MET, 992101, 1, "MINOR"),
+                        "UPDATE practice_observation SET practice_result_id = '%s' WHERE id = '%s'"
+                                .formatted(MET, extraId)))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("outcome is MET");
+    }
+
+    @Test
+    void shouldAllowReparentingWhenBothResultsKeepAnObservation() throws Exception {
+        String extraId = "00000000-0000-0000-0000-000000992194";
+        try {
+            execute(
+                    problem(extraId, NOT_MET, 992101, 1, "MINOR"),
+                    "UPDATE practice_observation SET practice_result_id = '%s' WHERE id = '%s'"
+                            .formatted(BARE_NOT_MET, extraId));
+            assertThat(column("SELECT practice_result_id::text FROM practice_observation WHERE id = '%s'"
+                            .formatted(extraId)))
+                    .containsExactly(BARE_NOT_MET);
+        } finally {
+            execute("DELETE FROM practice_observation WHERE id = '%s'".formatted(extraId));
+        }
+    }
+
+    @Test
+    void shouldRefuseRaisingAChildAboveItsResultWhenTheTransactionCommits() {
+        assertThatThrownBy(() ->
+                        execute("UPDATE practice_observation SET severity = 'CRITICAL' WHERE practice_result_id = '%s'"
+                                .formatted(NOT_MET)))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("less severe");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {Connection.TRANSACTION_READ_COMMITTED, Connection.TRANSACTION_REPEATABLE_READ})
+    void shouldKeepOneChildWhenConcurrentTransactionsDeleteDifferentChildren(int isolation) throws Exception {
+        String resultId = "00000000-0000-0000-0000-000000992190";
+        String firstId = "00000000-0000-0000-0000-000000992191";
+        String secondId = "00000000-0000-0000-0000-000000992192";
+        execute(
+                result(resultId),
+                problem(firstId, resultId, 992101, 0, "MINOR"),
+                problem(secondId, resultId, 992101, 1, "MINOR"));
+        try (Connection first = connect();
+                Connection second = connect();
+                var pool = Executors.newSingleThreadExecutor()) {
+            first.setTransactionIsolation(isolation);
+            second.setTransactionIsolation(isolation);
+            first.setAutoCommit(false);
+            second.setAutoCommit(false);
+            try (var firstStatement = first.createStatement();
+                    var secondStatement = second.createStatement()) {
+                firstStatement.execute("DELETE FROM practice_observation WHERE id = '%s'".formatted(firstId));
+                secondStatement.execute("DELETE FROM practice_observation WHERE id = '%s'".formatted(secondId));
+                int secondPid;
+                try (var pid = secondStatement.executeQuery("SELECT pg_backend_pid()")) {
+                    assertThat(pid.next()).isTrue();
+                    secondPid = pid.getInt(1);
+                }
+                firstStatement.execute("SET CONSTRAINTS ALL IMMEDIATE");
+                var checked = pool.submit(() -> {
+                    try {
+                        secondStatement.execute("SET CONSTRAINTS ALL IMMEDIATE");
+                        second.commit();
+                        return "committed";
+                    } catch (SQLException exception) {
+                        second.rollback();
+                        return exception.getSQLState();
+                    }
+                });
+                try {
+                    Awaitility.await().atMost(10, TimeUnit.SECONDS).until(() -> {
+                        try (var blocked = firstStatement.executeQuery(
+                                "SELECT cardinality(pg_blocking_pids(%d)) > 0".formatted(secondPid))) {
+                            return blocked.next() && blocked.getBoolean(1);
+                        }
+                    });
+                    first.commit();
+                    assertThat(checked.get(10, TimeUnit.SECONDS))
+                            .isEqualTo(isolation == Connection.TRANSACTION_REPEATABLE_READ ? "40001" : "23514");
+                } finally {
+                    first.rollback();
+                }
+            }
+            assertThat(column("SELECT id::text FROM practice_observation WHERE practice_result_id = '%s'"
+                            .formatted(resultId)))
+                    .containsExactly(secondId);
+        } finally {
+            execute("DELETE FROM practice_result WHERE id = '%s'".formatted(resultId));
+        }
+    }
+
+    @Test
+    void shouldRefuseScriptRunsAndUsageOfAnotherWorkspaceWhenTheTransactionCommits() {
+        assertThatThrownBy(() -> execute("""
+            INSERT INTO agent_job_practice_script_usage(job_id, attempt, model_kind, practice_slug, workspace_id, calls, input_tokens, output_tokens)
+            VALUES ('%s', 0, 'CHAT', 'explains-why', 992201, 1, 1, 1)
+            """.formatted(JOB)))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("sfk_agent_job_practice_script_usage_job_workspace");
+        assertThatThrownBy(() -> execute("""
+            INSERT INTO agent_job_practice_script_run(job_id, attempt, practice_slug, workspace_id, status, program_kind, finished_at)
+            VALUES ('%s', 0, 'other-practice', 992201, 'OK', 'CUSTOM', now())
+            """.formatted(JOB)))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("sfk_agent_job_practice_script_run_job_workspace");
     }
 
     @Test
@@ -241,20 +372,20 @@ class PracticeResultCutoverMigrationTest {
     /** A new negative about the seeded pull request, written without its problems. */
     private static String result(String id) {
         return """
-                INSERT INTO practice_result(id, occurrence_key, agent_job_id, workspace_id, practice_id, artifact_kind,
-                                            artifact_id, about_user_id, summary, outcome, severity, observed_at,
-                                            scope_key)
-                VALUES ('%s', 'occ-%s', '%s', 992101, 992121, 'scm.pull_request', 79, 992103, 'New', 'NOT_MET', 'MINOR',
-                        now(), 'scm.pull_request:79:AUTHOR')
-                """.formatted(id, id, JOB);
+            INSERT INTO practice_result(id, occurrence_key, agent_job_id, workspace_id, practice_id, artifact_kind,
+                                        artifact_id, about_user_id, summary, outcome, severity, observed_at,
+                                        scope_key)
+            VALUES ('%s', 'occ-%s', '%s', 992101, 992121, 'scm.pull_request', 79, 992103, 'New', 'NOT_MET', 'MINOR',
+                    now(), 'scm.pull_request:79:AUTHOR')
+            """.formatted(id, id, JOB);
     }
 
     private static String problem(String id, String resultId, long workspaceId, int position, String severity) {
         return """
-                INSERT INTO practice_observation(id, workspace_id, practice_result_id, position, severity, summary,
-                                                 explanation, citations)
-                VALUES ('%s', %d, '%s', %d, '%s', 'A problem', 'Why it is one', '[]')
-                """.formatted(id, workspaceId, resultId, position, severity);
+            INSERT INTO practice_observation(id, workspace_id, practice_result_id, position, severity, summary,
+                                             explanation, citations)
+            VALUES ('%s', %d, '%s', %d, '%s', 'A problem', 'Why it is one', '[]')
+            """.formatted(id, workspaceId, resultId, position, severity);
     }
 
     private static void execute(String... statements) throws SQLException {

@@ -13,13 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
-import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,37 +60,6 @@ class PracticePiAdapterTest extends BaseUnitTest {
         assertThat(adapter.buildSandboxSpec(proxyRequest()).environment())
                 .containsEntry(PracticePiAdapter.PRACTICE_MODEL_CALLS_ENV, "12")
                 .containsEntry(PracticePiAdapter.PRACTICE_OUTPUT_TOKENS_ENV, "16000");
-    }
-
-    /**
-     * The runner stops before any work when a variable it requires is missing or not a positive integer. The
-     * sandbox adapter adds the proxy URL and the job token; this adapter and the runtime factory set every other one.
-     */
-    @Test
-    void shouldSetEveryVariableTheRunnerRequiresWhenItBuildsTheSpec() throws IOException {
-        Path runner = Path.of("src/main/resources/agent/pi-runner.ts");
-        String source = Files.readString(
-                Files.exists(runner) ? runner : Path.of("server/application").resolve(runner));
-        Set<String> required = Pattern.compile("(?:requiredEnv|positiveIntegerEnv)\\(\"([A-Z_]+)\"\\)")
-                .matcher(source)
-                .results()
-                .map(match -> match.group(1))
-                .collect(Collectors.toSet());
-
-        assertThat(required)
-                .contains(
-                        PracticePiAdapter.PRACTICE_MODEL_CALLS_ENV,
-                        PracticePiAdapter.PRACTICE_OUTPUT_TOKENS_ENV,
-                        PracticePiAdapter.DIRECT_MODEL_TOKENS_ENV);
-        Set<String> set = adapter.buildSandboxSpec(proxyRequest()).environment().keySet();
-        assertThat(required)
-                .as("set here, or by the sandbox adapter from the network policy")
-                .allMatch(name -> set.contains(name)
-                        || Set.of("LLM_PROXY_URL", "LLM_PROXY_TOKEN").contains(name));
-        assertThat(adapter.buildSandboxSpec(proxyRequest())
-                        .environment()
-                        .get(PracticePiAdapter.DIRECT_MODEL_TOKENS_ENV))
-                .isEqualTo("150000");
     }
 
     @Test

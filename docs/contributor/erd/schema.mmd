@@ -143,6 +143,7 @@ erDiagram
         BIGINT cache_read_tokens "NOT NULL"
         BIGINT cache_write_tokens "NOT NULL"
         BIGINT search_units "NOT NULL"
+        INTEGER reported_calls "NOT NULL"
     }
 
     ArtifactSignal {
@@ -873,6 +874,7 @@ erDiagram
         TIMESTAMPTZ occurred_at "NOT NULL"
         VARCHAR(16) usage_provenance
         BIGINT search_units "NOT NULL"
+        BIGINT unreported_calls "NOT NULL"
     }
 
     LoginProvider {
@@ -1908,11 +1910,13 @@ erDiagram
     Repository ||--o{ ActivityEvent : has
     Workspace ||--o{ ActivityEvent : has
     Workspace ||--o{ AgentJob : has
-    AgentJob ||--o{ AgentJobPracticeScriptRun : has
+    AgentJob ||--o{ AgentJobPracticeScriptRun : job_id
     Workspace ||--o{ AgentJobPracticeScriptRun : has
+    AgentJob ||--o{ AgentJobPracticeScriptRun : job_id
     PracticeRevision ||--o{ AgentJobPracticeScriptRun : has
-    AgentJob ||--o{ AgentJobPracticeScriptUsage : has
+    AgentJob ||--o{ AgentJobPracticeScriptUsage : job_id
     Workspace ||--o{ AgentJobPracticeScriptUsage : has
+    AgentJob ||--o{ AgentJobPracticeScriptUsage : job_id
     Workspace ||--o{ ArtifactSignal : has
     User ||--o{ ArtifactSignal : actor_user_id
     User ||--o{ ArtifactSignal : requested_by_user_id

@@ -93,6 +93,14 @@ public class LlmUsageRecorder {
     }
 
     private boolean persist(Long workspaceId, LlmUsageSample sample, LlmPriceSnapshot quoted) {
+        int sourceAttempt = Math.max(0, sample.sourceAttempt());
+        long unreportedCalls = sample.sourceType() == LlmUsageSourceType.MENTOR_TURN
+                ? 0
+                : usageRepository.sumUnreportedPracticeScriptCalls(
+                        workspaceId,
+                        sample.sourceId(),
+                        sourceAttempt,
+                        sample.sourceType().name());
         // A PRICED snapshot missing a rate would silently cost the tokens it does have a rate for.
         LlmPriceSnapshot price = isPricedWithARateMissing(sample, quoted) ? asUnpriced(quoted) : quoted;
         LlmPriceSnapshot.Cost computed = price.calculateCost(
@@ -105,7 +113,7 @@ public class LlmUsageRecorder {
                 sample.jobType().name(),
                 sample.sourceType().name(),
                 sample.sourceId(),
-                Math.max(0, sample.sourceAttempt()),
+                sourceAttempt,
                 sample.model(),
                 Math.max(0, sample.inputTokens()),
                 Math.max(0, sample.outputTokens()),
@@ -124,7 +132,8 @@ public class LlmUsageRecorder {
                 price.per1mCacheReadUsd(),
                 price.per1mCacheWriteUsd(),
                 sample.provenance().name(),
-                Math.max(0, sample.searchUnits())));
+                Math.max(0, sample.searchUnits()),
+                unreportedCalls));
         if (inserted == 0) {
             log.debug(
                     "LLM usage already recorded for sourceType={}, sourceId={}, sourceAttempt={}",

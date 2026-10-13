@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.AdoptedBaseSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionField;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionMerge;
@@ -90,7 +91,10 @@ public class CuratedPracticeReleaseService {
         for (CuratedPracticeOverride override : overrides.findAll()) {
             PracticeDefinition current = override.definition();
             PracticeDefinition base = override.getAdoptedBase();
-            if (current == null || base == null) continue;
+            if (current == null
+                    || base == null
+                    || override.getAdoptedBaseSource() == null
+                    || override.getAdoptedBaseSource() == AdoptedBaseSource.CURRENT_DEFINITION) continue;
             CatalogEntry<PracticeDefinition> before =
                     catalog.catalog().practice(override.getSlug()).orElse(null);
             if (before == null) continue;

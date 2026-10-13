@@ -332,9 +332,13 @@ public final class CandidateParser {
         return true;
     }
 
-    /** Two citations of one place: the same source, path and side, and overlapping lines. */
-    public static boolean overlaps(JsonNode a, JsonNode b) {
+    /** Overlap established by the submitted coordinates; admission also resolves code source aliases. */
+    private static boolean overlaps(JsonNode a, JsonNode b) {
         return a.path("sourceKind").asString().equals(b.path("sourceKind").asString())
+                && a.path("artifactPath")
+                        .asString()
+                        .equals(b.path("artifactPath").asString())
+                && Objects.equals(a.get("revision"), b.get("revision"))
                 && a.path("path").asString().equals(b.path("path").asString())
                 && Objects.equals(sideOf(a), sideOf(b))
                 && a.path("startLine").asInt() <= b.path("endLine").asInt()

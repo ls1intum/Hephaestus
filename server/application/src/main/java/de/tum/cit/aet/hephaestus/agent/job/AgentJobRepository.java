@@ -1371,10 +1371,10 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
                     INSERT INTO agent_job_practice_script_usage
-                        (job_id, attempt, model_kind, practice_slug, workspace_id, data_handling_tier, calls,
+                        (job_id, attempt, model_kind, practice_slug, workspace_id, data_handling_tier, calls, reported_calls,
                          input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, search_units)
                     SELECT j.id, j.retry_count, :#{#call.modelKindName()}, :#{#call.practiceSlug()}, j.workspace_id,
-                        CAST(:#{#call.dataHandlingTierName()} AS varchar), 1, :#{#call.inputTokens()},
+                        CAST(:#{#call.dataHandlingTierName()} AS varchar), 1, :#{#call.usageReported() ? 1 : 0}, :#{#call.inputTokens()},
                         :#{#call.outputTokens()}, :#{#call.cacheReadTokens()}, :#{#call.cacheWriteTokens()},
                         :#{#call.searchUnits()}
                     FROM agent_job j
@@ -1382,6 +1382,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
                     FOR SHARE
                     ON CONFLICT (job_id, attempt, model_kind, practice_slug) DO UPDATE SET
                         calls = agent_job_practice_script_usage.calls + 1,
+                        reported_calls = agent_job_practice_script_usage.reported_calls + EXCLUDED.reported_calls,
                         input_tokens = agent_job_practice_script_usage.input_tokens + EXCLUDED.input_tokens,
                         output_tokens = agent_job_practice_script_usage.output_tokens + EXCLUDED.output_tokens,
                         cache_read_tokens = agent_job_practice_script_usage.cache_read_tokens
@@ -1399,7 +1400,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @Query("SELECT new de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal("
             + "u.id.modelKind, SUM(u.calls), SUM(u.inputTokens), SUM(u.outputTokens), SUM(u.cacheReadTokens), "
-            + "SUM(u.cacheWriteTokens), SUM(u.searchUnits)) "
+            + "SUM(u.cacheWriteTokens), SUM(u.searchUnits), SUM(u.reportedCalls)) "
             + "FROM AgentJobPracticeScriptUsage u "
             + "WHERE u.workspace.id = :workspaceId AND u.id.jobId = :jobId AND u.id.attempt = :attempt "
             + "GROUP BY u.id.modelKind ORDER BY u.id.modelKind")

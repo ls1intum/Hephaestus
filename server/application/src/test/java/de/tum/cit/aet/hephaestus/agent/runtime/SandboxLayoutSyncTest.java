@@ -56,28 +56,6 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
         assertThat(body).as("runner uses the task-declared practice index").contains("INPUT_PATHS.practiceIndex");
     }
 
-    @Test
-    void shouldReadThePracticeScriptModelsFileTheServerWrites() throws IOException {
-        assertThat(Files.readString(resolveResource("agent/pi-runner.ts")))
-                .as("pi-runner.ts reads SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE at the workspace root")
-                .contains("PRACTICE_SCRIPT_MODELS_PATH = `${CWD}/" + SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE + "`;");
-    }
-
-    /** The server refuses a report past these bounds whole, so the runner must stay within them. */
-    @Test
-    void shouldWriteThePracticeScriptReportTheServerReadsWithinItsBounds() throws IOException {
-        assertThat(Files.readString(resolveResource("agent/pi-runner.ts")))
-                .as("pi-runner.ts writes SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE under its output")
-                .contains("outputPath(OUTPUT, \"" + SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE + "\")");
-        assertThat(Files.readString(resolveResource("agent/pi-practice-scripts-report.ts")))
-                .contains(
-                        "PRACTICE_SCRIPT_REPORT_MAX_BYTES = " + PiResultParser.PRACTICE_SCRIPT_REPORT_MAX_BYTES / 1024
-                                + " * 1024;",
-                        "PRACTICE_SCRIPT_REPORT_MAX_PRACTICES = " + PiResultParser.PRACTICE_SCRIPT_REPORT_MAX_ENTRIES
-                                + ";",
-                        "PRACTICE_SCRIPT_ERROR_MAX_CHARS = " + PiResultParser.PRACTICE_SCRIPT_ERROR_MAX_LENGTH + ";");
-    }
-
     /** The parser records no run from a report of another version, so the runner must write the one it reads. */
     @Test
     void shouldWriteTheExecutionReportVersionTheServerReads() throws IOException {
@@ -96,8 +74,8 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName(
-            "pi-mentor-runner.ts pins MENTOR_SYSTEM_PROMPT_PATH, SESSIONS_DIR, PI_AGENT_DIR, and the envelope exit")
+    @DisplayName("pi-mentor-runner.ts pins MENTOR_SYSTEM_PROMPT_PATH, SESSIONS_DIR, PI_AGENT_DIR, and the"
+            + " envelope exit")
     void mentorRunnerLiteralsMatchAbi() throws IOException {
         Path runner = resolveResource("agent/pi-mentor-runner.ts");
         assertThat(runner).isRegularFile();
@@ -112,7 +90,7 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
                 .contains("/" + SandboxLayout.SESSIONS_DIR);
 
         assertThat(body)
-                .as("mentor runner falls back to SandboxLayout.PI_AGENT_DIR when PI_CODING_AGENT_DIR is unset")
+                .as("mentor runner falls back to SandboxLayout.PI_AGENT_DIR when PI_CODING_AGENT_DIR is" + " unset")
                 .contains("\"" + SandboxLayout.PI_AGENT_DIR + "\"");
 
         assertThat(body)

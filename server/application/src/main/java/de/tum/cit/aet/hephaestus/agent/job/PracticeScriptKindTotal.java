@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
  * would round, and clamp to the minimum cost, once per practice.
  *
  * @param inputTokens excludes the cache reads and writes, like the review's own counters
+ * @param reportedCalls calls whose provider reported usage, including a reported zero
  */
 public record PracticeScriptKindTotal(
         ModelKind modelKind,
@@ -16,7 +17,12 @@ public record PracticeScriptKindTotal(
         long outputTokens,
         long cacheReadTokens,
         long cacheWriteTokens,
-        long searchUnits) {
+        long searchUnits,
+        long reportedCalls) {
+
+    public boolean hasCompleteUsage() {
+        return calls > 0 && reportedCalls == calls;
+    }
 
     /** The tokens that count against the attempt token limit: the whole prompt and the output. */
     public long tokens() {

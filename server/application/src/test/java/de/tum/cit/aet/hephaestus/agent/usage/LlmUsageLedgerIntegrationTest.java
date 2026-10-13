@@ -8,7 +8,11 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPriceRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
+import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
@@ -18,9 +22,11 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobPracticeScriptUsage;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptCallUsage;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -46,6 +52,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -86,6 +94,12 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private LlmModelRepository llmModelRepository;
+
+    @Autowired
+    private LlmModelPriceRepository priceRepository;
+
+    @Autowired
+    private LlmUsageRepricer repricer;
 
     @Autowired
     private LlmUsageService llmUsageService;
@@ -613,6 +627,137 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Nested
     @DisplayName("Applying a resolved price to an unpriced row")
     class ApplyResolvedPrice {
+
+        private void accumulate(AgentJob job, PracticeScriptCallUsage call) {
+            transactionTemplate.executeWithoutResult(
+                    status -> jobRepository.accumulatePracticeScriptUsage(job.getId(), job.getRetryCount(), call));
+        }
+
+        private LlmUsageEvent scriptRow(Workspace workspace, AgentJob job, ModelKind kind) {
+            LlmModelPrice price = new LlmModelPrice();
+            price.setModel(instanceModel(workspace.getWorkspaceSlug()));
+            price.setPricingMode(PricingMode.UNPRICED);
+            price.setEffectiveFrom(Instant.now().minusSeconds(60));
+            price = priceRepository.saveAndFlush(price);
+            recordUnverifiable(
+                    workspace.getId(),
+                    new LlmUsageRecorder.LlmUsageSample(
+                            LlmUsageJobType.PULL_REQUEST_REVIEW,
+                            AgentJobPracticeScriptUsage.ledgerSourceType(kind),
+                            job.getId(),
+                            job.getRetryCount(),
+                            "gpt-ledger",
+                            1_000_000,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            2,
+                            new LlmPriceSnapshot(
+                                    FundingSource.INSTANCE,
+                                    PricingState.UNPRICED,
+                                    price.getId(),
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null),
+                            UsageProvenance.PROXY,
+                            Instant.now()));
+            price.setPricingMode(PricingMode.PRICED);
+            price.setPer1mInputUsd(new BigDecimal("3.00"));
+            price.setPer1mOutputUsd(new BigDecimal("9.00"));
+            priceRepository.saveAndFlush(price);
+            return eventsOf(workspace).getFirst();
+        }
+
+        private UnpricedLedgerRow projection(LlmUsageEvent row) {
+            return new UnpricedLedgerRow(
+                    row.getId(),
+                    row.getWorkspace().getId(),
+                    row.getModel(),
+                    row.getFundingSource(),
+                    row.getInputTokens(),
+                    row.getOutputTokens(),
+                    row.getCacheReadTokens(),
+                    row.getCacheWriteTokens(),
+                    row.getSearchUnits(),
+                    row.getAppliedPriceId(),
+                    row.getAppliedWorkspaceModelId());
+        }
+
+        @ParameterizedTest
+        @EnumSource(ModelKind.class)
+        void shouldKeepPartialUsageUnpricedAfterSourceDeletionWhenSomeCallsHaveNoReceipt(ModelKind kind) {
+            Workspace workspace = setupWorkspace("reprice-partial-" + kind.slot());
+            AgentJob job = queuedJob(workspace, Instant.now(), null);
+            job.setStatus(AgentJobStatus.RUNNING);
+            jobRepository.saveAndFlush(job);
+            accumulate(job, new PracticeScriptCallUsage(kind, "known", null, 1_000_000, 0, 0, 0, 0));
+            accumulate(job, new PracticeScriptCallUsage(kind, "unknown", null, 0, 0, 0, 0, 0, false));
+            LlmUsageEvent row = scriptRow(workspace, job, kind);
+
+            assertThat(row.getUnreportedCalls()).isEqualTo(1);
+            assertThat(usageRepository.findUnpricedInWindow(
+                            row.getOccurredAt().minusSeconds(60),
+                            row.getOccurredAt().plusSeconds(60),
+                            PageRequest.of(0, LlmUsageRepricingSweeper.MAX_ROWS_PER_PASS)))
+                    .extracting(UnpricedLedgerRow::id)
+                    .doesNotContain(row.getId());
+
+            jobRepository.deleteById(job.getId());
+            jobRepository.flush();
+
+            assertThat(usageRepository.sumUnreportedPracticeScriptCalls(
+                            workspace.getId(),
+                            job.getId(),
+                            job.getRetryCount(),
+                            row.getSourceType().name()))
+                    .isZero();
+            assertThat(usageRepository.findUnpricedInWindow(
+                            row.getOccurredAt().minusSeconds(60),
+                            row.getOccurredAt().plusSeconds(60),
+                            PageRequest.of(0, LlmUsageRepricingSweeper.MAX_ROWS_PER_PASS)))
+                    .extracting(UnpricedLedgerRow::id)
+                    .doesNotContain(row.getId());
+            assertThat(repricer.reprice(projection(row))).isEqualTo(LlmUsageRepricer.Outcome.STILL_UNPRICEABLE);
+            LlmUsageEvent unchanged = reload(row.getId());
+            assertThat(unchanged.getPricingState()).isEqualTo(PricingState.UNPRICED);
+            assertThat(unchanged.getCostUsd()).isNull();
+            assertThat(unchanged.getInputTokens()).isEqualTo(1_000_000);
+            assertThat(unchanged.getUnreportedCalls()).isEqualTo(1);
+        }
+
+        @ParameterizedTest
+        @EnumSource(ModelKind.class)
+        void shouldRepriceCompleteUsageWhenZeroIsReportedAndUnknownCallsBelongToAnotherKindOrAttempt(ModelKind kind) {
+            Workspace workspace = setupWorkspace("reprice-complete-" + kind.slot());
+            AgentJob job = queuedJob(workspace, Instant.now(), null);
+            job.setStatus(AgentJobStatus.RUNNING);
+            jobRepository.saveAndFlush(job);
+            accumulate(job, new PracticeScriptCallUsage(kind, "earlier", null, 0, 0, 0, 0, 0, false));
+            job.setRetryCount(1);
+            jobRepository.saveAndFlush(job);
+            accumulate(job, new PracticeScriptCallUsage(kind, "known", null, 1_000_000, 0, 0, 0, 0));
+            accumulate(job, new PracticeScriptCallUsage(kind, "reported-zero", null, 0, 0, 0, 0, 0));
+            ModelKind other = kind == ModelKind.CHAT ? ModelKind.EMBEDDING : ModelKind.CHAT;
+            accumulate(job, new PracticeScriptCallUsage(other, "unknown", null, 0, 0, 0, 0, 0, false));
+            LlmUsageEvent row = scriptRow(workspace, job, kind);
+
+            assertThat(row.getUnreportedCalls()).isZero();
+            assertThat(usageRepository.findUnpricedInWindow(
+                            row.getOccurredAt().minusSeconds(60),
+                            row.getOccurredAt().plusSeconds(60),
+                            PageRequest.of(0, LlmUsageRepricingSweeper.MAX_ROWS_PER_PASS)))
+                    .extracting(UnpricedLedgerRow::id)
+                    .contains(row.getId());
+            assertThat(repricer.reprice(projection(row))).isEqualTo(LlmUsageRepricer.Outcome.REPRICED);
+            LlmUsageEvent repriced = reload(row.getId());
+            assertThat(repriced.getPricingState()).isEqualTo(PricingState.PRICED);
+            assertThat(repriced.getCostUsd()).isEqualByComparingTo("3.00");
+            assertThat(repriced.getUnreportedCalls()).isZero();
+        }
 
         private LlmUsageEvent unpricedRow(String slug) {
             Workspace workspace = setupWorkspace(slug);

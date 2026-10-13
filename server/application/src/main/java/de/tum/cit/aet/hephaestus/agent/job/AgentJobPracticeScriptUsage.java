@@ -80,6 +80,10 @@ public class AgentJobPracticeScriptUsage {
     @Column(name = "calls", nullable = false)
     private int calls;
 
+    @ColumnDefault("0")
+    @Column(name = "reported_calls", nullable = false)
+    private int reportedCalls;
+
     /** The prompt tokens without the cache reads and writes, as the review's own counters keep them. */
     @Column(name = "input_tokens", nullable = false)
     private long inputTokens;

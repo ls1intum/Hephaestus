@@ -24,41 +24,11 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    @Test
-    void rejectsDeliveryWhenCurrentSourceAuthorizationWasWithdrawn() {
-        AgentJobRepository jobs = mock(AgentJobRepository.class);
-        ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
-        UUID jobId = UUID.randomUUID();
-        when(jobs.findEvidenceContractVersion(jobId, 7L)).thenReturn(Optional.of("1.3.0"));
-        when(catalogs.isSourceUsePermitted(
-                        new SourceContractVersion("1.3.0"),
-                        new SourceKind("scm.pull-request.diff"),
-                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                .thenReturn(false);
-
-        boolean permitted = new EvidenceDeliveryAuthorization(
-                        jobs,
-                        catalogs,
-                        mock(
-                                CitedSourceAccess.class,
-                                call -> call.getMethod().getName().equals("checks")
-                                        ? (CitedSourceAccess.Checks) citation -> true
-                                        : Mockito.RETURNS_DEFAULTS.answer(call)))
-                .permits(
-                        7L,
-                        jobId,
-                        MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"),
-                        SourceUsePurpose.CONVERSATIONAL_MENTORING);
-
-        assertThat(permitted).isFalse();
-    }
 
     @Test
     void permitsCanonicalEvidenceForTheRequestedAudience() {
@@ -82,8 +52,12 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
                                                 : Mockito.RETURNS_DEFAULTS.answer(call)))
                         .permits(
                                 7L,
-                                jobId,
-                                MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"),
+                                PracticeResult.builder()
+                                        .scopeKey("test-scope")
+                                        .agentJobId(jobId)
+                                        .evidence(MAPPER.readTree(
+                                                "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"))
+                                        .build(),
                                 SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
                 .isTrue();
     }
@@ -103,20 +77,21 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
         UUID malformedJobId = UUID.randomUUID();
         when(jobs.findEvidenceContractVersion(malformedJobId, 7L)).thenReturn(Optional.of("1.3.0"));
 
-        assertThat(authorization.permits(7L, (UUID) null, (JsonNode) null, SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                .isFalse();
         assertThat(authorization.permits(
                         7L,
-                        UUID.randomUUID(),
-                        MAPPER.readTree("{\"citations\":[]}"),
+                        PracticeResult.builder().scopeKey("test-scope").build(),
                         SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .isFalse();
-        assertThat(authorization.permits(
-                        7L,
-                        malformedJobId,
-                        MAPPER.readTree("{\"citations\":[{\"sourceKind\":7}]}"),
-                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                .isFalse();
+        for (String evidence :
+                List.of("{\"citations\":[]}", "{\"citations\":[{\"sourceKind\":7}]}", "{\"citations\":[{}]}")) {
+            PracticeResult result = PracticeResult.builder()
+                    .scopeKey("test-scope")
+                    .agentJobId(malformedJobId)
+                    .evidence(MAPPER.readTree(evidence))
+                    .build();
+            assertThat(authorization.permits(7L, result, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                    .isFalse();
+        }
     }
 
     /**

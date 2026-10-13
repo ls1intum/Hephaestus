@@ -49,11 +49,6 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
                 workspaceId, jobId, citationsOrNull(jobId, ResultCitations.all(practiceResult)), requestedPurpose);
     }
 
-    public boolean permits(
-            long workspaceId, @Nullable UUID jobId, @Nullable JsonNode evidence, SourceUsePurpose requestedPurpose) {
-        return permitsCited(workspaceId, jobId, citationsOrNull(jobId, evidence), requestedPurpose);
-    }
-
     private boolean permitsCited(
             long workspaceId, @Nullable UUID jobId, @Nullable JsonNode citations, SourceUsePurpose requestedPurpose) {
         if (jobId == null || citations == null) {
@@ -91,7 +86,8 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
         for (PracticeResult practiceResult : practiceResults) {
             UUID practiceResultId = practiceResult.getId();
             UUID jobId = practiceResult.getAgentJobId();
-            // Every place the result cites, its problems', its example's and its open questions' included.
+            // Every place the result cites, its problems', its example's and its open questions'
+            // included.
             JsonNode citations = citationsOrNull(jobId, ResultCitations.all(practiceResult));
             if (practiceResultId == null || jobId == null || citations == null) {
                 continue;
@@ -111,7 +107,8 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
                 contractVersions.put(row.getId(), row);
             }
         }
-        // One set of source checks for the whole batch: results citing the same source share its answer.
+        // One set of source checks for the whole batch: results citing the same source share its
+        // answer.
         CitedSourceAccess.Checks sources = citedSourceAccess.checks(workspaceId, requestedPurpose);
         // And one batch per kind of history record the batch cites, rather than one check per record.
         List<JsonNode> cited = new ArrayList<>();
@@ -139,15 +136,6 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
     }
 
     private record Citable(UUID practiceResultId, UUID jobId, JsonNode citations) {}
-
-    @Nullable
-    private static JsonNode citationsOrNull(@Nullable UUID jobId, @Nullable JsonNode evidence) {
-        if (jobId == null || evidence == null) {
-            return null;
-        }
-        JsonNode citations = evidence.path("citations");
-        return citations.isArray() && !citations.isEmpty() ? citations : null;
-    }
 
     @Nullable
     private static JsonNode citationsOrNull(@Nullable UUID jobId, List<JsonNode> cited) {

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult.LlmUsage;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
@@ -20,6 +21,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +29,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 
@@ -139,8 +142,8 @@ class TerminalUsageTest extends BaseUnitTest {
                 runner(1000, 700, 6),
                 new AgentJobLlmUsage(5, 800, 400, 0, 0, 0),
                 List.of(
-                        new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100, 0, 0, 0),
-                        new PracticeScriptKindTotal(ModelKind.DECISION, 5, 50_000, 9_000, 0, 0, 0)));
+                        new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100, 0, 0, 0, 2),
+                        new PracticeScriptKindTotal(ModelKind.DECISION, 5, 50_000, 9_000, 0, 0, 0, 5)));
 
         assertThat(usage.verifiable()).isTrue();
         assertThat(usage.provenance()).isEqualTo(UsageProvenance.RUNNER);
@@ -155,7 +158,7 @@ class TerminalUsageTest extends BaseUnitTest {
         TerminalUsage usage = TerminalUsage.resolve(
                 runner(1000, 700, 6),
                 new AgentJobLlmUsage(5, 800, 400, 0, 0, 0),
-                List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 40, 100, 260, 0, 0)));
+                List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 40, 100, 260, 0, 0, 2)));
 
         assertThat(usage.provenance()).isEqualTo(UsageProvenance.RUNNER);
         assertThat(usage.inputTokens()).isEqualTo(1040);
@@ -169,7 +172,7 @@ class TerminalUsageTest extends BaseUnitTest {
         TerminalUsage usage = TerminalUsage.resolve(
                 runner(1000, 700, 6),
                 new AgentJobLlmUsage(8, 1300, 800, 0, 0, 0),
-                List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100, 0, 0, 0)));
+                List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100, 0, 0, 0, 2)));
 
         assertThat(usage.verifiable()).isTrue();
         assertThat(usage.provenance()).isEqualTo(UsageProvenance.PROXY);
@@ -243,6 +246,29 @@ class TerminalUsageTest extends BaseUnitTest {
         assertThat(usage.totalCalls()).isZero();
     }
 
+    @Test
+    void shouldKeepMixedChatUsageUnverifiableWhenOneDirectCallReportsNoUsage() {
+        TerminalUsage usage = TerminalUsage.resolve(
+                runner(100, 20, 1),
+                new AgentJobLlmUsage(2, 110, 20, 0, 0, 0),
+                List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 10, 0, 0, 0, 0, 1)));
+
+        assertThat(usage.verifiable()).isFalse();
+        assertThat(usage.inputTokens()).isEqualTo(110);
+        assertThat(usage.totalCalls()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldVerifyZeroWhenTheProxyRecordedAReportedZero() {
+        TerminalUsage usage = TerminalUsage.fromProxy(new AgentJobLlmUsage(1, 0, 0, 0, 0, 0));
+
+        assertThat(usage.verifiable()).isTrue();
+        assertThat(usage.totalCalls()).isEqualTo(1);
+        assertThat(usage.inputTokens()).isZero();
+        assertThat(usage.outputTokens()).isZero();
+        assertThat(usage.provenance()).isEqualTo(UsageProvenance.PROXY);
+    }
+
     @Nested
     @DisplayName("appendTo picks the append path from the evidence, not from the call site")
     class AppendPath {
@@ -283,6 +309,64 @@ class TerminalUsageTest extends BaseUnitTest {
                                     null,
                                     null,
                                     null)));
+        }
+
+        @ParameterizedTest
+        @CsvSource({"40,1,PRICED,false", "0,2,PRICED,true", "0,0,PRICED,false", "40,1,NO_CHARGE,true"})
+        void shouldChooseTheLedgerStateFromCompletenessWhenDirectModelCallsFinish(
+                long tokens, long reportedCalls, PricingState pricingState, boolean billable) {
+            UUID jobId = UUID.randomUUID();
+            LlmPriceSnapshot price = pricingState == PricingState.NO_CHARGE
+                    ? new LlmPriceSnapshot(
+                            FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)
+                    : pricedInstance();
+            ConfigSnapshot withEmbedding = snapshot.withPracticeScript(Map.of(
+                    ModelKind.EMBEDDING,
+                    new FrozenModel(
+                            "openai-embeddings",
+                            "https://models.example/v1",
+                            "embedding",
+                            FundingSource.INSTANCE,
+                            1L,
+                            2L,
+                            7L,
+                            null,
+                            null,
+                            price)));
+            when(jobs.sumPracticeScriptUsageByKind(7L, jobId, 1))
+                    .thenReturn(List.of(
+                            new PracticeScriptKindTotal(ModelKind.EMBEDDING, 2, tokens, 0, 0, 0, 0, reportedCalls)));
+
+            TerminalUsage.none()
+                    .appendTo(recorder, jobs, 7L, jobFor(jobId, 1), withEmbedding, LlmPriceSnapshot.unpricedInstance());
+
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
+                    ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
+            if (billable) {
+                verify(recorder).record(eq(7L), sample.capture());
+            } else {
+                verify(recorder, times(2)).recordUnverifiable(eq(7L), sample.capture());
+            }
+            var embedding = sample.getValue();
+            assertThat(embedding.sourceType()).isEqualTo(LlmUsageSourceType.PRACTICE_SCRIPT_EMBEDDING);
+            assertThat(embedding.totalCalls()).isEqualTo(2);
+            assertThat(embedding.inputTokens()).isEqualTo(tokens);
+        }
+
+        @Test
+        void shouldKeepTerminalChatUsageUnverifiableWhenAStoppedAttemptHasAnUnknownDirectCall() {
+            UUID jobId = UUID.randomUUID();
+            when(jobs.sumPracticeScriptUsageByKind(7L, jobId, 1))
+                    .thenReturn(List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 40, 0, 0, 0, 0, 1)));
+
+            boolean billed = TerminalUsage.fromProxy(new AgentJobLlmUsage(1, 40, 0, 0, 0, 0))
+                    .appendTo(recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance());
+
+            assertThat(billed).isFalse();
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
+                    ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
+            verify(recorder).recordUnverifiable(eq(7L), sample.capture());
+            assertThat(sample.getValue().inputTokens()).isEqualTo(40);
         }
 
         static Stream<Arguments> unbillable() {
@@ -388,8 +472,8 @@ class TerminalUsageTest extends BaseUnitTest {
             UUID jobId = UUID.randomUUID();
             when(jobs.sumPracticeScriptUsageByKind(7L, jobId, 1))
                     .thenReturn(List.of(
-                            new PracticeScriptKindTotal(ModelKind.CHAT, 2, 70, 20, 0, 0, 0),
-                            new PracticeScriptKindTotal(ModelKind.DECISION, 5, 500_000, 100_000, 0, 0, 0)));
+                            new PracticeScriptKindTotal(ModelKind.CHAT, 2, 70, 20, 0, 0, 0, 2),
+                            new PracticeScriptKindTotal(ModelKind.DECISION, 5, 500_000, 100_000, 0, 0, 0, 5)));
 
             TerminalUsage.none().appendTo(recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance());
 

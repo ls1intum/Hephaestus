@@ -695,8 +695,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             AgentJob job = createPracticeScriptJob();
             when(agentJobRepository.sumPracticeScriptUsageByKind(7L, job.getId(), 0))
                     .thenReturn(List.of(
-                            new PracticeScriptKindTotal(ModelKind.DECISION, 2, 1_000, 100, 4_000, 500, 0),
-                            new PracticeScriptKindTotal(ModelKind.RERANKING, 3, 0, 0, 0, 0, 9)));
+                            new PracticeScriptKindTotal(ModelKind.DECISION, 2, 1_000, 100, 4_000, 500, 0, 2),
+                            new PracticeScriptKindTotal(ModelKind.RERANKING, 3, 0, 0, 0, 0, 9, 3)));
 
             ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/embedding/embeddings");
 
@@ -711,8 +711,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         void shouldPriceTheAttemptsPracticeScriptUsageFromTheSamePurseWhenRoutingASlot() throws Exception {
             AgentJob job = createPracticeScriptJob();
             when(agentJobRepository.sumPracticeScriptUsageByKind(7L, job.getId(), 0))
-                    .thenReturn(
-                            List.of(new PracticeScriptKindTotal(ModelKind.DECISION, 4, 1_000_000, 100_000, 0, 0, 0)));
+                    .thenReturn(List.of(
+                            new PracticeScriptKindTotal(ModelKind.DECISION, 4, 1_000_000, 100_000, 0, 0, 0, 4)));
 
             ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/embedding/embeddings");
 

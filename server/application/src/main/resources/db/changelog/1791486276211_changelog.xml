@@ -507,7 +507,7 @@ CREATE FUNCTION public.check_practice_result_children(result_id uuid) RETURNS vo
             SELECT r.outcome,
                    CASE r.severity WHEN 'CRITICAL' THEN 3 WHEN 'MAJOR' THEN 2 WHEN 'MINOR' THEN 1 WHEN 'INFO' THEN 0 END
               INTO result_outcome, result_rank
-              FROM practice_result r WHERE r.id = result_id;
+              FROM practice_result r WHERE r.id = result_id FOR NO KEY UPDATE;
             IF NOT FOUND THEN
                 RETURN;
             END IF;
@@ -529,16 +529,23 @@ CREATE FUNCTION public.check_practice_result_children(result_id uuid) RETURNS vo
 CREATE FUNCTION public.enforce_practice_result_children() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
+        DECLARE
+            parent_id uuid;
         BEGIN
             IF TG_TABLE_NAME = 'practice_result' THEN
                 PERFORM public.check_practice_result_children(NEW.id);
             ELSE
-                IF TG_OP <> 'INSERT' THEN
-                    PERFORM public.check_practice_result_children(OLD.practice_result_id);
-                END IF;
-                IF TG_OP <> 'DELETE' THEN
-                    PERFORM public.check_practice_result_children(NEW.practice_result_id);
-                END IF;
+                FOR parent_id IN
+                    SELECT id FROM practice_result
+                    WHERE id IN (
+                        CASE WHEN TG_OP <> 'INSERT' THEN OLD.practice_result_id END,
+                        CASE WHEN TG_OP <> 'DELETE' THEN NEW.practice_result_id END)
+                    ORDER BY id
+                LOOP
+                    -- A parent write makes competing snapshot transactions conflict.
+                    UPDATE practice_result SET severity = severity WHERE id = parent_id;
+                    PERFORM public.check_practice_result_children(parent_id);
+                END LOOP;
             END IF;
             RETURN NULL;
         END;
@@ -655,5 +662,55 @@ ALTER TABLE agent_job_practice_script_run
         <addColumn tableName="practice_catalog_installation">
             <column name="practice_scripts_upgraded_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
         </addColumn>
+    </changeSet>
+    <changeSet id="1791486276211-31" author="hephaestus">
+        <comment>The job's workspace is the row's workspace. The JPA association maps job_id alone.</comment>
+        <addForeignKeyConstraint baseColumnNames="job_id, workspace_id" baseTableName="agent_job_practice_script_usage" constraintName="sfk_agent_job_practice_script_usage_job_workspace" onDelete="CASCADE" referencedColumnNames="id, workspace_id" referencedTableName="agent_job"/>
+    </changeSet>
+    <changeSet id="1791486276211-32" author="hephaestus">
+        <comment>The job's workspace is the row's workspace. The JPA association maps job_id alone.</comment>
+        <addForeignKeyConstraint baseColumnNames="job_id, workspace_id" baseTableName="agent_job_practice_script_run" constraintName="sfk_agent_job_practice_script_run_job_workspace" onDelete="CASCADE" referencedColumnNames="id, workspace_id" referencedTableName="agent_job"/>
+    </changeSet>
+    <changeSet id="1791486276211-33" author="hephaestus">
+        <comment>A stored total cannot establish that every call reported usage.</comment>
+        <addColumn tableName="agent_job_practice_script_usage">
+            <column name="reported_calls" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql>ALTER TABLE agent_job_practice_script_usage ADD CONSTRAINT ck_agent_job_practice_script_usage_reported_calls CHECK (reported_calls &gt;= 0 AND reported_calls &lt;= calls);</sql>
+        <rollback>
+            <sql>ALTER TABLE agent_job_practice_script_usage DROP CONSTRAINT ck_agent_job_practice_script_usage_reported_calls;</sql>
+            <dropColumn tableName="agent_job_practice_script_usage" columnName="reported_calls"/>
+        </rollback>
+    </changeSet>
+    <changeSet id="1791486276211-34" author="hephaestus">
+        <comment>Unreported calls keep a ledger event unverifiable after its source job is deleted.</comment>
+        <addColumn tableName="llm_usage_event">
+            <column name="unreported_calls" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql><![CDATA[
+UPDATE llm_usage_event e
+SET unreported_calls = u.unreported_calls
+FROM (
+    SELECT workspace_id, job_id, attempt,
+        CASE model_kind WHEN 'CHAT' THEN 'AGENT_JOB'
+            ELSE 'PRACTICE_SCRIPT_' || model_kind END AS source_type,
+        SUM(calls - reported_calls) AS unreported_calls
+    FROM agent_job_practice_script_usage
+    GROUP BY workspace_id, job_id, attempt, model_kind
+) u
+WHERE e.workspace_id = u.workspace_id AND e.source_id = u.job_id
+    AND e.source_attempt = u.attempt AND e.source_type = u.source_type;
+
+ALTER TABLE llm_usage_event
+    ADD CONSTRAINT ck_llm_usage_event_unreported_calls CHECK (unreported_calls >= 0);
+        ]]></sql>
+        <rollback>
+            <sql>ALTER TABLE llm_usage_event DROP CONSTRAINT ck_llm_usage_event_unreported_calls;</sql>
+            <dropColumn tableName="llm_usage_event" columnName="unreported_calls"/>
+        </rollback>
     </changeSet>
 </databaseChangeLog>

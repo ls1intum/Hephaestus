@@ -74,7 +74,8 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens,
             total_calls, cost_usd, occurred_at, pricing_state, funding_source, applied_price_id,
             applied_workspace_model_id, applied_per_1m_input_usd, applied_per_1m_output_usd,
-            applied_per_1m_cache_read_usd, applied_per_1m_cache_write_usd, usage_provenance, search_units
+            applied_per_1m_cache_read_usd, applied_per_1m_cache_write_usd, usage_provenance, search_units,
+            unreported_calls
         ) VALUES (
             :#{#event.id()}, :#{#event.workspaceId()}, :#{#event.jobType()}, :#{#event.sourceType()},
             :#{#event.sourceId()}, :#{#event.sourceAttempt()}, :#{#event.model()},
@@ -84,10 +85,24 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             :#{#event.fundingSource()}, :#{#event.appliedPriceId()},
             :#{#event.appliedWorkspaceModelId()}, :#{#event.appliedPer1mInputUsd()},
             :#{#event.appliedPer1mOutputUsd()}, :#{#event.appliedPer1mCacheReadUsd()},
-            :#{#event.appliedPer1mCacheWriteUsd()}, :#{#event.usageProvenance()}, :#{#event.searchUnits()}
+            :#{#event.appliedPer1mCacheWriteUsd()}, :#{#event.usageProvenance()}, :#{#event.searchUnits()},
+            :#{#event.unreportedCalls()}
         ) ON CONFLICT (source_type, source_id, source_attempt) DO NOTHING
         """, nativeQuery = true)
     int insertIfAbsent(@Param("event") LlmUsageInsert event);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(u.calls - u.reported_calls), 0)
+            FROM agent_job_practice_script_usage u
+            WHERE u.workspace_id = :workspaceId AND u.job_id = :sourceId AND u.attempt = :attempt
+                AND CASE u.model_kind WHEN 'CHAT' THEN 'AGENT_JOB'
+                    ELSE 'PRACTICE_SCRIPT_' || u.model_kind END = :sourceType
+            """, nativeQuery = true)
+    long sumUnreportedPracticeScriptCalls(
+            @Param("workspaceId") Long workspaceId,
+            @Param("sourceId") UUID sourceId,
+            @Param("attempt") int attempt,
+            @Param("sourceType") String sourceType);
 
     /** The sum the instance cap compares against. Own-provider spend is a different purse. */
     @Query(
@@ -129,8 +144,8 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             @Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
 
     /**
-     * Every UNPRICED row in the window that measured a billable token, across all workspaces — the
-     * repricing pass's work list. A row without one is unknown spend that no rate repairs, so it is never
+     * Every UNPRICED row in the window with no unreported calls and at least one billable token, across all workspaces — the
+     * repricing pass's work list. Incomplete usage is unknown spend that no rate repairs, so it is never
      * selected and cannot hold a page against the rows behind it.
      *
      * <p>Ordered oldest first so a backlog is cleared in the order it accumulated, and paged because one
@@ -143,6 +158,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             + "FROM LlmUsageEvent e "
             + "WHERE e.occurredAt >= :from AND e.occurredAt < :to "
             + "AND e.pricingState = de.tum.cit.aet.hephaestus.agent.usage.PricingState.UNPRICED "
+            + "AND e.unreportedCalls = 0 "
             + "AND (e.inputTokens > 0 OR e.outputTokens > 0 OR e.cacheReadTokens > 0 OR e.cacheWriteTokens > 0) "
             + "ORDER BY e.occurredAt")
     List<UnpricedLedgerRow> findUnpricedInWindow(
@@ -155,7 +171,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      * <p>Fenced on {@code pricing_state = 'UNPRICED'}, so it can only ever move a row out of the
      * unpriced state and never re-price one that already carries a frozen amount somebody was charged.
      * Two pods repricing the same row concurrently is therefore safe: the loser updates nothing. Also
-     * fenced on a measured billable token: a row without one stays unknown, whatever the price says,
+     * fenced on no unreported calls and a measured billable token: incomplete usage stays unknown, whatever the price says,
      * because a free model's zero is a fact only about spend that was observed.
      *
      * <p>Every token column is untouched; this operation resolves a rate without changing the measurement.
@@ -173,7 +189,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      * @param price the resolved price, whose {@code pricingState} is what the row moves to — always the
      *     state the caller computed, so a NO_CHARGE model settles as a real zero rather than staying a
      *     blind spot
-     * @return 1 when this call priced the row, 0 when it was no longer unpriced or measured no billable token
+     * @return 1 when this call priced the row, 0 when it was no longer unpriced or lacked complete token evidence
      */
     @WorkspaceAgnostic("ID-based price repair; the event id comes from the cross-tenant repricing enumeration")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -187,6 +203,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
                     + "applied_per_1m_cache_read_usd = :#{#price.per1mCacheReadUsd()}, "
                     + "applied_per_1m_cache_write_usd = :#{#price.per1mCacheWriteUsd()} "
                     + "WHERE id = :id AND pricing_state = 'UNPRICED' "
+                    + "AND unreported_calls = 0 "
                     + "AND (input_tokens > 0 OR output_tokens > 0 OR cache_read_tokens > 0 OR cache_write_tokens > 0)",
             nativeQuery = true)
     int applyResolvedPrice(

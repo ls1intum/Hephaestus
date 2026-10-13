@@ -74,15 +74,14 @@ class PracticeCatalogInstallationManager {
 
     @EventListener(WorkspacesInitializedEvent.class)
     public void repairIncompleteInstallations() {
-        if (!enabled) {
-            return;
-        }
-        try {
-            workspaceRepository.findAll().stream()
-                    .sorted(Comparator.comparing(Workspace::getId, Comparator.nullsLast(Long::compareTo)))
-                    .forEach(this::repairCatalogSafely);
-        } catch (RuntimeException exception) {
-            log.error("Could not load workspaces for default practice catalog installation", exception);
+        if (enabled) {
+            try {
+                workspaceRepository.findAll().stream()
+                        .sorted(Comparator.comparing(Workspace::getId, Comparator.nullsLast(Long::compareTo)))
+                        .forEach(this::repairCatalogSafely);
+            } catch (RuntimeException exception) {
+                log.error("Could not load workspaces for default practice catalog installation", exception);
+            }
         }
         upgradePracticeScripts();
     }

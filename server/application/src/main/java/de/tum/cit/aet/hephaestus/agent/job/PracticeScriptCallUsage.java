@@ -21,7 +21,30 @@ public record PracticeScriptCallUsage(
         long outputTokens,
         long cacheReadTokens,
         long cacheWriteTokens,
-        long searchUnits) {
+        long searchUnits,
+        boolean usageReported) {
+
+    /** A call whose provider reported these usage buckets, including an explicit zero. */
+    public PracticeScriptCallUsage(
+            ModelKind modelKind,
+            String practiceSlug,
+            @Nullable DataHandlingTier dataHandlingTier,
+            long inputTokens,
+            long outputTokens,
+            long cacheReadTokens,
+            long cacheWriteTokens,
+            long searchUnits) {
+        this(
+                modelKind,
+                practiceSlug,
+                dataHandlingTier,
+                inputTokens,
+                outputTokens,
+                cacheReadTokens,
+                cacheWriteTokens,
+                searchUnits,
+                true);
+    }
 
     /** The stored form of {@link #modelKind()}, for the native query. */
     public String modelKindName() {

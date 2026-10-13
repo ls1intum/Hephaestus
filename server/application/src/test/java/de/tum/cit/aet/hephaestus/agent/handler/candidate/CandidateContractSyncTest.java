@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -95,21 +94,6 @@ class CandidateContractSyncTest extends BaseUnitTest {
                         "export const DIFF_SOURCE = \"" + CandidateParser.DIFF_SOURCE + "\";",
                         "export const TREE_SOURCE = \"" + CandidateParser.TREE_SOURCE + "\";",
                         "const COMMIT = /" + CandidateParser.COMMIT.pattern() + "/u;");
-    }
-
-    /** The runner submits the version admission accepts; another version is refused whole as malformed. */
-    @Test
-    void shouldSubmitTheAdmissionVersionTheServerAcceptsWhenTheRunnerAdmitsResults() throws IOException {
-        Path runner = Path.of("src/main/resources/agent/pi-runner.ts");
-        String source = Files.readString(
-                Files.exists(runner) ? runner : Path.of("server/application").resolve(runner));
-        Matcher request = Pattern.compile("function admissionRequest\\(\\) \\{\\s*return \\{\\s*schemaVersion: (\\d+),")
-                .matcher(source);
-
-        assertThat(request.find())
-                .as("pi-runner.ts builds the admission request")
-                .isTrue();
-        assertThat(Integer.parseInt(request.group(1))).isEqualTo(ResultAdmissionService.SCHEMA_VERSION);
     }
 
     private static List<String> quoted(String text) {
