@@ -176,7 +176,7 @@ void describe("the context helpers", () => {
 		}
 	});
 
-	void test("a record parses as JSON, is null when absent or not JSON, and a failed read stops the program", async () => {
+	void test("an absent record is null, and malformed JSON or a failed read stops the program", async () => {
 		const records: Record<string, string> = {
 			"metadata.json": '{"pr_number": 7}',
 			"notes.md": "# Notes",
@@ -191,7 +191,11 @@ void describe("the context helpers", () => {
 			},
 		};
 		assert.deepEqual(await readRecordJson(evidence, "metadata.json"), { pr_number: 7 });
-		assert.equal(await readRecordJson(evidence, "notes.md"), null);
+		await assert.rejects(readRecordJson(evidence, "notes.md"), {
+			name: "UnratedError",
+			reason: "unavailable",
+			message: "notes.md is not valid JSON",
+		});
 		assert.equal(await readRecordJson(evidence, "comments.json"), null);
 		await assert.rejects(readRecordJson(evidence, "broken.json"), {
 			name: "UnratedError",

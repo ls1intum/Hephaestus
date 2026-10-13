@@ -2,6 +2,7 @@
 // review decision placed against the time of the merge. The last decision of each reviewer is a lead
 // of its own. The order of the leads does not show that the decision history is complete.
 import { DIRECTION_CHARS, oneLine } from "../lib/bounded-text.ts";
+import { REVIEW_LEAD_LIMIT } from "../lib/contract.ts";
 import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 import {
 	decisionLeads,
@@ -73,8 +74,19 @@ export default definePracticeScript({
 				"Read decisionHistoryComplete in review_threads.json: the order of the leads does not establish complete historical coverage. Apply the practice criteria to that qualification.",
 			);
 		}
+		const leads = [mergeLead(ctx.work, merge, LABELS.merge), ...rows, ...last];
 		return ctx.review({
-			leads: [mergeLead(ctx.work, merge, LABELS.merge), ...rows, ...last],
+			leads: leads.slice(0, REVIEW_LEAD_LIMIT),
+			limitations:
+				leads.length > REVIEW_LEAD_LIMIT
+					? [
+							{
+								what: "review decision leads",
+								count: leads.length - REVIEW_LEAD_LIMIT,
+								reason: "selection",
+							},
+						]
+					: [],
 			facts: {
 				mergedByIsAuthor: merge.mergedByIsAuthor ? 1 : 0,
 				decisions: decisions.length,

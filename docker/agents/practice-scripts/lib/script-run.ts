@@ -169,6 +169,14 @@ export async function runCustomProgram(
 ): Promise<ProgramExecution> {
 	const { slug } = job;
 	const calls = noCalls();
+	if (services.signal.aborted || Date.now() >= job.deadline) {
+		const stopReason = services.signal.aborted ? abortReasonOf(services.signal) : "deadline";
+		return {
+			failure: { stopReason, error: `the host stopped this program: ${stopReason}` },
+			models: [],
+			calls,
+		};
+	}
 	let report: SlotReport[] = [];
 	const readable = readableRoots([path.dirname(path.dirname(modulePath))]);
 	const child = fork(path.join(import.meta.dirname, "..", "child.ts"), [], {
@@ -248,6 +256,9 @@ export async function runCustomProgram(
 			return;
 		}
 		aborted = reason;
+		settled = {
+			failure: { stopReason: reason, error: `the host stopped this program: ${reason}` },
+		};
 		if (child.connected) {
 			child.send({ kind: "abort", reason } satisfies HostMessage);
 		}
@@ -449,29 +460,38 @@ export async function runCustomProgram(
 	};
 
 	child.on("message", (raw: unknown) => {
-		if (finished && isJsonObject(raw) && (raw.kind === "result" || raw.kind === "failed")) {
+		if (aborted === undefined && Date.now() >= job.deadline) {
+			sendAbort("deadline");
+		}
+		if (settled !== undefined && aborted === undefined && !finished) {
+			return;
+		}
+		if (typeof raw !== "string") {
+			fail("error", "the program's process must send JSON text");
+			return;
+		}
+		if (Buffer.byteLength(raw) > MAX_IPC_MESSAGE_BYTES) {
+			fail("error", `the program sent a message larger than ${MAX_IPC_MESSAGE_BYTES} bytes`);
+			return;
+		}
+		let value: unknown;
+		try {
+			value = JSON.parse(raw);
+		} catch {
+			fail("error", "the program sent a message that is not JSON");
+			return;
+		}
+		if (finished && isJsonObject(value) && (value.kind === "result" || value.kind === "failed")) {
 			settled = {
 				failure: { stopReason: "error", error: "the program sent a second final message" },
 			};
 			child.kill("SIGKILL");
 			return;
 		}
-		if (settled !== undefined) {
+		if (settled !== undefined && aborted === undefined) {
 			return;
 		}
-		let bytes: number;
-		try {
-			const text: unknown = JSON.stringify(raw);
-			bytes = typeof text === "string" ? Buffer.byteLength(text) : 0;
-		} catch {
-			fail("error", "the program sent a message that is not JSON");
-			return;
-		}
-		if (bytes > MAX_IPC_MESSAGE_BYTES) {
-			fail("error", `the program sent a message larger than ${MAX_IPC_MESSAGE_BYTES} bytes`);
-			return;
-		}
-		const parsed = childMessageSchema.safeParse(raw);
+		const parsed = childMessageSchema.safeParse(value);
 		if (!parsed.success) {
 			fail("error", "the program's process sent a message the host does not accept");
 			return;
@@ -499,6 +519,9 @@ export async function runCustomProgram(
 					return;
 				}
 				finished = true;
+				if (aborted !== undefined) {
+					return;
+				}
 				settled = { value: message.value };
 				return;
 			}

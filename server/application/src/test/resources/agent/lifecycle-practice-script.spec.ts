@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { REVIEW_LEAD_LIMIT } from "../../../../../../docker/agents/practice-scripts/lib/contract.ts";
 import { isJsonObject } from "../../../../../../docker/agents/practice-scripts/lib/json.ts";
+import { UnratedError } from "../../../../../../docker/agents/practice-scripts/lib/practice-script.ts";
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
 import {
 	leadKeys,
 	moment,
 	requested,
 	runBundled,
+	runBundledProgram,
 	type Files,
 	type RunInputs,
 } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
@@ -104,6 +107,152 @@ const requestedOpen = requested("scm.pull_request", { state: "OPEN" });
 /** A review that a person requested, of a merged pull request. */
 const requestedMerged = requested("scm.pull_request", { state: "MERGED" });
 
+void test("malformed review comments stop the bundled program before it can claim no asks", async () => {
+	const result = await runBundledProgram("defers-review-asks-into-tracked-work", {
+		work: metadata,
+		cause: atMerge,
+		context: {
+			"comments.json": [{ path: "src/cart.ts", body: null }],
+			"general_comments.json": { comments: [] },
+		},
+	});
+	assert.deepEqual(result.reviews, []);
+	assert.ok("error" in result.outcome);
+	const { error } = result.outcome;
+	assert.ok(error instanceof UnratedError);
+	assert.equal(error.reason, "unavailable");
+	assert.match(error.message, /comments\.json/u);
+});
+
+for (const slug of [
+	"merge-confirms-the-linked-issue-outcome",
+	"plans-the-work-in-an-issue-first",
+]) {
+	for (const count of [199, 200, 201]) {
+		void test(`${slug} retains totals and bounds the leads for ${count} linked issues`, async () => {
+			const result = await review(slug, {
+				work: metadata,
+				cause: atMerge,
+				context: {
+					"linked_work_items.json": {
+						workItems: Array.from({ length: count }, (_, i) => ({
+							number: i + 1,
+							title: `Issue ${i + 1}`,
+							body: "- [ ] Confirm the outcome",
+							how: "closesOnMerge",
+							createdAt: i === count - 1 ? "2026-04-13T10:00:00Z" : "2026-04-13T08:00:00Z",
+						})),
+					},
+					"commits.json": commitsRecord([
+						{
+							sha: "f46a897aaaa",
+							message: "Implement the plan",
+							authoredAt: "2026-04-13T09:00:00Z",
+						},
+					]),
+				},
+			});
+			assert.equal(result.leads.length, Math.min(count, REVIEW_LEAD_LIMIT));
+			assert.equal(result.facts?.linkedItems, count);
+			if (slug === "merge-confirms-the-linked-issue-outcome") {
+				assert.equal(result.facts.checkableItems, count);
+				assert.equal(result.facts.untickedItems, count);
+			} else {
+				assert.equal(result.facts.namedIssues, count);
+				assert.equal(result.facts.issueOpenedAfterFirstCommitMinutes, 60);
+			}
+			assert.deepEqual(
+				result.limitations,
+				count > REVIEW_LEAD_LIMIT
+					? [{ what: "linked issue leads", count: count - REVIEW_LEAD_LIMIT, reason: "selection" }]
+					: [],
+			);
+		});
+	}
+}
+
+for (const count of [99, 100, 201]) {
+	void test(`approval preparation retains totals and bounds the leads for ${count} decisions`, async () => {
+		const result = await review("merges-only-after-approval", {
+			work: metadata,
+			cause: atMerge,
+			context: {
+				"review_threads.json": {
+					threads: [],
+					reviewDecisions: Array.from({ length: count }, (_, i) => ({
+						state: "APPROVED",
+						author: `reviewer-${i}`,
+						submittedAt: "2026-04-13T14:00:00Z",
+						bot: false,
+						dismissed: false,
+					})),
+				},
+			},
+		});
+		const total = 1 + count * 2;
+		assert.equal(result.leads.length, Math.min(total, REVIEW_LEAD_LIMIT));
+		assert.equal(result.facts?.decisions, count);
+		assert.equal(result.facts.approvalsBeforeMergeByOthers, count);
+		assert.deepEqual(
+			result.limitations,
+			total > REVIEW_LEAD_LIMIT
+				? [{ what: "review decision leads", count: total - REVIEW_LEAD_LIMIT, reason: "selection" }]
+				: [],
+		);
+	});
+}
+
+for (const count of [199, 200, 250]) {
+	void test(`thread preparation retains totals and bounds the leads for ${count} threads`, async () => {
+		const result = await review("merged-past-unresolved-review-threads", {
+			work: metadata,
+			cause: atMerge,
+			context: {
+				"review_threads.json": {
+					reviewDecisions: [],
+					threads: Array.from({ length: count }, (_, id) => ({
+						id,
+						path: "src/cart.ts",
+						line: 2,
+						state: "UNRESOLVED",
+						createdAt: "2026-04-13T14:00:00Z",
+					})),
+				},
+			},
+		});
+		assert.equal(result.leads.length, Math.min(count + 1, REVIEW_LEAD_LIMIT));
+		assert.equal(result.facts?.threads, count);
+		assert.equal(result.facts.candidateThreads, count);
+		assert.deepEqual(
+			result.limitations,
+			count + 1 > REVIEW_LEAD_LIMIT
+				? [
+						{
+							what: "review thread leads",
+							count: count + 1 - REVIEW_LEAD_LIMIT,
+							reason: "selection",
+						},
+					]
+				: [],
+		);
+	});
+}
+
+void test("malformed linked work JSON stops preparation instead of reporting an absent capture", async () => {
+	await assert.rejects(
+		review("honours-linked-issue-acceptance-criteria", {
+			work: metadata,
+			cause: requestedMerged,
+			context: { "linked_work_items.json": "{" },
+		}),
+		{
+			name: "UnratedError",
+			reason: "unavailable",
+			message: "linked_work_items.json is not valid JSON",
+		},
+	);
+});
+
 void test("plans-first puts the issue's opening beside the earliest commit, never beside the pull request", async () => {
 	const result = await review("plans-the-work-in-an-issue-first", {
 		work: metadata,
@@ -150,7 +299,9 @@ void test("plans-first preserves the exact recorded order before, at, and after 
 		const result = await review("plans-the-work-in-an-issue-first", {
 			work: metadata,
 			context: {
-				"linked_work_items.json": { workItems: [{ number: 18, createdAt: openedAt }] },
+				"linked_work_items.json": {
+					workItems: [{ number: 18, title: "Add ingredients", body: "", createdAt: openedAt }],
+				},
 				"commits.json": commitsRecord([
 					{ sha: "f46a897aaaa", message: "Add ingredients", authoredAt: "2026-04-12T18:00:00Z" },
 				]),
@@ -177,7 +328,9 @@ void test("plans-first cannot replace unknown authored dates with a later handof
 			work: metadata,
 			context: {
 				"linked_work_items.json": {
-					workItems: [{ number: 18, title: "Add ingredients", createdAt: "2026-04-13T09:35:24Z" }],
+					workItems: [
+						{ number: 18, title: "Add ingredients", body: "", createdAt: "2026-04-13T09:35:24Z" },
+					],
 				},
 				"commits.json": commitsRecord(commits),
 			},
@@ -203,7 +356,9 @@ void test("plans-first keeps missing commit capture separate from unknown author
 			work: metadata,
 			context: {
 				"linked_work_items.json": {
-					workItems: [{ number: 18, createdAt: "2026-04-13T09:35:24Z" }],
+					workItems: [
+						{ number: 18, title: "Add ingredients", body: "", createdAt: "2026-04-13T09:35:24Z" },
+					],
 				},
 				...(malformed === undefined ? {} : { "commits.json": malformed }),
 			},
@@ -548,12 +703,11 @@ void test("every captured linked issue is a row, and those with a checkable outc
 				},
 				{
 					number: 14,
-					title: "Unrecognized source",
+					title: "Source not captured",
 					state: "OPEN",
 					body: "",
 					subIssuesTotal: 2,
 					subIssuesCompleted: 2,
-					subIssuesSource: "everything",
 				},
 			],
 		},
@@ -606,7 +760,7 @@ void test("every captured linked issue is a row, and those with a checkable outc
 	assert.equal(Object.hasOwn(totalOnly.facts ?? {}, "subIssuesCompleted"), false);
 	assert.equal(keyOf(none.label), "no-checkable-outcome");
 	assert.equal(none.facts?.subIssuesTotal, 0);
-	// A capture that recorded no source, or one this reader does not recognize, claims neither.
+	// A capture that recorded no source claims neither.
 	for (const legacy of [story, subIssues, totalOnly, none, unrecognized]) {
 		assert.equal(Object.hasOwn(legacy.facts ?? {}, "subIssuesSource"), false);
 	}
@@ -898,7 +1052,7 @@ void test("a plain #number is the reviewed repository's issue, whichever permitt
 			truncated: false,
 			issues: [
 				{ ...teamProject, number: 7, title: "Show the map", state: "OPEN" },
-				{ ...teamOther, number: 7, title: "Rename the app", state: "CLOSED" },
+				{ ...teamOther, number: 7, title: "Rename the app", body: "", state: "CLOSED" },
 				{ ...teamOther, number: 8, title: "Fix the icon", state: "OPEN" },
 				// The same full name on another provider is another repository.
 				{
@@ -987,7 +1141,10 @@ void test("an inventory that does not say whose issues it holds leaves the revie
 	for (const inventory of [
 		{ issues: [{ number: 7, title: "Show the map", state: "OPEN" }] },
 		// A capture of one other repository says nothing about the reviewed one.
-		{ repository: "team/other", issues: [{ number: 7, title: "Rename the app", state: "OPEN" }] },
+		{
+			repository: "team/other",
+			issues: [{ number: 7, title: "Rename the app", body: "", state: "OPEN" }],
+		},
 	]) {
 		const result = await linksAgainst(inventory, {
 			repository_full_name: "team/project",
@@ -1084,6 +1241,7 @@ void test("a URL match without provider custody keeps a closing candidate outsid
 				{
 					number: 7,
 					title: "Captured candidate",
+					body: "",
 					state: "CLOSED",
 					how: "closesOnMerge",
 					url: address,
@@ -1114,6 +1272,7 @@ void test("a foreign provider closing candidate does not supply a plain referenc
 					...teamOther,
 					number: 7,
 					title: "Rename the app",
+					body: "",
 					state: "CLOSED",
 					url: "https://example.org/team/other/issues/7",
 				},
@@ -1125,6 +1284,7 @@ void test("a foreign provider closing candidate does not supply a plain referenc
 				{
 					number: 7,
 					title: "Rename the app",
+					body: "",
 					state: "CLOSED",
 					how: "closesOnMerge",
 					url: "https://example.org/team/other/issues/7",
@@ -1164,6 +1324,7 @@ void test("an unmatched closing candidate keeps its own URL instead of an unrela
 				{
 					number: 7,
 					title: "Foreign candidate",
+					body: "",
 					state: "CLOSED",
 					how: "closesOnMerge",
 					url: foreign,

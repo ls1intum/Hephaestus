@@ -230,11 +230,7 @@ export default definePracticeScript({
 		return ctx.review({
 			leads: [...untrackedTodos, ...parts.flatMap((p) => p.leads ?? [])],
 			facts,
-			// `ReviewOptions` types `units` as a mutable list and `Omission` as a readonly one; these
-			// omissions name no units.
-			limitations: parts
-				.flatMap((p) => p.unrated ?? [])
-				.map(({ what, count, reason }) => ({ what, count, reason })),
+			limitations: parts.flatMap((p) => p.unrated ?? []),
 			directions: ["Check each lead against the criterion before you cite it."],
 		});
 	},

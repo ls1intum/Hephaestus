@@ -146,6 +146,7 @@ import {
 	TREE_SOURCE,
 	type BoundModels,
 	type Candidate,
+	type CodeCitationIdentity,
 	type Coverage,
 	type Omission,
 	type Outcome,
@@ -1251,7 +1252,24 @@ function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Val
 			);
 		}
 	}
-	const parsed = parseCandidate({ ...submission, coverage });
+	const change = capturedChange();
+	const parsed = parseCandidate(
+		{ ...submission, coverage },
+		(citation): CodeCitationIdentity | undefined => {
+			if (citation.sourceKind === TREE_SOURCE) {
+				const repository = citationRepository(citation);
+				const revision = citation.revision ?? checkedOutCommit(repository);
+				return revision === null ? undefined : { repository, revision };
+			}
+			if (citation.sourceKind === DIFF_SOURCE && change !== null) {
+				return {
+					repository: INPUT_PATHS.repositoryRoot,
+					revision: citation.side === "OLD" ? change.base : change.head,
+				};
+			}
+			return undefined;
+		},
+	);
 	if (!parsed.ok) {
 		throw new Error(
 			parsed.reasonCode === "met_coverage_incomplete"
@@ -4871,6 +4889,7 @@ async function main() {
 			signal.addEventListener("abort", stop, { once: true });
 			const text = () => practiceTurnText(practiceHeading, slug, brief, prepared);
 			try {
+				signal.throwIfAborted();
 				await Promise.race([promptPractice(opened.session, text, slug), safety.elapsed]);
 				await askOnceMore(opened.session, text, slug);
 			} catch (error) {
@@ -4894,6 +4913,7 @@ async function main() {
 			if (sessionStopFailure !== null) {
 				throw sessionStopFailure;
 			}
+			signal.throwIfAborted();
 			if (review.draft !== null) {
 				return review.draft;
 			}

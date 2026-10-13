@@ -147,30 +147,6 @@ export function repositoryIssues(
 			);
 }
 
-/**
- * Number-only lookup for an explicitly scoped single-repository capture. Persisted scripts import
- * this export; ambiguous workspace rows must fail as advisory leads, never become another work's issue.
- */
-export function inventoryIssues(inventory: ProjectInventory | null): Map<number, InventoryItem> {
-	const repository = inventory?.repository;
-	if (
-		repository === undefined ||
-		repository === "" ||
-		inventory?.issues === undefined ||
-		inventory.issues.some(
-			(issue) => issue.repository !== undefined && issue.repository !== repository,
-		) ||
-		// One full name can name repositories of two providers; rows that say so are not one repository.
-		new Set(inventory.issues.flatMap((issue) => issue.repositoryId ?? [])).size > 1 ||
-		new Set(inventory.issues.flatMap((issue) => issue.providerId ?? [])).size > 1
-	) {
-		throw new Error(
-			"Issue inventory has no explicit single-repository scope; use repositoryIssues with the reviewed repository.",
-		);
-	}
-	return new Map(inventory.issues.map((issue) => [issue.number, issue]));
-}
-
 /** Whether an inventory state is the provider's "open" — `OPEN` on GitHub, `OPENED` on GitLab. */
 export function isOpenState(state: string | undefined): boolean {
 	return state !== undefined && /^open(?:ed)?$/iu.test(state);

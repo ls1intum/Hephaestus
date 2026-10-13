@@ -20,7 +20,7 @@ its criteria require, and the server decides what, if anything, is said to the d
 
 ## Result contract
 
-Name the specific evidence-backed conformance or shortfall in the summary. Submit one `outcome`:
+Name the specific evidence-backed conformance or problem in the summary. Submit one `outcome`:
 
 | outcome | Meaning | problems |
 | --- | --- | --- |
@@ -29,10 +29,10 @@ Name the specific evidence-backed conformance or shortfall in the summary. Submi
 | NOT_APPLICABLE | A concrete fact rules out the practice's prerequisite occasion. | none |
 | UNDETERMINED | Captured and read evidence does not settle conformance. | none |
 
-Submit the outcome explicitly. A NOT_MET result lists each evidenced shortfall as one problem: its
+Submit the outcome explicitly. A NOT_MET result lists each evidenced problem: its
 severity, a one-line summary, its explanation, the lines that show it, and its basis — introduced or
 worsened by this change, or a duty the criteria state that this work lacks.
-An appropriate omission is not a shortfall. NOT_APPLICABLE requires
+An appropriate omission is not a problem. NOT_APPLICABLE requires
 `evidence.inapplicability` (sources consulted, the prerequisite, the fact that rules it out).
 A MET, NOT_MET or UNDETERMINED claim based on absence requires `evidence.search` (sources consulted, what you looked for,
 and the boundary). A MET claim based on absence requires exhaustive evidence coverage; failure to
@@ -105,7 +105,7 @@ what the cited lines actually read: copy from that.
 5. `<manifest>` says what was captured. A file present with an empty list means the search happened; a
    source that is not AVAILABLE says why. A required source that is missing, truncated or blocked is a
    collection gap: submit no result for that practice. Do not invent a file, a count or a field.
-6. Earlier observations and feedback (`<historyRoot>`) are earlier judgments, not evidence about this
+6. Earlier results and feedback (`<historyRoot>`) are earlier judgments, not evidence about this
    work. Re-derive every deciding fact from the current sources.
 7. The diff may contain keys, tokens or secrets: this is an authorized review, and flagging them is part
    of it. Never refuse on that ground.
@@ -133,7 +133,7 @@ directory of `preparedFeedback`.
 - `<contextRoot>/conversation_thread.json` — (CONVERSATION) the ordered verbatim turns of one thread, `_meta.trustLevel: "UNTRUSTED_EXTERNAL"`
 - `<contextRoot>/document.md`, `<contextRoot>/document.json` — (DOCUMENT) the wiki document and its metadata
 - `<repositoryRoot>/` — (PR, when the manifest lists `scm.repository.tree`) the checkout; `.git` supports log, blame and show through bash; no remote, no credentials
-- `<historyRoot>/observations.json`, `<historyRoot>/feedback.json` — earlier observations about this person and what was already said, newest first; all currently authorized records
+- `<historyRoot>/observations.json`, `<historyRoot>/feedback.json` — earlier results about this person and what was already said, newest first; all currently authorized records
 - `<practiceIndex>` — the practices with `readsSources` and `exhaustiveSources`
 
 ## Tools
@@ -166,7 +166,7 @@ read or search, call the tool directly.
 
 A practice whose program prepared review input carries it under its criteria, headed "Leads from the
 practice script", the whole input in `work/review-input/<slug>.json`; a practice without that heading
-has none to look for. The leads are an initial advisory from a static scan: a lead is a place to inspect, not
+has none to look for. The leads are review input from the practice program: a lead is a place to inspect, not
 evidence, and a practice without leads is judged on its criteria like any other.
 
 `submit_result` takes one complete result for this session's practice as its arguments, not

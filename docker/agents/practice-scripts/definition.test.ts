@@ -567,7 +567,7 @@ void describe("the attempt's direct model budget", () => {
 		});
 	});
 
-	void test("a model that never answers is unrated at the practice's deadline, and the program still returns its result", async () => {
+	void test("a program that returns a candidate after its deadline fails without a candidate", async () => {
 		await withStandIn(never, async (standIn) => {
 			const { outcome } = await run(
 				"slow-model",
@@ -575,27 +575,44 @@ void describe("the attempt's direct model budget", () => {
 				standIn,
 				{ deadlineMs: 1500 },
 			);
-			assert.equal(outcome.status, "ok", outcome.error);
-			assert.partialDeepStrictEqual(outcome.candidate, {
-				outcome: "UNDETERMINED",
-				citations: [
-					{
-						path: "src/cart.ts",
-						side: "NEW",
-						startLine: 2,
-						quote: "  // increment the item count by one",
-					},
-				],
-				coverage: {
-					complete: false,
-					omitted: [{ what: "embedding of the added comments", count: 1, reason: "deadline" }],
-				},
-			});
+			assert.equal(outcome.status, "failed", outcome.error);
+			assert.equal(outcome.stopReason, "deadline");
+			assert.equal(outcome.candidate, undefined);
 			assert.deepEqual(outcome.models, [
 				{ slot: "embedding", need: "required", bound: true, notRated: { deadline: 1 } },
 			]);
 		});
 	});
+
+	for (const usage of [
+		{},
+		{ prompt_tokens: 10 },
+		{ completion_tokens: 5 },
+		{ prompt_tokens: -1, completion_tokens: 5 },
+	]) {
+		void test(`a chat receipt ${JSON.stringify(usage)} keeps its reservation`, async () => {
+			await withStandIn(
+				async () => ({ ...chatMessage("ok"), usage }),
+				async (standIn) => {
+					const budget = new ModelBudget(5000, MODEL_CONCURRENCY);
+					const source = `import { definePracticeScript, generateText } from "../lib/practice-script.ts";
+export default definePracticeScript({ meta: { models: { chat: "required" } }, async run(ctx) {
+await generateText({ model: ctx.models.chat, prompt: "Say yes.", maxOutputTokens: 1000 });
+return ctx.review();
+} });`;
+					const result = await runSource(
+						source,
+						{ chat: { protocol: "openai-completions", modelId: "chat" } },
+						standIn,
+						{ slugs: ["receipt"], budget },
+					);
+					reviewed(result.get("receipt") ?? assert.fail("the program ran"));
+					assert.ok(budget.left < 4000, `reservation retained: ${budget.left}`);
+					assert.equal(standIn.requests.length, 1);
+				},
+			);
+		});
+	}
 
 	for (const [status, refusal, reason] of [
 		[402, "a spending limit", "budget"],

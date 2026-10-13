@@ -222,6 +222,34 @@ const slowReview = (ms: number) => async () => {
 };
 
 void describe("a practice's result", () => {
+	void test("a custom program cannot return a diff problem with a tree example on the same lines", async () => {
+		const ws = await workspace({
+			overlap: program(
+				"definePracticeScript",
+				`{ meta: {}, async run(ctx) {
+				if (ctx.files === null || ctx.files.change === null) throw new Error("The files were not captured");
+				const diff = await ctx.files.change.cite("src/cart.ts", "NEW", 2);
+				const tree = await ctx.files.head.cite("src/cart.ts", 2);
+				return {
+					outcome: "NOT_MET", summary: "A problem", explanation: "The added code has a problem.", citations: [],
+					problems: [{ severity: "MAJOR", summary: "A problem", explanation: "The code has a problem.", citations: [diff], basis: { type: "introduced", head: 0, explanation: "The change adds it." } }],
+					example: { citation: tree, note: "The practice done well." }, evidence: {},
+					coverage: { source: "claimed", selected: 1, checked: 1, total: 1, complete: true }
+				};
+			} }`,
+			),
+		});
+		await writeFile(
+			path.join(ws.repo, "src", "cart.ts"),
+			"export class Cart {\n  // increment the item count by one\n  count += 1;\n}\n",
+		);
+		const { outcome } = await run(ws, "overlap");
+		assert.equal(outcome.status, "failed");
+		assert.equal(outcome.stopReason, "invalid-candidate");
+		assert.match(outcome.error ?? "", /example_overlaps_problem/u);
+		assert.equal(outcome.candidate, undefined);
+	});
+
 	void test("a custom program that decides in code returns its own result and asks for no review", async () => {
 		const ws = await workspace({ direct: await fixture("direct") });
 		const { outcome, reviews, staged } = await run(ws, "direct");
@@ -402,6 +430,26 @@ export default definePracticeScript({
 });
 
 void describe("the host's bounds on a program's messages", () => {
+	void test("a shared-reference object is refused without JSON expansion in the host", async () => {
+		const ws = await workspace({ graph: await fixture("shared-reference-ipc") });
+		const { outcome } = await run(ws, "graph");
+		assert.equal(outcome.status, "failed");
+		assert.equal(outcome.stopReason, "error");
+		assert.equal(outcome.error, "the program's process must send JSON text");
+		assert.equal(outcome.candidate, undefined);
+	});
+
+	void test("malformed JSON text is refused before a request runs", async () => {
+		const ws = await workspace({
+			malformed: program(
+				"definePracticeScript",
+				`{ meta: {}, async run() { process.send("{"); return Promise.withResolvers().promise; } }`,
+			),
+		});
+		const { outcome, reviews } = await run(ws, "malformed");
+		assert.equal(outcome.error, "the program sent a message that is not JSON");
+		assert.deepEqual(reviews, []);
+	});
 	void test("more requests in flight than the host answers stop the program", async () => {
 		const embedding = new MockEmbeddingModelV4({
 			// It answers only when the host aborts the call.
@@ -441,8 +489,8 @@ void describe("the host's bounds on a program's messages", () => {
 			reused: program(
 				"definePracticeScript",
 				`{ meta: {}, async run() {
-					process.send({ kind: "review", id: 7, options: {} });
-					process.send({ kind: "read", id: 7, request: { op: "record", name: "metadata.json" } });
+					process.send(JSON.stringify({ kind: "review", id: 7, options: {} }));
+					process.send(JSON.stringify({ kind: "read", id: 7, request: { op: "record", name: "metadata.json" } }));
 					return Promise.withResolvers().promise;
 				} }`,
 			),
@@ -463,6 +511,57 @@ void describe("the host's bounds on a program's messages", () => {
 });
 
 void describe("a program that does not stop when the host stops it", { concurrency: true }, () => {
+	void test("a custom program cannot replace its cancelled review with a final candidate", async () => {
+		const cancel = new AbortController();
+		const candidate = {
+			...REVIEWED,
+			coverage: { source: "claimed", selected: 1, checked: 1, total: 1, complete: true },
+		};
+		const ws = await workspace({
+			late: program(
+				"definePracticeScript",
+				`{ meta: {}, async run(ctx) { try { await ctx.review(); } catch {} return ${JSON.stringify(candidate)}; } }`,
+			),
+		});
+		const { outcome } = await run(ws, "late", {
+			signal: cancel.signal,
+			review: async () => {
+				cancel.abort(new UnratedError("cancelled", "the attempt was cancelled"));
+				return REVIEWED;
+			},
+		});
+		assert.equal(outcome.status, "failed");
+		assert.equal(outcome.stopReason, "cancelled");
+		assert.equal(outcome.candidate, undefined);
+	});
+
+	void test("a built-in review that answers after its deadline supplies no candidate", async () => {
+		const ws = await workspace({ builtin: null });
+		const { outcome } = await run(ws, "builtin", {
+			deadlineMs: 100,
+			review: async (_options, signal) => {
+				await once(signal, "abort");
+				return REVIEWED;
+			},
+		});
+		assert.equal(outcome.status, "failed");
+		assert.equal(outcome.stopReason, "deadline");
+		assert.equal(outcome.candidate, undefined);
+	});
+	void test("a built-in review that answers after cancellation supplies no candidate", async () => {
+		const cancel = new AbortController();
+		const ws = await workspace({ builtin: null });
+		const { outcome } = await run(ws, "builtin", {
+			signal: cancel.signal,
+			review: async () => {
+				cancel.abort(new UnratedError("cancelled", "the attempt was cancelled"));
+				return REVIEWED;
+			},
+		});
+		assert.equal(outcome.status, "failed");
+		assert.equal(outcome.stopReason, "cancelled");
+		assert.equal(outcome.candidate, undefined);
+	});
 	void test("on cancellation, its open review fails, a later reply is not delivered, and the host ends it", async () => {
 		const cancel = new AbortController();
 		const ws = await workspace({ cancellation: await fixture("cancellation") });
@@ -481,7 +580,7 @@ void describe("a program that does not stop when the host stops it", { concurren
 		);
 		assert.equal(outcome.status, "failed");
 		assert.equal(outcome.stopReason, "cancelled");
-		assert.equal(outcome.error, "the program did not return before its deadline");
+		assert.equal(outcome.error, "the host stopped this program: cancelled");
 		assert.ok(
 			(outcome.durationMs ?? 0) >= RETURN_MS,
 			`ended after ${String(outcome.durationMs)}ms`,

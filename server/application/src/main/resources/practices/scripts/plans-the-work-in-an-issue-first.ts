@@ -3,6 +3,7 @@
 // times beside each other.
 import { factsOf, listWithin } from "../lib/bounded-text.ts";
 import { readCapturedCommits } from "../lib/change.ts";
+import { REVIEW_LEAD_LIMIT } from "../lib/contract.ts";
 import { definePracticeScript, expectKind, type ReviewLead } from "../lib/practice-script.ts";
 import {
 	branchIssueReferences,
@@ -154,7 +155,17 @@ export default definePracticeScript({
 			}
 		}
 		return ctx.review({
-			leads,
+			leads: leads.slice(0, REVIEW_LEAD_LIMIT),
+			limitations:
+				leads.length > REVIEW_LEAD_LIMIT
+					? [
+							{
+								what: "linked issue leads",
+								count: leads.length - REVIEW_LEAD_LIMIT,
+								reason: "selection",
+							},
+						]
+					: [],
 			facts: {
 				namedIssues: named.size,
 				unresolvedNamedIssues: unresolved.length,

@@ -116,7 +116,16 @@ async function runBuiltin(job: ProgramJob, services: ProgramServices): Promise<P
 		abortSignal: signal,
 	});
 	try {
-		return { value: await BUILTIN_PROGRAM.run(ctx), models: report, calls };
+		signal.throwIfAborted();
+		if (Date.now() >= job.deadline) {
+			throw new UnratedError("deadline", "the program reached its deadline");
+		}
+		const value = await BUILTIN_PROGRAM.run(ctx);
+		signal.throwIfAborted();
+		if (Date.now() >= job.deadline) {
+			throw new UnratedError("deadline", "the program reached its deadline");
+		}
+		return { value, models: report, calls };
 	} catch (error) {
 		const stopReason = signal.aborted ? abortReasonOf(signal) : reasonOf(error);
 		return {
@@ -184,7 +193,9 @@ export async function runPracticeProgram(
 			? finished("skipped", failure.stopReason)
 			: finished("failed", failure.stopReason, { error: failure.error });
 	}
-	const parsed = parseCandidate(execution.value);
+	const parsed = parseCandidate(execution.value, (citation) =>
+		services.reader.citationIdentity(citation),
+	);
 	if (!parsed.ok) {
 		return finished("failed", "invalid-candidate", {
 			error: isLeadsReturn(execution.value)

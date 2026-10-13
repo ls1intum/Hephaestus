@@ -261,6 +261,11 @@ export class ModelBudget {
 		signal: AbortSignal,
 		call: () => Promise<{ value: T; tokens: number | undefined }>,
 	): Promise<{ value: T; tokens: number } | { reason: Reason }> {
+		try {
+			signal.throwIfAborted();
+		} catch {
+			return { reason: "deadline" };
+		}
 		if (this.#free > 0) {
 			this.#free -= 1;
 		} else {
@@ -288,10 +293,17 @@ export class ModelBudget {
 			}
 			this.#left -= reserve;
 			try {
-				const { value, tokens = reserve } = await call();
+				const answered = await call();
+				const tokens =
+					answered.tokens !== undefined &&
+					Number.isSafeInteger(answered.tokens) &&
+					answered.tokens >= 0
+						? answered.tokens
+						: reserve;
+				signal.throwIfAborted();
 				// Settle: give back what the call did not use, take what it used beyond the estimate.
 				this.#left += reserve - tokens;
-				return { value, tokens };
+				return { value: answered.value, tokens };
 			} catch (error) {
 				return { reason: failureOf(signal, error) };
 			}

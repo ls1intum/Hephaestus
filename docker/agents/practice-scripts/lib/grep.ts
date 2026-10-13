@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createInterface } from "node:readline";
 
@@ -157,22 +156,4 @@ export async function grep(
 		dir,
 		maxResults,
 	);
-}
-
-export async function readFileLines(file: string): Promise<Map<number, string>> {
-	try {
-		const content = await readFile(file, "utf8");
-		const lines = new Map<number, string>();
-		for (const [i, line] of content.split("\n").entries()) {
-			lines.set(i + 1, line);
-		}
-		return lines;
-	} catch (error) {
-		console.error(`[practice-script] readFileLines failed for ${file}: ${String(error)}`);
-		return new Map();
-	}
-}
-
-export function findFiles(dir: string, extension: string): string[] {
-	return globFilesSync(`**/*.${extension}`, dir).map((file) => path.join(dir, file));
 }

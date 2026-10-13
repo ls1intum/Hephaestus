@@ -148,7 +148,6 @@ const readRequestSchema = z.union([
 		endLine: lineNumber.optional(),
 	}),
 ]);
-export { readRequestSchema };
 
 export const childMessageSchema = z.discriminatedUnion("kind", [
 	z.strictObject({ kind: z.literal("meta"), meta: z.unknown() }),

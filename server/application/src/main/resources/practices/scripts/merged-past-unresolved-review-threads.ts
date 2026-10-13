@@ -1,3 +1,4 @@
+import { REVIEW_LEAD_LIMIT } from "../lib/contract.ts";
 // Finds the merge as the record holds it, and each review thread that the record does not show as
 // resolved by the merge. Each thread lead tells where the thread is anchored, when it was opened and
 // if the provider calls it outdated. The review reads each thread against the merge.
@@ -44,6 +45,7 @@ export default definePracticeScript({
 		const record = await readReviewThreads(ctx.evidence);
 		const threads = record?.threads ?? [];
 		const candidates = candidateThreads(threads, merge);
+		const selected = candidates.slice(0, REVIEW_LEAD_LIMIT - 1);
 		const directions: string[] = [];
 		if (record === null) {
 			directions.push(
@@ -51,7 +53,7 @@ export default definePracticeScript({
 			);
 		} else {
 			directions.push(
-				`Merged${merge.mergedBy === undefined ? "" : ` by ${merge.mergedBy}`}${merge.mergedByIsAuthor ? " (the author)" : ""}; ${String(threads.length)} thread(s) captured, ${String(candidates.length)} candidate thread(s), one lead each.`,
+				`Merged${merge.mergedBy === undefined ? "" : ` by ${merge.mergedBy}`}${merge.mergedByIsAuthor ? " (the author)" : ""}; ${String(threads.length)} thread(s) captured, ${String(candidates.length)} candidate thread(s), ${String(selected.length)} thread lead(s).`,
 				"A candidate thread is not marked RESOLVED now, was resolved after the merge, or was resolved at a time that the record does not establish.",
 				...(mergeUndated
 					? [
@@ -65,8 +67,18 @@ export default definePracticeScript({
 		return ctx.review({
 			leads: [
 				mergeLead(ctx.work, merge, LABELS.merge),
-				...candidates.map((thread) => threadLead(thread, merge, LABELS)),
+				...selected.map((thread) => threadLead(thread, merge, LABELS)),
 			],
+			limitations:
+				candidates.length > selected.length
+					? [
+							{
+								what: "review thread leads",
+								count: candidates.length - selected.length,
+								reason: "selection",
+							},
+						]
+					: [],
 			facts: {
 				mergedByIsAuthor: merge.mergedByIsAuthor ? 1 : 0,
 				threads: threads.length,

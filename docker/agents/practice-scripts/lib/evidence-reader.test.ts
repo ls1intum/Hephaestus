@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, test, type TestContext } from "node:test";
 
-import { DIFF_SOURCE, TREE_SOURCE } from "./contract.ts";
+import {
+	DIFF_SOURCE,
+	parseCandidate,
+	TREE_SOURCE,
+	type Candidate,
+	type Citation,
+} from "./contract.ts";
 import { parseDiff } from "./diff-parser.ts";
 import {
 	EvidenceReader,
@@ -85,6 +91,95 @@ async function unrated(promise: Promise<unknown>, reason: string, message?: RegE
 		return true;
 	});
 }
+
+const candidateWithExample = (problem: Citation, example: Citation) =>
+	({
+		outcome: "NOT_MET",
+		summary: "A problem at the cited lines",
+		explanation: "The cited lines show the problem.",
+		citations: [],
+		problems: [
+			{
+				severity: "MAJOR",
+				summary: "A problem",
+				explanation: "At these lines.",
+				citations: [problem],
+				basis: {
+					type: "duty",
+					criterionQuote: "The criteria require it.",
+					event: 0,
+					explanation: "The criteria require it.",
+				},
+			},
+		],
+		example: { citation: example, note: "The practice done well." },
+		evidence: {},
+		coverage: { source: "claimed", selected: 1, checked: 1, total: 1, complete: true },
+	}) satisfies Candidate;
+
+void test("a problem and example resolve to the same code across diff and tree citations", async (t) => {
+	const { reader, sources } = await captures(t);
+	const diff = await reader.answer({
+		op: "cite",
+		source: "change",
+		path: "src/cart.ts",
+		side: "NEW",
+		startLine: 2,
+		endLine: 3,
+	});
+	const head = await reader.answer({
+		op: "cite",
+		source: "tree",
+		tree: "head",
+		path: "src/cart.ts",
+		startLine: 3,
+	});
+	const old = await reader.answer({
+		op: "cite",
+		source: "change",
+		path: "src/cart.ts",
+		side: "OLD",
+		startLine: 2,
+	});
+	const headAtTwo = await reader.answer({
+		op: "cite",
+		source: "tree",
+		tree: "head",
+		path: "src/cart.ts",
+		startLine: 2,
+	});
+	const other = new EvidenceReader(
+		{ ...sources, treeArtifact: "repos/other/.git/HEAD" },
+		noReceipts(),
+	);
+	const elsewhere = await other.answer({
+		op: "cite",
+		source: "tree",
+		tree: "head",
+		path: "src/cart.ts",
+		startLine: 3,
+	});
+	const resolve = (citation: Citation) =>
+		reader.citationIdentity(citation) ?? other.citationIdentity(citation);
+
+	for (const example of [head, { ...head, revision: undefined }]) {
+		const parsed = parseCandidate(candidateWithExample(diff, example), resolve);
+		assert.ok(!parsed.ok);
+		assert.equal(parsed.reasonCode, "example_overlaps_problem", parsed.message);
+	}
+	for (const [problem, example] of [
+		[old, headAtTwo],
+		[headAtTwo, { ...headAtTwo, revision: "b".repeat(40) }],
+		[diff, elsewhere],
+		[headAtTwo, head],
+	] as const) {
+		assert.equal(parseCandidate(candidateWithExample(problem, example), resolve).ok, true);
+	}
+	const baseTree = { ...headAtTwo, revision: "b".repeat(40), quote: old.quote };
+	const parsed = parseCandidate(candidateWithExample(old, baseTree), resolve);
+	assert.ok(!parsed.ok);
+	assert.equal(parsed.reasonCode, "example_overlaps_problem", parsed.message);
+});
 
 void describe("reads of the head tree", () => {
 	void test("a file is FOUND with its text, a binary file is BINARY, and a missing path is ABSENT", async (t) => {

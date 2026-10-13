@@ -6,7 +6,13 @@
 import { open, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
-import { CANDIDATE_LIMITS, DIFF_SOURCE, TREE_SOURCE, type Citation } from "./contract.ts";
+import {
+	CANDIDATE_LIMITS,
+	DIFF_SOURCE,
+	TREE_SOURCE,
+	type Citation,
+	type CodeCitationIdentity,
+} from "./contract.ts";
 import { globFilesSync } from "./files.ts";
 import { grep } from "./grep.ts";
 import type { ReadRequest, ReadValues } from "./ipc.ts";
@@ -140,8 +146,21 @@ export class EvidenceReader {
 		this.#receipts = receipts;
 	}
 
-	get sources(): EvidenceSources {
-		return this.#sources;
+	citationIdentity(citation: Citation): CodeCitationIdentity | undefined {
+		const sources = this.#sources;
+		if (sources.repo === null) {
+			return undefined;
+		}
+		let revision: string | null | undefined;
+		if (citation.sourceKind === TREE_SOURCE && citation.artifactPath === sources.treeArtifact) {
+			revision = citation.revision ?? sources.headRevision;
+		} else if (
+			citation.sourceKind === DIFF_SOURCE &&
+			citation.artifactPath === path.posix.join(sources.contextReference, "change.json")
+		) {
+			revision = citation.side === "OLD" ? sources.change?.base : sources.change?.head;
+		}
+		return revision == null ? undefined : { repository: sources.treeArtifact, revision };
 	}
 
 	/** Answer one read. A read that cannot be answered throws `UnratedError` with its reason. */

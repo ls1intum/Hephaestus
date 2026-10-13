@@ -19,7 +19,7 @@ export default definePracticeScript({
 			}
 		});
 		const review = ctx.review();
-		process.send?.({ kind: "review", id: FORGED_ID, options: {} });
+		process.send?.(JSON.stringify({ kind: "review", id: FORGED_ID, options: {} }));
 		ctx.log(`nested review: ${await answered.promise}`);
 		return review;
 	},

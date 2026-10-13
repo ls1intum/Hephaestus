@@ -5,7 +5,7 @@ export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
 		const candidate = await ctx.review();
-		process.send?.({ kind: "result", value: candidate });
+		process.send?.(JSON.stringify({ kind: "result", value: candidate }));
 		return candidate;
 	},
 });

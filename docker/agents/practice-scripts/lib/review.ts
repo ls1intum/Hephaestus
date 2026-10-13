@@ -3,12 +3,14 @@
  * a captured record with no items; a read that fails throws `UnratedError("unavailable")`.
  */
 
+import { z } from "zod";
+
 import { factsOf } from "./bounded-text.ts";
 import type { ChangeCommit } from "./change.ts";
 import type { Cause, ReviewLead, Work } from "./contract.ts";
-import { subIssueSource, type SubIssueSource } from "./issue-classification.ts";
-import { isJsonObject, optionalNumber, optionalString, text } from "./json.ts";
-import { readRecordJson, type Evidence } from "./practice-script.ts";
+import type { SubIssueSource } from "./issue-classification.ts";
+import { optionalString } from "./json.ts";
+import { UnratedError, type Evidence } from "./practice-script.ts";
 import type { DiffFile } from "./types.ts";
 
 export interface LinkedWorkItem {
@@ -83,12 +85,93 @@ export interface ReviewDecision {
 	dismissed?: boolean;
 }
 
-function linkHow(value: unknown): LinkedWorkItem["how"] {
-	return value === "closesOnMerge" || value === "mentions" ? value : undefined;
-}
+const linkedWorkItemSchema = z.object({
+	number: z.int().positive(),
+	title: z.string().nullable(),
+	body: z.string().nullable(),
+	state: z.enum(["OPEN", "CLOSED"]).optional(),
+	how: z.enum(["closesOnMerge", "mentions"]).optional(),
+	url: z.string().nullable().optional(),
+	createdAt: z.string().optional(),
+	closedAt: z.string().optional(),
+	subIssuesTotal: z.int().nonnegative().optional(),
+	subIssuesCompleted: z.int().nonnegative().optional(),
+	subIssuesSource: z.enum(["provider", "children"]).optional(),
+});
+const linkedWorkItemCaptureSchema = z.object({
+	workItems: z.array(linkedWorkItemSchema),
+	unresolvedReferences: z.array(z.int().positive()).optional(),
+});
+const commentSchema = z.object({
+	body: z.string(),
+	author: z.string().optional(),
+	bot: z.boolean().optional(),
+	createdAt: z.string().optional(),
+	created_at: z.string().optional(),
+});
+const reviewCommentsSchema = z.array(
+	commentSchema.extend({
+		id: z.int().nonnegative().optional(),
+		thread: z.int().nonnegative().optional(),
+		in_reply_to: z.int().nonnegative().optional(),
+		path: z.string(),
+		line: z.int().nonnegative().optional(),
+		side: z.enum(["LEFT", "RIGHT"]).optional(),
+		outdated: z.boolean().optional(),
+	}),
+);
+const generalCommentsSchema = z
+	.object({ comments: z.array(commentSchema) })
+	.transform((record) => record.comments);
+const reviewThreadsSchema = z.object({
+	threads: z.array(
+		z.object({
+			id: z.int().nonnegative().optional(),
+			path: z.string().optional(),
+			line: z.int().nonnegative().optional(),
+			state: z.enum(["UNRESOLVED", "RESOLVED"]),
+			resolvedBy: z.string().optional(),
+			resolvedAt: z.string().optional(),
+			outdated: z.boolean().optional(),
+			createdAt: z.string().optional(),
+		}),
+	),
+	reviewDecisions: z.array(
+		z.object({
+			state: z.enum(["APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED"]),
+			author: z.string().optional(),
+			bot: z.boolean().optional(),
+			submittedAt: z.string().optional(),
+			body: z.string().optional(),
+			dismissed: z.boolean().optional(),
+		}),
+	),
+});
 
-function objects(value: unknown): Record<string, unknown>[] {
-	return Array.isArray(value) ? value.filter(isJsonObject) : [];
+async function readReviewRecord<T>(
+	evidence: Pick<Evidence, "record">,
+	name: string,
+	schema: z.ZodType<T>,
+): Promise<{ data: T; source: string } | null> {
+	const record = await evidence.record(name);
+	if (record.status === "ABSENT") {
+		return null;
+	}
+	let value: unknown;
+	try {
+		value = JSON.parse(record.text);
+	} catch {
+		throw new UnratedError("unavailable", `${name} is not valid JSON`);
+	}
+	const parsed = schema.safeParse(value);
+	if (!parsed.success) {
+		const issue = parsed.error.issues[0];
+		throw new UnratedError(
+			"unavailable",
+			`${name} has an invalid record shape at ${issue?.path.join(".") ?? ""}: ${issue?.message ?? "invalid"}`,
+		);
+	}
+	return { data: parsed.data, source: record.text };
 }
 
 /** What `linked_work_items.json` records: the resolved items and the numbers this repository holds no issue for. */
@@ -101,36 +184,23 @@ interface LinkedWorkItemCapture {
 export async function readLinkedWorkItemCapture(
 	evidence: Pick<Evidence, "record">,
 ): Promise<LinkedWorkItemCapture | null> {
-	const parsed = await readRecordJson(evidence, "linked_work_items.json");
-	if (parsed === null) {
+	const record = await readReviewRecord(
+		evidence,
+		"linked_work_items.json",
+		linkedWorkItemCaptureSchema,
+	);
+	if (record === null) {
 		return null;
 	}
-	const envelope = isJsonObject(parsed) ? parsed : { workItems: parsed };
-	const items = objects(envelope.workItems).flatMap((item) => {
-		const number = optionalNumber(item.number);
-		if (number === undefined) {
-			return [];
-		}
-		return [
-			{
-				number,
-				title: text(item.title),
-				state: optionalString(item.state),
-				how: linkHow(item.how),
-				url: optionalString(item.url),
-				body: text(item.body ?? item.description),
-				createdAt: optionalString(item.createdAt),
-				closedAt: optionalString(item.closedAt),
-				subIssuesTotal: optionalNumber(item.subIssuesTotal),
-				subIssuesCompleted: optionalNumber(item.subIssuesCompleted),
-				subIssuesSource: subIssueSource(item.subIssuesSource),
-			},
-		];
-	});
-	const unresolved = Array.isArray(envelope.unresolvedReferences)
-		? envelope.unresolvedReferences.flatMap((n) => optionalNumber(n) ?? [])
-		: [];
-	return { items, unresolved };
+	return {
+		items: record.data.workItems.map((item) => ({
+			...item,
+			title: item.title ?? "",
+			body: item.body ?? "",
+			url: item.url ?? undefined,
+		})),
+		unresolved: record.data.unresolvedReferences ?? [],
+	};
 }
 
 /** The issues the change names, as `linked_work_items.json` records them; null when not captured. */
@@ -146,23 +216,17 @@ export async function readLinkedWorkItems(
  * record with one key on each line, so the n-th `"body"` line is the n-th comment's. When the lines
  * do not pair one to one, each line is 0.
  */
-async function readCommentRecord(
+async function readCommentRecord<T>(
 	evidence: Pick<Evidence, "record">,
 	name: string,
-): Promise<{ comments: Record<string, unknown>[]; bodyLines: number[] } | null> {
-	const record = await evidence.record(name);
-	if (record.status === "ABSENT") {
+	schema: z.ZodType<T[]>,
+): Promise<{ comments: T[]; bodyLines: number[] } | null> {
+	const record = await readReviewRecord(evidence, name, schema);
+	if (record === null) {
 		return null;
 	}
-	const source = record.text;
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(source);
-	} catch {
-		return null;
-	}
-	const comments = isJsonObject(parsed) ? objects(parsed.comments) : objects(parsed);
-	const bodyLines = source
+	const comments = record.data;
+	const bodyLines = record.source
 		.split("\n")
 		.flatMap((line, index) => (/^\s*"body"\s*:/u.test(line) ? [index + 1] : []));
 	return {
@@ -175,22 +239,22 @@ async function readCommentRecord(
 export async function readReviewComments(
 	evidence: Pick<Evidence, "record">,
 ): Promise<ReviewComment[] | null> {
-	const record = await readCommentRecord(evidence, "comments.json");
+	const record = await readCommentRecord(evidence, "comments.json", reviewCommentsSchema);
 	if (record === null) {
 		return null;
 	}
 	return record.comments.map((comment, index) => ({
-		id: optionalNumber(comment.id),
-		thread: optionalNumber(comment.thread),
-		inReplyTo: optionalNumber(comment.in_reply_to),
-		path: text(comment.path),
-		line: optionalNumber(comment.line),
-		side: optionalString(comment.side),
+		id: comment.id,
+		thread: comment.thread,
+		inReplyTo: comment.in_reply_to,
+		path: comment.path,
+		line: comment.line,
+		side: comment.side,
 		outdated: comment.outdated === true,
-		body: text(comment.body),
-		author: optionalString(comment.author),
+		body: comment.body,
+		author: comment.author,
 		bot: comment.bot === true,
-		createdAt: optionalString(comment.created_at ?? comment.createdAt),
+		createdAt: comment.created_at ?? comment.createdAt,
 		recordLine: record.bodyLines[index] ?? 0,
 	}));
 }
@@ -199,15 +263,15 @@ export async function readReviewComments(
 export async function readGeneralComments(
 	evidence: Pick<Evidence, "record">,
 ): Promise<GeneralComment[] | null> {
-	const record = await readCommentRecord(evidence, "general_comments.json");
+	const record = await readCommentRecord(evidence, "general_comments.json", generalCommentsSchema);
 	if (record === null) {
 		return null;
 	}
 	return record.comments.map((comment, index) => ({
-		body: text(comment.body),
-		author: optionalString(comment.author),
+		body: comment.body,
+		author: comment.author,
 		bot: comment.bot === true,
-		createdAt: optionalString(comment.createdAt ?? comment.created_at),
+		createdAt: comment.createdAt ?? comment.created_at,
 		recordLine: record.bodyLines[index] ?? 0,
 	}));
 }
@@ -216,33 +280,16 @@ export async function readGeneralComments(
 export async function readReviewThreads(
 	evidence: Pick<Evidence, "record">,
 ): Promise<{ threads: ReviewThread[]; decisions: ReviewDecision[] } | null> {
-	const parsed = await readRecordJson(evidence, "review_threads.json");
-	if (parsed === null) {
-		return null;
-	}
-	if (!isJsonObject(parsed)) {
-		return { threads: [], decisions: [] };
-	}
-	return {
-		threads: objects(parsed.threads).map((thread) => ({
-			id: optionalNumber(thread.id),
-			path: optionalString(thread.path),
-			line: optionalNumber(thread.line),
-			state: text(thread.state) || "UNRESOLVED",
-			resolvedBy: optionalString(thread.resolvedBy),
-			resolvedAt: optionalString(thread.resolvedAt),
-			outdated: typeof thread.outdated === "boolean" ? thread.outdated : undefined,
-			createdAt: optionalString(thread.createdAt),
-		})),
-		decisions: objects(parsed.reviewDecisions).map((decision) => ({
-			state: text(decision.state),
-			author: optionalString(decision.author),
-			bot: decision.bot === true,
-			submittedAt: optionalString(decision.submittedAt),
-			body: optionalString(decision.body),
-			dismissed: typeof decision.dismissed === "boolean" ? decision.dismissed : undefined,
-		})),
-	};
+	const record = await readReviewRecord(evidence, "review_threads.json", reviewThreadsSchema);
+	return record === null
+		? null
+		: {
+				threads: record.data.threads,
+				decisions: record.data.reviewDecisions.map((decision) => ({
+					...decision,
+					bot: decision.bot ?? false,
+				})),
+			};
 }
 
 /** One task-list item of an issue or description body, as written. */

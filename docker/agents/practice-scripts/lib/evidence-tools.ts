@@ -60,11 +60,11 @@ export function evidenceTools(tree: FileTree | null): ToolSet {
 				glob: z.string().optional().describe('A file glob such as "*.ts"'),
 			}),
 			execute: async ({ pattern, glob }) => {
-				const { matches } = await tree.grep(pattern, { glob, maxResults: MAX_MATCHES });
-				return (
+				const { matches, truncated } = await tree.grep(pattern, { glob, maxResults: MAX_MATCHES });
+				const shown =
 					matches.map((m) => `${m.file}:${m.line}: ${m.content.slice(0, 300)}`).join("\n") ||
-					"(no matches)"
-				);
+					"(no matches)";
+				return truncated ? `${shown}\n(more matches are not listed)` : shown;
 			},
 		}),
 	};

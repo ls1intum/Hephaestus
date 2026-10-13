@@ -2,6 +2,7 @@
 // and unticked, its sub-issue rollup, its state, and how the change names it. The review decides which
 // of them this change implements. A lead is a candidate, not a claim.
 import { factsOf } from "../lib/bounded-text.ts";
+import { REVIEW_LEAD_LIMIT } from "../lib/contract.ts";
 import { subIssueRollup } from "../lib/issue-classification.ts";
 import { definePracticeScript, expectKind, type ReviewLead } from "../lib/practice-script.ts";
 import {
@@ -128,7 +129,17 @@ export default definePracticeScript({
 			);
 		}
 		return ctx.review({
-			leads,
+			leads: leads.slice(0, REVIEW_LEAD_LIMIT),
+			limitations:
+				leads.length > REVIEW_LEAD_LIMIT
+					? [
+							{
+								what: "linked issue leads",
+								count: leads.length - REVIEW_LEAD_LIMIT,
+								reason: "selection",
+							},
+						]
+					: [],
 			facts: {
 				linkedItems: linked.length,
 				checkableItems: candidates.length,

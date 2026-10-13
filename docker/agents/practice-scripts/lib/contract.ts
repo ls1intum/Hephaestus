@@ -218,9 +218,34 @@ function size(value: unknown): number {
 }
 
 const sum = (...counts: (number | undefined)[]): number | undefined =>
-	counts.every((n) => n === undefined)
-		? undefined
-		: counts.reduce<number>((s, n) => s + (n ?? 0), 0);
+	counts.every((n) => n !== undefined && Number.isSafeInteger(n) && n >= 0)
+		? counts.reduce<number>((s, n) => s + (n ?? 0), 0)
+		: undefined;
+
+const tokenCount = z.int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const chatUsageReceipt = z.union([
+	z.object({ prompt_tokens: tokenCount, completion_tokens: tokenCount }),
+	z.object({ input_tokens: tokenCount, output_tokens: tokenCount }),
+]);
+const languageUsageReceipt = z
+	.object({
+		inputTokens: z.object({
+			total: tokenCount,
+			noCache: tokenCount.optional(),
+			cacheRead: tokenCount.optional(),
+			cacheWrite: tokenCount.optional(),
+		}),
+		outputTokens: z.object({
+			total: tokenCount,
+			text: tokenCount.optional(),
+			reasoning: tokenCount.optional(),
+		}),
+	})
+	.refine(
+		({ inputTokens, outputTokens }) =>
+			(inputTokens.cacheRead ?? 0) + (inputTokens.cacheWrite ?? 0) <= inputTokens.total &&
+			(outputTokens.reasoning ?? 0) <= outputTokens.total,
+	);
 
 function isChatCall(options: Record<string, unknown>): options is CallOptions<"chat"> {
 	return Array.isArray(options.prompt);
@@ -276,7 +301,12 @@ export const MODEL_SLOT_CALLS = {
 			const { inputTokens, outputTokens } = result.usage;
 			return {
 				value: { slot: "chat", result },
-				tokens: sum(inputTokens.total, outputTokens.total),
+				// Compatible providers can normalize absent counts to zero; only their raw receipt proves presence.
+				tokens:
+					!languageUsageReceipt.safeParse(result.usage).success ||
+					(result.usage.raw !== undefined && !chatUsageReceipt.safeParse(result.usage.raw).success)
+						? undefined
+						: sum(inputTokens.total, outputTokens.total),
 			};
 		},
 	},
@@ -715,6 +745,13 @@ export interface Citation {
 	endLine: number;
 	quote: string;
 }
+
+export interface CodeCitationIdentity {
+	repository: string;
+	revision: string;
+}
+
+type ResolveCodeCitation = (citation: Citation) => CodeCitationIdentity | undefined;
 /** What a search for something missing consulted, looked for, and did not cover. Consulted names source kinds. */
 export interface SearchWarrant {
 	consulted: NonEmpty<string>;
@@ -927,8 +964,6 @@ const omissionShape = z.strictObject({
 		.readonly()
 		.optional(),
 });
-/** Limitations a program declares beside its review input: the omissions that the review is told about. */
-export const omissionSchema = omissionShape;
 const omitted = listOf(omissionShape, CANDIDATE_LIMITS.omissions).optional();
 const coverageShape = z.discriminatedUnion("source", [
 	z.strictObject({
@@ -1036,12 +1071,26 @@ function readCoverage(coverage: Superset["coverage"]): Coverage | string {
 		: { source: "claimed", selected, checked, total, complete: false, omitted: omissions };
 }
 
-const overlaps = (a: Citation, b: Citation) =>
-	a.sourceKind === b.sourceKind &&
-	a.path === b.path &&
-	a.side === b.side &&
-	a.startLine <= b.endLine &&
-	b.startLine <= a.endLine;
+function overlaps(a: Citation, b: Citation, resolve?: ResolveCodeCitation): boolean {
+	if (a.path !== b.path || a.startLine > b.endLine || b.startLine > a.endLine) {
+		return false;
+	}
+	const code = (citation: Citation) =>
+		citation.sourceKind === DIFF_SOURCE || citation.sourceKind === TREE_SOURCE;
+	if (code(a) && code(b) && resolve !== undefined) {
+		const left = resolve(a);
+		const right = resolve(b);
+		if (left !== undefined && right !== undefined) {
+			return left.repository === right.repository && left.revision === right.revision;
+		}
+	}
+	return (
+		a.sourceKind === b.sourceKind &&
+		a.artifactPath === b.artifactPath &&
+		a.side === b.side &&
+		a.revision === b.revision
+	);
+}
 
 function basisIndices(basis: ClaimBasis): number[] {
 	switch (basis.type) {
@@ -1146,7 +1195,7 @@ function outcomeRefusal(
 }
 
 /** The first rule about the example and the problems that the candidate breaks. */
-function problemRefusal(sent: Superset): Refusal | undefined {
+function problemRefusal(sent: Superset, resolve?: ResolveCodeCitation): Refusal | undefined {
 	const { example, outcome } = sent;
 	const problems = sent.problems ?? [];
 	if (example !== undefined && outcome !== "MET" && outcome !== "NOT_MET") {
@@ -1154,7 +1203,9 @@ function problemRefusal(sent: Superset): Refusal | undefined {
 	}
 	if (
 		example !== undefined &&
-		problems.some((problem) => problem.citations.some((cited) => overlaps(cited, example.citation)))
+		problems.some((problem) =>
+			problem.citations.some((cited) => overlaps(cited, example.citation, resolve)),
+		)
 	) {
 		return refuse("example_overlaps_problem", "the example cites the place of a problem");
 	}
@@ -1213,6 +1264,7 @@ function candidateOf(sent: Superset, coverage: Coverage): Candidate | undefined 
  */
 export function parseCandidate(
 	value: unknown,
+	resolve?: ResolveCodeCitation,
 ):
 	| { ok: true; candidate: Candidate }
 	| { ok: false; reasonCode: CandidateRefusal; message: string } {
@@ -1240,7 +1292,7 @@ export function parseCandidate(
 	if (typeof coverage === "string") {
 		return refuse("coverage_inconsistent", coverage);
 	}
-	const after = problemRefusal(sent);
+	const after = problemRefusal(sent, resolve);
 	if (after !== undefined) {
 		return after;
 	}
@@ -1250,16 +1302,6 @@ export function parseCandidate(
 		? refuse("malformed_candidate", "the candidate matches no outcome")
 		: { ok: true, candidate };
 }
-
-/** A candidate as a schema: parses with {@link parseCandidate} and reports its refusal code. */
-export const candidateSchema: z.ZodType<Candidate> = z.unknown().transform((value, ctx) => {
-	const parsed = parseCandidate(value);
-	if (!parsed.ok) {
-		ctx.addIssue({ code: "custom", message: `${parsed.reasonCode}: ${parsed.message}` });
-		return z.NEVER;
-	}
-	return parsed.candidate;
-});
 
 /*
  * What a program gives `ctx.review()`: prepared leads, scalar facts, authored directions, bounded
@@ -1304,8 +1346,10 @@ const preparedContextSchema = z.strictObject({
 });
 export type PreparedContext = z.infer<typeof preparedContextSchema>;
 
+export const REVIEW_LEAD_LIMIT = 200;
+
 export const reviewOptionsSchema = z.strictObject({
-	leads: listOf(reviewLeadSchema, 200).readonly().optional(),
+	leads: listOf(reviewLeadSchema, REVIEW_LEAD_LIMIT).readonly().optional(),
 	facts: factsSchema.optional(),
 	/** Directions to the reviewer. The program's author writes them; reviewed text and model text belong in context. */
 	directions: listOf(line(300), 10).readonly().optional(),
@@ -1362,7 +1406,6 @@ const coverageReachedSchema = z.strictObject({
 	truncatedReads: count,
 	failedReads: count,
 });
-export type CoverageReached = z.infer<typeof coverageReachedSchema>;
 
 export const executionEntrySchema = z
 	.strictObject({

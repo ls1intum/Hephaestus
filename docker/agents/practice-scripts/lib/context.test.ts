@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { inventoryIssues, readProjectInventory } from "./context.ts";
+import { readProjectInventory, repositoryIssues } from "./context.ts";
 import { UnratedError, type Evidence } from "./practice-script.ts";
 
 /** Evidence that holds the given records, and fails the read of any name in `failing`. */
@@ -25,18 +25,36 @@ void test("an inventory issue with an empty title is held, and one without a tit
 		evidence({
 			"project_inventory.json": JSON.stringify({
 				repository: "team/project",
-				issues: [{ number: 7, title: "", state: "OPEN" }, { number: 8 }, { title: "No number" }],
+				issues: [
+					{
+						number: 7,
+						title: "",
+						state: "OPEN",
+						repository: "team/project",
+						repository_id: 1,
+						provider_id: 1,
+					},
+					{ number: 8 },
+					{ title: "No number" },
+				],
 			}),
 		}),
 	);
-	const issues = inventoryIssues(inventory);
-	assert.deepEqual([...issues.keys()], [7]);
-	assert.partialDeepStrictEqual(issues.get(7), { title: "", state: "OPEN" });
+	const issues = repositoryIssues(inventory, { repositoryId: 1 });
+	assert.deepEqual(
+		issues?.map((issue) => issue.number),
+		[7],
+	);
+	assert.partialDeepStrictEqual(issues[0], { title: "", state: "OPEN" });
 });
 
-void test("an inventory that was not captured or is not JSON is null, and a read that fails stops the program", async () => {
+void test("an absent inventory is null, and malformed JSON or a failed read stops the program", async () => {
 	assert.equal(await readProjectInventory(evidence({})), null);
-	assert.equal(await readProjectInventory(evidence({ "project_inventory.json": "{" })), null);
+	await assert.rejects(readProjectInventory(evidence({ "project_inventory.json": "{" })), {
+		name: "UnratedError",
+		reason: "unavailable",
+		message: "project_inventory.json is not valid JSON",
+	});
 	await assert.rejects(readProjectInventory(evidence({}, ["project_inventory.json"])), {
 		name: "UnratedError",
 		reason: "unavailable",

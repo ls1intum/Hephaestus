@@ -25,6 +25,23 @@ export const REVIEWED_CHANGES: Record<"system" | "turn", readonly (readonly [str
 			"work, and NOT_MET is not the default when the evidence is thin. One result per practice.\nCorrect an earlier local draft only by submitting the complete result again; an invalid correction\nkeeps the previous draft. You are measuring, not advising: a problem's next step only names the change\nits criteria require, and the server decides what, if anything, is said to the developer.",
 		],
 		["## Observation contract", "## Result contract"],
+		[
+			"Name the specific evidence-backed conformance or shortfall in the summary. Submit one `outcome`:",
+			"Name the specific evidence-backed conformance or problem in the summary. Submit one `outcome`:",
+		],
+		["An appropriate omission is not a shortfall.", "An appropriate omission is not a problem."],
+		[
+			"— earlier observations about this person and what was already said",
+			"— earlier results about this person and what was already said",
+		],
+		[
+			"6. Earlier observations and feedback (`history`) are earlier judgments, not evidence about this",
+			"6. Earlier results and feedback (`history`) are earlier judgments, not evidence about this",
+		],
+		[
+			"has none to look for. The leads are an initial advisory from a static scan: a lead is a place to inspect, not",
+			"has none to look for. The leads are review input from the practice program: a lead is a place to inspect, not",
+		],
 		["| outcome | Meaning | severity |", "| outcome | Meaning | problems |"],
 		[
 			"| MET | The applicable practice standard is met in the captured evidence. | null |\n| NOT_MET | The applicable practice standard is not met in the captured evidence. | required |\n| NOT_APPLICABLE | A concrete fact rules out the practice's prerequisite occasion. | null |\n| UNDETERMINED | Captured and read evidence does not settle conformance. | null |",
@@ -32,7 +49,7 @@ export const REVIEWED_CHANGES: Record<"system" | "turn", readonly (readonly [str
 		],
 		[
 			"Submit outcome and severity explicitly. A NOT_MET outcome needs an evidenced shortfall.",
-			"Submit the outcome explicitly. A NOT_MET result lists each evidenced shortfall as one problem: its\nseverity, a one-line summary, its explanation, the lines that show it, and its basis — introduced or\nworsened by this change, or a duty the criteria state that this work lacks.",
+			"Submit the outcome explicitly. A NOT_MET result lists each evidenced problem: its\nseverity, a one-line summary, its explanation, the lines that show it, and its basis — introduced or\nworsened by this change, or a duty the criteria state that this work lacks.",
 		],
 		[
 			"A MET or NOT_MET claim based on absence requires `evidence.search` (sources consulted, what you looked for,",

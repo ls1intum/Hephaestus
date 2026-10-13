@@ -295,7 +295,7 @@ it at all.
   progress.
 - `outcome` records conformance to the practice criteria within the cited evidence boundary: `MET`
   or `NOT_MET`. Read it as given. A practice can have results from different reviews. A met result
-  does not establish general correctness or mastery; a not-met result describes the recorded shortfall,
+  does not establish general correctness or mastery; a not-met result describes the recorded problems,
   never a grade of the developer.
 - A `NOT_MET` result's `observations` name where it fell short: each observation is one located problem, with its
   own `severity`, `summary` and `explanation`. Discuss the verdict through the result, and one problem through its

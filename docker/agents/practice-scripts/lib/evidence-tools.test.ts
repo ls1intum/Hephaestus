@@ -98,4 +98,24 @@ void describe("the read tools of an agent", () => {
 	void test("work without a tree has no tools", () => {
 		assert.deepEqual(evidenceTools(null), {});
 	});
+
+	void test("grep names a cut search even when the returned matches are empty", async () => {
+		const { files } = tree();
+		const cut = { ...files, grep: async () => ({ matches: [], truncated: true }) };
+		assert.equal(
+			await run(cut, "grep", { pattern: "count" }),
+			"(no matches)\n(more matches are not listed)",
+		);
+		const matched = {
+			...files,
+			grep: async () => ({
+				matches: [{ file: "src/cart.ts", line: 2, content: "count += 1;" }],
+				truncated: true,
+			}),
+		};
+		assert.equal(
+			await run(matched, "grep", { pattern: "count" }),
+			"src/cart.ts:2: count += 1;\n(more matches are not listed)",
+		);
+	});
 });

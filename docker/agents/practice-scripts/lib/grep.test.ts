@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterEach, describe, it } from "node:test";
 
 import { globFilesSync } from "./files.ts";
-import { findFiles, grep } from "./grep.ts";
+import { grep } from "./grep.ts";
 
 const tempDirs: string[] = [];
 
@@ -103,13 +103,14 @@ void describe("grep", () => {
 		await writeFile(path.join(dir, "node_modules", "pkg", "dep.swift"), "struct Dep {}\n");
 		await writeFile(path.join(dir, ".build", "generated.swift"), "struct Generated {}\n");
 
-		const files = findFiles(dir, "swift");
+		const matches = await grep("struct", dir, { glob: "*.swift" });
+		const files = matches.map((match) => match.file).toSorted();
 
 		assert.deepEqual(files, [
-			path.join(dir, ".build", "generated.swift"),
-			path.join(dir, ".hidden", "hidden.swift"),
-			path.join(dir, "node_modules", "pkg", "dep.swift"),
-			path.join(dir, "src", "nested", "match.swift"),
+			".build/generated.swift",
+			".hidden/hidden.swift",
+			"node_modules/pkg/dep.swift",
+			"src/nested/match.swift",
 		]);
 	});
 
@@ -121,7 +122,11 @@ void describe("grep", () => {
 		await symlink(outside, path.join(dir, "linked"), "dir");
 		await symlink(path.join(outside, "outside.swift"), path.join(dir, "linked.swift"));
 
-		assert.deepEqual(findFiles(dir, "swift"), [path.join(dir, "inside.swift")]);
+		const matches = await grep("struct", dir, { glob: "*.swift" });
+		assert.deepEqual(
+			matches.map((match) => match.file),
+			["inside.swift"],
+		);
 	});
 
 	void it("searches hidden source with standard brace and globstar patterns", async () => {

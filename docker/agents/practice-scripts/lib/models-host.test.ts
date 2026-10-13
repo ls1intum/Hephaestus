@@ -69,6 +69,27 @@ void describe("the attempt's direct model account", () => {
 		assert.equal(budget.left, 990);
 	});
 
+	void test("a confirmed zero refunds a reservation, while implausible usage keeps it", async () => {
+		const budget = new ModelBudget(1000, 1);
+		await budget.run(120, never, async () => ({ value: "zero", tokens: 0 }));
+		assert.equal(budget.left, 1000);
+		for (const tokens of [-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+			await budget.run(120, never, async () => ({ value: "unverifiable", tokens }));
+		}
+		assert.equal(budget.left, 520);
+	});
+
+	void test("an answer after cancellation keeps its reservation and returns no value", async () => {
+		const budget = new ModelBudget(1000, 1);
+		const cancelled = new AbortController();
+		const outcome = await budget.run(120, cancelled.signal, async () => {
+			cancelled.abort();
+			return { value: "late", tokens: 0 };
+		});
+		assert.deepEqual(outcome, { reason: "deadline" });
+		assert.equal(budget.left, 880);
+	});
+
 	void test("a call that waits for its turn and reaches its deadline does not run and holds nothing", async () => {
 		const budget = new ModelBudget(1000, 1);
 		const busy = Promise.withResolvers<{ value: string; tokens: number }>();
@@ -127,6 +148,71 @@ void describe("the request allowlist", () => {
 			questions: Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`q${i}`, {}])),
 		});
 		assert.ok(thirty - one >= answerTokens(30) - answerTokens(1), `${one} → ${thirty}`);
+	});
+});
+
+void describe("chat usage receipts from the bound provider", () => {
+	for (const usage of [
+		undefined,
+		{},
+		{ prompt_tokens: 10 },
+		{ completion_tokens: 5 },
+		{ prompt_tokens: -1, completion_tokens: 5 },
+		{ prompt_tokens: 0.5, completion_tokens: 5 },
+		{ prompt_tokens: 10, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 11 } },
+		{ prompt_tokens: 10, completion_tokens: 5, completion_tokens_details: { reasoning_tokens: 6 } },
+	]) {
+		void test(`an incomplete or implausible receipt ${JSON.stringify(usage)} retains the reservation`, async (t) => {
+			t.mock.method(globalThis, "fetch", async () =>
+				Response.json({
+					choices: [{ message: { role: "assistant", content: "yes" }, finish_reason: "stop" }],
+					usage,
+				}),
+			);
+			const { chat } = hostModels(
+				{ chat: { protocol: "openai-completions", modelId: "chat" } },
+				"https://proxy.example/internal/llm",
+				"test-token",
+				"practice",
+			);
+			assert.ok(chat !== undefined);
+			const call = modelCall(
+				"chat",
+				chat,
+				{
+					prompt: [{ role: "user", content: [{ type: "text", text: "Say yes." }] }],
+					maxOutputTokens: 1000,
+				},
+				never,
+			);
+			assert.ok("run" in call);
+			const budget = new ModelBudget(5000, 1);
+			assert.ok("value" in (await budget.run(call.reserve, never, call.run)));
+			assert.equal(budget.left, 5000 - call.reserve);
+		});
+	}
+
+	void test("a complete receipt preserves a confirmed zero", async (t) => {
+		t.mock.method(globalThis, "fetch", async () =>
+			Response.json({
+				choices: [{ message: { role: "assistant", content: "yes" }, finish_reason: "stop" }],
+				usage: { prompt_tokens: 0, completion_tokens: 0 },
+			}),
+		);
+		const { chat } = hostModels(
+			{ chat: { protocol: "openai-completions", modelId: "chat" } },
+			"https://proxy.example/internal/llm",
+			"test-token",
+			"practice",
+		);
+		assert.ok(chat !== undefined);
+		const call = modelCall("chat", chat, { prompt: [], maxOutputTokens: 1000 }, never);
+		assert.ok("run" in call);
+		const budget = new ModelBudget(5000, 1);
+		const answer = await budget.run(call.reserve, never, call.run);
+		assert.ok("value" in answer);
+		assert.equal(answer.tokens, 0);
+		assert.equal(budget.left, 5000);
 	});
 });
 

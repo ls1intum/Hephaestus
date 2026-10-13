@@ -37,7 +37,9 @@ void test("a diagram-and-README change is named as an occasion-gate kind, with t
 			changed("README.md", ["![AOM](diagrams/aom.png)"]),
 		]),
 		work: metadata("## Description\n\nCloses #4\n\n## Testing Instructions\n\n<!-- steps -->\n"),
-		context: { "linked_work_items.json": { workItems: [{}] } },
+		context: {
+			"linked_work_items.json": { workItems: [{ number: 4, title: "Day 2 AOM", body: null }] },
+		},
 	});
 	assert.equal(result.facts?.codeFiles, 0);
 	assert.equal(result.facts.imageFiles, 1);

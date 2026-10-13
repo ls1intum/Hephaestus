@@ -153,7 +153,7 @@ export interface ChangeView {
 	) => Promise<Citation>;
 }
 
-/** The file trees of the reviewed work. Base reads arrive later; `base` is null for now. */
+/** The file trees of the reviewed work. Base-tree reads are unavailable, so `base` is null. */
 export interface Files {
 	head: FileTree;
 	base: FileTree | null;
@@ -266,8 +266,8 @@ export function requireChange(files: Files | null): ReadonlyMap<string, DiffFile
 }
 
 /**
- * The text of a captured record parsed as JSON, or null when the record was not captured or is not
- * JSON. A read that fails throws `UnratedError("unavailable")`.
+ * The text of a captured record parsed as JSON, or null when the record was not captured.
+ * Malformed JSON and failed reads throw `UnratedError("unavailable")`.
  */
 export async function readRecordJson(
 	evidence: Pick<Evidence, "record">,
@@ -280,7 +280,7 @@ export async function readRecordJson(
 	try {
 		return JSON.parse(record.text);
 	} catch {
-		return null;
+		throw new UnratedError("unavailable", `${name} is not valid JSON`);
 	}
 }
 

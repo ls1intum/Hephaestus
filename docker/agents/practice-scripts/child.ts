@@ -30,11 +30,11 @@ const send = process.send?.bind(process);
 if (send === undefined) {
 	throw new Error("child.ts runs only as a process forked by the program host");
 }
-const post = (message: ChildMessage) => send(message);
+const post = (message: ChildMessage) => send(JSON.stringify(message));
 
 /** Send the last message. A disconnect before a large message has left this process drops it. */
 const postLast = promisify((message: ChildMessage, sent: (error: Error | null) => void) => {
-	send(message, undefined, undefined, sent);
+	send(JSON.stringify(message), undefined, undefined, sent);
 });
 
 /** Replies the host owes this child, by request id. A reply with another id is not this child's. */
@@ -134,7 +134,7 @@ async function runDefinition(
 		read,
 		review: async (options) => {
 			stopped.signal.throwIfAborted();
-			const reply = await request((id) => ({ kind: "review", id, options }));
+			const reply = await request((id) => ({ kind: "review", id, options: options ?? {} }));
 			if (reply.kind === "review-result") {
 				return reply.candidate;
 			}
