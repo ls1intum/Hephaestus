@@ -2,6 +2,10 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse, http } from "msw";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	OBSERVATION_WORDS_UNAVAILABLE,
+	observationSummary,
+} from "@/components/admin/practice-reviews/observation-words";
 
 import {
 	listPracticeReviewsInfiniteQueryKey,
@@ -99,17 +103,17 @@ describe("practice review levels", () => {
 		await userEvent.click(
 			await screen.findByRole(
 				"link",
-				openRow("observation", observation.summary),
+				openRow("observation", observationSummary(observation)),
 				ROUTE_RENDER_WAIT,
 			),
 		);
 
 		const level = await screen.findByRole(
 			"dialog",
-			{ name: observation.summary },
+			{ name: observationSummary(observation) },
 			ROUTE_RENDER_WAIT,
 		);
-		within(level).getByRole("heading", { name: observation.summary });
+		within(level).getByRole("heading", { name: observationSummary(observation) });
 		expect(router.state.location.searchStr).toBe(
 			`?severity=MAJOR&detail=observation:${observation.id}`,
 		);
@@ -123,7 +127,7 @@ describe("practice review levels", () => {
 		expect(router.state.location.pathname).toBe(`${REVIEWS}/observations`);
 		expect(router.state.location.searchStr).toBe("?severity=MAJOR");
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-		screen.getByRole("link", openRow("observation", observation.summary));
+		screen.getByRole("link", openRow("observation", observationSummary(observation)));
 	});
 
 	/** Closing the level gives focus back to the row it was opened from, so the reader goes on there. */
@@ -133,14 +137,14 @@ describe("practice review levels", () => {
 		renderRouteAtWithRouter(`${REVIEWS}/observations`);
 		const row = await screen.findByRole(
 			"link",
-			openRow("observation", observation.summary),
+			openRow("observation", observationSummary(observation)),
 			ROUTE_RENDER_WAIT,
 		);
 
 		await userEvent.click(row);
 		const level = await screen.findByRole(
 			"dialog",
-			{ name: observation.summary },
+			{ name: observationSummary(observation) },
 			ROUTE_RENDER_WAIT,
 		);
 		await waitFor(() => expect(level.contains(document.activeElement)).toBe(true));
@@ -150,7 +154,7 @@ describe("practice review levels", () => {
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), ROUTE_RENDER_WAIT);
 		await waitFor(() =>
 			expect(document.activeElement).toBe(
-				screen.getByRole("link", openRow("observation", observation.summary)),
+				screen.getByRole("link", openRow("observation", observationSummary(observation))),
 			),
 		);
 	});
@@ -919,4 +923,36 @@ describe("practices turned off today", () => {
 		);
 		await within(options).findByRole("option", { name: /Thin controllers/u });
 	});
+});
+
+it("keeps denied observation facts and navigation without restoring its text", async () => {
+	const [first] = reviewObservations;
+	assert(first);
+	const detail = observationDetail(first.id);
+	server.use(
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/observations/:id", () =>
+			HttpResponse.json({
+				...detail,
+				summary: undefined,
+				evidenceRationale: undefined,
+				evidence: undefined,
+			}),
+		),
+	);
+	const { router } = renderRouteAtWithRouter(
+		`${REVIEWS}/observations?detail=observation:${detail.id}`,
+	);
+	const heading = await screen.findByRole(
+		"heading",
+		{ name: "Observation text unavailable", level: 2 },
+		ROUTE_RENDER_WAIT,
+	);
+	const dialog = heading.closest<HTMLElement>('[role="dialog"]');
+	assert(dialog);
+	const panel = within(dialog);
+	panel.getByText(OBSERVATION_WORDS_UNAVAILABLE);
+	panel.getByText(detail.practiceName);
+	expect(panel.queryByText(/Nothing was quoted/u)).toBeNull();
+	await userEvent.click(panel.getByRole("button", { name: "Close" }));
+	await waitFor(() => expect(router.state.location.searchStr).not.toContain("detail="));
 });

@@ -1,4 +1,5 @@
 import { ScanSearchIcon } from "lucide-react";
+import { observationSummary } from "./observation-words";
 
 import type { ReviewObservation } from "@/api/types.gen";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -174,7 +175,7 @@ export function ObservationRow({ observation, withDay = false }: ObservationRowP
 		<PracticeTableRow
 			link={{
 				text: "Open observation",
-				name: `${observation.summary}, ${formatDayTime(observation.observedAt, today)}`,
+				name: `${observationSummary(observation)}, ${formatDayTime(observation.observedAt, today)}`,
 				render: <DetailStackLink entry={observationLevel(observation.id)} single />,
 			}}
 			variant={tracked ? "highlighted" : undefined}
@@ -182,7 +183,7 @@ export function ObservationRow({ observation, withDay = false }: ObservationRowP
 				<RecordRowActions
 					record={{ kind: "observation", id: observation.id }}
 					agentJobId={observation.agentJobId}
-					name={`observation ${observation.summary}`}
+					name={`observation ${observationSummary(observation)}`}
 				/>
 			}
 		>
@@ -194,7 +195,9 @@ export function ObservationRow({ observation, withDay = false }: ObservationRowP
 			/>
 			<TableCell className="align-top whitespace-normal">
 				<span className="flex min-w-0 flex-col items-start gap-1.5">
-					<span className="max-w-md text-sm font-semibold break-words">{observation.summary}</span>
+					<span className="max-w-md text-sm font-semibold break-words">
+						{observationSummary(observation)}
+					</span>
 					<span className="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
 						<ReviewPracticeName practiceName={observation.practiceName} group={observation.group} />
 						{severity && <StatusLabel def={severity} className="text-xs" />}

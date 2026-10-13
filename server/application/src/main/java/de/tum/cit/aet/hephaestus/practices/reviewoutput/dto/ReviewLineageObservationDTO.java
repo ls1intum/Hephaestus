@@ -15,7 +15,9 @@ public record ReviewLineageObservationDTO(
         @NonNull @Schema(description = "The review that recorded it")
         UUID agentJobId,
 
-        @NonNull String summary,
+        @Schema(description = "Observation text; absent when source access cannot be verified") @Nullable
+        String summary,
+
         @NonNull String practiceSlug,
         @NonNull String practiceName,
         @NonNull Outcome outcome,

@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import type { ReviewLineageFeedback, ReviewLineageObservation } from "@/api/types.gen";
 import { OUTCOME_DEFS, type Outcome } from "@/components/practice-vocabulary/outcome-defs";
+import { observationSummary } from "./observation-words";
 
 import { countOf, type NumberedById, toneChip } from "./lineage-chain";
 
@@ -63,7 +64,7 @@ export function LineageObservationChip({
 	const words = [
 		`Observation ${number}, ${outcome.label.toLowerCase()}`,
 		observation.invalidated ? ", marked incorrect" : "",
-		withSummary ? `: ${observation.summary}` : "",
+		withSummary ? `: ${observationSummary(observation)}` : "",
 	].join("");
 	return (
 		<span
