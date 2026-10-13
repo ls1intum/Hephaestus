@@ -1,17 +1,20 @@
 import type { ReactElement, ReactNode } from "react";
 
-import type { UserInfo } from "@/api/types.gen";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import { levelPathAt } from "@/components/layout/detail-drawer/level-path";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 
 import type { ActivityOverviewState } from "./activity-buckets";
+import { categoryChartStateOf } from "./activity-category-chart";
 import { ACTIVITY_CATEGORY_DEFS } from "./activity-kind-defs";
+import { activityPersonName, type ActivityPersonIdentity } from "./activity-people-rows";
 import { type ActivityPeriod, periodLabel } from "./activity-period";
 import type { ActivityStackEntry } from "./activity-search";
 import { ActivityCategoryLevel } from "./ActivityCategoryLevel";
+import { ActivityTiles } from "./ActivityTiles";
 import type { ActivityWorkLogState } from "./ActivityWorkLog";
 import { PersonActivityLevel } from "./PersonActivityLevel";
+import { memberRepositoryState } from "./PersonActivitySections";
 
 /** One owner's reads for its levels: the period's overview, its timeline, and one category's. */
 export interface ActivityLevelReads {
@@ -33,7 +36,7 @@ export interface ActivityDetailDrawerProps {
 	 */
 	owner: ActivityLevelReads & {
 		login: string | undefined;
-		user?: UserInfo;
+		user?: ActivityPersonIdentity;
 		/** The people are in, and the person the URL opens is not among them. */
 		absent?: boolean;
 		automationAction?: ReactElement;
@@ -50,7 +53,8 @@ export function ActivityDetailDrawer({
 	period,
 	owner,
 }: ActivityDetailDrawerProps) {
-	const nameOf = (login: string): string => (owner.user?.login === login ? owner.user.name : login);
+	const nameOf = (login: string): string =>
+		activityPersonName(owner.user?.login === login ? owner.user : undefined, login);
 	const labelOf = ({ target }: ActivityStackEntry): string =>
 		target.kind === "person"
 			? nameOf(target.login)
@@ -75,7 +79,7 @@ export function ActivityDetailDrawer({
 										: `${periodLabel(period)} · ${nameOf(person)}`
 								}
 								providerType={providerType}
-								overview={owner.overview}
+								chart={categoryChartStateOf(owner.overview, target.category)}
 								workLog={owner.categoryWorkLog}
 								subject={{ people: "one", login: person ?? owner.login }}
 								absent={owner.absent}
@@ -92,7 +96,8 @@ export function ActivityDetailDrawer({
 								absent={owner.absent}
 								providerType={providerType}
 								period={period}
-								overview={owner.overview}
+								summary={<ActivityTiles state={owner.overview} providerType={providerType} />}
+								repositories={memberRepositoryState(owner.overview)}
 								workLog={owner.workLog}
 								automationAction={owner.automationAction}
 								hideAction={owner.hideAction}

@@ -19,6 +19,8 @@ import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityWorkDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityWorkPageDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.OpenWorkDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.PublicActivityDTO;
+import de.tum.cit.aet.hephaestus.activity.overview.dto.PublicActivityPersonDetailDTO;
+import de.tum.cit.aet.hephaestus.activity.overview.dto.PublicActivityWorkPageDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ReviewerDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ReviewerDTO.ReviewerState;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.TeamRefDTO;
@@ -212,6 +214,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         zoe = member("a-zoe", "Zoe");
         monitored = repository("activity-org/widgets", true);
         unmonitored = repository("activity-org/elsewhere", false);
+        connectGitHub();
     }
 
     @Autowired
@@ -406,12 +409,31 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             repositoryRepository.save(monitored);
             ada.setProvider(provider);
             userRepository.save(ada);
-            record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -1, DAY);
-            var result = page();
+            var work = issue(monitored, Issue.State.OPEN, ada);
+            work.setProvider(provider);
+            work.setHtmlUrl(
+                    provider.getServerUrl() + "/" + monitored.getNameWithOwner() + "/issues/" + work.getNumber());
+            issueRepository.save(work);
+            record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, work.getId(), DAY);
             boolean scm = type == IdentityProviderType.GITHUB || type == IdentityProviderType.GITLAB;
+            if (scm) {
+                connectPublicSource(provider);
+            }
+            var result = page();
             assertThat(result.people()).hasSize(scm ? 1 : 0);
             assertThat(result.repositories()).hasSize(scm ? 1 : 0);
             assertThat(result.coverage().totalRepositories()).isEqualTo(scm ? 1 : 0);
+            if (scm) {
+                assertThat(person(ada).person().login()).isEqualTo(ada.getLogin());
+                assertThat(personWork(ada, uri -> uri).content())
+                        .singleElement()
+                        .satisfies(entry -> {
+                            assertThat(entry.work().htmlUrl()).isEqualTo(work.getHtmlUrl());
+                            assertThat(entry.work().title()).isEqualTo(work.getTitle());
+                            assertThat(entry.actions())
+                                    .containsExactly(new ActivityActionDTO(ActivityKind.ISSUE_OPENED, 1));
+                        });
+            }
         }
 
         @Test
@@ -1019,6 +1041,365 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                     .expectBody(Void.class);
             jdbc.update("UPDATE instance_settings SET public_activity_allowed=false WHERE id=1");
             error(workspace.getWorkspaceSlug());
+        }
+
+        @Test
+        void shouldApplyPublicationPolicyAndPrivateRepositoryScopeToBothPersonReads() {
+            var pull = pullRequest(ada, monitored, work -> work);
+            record(ada, ActivityEventType.PULL_REQUEST_OPENED, ActivityTargetType.PULL_REQUEST, pull.getId(), DAY);
+            for (String suffix : List.of("", "/work")) {
+                personRead(ada, suffix, uri -> uri).isOk().expectBody(Void.class);
+                webTestClient
+                        .head()
+                        .uri(
+                                "/public/workspaces/{slug}/activity/people/{login}" + suffix,
+                                workspace.getWorkspaceSlug(),
+                                ada.getLogin())
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectHeader()
+                        .valueEquals("Cache-Control", "max-age=60, public")
+                        .expectHeader()
+                        .valueEquals("X-Robots-Tag", "noindex")
+                        .expectHeader()
+                        .doesNotExist("Set-Cookie")
+                        .expectBody()
+                        .isEmpty();
+                webTestClient
+                        .get()
+                        .uri(
+                                "/public/workspaces/{slug}/activity/people/{login}" + suffix,
+                                workspace.getWorkspaceSlug(),
+                                ada.getLogin())
+                        .headers(TestAuthUtils.withCurrentUser())
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectHeader()
+                        .valueEquals("Cache-Control", "no-store")
+                        .expectBody(Void.class);
+                personRead(ada, suffix, uri -> uri.queryParam("repo", unmonitored.getNameWithOwner()))
+                        .isNotFound()
+                        .expectBody(Void.class);
+            }
+            for (String policy : List.of("instance", "workspace", "inactive")) {
+                jdbc.update(
+                        "UPDATE instance_settings SET public_activity_allowed=? WHERE id=1",
+                        !policy.equals("instance"));
+                workspace.setPublicActivityEnabled(!policy.equals("workspace"));
+                workspace.setStatus(
+                        policy.equals("inactive")
+                                ? Workspace.WorkspaceStatus.SUSPENDED
+                                : Workspace.WorkspaceStatus.ACTIVE);
+                workspaceRepository.save(workspace);
+                for (String suffix : List.of("", "/work")) {
+                    personRead(ada, suffix, uri -> uri).isNotFound().expectBody(Void.class);
+                }
+            }
+        }
+
+        @Test
+        void shouldKeepAVisibleReviewWhenItsAuthorObjectsButRefuseTheHiddenReviewer() {
+            TestUserFactory.ensureAccountForUser(accountRepository, publicIdentities, ada);
+            var pull = pullRequest(ada, monitored, work -> work);
+            var approval = review(pull, zoe, PullRequestReview.State.APPROVED);
+            record(ada, ActivityEventType.PULL_REQUEST_OPENED, ActivityTargetType.PULL_REQUEST, pull.getId(), DAY);
+            record(zoe, ActivityEventType.REVIEW_APPROVED, ActivityTargetType.REVIEW, approval.getId(), DAY);
+            assertThat(person(zoe).counts().peopleHelped()).isEqualTo(1);
+            jdbc.update(
+                    "UPDATE account SET public_activity_visible=false WHERE id IN (SELECT account_id FROM identity_link WHERE provider_id=? AND subject=?)",
+                    ada.getProvider().getId(),
+                    ada.getNativeId().toString());
+            var visible = person(zoe);
+            assertThat(visible.counts().pullRequestsReviewed()).isEqualTo(1);
+            assertThat(visible.counts().peopleHelped()).isZero();
+            personRead(zoe, "/work", uri -> uri)
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.content[0].work.title")
+                    .isEqualTo(pull.getTitle())
+                    .jsonPath("$.content[0].work.author")
+                    .doesNotExist()
+                    .jsonPath("$.content[0].people")
+                    .doesNotExist();
+            personRead(zoe, "", uri -> uri)
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.person.email")
+                    .doesNotExist()
+                    .jsonPath("$.person.accountId")
+                    .doesNotExist();
+            for (String suffix : List.of("", "/work")) {
+                personRead(ada, suffix, uri -> uri).isNotFound().expectBody(Void.class);
+            }
+            publicObjections.hide(workspace.getId(), zoe.getId(), true);
+            for (String suffix : List.of("", "/work")) {
+                personRead(zoe, suffix, uri -> uri).isNotFound().expectBody(Void.class);
+                webTestClient
+                        .get()
+                        .uri(
+                                "/public/workspaces/{slug}/activity/people/{login}" + suffix,
+                                workspace.getWorkspaceSlug(),
+                                zoe.getLogin())
+                        .headers(TestAuthUtils.withCurrentUser())
+                        .exchange()
+                        .expectStatus()
+                        .isNotFound()
+                        .expectBody(Void.class);
+            }
+        }
+
+        @Test
+        void shouldRequireTheExactMonitoredProviderAndNativeRepositoryIdentity() {
+            var pull = pullRequest(ada, monitored, work -> work);
+            record(ada, ActivityEventType.PULL_REQUEST_OPENED, ActivityTargetType.PULL_REQUEST, pull.getId(), DAY);
+            for (IdentityProviderType type : List.of(IdentityProviderType.GITHUB, IdentityProviderType.GITLAB)) {
+                var foreign = repository("foreign/" + type, false);
+                var foreignProvider =
+                        gitProviderRepository.save(new IdentityProvider(type, "https://foreign-" + type + ".example"));
+                foreign.setProvider(foreignProvider);
+                foreign.setNameWithOwner(monitored.getNameWithOwner());
+                foreign.setHtmlUrl(foreignProvider.getServerUrl() + "/" + monitored.getNameWithOwner());
+                foreign.setNativeId(monitored.getNativeId());
+                foreign.setVisibility(Repository.Visibility.PUBLIC);
+                foreign.setPrivate(false);
+                repositoryRepository.save(foreign);
+                var outsider = persistUser("foreign-public-" + type);
+                outsider.setProvider(foreignProvider);
+                userRepository.save(outsider);
+                record(
+                        outsider,
+                        ActivityEventType.ISSUE_CREATED,
+                        ActivityTargetType.ISSUE,
+                        -1,
+                        DAY.minusSeconds(60),
+                        foreign);
+                for (String suffix : List.of("", "/work")) {
+                    personRead(outsider, suffix, uri -> uri).isNotFound().expectBody(Void.class);
+                }
+            }
+            assertThat(page().people()).extracting(p -> p.login()).containsExactly(ada.getLogin());
+            get("/people", uri -> uri)
+                    .isOk()
+                    .expectBody(ActivityPeopleDTO.class)
+                    .value(result -> assertThat(result.people())
+                            .extracting(p -> p.person().login())
+                            .containsExactly(ada.getLogin()));
+            assertThat(person(ada).repositories())
+                    .extracting(r -> r.rowKey())
+                    .containsExactly(monitored.getId().toString());
+            jdbc.update(
+                    "UPDATE repository_to_monitor SET native_id=? WHERE workspace_id=? AND name_with_owner=?",
+                    monitored.getNativeId() + 1,
+                    workspace.getId(),
+                    monitored.getNameWithOwner());
+            assertThat(page().repositories()).isEmpty();
+            for (String suffix : List.of("", "/work")) {
+                personRead(ada, suffix, uri -> uri).isNotFound().expectBody(Void.class);
+            }
+            jdbc.update(
+                    "UPDATE repository_to_monitor SET native_id=? WHERE workspace_id=? AND name_with_owner=?",
+                    monitored.getNativeId(),
+                    workspace.getId(),
+                    monitored.getNameWithOwner());
+            var connection = connections
+                    .findByWorkspaceIdAndKindAndInstanceKey(
+                            workspace.getId(), IntegrationKind.GITHUB, "activity-open-work")
+                    .orElseThrow();
+            for (IntegrationState state : List.of(
+                    IntegrationState.SUSPENDED,
+                    IntegrationState.PENDING,
+                    IntegrationState.UNINSTALLED,
+                    IntegrationState.ACTIVE)) {
+                connection.setState(state);
+                connection = connections.saveAndFlush(connection);
+                boolean available = state == IntegrationState.ACTIVE || state == IntegrationState.SUSPENDED;
+                assertThat(page().people()).hasSize(available ? 1 : 0);
+                get("/people", uri -> uri)
+                        .isOk()
+                        .expectBody(ActivityPeopleDTO.class)
+                        .value(result -> assertThat(result.people()).hasSize(available ? 1 : 0));
+                for (String suffix : List.of("", "/work")) {
+                    var response = personRead(ada, suffix, uri -> uri);
+                    if (available) {
+                        response.isOk().expectBody(Void.class);
+                    } else {
+                        response.isNotFound().expectBody(Void.class);
+                    }
+                }
+            }
+        }
+
+        @Test
+        void shouldFilterUnavailableWorkBeforePagingAndRecheckAuthorityOnTheNextPage() {
+            var older = pullRequest(ada, monitored, work -> work);
+            var newer = pullRequest(ada, monitored, work -> work);
+            record(ada, ActivityEventType.PULL_REQUEST_OPENED, ActivityTargetType.PULL_REQUEST, older.getId(), DAY);
+            record(ada, ActivityEventType.PULL_REQUEST_OPENED, ActivityTargetType.PULL_REQUEST, newer.getId(), DAY);
+            var deleted = pullRequest(ada, monitored, work -> {
+                work.setDeletedAt(DAY);
+                return work;
+            });
+            var privateWork = pullRequest(ada, unmonitored, work -> work);
+            var unlinked = pullRequest(ada, monitored, work -> {
+                work.setHtmlUrl("");
+                return work;
+            });
+            for (Long target : List.of(deleted.getId(), privateWork.getId(), unlinked.getId(), Long.MAX_VALUE)) {
+                record(
+                        ada,
+                        ActivityEventType.PULL_REQUEST_OPENED,
+                        ActivityTargetType.PULL_REQUEST,
+                        target,
+                        DAY.plusSeconds(600));
+            }
+            var first = personWork(ada, uri -> uri.replaceQueryParam("to").queryParam("size", 1));
+            var second = personWork(
+                    ada,
+                    uri -> uri.queryParam("size", 1).queryParam("cursor", Objects.requireNonNull(first.nextCursor())));
+            assertThat(List.of(
+                            first.content().getFirst().id(),
+                            second.content().getFirst().id()))
+                    .containsExactlyInAnyOrder("work:" + older.getId(), "work:" + newer.getId());
+            assertThat(second.nextCursor()).isNull();
+            var remaining = second.content().getFirst().id().equals("work:" + older.getId()) ? older : newer;
+            record(
+                    ada,
+                    ActivityEventType.PULL_REQUEST_MERGED,
+                    ActivityTargetType.PULL_REQUEST,
+                    remaining.getId(),
+                    Instant.now());
+            assertThat(personWork(
+                                    ada,
+                                    uri -> uri.queryParam("size", 1)
+                                            .queryParam("cursor", Objects.requireNonNull(first.nextCursor())))
+                            .content())
+                    .extracting(work -> work.id())
+                    .containsExactly(second.content().getFirst().id());
+            monitored.setVisibility(Repository.Visibility.PRIVATE);
+            monitored.setPrivate(true);
+            repositoryRepository.save(monitored);
+            personRead(ada, "/work", uri -> uri.queryParam("cursor", Objects.requireNonNull(first.nextCursor())))
+                    .isNotFound()
+                    .expectBody(Void.class);
+        }
+
+        @Test
+        void shouldRejectInvalidPublicWorkFiltersRatherThanListEveryKind() {
+            var pull = pullRequest(ada, monitored, work -> work);
+            record(ada, ActivityEventType.PULL_REQUEST_OPENED, ActivityTargetType.PULL_REQUEST, pull.getId(), DAY);
+            for (String size : List.of("0", "101")) {
+                personRead(ada, "/work", uri -> uri.queryParam("size", size))
+                        .isBadRequest()
+                        .expectBody(Void.class);
+            }
+            for (String kind : List.of("NOT_A_KIND", ActivityKind.COMMENTED.name())) {
+                personRead(ada, "/work", uri -> uri.queryParam("kinds", kind))
+                        .isBadRequest()
+                        .expectBody(Void.class);
+            }
+            personRead(ada, "/work", uri -> uri.queryParam("cursor", "not-a-cursor"))
+                    .isBadRequest()
+                    .expectBody(Void.class);
+            assertThat(personWork(ada, uri -> uri.queryParam("kinds", ActivityKind.REVIEW_APPROVED.name()))
+                            .content())
+                    .isEmpty();
+        }
+
+        @Test
+        void shouldUseCanonicalReviewOccurrencesWithoutEquatingWeeklyAndRangeDistinctCounts() {
+            var pull = pullRequest(zoe, monitored, work -> work);
+            var approval = review(pull, ada, PullRequestReview.State.APPROVED);
+            Instant nextWeek = DAY.plus(Duration.ofDays(7));
+            var changes = review(pull, ada, PullRequestReview.State.CHANGES_REQUESTED, nextWeek);
+            record(ada, ActivityEventType.REVIEW_APPROVED, ActivityTargetType.REVIEW, approval.getId(), DAY);
+            record(
+                    ada,
+                    ActivityEventType.REVIEW_APPROVED,
+                    ActivityTargetType.REVIEW,
+                    approval.getId(),
+                    nextWeek.plusSeconds(60));
+            record(
+                    ada,
+                    ActivityEventType.REVIEW_CHANGES_REQUESTED,
+                    ActivityTargetType.REVIEW,
+                    changes.getId(),
+                    nextWeek);
+            var detail = person(ada);
+            assertThat(detail.counts().pullRequestsReviewed()).isEqualTo(1);
+            assertThat(detail.weeks()).hasSize(2);
+            assertThat(detail.weeks().stream()
+                            .mapToLong(week -> week.counts().pullRequestsReviewed())
+                            .sum())
+                    .isEqualTo(2);
+            var work = personWork(ada, uri -> uri).content();
+            assertThat(work).singleElement().satisfies(entry -> {
+                assertThat(entry.id()).isEqualTo("work:" + pull.getId());
+                assertThat(entry.lastOccurredAt()).isEqualTo(nextWeek);
+                assertThat(entry.actions())
+                        .containsExactlyInAnyOrder(
+                                new ActivityActionDTO(ActivityKind.REVIEW_APPROVED, 1),
+                                new ActivityActionDTO(ActivityKind.REVIEW_CHANGES_REQUESTED, 1));
+            });
+        }
+
+        private StatusAssertions personRead(User user, String suffix, Function<UriBuilder, UriBuilder> query) {
+            return webTestClient
+                    .get()
+                    .uri(uri -> query.apply(uri.path("/public/workspaces/{slug}/activity/people/{login}" + suffix)
+                                    .queryParam("range", "custom")
+                                    .queryParam("from", FROM)
+                                    .queryParam("to", TO))
+                            .build(workspace.getWorkspaceSlug(), user.getLogin()))
+                    .exchange()
+                    .expectStatus();
+        }
+
+        private PublicActivityPersonDetailDTO person(User user) {
+            return Objects.requireNonNull(personRead(user, "", uri -> uri)
+                    .isOk()
+                    .expectBody(PublicActivityPersonDetailDTO.class)
+                    .returnResult()
+                    .getResponseBody());
+        }
+
+        private PublicActivityWorkPageDTO personWork(User user, Function<UriBuilder, UriBuilder> query) {
+            return Objects.requireNonNull(personRead(user, "/work", query)
+                    .isOk()
+                    .expectBody(PublicActivityWorkPageDTO.class)
+                    .returnResult()
+                    .getResponseBody());
+        }
+
+        private void connectPublicSource(IdentityProvider provider) {
+            boolean gitlab = provider.getType() == IdentityProviderType.GITLAB;
+            IntegrationKind kind = gitlab ? IntegrationKind.GITLAB : IntegrationKind.GITHUB;
+            ConnectionConfig config = gitlab
+                    ? new ConnectionConfig.GitLabConfig(
+                            provider.getServerUrl(),
+                            null,
+                            null,
+                            ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                            Set.of(),
+                            null)
+                    : new ConnectionConfig.GitHubAppConfig(
+                            9302L, workspace.getAccountLogin(), provider.getServerUrl(), Set.of());
+            jdbc.update(
+                    "UPDATE connection SET state='UNINSTALLED' WHERE workspace_id=? AND kind<>?",
+                    workspace.getId(),
+                    kind.name());
+            var connection =
+                    connections.saveAndFlush(new Connection(workspace, kind, "public-" + provider.getType(), config));
+            connectionService.transition(
+                    connection,
+                    new ConnectionService.TransitionRequest(
+                            IntegrationState.ACTIVE,
+                            "TEST_CONNECTED",
+                            "SYSTEM",
+                            "public-activity",
+                            UUID.randomUUID().toString(),
+                            "Source connected"));
         }
 
         private String error(String slug) {
@@ -1898,7 +2279,6 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         @BeforeEach
         void seedTeams() {
-            connectGitHub();
             Organization organization = new Organization();
             organization.setNativeId(nativeIds.incrementAndGet());
             organization.setLogin(workspace.getAccountLogin());
@@ -2350,11 +2730,6 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Nested
     class OpenWork {
-
-        @BeforeEach
-        void connectSource() {
-            connectGitHub();
-        }
 
         @Test
         void shouldListOpenReviewRequestsByOthersInMonitoredRepositoriesWhenAMemberIsAsked() {

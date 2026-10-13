@@ -1,5 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useSearch } from "@tanstack/react-router";
 import { expect, fn, within } from "storybook/test";
+import type { PublicActivityPersonDetail } from "@/api/types.gen";
+import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
+import type { PeopleTableState } from "./ActivityPeopleTable";
 
 import {
 	LARGE_PEOPLE,
@@ -14,18 +18,148 @@ import { expectNoPageOverflow } from "@/stories/reflow";
 import { daysBefore } from "@/stories/story-clock";
 import { precedes } from "@/test/dom";
 
-import { parseActivityStack, PUBLIC_ACTIVITY_LEVEL_KINDS } from "./activity-search";
+import {
+	publicActivitySearchSchema,
+	parsePublicActivityStack,
+	parseActivityStack,
+	PUBLIC_ACTIVITY_LEVEL_KINDS,
+} from "./activity-search";
 import { weekStarts } from "./activity-tally";
-import { PublicActivityPage, PublicActivityPageSkeleton } from "./PublicActivityPage";
+import {
+	PublicActivityPage,
+	PublicActivityPageSkeleton,
+	type PublicActivityPageProps,
+} from "./PublicActivityPage";
 
 const activity = publicActivityOf(PEOPLE);
 
+/** Synthetic independent reads preserve the page fixture's supplied totals and UTC contribution weeks. */
+function publicPersonReads(
+	people: PeopleTableState,
+	login: string,
+	provider: PublicActivityPageProps["providerType"],
+): PublicActivityPageProps["personActivity"] {
+	const unsettled = { status: "loading" as const };
+	if (people.status !== "ready") {
+		return { person: people, workLog: unsettled, categoryWorkLog: unsettled };
+	}
+	const row = people.people.people.find(({ person }) => person.login === login);
+	if (row === undefined) {
+		return {
+			person: { status: "error", error: { status: 404 }, onRetry: fn() },
+			workLog: unsettled,
+			categoryWorkLog: unsettled,
+		};
+	}
+	const { person, counts } = row;
+	const detail: PublicActivityPersonDetail = {
+		person: {
+			login: person.login,
+			name: person.name,
+			avatarUrl: person.avatarUrl,
+			htmlUrl: person.htmlUrl,
+		},
+		from: people.people.from,
+		to: people.people.to,
+		counts,
+		breakdown: { approvals: counts.pullRequestsReviewed, changeRequests: 0, commentReviews: 0 },
+		weeks: row.weeks.map(({ start, contributions }, index) => ({
+			start,
+			counts: {
+				...(index === 0
+					? counts
+					: {
+							contributions: 0,
+							pullRequestsOpened: 0,
+							pullRequestsMerged: 0,
+							pullRequestsReviewed: 0,
+							peopleHelped: 0,
+							issuesOpened: 0,
+							activeWeeks: 0,
+						}),
+				contributions,
+			},
+			breakdown: {
+				approvals: index === 0 ? counts.pullRequestsReviewed : 0,
+				changeRequests: 0,
+				commentReviews: 0,
+			},
+		})),
+		repositories: [{ rowKey: "1", repository: { key: "acme/api", name: "api" }, counts }],
+		supportedKinds: [
+			"PULL_REQUEST_OPENED",
+			"PULL_REQUEST_MERGED",
+			"REVIEW_APPROVED",
+			"REVIEW_CHANGES_REQUESTED",
+			"REVIEW_COMMENTED",
+			"ISSUE_OPENED",
+		],
+	};
+	const workLog = {
+		status: "ready" as const,
+		stale: people.stale,
+		items: [
+			{
+				id: "pr:42",
+				lastOccurredAt: new Date(people.people.from.getTime() + 3_600_000),
+				work: {
+					type: "PULL_REQUEST" as const,
+					number: 42,
+					title: "Keep public activity scoped",
+					state: "OPEN" as const,
+					isDraft: false,
+					htmlUrl:
+						provider === "GITLAB"
+							? "https://gitlab.com/acme/api/-/merge_requests/42"
+							: "https://github.com/acme/api/pull/42",
+					repository: { name: "api" },
+				},
+				actions: [{ kind: "REVIEW_APPROVED" as const, count: 1 }],
+			},
+		],
+		hasMore: false,
+		isLoadingMore: false,
+		onLoadMore: fn(),
+	};
+	return {
+		person: { status: "ready", person: detail, stale: people.stale },
+		workLog,
+		categoryWorkLog: workLog,
+	};
+}
+
+/** Native URL state owns opening and dismissal, exactly as on the public route. */
+function PublicActivityStory(args: PublicActivityPageProps) {
+	const search = useSearch({ strict: false });
+	const stack = parsePublicActivityStack(publicActivitySearchSchema.parse(search).detail);
+	const controls = useDetailStack();
+	const login = stack.find(({ target }) => target.kind === "person")?.id ?? "ada";
+	return (
+		<PublicActivityPage
+			{...args}
+			detail={{ stack, onClose: controls.close }}
+			personActivity={publicPersonReads(
+				args.people.status === "ready"
+					? { ...args.people, stale: args.people.stale || args.updating }
+					: args.people,
+				login,
+				args.providerType,
+			)}
+		/>
+	);
+}
+
 const meta = {
 	component: PublicActivityPage,
-	parameters: { layout: "fullscreen", chromatic: { viewports: [320, 1440] } },
+	parameters: {
+		router: { initialUrl: "/" },
+		layout: "fullscreen",
+		chromatic: { viewports: [320, 1440] },
+	},
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	args: {
+		personActivity: publicPersonReads(readyPublicPeople(activity), "ada", "GITHUB"),
 		workspaceName: activity.workspaceName,
 		providerType: "GITHUB",
 		viewer: { status: "signed-out", onSignIn: fn() },
@@ -41,6 +175,7 @@ const meta = {
 		updating: false,
 		detail: { stack: [], onClose: fn() },
 	},
+	render: (args) => <PublicActivityStory {...args} />,
 } satisfies Meta<typeof PublicActivityPage>;
 
 export default meta;
@@ -221,8 +356,14 @@ function tileFigure(totals: HTMLElement, title: string): HTMLElement {
 }
 
 export const PersonDetails: Story = {
+	parameters: { router: { initialUrl: "/?detail=person:ada" } },
 	args: {
 		detail: adaDetail,
+		period: {
+			kind: "custom",
+			from: new Date("2026-12-28T00:00:00Z"),
+			to: new Date("2027-01-10T00:00:00Z"),
+		},
 		people: readyPublicPeople(
 			publicActivityOf(PEOPLE, {
 				from: new Date("2026-12-28T00:00:00Z"),
@@ -238,11 +379,16 @@ export const PersonDetails: Story = {
 			}),
 		),
 	},
-	play: async () => {
+	play: async ({ userEvent }) => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByRole("heading", { name: "Ada Lovelace" })).toBeVisible();
-		await expect(panel.getByRole("heading", { name: "In this range" })).toBeVisible();
-		const totals = panel.getByRole("list", { name: "In this range" });
+		await expect(
+			panel.getByText(/28 December 2026.*10 January 2027/u, { selector: "p" }),
+		).toBeVisible();
+		await expect(
+			panel.getByRole("heading", { name: /28 December 2026.*10 January 2027/u }),
+		).toBeVisible();
+		const totals = panel.getByRole("list", { name: "Published totals" });
 		const counts = adaCounts();
 		await expect(tileFigure(totals, "Contributions")).toHaveTextContent(
 			counts.contributions.toLocaleString("en-GB"),
@@ -256,15 +402,21 @@ export const PersonDetails: Story = {
 		);
 		await expect(within(totals).getByText(`${counts.pullRequestsOpened} opened`)).toBeVisible();
 		await expect(within(totals).getByText(`${counts.peopleHelped} people helped`)).toBeVisible();
-		// The page publishes nothing behind a total, so no tile opens anything.
-		await expect(within(totals).queryByRole("link")).not.toBeInTheDocument();
+		await expect(within(totals).getByRole("link", { name: /^Reviews/u })).toHaveAttribute(
+			"href",
+			expect.stringContaining("activity:reviews"),
+		);
+		await expect(
+			panel.queryByRole("table", { name: "Contributions by week" }),
+		).not.toBeInTheDocument();
+		await userEvent.click(panel.getByRole("button", { name: "Show weekly contributions" }));
 		const weeks = within(panel.getByRole("table", { name: "Contributions by week" }));
 		await expect(weeks.getByRole("cell", { name: "28 December 2026" })).toBeVisible();
 		await expect(weeks.getByRole("cell", { name: "4 January 2027" })).toBeVisible();
 		await expect(
 			precedes(
 				panel.getByRole("link", { name: /ada on GitHub/u }),
-				panel.getByRole("heading", { name: "In this range" }),
+				panel.getByRole("heading", { name: /28 December 2026.*10 January 2027/u }),
 			),
 		).toBe(true);
 		await expect(panel.getByRole("link", { name: /ada on GitHub/u })).toHaveAttribute(
@@ -280,6 +432,7 @@ export const PersonDetails: Story = {
 
 /** Merges can be public without any of the work counted as Contributions in this range. */
 export const PersonOnlyMerges: Story = {
+	parameters: { router: { initialUrl: "/?detail=person:ada" } },
 	args: {
 		detail: adaDetail,
 		period: {
@@ -307,23 +460,28 @@ export const PersonOnlyMerges: Story = {
 			}),
 		),
 	},
-	play: async () => {
+	play: async ({ userEvent }) => {
 		const panel = within(await settledDrawerPanel());
-		const totals = panel.getByRole("list", { name: "In this range" });
+		const totals = panel.getByRole("list", { name: "Published totals" });
 		await expect(tileFigure(totals, "Contributions")).toHaveTextContent("0");
 		await expect(tileFigure(totals, "Pull requests")).toHaveTextContent("3");
 		await expect(panel.getByText("0 opened")).toBeVisible();
 		await expect(panel.getByText("1 active week")).toBeVisible();
+		await userEvent.click(panel.getByRole("button", { name: "Show weekly contributions" }));
 		const weeks = within(panel.getByRole("table", { name: "Contributions by week" }));
 		await expect(weeks.getByRole("columnheader", { name: "Week of (UTC)" })).toBeVisible();
 		await expect(weeks.getByRole("cell", { name: "21 September 2026" })).toBeVisible();
 		await expect(weeks.getByRole("cell", { name: "0" })).toBeVisible();
-		await expect(within(totals).queryByRole("link")).not.toBeInTheDocument();
+		await expect(within(totals).getByRole("link", { name: /^Pull requests/u })).toHaveAttribute(
+			"href",
+			expect.stringContaining("activity:pull-requests"),
+		);
 	},
 };
 
 /** Openings keep the category active even when nothing merged; unrelated zero totals stay muted. */
 export const PersonOnlyOpenings: Story = {
+	parameters: { router: { initialUrl: "/?detail=person:ada" } },
 	args: {
 		detail: adaDetail,
 		period: {
@@ -353,7 +511,7 @@ export const PersonOnlyOpenings: Story = {
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		const totals = panel.getByRole("list", { name: "In this range" });
+		const totals = panel.getByRole("list", { name: "Published totals" });
 		const merged = tileFigure(totals, "Pull requests");
 		await expect(merged).toHaveTextContent("0");
 		await expect(panel.getByText("4 opened")).toBeVisible();
@@ -371,6 +529,7 @@ export const PersonOnlyOpenings: Story = {
 
 /** The same supplied totals use singular units when one person and one week are counted. */
 export const PersonSingleton: Story = {
+	parameters: { router: { initialUrl: "/?detail=person:ada" } },
 	args: {
 		detail: adaDetail,
 		people: readyPublicPeople(
@@ -403,6 +562,7 @@ export const PersonSingleton: Story = {
 
 /** Provider terminology and profile links follow the published GitLab response. */
 export const PersonGitLab: Story = {
+	parameters: { router: { initialUrl: "/?detail=person:ada" } },
 	decorators: [withProvider("GITLAB")],
 	args: {
 		providerType: "GITLAB",
@@ -418,7 +578,11 @@ export const PersonGitLab: Story = {
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		await expect(panel.getByText("Merge requests")).toBeVisible();
+		await expect(
+			within(panel.getByRole("list", { name: "Published totals" })).getByRole("link", {
+				name: /^Merge requests/u,
+			}),
+		).toBeVisible();
 		await expect(panel.getByText("distinct merge requests")).toBeVisible();
 		await expect(
 			panel.getByRole("link", { name: "ada on GitLab (opens in a new tab)" }),
@@ -428,7 +592,11 @@ export const PersonGitLab: Story = {
 
 export const PersonReflow: Story = {
 	args: { detail: adaDetail },
-	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	parameters: {
+		router: { initialUrl: "/?detail=person:ada" },
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
 	play: async () => {
 		await settledDrawerPanel();
 		await expectNoPageOverflow();
@@ -436,15 +604,17 @@ export const PersonReflow: Story = {
 };
 
 export const PersonMissing: Story = {
+	parameters: { router: { initialUrl: "/?detail=person:ada" } },
 	args: { detail: adaDetail, people: readyPublicPeople(publicActivityOf([])) },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		await expect(panel.getByText("No activity in this range")).toBeVisible();
+		await expect(panel.getByText("We could not find this person’s activity")).toBeVisible();
 		await expect(panel.queryByRole("link", { name: /on GitHub/u })).not.toBeInTheDocument();
 	},
 };
 
 export const PersonLoading: Story = {
+	parameters: { router: { initialUrl: "/?detail=person:ada" } },
 	args: { detail: adaDetail, people: { status: "loading" } },
 	play: async () => {
 		const panel = await settledDrawerPanel();
@@ -458,6 +628,7 @@ export const PersonLoading: Story = {
 };
 
 export const PersonFailed: Story = {
+	parameters: { router: { initialUrl: "/?detail=person:ada" } },
 	args: {
 		detail: adaDetail,
 		people: { status: "error", error: new Error("Network down"), onRetry: fn() },
@@ -465,7 +636,13 @@ export const PersonFailed: Story = {
 	play: async ({ args, userEvent }) => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByText("We could not load this person’s activity")).toBeVisible();
-		await userEvent.click(panel.getByRole("button", { name: /Retry/u }));
+		const summaryError = panel
+			.getByText("We could not load this person’s activity")
+			.closest<HTMLElement>('[role="alert"]');
+		if (summaryError === null) {
+			throw new Error("The person summary failure is not an alert");
+		}
+		await userEvent.click(within(summaryError).getByRole("button", { name: /Retry/u }));
 		await expect(
 			args.people.status === "error" ? args.people.onRetry : undefined,
 		).toHaveBeenCalledOnce();
@@ -473,11 +650,14 @@ export const PersonFailed: Story = {
 };
 
 export const PersonUpdating: Story = {
-	args: { detail: adaDetail, period: { kind: "preset", preset: "30d" }, updating: true },
+	parameters: { router: { initialUrl: "/?detail=person:ada" } },
+	args: { ...PersonDetails.args, updating: true },
 	play: async () => {
 		const panel = await settledDrawerPanel();
 		await expect(
-			within(panel).getByText(/These figures are for .* while activity updates\./u),
+			within(panel).getByText(
+				/These figures are for 28 December 2026.*10 January 2027 while activity updates\./u,
+			),
 		).toBeVisible();
 		await expect(panel.querySelector('[aria-busy="true"]')).toBeVisible();
 	},

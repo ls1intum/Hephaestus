@@ -1,4 +1,4 @@
-import type { WorkItem } from "@/api/types.gen";
+import type { RepositoryInfo, WorkItem } from "@/api/types.gen";
 
 export type ProviderType = "GITHUB" | "GITLAB";
 
@@ -56,7 +56,7 @@ export function getProviderTerms(provider: ProviderType): ProviderTerminology {
  */
 export function workReference(
 	provider: ProviderType,
-	work: Pick<WorkItem, "type" | "number" | "repository">,
+	work: Pick<WorkItem, "type" | "number"> & { repository?: Pick<RepositoryInfo, "name"> },
 ): string {
 	const sigil = work.type === "PULL_REQUEST" ? TERMS[provider].pullRequestSigil : "#";
 	const number = `${sigil}${work.number}`;

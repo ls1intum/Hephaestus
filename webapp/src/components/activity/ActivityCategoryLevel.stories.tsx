@@ -8,6 +8,7 @@ import { settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 
+import { categoryChartStateOf } from "./activity-category-chart";
 import { categoryLevel } from "./activity-search";
 import { ActivityCategoryLevel } from "./ActivityCategoryLevel";
 
@@ -30,7 +31,7 @@ const meta = {
 		category: "reviews",
 		description: "Last 30 days · Ada Lovelace",
 		providerType: "GITHUB",
-		overview: readyOverview(OVERVIEW),
+		chart: categoryChartStateOf(readyOverview(OVERVIEW), "reviews"),
 		workLog: {
 			status: "ready",
 			stale: false,
@@ -105,7 +106,7 @@ export const Reflow: Story = {
 };
 
 export const Loading: Story = {
-	args: { overview: { status: "loading" }, workLog: { status: "loading" } },
+	args: { chart: { status: "loading" }, workLog: { status: "loading" } },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.queryByRole("figure")).not.toBeInTheDocument();

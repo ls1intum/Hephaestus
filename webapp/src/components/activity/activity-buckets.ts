@@ -132,14 +132,12 @@ export function utcWeekStartLabel(start: Date, nowMs: number): string {
 
 /** The week with the highest count, the earliest on a tie; none when nothing happened. */
 export function busiestWeek(
-	weeks: readonly ActivityWeek[],
-	count: (tally: ActivityTally) => number,
-): { week: ActivityWeek; count: number } | undefined {
-	let busiest: { week: ActivityWeek; count: number } | undefined;
+	weeks: readonly { start: Date; count: number }[],
+): { week: { start: Date; count: number }; count: number } | undefined {
+	let busiest: { week: { start: Date; count: number }; count: number } | undefined;
 	for (const week of weeks) {
-		const value = count(week.tally);
-		if (value > 0 && (busiest === undefined || value > busiest.count)) {
-			busiest = { week, count: value };
+		if (week.count > 0 && (busiest === undefined || week.count > busiest.count)) {
+			busiest = { week, count: week.count };
 		}
 	}
 	return busiest;
@@ -155,9 +153,23 @@ export function weeksSummary(
 	count: (tally: ActivityTally) => number,
 	unit: Noun,
 ): string {
-	const total = count(overview.tally);
+	return countedWeeksSummary(
+		count(overview.tally),
+		overview.weeks.map((week) => ({ start: week.start, count: count(week.tally) })),
+		span,
+		unit,
+	);
+}
+
+/** The accessible summary from any source's actual headline and weekly counts. */
+export function countedWeeksSummary(
+	total: number,
+	weeks: readonly { start: Date; count: number }[],
+	span: DateSpan | undefined,
+	unit: Noun,
+): string {
 	const headline = `${total} ${total === 1 ? unit.one : unit.many}`;
-	const busiest = busiestWeek(overview.weeks, count);
+	const busiest = busiestWeek(weeks);
 	if (busiest === undefined) {
 		return headline;
 	}

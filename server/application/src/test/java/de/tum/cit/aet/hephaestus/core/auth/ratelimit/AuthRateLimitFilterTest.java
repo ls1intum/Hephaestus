@@ -67,7 +67,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
             request.setRemoteAddr("192.0.2.1");
             limited.doFilter(request, new MockHttpServletResponse(), mock(FilterChain.class));
         }
-        var request = new MockHttpServletRequest("GET", "/public/workspaces/bravo/activity");
+        var request = new MockHttpServletRequest("GET", "/public/workspaces/bravo/activity/people/developer");
         request.setRemoteAddr("192.0.2.1");
         var blocked = new MockHttpServletResponse();
         limited.doFilter(request, blocked, mock(FilterChain.class));
@@ -102,7 +102,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
                 mock(FilterChain.class));
         var blocked = new MockHttpServletResponse();
         limited.doFilter(
-                new MockHttpServletRequest("HEAD", "/public/workspaces/alpha/activity"),
+                new MockHttpServletRequest("HEAD", "/public/workspaces/alpha/activity/people/developer/work"),
                 blocked,
                 mock(FilterChain.class));
         assertThat(blocked.getStatus()).isEqualTo(429);

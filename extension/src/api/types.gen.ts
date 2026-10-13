@@ -4810,6 +4810,40 @@ export type PublicActivityPerson = {
     weeks: Array<ActivitySparklineWeek>;
 };
 
+/**
+ * One published person's public contributions. Excludes account details, teams, automation and private activity.
+ */
+export type PublicActivityPersonDetail = {
+    breakdown: PublicActivityReviewBreakdown;
+    counts: PublicActivityCounts;
+    firstContributionAt?: string;
+    from: string;
+    person: PublicActivityPersonIdentity;
+    repositories: Array<PublicActivityPersonRepository>;
+    supportedKinds: Array<'PULL_REQUEST_OPENED' | 'PULL_REQUEST_MERGED' | 'PULL_REQUEST_CLOSED' | 'REVIEW_APPROVED' | 'REVIEW_CHANGES_REQUESTED' | 'REVIEW_COMMENTED' | 'COMMENTED' | 'CODE_COMMENTED' | 'ISSUE_OPENED' | 'ISSUE_CLOSED'>;
+    to: string;
+    weeks: Array<PublicActivityPersonWeek>;
+};
+
+export type PublicActivityPersonIdentity = {
+    avatarUrl: string;
+    htmlUrl: string;
+    login: string;
+    name: string;
+};
+
+export type PublicActivityPersonRepository = {
+    counts: PublicActivityCounts;
+    repository: PublicActivityRepository;
+    rowKey: string;
+};
+
+export type PublicActivityPersonWeek = {
+    breakdown: PublicActivityReviewBreakdown;
+    counts: PublicActivityCounts;
+    start: string;
+};
+
 export type PublicActivityPolicy = {
     allowed: boolean;
 };
@@ -4817,6 +4851,37 @@ export type PublicActivityPolicy = {
 export type PublicActivityRepository = {
     key: string;
     name: string;
+};
+
+export type PublicActivityReviewBreakdown = {
+    approvals: number;
+    changeRequests: number;
+    commentReviews: number;
+};
+
+export type PublicActivityWork = {
+    actions: Array<ActivityAction>;
+    id: string;
+    lastOccurredAt: string;
+    work: PublicActivityWorkSummary;
+};
+
+/**
+ * One page of the selected person's published work; no account, author or other participant data.
+ */
+export type PublicActivityWorkPage = {
+    content: Array<PublicActivityWork>;
+    nextCursor?: string;
+};
+
+export type PublicActivityWorkSummary = {
+    htmlUrl: string;
+    isDraft: boolean;
+    number: number;
+    repository: PublicActivityRepository;
+    state: 'OPEN' | 'CLOSED' | 'MERGED';
+    title: string;
+    type: 'PULL_REQUEST' | 'ISSUE';
 };
 
 export type PublicActivityWorkspaceSettings = {
@@ -10246,6 +10311,72 @@ export type GetPublicActivityResponses = {
 };
 
 export type GetPublicActivityResponse = GetPublicActivityResponses[keyof GetPublicActivityResponses];
+
+export type GetPublicActivityPersonData = {
+    body?: never;
+    path: {
+        slug: string;
+        login: string;
+    };
+    query?: {
+        /**
+         * Activity range
+         */
+        range?: '30d' | '90d' | '1y' | 'all' | 'custom';
+        from?: string;
+        to?: string;
+        repo?: Array<string>;
+    };
+    url: '/public/workspaces/{slug}/activity/people/{login}';
+};
+
+export type GetPublicActivityPersonResponses = {
+    /**
+     * Public contributions counted
+     */
+    200: PublicActivityPersonDetail;
+};
+
+export type GetPublicActivityPersonResponse = GetPublicActivityPersonResponses[keyof GetPublicActivityPersonResponses];
+
+export type GetPublicActivityPersonWorkData = {
+    body?: never;
+    path: {
+        slug: string;
+        login: string;
+    };
+    query?: {
+        /**
+         * Activity range
+         */
+        range?: '30d' | '90d' | '1y' | 'all' | 'custom';
+        from?: string;
+        to?: string;
+        repo?: Array<string>;
+        /**
+         * Kinds of activity to list (repeatable); omit for every kind
+         */
+        kinds?: Array<'PULL_REQUEST_OPENED' | 'PULL_REQUEST_MERGED' | 'PULL_REQUEST_CLOSED' | 'REVIEW_APPROVED' | 'REVIEW_CHANGES_REQUESTED' | 'REVIEW_COMMENTED' | 'COMMENTED' | 'CODE_COMMENTED' | 'ISSUE_OPENED' | 'ISSUE_CLOSED'>;
+        /**
+         * The previous page's nextCursor; omit for the first page
+         */
+        cursor?: string;
+        /**
+         * Page size from 1 to 100; defaults to 30
+         */
+        size?: number;
+    };
+    url: '/public/workspaces/{slug}/activity/people/{login}/work';
+};
+
+export type GetPublicActivityPersonWorkResponses = {
+    /**
+     * Public work listed
+     */
+    200: PublicActivityWorkPage;
+};
+
+export type GetPublicActivityPersonWorkResponse = GetPublicActivityPersonWorkResponses[keyof GetPublicActivityPersonWorkResponses];
 
 export type DeleteCurrentUserData = {
     body?: never;

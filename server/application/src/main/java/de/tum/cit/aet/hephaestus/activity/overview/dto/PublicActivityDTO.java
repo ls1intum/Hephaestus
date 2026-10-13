@@ -78,14 +78,7 @@ public record PublicActivityDTO(
                     person.name(),
                     person.avatarUrl(),
                     person.htmlUrl(),
-                    new PublicActivityCountsDTO(
-                            counts.contributions(),
-                            counts.pullRequestsOpened(),
-                            counts.pullRequestsMerged(),
-                            counts.pullRequestsReviewed(),
-                            counts.peopleHelped(),
-                            counts.issuesOpened(),
-                            counts.activeWeeks()),
+                    PublicActivityCountsDTO.from(counts),
                     row.firstContributionAt(),
                     row.weeks());
         }
@@ -98,5 +91,16 @@ public record PublicActivityDTO(
             @Schema(requiredMode = RequiredMode.REQUIRED) long pullRequestsReviewed,
             @Schema(requiredMode = RequiredMode.REQUIRED) long peopleHelped,
             @Schema(requiredMode = RequiredMode.REQUIRED) long issuesOpened,
-            @Schema(requiredMode = RequiredMode.REQUIRED) long activeWeeks) {}
+            @Schema(requiredMode = RequiredMode.REQUIRED) long activeWeeks) {
+        public static PublicActivityCountsDTO from(ActivityCountsDTO counts) {
+            return new PublicActivityCountsDTO(
+                    counts.contributions(),
+                    counts.pullRequestsOpened(),
+                    counts.pullRequestsMerged(),
+                    counts.pullRequestsReviewed(),
+                    counts.peopleHelped(),
+                    counts.issuesOpened(),
+                    counts.activeWeeks());
+        }
+    }
 }

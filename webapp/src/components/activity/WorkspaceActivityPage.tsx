@@ -154,7 +154,9 @@ export function WorkspaceActivityPage({
 						size="lg"
 						title="Timeline"
 						actions={
-							timeline.status === "ready" && timeline.items.length > 0 ? (
+							timeline.status === "ready" &&
+							timeline.items.length > 0 &&
+							timeline.onCopy !== undefined ? (
 								<CopyMarkdownButton onCopy={timeline.onCopy} />
 							) : undefined
 						}

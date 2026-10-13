@@ -6,6 +6,7 @@ import type {
 } from "@/api/types.gen";
 import { ARTIFACT_KIND, artifactKindNoun } from "@/lib/artifact-kinds";
 import type { ProviderType } from "@/lib/provider/provider-terms";
+import { hasText } from "@/lib/text";
 
 /** The figures a people row shows, which the public page counts too. */
 export type PersonCounts = Pick<
@@ -19,10 +20,21 @@ export type PersonCounts = Pick<
 	| "activeWeeks"
 >;
 
+/** The identity activity presents, without account or workspace fields. */
+export type ActivityPersonIdentity = Pick<UserInfo, "login" | "name" | "avatarUrl" | "htmlUrl">;
+
+/** A missing display name leaves the provider login as the identity. */
+export function activityPersonName(
+	person: ActivityPersonIdentity | undefined,
+	login: string,
+): string {
+	return person !== undefined && hasText(person.name) ? person.name : login;
+}
+
 /** What the people table reads of a person, whichever page lists them. */
 export interface PeopleRow {
 	/** `id` tells people apart within one response: a member's id, or a public login. */
-	person: Pick<UserInfo, "login" | "name" | "avatarUrl" | "htmlUrl"> & { id: number | string };
+	person: ActivityPersonIdentity & { id: number | string };
 	counts: PersonCounts;
 	weeks: readonly ActivitySparklineWeek[];
 }

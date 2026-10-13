@@ -13,6 +13,7 @@ import {
 import { withProvider, withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
+import { categoryChartStateOf } from "./activity-category-chart";
 import { weekStarts } from "./activity-tally";
 import { ActivityTrendChart } from "./ActivityTrendChart";
 
@@ -26,8 +27,7 @@ const meta = {
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	args: {
-		state: readyOverview(MONTH_OVERVIEW, "30d", PREVIOUS_TALLY),
-		category: "reviews",
+		state: categoryChartStateOf(readyOverview(MONTH_OVERVIEW, "30d", PREVIOUS_TALLY), "reviews"),
 		providerType: "GITHUB",
 	},
 } satisfies Meta<typeof ActivityTrendChart>;
@@ -64,7 +64,7 @@ export const Default: Story = {
 
 /** The table twin: every week's count per kind. */
 export const AsTable: Story = {
-	args: { state: readyOverview(SPARSE_OVERVIEW, "30d"), category: "pull-requests" },
+	args: { state: categoryChartStateOf(readyOverview(SPARSE_OVERVIEW, "30d"), "pull-requests") },
 	play: async ({ canvas, canvasElement, userEvent }) => {
 		await expect(figure(canvasElement, "Busiest week")).toMatch(/^2/u);
 		const chart = canvas.getByRole("figure");
@@ -179,12 +179,15 @@ export const WideReviewsAsTable: Story = {
 };
 
 /** Two kinds of one neutral tone: each in its own row, in the accent, never grey. */
-export const Comments: Story = { args: { category: "comments" } };
+export const Comments: Story = {
+	args: {
+		state: categoryChartStateOf(readyOverview(MONTH_OVERVIEW, "30d", PREVIOUS_TALLY), "comments"),
+	},
+};
 
 export const TwelveMonths: Story = {
 	args: {
-		state: readyOverview(YEAR_OVERVIEW, "1y"),
-		category: "pull-requests",
+		state: categoryChartStateOf(readyOverview(YEAR_OVERVIEW, "1y"), "pull-requests"),
 	},
 	play: async ({ canvas, canvasElement }) => {
 		await expect(figure(canvasElement, "Average per week")).toMatch(/^\d+\.\d$/u);
@@ -196,7 +199,7 @@ export const TwelveMonths: Story = {
 };
 
 export const Empty: Story = {
-	args: { state: readyOverview(QUIET_OVERVIEW, "30d") },
+	args: { state: categoryChartStateOf(readyOverview(QUIET_OVERVIEW, "30d"), "reviews") },
 	play: async ({ canvas, canvasElement, userEvent }) => {
 		const chart = canvas.getByRole("figure");
 		await expect(chart).toHaveAccessibleName("0 pull requests reviewed");
@@ -229,7 +232,13 @@ export const Empty: Story = {
 
 export const GitLab: Story = {
 	decorators: [withProvider("GITLAB")],
-	args: { providerType: "GITLAB", category: "pull-requests" },
+	args: {
+		providerType: "GITLAB",
+		state: categoryChartStateOf(
+			readyOverview(MONTH_OVERVIEW, "30d", PREVIOUS_TALLY),
+			"pull-requests",
+		),
+	},
 };
 
 export const Dark: Story = { globals: { theme: "dark" } };

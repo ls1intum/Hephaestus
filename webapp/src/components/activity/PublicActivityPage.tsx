@@ -26,7 +26,7 @@ import {
 } from "./ActivityPeopleTable";
 import { ActivityPeriodPicker } from "./ActivityPeriodPicker";
 import { personLevelLink } from "./people-links";
-import { PublicPersonDrawer } from "./PublicPersonDrawer";
+import { PublicPersonDrawer, type PublicPersonDrawerProps } from "./PublicPersonDrawer";
 
 export interface PublicActivityPageProps {
 	/** Undefined while the page could not read the workspace at all. */
@@ -50,6 +50,7 @@ export interface PublicActivityPageProps {
 	refreshError?: { error: unknown; onRetry: () => void; pending: boolean };
 	/** The person levels the URL opens over the page, and how each closes. */
 	detail: { stack: ActivityStackEntry[]; onClose: (depth: number) => void };
+	personActivity: Pick<PublicPersonDrawerProps, "person" | "workLog" | "categoryWorkLog">;
 }
 
 /**
@@ -72,6 +73,7 @@ export function PublicActivityPage({
 	updating,
 	refreshError,
 	detail,
+	personActivity,
 }: PublicActivityPageProps) {
 	const terms = getProviderTerms(providerType);
 	const pullRequests = artifactKindNoun(ARTIFACT_KIND.pullRequest, 2, providerType);
@@ -148,8 +150,19 @@ export function PublicActivityPage({
 				stack={detail.stack}
 				onClose={detail.onClose}
 				providerType={providerType}
-				// The previous period's figures stand in while the next loads, and the level says so.
-				people={people.status === "ready" ? { ...people, stale: people.stale || updating } : people}
+				period={period}
+				seed={
+					people.status === "ready"
+						? people.people.people.find(({ person }) =>
+								detail.stack.some(
+									({ target }) => target.kind === "person" && target.login === person.login,
+								),
+							)?.person
+						: undefined
+				}
+				person={personActivity.person}
+				workLog={personActivity.workLog}
+				categoryWorkLog={personActivity.categoryWorkLog}
 			/>
 		</PageLayout>
 	);

@@ -4,7 +4,7 @@ import { Section } from "@/components/layout/Section";
 import { DrawerBody } from "@/components/ui/drawer";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 
-import type { ActivityOverviewState } from "./activity-buckets";
+import type { ActivityCategoryChartState } from "./activity-category-chart";
 import { ACTIVITY_CATEGORY_DEFS, type ActivityCategory } from "./activity-kind-defs";
 import { ActivityEmpty, HistoryMark } from "./ActivityEmpty";
 import { ActivityTrendChart } from "./ActivityTrendChart";
@@ -18,8 +18,8 @@ export interface ActivityCategoryLevelProps {
 	/** The period and whose activity it is: "Last 30 days · Ada Lovelace". */
 	description: string;
 	providerType: ProviderType;
-	/** The overview of the level's owner, whose buckets the chart draws. */
-	overview: ActivityOverviewState;
+	/** The actual supported series and distinct-work headline for this category. */
+	chart: ActivityCategoryChartState;
 	/** The owner's timeline, filtered to the category's kinds. */
 	workLog: ActivityWorkLogState;
 	subject: WorkLogSubject;
@@ -34,7 +34,7 @@ export function ActivityCategoryLevel({
 	category,
 	description,
 	providerType,
-	overview,
+	chart,
 	workLog,
 	subject,
 	absent = false,
@@ -51,13 +51,15 @@ export function ActivityCategoryLevel({
 					/>
 				) : (
 					<>
-						<ActivityTrendChart state={overview} category={category} providerType={providerType} />
+						<ActivityTrendChart state={chart} providerType={providerType} />
 						<Section
 							level={3}
 							size="lg"
 							title="Timeline"
 							actions={
-								workLog.status === "ready" && workLog.items.length > 0 ? (
+								workLog.status === "ready" &&
+								workLog.items.length > 0 &&
+								workLog.onCopy !== undefined ? (
 									<CopyMarkdownButton onCopy={workLog.onCopy} />
 								) : undefined
 							}

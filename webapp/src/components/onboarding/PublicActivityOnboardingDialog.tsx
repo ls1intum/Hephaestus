@@ -73,9 +73,11 @@ export function PublicActivityOnboardingDialog({
 							<ul className="list-disc space-y-1 pl-5">
 								<li>your name, your picture and a link to your profile</li>
 								<li>
-									the {pullRequests} you opened and reviewed, and the issues you opened, as numbers
+									counts of the {pullRequests} you opened and reviewed, and the issues you opened
 								</li>
-								<li>a weekly line of your activity</li>
+								<li>
+									your public work timeline, with titles and links, and weekly activity counts
+								</li>
 							</ul>
 							<p>
 								Your choice covers every public activity page, and you can change it at any time in

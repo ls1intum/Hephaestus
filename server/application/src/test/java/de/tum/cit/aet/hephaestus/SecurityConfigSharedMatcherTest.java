@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.config.CorsProperties;
 import de.tum.cit.aet.hephaestus.core.auth.clientsession.InstalledClientRegistry;
+import de.tum.cit.aet.hephaestus.core.auth.web.PublicActivityReadRequestMatcher;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceOriginPolicy;
 import java.util.List;
@@ -38,6 +39,32 @@ class SecurityConfigSharedMatcherTest extends BaseUnitTest {
         }
         post.setMethod("GET");
         assertThat(SecurityConfig.EMAIL_UNSUBSCRIBE_MATCHER.matches(post)).isFalse();
+    }
+
+    @Test
+    void shouldPermitOnlyPublishedActivityReads() {
+        for (String path : List.of(
+                "/public/workspaces/team/activity",
+                "/public/workspaces/team/activity/people/developer",
+                "/public/workspaces/team/activity/people/developer/work")) {
+            for (String method : List.of("GET", "HEAD", "POST")) {
+                var request = new MockHttpServletRequest(method, path);
+                request.setServletPath(path);
+                assertThat(PublicActivityReadRequestMatcher.MATCHER.matches(request))
+                        .as("%s %s", method, path)
+                        .isEqualTo(!method.equals("POST"));
+            }
+        }
+        for (String path : List.of(
+                "/public/workspaces/team/activity/private",
+                "/public/workspaces/team/activity/people",
+                "/public/workspaces/team/activity/people/developer/work/extra")) {
+            var request = new MockHttpServletRequest("GET", path);
+            request.setServletPath(path);
+            assertThat(PublicActivityReadRequestMatcher.MATCHER.matches(request))
+                    .as(path)
+                    .isFalse();
+        }
     }
 
     private static ObjectProvider<InstalledClientRegistry> noClients() {

@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityRepositoryDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityTeamDTO;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.time.TimeRange;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.MonitoredRepositoryScope;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import java.time.Instant;
 import java.util.List;
@@ -46,7 +47,14 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
     String PUBLIC_MONITOR = """
             m.unavailable_since IS NULL AND m.repository_visibility_confirmed_at > :visibilityConfirmedAfter
             """;
-    String PUBLIC_REPOSITORY = " AND (:#{#scope.publicOnly()} = false OR (" + PUBLIC_REPOSITORY_CONDITION + ")) ";
+    String MONITOR_AUTHORITY = "EXISTS (SELECT 1 FROM repository_to_monitor rtm WHERE rtm.id = m.id AND "
+            + MonitoredRepositoryScope.NATIVE_RTM_R + ")";
+    String REPOSITORY_AUTHORITY = "EXISTS (SELECT 1 FROM repository_to_monitor rtm"
+            + " WHERE rtm.workspace_id = :#{#scope.workspaceId()} AND rtm.name_with_owner = r.name_with_owner AND "
+            + MonitoredRepositoryScope.NATIVE_RTM_R + ")";
+    String PUBLIC_REPOSITORY_FILTER =
+            " AND (:#{#scope.publicOnly()} = false OR (" + PUBLIC_REPOSITORY_CONDITION + ")) ";
+    String PUBLIC_REPOSITORY = " AND " + REPOSITORY_AUTHORITY + PUBLIC_REPOSITORY_FILTER;
     // Inline eligibility so each use can join by identity instead of scanning the whole public cohort.
     String PUBLIC_PEOPLE = """
             WITH public_people AS NOT MATERIALIZED (SELECT u.id FROM "user" u WHERE true
@@ -57,8 +65,8 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
             monitored AS (
                 SELECT DISTINCT r.id, r.provider_id FROM repository_to_monitor m
                 JOIN repository r ON r.name_with_owner = m.name_with_owner
-                WHERE m.workspace_id = :#{#scope.workspaceId()}
-            """ + PUBLIC_REPOSITORY + """
+                WHERE m.workspace_id = :#{#scope.workspaceId()} AND
+            """ + MONITOR_AUTHORITY + PUBLIC_REPOSITORY_FILTER + """
             )
             """;
     String NORMALIZED_HEAD = """
@@ -113,16 +121,22 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
             """;
     String SOURCE = SOURCE_HEAD + PUBLIC_SOURCE + SOURCE_TAIL;
     String INTERNAL_SOURCE = SOURCE_HEAD + SOURCE_TAIL;
-    String NORMALIZED_TAIL = """
+    String NORMALIZED_EVENTS_END = """
                   AND e.occurred_at >= :#{#range.from()} AND e.occurred_at < :#{#range.to()}
                 ORDER BY e.actor_id, e.event_type, e.target_id, e.occurred_at
-            ), marked AS (
+            )
+            """;
+    String MARKED_HEAD = """
+            , marked AS (
                 SELECT n.*,
                     row_number() OVER (PARTITION BY actor_id, reviewed_id) AS review_first,
                     row_number() OVER (PARTITION BY actor_id, week, reviewed_id) AS week_review_first,
                     row_number() OVER (PARTITION BY actor_id, helped_id) AS helped_first,
                     row_number() OVER (PARTITION BY actor_id, week) AS week_first
             """;
+    String NORMALIZED_TAIL = NORMALIZED_EVENTS_END + MARKED_HEAD;
+    String PUBLIC_EVENTS = PUBLIC_PEOPLE + ", " + MONITORS + NORMALIZED_HEAD + PUBLIC_HELPED + NORMALIZED_HELPED
+            + SOURCE + NORMALIZED_EVENTS_END;
     String NORMALIZED = PUBLIC_PEOPLE + ", " + MONITORS + NORMALIZED_HEAD + PUBLIC_HELPED + NORMALIZED_HELPED + SOURCE
             + NORMALIZED_TAIL;
     String INTERNAL_NORMALIZED =
@@ -272,8 +286,8 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
               AND ((:own = true AND wm.user_id IS NOT NULL) OR EXISTS (SELECT 1 FROM activity_event e JOIN repository r ON r.id = e.repository_id
                   WHERE e.workspace_id = :workspace AND e.actor_id = u.id AND r.provider_id = u.provider_id AND EXISTS (
                       SELECT 1 FROM repository_to_monitor m WHERE m.workspace_id = :workspace
-                          AND m.name_with_owner = r.name_with_owner)))
-            """, nativeQuery = true)
+                          AND m.name_with_owner = r.name_with_owner AND
+            """ + MONITOR_AUTHORITY + ")))", nativeQuery = true)
     Optional<ContributorRow> findContributor(
             @Param("workspace") long workspace, @Param("person") long userId, @Param("own") boolean own);
 
@@ -283,6 +297,19 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
         return new Contributor(row.person(), row.kind());
     }
 
+    @Query(value = PUBLIC_PEOPLE + """
+            SELECT u.id, u.login, u.name, u.avatar_url, u.html_url, false AS bot, false AS classified
+            FROM "user" u WHERE u.id IN (SELECT id FROM public_people) AND lower(u.login) = lower(:login)
+              AND EXISTS (SELECT 1 FROM activity_event e JOIN repository r ON r.id = e.repository_id
+                WHERE e.workspace_id = :#{#scope.workspaceId()} AND e.actor_id = u.id
+                  AND r.provider_id = u.provider_id AND e.repository_id IN (:#{#scope.repositoryIds()})
+                  AND e.event_type IN ('PULL_REQUEST_OPENED', 'PULL_REQUEST_MERGED', 'REVIEW_APPROVED',
+                    'REVIEW_CHANGES_REQUESTED', 'REVIEW_COMMENTED', 'ISSUE_CREATED')
+            """ + PUBLIC_REPOSITORY + """
+              ) ORDER BY u.id LIMIT 2
+            """, nativeQuery = true)
+    List<ContributorRow> findPublicContributor(@Param("scope") ActivityScope scope, @Param("login") String login);
+
     @Query(value = """
             SELECT u.id, u.login, u.name, u.avatar_url, u.html_url, false AS bot, false AS classified
             FROM "user" u JOIN workspace_hidden_former_member h ON h.user_id = u.id
@@ -291,17 +318,20 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
             """, nativeQuery = true)
     List<ContributorRow> findHiddenContributors(@Param("workspace") long workspace);
 
-    @Query(value = """
-                SELECT r.id, r.name_with_owner AS key, r.name FROM repository_to_monitor m
+    @Query(
+            value = """
+                SELECT DISTINCT r.id, r.name_with_owner AS key, r.name FROM repository_to_monitor m
                 JOIN repository r ON r.name_with_owner = m.name_with_owner
-                WHERE m.workspace_id = :workspace AND (:publicOnly = false OR (
-                """ + PUBLIC_REPOSITORY_CONDITION + " AND " + PUBLIC_MONITOR + """
+                WHERE m.workspace_id = :workspace AND
+                """ + MONITOR_AUTHORITY + " AND (:publicOnly = false OR ("
+                    + PUBLIC_REPOSITORY_CONDITION + " AND " + PUBLIC_MONITOR + """
                 )) AND (EXISTS (
                     SELECT 1 FROM workspace w JOIN organization o ON o.id = w.organization_id
                     WHERE w.id = :workspace AND o.provider_id = r.provider_id) OR EXISTS (
                     SELECT 1 FROM activity_event e WHERE e.workspace_id = :workspace AND e.repository_id = r.id))
                 ORDER BY r.name_with_owner
-                """, nativeQuery = true)
+                """,
+            nativeQuery = true)
     List<RepositoryRow> findRepositories(
             @Param("workspace") long workspace,
             @Param("publicOnly") boolean publicOnly,
@@ -369,7 +399,7 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
                     FROM repository_to_monitor m WHERE workspace_id = :#{#scope.workspaceId()}
                         AND EXISTS (SELECT 1 FROM repository r WHERE r.name_with_owner = m.name_with_owner
                             AND r.id IN (:#{#scope.repositoryIds()})
-            """ + PUBLIC_REPOSITORY + """
+            """ + " AND " + MONITOR_AUTHORITY + PUBLIC_REPOSITORY_FILTER + """
                         )
                 )
                 SELECT count(*) AS total, count(*) FILTER (WHERE complete) AS complete,
@@ -420,7 +450,8 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
         """, nativeQuery = true)
     boolean canClassify(@Param("workspace") long workspace, @Param("person") long userId);
 
-    @Query(value = """
+    @Query(
+            value = """
         SELECT count(DISTINCT u.id) FROM "user" u
         JOIN activity_event e ON e.actor_id = u.id AND e.workspace_id = :workspace
         JOIN repository r ON r.id = e.repository_id AND r.provider_id = u.provider_id
@@ -429,8 +460,7 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
         """ + PUBLIC_REPOSITORY_CONDITION + """
           AND EXISTS (SELECT 1 FROM repository_to_monitor m WHERE m.workspace_id = :workspace AND m.name_with_owner = r.name_with_owner
           AND
-          """ + PUBLIC_MONITOR + """
-          )
+          """ + PUBLIC_MONITOR + " AND " + MONITOR_AUTHORITY + ")" + """
           AND NOT EXISTS (SELECT 1 FROM activity_automation a WHERE a.workspace_id = :workspace AND a.user_id = u.id)
           AND NOT EXISTS (SELECT 1 FROM person_suppression s WHERE s.provider_id = u.provider_id
               AND s.subject = CAST(u.native_id AS text) AND s.team_key = '')
@@ -444,7 +474,8 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
             OR EXISTS (SELECT 1 FROM workspace_hidden_former_member h WHERE h.workspace_id = :workspace AND h.user_id = u.id)
             OR EXISTS (SELECT 1 FROM identity_link l JOIN account a ON a.id = l.account_id
                 WHERE l.provider_id = u.provider_id AND l.subject = CAST(u.native_id AS text) AND NOT a.public_activity_visible))
-        """, nativeQuery = true)
+        """,
+            nativeQuery = true)
     long countPublicHiddenPeople(
             @Param("workspace") long workspace, @Param("visibilityConfirmedAfter") Instant visibilityConfirmedAfter);
 
