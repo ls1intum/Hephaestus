@@ -12,13 +12,6 @@ if (!first) {
 	throw new Error("The review fixtures must contain an observation");
 }
 
-const otherWork = reviewObservations.find(
-	(row) => row.reviewedWork.label !== first.reviewedWork.label,
-);
-if (!otherWork) {
-	throw new Error("The review fixtures must contain problems on two pieces of work");
-}
-
 function hiddenRow(row: PracticeReviewObservationRow, id: string): PracticeReviewObservationRow {
 	return {
 		...row,
@@ -122,11 +115,11 @@ export const EvidenceHidden: Story = {
 			status: "ready",
 			observations: [
 				hiddenRow(first, "cccccccc-cccc-cccc-cccc-cccccccccccc"),
-				// The same practice at the same time, but another result on other work.
+				// The same practice, work number and minute, but another result in another repository.
 				{
 					...hiddenRow(first, "dddddddd-dddd-dddd-dddd-dddddddddddd"),
-					practiceResultId: otherWork.practiceResultId,
-					reviewedWork: otherWork.reviewedWork,
+					practiceResultId: "eeeeeeee-0000-0000-0000-000000000000",
+					reviewedWork: { ...first.reviewedWork, container: "platform/billing-service" },
 				},
 			],
 		},

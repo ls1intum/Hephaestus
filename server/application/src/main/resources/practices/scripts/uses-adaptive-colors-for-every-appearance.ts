@@ -159,7 +159,8 @@ async function assetColors(tree: FileTree | null): Promise<AssetColors> {
 		paths.set(name, [...(paths.get(name) ?? []), file]);
 	}
 	const read = new Map<string, DarkAppearance>();
-	for (const file of all.slice(0, COLORSETS_READ)) {
+	// A cut listing leaves every appearance unknown (appearanceOf), so nothing is read for it.
+	for (const file of listing === "complete" ? all.slice(0, COLORSETS_READ) : []) {
 		// An unreadable colorset is not a fact about its appearances.
 		const source = await tree?.read(file).catch(() => null);
 		read.set(file, source?.status === "FOUND" ? darkAppearanceOf(source.text) : "unknown");

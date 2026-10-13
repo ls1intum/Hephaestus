@@ -110,7 +110,9 @@ export function ObservationRow({ observation }: ObservationRowProps) {
 	const summary = observation.summary ?? HIDDEN_SUMMARY;
 	const place = placeOf(observation);
 	// A hidden summary is the same on every hidden row, so the name also says whose result it is.
-	const name = `${summary}, ${observation.practiceName}, ${observation.reviewedWork.label}, ${formatDayTime(observation.observedAt, today)}`;
+	const { container, label } = observation.reviewedWork;
+	const work = container === undefined ? label : `${container} ${label}`;
+	const name = `${summary}, ${observation.practiceName}, ${work}, ${formatDayTime(observation.observedAt, today)}`;
 	return (
 		<PracticeTableRow
 			link={{
