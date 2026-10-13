@@ -2533,6 +2533,7 @@ void describe("CI contract", () => {
 			results: Record<string, string>,
 			onVersionBranch: boolean,
 			needs = JSON.stringify(jobsOf({ ...green, ...results })),
+			summary?: string,
 		) => {
 			const run = await runStep(
 				render(
@@ -2540,7 +2541,7 @@ void describe("CI contract", () => {
 					{ ...green, ...results },
 					{ "release-candidate": String(onVersionBranch) },
 				),
-				{ NEEDS: needs },
+				{ NEEDS: needs, ...(summary === undefined ? {} : { GITHUB_STEP_SUMMARY: summary }) },
 			);
 			return { failed: run.failed, outputs: run.outputs };
 		};
@@ -2580,6 +2581,13 @@ void describe("CI contract", () => {
 		// The same jobs with results do pass, skipped ones included.
 		assert.deepEqual(await verdict({ ...skipped, Changesets: "success" }, false), passes);
 		assert.deepEqual(await verdict({}, false), passes);
+
+		// A directory cannot be opened as a summary file. Reporting loss does not change validation.
+		assert.deepEqual(await verdict({}, false, JSON.stringify(jobsOf(green)), tmpdir()), passes);
+		assert.deepEqual(
+			await verdict({ Quality: "failure" }, false, JSON.stringify(jobsOf(green)), tmpdir()),
+			fails,
+		);
 
 		// An ordinary pull request legitimately skips the preflight, and blocking one would block
 		// every pull request in the repository.

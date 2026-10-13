@@ -1,0 +1,84 @@
+name: CI diagnostics
+
+on:
+  workflow_run:
+    workflows: ["CI/CD"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  report:
+    name: "Completed CI diagnostics"
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    # Read metadata only. Never check out upstream source or consume executable artifacts here.
+    steps:
+      - name: Summarize completed CI run
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const upstream = context.payload.workflow_run;
+            if (!Number.isSafeInteger(upstream?.id) || upstream.id < 1
+              || !Number.isSafeInteger(upstream.run_attempt) || upstream.run_attempt < 1) {
+              throw new Error('Missing upstream run identity');
+            }
+            const identity = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: upstream.id,
+              attempt_number: upstream.run_attempt,
+            };
+            const { data: run } = await github.rest.actions.getWorkflowRunAttempt(identity);
+            if (run.id !== upstream.id || run.run_attempt !== upstream.run_attempt
+              || run.status !== 'completed' || run.name !== 'CI/CD') {
+              throw new Error('Expected the completed upstream CI attempt');
+            }
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
+              ...identity,
+              per_page: 100,
+            });
+            if (jobs.length === 0 || jobs.some((job) => job.run_id !== run.id
+              || job.run_attempt !== run.run_attempt || job.status !== 'completed')) {
+              throw new Error('Expected completed jobs from the upstream attempt');
+            }
+            const gate = jobs.find((job) => job.name === 'CI Status Gate');
+            if (!gate) throw new Error('Missing upstream CI verdict');
+            const duration = (start, end) => {
+              const seconds = (Date.parse(end) - Date.parse(start)) / 1000;
+              return start && end && Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+            };
+            const format = (seconds) => seconds === null ? 'Unavailable'
+              : `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+            const text = (value) => String(value ?? 'Unavailable')
+              .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+            const runnerTimes = jobs.filter((job) => job.conclusion !== 'skipped')
+              .map((job) => duration(job.started_at, job.completed_at));
+            const runnerSeconds = runnerTimes.every((value) => value !== null)
+              ? runnerTimes.reduce((total, value) => total + value, 0) : null;
+            await core.summary
+              .addHeading('Completed CI diagnostics', 2)
+              .addLink(`Upstream run ${run.id}, attempt ${run.run_attempt}`, run.html_url)
+              .addTable([
+                [{ data: 'Metric', header: true }, { data: 'Value', header: true }],
+                ['Required gate conclusion', text(gate.conclusion)],
+                ['Workflow-to-gate time', format(duration(run.created_at, gate.completed_at))],
+                ['Completed runner time', format(runnerSeconds)],
+              ])
+              .addHeading('Job timing', 3)
+              .addTable([
+                ['Job', 'Result', 'Creation to start', 'Execution'].map((data) => ({ data, header: true })),
+                ...jobs.map((job) => [text(job.name), text(job.conclusion),
+                  format(duration(job.created_at, job.started_at)),
+                  format(duration(job.started_at, job.completed_at))]),
+              ])
+              .addHeading('Step timing', 3)
+              .addTable([
+                ['Job', 'Step', 'Result', 'Execution'].map((data) => ({ data, header: true })),
+                ...jobs.flatMap((job) => (job.steps ?? []).map((step) => [text(job.name),
+                  text(step.name), text(step.conclusion), format(duration(step.started_at, step.completed_at))])),
+              ])
+              .addRaw('Creation-to-start time includes dependency waiting. Parallel job times are not additive portions of workflow time. Missing timestamps remain unavailable. This report does not publish or change the required CI verdict.')
+              .write();
