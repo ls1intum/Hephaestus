@@ -1917,6 +1917,7 @@ const IN_APP_DECISIONS = [
 /** ConversationRoutingDecision, per admitted NOT_MET observation. */
 const IN_CHAT_DECISIONS = [
 	"ADMIT",
+	"MENTOR_UNAVAILABLE",
 	"NOT_DELIVERABLE",
 	"HAS_INLINE_ANCHOR",
 	"ALREADY_DELIVERED_IN_CONTEXT",

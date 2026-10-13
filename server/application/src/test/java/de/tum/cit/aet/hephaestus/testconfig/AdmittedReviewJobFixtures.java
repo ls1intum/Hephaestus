@@ -37,4 +37,20 @@ public final class AdmittedReviewJobFixtures {
         binding.setInstanceModel(model);
         return ConfigSnapshot.from(bindings.saveAndFlush(binding), resolver).toJson(mapper);
     }
+
+    /** A conversation-capable fixture reuses the review's configured model through a distinct Mentor binding. */
+    public static WorkspaceAgentBinding mentorBinding(Workspace workspace, WorkspaceAgentBindingRepository bindings) {
+        var existing = bindings.findByWorkspaceIdAndPurposeAndDataHandlingTier(
+                workspace.getId(), AgentPurpose.MENTOR, DataHandlingTier.UNDECLARED);
+        if (existing.isPresent()) return existing.get();
+        var review = bindings.findByWorkspaceIdAndPurposeAndDataHandlingTier(
+                        workspace.getId(), AgentPurpose.PRACTICE_REVIEW, DataHandlingTier.UNDECLARED)
+                .orElseThrow();
+        var mentor = new WorkspaceAgentBinding();
+        mentor.setWorkspace(workspace);
+        mentor.setPurpose(AgentPurpose.MENTOR);
+        mentor.setInstanceModel(review.getInstanceModel());
+        mentor.setWorkspaceModel(review.getWorkspaceModel());
+        return bindings.saveAndFlush(mentor);
+    }
 }

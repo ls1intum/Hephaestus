@@ -8,6 +8,8 @@ package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 public enum ConversationRoutingDecision {
     /** Author-targeted problem with no natural inline anchor, not already delivered in-context - prepare it. */
     ADMIT,
+    /** No available Mentor model respects this recipient's current AI choice. */
+    MENTOR_UNAVAILABLE,
     /** Not a problem worth coaching on (a strength, or a NOT_APPLICABLE abstention). */
     NOT_DELIVERABLE,
     /** Has a natural inline anchor (a diff location on a PR) - it belongs in-context, not in the conversation. */

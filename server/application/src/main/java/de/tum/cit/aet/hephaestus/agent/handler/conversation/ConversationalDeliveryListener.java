@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
@@ -13,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -49,6 +52,7 @@ public class ConversationalDeliveryListener {
     private final AgentJobRepository agentJobRepository;
     private final FeedbackCompositionResultParser resultParser;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
+    private final MemberAiRoutingAdapter memberAiRouting;
 
     public ConversationalDeliveryListener(
             ObservationRepository observationRepository,
@@ -57,7 +61,8 @@ public class ConversationalDeliveryListener {
             OutboundEgressGuard egressGuard,
             AgentJobRepository agentJobRepository,
             FeedbackCompositionResultParser resultParser,
-            PracticeFeedbackDeliveryPolicy deliveryPolicy) {
+            PracticeFeedbackDeliveryPolicy deliveryPolicy,
+            MemberAiRoutingAdapter memberAiRouting) {
         this.observationRepository = observationRepository;
         this.router = router;
         this.preparer = preparer;
@@ -65,6 +70,7 @@ public class ConversationalDeliveryListener {
         this.agentJobRepository = agentJobRepository;
         this.resultParser = resultParser;
         this.deliveryPolicy = deliveryPolicy;
+        this.memberAiRouting = memberAiRouting;
     }
 
     @Async(FeedbackLaneExecutor.BEAN_NAME)
@@ -114,7 +120,10 @@ public class ConversationalDeliveryListener {
         if (observations.isEmpty()) {
             return 0;
         }
-        List<Observation> admitted = router.admit(observations, workspaceId, RoutingContext.author());
+        var decisions = decisions(observations, workspaceId);
+        List<Observation> admitted = observations.stream()
+                .filter(observation -> decisions.get(observation.getId()) == ConversationRoutingDecision.ADMIT)
+                .toList();
         return preparer.prepare(outputJobId, workspaceId, admitted, composedMoves(outputJobId));
     }
 
@@ -137,7 +146,23 @@ public class ConversationalDeliveryListener {
             return ConversationEligibility.refused(now);
         }
         return ConversationEligibility.complete(
-                now, router.decide(negatives, job.getWorkspace().getId(), RoutingContext.author()));
+                now, decisions(negatives, job.getWorkspace().getId()));
+    }
+
+    private Map<UUID, ConversationRoutingDecision> decisions(List<Observation> observations, long workspaceId) {
+        var decisions = router.decide(observations, workspaceId, RoutingContext.author());
+        Map<Long, Boolean> available = new HashMap<>();
+        for (Observation observation : observations) {
+            if (decisions.get(observation.getId()) == ConversationRoutingDecision.ADMIT
+                    && !available.computeIfAbsent(
+                            observation.getAboutUserId(),
+                            recipient -> memberAiRouting
+                                    .binding(workspaceId, AgentPurpose.MENTOR, recipient)
+                                    .isPresent())) {
+                decisions.put(observation.getId(), ConversationRoutingDecision.MENTOR_UNAVAILABLE);
+            }
+        }
+        return decisions;
     }
 
     private boolean composes(AgentJob job) {
