@@ -92,36 +92,52 @@ public class ReviewRepositoryPreparer {
 
     private AuthorizedRepository authorizedRepository(AgentJob job) {
         var metadata = job.getMetadata();
-        if (metadata == null) throw new JobPreparationException("Review job has no metadata");
+        if (metadata == null)
+            throw new JobPreparationException(
+                    JobPreparationException.Reason.INPUT_CONTRACT_INVALID, "Review job has no metadata");
         long workspaceId = job.getWorkspace().getId();
         var pullRequest = pullRequests
                 .findByIdWithAuthorAndRepository(requireLong(metadata, "pull_request_id"))
                 .filter(pr -> pr.getDeletedAt() == null)
-                .orElseThrow(() -> new JobPreparationException("Reviewed pull request is unavailable"));
+                .orElseThrow(() -> new JobPreparationException(
+                        JobPreparationException.Reason.REVIEWED_WORK_UNAVAILABLE,
+                        "Reviewed pull request is unavailable"));
         var repository = pullRequest.getRepository();
-        if (repository == null) throw new JobPreparationException("Reviewed work has no repository");
+        if (repository == null)
+            throw new JobPreparationException(
+                    JobPreparationException.Reason.REVIEWED_WORK_UNAVAILABLE, "Reviewed work has no repository");
         long repositoryId = requireLong(metadata, "repository_id");
         if (repository.getId() != repositoryId
                 || !monitors.existsByWorkspaceIdAndNameWithOwner(workspaceId, repository.getNameWithOwner())) {
-            throw new JobPreparationException("This workspace does not monitor the reviewed repository.");
+            throw new JobPreparationException(
+                    JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE,
+                    "This workspace does not monitor the reviewed repository.");
         }
         var kind = connections
                 .findActiveProviderKind(workspaceId)
-                .orElseThrow(() -> new JobPreparationException("Workspace has no active SCM connection"));
+                .orElseThrow(() -> new JobPreparationException(
+                        JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE,
+                        "Workspace has no active SCM connection"));
         var source = tokenSources.stream()
                 .filter(candidate -> candidate.kind() == kind)
                 .findFirst()
-                .orElseThrow(() -> new JobPreparationException("SCM Git preparation is unavailable"));
+                .orElseThrow(() -> new JobPreparationException(
+                        JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE,
+                        "SCM Git preparation is unavailable"));
         String serverUrl = source.serverUrl(workspaceId)
-                .orElseThrow(() -> new JobPreparationException("SCM server is unavailable"));
+                .orElseThrow(() -> new JobPreparationException(
+                        JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE, "SCM server is unavailable"));
         if (!matchesOrigin(repository, kind, serverUrl)) {
-            throw new JobPreparationException("Repository and workspace SCM provider do not match");
+            throw new JobPreparationException(
+                    JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE,
+                    "Repository and workspace SCM provider do not match");
         }
         String[] segments = repository.getNameWithOwner().split("/", -1);
         if (segments.length < 2
                 || Arrays.stream(segments)
                         .anyMatch(segment -> segment.isEmpty() || segment.equals(".") || segment.equals(".."))) {
-            throw new JobPreparationException("Repository has an invalid provider path");
+            throw new JobPreparationException(
+                    JobPreparationException.Reason.INPUT_CONTRACT_INVALID, "Repository has an invalid provider path");
         }
         segments[segments.length - 1] += ".git";
         String cloneUrl = UriComponentsBuilder.fromUriString(serverUrl)
@@ -148,14 +164,18 @@ public class ReviewRepositoryPreparer {
         return connections
                 .findActive(job.getWorkspace().getId(), kind)
                 .map(connection -> connection.getId())
-                .orElseThrow(() -> new JobPreparationException("Workspace has no active SCM connection"));
+                .orElseThrow(() -> new JobPreparationException(
+                        JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE,
+                        "Workspace has no active SCM connection"));
     }
 
     private AuthorizedRepository hydrateReviewRange(AgentJob job, AuthorizedRepository original, String head) {
         var rangeSource = rangeSources.stream()
                 .filter(candidate -> candidate.kind() == original.source().kind())
                 .findFirst()
-                .orElseThrow(() -> new JobPreparationException("SCM review range preparation is unavailable"));
+                .orElseThrow(() -> new JobPreparationException(
+                        JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE,
+                        "SCM review range preparation is unavailable"));
         long connectionId = activeConnectionId(job, original.source().kind());
         var read = new TransactionTemplate(transactionManager);
         read.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
@@ -167,7 +187,9 @@ public class ReviewRepositoryPreparer {
                 || range.pullRequestNativeId() != original.identity().pullRequestNativeId()
                 || !head.equals(range.head())
                 || range.base().isBlank()) {
-            throw new JobPreparationException("Provider review range does not match the queued merge request");
+            throw new JobPreparationException(
+                    JobPreparationException.Reason.REVIEW_RANGE_UNAVAILABLE,
+                    "Provider review range does not match the queued merge request");
         }
         var transaction = new TransactionTemplate(transactionManager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -175,7 +197,9 @@ public class ReviewRepositoryPreparer {
             // Lock before re-reading: JPA must not hand back a snapshot loaded before a concurrent hook committed.
             var locked = pullRequests
                     .findForUpdateByRepositoryIdAndNumber(original.key().repositoryId(), original.number())
-                    .orElseThrow(() -> new JobPreparationException("Reviewed pull request is unavailable"));
+                    .orElseThrow(() -> new JobPreparationException(
+                            JobPreparationException.Reason.REVIEWED_WORK_UNAVAILABLE,
+                            "Reviewed pull request is unavailable"));
             var current = authorizedRepository(job);
             if (original.identity().pullRequestId() != current.identity().pullRequestId()
                     || original.identity().repositoryNativeId()
@@ -187,7 +211,9 @@ public class ReviewRepositoryPreparer {
                     || !original.cloneUrl().equals(current.cloneUrl())
                     || original.source().kind() != current.source().kind()
                     || connectionId != activeConnectionId(job, current.source().kind())) {
-                throw new JobPreparationException("Review source no longer matches the queued merge request");
+                throw new JobPreparationException(
+                        JobPreparationException.Reason.REVIEW_RANGE_UNAVAILABLE,
+                        "Review source no longer matches the queued merge request");
             }
             if (!Objects.equals(
                     original.identity().updatedAt(), current.identity().updatedAt())) {
@@ -220,7 +246,9 @@ public class ReviewRepositoryPreparer {
     public PreparedReview prepare(AgentJob job) {
         var authorized = authorizedRepository(job);
         var metadata = job.getMetadata();
-        if (metadata == null) throw new JobPreparationException("Review job has no metadata");
+        if (metadata == null)
+            throw new JobPreparationException(
+                    JobPreparationException.Reason.INPUT_CONTRACT_INVALID, "Review job has no metadata");
         String head = requireText(metadata, "commit_sha");
         String recordedBase = null;
         if (authorized.source().recordsReviewDiffBase()) {
@@ -229,7 +257,9 @@ public class ReviewRepositoryPreparer {
             recordedBase = admittedDiffBase(metadata);
             if (recordedBase == null) {
                 if (!head.equals(authorized.head())) {
-                    throw new JobPreparationException("Recorded merge request revision does not match the queued head");
+                    throw new JobPreparationException(
+                            JobPreparationException.Reason.REVIEW_RANGE_UNAVAILABLE,
+                            "Recorded merge request revision does not match the queued head");
                 }
                 recordedBase = authorized.base();
                 if (recordedBase == null || recordedBase.isBlank()) {
@@ -249,23 +279,31 @@ public class ReviewRepositoryPreparer {
         var source = authorized.source();
         String cloneUrl = authorized.cloneUrl();
         String token = source.accessToken(key.workspaceId())
-                .orElseThrow(() -> new JobPreparationException("SCM credentials are unavailable"));
+                .orElseThrow(() -> new JobPreparationException(
+                        JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE,
+                        "SCM credentials are unavailable"));
         git.ensureRepository(key, cloneUrl, token);
         // The branch fetch usually carries the head already; the provider's review ref is for one it
         // does not reach, such as a fork's or a force-pushed branch's.
         if (!git.commitExists(key, head)) {
             var reviewRef = source.reviewHeadRef(authorized.number());
             if (reviewRef.isPresent()) git.fetchRemoteCommit(key, cloneUrl, reviewRef.get(), head, token);
-            if (!git.commitExists(key, head)) throw new JobPreparationException("Pinned review commit is unavailable");
+            if (!git.commitExists(key, head))
+                throw new JobPreparationException(
+                        JobPreparationException.Reason.REVIEW_RANGE_UNAVAILABLE, "Pinned review commit is unavailable");
         }
         String target = recordedBase != null ? recordedBase : MetaJson.optString(metadata, "base_ref_oid");
         if (target == null) target = git.resolveBranchHead(key, requireText(metadata, "target_branch"));
         if (target == null || !git.commitExists(key, target)) {
-            throw new JobPreparationException("Review base commit is unavailable");
+            throw new JobPreparationException(
+                    JobPreparationException.Reason.REVIEW_RANGE_UNAVAILABLE, "Review base commit is unavailable");
         }
         if (recordedBase == null) {
             String base = git.reviewBase(key, target, head);
-            if (base == null) throw new JobPreparationException("The pinned review diff range is unavailable");
+            if (base == null)
+                throw new JobPreparationException(
+                        JobPreparationException.Reason.REVIEW_RANGE_UNAVAILABLE,
+                        "The pinned review diff range is unavailable");
             target = base;
         }
         return new PreparedReview(key, head, target);
