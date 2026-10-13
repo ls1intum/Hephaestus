@@ -3,9 +3,15 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GitHubLifecycleListener;
@@ -13,6 +19,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,11 +50,49 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
     @Autowired
     private IdentityLinkRepository fixtureIdentities;
 
+    @Autowired
+    private ConnectionRepository activityConnections;
+
+    @Autowired
+    private ConnectionService activityConnectionService;
+
     private final AtomicLong userIdGenerator = new AtomicLong(50_000);
 
     @BeforeEach
     void resetWorkspaceDatabaseState() {
         databaseTestUtils.cleanDatabase();
+    }
+
+    /** Register the source that makes an activity fixture's monitored repositories authoritative. */
+    protected void connectActivitySource(Workspace workspace, IdentityProvider provider) {
+        ConnectionConfig config =
+                switch (provider.getType()) {
+                    case GITHUB ->
+                        new ConnectionConfig.GitHubAppConfig(
+                                workspace.getId(), workspace.getAccountLogin(), provider.getServerUrl(), Set.of());
+                    case GITLAB ->
+                        new ConnectionConfig.GitLabConfig(
+                                provider.getServerUrl(),
+                                null,
+                                null,
+                                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                                Set.of(),
+                                null);
+                    default -> throw new IllegalArgumentException("Activity source must be GitHub or GitLab");
+                };
+        IntegrationKind kind =
+                provider.getType() == IdentityProviderType.GITLAB ? IntegrationKind.GITLAB : IntegrationKind.GITHUB;
+        Connection connection =
+                activityConnections.saveAndFlush(new Connection(workspace, kind, "activity-fixture", config));
+        activityConnectionService.transition(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "activity-fixture",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
     }
 
     protected IdentityProvider ensureGitHubProvider() {

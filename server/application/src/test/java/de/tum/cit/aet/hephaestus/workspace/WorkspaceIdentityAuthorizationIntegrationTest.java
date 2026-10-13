@@ -192,6 +192,7 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
         link.setProviderId(Objects.requireNonNull(provider.getId()));
         link.setSubject(actor.getNativeId().toString());
         identities.saveAndFlush(link);
+        connectActivitySource(workspace, provider);
         recordIssueOpened(workspace, namesake);
         recordIssueOpened(workspace, actor);
 
