@@ -45,13 +45,15 @@ import {
 	ReviewRunsPage,
 } from "@/components/admin/practice-reviews/ReviewRunsPage";
 import { workRowKey } from "@/components/admin/practice-reviews/UnreviewedWorkRow";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { TraceRefusalAlert } from "@/components/practice-trace/TraceRefusalAlert";
 import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
 import { useReviewScopeSources } from "@/hooks/use-review-scope-sources";
 import { useScopeRecordFilter } from "@/hooks/use-scope-record-filter";
 import { useSearchState } from "@/lib/search-params";
-import { pagedListState } from "@/runtime/tanstack-query/infinite-list";
+import { type RefreshFailure, pagedListState } from "@/runtime/tanstack-query/infinite-list";
 import { loadedPages, pagedModelParams } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/runs",
@@ -73,15 +75,37 @@ function ReviewRunsRoute() {
 	};
 	const { groups, practices, people } = useReviewScopeSources(workspaceSlug);
 	const withoutReview = listsWorkWithoutReview(search);
+	const reviewsOptions = listPracticeReviewsInfiniteOptions({
+		path: { workspaceSlug },
+		query: runsQuery(search, REVIEW_PAGE_SIZE),
+	});
 	const reviewsQuery = useInfiniteQuery({
-		...listPracticeReviewsInfiniteOptions({
-			path: { workspaceSlug },
-			query: runsQuery(search, REVIEW_PAGE_SIZE),
-		}),
+		...reviewsOptions,
 		...pagedModelParams,
 		enabled: !withoutReview,
 	});
-	useActiveReviewPoll(workspaceSlug, search, reviewsQuery.data, !withoutReview);
+	useQueryReadRefusal(reviewsOptions.queryKey, reviewsQuery.isError, reviewsQuery.error);
+	const pollingFailure = useActiveReviewPoll(
+		workspaceSlug,
+		search,
+		reviewsQuery.data,
+		!withoutReview,
+	);
+	let reviews = pagedListState(reviewsQuery, (row) => row.id);
+	if (pollingFailure !== undefined && !queryErrorIsRetryable(pollingFailure.error)) {
+		reviews = { status: "error", error: pollingFailure.error, onRetry: pollingFailure.onRetry };
+	}
+	if (reviews.status === "ready" && pollingFailure !== undefined) {
+		const pageFailure = reviews.refreshFailure;
+		reviews.refreshFailure = {
+			...pollingFailure,
+			pending: pollingFailure.pending || pageFailure?.pending === true,
+			onRetry: () => {
+				pollingFailure.onRetry();
+				pageFailure?.onRetry();
+			},
+		};
+	}
 	const unreviewedOptions = listTracedArtifactsInfiniteOptions({
 		path: { workspaceSlug },
 		query: workWithoutReviewQuery(search, REVIEW_PAGE_SIZE),
@@ -91,6 +115,8 @@ function ReviewRunsRoute() {
 		...pagedModelParams,
 		enabled: withoutReview,
 	});
+
+	useQueryReadRefusal(unreviewedOptions.queryKey, unreviewedQuery.isError, unreviewedQuery.error);
 
 	// Every row asks for a review of its work. On the work without a review the row says a refusal
 	// inline, and a started review moves the work off that list, so it is read again once the ask
@@ -113,7 +139,7 @@ function ReviewRunsRoute() {
 		<ReviewRunsPage
 			search={search}
 			onSearchChange={updateSearch}
-			reviews={pagedListState(reviewsQuery, (row) => row.id)}
+			reviews={reviews}
 			unreviewed={pagedListState(unreviewedQuery, workRowKey)}
 			workspaceSlug={workspaceSlug}
 			requestReview={{
@@ -164,8 +190,10 @@ function useActiveReviewPoll(
 	const statuses = ACTIVE_REVIEW_STATUSES.filter((status) =>
 		listQuery.status === undefined ? !heldListed : listQuery.status.includes(status),
 	);
-	useLoadedRowsPoll(listKey, {
-		polling: enabled && (statuses.length > 0 || heldListed) && loaded.some(isActiveReview),
+	const activePolling =
+		enabled && (statuses.length > 0 || heldListed) && loaded.some(isActiveReview);
+	const activePoll = useLoadedRowsPoll(listKey, {
+		polling: activePolling,
 		request: {
 			path: { workspaceSlug },
 			query: {
@@ -180,14 +208,33 @@ function useActiveReviewPoll(
 	// results are still processed has its own poll, under the list's own filters.
 	const processingListed =
 		listQuery.resultProcessing === undefined || listQuery.resultProcessing.includes("PENDING");
-	useLoadedRowsPoll(listKey, {
-		polling: enabled && processingListed && loaded.some(isProcessingReview),
+	const processingPolling = enabled && processingListed && loaded.some(isProcessingReview);
+	const processingPoll = useLoadedRowsPoll(listKey, {
+		polling: processingPolling,
 		request: {
 			path: { workspaceSlug },
 			query: { ...listQuery, resultProcessing: ["PENDING"], size: ACTIVE_REVIEW_POLL_SIZE },
 		},
 		follows: isProcessingReview,
 	});
+	const failed = [
+		{ query: activePoll, enabled: activePolling },
+		{ query: processingPoll, enabled: processingPolling },
+	]
+		.filter((poll) => poll.query.isError && (poll.enabled || data === undefined))
+		.map((poll) => poll.query);
+	const first = failed.find((poll) => !queryErrorIsRetryable(poll.error)) ?? failed[0];
+	return first === undefined
+		? undefined
+		: ({
+				error: first.error,
+				pending: failed.some((poll) => poll.isFetching),
+				onRetry: () => {
+					for (const poll of failed) {
+						void poll.refetch();
+					}
+				},
+			} satisfies RefreshFailure);
 }
 
 /**
@@ -207,19 +254,35 @@ function useLoadedRowsPoll(
 	},
 ) {
 	const queryClient = useQueryClient();
-	useQuery({
+	return useQuery({
 		...listPracticeReviewsOptions(request),
 		queryFn: async ({ signal }) => {
 			const { data: polled } = await listPracticeReviews({
 				...request,
 				signal,
 				throwOnError: true,
+			}).catch((error: unknown) => {
+				if (!queryErrorIsRetryable(error)) {
+					queryClient.getQueryCache().find({ queryKey: listKey, exact: true })?.setState({
+						data: undefined,
+						dataUpdatedAt: 0,
+					});
+				}
+				throw error;
 			});
 			const rows = polled.content ?? [];
+			const loadedData =
+				queryClient.getQueryData<InfiniteData<PagedModelReviewRunSummary>>(listKey);
+			if (loadedData === undefined) {
+				// A refused read erased the old pages. A recovered poll must authorize the full list again.
+				void queryClient.invalidateQueries(
+					{ queryKey: listKey, exact: true },
+					{ cancelRefetch: false },
+				);
+				return polled;
+			}
 			const { updated, refetch } = reconcileActiveRows(
-				queryClient
-					.getQueryData<InfiniteData<PagedModelReviewRunSummary>>(listKey)
-					?.pages.flatMap((page) => page.content ?? []) ?? [],
+				loadedData.pages.flatMap((page) => page.content ?? []),
 				rows,
 				(polled.page?.totalElements ?? rows.length) <= rows.length,
 				follows,

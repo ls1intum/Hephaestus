@@ -397,3 +397,18 @@ export const NoFeedbackYet: Story = {
 		await canvas.findByText("No feedback yet");
 	},
 };
+
+const retryRefresh = fn();
+export const RefreshFailed: Story = {
+	args: {
+		feedback: loadedList(reviewFeedback, {
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: retryRefresh },
+		}),
+	},
+	play: async ({ canvas, userEvent }) => {
+		await canvas.findByText("These pieces of feedback may be out of date");
+		await expect(canvas.getByRole("table").querySelectorAll("tbody tr").length).toBeGreaterThan(0);
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		await expect(retryRefresh).toHaveBeenCalledOnce();
+	},
+};

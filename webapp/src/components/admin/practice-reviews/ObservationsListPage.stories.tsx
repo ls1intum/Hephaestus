@@ -408,3 +408,18 @@ export const NoObservationsYet: Story = {
 		await canvas.findByText("No observations yet");
 	},
 };
+
+const retryRefresh = fn();
+export const RefreshFailed: Story = {
+	args: {
+		observations: loadedList(reviewObservations, {
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: retryRefresh },
+		}),
+	},
+	play: async ({ canvas, userEvent }) => {
+		await canvas.findByText("These observations may be out of date");
+		await expect(canvas.getByRole("table").querySelectorAll("tbody tr").length).toBeGreaterThan(0);
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		await expect(retryRefresh).toHaveBeenCalledOnce();
+	},
+};
