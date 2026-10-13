@@ -1,18 +1,34 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+	listPracticeReviewsInfiniteOptions,
+	listPracticeReviewObservationsInfiniteOptions,
+	listPracticeReviewFeedbackInfiniteOptions,
+} from "@/api/@tanstack/react-query.gen";
 import type { ReviewRunSummary } from "@/api/types.gen";
-import { reviewRuns } from "@/components/admin/practice-reviews/fixtures";
-import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
+import {
+	reviewRuns,
+	reviewObservations,
+	reviewFeedback,
+} from "@/components/admin/practice-reviews/fixtures";
+import {
+	ACTIVE_REVIEW_POLL_MS,
+	runsQuery,
+	observationsQuery,
+	feedbackQuery,
+} from "@/components/admin/practice-reviews/review-search";
 import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { server } from "@/mocks/server";
+import { QUERY_RETRIES } from "@/runtime/tanstack-query/query-defaults";
+import { deferred } from "@/test/async";
 import { precedes } from "@/test/dom";
 import { ObserverStub } from "@/test/observers";
-import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
+import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter, testQueryClient } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
 // deadlock backstop, not a budget these renders were meant to fit inside.
@@ -136,9 +152,473 @@ function serveReviewPages(reviewUrls: URL[]) {
 	);
 }
 
+function responseFor(status: number, rows: readonly object[]): Response {
+	return status === 200
+		? HttpResponse.json({
+				content: rows,
+				page: { number: 0, size: 25, totalElements: rows.length, totalPages: 1 },
+			})
+		: HttpResponse.json({ status }, { status });
+}
+function listResponse(endpoint: string, response: () => Response, read?: () => void) {
+	return http.get(`*/workspaces/:workspaceSlug/practices/${endpoint}`, ({ request }) => {
+		if (isTabCount(new URL(request.url))) {
+			return HttpResponse.json(emptyPage);
+		}
+		read?.();
+		return response();
+	});
+}
+function activePollRequest(url: URL): boolean {
+	return values(url, "status").includes("RUNNING");
+}
+function processingPollRequest(url: URL): boolean {
+	return values(url, "resultProcessing").includes("PENDING");
+}
+function pendingRows(review: ReviewRunSummary): ReviewRunSummary[] {
+	return review.status === "COMPLETED" && review.resultProcessing === "DELIVERED" ? [] : [review];
+}
+function pollResponse(
+	isPoll: (url: URL) => boolean,
+	poll: () => Response,
+	page: () => Response,
+	pollRead: () => void,
+	pageRead: () => void,
+) {
+	return http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
+		const url = new URL(request.url);
+		if (isTabCount(url)) {
+			return HttpResponse.json(emptyPage);
+		}
+		if (isPoll(url)) {
+			pollRead();
+			return poll();
+		}
+		pageRead();
+		return page();
+	});
+}
+function heldFilterResponse(held: Promise<Response>) {
+	return http.get("*/workspaces/:workspaceSlug/practices/reviews", async ({ request }) => {
+		const url = new URL(request.url);
+		if (isTabCount(url)) {
+			return HttpResponse.json(emptyPage);
+		}
+		if (activePollRequest(url)) {
+			return held;
+		}
+		const rows =
+			url.searchParams.get("artifactId") === "99"
+				? [SECOND_PAGE]
+				: [{ ...FIRST_PAGE, status: "RUNNING" }];
+		return responseFor(200, rows);
+	});
+}
+
+function firstReviewWithTitle(title: string): ReviewRunSummary {
+	const work = FIRST_PAGE.target.reviewedWork;
+	return {
+		...FIRST_PAGE,
+		target: {
+			...FIRST_PAGE.target,
+			title,
+			...(work === undefined ? {} : { reviewedWork: { ...work, title } }),
+		},
+	};
+}
+
+/** Native production retries, with only the delay removed from this deterministic HTTP fixture. */
+function retryingClient() {
+	const client = testQueryClient();
+	client.setDefaultOptions({
+		queries: { retry: QUERY_RETRIES, retryDelay: 0 },
+		mutations: { retry: false },
+	});
+	return client;
+}
+function recoveringPollHandler(
+	ready: Promise<Response>,
+	requested: () => void,
+	counts: { pages: number; polls: number },
+) {
+	return http.get("*/workspaces/:workspaceSlug/practices/reviews", async ({ request }) => {
+		const url = new URL(request.url);
+		if (isTabCount(url)) {
+			return HttpResponse.json(emptyPage);
+		}
+		if (activePollRequest(url)) {
+			counts.polls += 1;
+			if (counts.polls === 1) {
+				return responseFor(403, []);
+			}
+			return responseFor(200, [
+				{
+					...firstReviewWithTitle("Poll-only metadata"),
+					status: "RUNNING",
+				},
+			]);
+		}
+		counts.pages += 1;
+		if (counts.pages === 1) {
+			return responseFor(200, [
+				{ ...FIRST_PAGE, status: "RUNNING", resultProcessing: "DELIVERED" },
+			]);
+		}
+		requested();
+		return ready;
+	});
+}
+function mixedPollRefusalHandler(counts: { active: number; processing: number }) {
+	return http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
+		const url = new URL(request.url);
+		if (isTabCount(url)) {
+			return HttpResponse.json(emptyPage);
+		}
+		if (activePollRequest(url)) {
+			counts.active += 1;
+			return responseFor(503, []);
+		}
+		if (processingPollRequest(url)) {
+			counts.processing += 1;
+			return responseFor(403, []);
+		}
+		return responseFor(200, [
+			{ ...FIRST_PAGE, status: "RUNNING", resultProcessing: "DELIVERED" },
+			{ ...SECOND_PAGE, status: "COMPLETED", resultProcessing: "PENDING" },
+		]);
+	});
+}
+
 describe("practice review list routes", () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();
+	});
+
+	it.each([
+		{
+			path: '/w/acme/admin/practices/reviews/runs?status=["COMPLETED"]',
+			endpoint: "reviews",
+			rows: [FIRST_PAGE],
+			table: "Practice reviews, newest first",
+			region: "Practice reviews",
+			warning: "These reviews may be out of date",
+			key: listPracticeReviewsInfiniteOptions({
+				path: { workspaceSlug: "acme" },
+				query: runsQuery({ status: ["COMPLETED"] }, 25),
+			}).queryKey,
+		},
+		{
+			path: "/w/acme/admin/practices/reviews/observations",
+			endpoint: "reviews/observations",
+			rows: reviewObservations.slice(0, 1),
+			table: "Observations",
+			region: "Practice review observations",
+			warning: "These observations may be out of date",
+			key: listPracticeReviewObservationsInfiniteOptions({
+				path: { workspaceSlug: "acme" },
+				query: observationsQuery({}, 25),
+			}).queryKey,
+		},
+		{
+			path: "/w/acme/admin/practices/reviews/feedback",
+			endpoint: "reviews/feedback",
+			rows: reviewFeedback.slice(0, 1),
+			table: "Feedback",
+			region: "Feedback",
+			warning: "These pieces of feedback may be out of date",
+			key: listPracticeReviewFeedbackInfiniteOptions({
+				path: { workspaceSlug: "acme" },
+				query: feedbackQuery({}, 25),
+			}).queryKey,
+		},
+	])(
+		"retains $endpoint rows with failed refresh and retries that read",
+		async ({ path, endpoint, rows, table, region: regionName, warning, key }) => {
+			recordRequests();
+			let status = 200;
+			let reads = 0;
+			server.use(
+				listResponse(
+					endpoint,
+					() => responseFor(status, rows),
+					() => {
+						reads += 1;
+					},
+				),
+			);
+			const { queryClient } = renderRouteAtWithRouter(path);
+			await screen.findByRole("table", { name: table }, ROUTE_RENDER_WAIT);
+			const region = screen.getByRole("region", { name: regionName });
+			const before = within(region).getByRole("table").textContent;
+			status = 503;
+			await act(async () => {
+				await queryClient.refetchQueries({ queryKey: key, exact: true });
+			});
+			await screen.findByText(warning);
+			expect(within(region).getByRole("table").textContent).toBe(before);
+			status = 200;
+			const failedReads = reads;
+			await userEvent.click(within(region).getByRole("button", { name: "Retry" }));
+			await waitFor(() => expect(screen.queryByText(warning)).toBeNull());
+			expect(reads).toBe(failedReads + 1);
+		},
+	);
+
+	it.each([403, 404])(
+		"does not restore denied list words after a later 503 (%s)",
+		async (denied) => {
+			recordRequests();
+			let status = 200;
+			server.use(listResponse("reviews", () => responseFor(status, [FIRST_PAGE])));
+			const { queryClient } = renderRouteAtWithRouter(
+				'/w/acme/admin/practices/reviews/runs?status=["COMPLETED"]',
+			);
+			await screen.findByText(FIRST_PAGE.target.title, undefined, ROUTE_RENDER_WAIT);
+			const key = listPracticeReviewsInfiniteOptions({
+				path: { workspaceSlug: "acme" },
+				query: runsQuery({ status: ["COMPLETED"] }, 25),
+			}).queryKey;
+			status = denied;
+			await act(async () => {
+				await queryClient.refetchQueries({ queryKey: key, exact: true });
+			});
+			await waitFor(() => expect(queryClient.getQueryData(key)).toBeUndefined());
+			expect(screen.queryByText(FIRST_PAGE.target.title)).toBeNull();
+			status = 503;
+			await act(async () => {
+				await queryClient.refetchQueries({ queryKey: key, exact: true });
+			});
+			await screen.findByText("We could not load reviews");
+			expect(screen.queryByText(FIRST_PAGE.target.title)).toBeNull();
+			expect(screen.queryByText("These reviews may be out of date")).toBeNull();
+		},
+	);
+
+	it.each([
+		{
+			kind: "active",
+			initialStatus: "RUNNING" as const,
+			processing: "DELIVERED" as const,
+			isPoll: activePollRequest,
+		},
+		{
+			kind: "processing",
+			initialStatus: "COMPLETED" as const,
+			processing: "PENDING" as const,
+			isPoll: processingPollRequest,
+		},
+	])(
+		"retries the failed $kind poll without refreshing every loaded page",
+		async ({ initialStatus, processing, isPoll }) => {
+			vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+			try {
+				recordRequests();
+				let status = 503;
+				let pollReads = 0;
+				let pageReads = 0;
+				let review: ReviewRunSummary = {
+					...FIRST_PAGE,
+					status: initialStatus,
+					resultProcessing: processing,
+				};
+				server.use(
+					pollResponse(
+						isPoll,
+						() => responseFor(status, pendingRows(review)),
+						() => responseFor(200, [review]),
+						() => {
+							pollReads += 1;
+						},
+						() => {
+							pageReads += 1;
+						},
+					),
+				);
+				renderRouteAtWithRouter("/w/acme/admin/practices/reviews/runs");
+				await screen.findByText(FIRST_PAGE.target.title, undefined, ROUTE_RENDER_WAIT);
+				await screen.findByText("These reviews may be out of date");
+				const pagesBefore = pageReads;
+				status = 200;
+				await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+				await waitFor(() =>
+					expect(screen.queryByText("These reviews may be out of date")).toBeNull(),
+				);
+				expect(pageReads).toBe(pagesBefore);
+				review = {
+					...firstReviewWithTitle("Finished review"),
+					status: "COMPLETED",
+					resultProcessing: "DELIVERED",
+				};
+				await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+				await screen.findByText("Finished review");
+				expect(pageReads).toBeGreaterThan(pagesBefore);
+				const settled = pollReads;
+				await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS * 2);
+				expect(pollReads).toBe(settled);
+			} finally {
+				vi.useRealTimers();
+			}
+		},
+	);
+
+	it("discloses a failed refresh even when the loaded list is empty", async () => {
+		recordRequests();
+		let status = 200;
+		server.use(listResponse("reviews", () => responseFor(status, [])));
+		const { queryClient } = renderRouteAtWithRouter(
+			'/w/acme/admin/practices/reviews/runs?status=["COMPLETED"]',
+		);
+		await screen.findByText("No reviews match these filters", undefined, ROUTE_RENDER_WAIT);
+		status = 503;
+		await act(async () => {
+			await queryClient.refetchQueries({
+				queryKey: listPracticeReviewsInfiniteOptions({
+					path: { workspaceSlug: "acme" },
+					query: runsQuery({ status: ["COMPLETED"] }, 25),
+				}).queryKey,
+				exact: true,
+			});
+		});
+		await screen.findByText("These reviews may be out of date");
+		screen.getByText("No reviews match these filters");
+	});
+
+	it("a refused active poll clears loaded words until a newly authorized page returns", async () => {
+		recordRequests();
+		let pollStatus = 503;
+		let pageStatus = 200;
+		let review: ReviewRunSummary = {
+			...FIRST_PAGE,
+			status: "RUNNING",
+			resultProcessing: "DELIVERED",
+		};
+		server.use(
+			pollResponse(
+				activePollRequest,
+				() => responseFor(pollStatus, [review]),
+				() => responseFor(pageStatus, [review]),
+				() => undefined,
+				() => undefined,
+			),
+		);
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/practices/reviews/runs");
+		await screen.findByText("These reviews may be out of date", undefined, ROUTE_RENDER_WAIT);
+		screen.getByText(FIRST_PAGE.target.title);
+		pollStatus = 403;
+		await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByText("You do not have access to reviews");
+		const key = listPracticeReviewsInfiniteOptions({
+			path: { workspaceSlug: "acme" },
+			query: runsQuery({}, 25),
+		}).queryKey;
+		expect(queryClient.getQueryData(key)).toBeUndefined();
+		expect(screen.queryByText(FIRST_PAGE.target.title)).toBeNull();
+		pageStatus = 503;
+		await act(async () => {
+			await queryClient.refetchQueries({ queryKey: key, exact: true });
+		});
+		expect(screen.queryByText(FIRST_PAGE.target.title)).toBeNull();
+		pageStatus = 200;
+		review = { ...review, status: "COMPLETED" };
+		await act(async () => {
+			await queryClient.refetchQueries({ queryKey: key, exact: true });
+		});
+		await screen.findByText(FIRST_PAGE.target.title);
+		expect(screen.queryByText("You do not have access to reviews")).toBeNull();
+	});
+
+	it("recovers a refused poll through a fresh authorized page with native retries", async () => {
+		recordRequests();
+		const ready = deferred<Response>();
+		const requested = deferred();
+		const counts = { pages: 0, polls: 0 };
+		server.use(recoveringPollHandler(ready.promise, () => requested.resolve(), counts));
+		const client = retryingClient();
+		renderRouteAtWithRouter("/w/acme/admin/practices/reviews/runs", client);
+		try {
+			await waitFor(() => expect(counts.polls).toBeGreaterThanOrEqual(2), ROUTE_RENDER_WAIT);
+			await waitFor(() => expect(counts.pages).toBe(2));
+			await requested.promise;
+			expect(screen.queryByText(FIRST_PAGE.target.title)).toBeNull();
+			expect(screen.queryByText("Poll-only metadata")).toBeNull();
+			await act(async () => {
+				ready.resolve(
+					responseFor(200, [
+						{
+							...firstReviewWithTitle("Fresh authorized review"),
+							status: "COMPLETED",
+							resultProcessing: "DELIVERED",
+						},
+					]),
+				);
+			});
+			await screen.findByText("Fresh authorized review");
+			expect(screen.queryByText("Poll-only metadata")).toBeNull();
+		} finally {
+			ready.resolve(responseFor(200, []));
+		}
+	});
+
+	it("shows a processing-poll refusal before an active-poll transport error with native retries", async () => {
+		recordRequests();
+		const counts = { active: 0, processing: 0 };
+		server.use(mixedPollRefusalHandler(counts));
+		const client = retryingClient();
+		renderRouteAtWithRouter("/w/acme/admin/practices/reviews/runs", client);
+		await waitFor(() => expect(counts.active).toBe(4), ROUTE_RENDER_WAIT);
+		await waitFor(() => expect(counts.processing).toBe(4));
+		await screen.findByText("You do not have access to reviews");
+		expect(screen.queryByText(FIRST_PAGE.target.title)).toBeNull();
+		expect(screen.queryByText(SECOND_PAGE.target.title)).toBeNull();
+		expect(screen.queryByText("These reviews may be out of date")).toBeNull();
+		const key = listPracticeReviewsInfiniteOptions({
+			path: { workspaceSlug: "acme" },
+			query: runsQuery({}, 25),
+		}).queryKey;
+		expect(client.getQueryData(key)).toBeUndefined();
+	});
+
+	it("keeps next-page failure separate from refresh and retries the next page", async () => {
+		vi.stubGlobal("IntersectionObserver", ObserverStub);
+		const { reviewUrls } = recordRequests();
+		serveReviewPages(reviewUrls);
+		renderRouteAtWithRouter('/w/acme/admin/practices/reviews/runs?status=["COMPLETED"]');
+		await screen.findByText(FIRST_PAGE.target.title, undefined, ROUTE_RENDER_WAIT);
+		server.use(
+			http.get(
+				"*/workspaces/:workspaceSlug/practices/reviews",
+				() => HttpResponse.json({ status: 503 }, { status: 503 }),
+				{ once: true },
+			),
+		);
+		await userEvent.click(screen.getByRole("button", { name: "Show more reviews" }));
+		await screen.findByText("We could not load more reviews.");
+		expect(screen.queryByText("These reviews may be out of date")).toBeNull();
+		screen.getByText(FIRST_PAGE.target.title);
+		await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByText(SECOND_PAGE.target.title);
+		expect(reviewUrls.at(-1)?.searchParams.get("page")).toBe("1");
+	});
+
+	it("keeps the new filter identity when an old poll finishes", async () => {
+		recordRequests();
+		const held = deferred<Response>();
+		server.use(heldFilterResponse(held.promise));
+		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices/reviews/runs");
+		await screen.findByText(FIRST_PAGE.target.title, undefined, ROUTE_RENDER_WAIT);
+		await act(async () => {
+			await router.navigate({
+				to: "/w/$workspaceSlug/admin/practices/reviews/runs",
+				params: { workspaceSlug: "acme" },
+				search: { artifactKind: "scm.pull_request", artifactId: 99 },
+			});
+		});
+		await screen.findByText(SECOND_PAGE.target.title);
+		await act(async () => {
+			held.resolve(responseFor(200, [FIRST_PAGE]));
+		});
+		expect(screen.queryByText(FIRST_PAGE.target.title)).toBeNull();
+		screen.getByText(SECOND_PAGE.target.title);
 	});
 
 	/**
@@ -403,7 +883,7 @@ describe("practice review list routes", () => {
 		const { workUrls, reviewUrls } = recordRequests();
 
 		renderRouteAtWithRouter("/w/acme/admin/practices/reviews/runs?withoutReview=true");
-		await screen.findByText("A review started on all work", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("No work without a review", undefined, ROUTE_RENDER_WAIT);
 
 		const requested = workUrls.at(-1);
 		expect(requested?.searchParams.get("withoutReview")).toBe("true");
@@ -429,7 +909,7 @@ describe("practice review list routes", () => {
 			expect(router.state.location.search).toMatchObject({ status: "NOT_STARTED" }),
 		);
 		await waitFor(() => expect(workUrls.at(-1)?.searchParams.get("withoutReview")).toBe("true"));
-		await screen.findByText("A review started on all work", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("No work without a review", undefined, ROUTE_RENDER_WAIT);
 
 		const reviewsBefore = reviewUrls.length;
 		await userEvent.click(await screen.findByRole("option", { name: "Completed" }));
@@ -449,7 +929,7 @@ describe("practice review list routes", () => {
 		const { router } = renderRouteAtWithRouter(
 			"/w/acme/admin/practices/reviews/runs?withoutReview=true",
 		);
-		await screen.findByText("A review started on all work", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("No work without a review", undefined, ROUTE_RENDER_WAIT);
 		expect(workUrls.at(-1)?.searchParams.get("withoutReview")).toBe("true");
 		screen.getByRole("button", { name: "Clear status filter (No review started)" });
 
@@ -491,7 +971,7 @@ describe("practice review list routes", () => {
 		renderRouteAtWithRouter(
 			'/w/acme/admin/practices/reviews/runs?withoutReview=true&from=2026-09-01&to=2026-09-10&subjectUserId=7&practiceSlug=["thin-controllers"]&artifactKind=scm.issue&artifactId=5',
 		);
-		await screen.findByText("A review started on all of this work", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("No work matches these filters", undefined, ROUTE_RENDER_WAIT);
 
 		// The work's pill reads its name from the same endpoint; the list is the read without a review.
 		const requested = workUrls.find((url) => url.searchParams.has("withoutReview"));

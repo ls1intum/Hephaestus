@@ -2,10 +2,20 @@ import type { InfiniteData } from "@tanstack/react-query";
 
 import { type LoadState, type PanelState, queryLoadState } from "@/components/common/panel-state";
 
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
+
 import { loadedPages, type PagedModel } from "./spring-page";
+
+/** A loaded list could not refresh; its retained rows may be out of date. */
+export interface RefreshFailure {
+	error: unknown;
+	onRetry: () => void;
+	pending: boolean;
+}
 
 /** An infinite list's paging, once its first page is in. */
 export interface MorePages {
+	refreshFailure?: RefreshFailure;
 	hasMore: boolean;
 	isLoadingMore: boolean;
 	/**
@@ -40,16 +50,22 @@ const READY: LoadState = { status: "ready" };
 
 /**
  * One infinite query as a panel's state: loading or failed until its first page is in, then the
- * loaded pages shaped by `settled`. Once pages are in, a failed read is not the panel's failure:
- * TanStack reports it as the query's error, but what was loaded stays on screen. A failed next page
- * shows its failure beside the rows. A failed refresh, such as a poll, shows the rows it could not
- * update, and a later refresh asks again.
+ * loaded pages shaped by `settled`. Retryable next-page and refresh failures keep those pages and
+ * expose their errors separately. A refused read fails the panel; its host clears refused cache
+ * data so a later transport error cannot restore it.
  */
 export function infiniteListState<TPage, TReady extends object>(
 	query: InfiniteQueryLike<TPage>,
 	settled: (pages: TPage[]) => TReady,
 ): PanelState<TReady & MorePages> {
-	const state = query.isFetchNextPageError || query.isRefetchError ? READY : queryLoadState(query);
+	const retained =
+		query.data !== undefined &&
+		(query.isFetchNextPageError || query.isRefetchError) &&
+		queryErrorIsRetryable(query.error);
+	if (query.data === undefined && !query.isError) {
+		return { status: "loading" };
+	}
+	const state = retained ? READY : queryLoadState(query);
 	if (state.status !== "ready") {
 		return state;
 	}
@@ -63,6 +79,15 @@ export function infiniteListState<TPage, TReady extends object>(
 			void query.fetchNextPage({ cancelRefetch: false });
 		},
 	};
+	if (query.isRefetchError) {
+		more.refreshFailure = {
+			error: query.error,
+			pending: query.isFetching,
+			onRetry: () => {
+				void query.refetch();
+			},
+		};
+	}
 	if (query.isFetchNextPageError && !query.isFetchingNextPage) {
 		more.loadMoreError = query.error;
 	}

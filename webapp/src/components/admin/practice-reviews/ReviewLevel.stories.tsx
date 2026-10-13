@@ -499,3 +499,19 @@ export const Loading: Story = {
 		await expect(panel.queryByRole("heading", { name: SHEET_SECTIONS.what })).toBeNull();
 	},
 };
+
+export const NoPracticeResultsRecordedYet: Story = {
+	args: {
+		...Running.args,
+		trace: {
+			status: "ready",
+			trace: { ...reviewTraceOf(mockJobRunning), practices: [], signals: [] },
+		},
+		summary: undefined,
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText("No practice results have been recorded yet.");
+		await expect(panel.queryByRole("list", { name: "Every practice in this review" })).toBeNull();
+	},
+};

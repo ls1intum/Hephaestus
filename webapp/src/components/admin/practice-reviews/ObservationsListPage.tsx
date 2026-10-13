@@ -14,6 +14,7 @@ import { ObservationResults, type ObservationResultsState } from "./ObservationR
 import { clearedScope } from "./review-scope";
 import type { ObservationsSearch } from "./review-search";
 import { ReviewListEnd } from "./ReviewListEnd";
+import { ReviewListRefresh } from "./ReviewListRefresh";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { ReviewTabIntro } from "./ReviewTabIntro";
@@ -91,6 +92,7 @@ export function ObservationsListPage({
 			{observations.status === "loading" && <ObservationResults state={{ status: "loading" }} />}
 			{observations.status === "ready" && (
 				<>
+					<ReviewListRefresh failure={observations.refreshFailure} noun="observations" />
 					<ObservationResults
 						state={resultsState(rows, hasFilter ? reset : undefined)}
 						byDay={byDay}

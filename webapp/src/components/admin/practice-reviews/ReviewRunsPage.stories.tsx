@@ -602,3 +602,18 @@ export const Dark: Story = {
 		await canvas.findByRole("table", LIST);
 	},
 };
+
+const retryRefresh = fn();
+export const RefreshFailed: Story = {
+	args: {
+		reviews: loadedList(RUNS, {
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: retryRefresh },
+		}),
+	},
+	play: async ({ canvas, userEvent }) => {
+		await canvas.findByText("These reviews may be out of date");
+		await expect(canvas.getByRole("table").querySelectorAll("tbody tr").length).toBeGreaterThan(0);
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		await expect(retryRefresh).toHaveBeenCalledOnce();
+	},
+};
