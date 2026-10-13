@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogLock;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeOverride;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeOverrideRepository;
@@ -18,6 +19,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
@@ -26,7 +28,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.support.TransactionOperations;
 
 /**
  * The one-shot practice script upgrade as the server runs it after startup: an unchanged copy of a bundled practice
@@ -34,7 +36,6 @@ import org.springframework.test.context.TestPropertySource;
  * diverged copy keeps its own.
  */
 @Tag("integration")
-@TestPropertySource(properties = "hephaestus.practices.seed-default-catalog=false")
 class PracticeScriptUpgradeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     /** Two bundled practices of one group, both shipping a practice script. */
@@ -79,6 +80,18 @@ class PracticeScriptUpgradeIntegrationTest extends AbstractWorkspaceIntegrationT
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private PracticeGroupService groupService;
+
+    @Autowired
+    private CuratedCatalogLock catalogLock;
+
+    @Autowired
+    private TransactionOperations transactions;
+
+    @Autowired
+    private Clock clock;
+
     @Test
     void shouldUpgradeAnUnchangedCopyAtStartupWhenCatalogSeedingIsDisabled() {
         WorkspaceContext ctx = pendingWorkspace("script-upgrade-unchanged");
@@ -88,7 +101,22 @@ class PracticeScriptUpgradeIntegrationTest extends AbstractWorkspaceIntegrationT
         Practice before = practice(ctx, SLUG);
         int oldRevision = before.getCurrentRevision().getRevisionNumber();
 
-        manager.repairIncompleteInstallations();
+        // The startup handler of a server that does not seed the catalog, built from this context's beans.
+        new PracticeCatalogInstallationManager(
+                        false,
+                        groupService,
+                        practiceService,
+                        groups,
+                        practices,
+                        catalog,
+                        catalogLock,
+                        installations,
+                        workspaces,
+                        transactions,
+                        clock,
+                        releases,
+                        instanceReleases)
+                .repairIncompleteInstallations();
 
         Practice upgraded = practice(ctx, SLUG);
         assertThat(upgraded.getPracticeScript()).isEqualTo(offeredScript);
