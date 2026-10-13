@@ -585,6 +585,9 @@ if (scenario !== undefined && scenario !== "") {
 	let publicHistoryReads = 0;
 	let publicCompletionAttempts = 0;
 	mock.method(globalThis, "fetch", async (input: unknown, init?: RequestInit) => {
+		if (nativeSdk) {
+			assert.equal(String(input), "https://unused.invalid/admit-observations");
+		}
 		if (String(input).endsWith("/complete-public-review")) {
 			publicCompletionAttempts += 1;
 			const mode = process.env.PI_PUBLIC_COMPLETION_MODE;
@@ -949,6 +952,7 @@ if (scenario !== undefined && scenario !== "") {
 						refreshOnCreate: false,
 						allowModelNetwork: false,
 					});
+					await runtime.setRuntimeApiKey("openai", "synthetic-native-test-key");
 					const model = runtime.getModel("openai", "gpt-4.1");
 					assert.ok(model);
 					const settingsManager = nativeSdk.SettingsManager.inMemory(
@@ -999,7 +1003,9 @@ if (scenario !== undefined && scenario !== "") {
 						requests += 1;
 						record(`native-request:${sessionNumber}:${requests}`);
 						const slug = sessionNumber === 1 ? "test-practice" : "second-practice";
-						const refusedRevision = scenario === "scope-native-revision";
+						const batchCorrection = scenario === "scope-native-batch-correction";
+						const readCorrection = scenario === "scope-native-read-correction";
+						const refusedRevision = scenario === "scope-native-revision" || readCorrection;
 
 						const content: Awaited<ReturnType<NativeStream["result"]>>["content"] = [];
 						if (requests === 1) {
@@ -1013,8 +1019,13 @@ if (scenario !== undefined && scenario !== "") {
 								observationCall(
 									"report",
 									nativeObservation(
-										sessionNumber === 1 || refusedRevision ? slug : "test-practice",
+										sessionNumber === 1 || refusedRevision || batchCorrection
+											? slug
+											: "test-practice",
 										`Own ${slug}`,
+										sessionNumber === 2 && batchCorrection
+											? { ...changeCitation, quote: "+ notCaptured();" }
+											: changeCitation,
 									),
 								),
 							);
@@ -1024,6 +1035,13 @@ if (scenario !== undefined && scenario !== "") {
 										...nativeObservation(slug, "Revised within the batch"),
 										revises: slug,
 									}),
+								);
+							} else if (batchCorrection) {
+								content.push(
+									observationCall(
+										"same-batch-correction",
+										nativeObservation(slug, `Corrected ${slug}`),
+									),
 								);
 							} else if (refusedRevision) {
 								content.push(
@@ -1036,7 +1054,14 @@ if (scenario !== undefined && scenario !== "") {
 									}),
 								);
 							}
-						} else if (sessionNumber === 2 && requests === 2) {
+						} else if (sessionNumber === 2 && readCorrection && requests === 2) {
+							content.push({
+								type: "toolCall",
+								id: "read-again",
+								name: "read",
+								arguments: { path: "evidence/metadata.json" },
+							});
+						} else if (sessionNumber === 2 && requests === (readCorrection ? 3 : 2)) {
 							content.push(
 								observationCall("correction", {
 									...nativeObservation(slug, `Corrected ${slug}`),
@@ -2876,6 +2901,8 @@ if (scenario !== undefined && scenario !== "") {
 	for (const fixture of [
 		"scope-native-completion",
 		"scope-native-revision",
+		"scope-native-batch-correction",
+		"scope-native-read-correction",
 		"scope-cut-off",
 		"scope-recording-guard",
 		"scope-repeat",
@@ -3008,6 +3035,10 @@ if (scenario !== undefined && scenario !== "") {
 					"native mixed report and read ends each recorded practice before another model request",
 				"scope-native-revision":
 					"native refused revision stays open until corrected while same-batch valid revision settles",
+				"scope-native-batch-correction":
+					"native same-batch correction closes after the final successful report",
+				"scope-native-read-correction":
+					"native refused revision stays unresolved through a read-only turn until corrected",
 				"scope-cut-off":
 					"a truncated response in a prior practice does not consume the next session's correction chance",
 				"scope-recording-guard":
@@ -3434,7 +3465,7 @@ if (scenario !== undefined && scenario !== "") {
 						],
 						{
 							env: {
-								...process.env,
+								...(stage.startsWith("scope-native-") ? { PATH: process.env.PATH } : process.env),
 								PI_ORCHESTRATION_SCENARIO: stage,
 								PI_PUBLIC_COMPLETION_MODE: fixture.startsWith("compose-completion-")
 									? fixture.slice("compose-completion-".length)
@@ -3461,7 +3492,7 @@ if (scenario !== undefined && scenario !== "") {
 								PI_RUNNER_CWD: cwd,
 								PI_CODING_AGENT_DIR: cwd,
 								AGENT_BUDGET_MS: budgetMs,
-								PI_PRACTICE_MODEL_CALLS: "2",
+								PI_PRACTICE_MODEL_CALLS: stage === "scope-native-read-correction" ? "4" : "2",
 								PI_PRACTICE_OUTPUT_TOKENS: "8000",
 								LLM_PROXY_URL: "https://unused.invalid",
 								LLM_PROXY_TOKEN: "test-token",
@@ -3615,11 +3646,18 @@ if (scenario !== undefined && scenario !== "") {
 					}
 					switch (stage) {
 						case "scope-native-completion":
-						case "scope-native-revision": {
+						case "scope-native-revision":
+						case "scope-native-batch-correction":
+						case "scope-native-read-correction": {
 							assert.equal(child.status, 0, child.stderr);
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("native-request:")),
-								["native-request:1:1", "native-request:2:1", "native-request:2:2"],
+								[
+									"native-request:1:1",
+									"native-request:2:1",
+									...(stage === "scope-native-batch-correction" ? [] : ["native-request:2:2"]),
+									...(stage === "scope-native-read-correction" ? ["native-request:2:3"] : []),
+								],
 							);
 							const observations = readObservations(nodePath.join(cwd, "out/result.json"));
 							assert.deepEqual(
