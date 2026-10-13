@@ -658,25 +658,24 @@ if (scenario !== undefined && scenario !== "") {
 				});
 			}
 			if (mode === "unavailable-words" || mode === "missing-currentness") {
+				const history: unknown = JSON.parse(
+					readFileSync(
+						new URL("fixtures/public-feedback-history-unavailable-words.json", import.meta.url),
+						"utf8",
+					),
+				);
+				assert.ok(isRecord(history) && Array.isArray(history.feedback));
+				if (mode === "missing-currentness") {
+					history.feedback = history.feedback.map((entry: unknown) => {
+						assert.ok(isRecord(entry));
+						const { recordedClaimCurrentness: _currentness, ...facts } = entry;
+						return facts;
+					});
+				}
 				return Response.json({
 					schemaVersion: 1,
 					readAt: "2026-10-07T11:00:00Z",
-					history: {
-						wordsCoverage: "PARTIAL",
-						feedback: ["CURRENT", "STALE"].map((currentness, index) => ({
-							id: `00000000-0000-4000-8000-00000000000${index + 1}`,
-							channel: "IN_CONTEXT",
-							publicEligible: true,
-							artifact: {
-								kind: "scm.pull_request",
-								url: "https://gitlab.example/group/repo/-/merge_requests/3",
-							},
-							deliveredAt: "2026-10-07T10:00:00Z",
-							...(mode === "missing-currentness" ? {} : { recordedClaimCurrentness: currentness }),
-							...(index === 1 ? { withdrawn: true } : {}),
-							wordsUnavailable: "COPY_AUTHORITY_UNAVAILABLE",
-						})),
-					},
+					history,
 				});
 			}
 			if (mode === "refused") {
@@ -3201,6 +3200,23 @@ if (scenario !== undefined && scenario !== "") {
 			async () => {
 				const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-orchestration-"));
 				try {
+					let publicHistoryWorkUrl = "https://gitlab.example/group/repo/-/merge_requests/3";
+					if (
+						fixture === "compose-history-unavailable-words" ||
+						fixture === "compose-history-missing-currentness"
+					) {
+						const history: unknown = JSON.parse(
+							readFileSync(
+								new URL("fixtures/public-feedback-history-unavailable-words.json", import.meta.url),
+								"utf8",
+							),
+						);
+						assert.ok(isRecord(history) && Array.isArray(history.feedback));
+						const entry: unknown = history.feedback[0];
+						assert.ok(isRecord(entry) && isRecord(entry.artifact));
+						assert.ok(typeof entry.artifact.url === "string");
+						publicHistoryWorkUrl = entry.artifact.url;
+					}
 					mkdirSync(nodePath.join(cwd, "catalog/practices"), { recursive: true });
 					mkdirSync(nodePath.join(cwd, "evidence"), { recursive: true });
 					mkdirSync(nodePath.join(cwd, "work/change"), { recursive: true });
@@ -3265,7 +3281,7 @@ if (scenario !== undefined && scenario !== "") {
 							repository_full_name: "group/repo",
 							pr_number: 3,
 							commit_sha: "a".repeat(40),
-							pr_url: "https://gitlab.example/group/repo/-/merge_requests/3",
+							pr_url: publicHistoryWorkUrl,
 						}),
 					);
 					writeFileSync(
@@ -3381,7 +3397,8 @@ if (scenario !== undefined && scenario !== "") {
 						JSON.stringify({
 							artifactKind: "scm.pull_request",
 							...(fixture === "compose-fresh-history" ||
-							fixture === "compose-history-body-transport"
+							fixture === "compose-history-body-transport" ||
+							fixture === "compose-history-unavailable-words"
 								? { capturedAt: "2026-10-07T09:00:00Z" }
 								: {}),
 							artifacts: [
@@ -4739,20 +4756,54 @@ for (const item of nullableCases) {
 							if (fixture === "compose-history-unavailable-words") {
 								const prompt = readFileSync(nodePath.join(cwd, "prompt-2.md"), "utf8");
 								assert.match(prompt, /"wordsUnavailable": "COPY_AUTHORITY_UNAVAILABLE"/u);
+								assert.match(prompt, /"recordedClaimCurrentness": "STALE"/u);
+								assert.match(prompt, /"withdrawn": true/u);
+								assert.ok(prompt.includes("Trusted delivered guidance on this work."));
+								assert.ok(!prompt.includes("Unvouched historical guidance must stay unavailable."));
+								assert.ok(!prompt.includes("Current unvouched guidance must stay unavailable."));
 								assert.ok(!prompt.includes("An earlier comment on this same change."));
+								const candidateWitnesses = [
+									...prompt.matchAll(/```json\n(?<context>[\s\S]*?)\n```/gu),
+								]
+									.flatMap((block): unknown[] => {
+										const entry: unknown = JSON.parse(block.groups?.context ?? "null");
+										return isRecord(entry) && Array.isArray(entry.candidatePriorWitnesses)
+											? entry.candidatePriorWitnesses
+											: [];
+									})
+									.map((entry: unknown) => {
+										assert.ok(isRecord(entry));
+										return entry.witnessId;
+									});
+								assert.deepEqual(candidateWitnesses, [
+									"feedback:00000000-0000-4000-8000-000000000002",
+								]);
 								const debug: unknown = JSON.parse(
 									readFileSync(nodePath.join(cwd, "out/runner-debug.json"), "utf8"),
 								);
 								assert.ok(isRecord(debug) && isRecord(debug.publicHistory));
-								assert.deepEqual(
-									debug.publicHistory.entries,
-									[1, 2].map((entryNumber) => ({
-										id: `00000000-0000-4000-8000-00000000000${entryNumber}`,
+								assert.equal(debug.publicHistory.readAt, "2026-10-07T11:00:00Z");
+								assert.equal(debug.publicHistory.workCapturedAt, "2026-10-07T09:00:00Z");
+								assert.deepEqual(debug.publicHistory.entries, [
+									{
+										id: "00000000-0000-4000-8000-000000000001",
 										deliveredAt: "2026-10-07T10:00:00Z",
 										eligibleForAlreadySaid: false,
 										eligibleForPriorAdvice: false,
-									})),
-								);
+									},
+									{
+										id: "00000000-0000-4000-8000-000000000002",
+										deliveredAt: "2026-10-07T10:00:00Z",
+										eligibleForAlreadySaid: true,
+										eligibleForPriorAdvice: false,
+									},
+									{
+										id: "00000000-0000-4000-8000-000000000003",
+										deliveredAt: "2026-10-07T10:00:00Z",
+										eligibleForAlreadySaid: false,
+										eligibleForPriorAdvice: false,
+									},
+								]);
 								const answer: unknown = JSON.parse(
 									readFileSync(
 										nodePath.join(cwd, "work/composition/public-feedback-history.json"),
@@ -4761,6 +4812,16 @@ for (const item of nullableCases) {
 								);
 								assert.ok(isRecord(answer) && isRecord(answer.history));
 								assert.equal(answer.history.wordsCoverage, "PARTIAL");
+								const expected: unknown = JSON.parse(
+									readFileSync(
+										new URL(
+											"fixtures/public-feedback-history-unavailable-words.json",
+											import.meta.url,
+										),
+										"utf8",
+									),
+								);
+								assert.deepEqual(answer.history, expected);
 							}
 
 							// Measurement, then the review on the work in a fresh session, then the private lanes in
