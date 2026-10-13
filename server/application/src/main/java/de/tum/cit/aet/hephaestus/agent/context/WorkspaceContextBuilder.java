@@ -229,7 +229,10 @@ public class WorkspaceContextBuilder {
                                             AgentMetrics.AGENT_CONTEXT_PROVIDER_REQUIRED_FAILURE,
                                             Tags.of("provider", providerName))
                                     .increment();
-                            throw new JobPreparationException("Required content provider failed: " + providerName, e);
+                            throw new JobPreparationException(
+                                    JobPreparationException.Reason.REQUIRED_SOURCE_COLLECTION_FAILED,
+                                    "Required content provider failed: " + providerName,
+                                    e);
                         }
                         log.warn("Optional content provider failed, continuing: {} — {}", providerName, e.getMessage());
                         continue;
@@ -375,7 +378,11 @@ public class WorkspaceContextBuilder {
                 contribution = source.capture(request, collecting);
             } catch (RuntimeException e) {
                 if (e instanceof WorkspaceBudgetExceededException || e instanceof JobPreparationException) throw e;
-                if (folder) throw new JobPreparationException("Workspace folder rendering failed", e);
+                if (folder)
+                    throw new JobPreparationException(
+                            JobPreparationException.Reason.WORKSPACE_RENDERING_FAILED,
+                            "Workspace folder rendering failed",
+                            e);
                 // Collector failures affect only their source; contribution validation failures propagate.
                 stateOverrides.put(kind, new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE));
                 meterRegistry

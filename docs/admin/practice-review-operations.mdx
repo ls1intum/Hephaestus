@@ -83,6 +83,14 @@ Sandbox inputs and results pass through the authenticated worker gateway.
 
 Preparation failures record the stage and a known failure type without exception text.
 File and database failure types remain visible when preparation wraps the cause.
+
+A closed preparation reason distinguishes unavailable reviewed work, source authority, pinned ranges, and input contracts.
+Required source collection and folder rendering have separate reasons.
+The terminal job retains the attempt, stage, type and reason in `metadata.preparation_failure`.
+Other metadata fields stay unchanged.
+
+Structured preparation logs and spans carry the same reason without exception text.
+An unclassified reason remains explicit.
 A diagnostic type does not grant a retry.
 Eligibility and retry limits are unchanged.
 Earlier failures without a retained cause cannot be classified retrospectively.

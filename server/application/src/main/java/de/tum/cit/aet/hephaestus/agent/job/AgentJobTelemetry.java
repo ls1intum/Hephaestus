@@ -151,12 +151,14 @@ final class AgentJobTelemetry {
                 .addKeyValue("job.type", job.getJobType())
                 .addKeyValue("job.preparation.stage", failure.stage().tag())
                 .addKeyValue("job.preparation.kind", failure.kind().tag())
+                .addKeyValue("job.preparation.reason", failure.reasonTag())
                 .addKeyValue("job.result", result)
                 .log("Agent job preparation failed");
         Span span = tracer.currentSpan();
         if (span != null) {
             span.tag("hephaestus.job.preparation.stage", failure.stage().tag());
             span.tag("hephaestus.job.preparation.kind", failure.kind().tag());
+            span.tag("hephaestus.job.preparation.reason", failure.reasonTag());
         }
     }
 

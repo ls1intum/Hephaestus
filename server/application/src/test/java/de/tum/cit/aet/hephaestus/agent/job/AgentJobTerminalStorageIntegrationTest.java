@@ -28,7 +28,9 @@ import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedJobInputsFixtures;
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
@@ -114,6 +116,9 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private AgentProperties properties;
 
+    @Autowired
+    private ReviewRepositoryPreparer repositoryPreparer;
+
     private final ReviewMemberAiPolicy policy = mock(ReviewMemberAiPolicy.class);
     private final SandboxManager sandbox = mock(SandboxManager.class);
     private final PracticePiAdapter runner = mock(PracticePiAdapter.class);
@@ -169,6 +174,79 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
                 Optional.empty(),
                 Optional.empty(),
                 mock(LinkedRepairFollowups.class));
+    }
+
+    @Test
+    void shouldRetainTheClosedReasonOfAnUnavailableReviewedWorkBeforeExecution() {
+        AgentJob job = queued();
+        job.setMetadata(mapper.createObjectNode()
+                .put("pull_request_id", Long.MAX_VALUE)
+                .put("repository_id", Long.MAX_VALUE)
+                .put("commit_sha", "a".repeat(40))
+                .put("target_branch", "main")
+                .put("fixture_marker", "keep"));
+        jobs.saveAndFlush(job);
+        when(handler.prepareInputs(any())).thenAnswer(invocation -> {
+            repositoryPreparer.prepare(invocation.getArgument(0));
+            return PreparedJobInputsFixtures.filesOnly(Map.of());
+        });
+
+        executor.processJob(job.getId());
+
+        AgentJob stored = jobs.findById(job.getId()).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(AgentJobStatus.FAILED);
+        assertThat(stored.getExecutionStartedAt()).isNull();
+        var metadata = Objects.requireNonNull(stored.getMetadata());
+        assertThat(metadata.path("fixture_marker").asString()).isEqualTo("keep");
+        assertThat(metadata.path("preparation_failure").path("reason").asString())
+                .isEqualTo("REVIEWED_WORK_UNAVAILABLE");
+        assertThat(metadata.path("preparation_failure").path("stage").asString())
+                .isEqualTo("INPUTS");
+        assertThat(metadata.path("preparation_failure").path("kind").asString()).isEqualTo("INPUT_PREPARATION");
+        assertThat(metadata.path("preparation_failure").path("attempt").asInt()).isEqualTo(stored.getRetryCount());
+        assertThat(stored.getErrorMessage())
+                .isEqualTo(
+                        "The job failed before execution while preparing the review inputs: the review inputs could not be prepared.");
+        assertThat(usageRows(job.getId())).isZero();
+        verify(sandbox, never()).execute(any());
+        verify(handler, never()).deliver(any());
+
+        for (int blocked : List.of(
+                Objects.requireNonNull(transactions.execute(status -> jobs.recordPreparationFailure(
+                        job.getId(), Long.MAX_VALUE, null, stored.getRetryCount(), "{}"))),
+                Objects.requireNonNull(transactions.execute(status -> jobs.recordPreparationFailure(
+                        job.getId(), workspace.getId(), "other-worker", stored.getRetryCount(), "{}"))),
+                Objects.requireNonNull(transactions.execute(status -> jobs.recordPreparationFailure(
+                        job.getId(), workspace.getId(), null, stored.getRetryCount() + 1, "{}"))))) {
+            assertThat(blocked).isZero();
+        }
+        assertThat(Objects.requireNonNull(
+                        jobs.findById(job.getId()).orElseThrow().getMetadata()))
+                .isEqualTo(metadata);
+    }
+
+    @Test
+    void shouldNotWritePreparationDiagnosisAfterTheTerminalFenceWasLost() {
+        AgentJob job = queued();
+        job.setMetadata(mapper.createObjectNode().put("fixture_marker", "keep"));
+        jobs.saveAndFlush(job);
+        when(handler.prepareInputs(any())).thenAnswer(invocation -> {
+            transactions.executeWithoutResult(status -> jobs.transitionStatus(
+                    job.getId(), AgentJobStatus.CANCELLED, Instant.now(), "cancelled", Set.of(AgentJobStatus.RUNNING)));
+            throw new JobPreparationException(
+                    JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE, "private source");
+        });
+
+        executor.processJob(job.getId());
+
+        AgentJob stored = jobs.findById(job.getId()).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
+        assertThat(stored.getErrorMessage()).isEqualTo("cancelled");
+        assertThat(Objects.requireNonNull(stored.getMetadata()).has("preparation_failure"))
+                .isFalse();
+        assertThat(usageRows(job.getId())).isZero();
+        verify(sandbox, never()).execute(any());
+        verify(handler, never()).deliver(any());
     }
 
     @Test

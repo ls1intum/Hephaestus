@@ -88,7 +88,7 @@ class AgentJobTelemetryTest {
 
     @Test
     @SuppressWarnings("try") // The scope makes the span current until this block ends.
-    void shouldTagTheExecutionSpanWithOnlyTheClosedPreparationStageAndKind() {
+    void shouldTagTheExecutionSpanWithOnlyTheClosedPreparationStageKindAndReason() {
         var exporter = mock(SpanExporter.class);
         when(exporter.export(any())).thenReturn(CompletableResultCode.ofSuccess());
         when(exporter.shutdown()).thenReturn(CompletableResultCode.ofSuccess());
@@ -115,6 +115,8 @@ class AgentJobTelemetryTest {
                 var attributes = spans.iterator().next().getAttributes();
                 return "provenance".equals(attributes.get(AttributeKey.stringKey("hephaestus.job.preparation.stage")))
                         && "unknown".equals(attributes.get(AttributeKey.stringKey("hephaestus.job.preparation.kind")))
+                        && "unclassified"
+                                .equals(attributes.get(AttributeKey.stringKey("hephaestus.job.preparation.reason")))
                         && !attributes.toString().contains("secret");
             }));
         }

@@ -1312,6 +1312,22 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses,
             @Param("workerId") String workerId);
 
+    /** Called in the successful owned terminal transaction; unrelated metadata is retained. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            UPDATE agent_job SET metadata=jsonb_set(
+                CASE WHEN jsonb_typeof(metadata)='object' THEN metadata ELSE '{}'::jsonb END,
+                '{preparation_failure}',CAST(:diagnosis AS jsonb))
+            WHERE id=:id AND workspace_id=:workspaceId AND status='FAILED' AND retry_count=:attempt
+              AND (CAST(:workerId AS text) IS NULL OR worker_id=:workerId)
+            """, nativeQuery = true)
+    int recordPreparationFailure(
+            @Param("id") UUID id,
+            @Param("workspaceId") long workspaceId,
+            @Param("workerId") @Nullable String workerId,
+            @Param("attempt") int attempt,
+            @Param("diagnosis") String diagnosis);
+
     /**
      * Unfenced by worker; callers that know the owning worker should prefer
      * {@link #transitionToCancelledOwnedBy}.
