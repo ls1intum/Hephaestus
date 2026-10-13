@@ -326,7 +326,10 @@ const REVIEW_SUMMARY =
 	"Route it through the checked helper so a bad token cannot reach it.";
 
 /** A NOT_MET result of one problem, as a review session submits it: no practice, no coverage; the host binds both. */
-function notMet(summary: string, citation: unknown = changeCitation) {
+/** A citation as a session submits it: plain JSON fields. */
+type SubmittedCitation = Record<string, string | number>;
+
+function notMet(summary: string, citation: SubmittedCitation = changeCitation) {
 	return {
 		outcome: "NOT_MET",
 		summary,
@@ -488,14 +491,14 @@ function isStreamFactory(value: unknown): value is () => NativeStream {
 	return typeof value === "function";
 }
 
-function observationCall(
+function submitCall(
 	id: string,
 	args: Extract<
 		Awaited<ReturnType<NativeStream["result"]>>["content"][number],
 		{ type: "toolCall" }
 	>["arguments"],
 ) {
-	return { type: "toolCall" as const, id, name: "report_observation", arguments: args };
+	return { type: "toolCall" as const, id, name: "submit_result", arguments: args };
 }
 
 const scenario = process.env.PI_ORCHESTRATION_SCENARIO;
@@ -697,7 +700,7 @@ if (scenario !== undefined && scenario !== "") {
 	let publicCompletionAttempts = 0;
 	mock.method(globalThis, "fetch", async (input: unknown, init?: RequestInit) => {
 		if (nativeSdk) {
-			assert.equal(String(input), "https://unused.invalid/admit-observations");
+			assert.equal(String(input), "https://unused.invalid/admit-results");
 		}
 		if (String(input).endsWith("/complete-public-review")) {
 			publicCompletionAttempts += 1;
@@ -1121,10 +1124,6 @@ if (scenario !== undefined && scenario !== "") {
 					);
 					const makeStream = nativeAi.createAssistantMessageEventStream;
 					let requests = 0;
-					const nativeObservation = (slug: string, summary: string, citation = changeCitation) => ({
-						...observation(slug, summary, citation),
-						evidence: { citations: [citation] },
-					});
 
 					opened.session.agent.streamFunction = () => {
 						requests += 1;
@@ -1143,12 +1142,9 @@ if (scenario !== undefined && scenario !== "") {
 									name: "read",
 									arguments: { path: "work/change/diff.patch" },
 								},
-								observationCall(
+								submitCall(
 									"report",
-									nativeObservation(
-										sessionNumber === 1 || refusedRevision || batchCorrection
-											? slug
-											: "test-practice",
+									notMet(
 										`Own ${slug}`,
 										sessionNumber === 2 && batchCorrection
 											? { ...changeCitation, quote: "+ notCaptured();" }
@@ -1157,28 +1153,18 @@ if (scenario !== undefined && scenario !== "") {
 								),
 							);
 							if (sessionNumber === 1) {
-								content.push(
-									observationCall("revision", {
-										...nativeObservation(slug, "Revised within the batch"),
-										revises: slug,
-									}),
-								);
+								content.push(submitCall("revision", notMet("Revised within the batch")));
 							} else if (batchCorrection) {
-								content.push(
-									observationCall(
-										"same-batch-correction",
-										nativeObservation(slug, `Corrected ${slug}`),
-									),
-								);
+								content.push(submitCall("same-batch-correction", notMet(`Corrected ${slug}`)));
 							} else if (refusedRevision) {
 								content.push(
-									observationCall("bad-revision", {
-										...nativeObservation(slug, "Unverified correction", {
+									submitCall(
+										"bad-revision",
+										notMet("Unverified correction", {
 											...changeCitation,
 											quote: "+ notCaptured();",
 										}),
-										revises: slug,
-									}),
+									),
 								);
 							}
 						} else if (sessionNumber === 2 && readCorrection && requests === 2) {
@@ -1189,12 +1175,7 @@ if (scenario !== undefined && scenario !== "") {
 								arguments: { path: "evidence/metadata.json" },
 							});
 						} else if (sessionNumber === 2 && requests === (readCorrection ? 3 : 2)) {
-							content.push(
-								observationCall("correction", {
-									...nativeObservation(slug, `Corrected ${slug}`),
-									revises: refusedRevision ? slug : null,
-								}),
-							);
+							content.push(submitCall("correction", notMet(`Corrected ${slug}`)));
 						} else {
 							content.push({ type: "text", text: "Unnecessary wrap-up." });
 						}
@@ -2816,7 +2797,7 @@ if (scenario !== undefined && scenario !== "") {
 								"o-na2",
 								undecided(["scm.pull-request.core", "scm.pull-request.diff"]),
 							);
-							const revise = (summary: string, citation: unknown = changeCitation) =>
+							const revise = (summary: string, citation: SubmittedCitation = changeCitation) =>
 								notMet(summary, citation);
 							const before = notesText();
 							await assert.rejects(
@@ -3719,14 +3700,20 @@ if (scenario !== undefined && scenario !== "") {
 								[
 									"native-request:1:1",
 									"native-request:2:1",
-									...(stage === "scope-native-batch-correction" ? [] : ["native-request:2:2"]),
+									...(stage === "scope-native-revision" || stage === "scope-native-read-correction"
+										? ["native-request:2:2"]
+										: []),
 									...(stage === "scope-native-read-correction" ? ["native-request:2:3"] : []),
 								],
 							);
-							const observations = readObservations(nodePath.join(cwd, "out/result.json"));
-							assert.deepEqual(
-								observations.map((item) => item.summary),
-								["Revised within the batch", "Corrected second-practice"],
+							const candidates = candidatesIn(nodePath.join(cwd, "out/result.json"));
+							assert.equal(candidates.get("test-practice")?.summary, "Revised within the batch");
+							// A submission always binds to its session's practice, so the first one settles it.
+							assert.equal(
+								candidates.get("second-practice")?.summary,
+								stage === "scope-native-completion"
+									? "Own second-practice"
+									: "Corrected second-practice",
 							);
 							for (const session of [1, 2]) {
 								assert.ok(events.includes(`native-queued:${session}:2`));

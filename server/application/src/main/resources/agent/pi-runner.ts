@@ -4886,6 +4886,23 @@ async function main() {
 			const unsubscribeReads = opened.session.subscribe((event) => {
 				noteSessionRead(review.reads, event);
 			});
+			// A mixed batch can keep Pi running after this practice submits. Finish its tools and native
+			// boundary first; a refused correction still gets its answer before the draft is final here.
+			const { finishTurn } = opened.session.agent;
+			let unresolvedRefusal = false;
+			opened.session.agent.finishTurn = async (turn, finishSignal) => {
+				const decision = await finishTurn?.(turn, finishSignal);
+				for (const result of turn.toolResults) {
+					if (result.toolName === "submit_result") {
+						unresolvedRefusal = result.isError;
+					}
+				}
+				if (!unresolvedRefusal && review.draft !== null) {
+					opened.session.clearQueue();
+					return { action: "end" };
+				}
+				return decision ?? undefined;
+			};
 			const stop = () => {
 				void abortSession(opened.session);
 			};
