@@ -81,7 +81,10 @@ export function DetailDrawerStack<TKind extends string>({
 	}
 	return (
 		<DetailDrawerLevelView
+			// The entry owns the complete level lifecycle, including initial focus and nested arrival.
+			key={keyAt(stack, 0)}
 			depth={0}
+			parentEntered
 			stack={stack}
 			guardedKinds={guardedKinds}
 			closingDepth={closingDepth}
@@ -96,6 +99,7 @@ export function DetailDrawerStack<TKind extends string>({
 
 interface DetailDrawerLevelViewProps<TKind extends string> extends DetailDrawerStackProps<TKind> {
 	depth: number;
+	parentEntered: boolean;
 	closingDepth: number | null;
 	setClosingDepth: (depth: number) => void;
 }
@@ -103,6 +107,7 @@ interface DetailDrawerLevelViewProps<TKind extends string> extends DetailDrawerS
 /** A component, not a loop, because it owns `useArrived` and each level mounts at a different time. */
 function DetailDrawerLevelView<TKind extends string>({
 	depth,
+	parentEntered,
 	stack,
 	guardedKinds,
 	closingDepth,
@@ -113,6 +118,9 @@ function DetailDrawerLevelView<TKind extends string>({
 }: DetailDrawerLevelViewProps<TKind>) {
 	const entry = stack[depth];
 	const arrived = useArrived();
+	// URL state can mount every level together. The parent takes native initial focus before its
+	// child opens, so the child has a return target even when no control opened it.
+	const [entered, setEntered] = useState(false);
 	if (!entry) {
 		return null;
 	}
@@ -121,13 +129,8 @@ function DetailDrawerLevelView<TKind extends string>({
 	const guarded = guardedKinds?.includes(entry.kind) ?? false;
 	return (
 		<Drawer
-			// The entry is the level: another id at the same depth is another level, mounted fresh, so
-			// a form seeded from the entry starts over instead of showing the last id's draft under
-			// this one's title (`webapp/AGENTS.md` § Seeding a form from props). Keying on the kind
-			// alone would leave that reset to every editor's own mount site, each one a place to miss it.
-			key={detailStackKey(entry)}
 			// Base UI shuts a parent's children anyway; this keeps the React tree in step.
-			open={arrived && (closingDepth === null || depth < closingDepth)}
+			open={arrived && parentEntered && (closingDepth === null || depth < closingDepth)}
 			swipeDirection="right"
 			onOpenChange={(next, details) => {
 				if (next) {
@@ -144,10 +147,13 @@ function DetailDrawerLevelView<TKind extends string>({
 				setClosingDepth(target);
 			}}
 			onOpenChangeComplete={(next) => {
-				if (next || closingDepth !== depth) {
+				if (next) {
+					setEntered(true);
 					return;
 				}
-				onClose(depth);
+				if (closingDepth === depth) {
+					onClose(depth);
+				}
 			}}
 		>
 			<DrawerContent size="detail" dimWhenNested={false} data-detail-depth={depth}>
@@ -155,7 +161,9 @@ function DetailDrawerLevelView<TKind extends string>({
 				{footer?.(entry)}
 				{child && (
 					<DetailDrawerLevelView
+						key={detailStackKey(child)}
 						depth={depth + 1}
+						parentEntered={entered}
 						stack={stack}
 						guardedKinds={guardedKinds}
 						closingDepth={closingDepth}

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
+import { flushSync } from "react-dom";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 
 import { DetailDrawerHeader } from "@/components/layout/detail-drawer/DetailDrawerHeader";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { expectSettledVisible } from "@/stories/overlay";
 import { Stateful } from "@/stories/stateful";
 import { nextFrame } from "@/test/async";
 
+import type { DetailStackEntry } from "./detail-stack";
 import { DetailDrawerStack } from "./DetailDrawerStack";
 
 const popups = () => [...document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]')];
@@ -648,6 +650,110 @@ export const TwoLevels: Story = {
 		await userEvent.click(back);
 		await waitFor(async () => expect(args.onClose).toHaveBeenCalledWith(1));
 		await expect(await screen.findByText("group · review-ready-work")).toBeVisible();
+		await waitFor(async () => expect(popups()).toHaveLength(1));
+		await waitFor(async () => expect(parent.contains(document.activeElement)).toBe(true));
+		await userEvent.tab();
+		await expect(parent.contains(document.activeElement)).toBe(true);
+	},
+};
+
+export const NestedFocusReturnsToTheOpener: Story = {
+	render: (args) => (
+		<Stateful<DetailStackEntry[]> initial={[]}>
+			{(stack, setStack) => (
+				<>
+					<Button onClick={() => setStack([{ kind: "group", id: "review-ready-work" }])}>
+						Open group
+					</Button>
+					<DetailDrawerStack
+						{...args}
+						stack={stack}
+						onClose={(depth) => setStack(stack.slice(0, depth))}
+					>
+						{(entry, level) => (
+							<>
+								<DetailDrawerHeader nested={level.nested}>
+									<DrawerTitle>{`${entry.kind} · ${entry.id}`}</DrawerTitle>
+								</DetailDrawerHeader>
+								<DrawerBody>
+									{level.depth === 0 ? (
+										<Button
+											onClick={() =>
+												setStack([...stack, { kind: "practice", id: "describe-what-and-why" }])
+											}
+										>
+											Open practice
+										</Button>
+									) : (
+										<Button
+											onClick={() => {
+												flushSync(() =>
+													setStack([
+														{ kind: "group", id: "other-group" },
+														{ kind: "practice", id: "describe-what-and-why" },
+													]),
+												);
+												setStack([
+													{ kind: "group", id: "review-ready-work" },
+													{ kind: "practice", id: "describe-what-and-why" },
+												]);
+											}}
+										>
+											Replace parent and return
+										</Button>
+									)}
+								</DrawerBody>
+							</>
+						)}
+					</DetailDrawerStack>
+				</>
+			)}
+		</Stateful>
+	),
+	play: async () => {
+		const opener = screen.getByRole("button", { name: "Open group" });
+		await userEvent.click(opener);
+		await expectSettledVisible(await screen.findByText("group · review-ready-work"));
+		const practice = screen.getByRole("button", { name: "Open practice" });
+		await userEvent.click(practice);
+		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
+		await userEvent.click(within(popupAt(1)).getByRole("button", { name: "Back" }));
+		await waitFor(async () => expect(popups()).toHaveLength(1));
+		await waitFor(async () => expect(practice).toHaveFocus());
+		await userEvent.click(practice);
+		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
+		await userEvent.keyboard("{Escape}");
+		await waitFor(async () => expect(popups()).toHaveLength(1));
+		await waitFor(async () => expect(practice).toHaveFocus());
+		await userEvent.click(practice);
+		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
+		let replaced = false;
+		const observer = new MutationObserver((records) => {
+			for (const record of records) {
+				for (const node of record.addedNodes) {
+					if (node instanceof HTMLElement && node.textContent.includes("group · other-group")) {
+						replaced = true;
+					}
+				}
+			}
+		});
+		observer.observe(document.body, { childList: true, subtree: true });
+		try {
+			await userEvent.click(screen.getByRole("button", { name: "Replace parent and return" }));
+			await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
+			await expect(replaced).toBe(true);
+			const parent = popupAt(0);
+			await userEvent.click(within(popupAt(1)).getByRole("button", { name: "Back" }));
+			await waitFor(async () => expect(popups()).toHaveLength(1));
+			await waitFor(async () => expect(parent.contains(document.activeElement)).toBe(true));
+			await userEvent.tab();
+			await expect(parent.contains(document.activeElement)).toBe(true);
+		} finally {
+			observer.disconnect();
+		}
+		await userEvent.click(within(popupAt(0)).getByRole("button", { name: "Close" }));
+		await waitFor(async () => expect(popups()).toHaveLength(0));
+		await waitFor(async () => expect(opener).toHaveFocus());
 	},
 };
 

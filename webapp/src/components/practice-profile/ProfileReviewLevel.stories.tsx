@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 
 import type { PracticeTraceEntry, ProfileReviewRun } from "@/api/types.gen";
 import { DetailDrawerHeader } from "@/components/layout/detail-drawer/DetailDrawerHeader";
@@ -7,7 +7,7 @@ import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawe
 import { artifactTrace } from "@/components/practice-trace/fixtures";
 import { DrawerBody, DrawerTitle } from "@/components/ui/drawer";
 import { withPageBehind } from "@/stories/decorators";
-import { settledDrawerPanel } from "@/stories/overlay";
+import { expectSettledVisible } from "@/stories/overlay";
 import { groups } from "@/stories/practice-profile-story-mock-data";
 import {
 	openProfileReviewRun,
@@ -37,6 +37,21 @@ const loaded = {
 } satisfies ProfileReviewDetailState;
 
 const practiceTable = () => screen.getByRole("table", { name: "Every practice in this review" });
+
+/** Every state belongs to the review at depth one, after that drawer has entered. */
+async function settledReviewPanel() {
+	const panel = await waitFor(() => {
+		const review = document.querySelector<HTMLElement>(
+			'[data-slot="drawer-popup"][data-detail-depth="1"]',
+		);
+		if (review === null) {
+			throw new Error("The review drawer has not opened.");
+		}
+		return review;
+	});
+	await expectSettledVisible(panel);
+	return panel;
+}
 
 /** Always stacked on the reviews list, so every story mounts it as a drawer's second level. */
 const meta = {
@@ -95,7 +110,7 @@ type Story = StoryObj<typeof meta>;
  */
 export const Default: Story = {
 	play: async ({ args }) => {
-		const panel = await settledDrawerPanel();
+		const panel = await settledReviewPanel();
 		await expect(screen.getByRole("link", { name: /^Open the original/u })).toBeVisible();
 		await userEvent.click(screen.getByRole("button", { name: "Request review" }));
 		await expect(args.onReviewNow).toHaveBeenCalledWith(openProfileReviewRun.reviewedWork);
@@ -195,7 +210,7 @@ export const AnsweredByAnEarlierReview: Story = {
 		},
 	},
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(
 			screen.getByText(
 				"three practices assessed in this review · two practices answered by an earlier review · six practices listed",
@@ -217,7 +232,7 @@ export const AnsweredByAnEarlierReview: Story = {
 export const FilteredPractices: Story = {
 	args: { filters: { watches: "scm.pull_request.synchronized" } },
 	play: async ({ args }) => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(screen.getByLabelText("Reviews when")).toHaveTextContent("New commits pushed");
 		await expect(within(practiceTable()).queryByText("Clear ownership")).toBeNull();
 		await expect(screen.getByText("1 practice matches your filters.")).toBeVisible();
@@ -235,8 +250,9 @@ export const FilterOnAMomentNobodyWatches: Story = {
 	args: { filters: { watches: "scm.pull_request.labeled" } },
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
-		const panel = await settledDrawerPanel();
-		await expect(screen.getByLabelText("Reviews when")).toHaveTextContent("Any moment");
+		const panel = await settledReviewPanel();
+		const moment = within(panel).getByLabelText("Reviews when");
+		await expect(moment).toHaveTextContent("Any moment");
 		await expect(within(practiceTable()).getByText("Clear ownership")).toBeVisible();
 		await expect(panel).not.toHaveTextContent(/scm\./u);
 	},
@@ -254,7 +270,7 @@ export const ObservationWithoutASummary: Story = {
 		},
 	},
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(
 			within(practiceTable()).getByText(/^Reviewed on the commits pushed/u),
 		).toBeVisible();
@@ -281,7 +297,7 @@ export const MarkedIncorrect: Story = {
 		},
 	},
 	play: async () => {
-		const panel = await settledDrawerPanel();
+		const panel = await settledReviewPanel();
 		const table = within(practiceTable());
 		await expect(table.getByText("The changes each have a clear purpose")).toBeVisible();
 		await expect(table.getAllByText("Marked incorrect")).toHaveLength(1);
@@ -296,7 +312,7 @@ export const MarkedIncorrect: Story = {
 export const WhatWeNoticed: Story = {
 	args: { tab: "noticed" },
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(screen.getByRole("heading", { name: "What we noticed" })).toBeVisible();
 		await expect(
 			screen.getByText(/already had a review within this workspace’s cooldown period/u),
@@ -308,7 +324,7 @@ export const WhatWeNoticed: Story = {
 export const AsAnAdmin: Story = {
 	args: { canAdminister: true },
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(screen.getByText("1 piece of feedback reached the developer")).toBeVisible();
 		await expect(screen.getAllByText(/^Rests on Marked ready for review/u)[0]).toBeVisible();
 	},
@@ -317,7 +333,7 @@ export const AsAnAdmin: Story = {
 export const AskingForAReview: Story = {
 	args: { requesting: openProfileReviewRun.reviewedWork },
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(screen.getByRole("button", { name: "Requesting review…" })).toBeDisabled();
 	},
 };
@@ -331,7 +347,7 @@ export const NothingReached: Story = {
 		},
 	},
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(
 			screen.getByText("This review reached no practice, so there is nothing to list here."),
 		).toBeVisible();
@@ -352,7 +368,7 @@ export const RunningWithNothingReached: Story = {
 		},
 	},
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(screen.getByText("Running")).toBeVisible();
 		await expect(
 			screen.getByText("Practices appear here as the review reaches them."),
@@ -373,7 +389,7 @@ export const UntitledWork: Story = {
 		},
 	},
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(
 			screen.getByRole("heading", { name: openProfileReviewRun.reviewedWork.label }),
 		).toBeVisible();
@@ -384,7 +400,7 @@ export const UntitledWork: Story = {
 export const ActivityLoading: Story = {
 	args: { state: { ...loaded, activity: { status: "loading" } } },
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(screen.getByText("Review 2")).toBeVisible();
 		await expect(practiceTable()).toHaveAttribute("aria-busy", "true");
 	},
@@ -398,7 +414,7 @@ export const ActivityFailed: Story = {
 		},
 	},
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(screen.getByText("We could not load this work’s review activity")).toBeVisible();
 	},
 };
@@ -406,7 +422,7 @@ export const ActivityFailed: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(practiceTable()).toHaveAttribute("aria-busy", "true");
 	},
 };
@@ -415,7 +431,7 @@ export const Loading: Story = {
 export const NotFound: Story = {
 	args: { state: { status: "error", error: { status: 404 }, onRetry: fn() } },
 	play: async () => {
-		await settledDrawerPanel();
+		await settledReviewPanel();
 		await expect(screen.getByText("We could not find this review")).toBeVisible();
 		await expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
 	},
@@ -427,6 +443,6 @@ export const MobileReflow: Story = {
 		chromatic: { viewports: [320] },
 	},
 	play: async () => {
-		await expectNoPanelOverflow(await settledDrawerPanel());
+		await expectNoPanelOverflow(await settledReviewPanel());
 	},
 };

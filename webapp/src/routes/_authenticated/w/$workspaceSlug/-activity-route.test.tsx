@@ -1043,8 +1043,9 @@ describe("Workspace activity", () => {
 			"/w/acme/workspace-activity?detail=person:carol&detail=activity:reviews",
 		);
 
-		const level = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
-		await within(level).findByRole("heading", { name: "Reviews" });
+		const heading = await screen.findByRole("heading", { name: "Reviews" }, ROUTE_RENDER_WAIT);
+		const level = heading.closest<HTMLElement>('[role="dialog"]');
+		assert(level);
 		await within(level).findByText("No activity in this range");
 	});
 

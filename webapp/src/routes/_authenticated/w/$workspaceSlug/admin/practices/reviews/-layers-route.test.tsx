@@ -135,6 +135,18 @@ async function traceSheet() {
 	return sheet;
 }
 
+/** The addressed front level, after its parent has entered and its own heading is visible. */
+async function frontSheet(levels: number) {
+	return waitFor(() => {
+		const sheet = document.querySelector<HTMLElement>(
+			`[role="dialog"][data-detail-depth="${levels - 1}"]`,
+		);
+		assert(sheet);
+		within(sheet).getByRole("heading", { level: 2 });
+		return sheet;
+	}, ROUTE_RENDER_WAIT);
+}
+
 /** A sheet links out to the provider or to a setting, never to another record of Practice reviews. */
 function expectNoRecordLinks(sheet: HTMLElement) {
 	for (const link of within(sheet).queryAllByRole("link")) {
@@ -565,9 +577,7 @@ describe("a record's sheet is the record alone", () => {
 			renderRouteAtWithRouter(
 				`${REVIEWS}/runs?detail=${encodeURIComponent(JSON.stringify(detail))}`,
 			);
-			const dialogs = await screen.findAllByRole("dialog", undefined, ROUTE_RENDER_WAIT);
-			const sheet = dialogs.at(-1);
-			assert(sheet);
+			const sheet = await frontSheet(detail.length);
 			await within(sheet).findByRole("heading", { level: 2 }, ROUTE_RENDER_WAIT);
 			expect(sheet.querySelector("[data-trace-verdict]")).toBeNull();
 			expect(sheet.querySelector("[data-step-key]")).toBeNull();
@@ -597,9 +607,7 @@ function sheetMarkup(sheet: HTMLElement): string {
 /** The sheet in front once it has settled: its record read and nothing left loading. */
 async function settledSheet(detail: string[]): Promise<string> {
 	renderRouteAtWithRouter(`${REVIEWS}/runs?detail=${encodeURIComponent(JSON.stringify(detail))}`);
-	const dialogs = await screen.findAllByRole("dialog", undefined, ROUTE_RENDER_WAIT);
-	const sheet = dialogs.at(-1);
-	assert(sheet);
+	const sheet = await frontSheet(detail.length);
 	await within(sheet).findByRole("heading", { level: 2 }, ROUTE_RENDER_WAIT);
 	await waitFor(
 		() => expect(sheet.querySelector('[data-slot="skeleton"]')).toBeNull(),
