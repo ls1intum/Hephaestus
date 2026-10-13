@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.92.2
+
+### Patch Changes
+
+- Activity keeps zero counts visible without repeating empty plots, so a category’s timeline is easier to reach on a small screen. Nonempty charts keep their shared scale and dates, and every week remains available in the table. Weekly table dates remain readable while you scroll through the counts.
+- Activity keeps each repository path visible while you scroll across its counts. Long paths wrap in a bounded column so repositories with similar names remain distinguishable on a small screen.
+- Activity marks retained repository counts while a newly selected time range loads. The counts stay visible until the new range arrives.
+- Activity tables use the available drawer width for week dates and repository paths while keeping the first column visible when figures scroll.
+- Activity charts and tables now label UTC weeks accurately when a custom range starts or ends on a Monday in your time zone. Every count stays in its original week, including activity near the range boundary.
+- Going back from a nested drawer opened through a link keeps keyboard focus in the drawer beneath it. Drawers opened directly enter one level at a time; opening details from inside a drawer still returns focus to the control that opened them.
+- Error-handling reviews assess the available failure signal and whether required work is left unfinished. Preserved failure results and source-established safe fallbacks do not require every operation to expose detailed exception information.
+
+  Existing workspaces can review and accept the catalogue update in **Practice setup → Review updates**. Local customizations and earlier observations stay in place.
+
+- GitLab synchronization reliably records discussion reviews, requests for changes, and issue and merge request comments. Replaying an unchanged request for changes no longer rewrites its stored update time.
+- A queued practice review of linked issue changes can review the latest issue content when it changes again before the review starts. The follow-up keeps the original event’s deadline and checks current review preferences and supported practices again.
+- Failed review preparation preserves known file and database failure types in its safe diagnostics. Retry limits and eligibility are unchanged; earlier failures without a retained cause remain unclassified.
+- A person opened on a public activity page now shows their published totals as the same tiles members see, with their weekly contributions as bars, their provider profile beside their name, and the exact weekly counts still listed below.
+- Practice review tab totals refresh while you keep the page open, so they stay current as reviews record observations and feedback.
+- Practice reviews avoid an extra byte-for-byte copy of sibling repository checkouts when the filesystem supports moving them into the review folder. The same files, history and refs remain available. When that move is unsupported, the existing copy path is used.
+- The worker in the Compose stack accepts the optional `BPL_JVM_HEAD_ROOM` setting. Use it to keep a percentage of the worker's container memory out of the Java memory that the image calculates at startup. If you do not set it, nothing changes.
+
 ## 0.92.1
 
 ### Patch Changes
