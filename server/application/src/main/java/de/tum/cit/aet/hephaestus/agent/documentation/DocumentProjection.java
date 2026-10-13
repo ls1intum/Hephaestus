@@ -21,6 +21,9 @@ public interface DocumentProjection {
     /** Each reference may be a document id or URL. */
     List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> documentRefs);
 
+    /** Body-free authority metadata for references that may be a document id or URL. */
+    List<DocumentAccess> documentAccessByReference(long workspaceId, Collection<String> documentRefs);
+
     /**
      * Keyed on the local id because that is what the signal ledger records as the artifact — a review is
      * occasioned by {@code docs.document.published} against a row in this workspace's mirror. Empty when
@@ -28,6 +31,9 @@ public interface DocumentProjection {
      * nothing.
      */
     Optional<ProjectedDocument> documentById(long workspaceId, long documentId);
+
+    /** Body-free authority metadata keyed by local mirrored document id. */
+    List<DocumentAccess> documentAccessById(long workspaceId, Collection<Long> documentIds);
 
     /**
      * Ranked by full-text relevance to {@code queryText}. Tombstoned/evicted documents are excluded; a
@@ -37,6 +43,14 @@ public interface DocumentProjection {
      * @param queryText free text describing what is relevant (websearch syntax; {@code OR}-joined terms)
      */
     List<ProjectedDocument> searchDocuments(long workspaceId, String queryText, int limit);
+
+    record DocumentAccess(
+            long id,
+            @Nullable String sourceId,
+            String collectionSlug,
+            String slug,
+            boolean deleted,
+            boolean bodyAvailable) {}
 
     /**
      * The agent-facing view of one mirrored document. {@code bodyMarkdown} is {@code null} when the

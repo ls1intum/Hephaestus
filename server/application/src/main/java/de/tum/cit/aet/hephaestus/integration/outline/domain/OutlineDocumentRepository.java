@@ -60,6 +60,13 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     Optional<OutlineDocument> findByWorkspaceIdAndConnectionIdAndDocumentId(
             Long workspaceId, Long connectionId, String documentId);
 
+    @Query("SELECT d.id AS id, d.documentId AS sourceId, d.collectionSlug AS collectionSlug, d.slug AS slug, "
+            + "(d.deletedAt IS NOT NULL) AS deleted, (d.bodyMarkdown IS NOT NULL) AS bodyAvailable "
+            + "FROM OutlineDocument d WHERE d.workspaceId=:workspaceId AND d.id IN :ids "
+            + PERSON_PROJECTION_GUARD)
+    List<DocumentAccessRow> findAccessByWorkspaceIdAndIdIn(
+            @Param("workspaceId") long workspaceId, @Param("ids") Collection<Long> ids);
+
     /**
      * The body-free diff set the reconcile runs against. {@code LENGTH(body_markdown)} is evaluated in Postgres,
      * so no Markdown body crosses the wire or lands on the heap.
@@ -109,6 +116,13 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     @Query("SELECT d FROM OutlineDocument d WHERE d.workspaceId = :workspaceId "
             + "AND (d.documentId IN :refs OR d.slug IN :refs) " + PERSON_PROJECTION_GUARD)
     List<OutlineDocument> findByWorkspaceIdAndReferenceIn(
+            @Param("workspaceId") long workspaceId, @Param("refs") Collection<String> refs);
+
+    @Query("SELECT d.id AS id, d.documentId AS sourceId, d.collectionSlug AS collectionSlug, d.slug AS slug, "
+            + "(d.deletedAt IS NOT NULL) AS deleted, (d.bodyMarkdown IS NOT NULL) AS bodyAvailable "
+            + "FROM OutlineDocument d WHERE d.workspaceId = :workspaceId "
+            + "AND (d.documentId IN :refs OR d.slug IN :refs) " + PERSON_PROJECTION_GUARD)
+    List<DocumentAccessRow> findAccessByWorkspaceIdAndReferenceIn(
             @Param("workspaceId") long workspaceId, @Param("refs") Collection<String> refs);
 
     @Query("SELECT d FROM OutlineDocument d WHERE d.workspaceId=:workspaceId AND d.id=:documentId "
@@ -228,6 +242,23 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
 
         @Nullable
         String getCollectionName();
+    }
+
+    interface DocumentAccessRow {
+        Long getId();
+
+        @Nullable
+        String getSourceId();
+
+        @Nullable
+        String getCollectionSlug();
+
+        @Nullable
+        String getSlug();
+
+        boolean getDeleted();
+
+        boolean getBodyAvailable();
     }
 
     interface PersonSourceIdentityRow {

@@ -148,6 +148,14 @@ public class ReviewOutputService {
             throw new JobDeliveryException("Missing job metadata: jobId=" + job.getId());
         }
 
+        return citedSourceAccess.asOneRead(
+                job.getWorkspace().getId(),
+                SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW,
+                () -> prepareInOneRead(job, validObservations, metadata));
+    }
+
+    private PreparedObservations prepareInOneRead(
+            AgentJob job, List<ValidatedObservation> validObservations, JsonNode metadata) {
         Admissible admissible = requireAdmissible(job, metadata);
         CapturedEvidence captured = admissible.evidence();
         Map<String, PracticeRevision> revisionsBySlug = admissible.revisionsBySlug();

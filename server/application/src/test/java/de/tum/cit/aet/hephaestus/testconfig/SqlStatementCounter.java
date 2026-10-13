@@ -4,6 +4,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Supplier;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -20,16 +22,20 @@ public class SqlStatementCounter implements BeanPostProcessor {
         ACTIVE.set(counter);
         try {
             T value = read.get();
-            return new Measurement<>(value, counter.statements);
+            return new Measurement<>(value, List.copyOf(counter.sql));
         } finally {
             ACTIVE.remove();
         }
     }
 
-    public record Measurement<T>(T value, long statements) {}
+    public record Measurement<T>(T value, List<String> sql) {
+        public long statements() {
+            return sql.size();
+        }
+    }
 
     private static class Counter {
-        private long statements;
+        private final List<String> sql = new ArrayList<>();
     }
 
     @Override
@@ -56,7 +62,13 @@ public class SqlStatementCounter implements BeanPostProcessor {
             return (Connection) Proxy.newProxyInstance(
                     Connection.class.getClassLoader(), new Class<?>[] {Connection.class}, (proxy, method, args) -> {
                         Counter counter = ACTIVE.get();
-                        if (counter != null && method.getName().equals("prepareStatement")) counter.statements++;
+                        if (counter != null
+                                && method.getName().equals("prepareStatement")
+                                && args != null
+                                && args.length > 0
+                                && args[0] instanceof String sql) {
+                            counter.sql.add(sql);
+                        }
                         try {
                             return method.invoke(connection, args);
                         } catch (InvocationTargetException failure) {

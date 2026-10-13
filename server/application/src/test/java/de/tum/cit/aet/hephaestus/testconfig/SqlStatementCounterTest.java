@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +35,7 @@ class SqlStatementCounterTest extends BaseUnitTest {
                         prepare(jdbc);
                         return "read";
                     }))
-                    .isEqualTo(new SqlStatementCounter.Measurement<>("read", 2));
+                    .isEqualTo(new SqlStatementCounter.Measurement<>("read", List.of("SELECT 1", "SELECT 1")));
             prepare(jdbc);
             assertThat(counter.measure(() -> "empty").statements()).isZero();
         }

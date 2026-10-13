@@ -63,6 +63,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -138,6 +139,11 @@ class ReviewOutputServiceTest extends BaseUnitTest {
     void setUp() {
         // The developer's AI choice permits the result unless a scenario withdraws it.
         lenient().when(citedSourceAccess.permitsReviewResult(any())).thenReturn(true);
+        lenient()
+                .when(citedSourceAccess.asOneRead(anyLong(), eq(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW), any()))
+                .thenAnswer(invocation -> invocation
+                        .<Supplier<ReviewOutputService.PreparedObservations>>getArgument(2)
+                        .get());
         service = new ReviewOutputService(
                 practiceRevisionRepository,
                 observationRepository,

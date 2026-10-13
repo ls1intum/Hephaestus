@@ -52,6 +52,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.AdmittedReviewJobFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.GitTestFixtures;
+import de.tum.cit.aet.hephaestus.testconfig.SqlReadMeasurement;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -63,6 +64,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -152,6 +154,9 @@ class ReviewOutputServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private FabricLayout evidenceLayout;
+
+    @Autowired
+    private SqlReadMeasurement reads;
 
     private final List<PreparedJobInputs> preparedEvidence = new ArrayList<>();
 
@@ -422,6 +427,69 @@ class ReviewOutputServiceIntegrationTest extends BaseIntegrationTest {
             assertThat(persisted)
                     .extracting(Observation::getOutcome)
                     .containsExactlyInAnyOrder(Outcome.MET, Outcome.NOT_MET);
+        }
+
+        @Test
+        void shouldReadRepositoryAuthorityOnceWhenPreparingValidCitationsAcrossObservations() {
+            var atHead = observation("pr-description-quality", Outcome.MET);
+            var atBase = observation("error-handling", Outcome.MET);
+            ((ObjectNode) Objects.requireNonNull(atBase.evidence())
+                            .withArray("citations")
+                            .get(0))
+                    .put("side", "OLD")
+                    .put("quote", "requireAdmin();");
+
+            var measured = reads.measure(() -> deliveryService.prepare(agentJob, List.of(atHead, atBase)));
+            var result = deliveryService.publish(agentJob, measured.value());
+
+            assertThat(result.inserted()).isEqualTo(2);
+            var persisted = observationRepository.findByAgentJobId(agentJob.getId(), workspace.getId());
+            assertThat(persisted).hasSize(2);
+            assertThat(persisted)
+                    .extracting(row -> row.getPractice().getSlug())
+                    .containsExactlyInAnyOrder("pr-description-quality", "error-handling");
+            assertThat(persisted)
+                    .extracting(row -> Objects.requireNonNull(row.getEvidence())
+                            .at("/citations/0/revision")
+                            .asString())
+                    .containsExactlyInAnyOrder(headSha, baseSha);
+            assertThat(persisted).allSatisfy(row -> {
+                var admittedEvidence = Objects.requireNonNull(row.getEvidence());
+                CitationVerification.requireVerified(agentJob, admittedEvidence);
+                assertThat(admittedEvidence.path("citations")).hasSize(1);
+                var sourceRecords = admittedEvidence.at("/citations/0/sourceReference/records");
+                assertThat(sourceRecords).hasSize(1);
+                assertThat(sourceRecords.path(0).path("type").asString()).isEqualTo("repository");
+                assertThat(sourceRecords.path(0).path("id").asLong())
+                        .isEqualTo(Objects.requireNonNull(agentJob.getMetadata())
+                                .path("repository_id")
+                                .asLong());
+            });
+            assertThat(measured.sql().stream()
+                            .map(sql -> sql.toLowerCase(Locale.ROOT))
+                            .filter(sql ->
+                                    sql.contains(" from repository ") && sql.contains(" from repository_to_monitor "))
+                            .toList())
+                    .as("Scoped monitored-repository authority reads")
+                    .hasSize(1)
+                    .allSatisfy(sql -> assertThat(sql).containsPattern("\\bworkspace_id\\s*=\\s*\\?"));
+        }
+
+        @Test
+        void shouldRecheckRepositoryAuthorityWhenTheNextPrepareFollowsMonitorRemoval() {
+            var first = reads.measure(() ->
+                    deliveryService.prepare(agentJob, List.of(observation("pr-description-quality", Outcome.MET))));
+            assertThat(first.value()).isNotNull();
+            var monitor = monitors.findByWorkspaceIdAndNameWithOwner(workspace.getId(), "org/test-repo")
+                    .orElseThrow();
+            monitors.delete(monitor);
+
+            assertThatThrownBy(() -> reads.measure(() -> deliveryService.prepare(
+                            agentJob, List.of(observation("pr-description-quality", Outcome.MET)))))
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessage("The cited source is no longer permitted");
+            assertThat(observationRepository.findByAgentJobId(agentJob.getId(), workspace.getId()))
+                    .isEmpty();
         }
 
         @Test

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.DocumentAccess;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.ProjectedDocument;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
@@ -96,6 +97,18 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
                 IntegrationKind.OUTLINE,
                 TEAM_ID,
                 new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of()));
+    }
+
+    private static OutlineDocumentRepository.DocumentAccessRow accessRow(
+            long id, String sourceId, String collectionSlug, String slug, boolean deleted, boolean bodyAvailable) {
+        var row = Mockito.mock(OutlineDocumentRepository.DocumentAccessRow.class);
+        when(row.getId()).thenReturn(id);
+        when(row.getSourceId()).thenReturn(sourceId);
+        when(row.getCollectionSlug()).thenReturn(collectionSlug);
+        when(row.getSlug()).thenReturn(slug);
+        when(row.getDeleted()).thenReturn(deleted);
+        when(row.getBodyAvailable()).thenReturn(bodyAvailable);
+        return row;
     }
 
     private static final Instant CREATED = Instant.parse("2025-11-01T00:00:00Z");
@@ -418,6 +431,41 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldUseBodyFreeRowsAndExpandReferencesWhenReadingAccessMetadata() {
+        var rows = List.of(accessRow(7L, "source-7", "engineering", "design", false, true));
+        when(documentRepository.findAccessByWorkspaceIdAndReferenceIn(eq(WORKSPACE_ID), refsCaptor.capture()))
+                .thenReturn(rows);
+
+        var result = projector.documentAccessByReference(
+                WORKSPACE_ID, List.of("https://wiki.example.com/doc/setup-guide-psUl8qCles", "source-7"));
+
+        assertThat(result).singleElement().satisfies(access -> {
+            assertThat(access.id()).isEqualTo(7L);
+            assertThat(access.sourceId()).isEqualTo("source-7");
+            assertThat(access.bodyAvailable()).isTrue();
+        });
+        assertThat(refsCaptor.getValue()).contains("setup-guide-psUl8qCles", "psUl8qCles", "source-7");
+        verify(connectionService, never()).findActive(anyLong(), any());
+        verify(collectionRepository, never()).findByWorkspaceIdOrderByCreatedAtAsc(anyLong());
+    }
+
+    @Test
+    void shouldUseBodyFreeRowsWhenReadingAccessMetadataById() {
+        var rows = List.of(
+                accessRow(7L, "source-7", "engineering", "design", false, true),
+                accessRow(8L, "source-8", "engineering", "removed", true, false));
+        when(documentRepository.findAccessByWorkspaceIdAndIdIn(WORKSPACE_ID, List.of(7L, 8L)))
+                .thenReturn(rows);
+
+        var result = projector.documentAccessById(WORKSPACE_ID, List.of(7L, 8L));
+
+        assertThat(result).extracting(DocumentAccess::id).containsExactly(7L, 8L);
+        assertThat(result.get(1).deleted()).isTrue();
+        verify(connectionService, never()).findActive(anyLong(), any());
+        verify(collectionRepository, never()).findByWorkspaceIdOrderByCreatedAtAsc(anyLong());
+    }
+
+    @Test
     @DisplayName("searchDocuments projects the selector's ranked hits in order")
     void searchDocuments_projectsSelectorHitsInOrder() {
         OutlineDocument second = liveDocument();
@@ -452,6 +500,25 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
                 Mockito.mock(PersonDataCopyRecorder.class));
 
         assertThat(denied.documentsForWorkspace(WORKSPACE_ID)).isEmpty();
+        assertThat(denied.documentAccessById(WORKSPACE_ID, List.of(7L))).isEmpty();
+        assertThat(denied.documentAccessByReference(WORKSPACE_ID, List.of("source-7")))
+                .isEmpty();
         verify(documentRepository, never()).findForProjection(anyLong(), any());
+        verify(documentRepository, never()).findAccessByWorkspaceIdAndIdIn(anyLong(), any());
+        verify(documentRepository, never()).findAccessByWorkspaceIdAndReferenceIn(anyLong(), any());
+    }
+
+    @Test
+    void shouldRefuseMetadataWithoutAnActiveConnectionAndPermitItAfterReconnect() {
+        when(connectionService.findActiveOutlineConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
+        assertThat(projector.documentAccessById(WORKSPACE_ID, List.of(7L))).isEmpty();
+        assertThat(projector.documentAccessByReference(WORKSPACE_ID, List.of("source-7")))
+                .isEmpty();
+        when(connectionService.findActiveOutlineConfig(WORKSPACE_ID))
+                .thenReturn(Optional.of(new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of())));
+        var rows = List.of(accessRow(7L, "source-7", "c", "d", false, true));
+        when(documentRepository.findAccessByWorkspaceIdAndIdIn(WORKSPACE_ID, List.of(7L)))
+                .thenReturn(rows);
+        assertThat(projector.documentAccessById(WORKSPACE_ID, List.of(7L))).hasSize(1);
     }
 }

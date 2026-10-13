@@ -94,8 +94,40 @@ public class OutlineDocumentProjector implements DocumentProjection {
     @Override
     public List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> documentRefs) {
         if (!isOriginApproved(workspaceId)) return List.of();
-        if (documentRefs == null || documentRefs.isEmpty()) {
+        Set<String> tokens = referenceTokens(documentRefs);
+        if (tokens.isEmpty()) {
             return List.of();
+        }
+        AuthorContext authors = authorContext(workspaceId);
+        Map<String, String> collectionNames = collectionNames(workspaceId);
+        return documentRepository.findByWorkspaceIdAndReferenceIn(workspaceId, tokens).stream()
+                .map(doc -> project(doc, authors, collectionNames))
+                .toList();
+    }
+
+    @Override
+    public List<DocumentAccess> documentAccessByReference(long workspaceId, Collection<String> documentRefs) {
+        if (!isOriginApproved(workspaceId)) return List.of();
+        Set<String> tokens = referenceTokens(documentRefs);
+        if (tokens.isEmpty()) {
+            return List.of();
+        }
+        return documentRepository.findAccessByWorkspaceIdAndReferenceIn(workspaceId, tokens).stream()
+                .map(OutlineDocumentProjector::documentAccess)
+                .toList();
+    }
+
+    @Override
+    public List<DocumentAccess> documentAccessById(long workspaceId, Collection<Long> documentIds) {
+        if (!isOriginApproved(workspaceId) || documentIds.isEmpty()) return List.of();
+        return documentRepository.findAccessByWorkspaceIdAndIdIn(workspaceId, documentIds).stream()
+                .map(OutlineDocumentProjector::documentAccess)
+                .toList();
+    }
+
+    private static Set<String> referenceTokens(Collection<String> documentRefs) {
+        if (documentRefs == null || documentRefs.isEmpty()) {
+            return Set.of();
         }
         // A reference is either a raw Outline document id or a document URL; match on the id and slug columns,
         // adding the last URL path segment as a candidate token so a link resolves to the mirrored row.
@@ -123,14 +155,7 @@ public class OutlineDocumentProjector implements DocumentProjection {
                 }
             }
         }
-        if (tokens.isEmpty()) {
-            return List.of();
-        }
-        AuthorContext authors = authorContext(workspaceId);
-        Map<String, String> collectionNames = collectionNames(workspaceId);
-        return documentRepository.findByWorkspaceIdAndReferenceIn(workspaceId, tokens).stream()
-                .map(doc -> project(doc, authors, collectionNames))
-                .toList();
+        return tokens;
     }
 
     @Override
@@ -292,5 +317,15 @@ public class OutlineDocumentProjector implements DocumentProjection {
 
     private static String orEmpty(@Nullable String value) {
         return value == null ? "" : value;
+    }
+
+    private static DocumentAccess documentAccess(OutlineDocumentRepository.DocumentAccessRow row) {
+        return new DocumentAccess(
+                row.getId(),
+                row.getSourceId(),
+                orEmpty(row.getCollectionSlug()),
+                orEmpty(row.getSlug()),
+                row.getDeleted(),
+                row.getBodyAvailable());
     }
 }
