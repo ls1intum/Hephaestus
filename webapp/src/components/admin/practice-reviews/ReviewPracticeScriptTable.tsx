@@ -50,7 +50,7 @@ export interface ReviewPracticeScriptTableProps {
 }
 
 /**
- * What each practice's script did before one review: how it ended, which models it had,
+ * How each practice's program ran in one review: how it ended, which models it had,
  * what they could not rate and why, how many calls the proxy counted, and how long it ran. The calls
  * to the review's own model are the review's, and spend is on AI usage, so neither is here.
  */

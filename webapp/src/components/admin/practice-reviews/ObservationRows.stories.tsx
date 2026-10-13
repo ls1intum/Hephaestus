@@ -12,9 +12,11 @@ if (!first) {
 	throw new Error("The review fixtures must contain an observation");
 }
 
-const other = reviewObservations.find((row) => row.practiceName !== first.practiceName);
-if (!other) {
-	throw new Error("The review fixtures must contain problems of two practices");
+const otherWork = reviewObservations.find(
+	(row) => row.reviewedWork.label !== first.reviewedWork.label,
+);
+if (!otherWork) {
+	throw new Error("The review fixtures must contain problems on two pieces of work");
 }
 
 function hiddenRow(row: PracticeReviewObservationRow, id: string): PracticeReviewObservationRow {
@@ -73,8 +75,8 @@ if (!code || codePath === undefined) {
 }
 
 /**
- * A place is named as the result's sheet names it: a file and its lines for code, with the side of
- * the diff it is on, and the object's name for anything else.
+ * A place is named as the result's sheet names it: a file and its lines for code, and the object's
+ * name for anything else. Only a passage from before the change names its side.
  */
 export const Places: Story = {
 	args: {
@@ -105,6 +107,7 @@ export const Places: Story = {
 		const table = canvas.getByRole("table", TABLE);
 		within(table).getByText(`${codePath}:40`);
 		await expect(within(table).getByText("Before")).toBeVisible();
+		await expect(within(table).queryByText("After")).toBeNull();
 		within(table).getByText("Review thread on ReviewQueryService.java");
 		await expect(
 			within(table).queryByText(/Review thread on ReviewQueryService\.java:/u),
@@ -119,16 +122,29 @@ export const EvidenceHidden: Story = {
 			status: "ready",
 			observations: [
 				hiddenRow(first, "cccccccc-cccc-cccc-cccc-cccccccccccc"),
-				hiddenRow(other, "dddddddd-dddd-dddd-dddd-dddddddddddd"),
+				// The same practice at the same time, but another result on other work.
+				{
+					...hiddenRow(first, "dddddddd-dddd-dddd-dddd-dddddddddddd"),
+					practiceResultId: otherWork.practiceResultId,
+					reviewedWork: otherWork.reviewedWork,
+				},
 			],
 		},
 	},
 	play: async ({ canvas }) => {
 		const table = canvas.getByRole("table", TABLE);
 		await expect(within(table).getAllByText("Details hidden")).toHaveLength(2);
-		// Two hidden rows of different results still name different results.
-		const links = within(table).getAllByRole("link", { name: /^Open result Details hidden/u });
-		await expect(new Set(links.map((link) => link.getAttribute("aria-label"))).size).toBe(2);
+		// Two hidden rows of different results still name different results, in every control.
+		for (const [role, name] of [
+			["link", /^Open result Details hidden/u],
+			["button", /^Track result Details hidden/u],
+			["link", /^Trace result Details hidden/u],
+		] as const) {
+			const controls = within(table).getAllByRole(role, { name });
+			await expect(
+				new Set(controls.map((control) => control.getAttribute("aria-label"))).size,
+			).toBe(2);
+		}
 	},
 };
 

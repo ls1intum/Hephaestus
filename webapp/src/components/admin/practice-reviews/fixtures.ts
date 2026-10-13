@@ -2379,7 +2379,7 @@ export const PRIVATE_FEEDBACK_TEXT =
 	"Private to Barbara: the runbook's first step is the one a tired reader most needs.";
 
 // ---------------------------------------------------------------------------------------------
-// What each practice's program did before one review: one entry per way the section words it.
+// How each practice's program ran in one review: one entry per way the section words it.
 
 const decision = { purpose: "PRACTICE_DECISION", need: "REQUIRED", bound: true } as const;
 const custom = { programKind: "CUSTOM" } as const;

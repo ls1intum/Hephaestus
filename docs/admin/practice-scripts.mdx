@@ -87,8 +87,9 @@ Then write down the places that a reviewer must look at to judge it:
 - Each comment that the change adds and that marks open work, such as a `TODO` or `FIXME`.
 - Of those, each comment without a tracking reference: an issue number, a ticket key, or a URL.
 
-Code can find both.
-Thus, the first version of the script uses no model.
+Code can find candidate places.
+The review must check their context and look beyond them.
+Thus, the first version of the script makes no direct model call.
 
 ### 2. Find the places with code
 
@@ -121,7 +122,10 @@ export default definePracticeScript({
 `expectKind` tells TypeScript that the script reads a pull request.
 [Narrow the context to a kind](#narrow-the-context-to-a-kind) tells more.
 `requireChange` returns the captured change, or stops the program when the change was not captured.
-`addedComments` returns each comment that the change adds, with its location.
+
+`addedComments` uses line prefixes to find runs of added full-line comments in supported source languages.
+It skips unsupported files and inline comments, and it can mistake string content for a comment.
+Use its locations as heuristic candidate input, not as complete coverage or proof of a problem.
 Each **lead** is a location and a one-line label that the review reads.
 `ctx.review({ leads })` asks the review to decide, and returns its result.
 
@@ -211,95 +215,75 @@ It shows each lead with its quote, and one `Not rated` line for the comments wit
 
 ## Return a result in code
 
-A program can return the result itself when code decides the criteria.
-This version of the TODO practice decides in code where it is certain.
-When the change adds no open-work comment, it asks the review, because code cannot tell if the practice applies.
-It also asks the review when an open-work comment spans several lines.
-A tracking reference in one line does not necessarily track the work in the next.
+A program can return the result itself when code decides the complete criterion from captured structured records.
+Use this example for an author practice with this criterion: *The author must target the main branch for each pull request.*
+The host validates `ctx.work.target_branch` from `metadata.json` before the program starts.
+The program checks that one field and cites its captured value.
 
 ```ts
-import {
-  addedComments,
-  definePracticeScript,
-  expectKind,
-  requireChange,
-  UnratedError,
-  type Citation,
-  type NonEmpty,
-  type Problem,
-} from "../lib/practice-script.ts";
-
-const OPEN_WORK = /\b(TODO|FIXME|HACK|XXX)\b/u;
-const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
-const MAX = 50;
+import { definePracticeScript, expectKind, UnratedError } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
   meta: {},
   async run(ctx) {
     expectKind(ctx, "scm.pull_request");
-    const change = ctx.files?.change;
-    if (change == null) {
-      throw new UnratedError("unavailable", "the change of this work was not captured");
+    if (ctx.subject.role !== "AUTHOR") {
+      throw new UnratedError(
+        "error",
+        "This practice reviews pull request authors. Set its subject to Author.",
+      );
     }
-    const open = addedComments(requireChange(ctx.files)).filter((c) => OPEN_WORK.test(c.text));
-    if (open.length === 0 || open.some((comment) => comment.at.endLine !== undefined)) {
-      return ctx.review();
+    const record = await ctx.evidence.record("metadata.json");
+    if (record.status === "ABSENT" || ctx.work.target_branch.trim() === "") {
+      throw new UnratedError("unavailable", "The target branch was not captured.");
     }
-    const cite = (c: (typeof open)[number]) => change.cite(c.at.change, "NEW", c.at.line, c.at.endLine);
+    const line = record.text.split("\n").findIndex((text) => /^\s*"target_branch"\s*:/u.test(text));
+    if (line < 0) {
+      throw new UnratedError(
+        "unavailable",
+        "The captured target branch could not be located for citation.",
+      );
+    }
+    const citation = await ctx.evidence.citeRecord("metadata.json", line + 1);
     const coverage = {
       source: "claimed",
-      selected: open.length,
-      checked: open.length,
-      total: open.length,
+      selected: 1,
+      checked: 1,
+      total: 1,
       complete: true,
     } as const;
-    const search = {
-      consulted: ["scm.pull-request.diff"],
-      lookedFor: "a TODO, FIXME, HACK or XXX comment that the change adds without a tracking reference",
-      boundary: "the comments that the change adds; existing comments are not part of this practice",
-    } satisfies { consulted: NonEmpty<string>; lookedFor: string; boundary: string };
 
-    const untracked = open.filter((c) => !TRACKING.test(c.text)).slice(0, MAX);
-    if (untracked.length > 0) {
-      const problems: Problem[] = [];
-      for (const comment of untracked) {
-        problems.push({
-          severity: "MINOR",
-          summary: "An added TODO names no tracking item",
-          explanation: "The change adds this TODO, and it names no issue, ticket or link.",
-          citations: [await cite(comment)],
-          basis: { type: "introduced", head: 0, explanation: "The change adds this comment." },
-          nextStep: "Open an issue for the work, and name it in the comment.",
-        });
-      }
-      const [first, ...rest] = problems;
-      if (first === undefined) {
-        throw new Error("unreachable");
-      }
+    if (ctx.work.target_branch !== "main") {
       return {
         outcome: "NOT_MET",
-        summary: `${untracked.length} of ${open.length} added open-work comments name no tracking item`,
-        explanation: "Each comment below marks open work that no issue, ticket or link tracks.",
+        summary: "The pull request targets a branch other than main",
+        explanation: "The captured target branch does not meet the practice's requirement.",
         citations: [],
-        problems: [first, ...rest],
-        evidence: { search },
+        problems: [
+          {
+            severity: "MINOR",
+            summary: "The target branch is not main",
+            explanation: "The author must target main, but the captured pull request targets another branch.",
+            citations: [citation],
+            basis: {
+              type: "duty",
+              criterionQuote: "The author must target the main branch for each pull request.",
+              event: 0,
+              explanation: "The author submitted this pull request with a different target branch.",
+            },
+            nextStep: "Target the main branch.",
+          },
+        ],
+        evidence: {},
         coverage,
       };
     }
-    const tracked: Citation[] = [];
-    for (const comment of open.slice(0, MAX)) {
-      tracked.push(await cite(comment));
-    }
-    const [first, ...rest] = tracked;
-    if (first === undefined) {
-      throw new Error("unreachable");
-    }
     return {
       outcome: "MET",
-      summary: "Every added TODO names a tracking item",
-      explanation: `The change adds ${open.length} open-work comments, and each one names an issue, a ticket or a link.`,
-      citations: [first, ...rest],
-      evidence: { search },
+      summary: "The pull request targets main",
+      explanation: "The captured pull request targets the branch that the practice requires.",
+      citations: [citation],
+      evidence: {},
       coverage,
     };
   },
@@ -308,14 +292,14 @@ export default definePracticeScript({
 
 Each part of the result has a rule:
 
-- `change.cite` reads the quote of the cited lines from the change.
+- `citeRecord` reads the quote from the captured record.
   Use the `cite` functions of the context for every citation, because admission checks each quote again.
 - Each observation has its own severity, summary, explanation and citations.
-  Its `basis` tells why the problem belongs to this work: here, the change introduced the cited line.
+  Its `basis` quotes the duty in the criteria and names the citation that shows the submitted target branch.
 - A not met result can have no result citations of its own, because its observations cite the work.
 - A met result needs complete coverage.
-  This script claims coverage: it selected, checked and found the same number of comments.
-- The search warrant states what the program looked for, in which sources, and where it stopped.
+  This script claims coverage of the one captured field that decides its complete criterion.
+- An absent record or a failed citation stops the program without a result.
 
 [The result](#the-result) gives every field and its rules.
 

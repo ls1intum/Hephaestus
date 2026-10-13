@@ -87,7 +87,7 @@ export interface ReviewLevelProps {
 	groups?: readonly PracticeGroupLook[] | undefined;
 	/** The delivery checks the review ran for itself rather than for one piece of feedback. */
 	deliveryChecks?: PanelState<{ checks: DeliveryCheck[] }>;
-	/** What each practice's script did before the review; the section shows only with one. */
+	/** How each practice's program ran in this review; the section shows only with one. */
 	practiceScript?: PanelState<{ scripts: ReviewPracticeScripts[] }>;
 	/** What the review spent on the model, attempt by attempt. */
 	usage?: PanelState<{ usage: AgentJobUsage }>;

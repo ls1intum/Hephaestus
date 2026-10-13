@@ -32,7 +32,7 @@ function cellUnder(table: HTMLElement, row: ReturnType<typeof scriptRow>, column
 const guideSection = (link: HTMLElement) => new URL(link.getAttribute("href") ?? "").hash;
 
 /**
- * What each practice's program did before one review: its own script, or the built-in review a
+ * How each practice's program ran in one review: its own script, or the built-in review a
  * practice without one gets. The result is words, never a badge: it is about the program, not about
  * the developer's work.
  *

@@ -88,7 +88,11 @@ function placeOf(observation: PracticeReviewObservationRow) {
 		return;
 	}
 	const place = { sourceKind, path, startLine, endLine, side };
-	return { location: citationLocation(place), side: citationSide(place) };
+	// After the change is where a problem usually is, so a row names only the side before it.
+	return {
+		location: citationLocation(place),
+		before: side === "OLD" ? citationSide(place) : undefined,
+	};
 }
 
 export interface ObservationRowProps {
@@ -105,11 +109,13 @@ export function ObservationRow({ observation }: ObservationRowProps) {
 	const tracked = useTracked({ kind: "result", id: observation.practiceResultId });
 	const summary = observation.summary ?? HIDDEN_SUMMARY;
 	const place = placeOf(observation);
+	// A hidden summary is the same on every hidden row, so the name also says whose result it is.
+	const name = `${summary}, ${observation.practiceName}, ${observation.reviewedWork.label}, ${formatDayTime(observation.observedAt, today)}`;
 	return (
 		<PracticeTableRow
 			link={{
 				text: "Open result",
-				name: `${summary}, ${observation.practiceName}, ${formatDayTime(observation.observedAt, today)}`,
+				name,
 				render: <DetailStackLink entry={resultLevel(observation.practiceResultId)} single />,
 			}}
 			variant={tracked ? "highlighted" : undefined}
@@ -117,7 +123,7 @@ export function ObservationRow({ observation }: ObservationRowProps) {
 				<RecordRowActions
 					record={{ kind: "result", id: observation.practiceResultId }}
 					agentJobId={observation.agentJobId}
-					name={`result ${summary}, ${observation.practiceName}`}
+					name={`result ${name}`}
 				/>
 			}
 		>
@@ -140,7 +146,7 @@ export function ObservationRow({ observation }: ObservationRowProps) {
 					<span className="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
 						<ReviewPracticeName practiceName={observation.practiceName} group={observation.group} />
 						{place !== undefined && <code className="break-all">{place.location}</code>}
-						{place?.side !== undefined && <span>{place.side}</span>}
+						{place?.before !== undefined && <span>{place.before}</span>}
 					</span>
 					<ResultExceptions result={observation} />
 				</span>

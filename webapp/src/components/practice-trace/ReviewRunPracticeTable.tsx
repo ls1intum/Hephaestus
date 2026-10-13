@@ -583,9 +583,8 @@ function WhatItSaw({
 }
 
 /**
- * What the practice's script did before the review, in one muted line: how it ended, the
- * one change that would help it, and *Details*, which opens the review's *Practice scripts* section
- * section with the reasons behind any unrated call. The links name the practice for a screen
+ * How the practice's program ran in the review, in one muted line: how it ended, the one change
+ * that would help it, and *Details*, which opens the review's *Practice scripts* section with the reasons behind any unrated call. The links name the practice for a screen
  * reader, which lists every row's links together.
  */
 export function PracticeScriptTraceLine({
