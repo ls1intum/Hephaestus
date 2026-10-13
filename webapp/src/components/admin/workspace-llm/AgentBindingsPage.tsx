@@ -118,7 +118,7 @@ const REVIEWS_GROUP: PurposeGroup = {
 
 const PRACTICE_SCRIPT_GROUP: PurposeGroup = {
 	title: "Models for practice scripts",
-	rule: "A practice’s script runs before its review and points it to places to check. A script uses only models at least as strict as the review’s own model.",
+	rule: "A practice’s script reviews its practice and can call these models. A script uses only models at least as strict as the review’s own model.",
 	purposes: PRACTICE_SCRIPT_PURPOSES,
 };
 
