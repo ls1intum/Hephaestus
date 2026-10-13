@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
-import { listPracticeReviewObservationsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
+import { listPracticeReviewResultObservationsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
 import { ObservationsListPage } from "@/components/admin/practice-reviews/ObservationsListPage";
 import { practiceReviewsHead } from "@/components/admin/practice-reviews/review-levels";
 import {
@@ -33,7 +33,7 @@ function ObservationsListRoute() {
 	};
 
 	const observationsQueryResult = useInfiniteQuery({
-		...listPracticeReviewObservationsInfiniteOptions({
+		...listPracticeReviewResultObservationsInfiniteOptions({
 			path: { workspaceSlug },
 			query: observationsQuery(search, REVIEW_PAGE_SIZE),
 		}),

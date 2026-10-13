@@ -47,7 +47,7 @@ export const PRACTICE_REVIEW_READS: ReadonlySet<string> = new Set([
 	"getPracticeReviewOverview",
 	"listPracticeReviews",
 	"listPracticeReviewResults",
-	"listPracticeReviewObservations",
+	"listPracticeReviewResultObservations",
 	"getPracticeReviewResult",
 	"listPracticeReviewFeedback",
 	"getPracticeReviewFeedback",

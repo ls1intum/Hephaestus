@@ -65,13 +65,16 @@ function recordRequests() {
 			}
 			return HttpResponse.json(emptyPage);
 		}),
-		http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", ({ request }) => {
-			const url = new URL(request.url);
-			if (!isTabCount(url)) {
-				observationUrls.push(url);
-			}
-			return HttpResponse.json(emptyPage);
-		}),
+		http.get(
+			"*/workspaces/:workspaceSlug/practices/reviews/results/observations",
+			({ request }) => {
+				const url = new URL(request.url);
+				if (!isTabCount(url)) {
+					observationUrls.push(url);
+				}
+				return HttpResponse.json(emptyPage);
+			},
+		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", ({ request }) => {
 			const url = new URL(request.url);
 			if (!isTabCount(url)) {

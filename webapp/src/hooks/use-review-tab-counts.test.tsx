@@ -18,7 +18,7 @@ function countReads(status = 200) {
 	const endpoints = [
 		["runs", ""],
 		["results", "/results"],
-		["observations", "/observations"],
+		["observations", "/results/observations"],
 		["feedback", "/feedback"],
 	] as const;
 	server.use(

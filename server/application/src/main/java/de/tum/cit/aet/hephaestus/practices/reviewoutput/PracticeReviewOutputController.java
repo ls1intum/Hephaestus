@@ -155,12 +155,12 @@ public class PracticeReviewOutputController {
         return ResponseEntity.ok(practiceResultQueryService.get(workspaceContext.id(), practiceResultId));
     }
 
-    @GetMapping("/observations")
+    @GetMapping("/results/observations")
     @Operation(
             summary = "List the observations of practice review results across the workspace",
             description = "Newest result first, then each result's display order. Where the result's detail hides"
                     + " its evidence, the row leaves out its summary and place and sets evidenceHidden.",
-            operationId = "listPracticeReviewObservations")
+            operationId = "listPracticeReviewResultObservations")
     @ApiResponse(responseCode = "200", description = "Paginated observations returned")
     @ApiResponse(
             responseCode = "400",

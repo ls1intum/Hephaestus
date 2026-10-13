@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import {
 	listPracticeReviewFeedbackOptions,
-	listPracticeReviewObservationsOptions,
+	listPracticeReviewResultObservationsOptions,
 	listPracticeReviewResultsOptions,
 	listPracticeReviewsOptions,
 } from "@/api/@tanstack/react-query.gen";
@@ -66,7 +66,7 @@ export function useReviewTabCounts(
 		...COUNT_READ,
 	});
 	const observations = useQuery({
-		...listPracticeReviewObservationsOptions({
+		...listPracticeReviewResultObservationsOptions({
 			path,
 			query: observationsQuery(carriedScope("observations", search), COUNT_PAGE),
 		}),
