@@ -70,6 +70,7 @@ export const Default: Story = {
 		);
 		// The time frame under the bars ends today.
 		await expect(within(reviews).getByText("Today")).toBeVisible();
+		await expect(within(reviews).getByText("UTC weeks")).toBeVisible();
 		for (const tile of canvas.getAllByRole("link")) {
 			await expect(peakLabels(tile)).toHaveLength(1);
 			await expect(columns(tile)).toBe(MONTH_WEEKS);

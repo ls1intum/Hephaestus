@@ -315,6 +315,7 @@ export const PersonOnlyMerges: Story = {
 		await expect(panel.getByText("0 opened")).toBeVisible();
 		await expect(panel.getByText("1 active week")).toBeVisible();
 		const weeks = within(panel.getByRole("table", { name: "Contributions by week" }));
+		await expect(weeks.getByRole("columnheader", { name: "Week of (UTC)" })).toBeVisible();
 		await expect(weeks.getByRole("cell", { name: "21 September 2026" })).toBeVisible();
 		await expect(weeks.getByRole("cell", { name: "0" })).toBeVisible();
 		await expect(within(totals).queryByRole("link")).not.toBeInTheDocument();

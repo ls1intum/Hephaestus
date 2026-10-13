@@ -46,8 +46,10 @@ export const Default: Story = {
 		// Each pull request reviewed counts once, however many verdicts it got.
 		await expect(figure(canvasElement, "Reviewed")).toBe("12");
 		await expect(figure(canvasElement, "Average per week")).toMatch(/^\d+\.\d$/u);
+		await expect(figure(canvasElement, "Busiest week")).toMatch(/^\d+ in .+ \(UTC\)$/u);
 		await expect(figure(canvasElement, "vs the previous 30 days")).toBe("−3");
 		const chart = canvas.getByRole("figure");
+		await expect(canvas.getByText("Weeks use UTC.")).toBeVisible();
 		await expect(chart).toHaveAccessibleName(/^12 pull requests reviewed\. Busiest week .+, \d+$/u);
 		// One chart per kind, each headed by its name and total.
 		const rows = within(chart).getAllByRole("listitem");
@@ -79,7 +81,7 @@ export const AsTable: Story = {
 		}
 		await expect(openedRow.getBoundingClientRect().height).toBeLessThan(48);
 		await expect(closedRow.getBoundingClientRect().height).toBeLessThan(48);
-		await expect(within(mergedRow).getAllByText(/^\d+ \w{3}(?: \d{4})?$/u).length).toBeGreaterThan(
+		await expect(within(mergedRow).getAllByText(/^\d+ \p{L}+(?: \d{4})?$/u).length).toBeGreaterThan(
 			0,
 		);
 		await userEvent.click(canvas.getByRole("button", { name: "Show as table" }));
@@ -166,7 +168,7 @@ export const TwelveMonths: Story = {
 		await expect(figure(canvasElement, "Average per week")).toMatch(/^\d+\.\d$/u);
 		// A year of weeks starts with its year, so September never reads twice.
 		const [firstTick] = canvasElement.querySelectorAll(".recharts-xAxis-tick-labels text");
-		await expect(firstTick?.textContent).toMatch(/^\d+ \w{3} \d{4}$/u);
+		await expect(firstTick?.textContent).toMatch(/^\d+ \p{L}+ \d{4}$/u);
 		await expect(canvas.getByRole("figure")).toHaveAccessibleName(/Busiest week /u);
 	},
 };

@@ -27,7 +27,6 @@ import { ACTIVITY_RANGE_DEFS } from "@/components/activity/activity-range";
 import {
 	type ActivityOverview,
 	type ActivityTally,
-	localWeekStart,
 	weekStarts,
 } from "@/components/activity/activity-tally";
 import type {
@@ -516,7 +515,7 @@ export function overviewOf(total: ActivityTally, preset: StoryPreset): ActivityO
 	return {
 		tally: total,
 		weeks: starts.map((start, index) => ({
-			start: localWeekStart(start),
+			start,
 			tally: weeks[index] ?? tallyOf({}),
 		})),
 		repositories: repositoriesOf(total),
@@ -551,7 +550,7 @@ export const SPARSE_OVERVIEW: ActivityOverview = (() => {
 	const weeks = starts.map((start, index) => {
 		const weeksAgo = starts.length - 1 - index;
 		return {
-			start: localWeekStart(start),
+			start,
 			tally: tallyOf({
 				PULL_REQUEST_MERGED: { 3: 1, 1: 2 }[weeksAgo] ?? 0,
 				REVIEW_APPROVED: weeksAgo === 1 ? 1 : 0,
