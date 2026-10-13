@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
-import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -39,16 +38,15 @@ public class WebhookController {
     public ResponseEntity<?> ingest(@PathVariable String kind, HttpServletRequest req) throws IOException {
         return routing.resolve(kind)
                 .<ResponseEntity<?>>map(k -> doHandle(k, req))
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("error", "unknown integration kind: " + kind)));
+                .orElseGet(
+                        () -> WebhookIngestPipeline.problem(HttpStatus.NOT_FOUND, "unknown integration kind: " + kind));
     }
 
     private ResponseEntity<?> doHandle(IntegrationKind k, HttpServletRequest req) {
         try {
             return pipeline.handle(k, req);
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "could not read body: " + e.getMessage()));
+            return WebhookIngestPipeline.problem(HttpStatus.BAD_REQUEST, "could not read body");
         }
     }
 }
