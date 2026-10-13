@@ -1,4 +1,5 @@
 import {
+	hashKey,
 	queryOptions,
 	skipToken,
 	useQueries,
@@ -7,12 +8,14 @@ import {
 } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { resultSummary } from "@/components/admin/practice-reviews/result-words";
 
 import {
 	getAgentJobOptions,
 	getAgentJobQueryKey,
 	getArtifactTraceOptions,
 	getPracticeDefinitionOptionsOptions,
+	getPracticeReviewLineageOptions,
 	getPracticeReviewWorkFactsOptions,
 	listGroupsOptions,
 	listPracticeReviewResultsOptions,
@@ -271,10 +274,8 @@ function traceTitle(
 			return `Review of ${work}`;
 		}
 		case "result": {
-			return (
-				lineage?.results.find((result) => result.id === record.id)?.summary ??
-				PRACTICE_REVIEW_LEVEL_LABELS.result
-			);
+			const result = lineage?.results.find((item) => item.id === record.id);
+			return result === undefined ? PRACTICE_REVIEW_LEVEL_LABELS.result : resultSummary(result);
 		}
 		case "feedback": {
 			return `Feedback on ${work}`;
@@ -347,10 +348,8 @@ function TraceLevelRead({
 	}).data;
 
 	const { work, traced, recorded, askChain } = useRecordedWork(workspaceSlug, record);
-	const lineage = useReviewLineage(
-		workspaceSlug,
-		askChain ? lineageTarget(record, newest?.id) : undefined,
-	);
+	const target = askChain ? lineageTarget(record, newest?.id) : undefined;
+	const lineage = useReviewLineage(workspaceSlug, target);
 	const practicesEnabled = useActiveWorkspaceSlug().workspaces.find(
 		(workspace) => workspace.workspaceSlug === workspaceSlug,
 	)?.practicesEnabled;
@@ -373,10 +372,19 @@ function TraceLevelRead({
 	// outcome and first read, and the cache the sheet over the trace shares.
 	const reviewId = ready?.review?.id;
 	const jobOptions = getAgentJobOptions({ path: { workspaceSlug, jobId: reviewId ?? "" } });
-	const job = useQuery({
+	const jobQuery = useQuery({
 		...jobOptions,
 		queryFn: reviewId === undefined ? skipToken : jobOptions.queryFn,
-	}).data;
+		refetchInterval: ({ state }) =>
+			state.status === "success" &&
+			(state.data?.status === "QUEUED" ||
+				state.data?.status === "RUNNING" ||
+				state.data?.deliveryStatus === "PENDING")
+				? ACTIVE_REVIEW_POLL_MS
+				: false,
+	});
+	const currentJob = jobQuery.data;
+	const job = jobQuery.isError ? undefined : currentJob;
 	// The review's row, as its sheet reads it, for how the review came to run.
 	const rowOptions = listPracticeReviewsOptions({
 		path: { workspaceSlug },
@@ -386,6 +394,40 @@ function TraceLevelRead({
 		...rowOptions,
 		queryFn: reviewId === undefined ? skipToken : rowOptions.queryFn,
 	}).data?.content?.[0];
+	const queryClient = useQueryClient();
+	const lineageOptions = getPracticeReviewLineageOptions({
+		path: { workspaceSlug },
+		query: target ?? { kind: "REVIEW" },
+	});
+	const key = hashKey(lineageOptions.queryKey);
+	// Processing can settle after the lineage's review stops running. Read its final chain and row
+	// once more, only for the same selected workspace, target and review.
+	const settled =
+		currentJob !== undefined &&
+		currentJob.status !== "QUEUED" &&
+		currentJob.status !== "RUNNING" &&
+		currentJob.deliveryStatus !== "PENDING";
+	const previous = useRef<{ key: string; reviewId: string; settled: boolean } | undefined>(
+		undefined,
+	);
+	useEffect(() => {
+		const before = previous.current;
+		previous.current =
+			reviewId === undefined || currentJob === undefined ? undefined : { key, reviewId, settled };
+		if (before?.key === key && before.reviewId === reviewId && !before.settled && settled) {
+			void queryClient.invalidateQueries({ queryKey: lineageOptions.queryKey, exact: true });
+			void queryClient.invalidateQueries({ queryKey: rowOptions.queryKey, exact: true });
+		}
+	});
+	if (chain.status === "ready" && jobQuery.isError) {
+		chain = {
+			status: "error",
+			error: jobQuery.error,
+			onRetry: () => {
+				void jobQuery.refetch();
+			},
+		};
+	}
 	const practiceName =
 		practices?.find((practice) => practice.slug === record.id)?.name ?? newest?.practiceName;
 	return (

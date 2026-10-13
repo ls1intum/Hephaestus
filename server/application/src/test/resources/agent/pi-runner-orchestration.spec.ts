@@ -771,6 +771,28 @@ if (scenario !== undefined && scenario !== "") {
 					},
 				});
 			}
+			if (mode === "unavailable-words" || mode === "missing-currentness") {
+				return Response.json({
+					schemaVersion: 1,
+					readAt: "2026-10-07T11:00:00Z",
+					history: {
+						wordsCoverage: "PARTIAL",
+						feedback: ["CURRENT", "STALE"].map((currentness, index) => ({
+							id: `00000000-0000-4000-8000-00000000000${index + 1}`,
+							channel: "IN_CONTEXT",
+							publicEligible: true,
+							artifact: {
+								kind: "scm.pull_request",
+								url: "https://gitlab.example/group/repo/-/merge_requests/3",
+							},
+							deliveredAt: "2026-10-07T10:00:00Z",
+							...(mode === "missing-currentness" ? {} : { recordedClaimCurrentness: currentness }),
+							...(index === 1 ? { withdrawn: true } : {}),
+							wordsUnavailable: "COPY_AUTHORITY_UNAVAILABLE",
+						})),
+					},
+				});
+			}
 			if (mode === "refused") {
 				return new Response("Attempt no longer owns the job", { status: 409 });
 			}
@@ -852,6 +874,7 @@ if (scenario !== undefined && scenario !== "") {
 			scenario === "compose" ||
 			scenario === "compose-foreign-provider" ||
 			supportMode === "selected" ||
+			supportMode === "mentor-unavailable" ||
 			supportMode === "routing-missing"
 		) {
 			selected = [supportOccurrence("scm.pull_request", 3), supportOccurrence("scm.issue", 3)];
@@ -899,12 +922,13 @@ if (scenario !== undefined && scenario !== "") {
 							const inline =
 								supportMode === "inline" ||
 								(supportMode === "first-inline" && row.practiceSlug === "test-practice");
-							return [
-								{
-									practiceResultId: row.practiceResultId,
-									decision: inline ? "HAS_INLINE_ANCHOR" : "ADMIT",
-								},
-							];
+							let decision = "ADMIT";
+							if (supportMode === "mentor-unavailable") {
+								decision = "MENTOR_UNAVAILABLE";
+							} else if (inline) {
+								decision = "HAS_INLINE_ANCHOR";
+							}
+							return [{ practiceResultId: row.practiceResultId, decision }];
 						}),
 					};
 		let support: unknown = complete;
@@ -2939,6 +2963,7 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-recovered-error",
 		"compose-complete-error",
 		"compose-support-selected",
+		"compose-support-mentor-unavailable",
 		"compose-support-empty",
 		"compose-support-duplicate",
 		"compose-support-missing",
@@ -2956,6 +2981,8 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-completion-lost-ack",
 		"compose-continuation",
 		"compose-fresh-history",
+		"compose-history-unavailable-words",
+		"compose-history-missing-currentness",
 		"compose-history-invalid",
 		"compose-history-invalid-link",
 		"compose-history-refused",
@@ -2988,6 +3015,7 @@ if (scenario !== undefined && scenario !== "") {
 				["compose-completion-refused", "compose"],
 				["compose-completion-lost-ack", "compose"],
 				["compose-support-selected", "compose-support"],
+				["compose-support-mentor-unavailable", "compose-support"],
 				["compose-support-empty", "compose-support"],
 				["compose-support-duplicate", "compose-support"],
 				["compose-support-missing", "compose-support"],
@@ -3003,6 +3031,8 @@ if (scenario !== undefined && scenario !== "") {
 				["compose-loop-rejection", "compose-loop"],
 				["compose-compacted", "compose-qualify"],
 				["compose-fresh-history", "compose"],
+				["compose-history-unavailable-words", "compose"],
+				["compose-history-missing-currentness", "compose"],
 				["compose-history-invalid", "compose"],
 				["compose-history-invalid-link", "compose"],
 				["compose-history-refused", "compose"],
@@ -3461,6 +3491,8 @@ if (scenario !== undefined && scenario !== "") {
 								PI_UNAVAILABLE_CONTEXT: String(fixture === "compose-context-unavailable"),
 								PI_PUBLIC_HISTORY_MODE: new Map([
 									["compose-fresh-history", "fresh"],
+									["compose-history-unavailable-words", "unavailable-words"],
+									["compose-history-missing-currentness", "missing-currentness"],
 									["compose-history-invalid", "invalid"],
 									["compose-history-invalid-link", "invalid-link"],
 									["compose-history-refused", "refused"],
@@ -4749,7 +4781,7 @@ for (const item of nullableCases) {
 									(unit: unknown) =>
 										isRecord(unit) && unit.channel === "IN_CHAT" && unit.action === "NEW",
 								),
-								!["refused-only", "inline", "routing-missing"].includes(mode),
+								!["refused-only", "inline", "routing-missing", "mentor-unavailable"].includes(mode),
 							);
 							assert.deepEqual(
 								payload.units
@@ -4760,6 +4792,7 @@ for (const item of nullableCases) {
 									}),
 								new Map<string, string[]>([
 									["selected", ["NEW"]],
+									["mentor-unavailable", ["NEW"]],
 									["routing-missing", ["NEW"]],
 									["empty", ["WITHHOLD"]],
 									["duplicate", ["WITHHOLD"]],
@@ -4801,6 +4834,13 @@ for (const item of nullableCases) {
 									/IN_CHAT closed for this run: routing missing or malformed/u,
 								);
 							}
+							if (mode === "mentor-unavailable") {
+								assert.match(unitReply, /#2: IN_CHAT is not a lane this run may write for/u);
+								assert.match(
+									child.stderr,
+									/IN_CHAT closed for this run: no practice is routed to it/u,
+								);
+							}
 							if (mode === "inline") {
 								// Nothing private is asked of the model; the review and every observation remain.
 								assert.equal(unitReply, "");
@@ -4834,6 +4874,7 @@ for (const item of nullableCases) {
 								reranking: 0,
 							});
 							if (
+								fixture === "compose-history-missing-currentness" ||
 								fixture === "compose-history-invalid" ||
 								fixture === "compose-history-invalid-link" ||
 								fixture === "compose-history-refused" ||
@@ -4905,6 +4946,33 @@ for (const item of nullableCases) {
 								);
 							}
 
+							if (fixture === "compose-history-unavailable-words") {
+								const prompt = readFileSync(nodePath.join(cwd, "prompt-2.md"), "utf8");
+								assert.match(prompt, /"wordsUnavailable": "COPY_AUTHORITY_UNAVAILABLE"/u);
+								assert.ok(!prompt.includes("An earlier comment on this same change."));
+								const debug: unknown = JSON.parse(
+									readFileSync(nodePath.join(cwd, "out/runner-debug.json"), "utf8"),
+								);
+								assert.ok(isRecord(debug) && isRecord(debug.publicHistory));
+								assert.deepEqual(
+									debug.publicHistory.entries,
+									[1, 2].map((entryNumber) => ({
+										id: `00000000-0000-4000-8000-00000000000${entryNumber}`,
+										deliveredAt: "2026-10-07T10:00:00Z",
+										eligibleForAlreadySaid: false,
+										eligibleForPriorAdvice: false,
+									})),
+								);
+								const answer: unknown = JSON.parse(
+									readFileSync(
+										nodePath.join(cwd, "work/composition/public-feedback-history.json"),
+										"utf8",
+									),
+								);
+								assert.ok(isRecord(answer) && isRecord(answer.history));
+								assert.equal(answer.history.wordsCoverage, "PARTIAL");
+							}
+
 							// Measurement, then the review on the work in a fresh session, then the private lanes in
 							// a third fresh session.
 							assert.deepEqual(
@@ -4938,6 +5006,7 @@ for (const item of nullableCases) {
 							assert.match(reviewTurn, /"quote": "\+ insecure\(\);"/u);
 							if (
 								fixture !== "compose-fresh-history" &&
+								fixture !== "compose-history-unavailable-words" &&
 								fixture !== "compose-history-body-transport"
 							) {
 								assert.match(reviewTurn, /An earlier comment on this same change\./u);

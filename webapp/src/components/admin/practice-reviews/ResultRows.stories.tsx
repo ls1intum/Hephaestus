@@ -7,6 +7,7 @@ import { daysBefore, hoursBefore } from "@/stories/story-clock";
 import { levelsOpenedBy } from "@/test/detail-stack";
 
 import { feedbackCounts, reviewResults } from "./fixtures";
+import { resultSummary } from "./result-words";
 import { ResultRows } from "./ResultRows";
 
 const [firstResult] = reviewResults;
@@ -85,7 +86,9 @@ export const Default: Story = {
 		// A row opens its result over the list, so the list stays where the reader left it.
 		const open = canvas
 			.getAllByRole("link", { name: /^Open result /u })
-			.find((link) => link.getAttribute("aria-label")?.includes(firstResult.summary) === true);
+			.find(
+				(link) => link.getAttribute("aria-label")?.includes(resultSummary(firstResult)) === true,
+			);
 		await expect(open === undefined ? [] : levelsOpenedBy(open)).toEqual([
 			`result:${firstResult.id}`,
 		]);
@@ -266,5 +269,18 @@ export const Tracked: Story = {
 		const [tracked] = canvas.getAllByRole("button", { name: /^Track result /u });
 		await expect(tracked).toHaveAttribute("aria-pressed", "true");
 		await expect(tracked?.closest("tr")).toHaveAttribute("data-variant", "highlighted");
+	},
+};
+
+/** Denied source prose keeps the result’s facts and a usable, truthfully named link. */
+export const TextUnavailable: Story = {
+	args: { state: { status: "ready", results: [{ ...firstResult, summary: undefined }] } },
+	play: async ({ canvas }) => {
+		canvas.getByText("Result text unavailable");
+		const link = canvas.getByRole("link", {
+			name: /Open result Result text unavailable/u,
+		});
+		await expect(levelsOpenedBy(link)).toEqual([`result:${firstResult.id}`]);
+		await expect(canvas.queryByText("undefined")).not.toBeInTheDocument();
 	},
 };

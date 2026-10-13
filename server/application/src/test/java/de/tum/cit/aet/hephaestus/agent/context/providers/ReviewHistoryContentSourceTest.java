@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.context.StagedArtifactNames;
@@ -122,6 +123,9 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     @Mock
     private PersonDataCopyRecorder personCopies;
 
+    @Mock
+    private EvidenceFolderPersonDataCatalog copyAuthority;
+
     private ReviewHistoryContentSource provider;
 
     private final Map<UUID, List<PracticeResult>> boundTo = new HashMap<>();
@@ -140,7 +144,11 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                 new StagedArtifactNames(ReviewHistoryContentSourceTest::identitiesOf),
                 objectMapper,
                 publicEligibility,
-                personCopies);
+                personCopies,
+                copyAuthority);
+        lenient()
+                .when(copyAuthority.recordVouchedHistoricalJobs(anyLong(), any()))
+                .thenAnswer(invocation -> Set.copyOf(invocation.<Collection<UUID>>getArgument(1)));
         lenient().when(conversationLiveness.activeThreadIds(anyLong(), any())).thenAnswer(invocation -> {
             Collection<Long> threads = invocation.getArgument(1);
             return threads.stream()
@@ -357,6 +365,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                 .thenReturn(List.of(practiceResultWithRationale(rationale)));
         when(feedbackRepository.findDeliveredForPersonHistory(any(), any()))
                 .thenReturn(List.of(Feedback.builder()
+                        .agentJobId(UUID.randomUUID())
                         .id(UUID.randomUUID())
                         .channel(FeedbackChannel.IN_CONTEXT)
                         .body(body)
@@ -364,6 +373,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                         .build()));
         when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
                 .thenReturn(List.of(Feedback.builder()
+                        .agentJobId(UUID.randomUUID())
                         .id(UUID.randomUUID())
                         .channel(FeedbackChannel.IN_APP)
                         .threadKey("in-app:99:swallows-errors")
@@ -421,6 +431,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         practice.setCurrentRevision(mock(PracticeRevision.class));
         PracticeResult recorded = PracticeResult.builder()
                 .scopeKey("test-scope")
+                .agentJobId(UUID.randomUUID())
                 .id(UUID.randomUUID())
                 .practice(practice)
                 .practiceRevision(recordedRevision)
@@ -432,6 +443,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                 .build();
         PracticeResult unrecorded = PracticeResult.builder()
                 .scopeKey("test-scope")
+                .agentJobId(UUID.randomUUID())
                 .id(UUID.randomUUID())
                 .practice(practice)
                 .summary("Missing restart check")
@@ -486,6 +498,29 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldKeepRecordFactsWithoutUnvouchedObservationWords() {
+        PracticeResult row = practiceResultWithRationale("Quoted prior discussion");
+        PracticeResult trusted = practiceResult("swallows-errors", "Trusted earlier review");
+        when(practiceResultRepository.findForPersonHistory(any(), any())).thenReturn(List.of(row, trusted));
+        doReturn(Set.of(trusted.getAgentJobId())).when(copyAuthority).recordVouchedHistoricalJobs(anyLong(), any());
+
+        var captured = captureResultHistory();
+        JsonNode payload = read(captured.files().get("inputs/history/observations.json"));
+        JsonNode record = payload.path("observations").get(0);
+        assertThat(record.path("practiceResultId").asString())
+                .isEqualTo(row.getId().toString());
+        assertThat(record.has("summary") || record.has("evidenceRationale") || record.has("evidence"))
+                .isFalse();
+        assertThat(record.path("wordsUnavailable").asString()).isEqualTo("COPY_AUTHORITY_UNAVAILABLE");
+        assertThat(payload.path("observations").get(1).path("summary").asString())
+                .isEqualTo("Trusted earlier review");
+        assertThat(captured.completeness())
+                .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceCompleteness.PARTIAL);
+        assertThat(captured.contentStates())
+                .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceContentState.NON_EMPTY);
+    }
+
+    @Test
     void shouldKeepTheWholePermittedHistoryOfARecurringPractice() {
         List<PracticeResult> newestFirst = new ArrayList<>();
         for (int i = 0; i < 3 + 2; i++) {
@@ -511,6 +546,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     void stagesFeedbackThatWasAlreadyDeliveredWithItsChannel() {
         when(feedbackRepository.findDeliveredForPersonHistory(any(), any()))
                 .thenReturn(List.of(Feedback.builder()
+                        .agentJobId(UUID.randomUUID())
                         .id(UUID.randomUUID())
                         .channel(FeedbackChannel.IN_CONTEXT)
                         .body("Consider handling this error rather than logging it.")
@@ -532,6 +568,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     void stagesWhatIsQueuedAndUnreadWithTheKeyThatIdentifiesIt() {
         when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
                 .thenReturn(List.of(Feedback.builder()
+                        .agentJobId(UUID.randomUUID())
                         .id(UUID.randomUUID())
                         .channel(FeedbackChannel.IN_APP)
                         .threadKey("in-app:99:swallows-errors")
@@ -774,29 +811,34 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         void shouldNameWhoseWordsEachStagedBodyHolds() {
             Instant at = Instant.parse("2026-07-01T09:00:00Z");
             Feedback onWork = Feedback.builder()
+                    .agentJobId(UUID.randomUUID())
                     .id(UUID.randomUUID())
                     .channel(FeedbackChannel.IN_CONTEXT)
                     .body("Name the failure the catch block hides.")
                     .deliveredAt(at)
                     .build();
             Feedback onPage = Feedback.builder()
+                    .agentJobId(UUID.randomUUID())
                     .id(UUID.randomUUID())
                     .channel(FeedbackChannel.IN_APP)
                     .body("Two issues share one failure path.")
                     .deliveredAt(at)
                     .build();
             Feedback legacy = Feedback.builder()
+                    .agentJobId(UUID.randomUUID())
                     .id(UUID.randomUUID())
                     .body("Recorded before its channel was stored.")
                     .deliveredAt(at)
                     .build();
             Feedback unwritten = Feedback.builder()
+                    .agentJobId(UUID.randomUUID())
                     .id(UUID.randomUUID())
                     .channel(FeedbackChannel.IN_CONTEXT)
                     .deliveredAt(at)
                     .build();
             Feedback brief = queued("in-chat:7:errors", "Situation: the catch block hides failures.");
             Feedback card = Feedback.builder()
+                    .agentJobId(UUID.randomUUID())
                     .id(UUID.randomUUID())
                     .channel(FeedbackChannel.IN_APP)
                     .threadKey("in-app:7:errors")
@@ -895,6 +937,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
             Feedback mixed = queued("in-app:1:mixed", "Bound to code and to the paused conversation.");
             boundTo.put(mixed.getId(), List.of(boundResult(false), boundConversation(PAUSED_THREAD)));
             Feedback aboutPaused = Feedback.builder()
+                    .agentJobId(UUID.randomUUID())
                     .id(UUID.randomUUID())
                     .channel(FeedbackChannel.IN_CHAT)
                     .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
@@ -904,6 +947,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                     .createdAt(Instant.parse("2026-07-02T09:00:00Z"))
                     .build();
             Feedback threadless = Feedback.builder()
+                    .agentJobId(UUID.randomUUID())
                     .id(UUID.randomUUID())
                     .channel(FeedbackChannel.IN_CHAT)
                     .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
@@ -942,6 +986,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
             PracticeResult current = boundResult(false);
             return PracticeResult.builder()
                     .scopeKey("test-scope")
+                    .agentJobId(UUID.randomUUID())
                     .id(current.getId())
                     .practice(current.getPractice())
                     .practiceRevision(current.getPracticeRevision())
@@ -953,6 +998,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
 
     private static Feedback queued(String threadKey, String body) {
         return Feedback.builder()
+                .agentJobId(UUID.randomUUID())
                 .id(UUID.randomUUID())
                 .channel(FeedbackChannel.IN_CHAT)
                 .threadKey(threadKey)
@@ -969,6 +1015,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         practice.setCurrentRevision(revision);
         return PracticeResult.builder()
                 .scopeKey("test-scope")
+                .agentJobId(UUID.randomUUID())
                 .id(UUID.randomUUID())
                 .practice(practice)
                 .practiceRevision(revision)
@@ -996,6 +1043,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
             names = {"DELIVERED", "SUPERSEDED"})
     void shouldCiteHistoryFeedbackOnlyWhileItsWordsMayStillBeRead(FeedbackDeliveryState state) {
         Feedback note = Feedback.builder()
+                .agentJobId(UUID.randomUUID())
                 .id(UUID.randomUUID())
                 .channel(FeedbackChannel.IN_CONTEXT)
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
@@ -1030,6 +1078,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
             names = {"DELIVERED", "SUPERSEDED"})
     void deliveredHistoryRetainsOriginalSupportAndRevisionWithoutCurrentSubstitution(FeedbackDeliveryState state) {
         Feedback note = Feedback.builder()
+                .agentJobId(UUID.randomUUID())
                 .id(UUID.randomUUID())
                 .channel(FeedbackChannel.IN_CONTEXT)
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
@@ -1151,9 +1200,53 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldKeepCommunicationFactsWhenHistoricalWordsAreUnavailable() {
+        Feedback unavailable = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
+        Feedback trusted = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
+        Feedback prepared = queued("in-chat:7:subtasks", "Unavailable mentor words");
+        boundTo.put(unavailable.getId(), List.of(boundResult(true)));
+        PracticeResult trustedSupport = boundResult(false);
+        boundTo.put(trusted.getId(), List.of(trustedSupport));
+        when(feedbackRepository.findDeliveredForPublicWorkHistory(
+                        WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
+                .thenReturn(List.of(unavailable, trusted));
+        when(publicEligibility.permitsPublicHistory(eq(unavailable), any())).thenReturn(true);
+        when(publicEligibility.permitsPublicHistory(eq(trusted), any())).thenReturn(true);
+        when(feedbackRepository.findDeliveredForPersonHistory(any(), any())).thenReturn(List.of(unavailable, trusted));
+        when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(List.of(prepared));
+        when(withdrawalRepository.withdrawnAmong(eq(WORKSPACE_ID), any())).thenReturn(Set.of(prepared.getId()));
+        doReturn(Set.of(trusted.getAgentJobId(), trustedSupport.getAgentJobId()))
+                .when(copyAuthority)
+                .recordVouchedHistoricalJobs(anyLong(), any());
+
+        JsonNode publicHistory = provider.publicSameWorkFeedback(
+                WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
+        var captured = captureFeedbackHistory();
+        JsonNode personHistory = read(captured.files().get("inputs/history/feedback.json"));
+        JsonNode preparedHistory = read(captured.files().get("inputs/history/prepared.json"));
+        for (JsonNode history : List.of(publicHistory, personHistory, preparedHistory)) {
+            JsonNode rows = history.path(history.has("prepared") ? "prepared" : "feedback");
+            JsonNode row = rows.get(0);
+            assertThat(row.path("recordedClaimCurrentness").asString())
+                    .isEqualTo(history.has("prepared") ? "CURRENT" : "STALE");
+            assertThat(row.path("withdrawn").asBoolean()).isEqualTo(history.has("prepared"));
+            assertThat(row.has("body") || row.has("bodyRole")).isFalse();
+            assertThat(row.path("wordsUnavailable").asString()).isEqualTo("COPY_AUTHORITY_UNAVAILABLE");
+            assertThat(history.path("wordsCoverage").asString()).isEqualTo("PARTIAL");
+        }
+        assertThat(publicHistory.path("feedback").get(1).path("body").asString())
+                .isEqualTo(trusted.getBody());
+        assertThat(personHistory.path("feedback").get(1).path("body").asString())
+                .isEqualTo(trusted.getBody());
+        assertThat(captured.completeness())
+                .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceCompleteness.PARTIAL);
+    }
+
+    @Test
     void freshPublicHistoryKeepsOnlyAuthorizedPublicDeliveriesOnThisWork() {
         Feedback author = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
         Feedback replaced = Feedback.builder()
+                .agentJobId(UUID.randomUUID())
                 .id(UUID.randomUUID())
                 .channel(FeedbackChannel.IN_CONTEXT)
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
@@ -1234,6 +1327,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
 
     private static Feedback deliveredAgainst(ArtifactKind kind, long artifactId) {
         return Feedback.builder()
+                .agentJobId(UUID.randomUUID())
                 .id(UUID.randomUUID())
                 .channel(FeedbackChannel.IN_CONTEXT)
                 .artifactKind(kind)
@@ -1266,6 +1360,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         practice.setSlug(practiceSlug);
         return PracticeResult.builder()
                 .scopeKey("test-scope")
+                .agentJobId(UUID.randomUUID())
                 .id(UUID.randomUUID())
                 .practice(practice)
                 .summary(title)

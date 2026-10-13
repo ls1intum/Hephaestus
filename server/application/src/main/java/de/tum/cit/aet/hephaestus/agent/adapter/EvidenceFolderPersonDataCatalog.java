@@ -61,6 +61,10 @@ import tools.jackson.databind.node.ObjectNode;
 @PersonDataStores({"person_evidence_copy"})
 @WorkspaceAgnostic("Exact-person receipts span workspaces; every job mutation also pins its workspace key")
 public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, WorkspacePurgeContributor {
+    private static final ThreadLocal<JdbcOperations> LATE_READ_CONTROLS = new ThreadLocal<>();
+
+    public static final String COPY_AUTHORITY_UNAVAILABLE = "COPY_AUTHORITY_UNAVAILABLE";
+
     private static final Logger log = LoggerFactory.getLogger(EvidenceFolderPersonDataCatalog.class);
 
     private final FabricLayout layout;
@@ -292,6 +296,10 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                         mapper.readTree(Objects.requireNonNull(rs.getString(3)))),
                 workspaceId,
                 new SqlArrayValue("uuid", sources.toArray()));
+        return dependencies(sources, receipts);
+    }
+
+    private Dependencies dependencies(Collection<UUID> sources, List<SourceReceipt> receipts) {
         var covered = receipts.stream().map(SourceReceipt::jobId).collect(Collectors.toSet());
         boolean complete = covered.containsAll(sources)
                 && receipts.stream()
@@ -318,6 +326,71 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         return new Dependencies(complete, identities, repositories, counts);
     }
 
+    /**
+     * The producing jobs whose historical words may be copied now. Missing, incomplete, revoked or suppressed
+     * receipts leave the record's facts usable but cannot vouch for its prose. Accepted people are recorded before
+     * formatting, while copy admission prevents an erasure from passing between authorization and indexing.
+     */
+    public Set<UUID> recordVouchedHistoricalJobs(long workspaceId, Collection<UUID> sourceJobs) {
+        Set<UUID> selectedJobs = Set.copyOf(sourceJobs);
+        if (selectedJobs.isEmpty()) return Set.of();
+        ActiveCapture capture = ACTIVE.get();
+        if (capture != null)
+            return recordVouchedHistoricalJobs(
+                    workspaceId, selectedJobs, capture.admission().jdbc());
+        JdbcOperations lateRead = LATE_READ_CONTROLS.get();
+        if (lateRead != null) return recordVouchedHistoricalJobs(workspaceId, selectedJobs, lateRead);
+        try (var admission = fence.capture()) {
+            return recordVouchedHistoricalJobs(workspaceId, selectedJobs, admission.jdbc());
+        }
+    }
+
+    private Set<UUID> recordVouchedHistoricalJobs(long workspaceId, Set<UUID> sourceJobs, JdbcOperations controls) {
+        var receipts = controls.query(
+                "SELECT job_id,state,payload::text FROM person_evidence_copy WHERE workspace_id=? AND job_id=ANY(?)",
+                (rs, row) -> new SourceReceipt(
+                        Objects.requireNonNull(rs.getObject(1, UUID.class)),
+                        Objects.requireNonNull(rs.getString(2)),
+                        mapper.readTree(Objects.requireNonNull(rs.getString(3)))),
+                workspaceId,
+                new SqlArrayValue("uuid", sourceJobs.toArray()));
+        var byJob = receipts.stream().collect(Collectors.groupingBy(SourceReceipt::jobId));
+        var complete = new HashMap<UUID, Dependencies>();
+        var people = new HashMap<UUID, List<PersonCopyIdentity>>();
+        for (UUID sourceJob : sourceJobs) {
+            var rows = byJob.getOrDefault(sourceJob, List.of());
+            var dependency = dependencies(Set.of(sourceJob), rows);
+            if (!dependency.complete()) continue;
+            try {
+                if (rows.stream()
+                        .anyMatch(row -> !row.payload().path("identities").isArray())) continue;
+                var identities = dependency.identities().stream()
+                        .map(identity -> {
+                            if (!identity.isObject()) throw new IllegalArgumentException("Invalid copy identity");
+                            return mapper.convertValue(identity, PersonCopyIdentity.class);
+                        })
+                        .toList();
+                complete.put(sourceJob, dependency);
+                people.put(sourceJob, identities);
+            } catch (RuntimeException malformed) {
+                // A malformed producing receipt cannot authorize copied words.
+            }
+        }
+        var blocked = suppressionControls(
+                people.values().stream().flatMap(List::stream).toList(), controls);
+        var vouched = new HashSet<UUID>();
+        people.forEach((sourceJob, identities) -> {
+            if (isSuppressed(identities, blocked)) return;
+            identities.forEach(recorder::recordIdentity);
+            Objects.requireNonNull(complete.get(sourceJob))
+                    .repositories()
+                    .forEach(repository -> recorder.recordRepository(repository.asLong()));
+            recorder.recordCopiedJob(sourceJob);
+            vouched.add(sourceJob);
+        });
+        return Set.copyOf(vouched);
+    }
+
     private record SourceReceipt(UUID jobId, String state, JsonNode payload) {}
 
     private record CopiedRow(UUID sourceJob, long recipient, long about) {}
@@ -325,8 +398,8 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
     /**
      * A read that the runtime receives after its capture was frozen. Copy admission is held from before the read
      * selects its rows until their people and source receipts are unioned into the attempt's READY receipt, so an
-     * erasure either precedes the read or finds this job. A receipt that is no longer READY is never revived; the read
-     * is answered as before and the attempt keeps no transcript.
+     * erasure either precedes the read or finds this job. The current receipt must still be READY. Historical words
+     * without complete, unsuppressed provenance are refused before the result returns; no receipt is revived.
      */
     public <T> T indexLateRead(
             UUID jobId,
@@ -336,49 +409,65 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
             Function<T, Set<UUID>> practiceResultIds,
             Function<T, Set<UUID>> feedbackIds) {
         try (var admission = fence.capture()) {
-            T result = read.get();
-            var practiceResults = practiceResultIds.apply(result);
-            var feedback = feedbackIds.apply(result);
-            var controls = admission.jdbc();
-            var rows = new ArrayList<CopiedRow>();
-            if (!practiceResults.isEmpty())
-                rows.addAll(controls.query(
-                        "SELECT agent_job_id,about_user_id,about_user_id FROM practice_result WHERE workspace_id=? AND id=ANY(?)",
-                        COPIED_ROW_MAPPER,
-                        workspaceId,
-                        new SqlArrayValue("uuid", practiceResults.toArray())));
-            if (!feedback.isEmpty())
-                rows.addAll(controls.query(
-                        "SELECT agent_job_id,recipient_user_id,about_user_id FROM feedback WHERE workspace_id=? AND id=ANY(?)",
-                        COPIED_ROW_MAPPER,
-                        workspaceId,
-                        new SqlArrayValue("uuid", feedback.toArray())));
-            int found = rows.size();
-            var sources = new HashSet<UUID>();
-            var users = new HashSet<Long>();
-            for (var row : rows) {
-                sources.add(row.sourceJob());
-                users.add(row.recipient());
-                users.add(row.about());
-            }
-            sources.remove(jobId);
-            var dependencies = dependencies(controls, workspaceId, sources);
-            List<PersonCopyIdentity> direct;
-            try (var frame = recorder.begin()) {
-                users.forEach(recorder::recordUser);
-                direct = frame.identities();
-            }
-            var identities = new ArrayList<JsonNode>(dependencies.identities());
-            direct.forEach(identity -> identities.add(mapper.valueToTree(identity)));
-            // A row the read returned that this lookup no longer finds has no provenance to vouch for it.
-            boolean complete = dependencies.complete() && found == practiceResults.size() + feedback.size();
-            if (!complete)
-                incomplete(Assessment.LATE_READ, dependencies.counts())
-                        .addKeyValue("evidence.missingRows", practiceResults.size() + feedback.size() - found)
-                        .log(INCOMPLETE_ASSESSMENT);
-            // One statement: concurrent unions serialize on the row, and a receipt only ever gains people.
-            controls.update(
-                    """
+            JdbcOperations previous = LATE_READ_CONTROLS.get();
+            LATE_READ_CONTROLS.set(admission.jdbc());
+            try {
+                T result = read.get();
+                if (!vouchesForLiveAttempt(jobId, workspaceId, attempt))
+                    throw new CopyUnavailableException("This review's copy authority is unavailable");
+                var practiceResults = practiceResultIds.apply(result);
+                var feedback = feedbackIds.apply(result);
+                var controls = admission.jdbc();
+                var rows = new ArrayList<CopiedRow>();
+                if (!practiceResults.isEmpty())
+                    rows.addAll(controls.query(
+                            "SELECT agent_job_id,about_user_id,about_user_id FROM practice_result WHERE workspace_id=? AND id=ANY(?)",
+                            COPIED_ROW_MAPPER,
+                            workspaceId,
+                            new SqlArrayValue("uuid", practiceResults.toArray())));
+                if (!feedback.isEmpty())
+                    rows.addAll(controls.query(
+                            "SELECT agent_job_id,recipient_user_id,about_user_id FROM feedback WHERE workspace_id=? AND id=ANY(?)",
+                            COPIED_ROW_MAPPER,
+                            workspaceId,
+                            new SqlArrayValue("uuid", feedback.toArray())));
+                int found = rows.size();
+                var sources = new HashSet<UUID>();
+                var users = new HashSet<Long>();
+                for (var row : rows) {
+                    sources.add(row.sourceJob());
+                    users.add(row.recipient());
+                    users.add(row.about());
+                }
+                sources.remove(jobId);
+                var dependencies = dependencies(controls, workspaceId, sources);
+                List<PersonCopyIdentity> direct;
+                try (var frame = recorder.begin()) {
+                    users.forEach(recorder::recordUser);
+                    direct = frame.identities();
+                }
+                var identities = new ArrayList<JsonNode>(dependencies.identities());
+                direct.forEach(identity -> identities.add(mapper.valueToTree(identity)));
+                if (!dependencies.complete() || found != practiceResults.size() + feedback.size()) {
+                    incomplete(Assessment.LATE_READ, dependencies.counts())
+                            .addKeyValue("evidence.missingRows", practiceResults.size() + feedback.size() - found)
+                            .log(INCOMPLETE_ASSESSMENT);
+                    throw new CopyUnavailableException("Historical review words have no complete copy authority");
+                }
+                List<PersonCopyIdentity> copiedIdentities;
+                try {
+                    copiedIdentities = identities.stream()
+                            .map(identity -> mapper.convertValue(identity, PersonCopyIdentity.class))
+                            .toList();
+                } catch (RuntimeException malformed) {
+                    throw new CopyUnavailableException("Historical review copy authority is unavailable", malformed);
+                }
+                if (isSuppressed(copiedIdentities, controls))
+                    throw new CopyUnavailableException("Historical review copy authority is unavailable");
+                // This read is complete; the update still preserves an earlier UNKNOWN capture.
+                // One statement: concurrent unions serialize on the row, and a receipt only ever gains people.
+                controls.update(
+                        """
                 UPDATE person_evidence_copy SET payload=jsonb_set(jsonb_set(jsonb_set(jsonb_set(payload,
                     '{identities}',(SELECT COALESCE(jsonb_agg(DISTINCT e),'[]'::jsonb) FROM jsonb_array_elements(
                         COALESCE(payload->'identities','[]'::jsonb) || CAST(? AS jsonb)) e)),
@@ -391,15 +480,32 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                 WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY'
                   AND payload->>'attempt'=?
                 """,
-                    mapper.writeValueAsString(identities),
-                    mapper.writeValueAsString(dependencies.repositories()),
-                    mapper.writeValueAsString(sources.stream().sorted().toList()),
-                    complete,
-                    jobId,
-                    workspaceId,
-                    storeId().toString(),
-                    Integer.toString(attempt));
-            return result;
+                        mapper.writeValueAsString(identities),
+                        mapper.writeValueAsString(dependencies.repositories()),
+                        mapper.writeValueAsString(sources.stream().sorted().toList()),
+                        true,
+                        jobId,
+                        workspaceId,
+                        storeId().toString(),
+                        Integer.toString(attempt));
+                return result;
+            } finally {
+                if (previous == null) LATE_READ_CONTROLS.remove();
+                else LATE_READ_CONTROLS.set(previous);
+            }
+        }
+    }
+
+    /** Closed custody refusal, distinct from a temporarily unavailable source or database transport failure. */
+    public static class CopyUnavailableException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public CopyUnavailableException(String reason) {
+            super(reason);
+        }
+
+        public CopyUnavailableException(String reason, Throwable cause) {
+            super(reason, cause);
         }
     }
 
@@ -462,6 +568,35 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
     /** Holds the existing copy/erasure fence before a recovery transaction takes any job lock. */
     public void holdCopyAdmission() {
         fence.holdForCapture();
+    }
+
+    /**
+     * The still-owning admitting attempt may finish from the capture it received. Incomplete copied-job lineage
+     * prevents retaining or recovering its inputs, not this live writer. Its local READY receipt must still be unique
+     * and name no suppressed identity. The caller holds copy admission before its job lock.
+     */
+    public boolean vouchesForLiveAttempt(UUID jobId, long workspaceId, int attempt) {
+        if (!Files.exists(layout.root().resolve(".person-evidence-store-id"))) return false;
+        var payloads = jdbc.query(
+                """
+            SELECT payload::text FROM person_evidence_copy
+            WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY'
+              AND payload->>'attempt'=?
+            """,
+                (rs, row) -> mapper.readTree(Objects.requireNonNull(rs.getString(1))),
+                jobId,
+                workspaceId,
+                storeId().toString(),
+                Integer.toString(attempt));
+        if (payloads.size() != 1 || !payloads.getFirst().path("identities").isArray()) return false;
+        List<PersonCopyIdentity> identities;
+        try {
+            identities =
+                    List.of(mapper.convertValue(payloads.getFirst().path("identities"), PersonCopyIdentity[].class));
+        } catch (RuntimeException malformedIdentities) {
+            return false;
+        }
+        return !isSuppressed(identities, jdbc);
     }
 
     /** A durable original receipt can vouch for retained inputs independently of the mounted worker store. */
@@ -560,7 +695,12 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
 
     private boolean isSuppressed(List<PersonCopyIdentity> identities, JdbcOperations controls) {
         if (identities.isEmpty()) return false;
-        var blocked = controls.query(
+        return isSuppressed(identities, suppressionControls(identities, controls));
+    }
+
+    private List<PersonCopyIdentity> suppressionControls(List<PersonCopyIdentity> identities, JdbcOperations controls) {
+        if (identities.isEmpty()) return List.of();
+        return controls.query(
                 """
             SELECT DISTINCT p.type,p.server_url,s.subject,NULLIF(s.team_key,'')
             FROM person_suppression s JOIN identity_provider p ON p.id=s.provider_id
@@ -575,6 +715,9 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                                 .map(PersonCopyIdentity::subject)
                                 .distinct()
                                 .toArray()));
+    }
+
+    private static boolean isSuppressed(List<PersonCopyIdentity> identities, List<PersonCopyIdentity> blocked) {
         return blocked.stream()
                 .anyMatch(control -> identities.stream()
                         .anyMatch(identity -> control.providerType().equals(identity.providerType())

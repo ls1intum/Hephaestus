@@ -5688,7 +5688,10 @@ export type ReviewBoundResult = {
      * Severity band (null unless outcome is NOT_MET)
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    summary: string;
+    /**
+     * Result text; absent when source access cannot be verified
+     */
+    summary?: string;
 };
 
 /**
@@ -6142,7 +6145,10 @@ export type ReviewLineageResult = {
      * Severity band (null unless outcome is NOT_MET)
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    summary: string;
+    /**
+     * Result text; absent when source access cannot be verified
+     */
+    summary?: string;
 };
 
 /**
@@ -6401,7 +6407,10 @@ export type ReviewResult = {
      * Whose work the result is about; null when the identity is no longer resolvable
      */
     subject?: ReviewSubject;
-    summary: string;
+    /**
+     * Result text; absent when source access cannot be verified
+     */
+    summary?: string;
 };
 
 /**
@@ -6492,7 +6501,10 @@ export type ReviewResultDetail = {
      * Whose work the result is about; null when the identity is no longer resolvable
      */
     subject?: ReviewSubject;
-    summary: string;
+    /**
+     * Result text; absent when source access cannot be verified
+     */
+    summary?: string;
     /**
      * When a later review of the same work superseded this result; null while current
      */

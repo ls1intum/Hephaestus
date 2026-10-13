@@ -12,15 +12,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
+import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedJobInputsFixtures;
 import de.tum.cit.aet.hephaestus.agent.context.ReviewedWork;
+import de.tum.cit.aet.hephaestus.agent.context.providers.GeneralReviewCommentContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.PullRequestContentSource;
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService.AdmissionIdentity;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedReview;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
@@ -33,7 +38,13 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasis;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
+import de.tum.cit.aet.hephaestus.core.privacy.PersonDataRequest;
+import de.tum.cit.aet.hephaestus.core.privacy.PersonDataService;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig.GitHubAppConfig;
@@ -44,23 +55,32 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.SummaryHandle;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.GitHubIssueCommentProcessor;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatch;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalDecision;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackProposalRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -78,6 +98,8 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -130,6 +152,9 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     private PublicReviewCompletionService completionService;
+
+    @Autowired
+    private ResultAdmissionService liveAdmission;
 
     @Autowired
     private PublicReviewCompletionRepository completions;
@@ -211,6 +236,33 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     private AccountPreferencesQuery accountPreferencesQuery;
+
+    @Autowired
+    private GeneralReviewCommentContentSource generalComments;
+
+    @Autowired
+    private ReviewHistoryContentSource reviewHistory;
+
+    @Autowired
+    private IssueCommentRepository issueComments;
+
+    @Autowired
+    private GitHubIssueCommentProcessor commentProcessor;
+
+    @Autowired
+    private PersonDataCopyRecorder personCopies;
+
+    @Autowired
+    private PersonDataService personData;
+
+    @Autowired
+    private AccountRepository accounts;
+
+    @Autowired
+    private InAppFeedbackEvidence inAppEvidence;
+
+    @Autowired
+    private FeedbackEvidenceRepository feedbackEvidence;
 
     private final Map<String, byte[]> capturedFiles = new LinkedHashMap<>();
     private final List<PreparedJobInputs> preparedEvidence = new ArrayList<>();
@@ -349,6 +401,422 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
                 .resolve(workspace.getId().toString())
                 .resolve(job.getId().toString())
                 .toFile());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing-before", "missing-after", "unknown-after", "complete-after"})
+    void shouldWithholdUnvouchedHistoricalWordsAfterTheirDiscussionAuthorDisappears(String custody) {
+        String quotedWords = "split persistence out so each unit is testable";
+        var pr = pullRequestRepository.findByIdWithAuthorAndRepository(prId).orElseThrow();
+        var repo = Objects.requireNonNull(pr.getRepository());
+        var provider = repo.getProvider();
+        Long authorId = Objects.requireNonNull(pr.getAuthor()).getId();
+        User reviewer = userRepository.save(TestUserFactory.createUser(511L, "earlier-reviewer", provider));
+        IssueComment comment = new IssueComment();
+        comment.setNativeId(9011L);
+        comment.setProvider(provider);
+        comment.setIssue(pr);
+        comment.setAuthor(reviewer);
+        comment.setBody(quotedWords);
+        comment.setHtmlUrl(pr.getHtmlUrl() + "#issuecomment-9011");
+        comment.setAuthorAssociation(AuthorAssociation.NONE);
+        comment.setCreatedAt(Instant.now());
+        comment.setUpdatedAt(Instant.now());
+        issueComments.saveAndFlush(comment);
+
+        AgentJob current = job;
+        AgentJob earlier = new AgentJob();
+        earlier.setWorkspace(workspace);
+        earlier.setWorkerId(WORKER);
+        earlier.setPurpose(job.getPurpose());
+        earlier.setJobType(job.getJobType());
+        earlier.setArtifactKind(job.getArtifactKind());
+        earlier.setStatus(AgentJobStatus.RUNNING);
+        earlier.setConfigSnapshot(job.getConfigSnapshot());
+        earlier.setMetadata(Objects.requireNonNull(job.getMetadata()).deepCopy());
+        earlier.setEvidenceSnapshot(job.getEvidenceSnapshot());
+        job = agentJobRepository.saveAndFlush(earlier);
+        evidenceFiles.beginPersonCapture(job);
+        var previousFiles = new LinkedHashMap<>(capturedFiles);
+        previousFiles.putAll(generalComments
+                .capture(new ContextRequest.PracticeReviewRequest(job), generalComments.sourceKinds())
+                .files());
+        assertThat(new String(previousFiles.get("context/general_comments.json"), StandardCharsets.UTF_8))
+                .contains(quotedWords);
+        // These are the actual participants of the captured discussion, recorded before freezing its bytes.
+        personCopies.recordUser(reviewer.getId());
+        personCopies.recordUser(authorId);
+        preparedEvidence.add(evidenceFiles.prepare(job, new PreparedEvidence(previousFiles, null), null));
+        String earlierDigest = admitLive();
+        String priorBody =
+                "The description makes the new boundary clear. The earlier reviewer asked to '" + quotedWords + "'.";
+        assertThat(completionService
+                        .complete(identity(), earlierDigest, summaryOn(priorBody, all()))
+                        .accepted())
+                .isTrue();
+        UUID earlierJob = job.getId();
+        assertThat(reviewHistory
+                        .publicSameWorkFeedback(workspace.getId(), authorId, ArtifactKinds.PULL_REQUEST, prId)
+                        .toString())
+                .contains(priorBody);
+
+        commentProcessor.delete(
+                comment.getNativeId(), ProcessingContext.forWebhook(workspace.getId(), repo, "deleted"));
+        assertThat(issueComments.findByNativeIdAndProviderId(9011L, Objects.requireNonNull(provider.getId())))
+                .isEmpty();
+        // A's retained guidance still rests on the valid core source after B's discussion is deleted.
+        assertThat(reviewHistory
+                        .publicSameWorkFeedback(workspace.getId(), authorId, ArtifactKinds.PULL_REQUEST, prId)
+                        .toString())
+                .contains(priorBody);
+        if (custody.startsWith("missing")) jdbc.update("DELETE FROM person_evidence_copy WHERE job_id=?", earlierJob);
+        if (custody.startsWith("unknown"))
+            jdbc.update(
+                    "UPDATE person_evidence_copy SET payload=jsonb_set(payload,'{dependencies}','\"UNKNOWN\"'::jsonb) WHERE job_id=?",
+                    earlierJob);
+        job = current;
+        String digest = admitLive();
+        UUID suppression = UUID.randomUUID();
+        try {
+            if (custody.endsWith("before")) suppressReviewer(suppression, reviewer);
+            ObjectNode read = liveAdmission.publicFeedbackHistory(identity());
+            assertThat(read.path("history").path("feedback")).isNotEmpty();
+            if (custody.startsWith("complete")) assertThat(read.toString()).contains(quotedWords);
+            else {
+                assertThat(read.toString()).doesNotContain(quotedWords).contains("COPY_AUTHORITY_UNAVAILABLE");
+                assertThat(read.path("history").path("wordsCoverage").asString())
+                        .isEqualTo("PARTIAL");
+            }
+            if (custody.endsWith("after")) suppressReviewer(suppression, reviewer);
+            var completed = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+            assertThat(completed.accepted()).isEqualTo(!custody.startsWith("complete"));
+            if (custody.startsWith("complete")) {
+                assertThat(completions.findByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                        .isEmpty();
+            }
+        } finally {
+            jdbc.update("DELETE FROM person_suppression WHERE id=?", suppression);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @WithAdminUser
+    void shouldRespectOperatorWordAuthorityAfterParticipantErasure(boolean missingReceipt) {
+        String quotedWords = "split persistence out so each unit is testable";
+        var pr = pullRequestRepository.findByIdWithAuthorAndRepository(prId).orElseThrow();
+        var repo = Objects.requireNonNull(pr.getRepository());
+        var provider = repo.getProvider();
+        Long authorId = Objects.requireNonNull(pr.getAuthor()).getId();
+        User reviewer = userRepository.save(TestUserFactory.createUser(511L, "earlier-reviewer", provider));
+        IssueComment comment = new IssueComment();
+        comment.setNativeId(9011L);
+        comment.setProvider(provider);
+        comment.setIssue(pr);
+        comment.setAuthor(reviewer);
+        comment.setBody(quotedWords);
+        comment.setHtmlUrl(pr.getHtmlUrl() + "#issuecomment-9011");
+        comment.setAuthorAssociation(AuthorAssociation.NONE);
+        comment.setCreatedAt(Instant.now());
+        comment.setUpdatedAt(Instant.now());
+        issueComments.saveAndFlush(comment);
+
+        AgentJob captured = new AgentJob();
+        captured.setWorkspace(workspace);
+        captured.setWorkerId(WORKER);
+        captured.setPurpose(job.getPurpose());
+        captured.setJobType(job.getJobType());
+        captured.setArtifactKind(job.getArtifactKind());
+        captured.setStatus(AgentJobStatus.RUNNING);
+        captured.setConfigSnapshot(job.getConfigSnapshot());
+        captured.setMetadata(Objects.requireNonNull(job.getMetadata()).deepCopy());
+        captured.setEvidenceSnapshot(job.getEvidenceSnapshot());
+        job = agentJobRepository.saveAndFlush(captured);
+        evidenceFiles.beginPersonCapture(job);
+        var previousFiles = new LinkedHashMap<>(capturedFiles);
+        previousFiles.putAll(generalComments
+                .capture(new ContextRequest.PracticeReviewRequest(job), generalComments.sourceKinds())
+                .files());
+        assertThat(new String(previousFiles.get("context/general_comments.json"), StandardCharsets.UTF_8))
+                .contains(quotedWords);
+        personCopies.recordUser(reviewer.getId());
+        personCopies.recordUser(authorId);
+        preparedEvidence.add(evidenceFiles.prepare(job, new PreparedEvidence(previousFiles, null), null));
+        var submitted = MAPPER.readTree(withEvidence(BOTH_RESULTS));
+        var first = (ObjectNode) submitted.path("results").get(0).path("candidate");
+        first.put("summary", "The description explains the boundary discussed by the reviewer: " + quotedWords);
+        first.put("explanation", "The description names the change; the captured discussion asks to " + quotedWords);
+        liveAdmission.admit(identity(), submitted);
+        job = reload();
+        PracticeResult kept = result(Outcome.MET);
+        String privateBody = "A private practice-page note quotes: " + quotedWords;
+        Feedback card = feedbackRepository.saveAndFlush(Feedback.builder()
+                .agentJobId(job.getId())
+                .workspaceId(workspace.getId())
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(prId)
+                .recipientUserId(authorId)
+                .aboutUserId(authorId)
+                .channel(FeedbackChannel.IN_APP)
+                .position(9000)
+                .deliveryState(FeedbackDeliveryState.PREPARED)
+                .body(privateBody)
+                .source(FeedbackSource.AGENT)
+                .createdAt(Instant.now())
+                .build());
+        feedbackEvidence.insertIfAbsent(card.getId(), kept.getId(), null, "SUPPORTING", 0);
+        assertThat(inAppEvidence.visibleEvidence(workspace.getId(), List.of(card.getId())))
+                .containsKey(card.getId());
+        commentProcessor.delete(
+                comment.getNativeId(), ProcessingContext.forWebhook(workspace.getId(), repo, "deleted"));
+        assertThat(issueComments.findByNativeIdAndProviderId(9011L, Objects.requireNonNull(provider.getId())))
+                .isEmpty();
+        preparedEvidence.forEach(PreparedJobInputs::close);
+        preparedEvidence.clear();
+        if (missingReceipt) jdbc.update("DELETE FROM person_evidence_copy WHERE job_id=?", job.getId());
+        jdbc.update("UPDATE agent_job SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE id=?", job.getId());
+        Account administrator = new Account("Synthetic privacy administrator");
+        administrator.setAppRole(Account.AppRole.APP_ADMIN);
+        administrator = accounts.saveAndFlush(administrator);
+        long administratorId = Objects.requireNonNull(administrator.getId());
+        var preview = personData.preview(
+                administratorId,
+                null,
+                List.of(new PersonIdentity(
+                        Objects.requireNonNull(provider.getId()),
+                        reviewer.getNativeId().toString(),
+                        null)));
+        personData.requestErasure(preview.request().getId(), administratorId, true);
+        personData.run(preview.request().getId());
+        assertThat(personData.get(preview.request().getId()).request().getState())
+                .isEqualTo(PersonDataRequest.State.COMPLETE);
+        assertThat(practiceResultRepository.findById(kept.getId())).isPresent();
+        assertThat(inAppEvidence
+                        .visibleEvidence(workspace.getId(), List.of(card.getId()))
+                        .containsKey(card.getId()))
+                .isEqualTo(missingReceipt);
+        JsonNode admin = MAPPER.readTree(Objects.requireNonNull(webTestClient
+                .get()
+                .uri("/workspaces/{slug}/practices/reviews/results/{id}", workspace.getWorkspaceSlug(), kept.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .returnResult()
+                .getResponseBody()));
+        assertThat(admin.path("id").asString()).isEqualTo(kept.getId().toString());
+        assertThat(admin.path("outcome").asString()).isEqualTo("MET");
+        assertThat(!admin.path("evidence").isNull() && !admin.path("evidence").isMissingNode())
+                .isEqualTo(missingReceipt);
+        JsonNode privateAdmin = MAPPER.readTree(Objects.requireNonNull(webTestClient
+                .get()
+                .uri("/workspaces/{slug}/practices/reviews/feedback/{id}", workspace.getWorkspaceSlug(), card.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .returnResult()
+                .getResponseBody()));
+        assertThat(privateAdmin.toString()).doesNotContain(privateBody);
+        for (String uri : List.of(
+                "/workspaces/" + workspace.getWorkspaceSlug() + "/practices/reviews/results",
+                "/workspaces/" + workspace.getWorkspaceSlug() + "/practices/reviews/lineage?kind=RESULT&id="
+                        + kept.getId())) {
+            String content = new String(
+                    Objects.requireNonNull(webTestClient
+                            .get()
+                            .uri(uri)
+                            .headers(TestAuthUtils.withCurrentUser())
+                            .exchange()
+                            .expectStatus()
+                            .isOk()
+                            .expectBody()
+                            .returnResult()
+                            .getResponseBody()),
+                    StandardCharsets.UTF_8);
+            assertThat(content.contains(quotedWords)).isEqualTo(missingReceipt);
+        }
+        assertThat(privateAdmin.toString().contains(quotedWords)).isEqualTo(missingReceipt);
+        boolean summaryWords = admin.path("summary").asString().contains(quotedWords);
+        boolean rationaleWords = admin.path("evidenceRationale").asString().contains(quotedWords);
+        assertThat(summaryWords || rationaleWords)
+                .as(
+                        "erased participant words: missingReceipt=%s summary=%s rationale=%s ownEvidenceVisible=%s",
+                        missingReceipt, summaryWords, rationaleWords, missingReceipt)
+                .isEqualTo(missingReceipt);
+    }
+
+    private void suppressReviewer(UUID request, User reviewer) {
+        jdbc.update(
+                "INSERT INTO person_suppression(id,provider_id,subject,team_key) SELECT ?,provider_id,native_id::text,'' FROM \"user\" WHERE id=?",
+                request,
+                reviewer.getId());
+    }
+
+    @Test
+    void shouldRefusePublicHistoryExplicitlyWhenTheCurrentCopyIsRevoked() {
+        admitLive();
+        jdbc.update("UPDATE person_evidence_copy SET state='ERASE_REQUESTED' WHERE job_id=?", job.getId());
+        assertThatThrownBy(() -> liveAdmission.publicFeedbackHistory(identity()))
+                .isInstanceOf(ResultAdmissionService.PublicHistoryRefusedException.class)
+                .hasMessage("Review history copy authority is unavailable")
+                .hasCauseInstanceOf(EvidenceFolderPersonDataCatalog.CopyUnavailableException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldAcceptTheLiveAdmittingWriterWithoutRetainedRecoveryInputs(boolean unknownLineage) {
+        if (unknownLineage) leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        assertThat(bases.findOriginalCopy(workspace.getId(), job.getId())).isEmpty();
+
+        var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+
+        assertThat(outcome.accepted()).isTrue();
+        assertThat(completion().getAdmissionAttempt()).isZero();
+        assertThat(automaticPackage().getState()).isEqualTo(FeedbackDispatchState.SENT);
+        assertThat(reload().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        verify(commentPoster, times(1)).post(any());
+        if (unknownLineage)
+            assertThat(evidenceFiles.completeReceipt(identity())).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "absent",
+                "revoked",
+                "foreign-store",
+                "wrong-attempt",
+                "wrong-workspace",
+                "ambiguous",
+                "malformed-identities"
+            })
+    void shouldRefuseTheLiveWriterWithoutItsExactReadyCapture(String invalidation) {
+        leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        switch (invalidation) {
+            case "absent" -> jdbc.update("DELETE FROM person_evidence_copy WHERE job_id=?", job.getId());
+            case "revoked" ->
+                jdbc.update("UPDATE person_evidence_copy SET state='ERASE_REQUESTED' WHERE job_id=?", job.getId());
+            case "foreign-store" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET store_id=? WHERE job_id=?", UUID.randomUUID(), job.getId());
+            case "wrong-attempt" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET payload=jsonb_set(payload,'{attempt}','1'::jsonb) WHERE job_id=?",
+                        job.getId());
+            case "wrong-workspace" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET workspace_id=? WHERE job_id=?",
+                        workspace.getId() + 1,
+                        job.getId());
+            case "ambiguous" ->
+                jdbc.update(
+                        "INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload) SELECT ?,workspace_id,job_id,store_id,state,payload FROM person_evidence_copy WHERE job_id=?",
+                        UUID.randomUUID(),
+                        job.getId());
+            case "malformed-identities" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET payload=jsonb_set(payload,'{identities}','[\"invalid\"]'::jsonb) WHERE job_id=?",
+                        job.getId());
+            default -> throw new IllegalArgumentException("Unknown capture invalidation");
+        }
+
+        var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+
+        assertThat(outcome.accepted()).isFalse();
+        assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+        assertThat(PublicReviewCompletionService.wasRefused(reload())).isTrue();
+        assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                .isFalse();
+        assertThat(jobFeedback()).isEmpty();
+        verify(commentPoster, never()).post(any());
+    }
+
+    @Test
+    void shouldRefuseTheLiveWriterWhenACopiedPersonIsSuppressedAfterAdmission() {
+        leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        PracticeResult about = result(Outcome.MET);
+        evidenceFiles.indexLateRead(
+                identity(), () -> Set.of(about.getId()), ids -> new JobEvidenceFiles.LateCopies(ids, Set.of()));
+        UUID suppression = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO person_suppression(id,provider_id,subject,team_key) SELECT ?,provider_id,native_id::text,'' FROM \"user\" WHERE id=?",
+                suppression,
+                about.getAboutUserId());
+        try {
+            var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+            assertThat(outcome.accepted()).isFalse();
+            assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+            assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                    .isFalse();
+            assertThat(jobFeedback()).isEmpty();
+            verify(commentPoster, never()).post(any());
+        } finally {
+            jdbc.update("DELETE FROM person_suppression WHERE id=?", suppression);
+        }
+    }
+
+    @Test
+    void shouldRefuseTheLiveWriterWhileItsJobIsSelectedByAnUnfinishedErasure() {
+        leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        UUID request = UUID.randomUUID();
+        ObjectNode selections = MAPPER.createObjectNode();
+        selections
+                .putObject("agent_job")
+                .putArray("rows")
+                .addObject()
+                .putObject("columns")
+                .put("id", job.getId().toString());
+        jdbc.update(
+                "INSERT INTO person_data_request(id,state,selections_json,counts_json,completed_json,created_at,expires_at,version) VALUES (?,'FAILED',?,'{}','{}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+INTERVAL '1 day',0)",
+                request,
+                MAPPER.writeValueAsString(selections));
+        try {
+            var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+            assertThat(outcome.accepted()).isFalse();
+            assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+            assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                    .isFalse();
+            assertThat(jobFeedback()).isEmpty();
+            verify(commentPoster, never()).post(any());
+        } finally {
+            jdbc.update("DELETE FROM person_data_request WHERE id=?", request);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"unknown-lineage", "expired", "absent"})
+    void shouldRefuseAContinuedWriterWithoutVouchingUnexpiredOriginalInputs(String invalidation) {
+        admit(BOTH_RESULTS);
+        switch (invalidation) {
+            case "unknown-lineage" -> leaveCaptureLineageUnknown();
+            case "expired" ->
+                jdbc.update(
+                        "UPDATE review_composition_basis SET expires_at=? WHERE job_id=?",
+                        Timestamp.from(Instant.EPOCH),
+                        job.getId());
+            case "absent" -> jdbc.update("DELETE FROM review_composition_basis WHERE job_id=?", job.getId());
+            default -> throw new IllegalArgumentException("Unknown recovery invalidation");
+        }
+        jdbc.update("UPDATE agent_job SET retry_count=1 WHERE id=?", job.getId());
+
+        var outcome = completionService.complete(
+                new AdmissionIdentity(job.getId(), workspace.getId(), 1, WORKER),
+                ADMISSION_DIGEST,
+                summaryOn(SUMMARY, all()));
+
+        assertThat(outcome.accepted()).isFalse();
+        assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+        assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                .isFalse();
+        assertThat(jobFeedback()).isEmpty();
+        verify(commentPoster, never()).post(any());
     }
 
     @Test
@@ -837,6 +1305,32 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
         ]}\
         """;
 
+    private void leaveCaptureLineageUnknown() {
+        preparedEvidence.forEach(PreparedJobInputs::close);
+        preparedEvidence.clear();
+        try {
+            FileUtils.deleteDirectory(evidenceLayout
+                    .jobsRoot()
+                    .resolve(workspace.getId().toString())
+                    .resolve(job.getId().toString())
+                    .toFile());
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
+        }
+        jdbc.update("DELETE FROM person_evidence_copy WHERE job_id=?", job.getId());
+        evidenceFiles.beginPersonCapture(job);
+        // A copied source job without a retained receipt makes capture lineage UNKNOWN before runtime admission.
+        personCopies.recordCopiedJob(UUID.randomUUID());
+        preparedEvidence.add(evidenceFiles.prepare(job, new PreparedEvidence(capturedFiles, null), null));
+        assertThat(evidenceFiles.completeReceipt(identity())).isEmpty();
+    }
+
+    private String admitLive() {
+        JsonNode response = liveAdmission.admit(identity(), MAPPER.readTree(withEvidence(BOTH_RESULTS)));
+        job = reload();
+        return response.path("admissionDigest").asString();
+    }
+
     private AdmissionIdentity identity() {
         return new AdmissionIdentity(job.getId(), workspace.getId(), 0, WORKER);
     }
@@ -1027,6 +1521,7 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
     /** Each candidate cites the description captured for this attempt. */
     private static String withEvidence(String rawResults) {
         ObjectNode request = (ObjectNode) MAPPER.readTree(rawResults);
+        request.put("schemaVersion", ResultAdmissionService.SCHEMA_VERSION);
         for (JsonNode result : request.path("results")) {
             ObjectNode candidate = (ObjectNode) result.path("candidate");
             candidate.putObject("evidence");

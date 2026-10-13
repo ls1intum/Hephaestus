@@ -260,6 +260,7 @@ export const IN_APP_DECISIONS = [
 /** ConversationRoutingDecision, per admitted NOT_MET result. */
 export const IN_CHAT_DECISIONS = [
 	"ADMIT",
+	"MENTOR_UNAVAILABLE",
 	"NOT_DELIVERABLE",
 	"HAS_INLINE_ANCHOR",
 	"ALREADY_DELIVERED_IN_CONTEXT",
@@ -988,6 +989,7 @@ export interface OwnPriorFeedback {
 	body: unknown;
 	recordedClaimCurrentness: unknown;
 	withdrawn: unknown;
+	wordsUnavailable?: "COPY_AUTHORITY_UNAVAILABLE";
 	eligibleForPriorAdvice: boolean;
 	eligibleForAlreadySaid: boolean;
 }
@@ -1081,6 +1083,9 @@ export function priorPublicFeedback(
 				body,
 				recordedClaimCurrentness,
 				withdrawn,
+				...(entry.wordsUnavailable === "COPY_AUTHORITY_UNAVAILABLE"
+					? { wordsUnavailable: "COPY_AUTHORITY_UNAVAILABLE" as const }
+					: {}),
 				eligibleForPriorAdvice:
 					recorded &&
 					recordedClaimCurrentness === "CURRENT" &&

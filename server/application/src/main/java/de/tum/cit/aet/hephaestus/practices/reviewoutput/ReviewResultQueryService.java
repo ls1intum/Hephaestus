@@ -54,6 +54,7 @@ class ReviewResultQueryService {
     private final ReviewSubjectResolver subjectResolver;
     private final ReviewRunLookup reviewRunLookup;
     private final EvidenceAuthorization evidenceAuthorization;
+    private final ReviewResultWords resultWords;
     private final PracticeResultInvalidationRepository invalidationRepository;
     private final AccountSummaryQuery accountSummaryQuery;
     private final ReactionRepository reactionRepository;
@@ -80,12 +81,16 @@ class ReviewResultQueryService {
         Map<UUID, Target> targets = reviewRunLookup.findTargets(
                 workspaceId,
                 rows.getContent().stream().map(OperatorResultRow::getAgentJobId).toList());
+        Set<UUID> permittedWords = resultWords.permitted(
+                workspaceId,
+                rows.getContent().stream().map(OperatorResultRow::getId).toList());
         return rows.map(row -> ReviewResultDTO.from(
                 row,
                 feedbackCounts.get(row.getId()),
                 ReviewedWorkLabels.ref(
                         ArtifactKind.of(row.getArtifactKind()), row.getArtifactId(), targets.get(row.getAgentJobId())),
-                subjects));
+                subjects,
+                permittedWords.contains(row.getId())));
     }
 
     /**
@@ -140,8 +145,7 @@ class ReviewResultQueryService {
                 reviewRunLookup
                         .findTargets(workspaceId, List.of(practiceResult.getAgentJobId()))
                         .get(practiceResult.getAgentJobId()));
-        boolean includeEvidence =
-                evidenceAuthorization.permits(workspaceId, practiceResult, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW);
+        boolean includeEvidence = resultWords.permits(workspaceId, practiceResult);
         List<PracticeResultInvalidation> history = invalidationRepository.findHistory(workspaceId, practiceResultId);
         Map<Long, AccountSummary> accounts = accountSummaryQuery.findAllByIds(history.stream()
                 .flatMap(invalidation ->

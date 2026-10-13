@@ -489,6 +489,11 @@ public class JobEvidenceFiles implements SandboxResultListener {
         personCopies.holdCopyAdmission();
     }
 
+    /** See {@link EvidenceFolderPersonDataCatalog#vouchesForLiveAttempt}. */
+    public boolean vouchesForLiveAttempt(ResultAdmissionService.AdmissionIdentity identity) {
+        return personCopies.vouchesForLiveAttempt(identity.jobId(), identity.workspaceId(), identity.attempt());
+    }
+
     /** See {@link EvidenceFolderPersonDataCatalog#vouchesForOriginalCopy}. */
     public boolean vouchesForOriginalCopy(UUID copyId, UUID jobId, long workspaceId, int attempt) {
         return personCopies.vouchesForOriginalCopy(copyId, jobId, workspaceId, attempt);

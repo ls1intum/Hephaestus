@@ -78,6 +78,7 @@ class ReviewLineageService {
     private final ReactionRepository reactionRepository;
     private final InAppFeedbackEvidence inAppFeedbackEvidence;
     private final Clock clock;
+    private final ReviewResultWords resultWords;
 
     /**
      * @param whole list every result and piece of feedback of the result's review, up to
@@ -266,11 +267,14 @@ class ReviewLineageService {
         ReviewedWorkRefDTO work = work(results, feedback, facts);
         StartRow start = work == null ? null : start(workspaceId, work, reviewId);
 
+        var permittedWords = resultWords.permitted(
+                workspaceId, results.stream().map(ResultRow::getId).toList());
         return new ReviewLineageDTO(
                 work,
                 review,
                 results.stream()
-                        .map(row -> result(row, focusedResults.contains(row.getId())))
+                        .map(row ->
+                                result(row, focusedResults.contains(row.getId()), permittedWords.contains(row.getId())))
                         .toList(),
                 Math.max(moreResults, 0),
                 feedback.stream()
@@ -441,11 +445,11 @@ class ReviewLineageService {
         return sorted;
     }
 
-    private static ReviewLineageResultDTO result(ResultRow row, boolean focus) {
+    private static ReviewLineageResultDTO result(ResultRow row, boolean focus, boolean includeWords) {
         return new ReviewLineageResultDTO(
                 row.getId(),
                 row.getAgentJobId(),
-                row.getSummary(),
+                includeWords ? row.getSummary() : null,
                 row.getPracticeSlug(),
                 row.getPracticeName(),
                 Outcome.valueOf(row.getOutcome()),

@@ -1,4 +1,5 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
+import { resultSummary } from "@/components/admin/practice-reviews/result-words";
 
 import {
 	getAgentJobOptions,
@@ -178,7 +179,7 @@ function useRecordRead(
 				picked,
 				name: panelState(resultQuery, (result) => ({
 					status: "ready" as const,
-					name: result.summary,
+					name: resultSummary(result),
 				})),
 				trace,
 				work: panelState(resultQuery, (result) => ({

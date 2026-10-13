@@ -2,6 +2,7 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 
 import { getPracticeReviewLineageOptions } from "@/api/@tanstack/react-query.gen";
 import type { GetPracticeReviewLineageData, ReviewLineage } from "@/api/types.gen";
+import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
 import { type PanelState, panelState } from "@/components/common/panel-state";
 import { problemStatusOf } from "@/lib/problem-detail";
 import { retryUnlessNotFound } from "@/runtime/tanstack-query/query-defaults";
@@ -29,6 +30,10 @@ export function useReviewLineage(
 		...options,
 		queryFn: target === undefined ? skipToken : options.queryFn,
 		retry: retryUnlessNotFound,
+		refetchInterval: ({ state }) =>
+			state.status === "success" && state.data?.review?.status === "IN_PROGRESS"
+				? ACTIVE_REVIEW_POLL_MS
+				: false,
 	});
 	if (target === undefined || problemStatusOf(query.error) === 404) {
 		return undefined;

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
+import { RESULT_WORDS_UNAVAILABLE } from "./result-words";
 
 import type { ReviewResultDetail } from "@/api/types.gen";
 import { withPageBehind } from "@/stories/decorators";
@@ -462,5 +463,28 @@ export const LoadFailed: Story = {
 			panel.queryByRole("button", { name: "Mark as incorrect" }),
 		).not.toBeInTheDocument();
 		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
+	},
+};
+
+/** Source denial withholds words without claiming no passage was ever captured. */
+export const TextUnavailable: Story = {
+	args: {
+		result: ready({
+			...reviewResultDetail,
+			summary: undefined,
+			evidenceRationale: undefined,
+			evidence: undefined,
+			observations: [],
+			evidenceHidden: true,
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(
+			panel.getByRole("heading", { name: "Result text unavailable", level: 2 }),
+		).toBeVisible();
+		await expect(panel.getByText(RESULT_WORDS_UNAVAILABLE)).toBeVisible();
+		await expect(panel.queryByText(/Nothing was quoted/u)).not.toBeInTheDocument();
+		panel.getByText(reviewResultDetail.practiceName);
 	},
 };

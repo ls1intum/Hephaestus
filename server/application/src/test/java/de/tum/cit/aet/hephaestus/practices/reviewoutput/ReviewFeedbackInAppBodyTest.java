@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
@@ -34,7 +33,6 @@ class ReviewFeedbackInAppBodyTest extends BaseUnitTest {
     private static final long WORKSPACE_ID = 7L;
 
     private final FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
-    private final FeedbackEvidenceRepository feedbackEvidenceRepository = mock(FeedbackEvidenceRepository.class);
     private final FeedbackPlacementRepository feedbackPlacementRepository = mock(FeedbackPlacementRepository.class);
     private final ReviewSubjectResolver subjectResolver = mock(ReviewSubjectResolver.class);
     private final ReviewRunLookup reviewRunLookup = mock(ReviewRunLookup.class);
@@ -42,9 +40,10 @@ class ReviewFeedbackInAppBodyTest extends BaseUnitTest {
     private final DeliveryPolicyEvaluationRepository policyEvaluationRepository =
             mock(DeliveryPolicyEvaluationRepository.class);
 
+    private final ReviewResultWords resultWords = mock(ReviewResultWords.class);
+
     private final ReviewFeedbackQueryService service = new ReviewFeedbackQueryService(
             feedbackRepository,
-            feedbackEvidenceRepository,
             feedbackPlacementRepository,
             mock(FeedbackDispatchRepository.class),
             subjectResolver,
@@ -54,7 +53,8 @@ class ReviewFeedbackInAppBodyTest extends BaseUnitTest {
             mock(FeedbackWithdrawalRepository.class),
             mock(AccountSummaryQuery.class),
             mock(ReactionRepository.class),
-            JsonMapper.builder().build());
+            JsonMapper.builder().build(),
+            resultWords);
 
     @Test
     void withholdsAnInAppBodyFromTheOperatorDetailRoute() {
@@ -96,8 +96,7 @@ class ReviewFeedbackInAppBodyTest extends BaseUnitTest {
                 .build();
         when(feedbackRepository.findByIdAndWorkspaceId(feedbackId, WORKSPACE_ID))
                 .thenReturn(Optional.of(unit));
-        when(feedbackEvidenceRepository.findBoundResults(WORKSPACE_ID, feedbackId))
-                .thenReturn(List.of());
+        when(resultWords.boundToFeedback(WORKSPACE_ID, feedbackId)).thenReturn(List.of());
         when(feedbackPlacementRepository.findByFeedbackIdInDisplayOrder(feedbackId))
                 .thenReturn(List.of());
         when(policyEvaluationRepository.findByWorkspaceIdAndFeedbackIdOrderByEvaluatedAtAsc(WORKSPACE_ID, feedbackId))

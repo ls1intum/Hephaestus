@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
@@ -77,7 +78,7 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
         practice.setCurrentRevision(revision);
         practice = practiceRepository.saveAndFlush(practice);
-        job = newJob();
+        job = captureCopiedPeople(newJob(), recipient);
         nextPosition = 0;
     }
 
@@ -128,6 +129,31 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
 
         assertThat(root.has("_meta")).isFalse();
         assertThat(bodies(root)).containsExactly("pr-body");
+    }
+
+    @Test
+    void shouldKeepUnvouchedDeliveryFactsWithoutItsWordsBesideTrustedFeedback() {
+        Feedback trusted = saveDelivered(ArtifactKinds.PULL_REQUEST, 909L, FeedbackChannel.IN_CONTEXT, "trusted-body");
+        job = newJob();
+        Feedback unvouched =
+                saveDelivered(ArtifactKinds.PULL_REQUEST, 910L, FeedbackChannel.IN_CONTEXT, "unvouched-body");
+
+        JsonNode root = contribute();
+
+        assertThat(bodies(root)).containsExactly("trusted-body");
+        assertThat(root.path("wordsCoverage").asString()).isEqualTo("PARTIAL");
+        assertThat(root.get("feedbackStates"))
+                .extracting(state -> state.path("feedbackId").asString())
+                .containsExactlyInAnyOrder(
+                        trusted.getId().toString(), unvouched.getId().toString());
+        assertThat(root.get("feedbackStates"))
+                .filteredOn(state -> state.path("feedbackId")
+                        .asString()
+                        .equals(unvouched.getId().toString()))
+                .singleElement()
+                .satisfies(state -> assertThat(state.path("wordsUnavailable").asString())
+                        .isEqualTo(EvidenceFolderPersonDataCatalog.COPY_AUTHORITY_UNAVAILABLE));
+        assertThat(root.toString()).doesNotContain("unvouched-body");
     }
 
     private JsonNode contribute() {

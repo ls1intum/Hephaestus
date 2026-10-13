@@ -38,7 +38,8 @@ public record ReviewResultDetailDTO(
         @Nullable
         ReviewSubjectDTO subject,
 
-        @NonNull String summary,
+        @Schema(description = "Result text; absent when source access cannot be verified") @Nullable
+        String summary,
 
         @NonNull @Schema(description = "Result of the practice review")
         Outcome outcome,
@@ -120,16 +121,16 @@ public record ReviewResultDetailDTO(
                 revision == null ? null : revision.getId(),
                 reviewedWork,
                 subject,
-                practiceResult.getSummary(),
+                includeEvidence ? practiceResult.getSummary() : null,
                 practiceResult.getOutcome(),
                 practiceResult.getSeverity(),
                 practiceResult.getOrigin(),
                 !includeEvidence,
                 includeEvidence ? PracticeResultEvidenceDTO.from(practiceResult.getEvidence(), problems) : null,
-                practiceResult.getEvidenceRationale(),
+                includeEvidence ? practiceResult.getEvidenceRationale() : null,
                 includeEvidence ? problems.stream().map(ObservationDTO::from).toList() : List.of(),
                 includeEvidence ? PracticeResultExampleDTO.from(practiceResult.getExample()) : null,
-                PracticeResultCoverageDTO.from(practiceResult.getCoverage()),
+                includeEvidence ? PracticeResultCoverageDTO.from(practiceResult.getCoverage()) : null,
                 PracticeResultProvenanceDTO.from(practiceResult.getProvenance()),
                 ReviewClaimCurrentness.of(revision, practice, practiceResult.getSupersededAt()),
                 practiceResult.getSupersededAt(),

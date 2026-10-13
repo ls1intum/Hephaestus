@@ -95,6 +95,14 @@ Sandbox inputs and results pass through the authenticated worker gateway.
 
 Preparation failures record the stage and a known failure type without exception text.
 File and database failure types remain visible when preparation wraps the cause.
+
+A closed preparation reason distinguishes unavailable reviewed work, source authority, pinned ranges, and input contracts.
+Required source collection and folder rendering have separate reasons.
+The terminal job retains the attempt, stage, type and reason in `metadata.preparation_failure`.
+Other metadata fields stay unchanged.
+
+Structured preparation logs and spans carry the same reason without exception text.
+An unclassified reason remains explicit.
 A diagnostic type does not grant a retry.
 Eligibility and retry limits are unchanged.
 Earlier failures without a retained cause cannot be classified retrospectively.
@@ -482,3 +490,10 @@ These behaviors matter independently of configured capacity:
 2. Return to a previous release only through restoration of a compatible backup.
 
 See [Install § Rollback](./install.mdx#rollback).
+
+## Observation text availability
+
+Operator review views keep the outcome, practice, reviewed work and delivery history when source access cannot be verified.
+They withhold the observation summary, rationale and evidence in that state.
+The API omits the summary instead of returning an empty observation.
+Private practice-page and conversation feedback bodies remain unavailable to operators.

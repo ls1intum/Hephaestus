@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
@@ -103,6 +104,7 @@ public class ResultHistoryContentSource implements ContentSource {
     private final ReviewedWorkCoverage reviewedWorkCoverage;
     private final ObjectMapper objectMapper;
     private final ObservationRepository observationRepository;
+    private final EvidenceFolderPersonDataCatalog personCopies;
 
     @Override
     public boolean supports(ContextRequest request) {
@@ -178,9 +180,13 @@ public class ResultHistoryContentSource implements ContentSource {
         root.put("list", listed.get().getKey());
         Map<UUID, ObjectNode> reviewedWork = reviewedWorkCoverage.of(workspaceId, List.of(practiceResult));
         ObjectNode row = root.putObject("result");
-        describe(row, practiceResult, reviewedWork);
-        describeEvidence(row, practiceResult);
-        describeProblems(row, observationRepository.findByPracticeResultIds(workspaceId, List.of(practiceResultId)));
+        boolean wordsAvailable = selection.vouchedJobs().contains(practiceResult.getAgentJobId());
+        describe(row, practiceResult, reviewedWork, wordsAvailable);
+        if (wordsAvailable) {
+            describeEvidence(row, practiceResult);
+            describeProblems(
+                    row, observationRepository.findByPracticeResultIds(workspaceId, List.of(practiceResultId)));
+        } else root.put("wordsCoverage", "PARTIAL");
         return fittedDetail(root, row);
     }
 
@@ -214,7 +220,13 @@ public class ResultHistoryContentSource implements ContentSource {
                 .stream()
                 .filter(candidate -> outrankedByListedRun(latest, candidate))
                 .toList());
-        return new Selection(preparedAt, since, recent, abstentions, earlier);
+        Set<UUID> vouchedJobs = personCopies.recordVouchedHistoricalJobs(
+                workspaceId,
+                Stream.of(recent, abstentions, earlier)
+                        .flatMap(List::stream)
+                        .map(PracticeResult::getAgentJobId)
+                        .toList());
+        return new Selection(preparedAt, since, recent, abstentions, earlier, vouchedJobs);
     }
 
     private record Selection(
@@ -222,7 +234,8 @@ public class ResultHistoryContentSource implements ContentSource {
             Instant since,
             List<PracticeResult> recent,
             List<PracticeResult> abstentions,
-            List<PracticeResult> earlier) {
+            List<PracticeResult> earlier,
+            Set<UUID> vouchedJobs) {
 
         /** The lists in the overview's order: verdicts first, earlier runs last. */
         List<Listed> lists() {
@@ -323,6 +336,8 @@ public class ResultHistoryContentSource implements ContentSource {
         }
         root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
         root.set("coverage", objectMapper.valueToTree(Coverage.of(preparedAt)));
+        if (selection.all().anyMatch(o -> !selection.vouchedJobs().contains(o.getAgentJobId())))
+            root.put("wordsCoverage", "PARTIAL");
         root.putObject("detail")
                 .put("loaded", false)
                 .set(
@@ -360,7 +375,7 @@ public class ResultHistoryContentSource implements ContentSource {
             ArrayNode into = root.putArray(list.name());
             for (PracticeResult o : list.rows()) {
                 ObjectNode row = into.addObject();
-                describe(row, o, reviewedWork);
+                describe(row, o, reviewedWork, selection.vouchedJobs().contains(o.getAgentJobId()));
                 if (summariesLeftOut.contains(o.getId())) {
                     row.putNull("summary");
                     row.put("summaryNotLoaded", true);
@@ -406,12 +421,14 @@ public class ResultHistoryContentSource implements ContentSource {
         return root;
     }
 
-    private static void describe(ObjectNode node, PracticeResult o, Map<UUID, ObjectNode> reviewedWork) {
+    private static void describe(
+            ObjectNode node, PracticeResult o, Map<UUID, ObjectNode> reviewedWork, boolean wordsAvailable) {
         node.put("practiceResultId", o.getId().toString());
         node.put("resource", resourceOf(o.getId()));
         node.put("reviewId", o.getAgentJobId().toString());
         node.put("origin", o.getOrigin().name());
-        node.put("summary", o.getSummary());
+        if (wordsAvailable) node.put("summary", o.getSummary());
+        else node.put("wordsUnavailable", EvidenceFolderPersonDataCatalog.COPY_AUTHORITY_UNAVAILABLE);
         node.put("practiceSlug", o.getPractice().getSlug());
 
         node.put("outcome", o.getOutcome().name());

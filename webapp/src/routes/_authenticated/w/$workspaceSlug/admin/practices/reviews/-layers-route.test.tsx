@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-libra
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
+import { resultSummary } from "@/components/admin/practice-reviews/result-words";
 
 import {
 	feedbackDetail,
@@ -196,7 +197,7 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 		// The loading table is replaced by the loaded one, so the row is found first and its table after.
 		const track = await screen.findByRole(
 			"button",
-			{ name: `Track result ${fixtureResult.summary}` },
+			{ name: `Track result ${resultSummary(fixtureResult)}` },
 			ROUTE_RENDER_WAIT,
 		);
 		expect(track.closest("table")?.getAttribute("aria-label")).toBe("Results");
@@ -222,7 +223,9 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 			expect(
 				// The list is read again for the narrowed scope, so the row is found afresh.
 				screen
-					.getByRole("button", { name: `Track result ${fixtureResult.summary}` })
+					.getByRole("button", {
+						name: `Track result ${resultSummary(fixtureResult)}`,
+					})
 					.getAttribute("aria-pressed"),
 			).toBe("true"),
 		);

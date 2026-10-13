@@ -16,10 +16,10 @@ public interface ReviewCompositionBasisRepository extends Repository<ReviewCompo
 
     Optional<ReviewCompositionBasis> findByWorkspaceIdAndJobId(long workspaceId, UUID jobId);
 
-    record OriginalCopy(UUID copyId, int admissionAttempt) {}
+    record OriginalCopy(UUID copyId, int admissionAttempt, Instant expiresAt) {}
 
     @Query(
-            "SELECT new de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository$OriginalCopy(b.copyId,b.admissionAttempt) FROM ReviewCompositionBasis b WHERE b.workspaceId=:workspaceId AND b.jobId=:jobId")
+            "SELECT new de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository$OriginalCopy(b.copyId,b.admissionAttempt,b.expiresAt) FROM ReviewCompositionBasis b WHERE b.workspaceId=:workspaceId AND b.jobId=:jobId")
     Optional<OriginalCopy> findOriginalCopy(@Param("workspaceId") long workspaceId, @Param("jobId") UUID jobId);
 
     @Modifying

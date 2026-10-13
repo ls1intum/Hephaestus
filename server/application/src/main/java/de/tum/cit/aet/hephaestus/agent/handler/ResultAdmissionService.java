@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationEligibility;
@@ -368,8 +369,12 @@ public class ResultAdmissionService {
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ObjectNode publicFeedbackHistory(AdmissionIdentity identity) {
-        return evidenceFiles.indexLateRead(
-                identity, () -> readPublicFeedbackHistory(identity), ResultAdmissionService::publicHistoryCopies);
+        try {
+            return evidenceFiles.indexLateRead(
+                    identity, () -> readPublicFeedbackHistory(identity), ResultAdmissionService::publicHistoryCopies);
+        } catch (EvidenceFolderPersonDataCatalog.CopyUnavailableException refused) {
+            throw new PublicHistoryRefusedException("Review history copy authority is unavailable", refused);
+        }
     }
 
     /** The rows a public history read copies into the job's evidence: its feedback and the results they rest on. */
@@ -377,6 +382,7 @@ public class ResultAdmissionService {
         Set<UUID> feedback = new HashSet<>();
         Set<UUID> basedOn = new HashSet<>();
         read.path("history").path("feedback").forEach(row -> {
+            if (!row.path("body").isString()) return;
             feedback.add(UUID.fromString(row.path("id").asString()));
             row.path("basedOn")
                     .forEach(support -> basedOn.add(
@@ -652,6 +658,10 @@ public class ResultAdmissionService {
 
         public PublicHistoryRefusedException(String reason) {
             super(reason);
+        }
+
+        public PublicHistoryRefusedException(String reason, Throwable cause) {
+            super(reason, cause);
         }
     }
 

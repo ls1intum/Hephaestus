@@ -74,4 +74,46 @@ class PreparationFailureTest {
                         .kind())
                 .isEqualTo(PreparationFailure.Kind.INPUT_PREPARATION);
     }
+
+    @Test
+    void shouldKeepTheSourceOwnedReasonAlongsideAFileOrDatabaseCause() {
+        String privateText = "token=private path=/private/student/repository";
+        var io = new JobPreparationException(
+                JobPreparationException.Reason.WORKSPACE_RENDERING_FAILED,
+                privateText,
+                new UncheckedIOException(new IOException(privateText)));
+        var database = new JobPreparationException(
+                JobPreparationException.Reason.REQUIRED_SOURCE_COLLECTION_FAILED,
+                privateText,
+                new EvidenceCollectionException(privateText, new DataIntegrityViolationException(privateText)));
+
+        var ioFailure = PreparationFailure.of(PreparationFailure.Stage.INPUTS, io);
+        var databaseFailure = PreparationFailure.of(PreparationFailure.Stage.INPUTS, database);
+
+        assertThat(ioFailure.kind()).isEqualTo(PreparationFailure.Kind.IO);
+        assertThat(ioFailure.reason()).isEqualTo(JobPreparationException.Reason.WORKSPACE_RENDERING_FAILED);
+        assertThat(databaseFailure.kind()).isEqualTo(PreparationFailure.Kind.DATABASE);
+        assertThat(databaseFailure.reason())
+                .isEqualTo(JobPreparationException.Reason.REQUIRED_SOURCE_COLLECTION_FAILED);
+        assertThat(io.getCause()).isInstanceOf(UncheckedIOException.class);
+        assertThat(database.getCause()).isInstanceOf(EvidenceCollectionException.class);
+        assertThat(ioFailure.message()).doesNotContain(privateText);
+        assertThat(databaseFailure.message()).doesNotContain(privateText);
+        assertThat(AgentJobExecutor.isRetryableExecutionFailure(io)).isFalse();
+        assertThat(AgentJobExecutor.isRetryableExecutionFailure(database)).isFalse();
+    }
+
+    @Test
+    void shouldNotInferAReasonFromTextOrAnArbitraryCause() {
+        var coded = new JobPreparationException(JobPreparationException.Reason.REVIEW_RANGE_UNAVAILABLE, "private");
+        var failure = new RuntimeException("REVIEW_RANGE_UNAVAILABLE", coded);
+        assertThat(PreparationFailure.of(PreparationFailure.Stage.INPUTS, failure)
+                        .reason())
+                .isEqualTo(JobPreparationException.Reason.UNCLASSIFIED);
+        assertThat(PreparationFailure.of(
+                                PreparationFailure.Stage.INPUTS,
+                                new JobPreparationException("REVIEW_RANGE_UNAVAILABLE"))
+                        .reason())
+                .isEqualTo(JobPreparationException.Reason.UNCLASSIFIED);
+    }
 }

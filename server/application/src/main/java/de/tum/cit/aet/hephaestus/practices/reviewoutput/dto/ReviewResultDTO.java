@@ -30,7 +30,8 @@ public record ReviewResultDTO(
         @Nullable
         ReviewSubjectDTO subject,
 
-        @NonNull String summary,
+        @Schema(description = "Result text; absent when source access cannot be verified") @Nullable
+        String summary,
 
         @NonNull @Schema(description = "Result of the practice review")
         Outcome outcome,
@@ -69,7 +70,8 @@ public record ReviewResultDTO(
             OperatorResultRow row,
             @Nullable FeedbackStateCounts feedback,
             ReviewedWorkRefDTO reviewedWork,
-            Map<Long, ReviewSubjectDTO> subjects) {
+            Map<Long, ReviewSubjectDTO> subjects,
+            boolean includeWords) {
         return new ReviewResultDTO(
                 row.getId(),
                 row.getAgentJobId(),
@@ -79,7 +81,7 @@ public record ReviewResultDTO(
                         row.getGroupSlug(), row.getGroupName(), row.getGroupIcon(), row.getGroupColor()),
                 reviewedWork,
                 subjects.get(row.getAboutUserId()),
-                row.getSummary(),
+                includeWords ? row.getSummary() : null,
                 row.getOutcome(),
                 row.getSeverity(),
                 row.getProblemCount(),

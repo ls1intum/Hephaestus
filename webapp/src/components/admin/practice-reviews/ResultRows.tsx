@@ -21,6 +21,8 @@ import { StatusLabel } from "@/components/practice-vocabulary/StatusTooltip";
 import { TableCell } from "@/components/ui/table";
 import { formatDayTime } from "@/lib/dates";
 
+import { resultSummary } from "./result-words";
+
 import { RecordResults, type RecordResultsWords } from "./RecordResults";
 import { RecordRowActions, ROW_OPEN_COLUMN, rowActionsColumn } from "./RecordRowActions";
 import { resultLevel } from "./review-levels";
@@ -193,7 +195,7 @@ export function ResultRow({ result, withDay = false }: ResultRowProps) {
 		<PracticeTableRow
 			link={{
 				text: "Open result",
-				name: `${result.summary}, ${formatDayTime(result.observedAt, today)}`,
+				name: `${resultSummary(result)}, ${formatDayTime(result.observedAt, today)}`,
 				render: <DetailStackLink entry={resultLevel(result.id)} single />,
 			}}
 			variant={tracked ? "highlighted" : undefined}
@@ -201,7 +203,7 @@ export function ResultRow({ result, withDay = false }: ResultRowProps) {
 				<RecordRowActions
 					record={{ kind: "result", id: result.id }}
 					agentJobId={result.agentJobId}
-					name={`result ${result.summary}`}
+					name={`result ${resultSummary(result)}`}
 				/>
 			}
 		>
@@ -213,7 +215,9 @@ export function ResultRow({ result, withDay = false }: ResultRowProps) {
 			/>
 			<TableCell className="align-top whitespace-normal">
 				<span className="flex min-w-0 flex-col items-start gap-1.5">
-					<span className="max-w-md text-sm font-semibold break-words">{result.summary}</span>
+					<span className="max-w-md text-sm font-semibold break-words">
+						{resultSummary(result)}
+					</span>
 					<span className="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
 						<ReviewPracticeName practiceName={result.practiceName} group={result.group} />
 						{result.outcome === "NOT_MET" && result.problemCount > 0 && (

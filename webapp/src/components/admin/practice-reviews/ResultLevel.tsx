@@ -1,5 +1,6 @@
 import { CircleSlashIcon, Undo2Icon } from "lucide-react";
 import type { ReactNode } from "react";
+import { resultSummary, RESULT_WORDS_UNAVAILABLE } from "./result-words";
 
 import { cn } from "cn";
 import type { GetPracticeReviewResultResponse, Observation, OpenQuestion } from "@/api/types.gen";
@@ -118,7 +119,7 @@ export function ResultLevel({
 					/>
 				)
 			}
-			title={result?.summary}
+			title={result === undefined ? undefined : resultSummary(result)}
 			description={result && <ReviewArtifactLink reviewedWork={result.reviewedWork} />}
 		/>
 	);
@@ -215,7 +216,9 @@ export function ResultLevel({
 						    nothing was quoted. Hidden evidence is neither: the server sends none of it. */}
 						{record.evidenceHidden ? (
 							<Section level={4} size="sm" title="Evidence">
-								<p className="text-sm text-muted-foreground">{HIDDEN_EVIDENCE}</p>
+								<p className="text-sm text-muted-foreground">
+									{record.summary === undefined ? RESULT_WORDS_UNAVAILABLE : HIDDEN_EVIDENCE}
+								</p>
 							</Section>
 						) : (
 							(citations.length > 0 || problems.length === 0) && (

@@ -1255,6 +1255,20 @@ public class AgentJobExecutor {
 
         Integer failed = transactionTemplate.execute(status -> {
             int updated = transitionTerminal(jobId, AgentJobStatus.FAILED, Instant.now(), errorMessage);
+            if (updated > 0 && preparation != null) {
+                var diagnosis = objectMapper
+                        .createObjectNode()
+                        .put("attempt", job.getRetryCount())
+                        .put("stage", preparation.stage().name())
+                        .put("kind", preparation.kind().name())
+                        .put("reason", preparation.reason().name());
+                jobRepository.recordPreparationFailure(
+                        jobId,
+                        job.getWorkspace().getId(),
+                        workerId,
+                        job.getRetryCount(),
+                        objectMapper.writeValueAsString(diagnosis));
+            }
             if (updated > 0 && sandboxExecutionStarted) billTerminatedJob(job, "execution failure");
             return updated;
         });

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
@@ -76,7 +77,7 @@ class ResultHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
         practice.setCurrentRevision(revision);
         practice = practiceRepository.saveAndFlush(practice);
-        job = newJob();
+        job = captureCopiedPeople(newJob(), recipient);
     }
 
     @Test
@@ -131,17 +132,74 @@ class ResultHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
     }
 
     @Test
+    void shouldKeepUnvouchedObservationFactsWithoutEvidenceBesideTrustedHistory() {
+        PracticeResult trusted = saveResult("trusted", "scm.pull_request", 909L);
+        job = newJob();
+        PracticeResult unvouched = saveResult("unvouched", "scm.pull_request", 910L);
+
+        JsonNode root = contribute();
+        assertThat(practiceResultIds(root))
+                .containsExactlyInAnyOrder(
+                        trusted.getId().toString(), unvouched.getId().toString());
+        assertThat(root.path("wordsCoverage").asString()).isEqualTo("PARTIAL");
+        ObjectNode detail = contentSource.inspect(workspace.getId(), recipient.getId(), unvouched.getId());
+        JsonNode row = detail.path("result");
+        assertThat(row.path("wordsUnavailable").asString())
+                .isEqualTo(EvidenceFolderPersonDataCatalog.COPY_AUTHORITY_UNAVAILABLE);
+        assertThat(row.has("summary")).isFalse();
+        assertThat(row.has("evidenceRationale")).isFalse();
+        assertThat(row.has("evidence")).isFalse();
+        assertThat(contentSource
+                        .inspect(workspace.getId(), recipient.getId(), trusted.getId())
+                        .path("result")
+                        .path("evidence")
+                        .path("citations"))
+                .hasSize(1);
+    }
+
+    @Test
     @DisplayName("an earlier review stays beside the latest one, abstentions are listed, and no other row is")
     void shouldKeepEarlierReviewsAndAbstentionsBesideEachClaimsLatestRun() {
         Instant base = Instant.now().minus(1, ChronoUnit.DAYS);
-        UUID earlier = observe(newJob(), practice, 3L, recipient.getId(), "NOT_MET", "MAJOR", EVIDENCE, base);
-        AgentJob repair = newJob();
+        UUID earlier = observe(
+                captureCopiedPeople(newJob(), recipient),
+                practice,
+                3L,
+                recipient.getId(),
+                "NOT_MET",
+                "MAJOR",
+                EVIDENCE,
+                base);
+        AgentJob repair = captureCopiedPeople(newJob(), recipient);
         UUID latest = observe(repair, practice, 3L, recipient.getId(), "MET", null, EVIDENCE, base.plusSeconds(60));
         UUID abstention = observe(
-                newJob(), practice, 4L, recipient.getId(), "NOT_APPLICABLE", null, EVIDENCE, base.plusSeconds(60));
+                captureCopiedPeople(newJob(), recipient),
+                practice,
+                4L,
+                recipient.getId(),
+                "NOT_APPLICABLE",
+                null,
+                EVIDENCE,
+                base.plusSeconds(60));
         // A later run this conversation may not use hides its claim entirely rather than exposing its earlier run.
-        observe(newJob(), practice, 5L, recipient.getId(), "NOT_MET", "MAJOR", EVIDENCE, base);
-        observe(newJob(), practice, 5L, recipient.getId(), "MET", null, NO_CITATIONS, base.plusSeconds(60));
+        observe(
+                captureCopiedPeople(newJob(), recipient),
+                practice,
+                5L,
+                recipient.getId(),
+                "NOT_MET",
+                "MAJOR",
+                EVIDENCE,
+                base);
+        observe(
+                captureCopiedPeople(newJob(), recipient),
+                practice,
+                5L,
+                recipient.getId(),
+                "MET",
+                null,
+                NO_CITATIONS,
+                base.plusSeconds(60));
         User colleague = userRepository.save(TestUserFactory.createUser(101L, "colleague", recipient.getProvider()));
         observe(repair, practice, 3L, colleague.getId(), "NOT_MET", "MAJOR", EVIDENCE, base.plusSeconds(120));
         Workspace own = workspace;
@@ -174,9 +232,17 @@ class ResultHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
     void shouldAnswerAlikeWhetherOrNotWithheldRowsExist() {
         Instant base = Instant.now().minus(1, ChronoUnit.DAYS);
         for (int i = 0; i < 60; i++) {
-            observe(newJob(), practice, i, recipient.getId(), "NOT_MET", "MAJOR", NO_CITATIONS, base.plusSeconds(i));
             observe(
-                    newJob(),
+                    captureCopiedPeople(newJob(), recipient),
+                    practice,
+                    i,
+                    recipient.getId(),
+                    "NOT_MET",
+                    "MAJOR",
+                    NO_CITATIONS,
+                    base.plusSeconds(i));
+            observe(
+                    captureCopiedPeople(newJob(), recipient),
                     practice,
                     i,
                     recipient.getId(),
@@ -205,7 +271,7 @@ class ResultHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
         UUID newest = null;
         for (int i = 0; i < 30; i++) {
             observe(
-                    newJob(),
+                    captureCopiedPeople(newJob(), recipient),
                     practice,
                     i,
                     recipient.getId(),
@@ -215,7 +281,7 @@ class ResultHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
                     base.plusSeconds(i),
                     hostile);
             newest = observe(
-                    newJob(),
+                    captureCopiedPeople(newJob(), recipient),
                     practice,
                     i,
                     recipient.getId(),
@@ -256,13 +322,36 @@ class ResultHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
     @DisplayName("a detail answers only for a result the overview lists, and alike for every other")
     void detailAnswersOnlyForListedResults() {
         Instant base = Instant.now().minus(1, ChronoUnit.DAYS);
-        UUID earlier = observe(newJob(), practice, 3L, recipient.getId(), "NOT_MET", "MAJOR", EVIDENCE, base);
-        AgentJob repair = newJob();
+        UUID earlier = observe(
+                captureCopiedPeople(newJob(), recipient),
+                practice,
+                3L,
+                recipient.getId(),
+                "NOT_MET",
+                "MAJOR",
+                EVIDENCE,
+                base);
+        AgentJob repair = captureCopiedPeople(newJob(), recipient);
         UUID latest = observe(repair, practice, 3L, recipient.getId(), "MET", null, EVIDENCE, base.plusSeconds(60));
         // A later run this conversation may not use hides its claim's earlier run too.
-        UUID orphaned = observe(newJob(), practice, 5L, recipient.getId(), "NOT_MET", "MAJOR", EVIDENCE, base);
-        UUID unusable =
-                observe(newJob(), practice, 5L, recipient.getId(), "MET", null, NO_CITATIONS, base.plusSeconds(60));
+        UUID orphaned = observe(
+                captureCopiedPeople(newJob(), recipient),
+                practice,
+                5L,
+                recipient.getId(),
+                "NOT_MET",
+                "MAJOR",
+                EVIDENCE,
+                base);
+        UUID unusable = observe(
+                captureCopiedPeople(newJob(), recipient),
+                practice,
+                5L,
+                recipient.getId(),
+                "MET",
+                null,
+                NO_CITATIONS,
+                base.plusSeconds(60));
         User colleague = userRepository.save(TestUserFactory.createUser(101L, "colleague", recipient.getProvider()));
         UUID colleagues =
                 observe(repair, practice, 3L, colleague.getId(), "NOT_MET", "MAJOR", EVIDENCE, base.plusSeconds(120));

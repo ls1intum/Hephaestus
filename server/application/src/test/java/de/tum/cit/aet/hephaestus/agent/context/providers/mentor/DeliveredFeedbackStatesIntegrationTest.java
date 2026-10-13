@@ -108,7 +108,7 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
         practice.setCurrentRevision(revision);
         practice = practiceRepository.saveAndFlush(practice);
-        job = newJob();
+        job = captureCopiedPeople(newJob(), recipient);
         base = Instant.now().minus(1, ChronoUnit.DAYS);
         nextPosition = 0;
     }
@@ -360,14 +360,14 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
     @Test
     void shouldTieEachStatusToItsOwnUnitWhenOneMergeRequestIsReviewedRepeatedly() {
         Feedback first = save(
-                newJob(),
+                captureCopiedPeople(newJob(), recipient),
                 FIRST_MR,
                 FeedbackChannel.IN_CONTEXT,
                 FeedbackDeliveryState.DELIVERED,
                 "first-summary",
                 observeStrength(ArtifactKinds.PULL_REQUEST, FIRST_MR));
         Feedback second = save(
-                newJob(),
+                captureCopiedPeople(newJob(), recipient),
                 FIRST_MR,
                 FeedbackChannel.IN_CONTEXT,
                 FeedbackDeliveryState.DELIVERED,
@@ -375,7 +375,7 @@ class DeliveredFeedbackStatesIntegrationTest extends AbstractSlackConsentGateInt
                 observeStrength(ArtifactKinds.PULL_REQUEST, FIRST_MR));
         feedbackRepository.supersedeDelivered(workspace.getId(), first.getId());
         Feedback third = save(
-                newJob(),
+                captureCopiedPeople(newJob(), recipient),
                 FIRST_MR,
                 FeedbackChannel.IN_CONTEXT,
                 FeedbackDeliveryState.FAILED,

@@ -23,7 +23,9 @@ public record EvidencePlan(SourceContractVersion contractVersion, ArtifactKind a
 
     public static EvidencePlan compile(List<Practice> practices) {
         if (practices.isEmpty()) {
-            throw new JobPreparationException("Cannot compile evidence for an empty practice set");
+            throw new JobPreparationException(
+                    JobPreparationException.Reason.INPUT_CONTRACT_INVALID,
+                    "Cannot compile evidence for an empty practice set");
         }
         PracticeAutomatedReviewPolicy first = requireRequirements(practices.getFirst());
         ArtifactKind artifactKind = practices.getFirst().getArtifactKind();
@@ -32,6 +34,7 @@ public record EvidencePlan(SourceContractVersion contractVersion, ArtifactKind a
             if (!first.sourceContractVersion().equals(requirements.sourceContractVersion())
                     || !artifactKind.equals(practice.getArtifactKind())) {
                 throw new JobPreparationException(
+                        JobPreparationException.Reason.INPUT_CONTRACT_INVALID,
                         "Practices sharing one invocation must use the same source contract and artifact kind");
             }
         }
@@ -40,7 +43,9 @@ public record EvidencePlan(SourceContractVersion contractVersion, ArtifactKind a
 
     private static PracticeAutomatedReviewPolicy requireRequirements(Practice practice) {
         if (practice.getAutomatedReviewPolicy() == null) {
-            throw new JobPreparationException("Practice has no evidence requirements: " + practice.getSlug());
+            throw new JobPreparationException(
+                    JobPreparationException.Reason.INPUT_CONTRACT_INVALID,
+                    "Practice has no evidence requirements: " + practice.getSlug());
         }
         return practice.getAutomatedReviewPolicy();
     }

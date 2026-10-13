@@ -1,5 +1,6 @@
 import { ChevronRightIcon } from "lucide-react";
 import { use } from "react";
+import { resultSummary } from "./result-words";
 
 import { cn } from "cn";
 import type { ReviewLineage, ReviewLineageResult } from "@/api/types.gen";
@@ -284,7 +285,7 @@ function ResultDot({
 		disputed ? "disputed" : undefined,
 		result.invalidated ? "marked incorrect" : undefined,
 	].filter(hasText);
-	const title = `${number} · ${facts.join(", ")}: ${result.summary}`;
+	const title = `${number} · ${facts.join(", ")}: ${resultSummary(result)}`;
 	if (open === undefined) {
 		return (
 			<span title={title} className="flex size-6 items-center justify-center rounded-full">
@@ -369,7 +370,7 @@ function ResultRow({
 								result.invalidated && "line-through",
 							)}
 						>
-							{result.summary}
+							{resultSummary(result)}
 						</span>
 						{flagged && (
 							<span className="flex flex-wrap items-center gap-x-2 text-muted-foreground">

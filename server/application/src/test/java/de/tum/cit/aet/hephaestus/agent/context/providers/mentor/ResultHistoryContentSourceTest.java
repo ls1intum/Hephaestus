@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -73,6 +75,9 @@ class ResultHistoryContentSourceTest extends BaseUnitTest {
     @Mock
     ObservationRepository observationRepository;
 
+    @Mock
+    EvidenceFolderPersonDataCatalog personCopies;
+
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
 
@@ -83,7 +88,10 @@ class ResultHistoryContentSourceTest extends BaseUnitTest {
     private static final List<String> ABSTENTIONS = List.of("NOT_APPLICABLE", "UNDETERMINED");
 
     @BeforeEach
-    void authorizeResults() {
+    void authorizePracticeResults() {
+        lenient()
+                .when(personCopies.recordVouchedHistoricalJobs(anyLong(), any()))
+                .thenAnswer(invocation -> Set.copyOf(invocation.<Collection<UUID>>getArgument(1)));
         lenient().when(reviewedWorkCoverage.of(anyLong(), any())).thenAnswer(invocation -> {
             Map<UUID, ObjectNode> nodes = new HashMap<>();
             for (PracticeResult practiceResult : invocation.<Collection<PracticeResult>>getArgument(1)) {
@@ -102,6 +110,41 @@ class ResultHistoryContentSourceTest extends BaseUnitTest {
                     Collection<PracticeResult> batch = invocation.getArgument(1);
                     return batch.stream().map(PracticeResult::getId).collect(Collectors.toSet());
                 });
+    }
+
+    @Test
+    void shouldKeepFactsWithoutDisclosingUnvouchedWordsInOverviewAndDetail() {
+        givenDeveloper();
+        PracticeResult unsafe =
+                practiceResult(Outcome.NOT_MET, "Earlier third-person words", citations(1, 10), "Earlier rationale");
+        PracticeResult trusted = practiceResult(Outcome.MET, "Trusted summary", citations(1, 10), "Trusted rationale");
+        when(practiceResultRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), eq(VERDICTS), any(Pageable.class)))
+                .thenReturn(List.of(unsafe, trusted));
+        when(queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of());
+        doReturn(Set.of(trusted.getAgentJobId())).when(personCopies).recordVouchedHistoricalJobs(eq(1L), any());
+
+        ObjectNode overview = provider.buildPayload(1L, 2L);
+        JsonNode unsafeRow = overview.path("recentResults").get(0);
+        assertThat(overview.path("recentResults")).hasSize(2);
+        assertThat(unsafeRow.path("outcome").asString()).isEqualTo("NOT_MET");
+        assertThat(unsafeRow.path("wordsUnavailable").asString()).isEqualTo("COPY_AUTHORITY_UNAVAILABLE");
+        assertThat(unsafeRow.has("summary")).isFalse();
+        assertThat(overview.path("recentResults").get(1).path("summary").asString())
+                .isEqualTo("Trusted summary");
+        assertThat(overview.path("wordsCoverage").asString()).isEqualTo("PARTIAL");
+
+        JsonNode detail = provider.inspect(1L, 2L, unsafe.getId()).path("result");
+        assertThat(detail.path("practiceResultId").asString())
+                .isEqualTo(unsafe.getId().toString());
+        assertThat(detail.has("summary")).isFalse();
+        assertThat(detail.has("evidence")).isFalse();
+        assertThat(detail.has("evidenceRationale")).isFalse();
+        assertThat(detail.path("wordsUnavailable").asString()).isEqualTo("COPY_AUTHORITY_UNAVAILABLE");
+        JsonNode safeDetail = provider.inspect(1L, 2L, trusted.getId()).path("result");
+        assertThat(safeDetail.path("summary").asString()).isEqualTo("Trusted summary");
+        assertThat(safeDetail.path("evidence")).isEqualTo(trusted.getEvidence());
     }
 
     @Test

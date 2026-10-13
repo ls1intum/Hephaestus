@@ -2,12 +2,16 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
@@ -27,6 +31,7 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +42,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -69,11 +75,44 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
     @Mock
     ResultVisibilityPolicy visibilityPolicy;
 
+    @Mock
+    EvidenceFolderPersonDataCatalog personCopies;
+
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     DeliveredFeedbackContentSource provider;
+
+    @BeforeEach
+    void vouchFixtureJobs() {
+        lenient()
+                .when(personCopies.recordVouchedHistoricalJobs(anyLong(), any()))
+                .thenAnswer(invocation -> Set.copyOf(invocation.<Collection<UUID>>getArgument(1)));
+    }
+
+    @Test
+    void shouldPreserveDeliveryFactsButOmitWordsWithoutSourceAuthority() throws Exception {
+        givenUser();
+        Row unsafe = delivered(ArtifactKinds.PULL_REQUEST, 575L, "Earlier third-person words");
+        Row trusted = delivered(ArtifactKinds.PULL_REQUEST, 576L, "Trusted guidance");
+        givenRows(unsafe, trusted);
+        authorize(unsafe, trusted);
+        doReturn(Set.of(trusted.getAgentJobId())).when(personCopies).recordVouchedHistoricalJobs(eq(1L), any());
+
+        JsonNode root = contribute();
+
+        assertThat(root.path("deliveredFeedback")).hasSize(1);
+        assertThat(root.path("deliveredFeedback").get(0).path("body").asString())
+                .isEqualTo("Trusted guidance");
+        assertThat(root.path("feedbackStates")).hasSize(2);
+        JsonNode state = root.path("feedbackStates").get(0);
+        assertThat(state.path("feedbackId").asString()).isEqualTo(unsafe.getId().toString());
+        assertThat(state.path("status").asString()).isEqualTo("DELIVERED");
+        assertThat(state.path("wordsUnavailable").asString()).isEqualTo("COPY_AUTHORITY_UNAVAILABLE");
+        assertThat(state.has("withdrawn")).isFalse();
+        assertThat(root.path("wordsCoverage").asString()).isEqualTo("PARTIAL");
+    }
 
     @Test
     @DisplayName("no feedback → empty arrays")
@@ -157,6 +196,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
     void keepsAConversationStatusButNeverItsBody() throws Exception {
         givenUser();
         Row chat = new Row(
+                UUID.randomUUID(),
                 UUID.randomUUID(),
                 FeedbackChannel.IN_CHAT,
                 FeedbackDeliveryState.DELIVERED,
@@ -248,6 +288,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
     private static FeedbackResultVisibility binding(Row row) {
         PracticeResult practiceResult = mock(PracticeResult.class);
         when(practiceResult.getId()).thenReturn(UUID.randomUUID());
+        when(practiceResult.getAgentJobId()).thenReturn(row.getAgentJobId());
         when(practiceResult.getPractice()).thenReturn(new Practice());
         FeedbackResultVisibility binding = mock(FeedbackResultVisibility.class);
         when(binding.getFeedbackId()).thenReturn(row.getId());
@@ -257,6 +298,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
 
     private static Row delivered(@Nullable ArtifactKind artifactKind, @Nullable Long artifactId, String body) {
         return new Row(
+                UUID.randomUUID(),
                 UUID.randomUUID(),
                 FeedbackChannel.IN_CONTEXT,
                 FeedbackDeliveryState.DELIVERED,
@@ -269,6 +311,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
 
     private record Row(
             UUID getId,
+            UUID getAgentJobId,
             FeedbackChannel getChannel,
             FeedbackDeliveryState getDeliveryState,
             @Nullable ArtifactKind getArtifactKind,

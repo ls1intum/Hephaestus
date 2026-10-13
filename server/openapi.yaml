@@ -20870,6 +20870,7 @@ components:
           - INFO
         summary:
           type: string
+          description: Result text; absent when source access cannot be verified
       required:
       - claimCurrentness
       - observedAt
@@ -20879,7 +20880,6 @@ components:
       - practiceResultId
       - practiceSlug
       - role
-      - summary
     ReviewContext:
       type: object
       description: "The piece of reviewed work a provider page shows, and what the\
@@ -21719,6 +21719,7 @@ components:
           - INFO
         summary:
           type: string
+          description: Result text; absent when source access cannot be verified
       required:
       - agentJobId
       - feedbackCount
@@ -21731,7 +21732,6 @@ components:
       - practiceName
       - practiceSlug
       - problemCount
-      - summary
     ReviewLineageRun:
       type: object
       description: The review in a lineage
@@ -22135,6 +22135,7 @@ components:
             longer resolvable
         summary:
           type: string
+          description: Result text; absent when source access cannot be verified
       required:
       - agentJobId
       - claimCurrentness
@@ -22147,7 +22148,6 @@ components:
       - practiceSlug
       - problemCount
       - reviewedWork
-      - summary
     ReviewResultCounts:
       type: object
       description: Counts of results by assessment
@@ -22284,6 +22284,7 @@ components:
             longer resolvable
         summary:
           type: string
+          description: Result text; absent when source access cannot be verified
         supersededAt:
           type: string
           format: date-time
@@ -22304,7 +22305,6 @@ components:
       - practiceName
       - practiceSlug
       - reviewedWork
-      - summary
     ReviewRunCounts:
       type: object
       description: Counts of practice reviews by status

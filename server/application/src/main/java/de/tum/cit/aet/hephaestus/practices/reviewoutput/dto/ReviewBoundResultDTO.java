@@ -27,7 +27,8 @@ public record ReviewBoundResultDTO(
         @Schema(description = "Practice group; null when the practice is Unassigned") @Nullable
         ReviewPracticeGroupDTO group,
 
-        @NonNull String summary,
+        @Schema(description = "Result text; absent when source access cannot be verified") @Nullable
+        String summary,
 
         @NonNull @Schema(description = "Result of the practice review")
         Outcome outcome,
@@ -38,7 +39,7 @@ public record ReviewBoundResultDTO(
         @NonNull ReviewClaimCurrentness claimCurrentness,
         @NonNull Instant observedAt) {
 
-    public static ReviewBoundResultDTO from(BoundResult row) {
+    public static ReviewBoundResultDTO from(BoundResult row, boolean includeWords) {
         return new ReviewBoundResultDTO(
                 row.getPracticeResultId(),
                 row.getRole(),
@@ -47,7 +48,7 @@ public record ReviewBoundResultDTO(
                 row.getPracticeName(),
                 ReviewPracticeGroupDTO.from(
                         row.getGroupSlug(), row.getGroupName(), row.getGroupIcon(), row.getGroupColor()),
-                row.getSummary(),
+                includeWords ? row.getSummary() : null,
                 row.getOutcome(),
                 row.getSeverity(),
                 ReviewClaimCurrentness.of(

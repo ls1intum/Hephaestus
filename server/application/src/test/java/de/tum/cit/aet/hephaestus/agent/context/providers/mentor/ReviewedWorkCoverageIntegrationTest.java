@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.context.ReviewedWork;
@@ -58,6 +59,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.AdditionalAnswers;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
@@ -192,6 +194,12 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
      * Citing the diff makes the result usable in conversation; it does not make the pull request's own record
      * usable. Under a contract that denies that for the core source, nothing about the captured core is told.
      */
+    @Autowired
+    private EvidenceFolderPersonDataCatalog copyAuthority;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
     @Test
     void shouldTellNothingOfTheCapturedCoreWhenOnlyTheDiffMayBeUsedInConversation() {
         PullRequest mr = mergeRequest(course, "MR !2", "Closes #12");
@@ -211,7 +219,8 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
                 visibilityPolicy,
                 new ReviewedWorkCoverage(agentJobRepository, queryRepository, actorSelector, coreDenied, objectMapper),
                 objectMapper,
-                observationRepository);
+                observationRepository,
+                copyAuthority);
 
         assertThat(history()
                         .path("recentResults")
@@ -442,7 +451,7 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
         AgentJob job = persistPullRequestReview(workspace, mr.getNumber(), mr.getId(), NOW);
         job.setStatus(AgentJobStatus.COMPLETED);
         job.setEvidenceSnapshot(snapshot);
-        return agentJobRepository.save(job);
+        return keepHistoryReceipt(agentJobRepository.save(job));
     }
 
     private JsonNode history() {
@@ -456,7 +465,18 @@ class ReviewedWorkCoverageIntegrationTest extends AbstractPracticeReviewIntegrat
     private AgentJob legacyReview(PullRequest mr, String body) {
         AgentJob job = persistPullRequestReview(workspace, mr.getNumber(), mr.getId(), NOW);
         job.setEvidenceSnapshot(snapshot(ReviewedWorkFixtures.pullRequestManifest(CAPTURED, body, HEAD), null));
-        return agentJobRepository.save(job);
+        return keepHistoryReceipt(agentJobRepository.save(job));
+    }
+
+    private AgentJob keepHistoryReceipt(AgentJob job) {
+        jdbc.update("""
+                INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload)
+                SELECT ?,?,?,?,'READY',jsonb_build_object('attempt',0,'dependencies','COMPLETE',
+                    'identities',jsonb_build_array(jsonb_build_object('providerType',p.type,'providerOrigin',p.server_url,
+                    'subject',u.native_id::text,'teamId',NULL)), 'repositories','[]'::jsonb)
+                FROM "user" u JOIN identity_provider p ON p.id=u.provider_id WHERE u.id=?
+                """, UUID.randomUUID(), workspace.getId(), job.getId(), UUID.randomUUID(), student.getId());
+        return job;
     }
 
     private ObjectNode capture(PullRequest mr, String title, String body, String head) {

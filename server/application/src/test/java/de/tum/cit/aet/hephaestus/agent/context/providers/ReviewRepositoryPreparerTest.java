@@ -168,7 +168,11 @@ class ReviewRepositoryPreparerTest extends BaseUnitTest {
 
     @Test
     void shouldRejectUnmonitoredRepositoryBeforeResolvingCredentials() {
-        assertThatThrownBy(() -> preparer.prepare(job)).isInstanceOf(JobPreparationException.class);
+        assertThatThrownBy(() -> preparer.prepare(job))
+                .isInstanceOfSatisfying(
+                        JobPreparationException.class,
+                        failure -> assertThat(failure.reason())
+                                .isEqualTo(JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE));
         verifyNoInteractions(git, connections, tokens);
     }
 
@@ -186,7 +190,10 @@ class ReviewRepositoryPreparerTest extends BaseUnitTest {
         when(tokens.accessToken(1)).thenReturn(Optional.of("private-token"));
         when(tokens.reviewHeadRef(42)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> preparer.prepare(job))
-                .isInstanceOf(JobPreparationException.class)
+                .isInstanceOfSatisfying(
+                        JobPreparationException.class,
+                        failure -> assertThat(failure.reason())
+                                .isEqualTo(JobPreparationException.Reason.REVIEW_RANGE_UNAVAILABLE))
                 .hasMessageContaining("Pinned review commit");
     }
 

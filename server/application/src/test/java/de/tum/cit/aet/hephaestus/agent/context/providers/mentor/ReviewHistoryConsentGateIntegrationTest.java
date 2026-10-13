@@ -176,6 +176,21 @@ class ReviewHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIn
                 .doesNotContain(published, deliveredUnknownTime);
     }
 
+    @Override
+    AgentJob newJob() {
+        AgentJob job = super.newJob();
+        // These synthetic history rows have a declared complete capture of their sole recipient.
+        jdbcTemplate.update(
+                """
+                INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload)
+                SELECT ?,?,?,?,'READY',jsonb_build_object('attempt',0,'dependencies','COMPLETE',
+                    'identities',jsonb_build_array(jsonb_build_object('providerType',p.type,'providerOrigin',p.server_url,
+                    'subject',u.native_id::text,'teamId',NULL)), 'repositories','[]'::jsonb)
+                FROM "user" u JOIN identity_provider p ON p.id=u.provider_id WHERE u.id=?
+                """, UUID.randomUUID(), workspace.getId(), job.getId(), UUID.randomUUID(), recipient.getId());
+        return job;
+    }
+
     private boolean permits(UUID feedbackId) {
         return historySource.permitsHistoryRecord(
                 workspace.getId(), "feedback", feedbackId, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
