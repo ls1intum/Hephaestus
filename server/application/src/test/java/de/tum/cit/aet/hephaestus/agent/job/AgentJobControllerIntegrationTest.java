@@ -4,6 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEvent;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -23,6 +30,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +39,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -55,6 +64,12 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Autowired
     private ConnectionService connectionService;
+
+    @Autowired
+    private LlmUsageEventRepository usageEvents;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -515,6 +530,188 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Test
     @WithAdminUser
+    void shouldRetainCommittedProxyUsageWhenApiCancellationWins() {
+        Workspace workspace = setupWorkspace();
+        AgentJob job = createJob(workspace, AgentJobStatus.RUNNING);
+        job.setWorkerId("cancel-usage-worker");
+        job.setRetryCount(2);
+        job.setExecutionStartedAt(Instant.now().minusSeconds(30));
+        var price = new LlmPriceSnapshot(
+                FundingSource.WORKSPACE,
+                PricingState.PRICED,
+                42L,
+                null,
+                new BigDecimal("3"),
+                new BigDecimal("9"),
+                new BigDecimal("1"),
+                new BigDecimal("2"));
+        job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of(
+                "schemaVersion",
+                ConfigSnapshot.SCHEMA_VERSION,
+                "apiProtocol",
+                "openai-completions",
+                "baseUrl",
+                "https://unused.invalid",
+                "upstreamModelId",
+                "cancel-frozen-model",
+                "timeoutSeconds",
+                600,
+                "priceSnapshot",
+                price)));
+        agentJobRepository.saveAndFlush(job);
+        transactionTemplate.executeWithoutResult(status -> {
+            assertThat(agentJobRepository.accumulateLlmUsage(
+                            job.getId(), 1, new AgentJobLlmUsageDelta(900, 900, 0, 0, 0)))
+                    .isZero();
+            assertThat(agentJobRepository.accumulateLlmUsage(
+                            job.getId(), 2, new AgentJobLlmUsageDelta(1_000_000, 200_000, 30_000, 50_000, 7_000)))
+                    .isEqualTo(1);
+        });
+
+        webTestClient
+                .post()
+                .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo("CANCELLED");
+
+        List<LlmUsageEvent> events = usageEvents.findAll().stream()
+                .filter(event -> event.getSourceId().equals(job.getId()))
+                .toList();
+        assertThat(events).hasSize(1);
+        LlmUsageEvent event = events.getFirst();
+        assertThat(event.getWorkspace().getId()).isEqualTo(workspace.getId());
+        assertThat(event.getSourceAttempt()).isEqualTo(2);
+        assertThat(event.getTotalCalls()).isEqualTo(1);
+        assertThat(event.getInputTokens()).isEqualTo(1_000_000);
+        assertThat(event.getOutputTokens()).isEqualTo(200_000);
+        assertThat(event.getReasoningTokens()).isEqualTo(30_000);
+        assertThat(event.getCacheReadTokens()).isEqualTo(50_000);
+        assertThat(event.getCacheWriteTokens()).isEqualTo(7_000);
+        assertThat(event.getFundingSource()).isEqualTo(FundingSource.WORKSPACE);
+        assertThat(event.getAppliedPriceId()).isEqualTo(42L);
+        assertThat(event.getPricingState()).isEqualTo(PricingState.PRICED);
+        assertThat(event.getUsageProvenance()).isEqualTo(UsageProvenance.PROXY);
+        assertThat(event.getCostUsd()).isEqualByComparingTo("4.864");
+        assertThat(event.getModel()).isEqualTo("cancel-frozen-model");
+        assertThat(event.getAppliedPer1mInputUsd()).isEqualByComparingTo("3");
+        assertThat(event.getAppliedPer1mOutputUsd()).isEqualByComparingTo("9");
+
+        webTestClient
+                .post()
+                .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(Void.class);
+        transactionTemplate.executeWithoutResult(status -> {
+            assertThat(agentJobRepository.transitionStatusOwnedBy(
+                            job.getId(),
+                            AgentJobStatus.CANCELLED,
+                            Instant.now(),
+                            "late worker cancellation",
+                            Set.of(AgentJobStatus.RUNNING),
+                            "cancel-usage-worker"))
+                    .isZero();
+            assertThat(agentJobRepository.accumulateLlmUsage(
+                            job.getId(), 2, new AgentJobLlmUsageDelta(10, 10, 0, 0, 0)))
+                    .isZero();
+        });
+        assertThat(usageEvents.findAll().stream()
+                        .filter(saved -> saved.getSourceId().equals(job.getId()))
+                        .toList())
+                .extracting(LlmUsageEvent::getId)
+                .containsExactly(event.getId());
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/agents/jobs/{id}/usage", workspace.getWorkspaceSlug(), job.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.attempts.length()")
+                .isEqualTo(1)
+                .jsonPath("$.attempts[0].attempt")
+                .isEqualTo(2)
+                .jsonPath("$.attempts[0].inputTokens")
+                .isEqualTo(1_000_000)
+                .jsonPath("$.totalCostUsd")
+                .isEqualTo(4.864);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldKeepTokenlessCancellationUnknownWhileRetainingObservedCalls() {
+        Workspace workspace = setupWorkspace();
+        AgentJob job = createJob(workspace, AgentJobStatus.RUNNING);
+        job.setExecutionStartedAt(Instant.now());
+        agentJobRepository.saveAndFlush(job);
+        transactionTemplate.executeWithoutResult(status -> {
+            assertThat(agentJobRepository.accumulateLlmUsage(job.getId(), 0, new AgentJobLlmUsageDelta(0, 0, 0, 0, 0)))
+                    .isEqualTo(1);
+            assertThat(agentJobRepository.accumulateLlmUsage(job.getId(), 0, new AgentJobLlmUsageDelta(0, 0, 0, 0, 0)))
+                    .isEqualTo(1);
+        });
+        webTestClient
+                .post()
+                .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(Void.class);
+        List<LlmUsageEvent> events = usageEvents.findAll().stream()
+                .filter(event -> event.getSourceId().equals(job.getId()))
+                .toList();
+        assertThat(events).hasSize(1);
+        LlmUsageEvent event = events.getFirst();
+        assertThat(event.getTotalCalls()).isEqualTo(2);
+        assertThat(event.getInputTokens()).isZero();
+        assertThat(event.getCostUsd()).isNull();
+        assertThat(event.getPricingState()).isEqualTo(PricingState.UNPRICED);
+        assertThat(event.getUsageProvenance()).isEqualTo(UsageProvenance.NONE);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldRetainObservedCancellationTokensWithoutInventingAMissingPrice() {
+        Workspace workspace = setupWorkspace();
+        AgentJob job = createJob(workspace, AgentJobStatus.RUNNING);
+        job.setExecutionStartedAt(Instant.now());
+        agentJobRepository.saveAndFlush(job);
+        transactionTemplate.executeWithoutResult(status -> assertThat(agentJobRepository.accumulateLlmUsage(
+                        job.getId(), 0, new AgentJobLlmUsageDelta(120, 50, 10, 20, 0)))
+                .isEqualTo(1));
+        webTestClient
+                .post()
+                .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(Void.class);
+        List<LlmUsageEvent> events = usageEvents.findAll().stream()
+                .filter(event -> event.getSourceId().equals(job.getId()))
+                .toList();
+        assertThat(events).hasSize(1);
+        LlmUsageEvent event = events.getFirst();
+        assertThat(event.getInputTokens()).isEqualTo(120);
+        assertThat(event.getOutputTokens()).isEqualTo(50);
+        assertThat(event.getReasoningTokens()).isEqualTo(10);
+        assertThat(event.getCacheReadTokens()).isEqualTo(20);
+        assertThat(event.getUsageProvenance()).isEqualTo(UsageProvenance.PROXY);
+        assertThat(event.getCostUsd()).isNull();
+        assertThat(event.getPricingState()).isEqualTo(PricingState.UNPRICED);
+    }
+
+    @Test
+    @WithAdminUser
     void cancelQueuedJobReturns200() {
         Workspace workspace = setupWorkspace();
         AgentJob job = createJob(workspace, AgentJobStatus.QUEUED);
@@ -532,6 +729,10 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         assertThat(result).isNotNull();
         assertThat(result.status()).isEqualTo(AgentJobStatus.CANCELLED);
+        assertThat(usageEvents.findAll().stream()
+                        .filter(event -> event.getSourceId().equals(job.getId()))
+                        .toList())
+                .isEmpty();
     }
 
     @Test
@@ -550,6 +751,10 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectBody()
                 .jsonPath("$.status")
                 .isEqualTo("CANCELLED");
+        assertThat(usageEvents.findAll().stream()
+                        .filter(event -> event.getSourceId().equals(job.getId()))
+                        .toList())
+                .isEmpty();
     }
 
     @Test
@@ -566,6 +771,12 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectStatus()
                 .isEqualTo(409)
                 .expectBody(Void.class);
+        assertThat(usageEvents.findAll().stream()
+                        .filter(event -> event.getSourceId().equals(job.getId()))
+                        .toList())
+                .isEmpty();
+        assertThat(agentJobRepository.findById(job.getId()).orElseThrow().getStatus())
+                .isEqualTo(AgentJobStatus.COMPLETED);
     }
 
     @Test
@@ -602,6 +813,12 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectStatus()
                 .isNotFound()
                 .expectBody(Void.class);
+        assertThat(agentJobRepository.findById(jobInA.getId()).orElseThrow().getStatus())
+                .isEqualTo(AgentJobStatus.QUEUED);
+        assertThat(usageEvents.findAll().stream()
+                        .filter(event -> event.getSourceId().equals(jobInA.getId()))
+                        .toList())
+                .isEmpty();
     }
 
     @Test
