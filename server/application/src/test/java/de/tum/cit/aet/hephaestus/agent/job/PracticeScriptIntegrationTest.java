@@ -44,8 +44,6 @@ import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -460,10 +458,6 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .isEqualTo("CLOUD")
                 .jsonPath("$[0].models[0].calls")
                 .isEqualTo(4)
-                .jsonPath("$[0].models[0].inputTokens")
-                .isEqualTo(120)
-                .jsonPath("$[0].models[0].outputTokens")
-                .isEqualTo(8)
                 .jsonPath("$[0].error")
                 .doesNotExist()
                 .jsonPath("$[0].durationMs")
@@ -480,39 +474,6 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .isEqualTo(0)
                 .jsonPath("$[1].error")
                 .isEqualTo("TypeError: answer is undefined");
-    }
-
-    @ParameterizedTest
-    @CsvSource({"1,0,0,0", "2,1,120,8", "1,1,0,0"})
-    @WithAdminUser
-    void shouldOmitIncompleteTokenTotalsAndKeepConfirmedZeroWhenListingModelCalls(
-            int calls, int reportedCalls, long input, long output) {
-        Practice practice = persistPractice(workspace, "comment-quality", "Comment quality", "decide()");
-        AgentJob job = persistJob(workspace, practice);
-        record(job, MONDAY, entry("comment-quality", PracticeProgramKind.CUSTOM, "ok", null));
-        countCalls(job, 0, "comment-quality", ModelKind.DECISION, DataHandlingTier.CLOUD, calls, input, output);
-        jdbc.update(
-                "UPDATE agent_job_practice_script_usage SET reported_calls = ? WHERE job_id = ?",
-                reportedCalls,
-                job.getId());
-
-        var response = reviewPracticeScript(workspace, job.getId())
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].models[0].calls")
-                .isEqualTo(calls);
-        if (reportedCalls == calls) {
-            response.jsonPath("$[0].models[0].inputTokens")
-                    .isEqualTo(0)
-                    .jsonPath("$[0].models[0].outputTokens")
-                    .isEqualTo(0);
-        } else {
-            response.jsonPath("$[0].models[0].inputTokens")
-                    .doesNotExist()
-                    .jsonPath("$[0].models[0].outputTokens")
-                    .doesNotExist();
-        }
     }
 
     /**

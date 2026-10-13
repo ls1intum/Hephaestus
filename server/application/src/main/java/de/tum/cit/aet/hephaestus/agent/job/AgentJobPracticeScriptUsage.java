@@ -108,11 +108,6 @@ public class AgentJobPracticeScriptUsage {
         return id.getModelKind();
     }
 
-    /** The whole prompt: the input and the cache reads and writes. */
-    public long promptTokens() {
-        return inputTokens + cacheReadTokens + cacheWriteTokens;
-    }
-
     /** The ledger source that bills calls of this kind; the review's own row bills the chat model. */
     public static LlmUsageSourceType ledgerSourceType(ModelKind kind) {
         return switch (kind) {

@@ -2395,8 +2395,6 @@ export const reviewPracticeScripts = {
 				purpose: "PRACTICE_DECISION",
 				tier: "CLOUD",
 				calls: 12,
-				inputTokens: 8400,
-				outputTokens: 96,
 			},
 		],
 	},
@@ -2424,15 +2422,11 @@ export const reviewPracticeScripts = {
 				purpose: "PRACTICE_DECISION",
 				tier: "IN_HOUSE",
 				calls: 9,
-				inputTokens: 5100,
-				outputTokens: 40,
 			},
 			{
 				purpose: "PRACTICE_EMBEDDING",
 				tier: "IN_HOUSE",
 				calls: 2,
-				inputTokens: 1800,
-				outputTokens: 0,
 			},
 		],
 	},
@@ -2451,8 +2445,6 @@ export const reviewPracticeScripts = {
 				purpose: "PRACTICE_DECISION",
 				tier: "CLOUD",
 				calls: 4,
-				inputTokens: 2600,
-				outputTokens: 12,
 			},
 		],
 	},
@@ -2468,7 +2460,7 @@ export const reviewPracticeScripts = {
 		practiceSlug: "product-language",
 		practiceName: "Product language",
 		run: { ...custom, status: "SKIPPED", models: [{ ...decision, bound: false, notRated: [] }] },
-		models: [{ purpose: "PRACTICE_DECISION", calls: 0, inputTokens: 0, outputTokens: 0 }],
+		models: [{ purpose: "PRACTICE_DECISION", calls: 0 }],
 	},
 	failed: {
 		practiceSlug: "tests-name-the-behaviour",
@@ -2478,13 +2470,13 @@ export const reviewPracticeScripts = {
 		models: [],
 		error: "TypeError: change.files is not iterable at run (tests-name-the-behaviour.ts:14:23)",
 	},
-	// The stage stopped before the script reported, so the run names no models and their tiers are
+	// The program stopped before it reported, so the run names no models and their tiers are
 	// unknown, while the proxy still counted the calls it forwarded.
 	notFinished: {
 		practiceSlug: "decisions-are-written-down",
 		practiceName: "Decisions are written down",
 		run: { ...custom, status: "NOT_FINISHED", models: [] },
-		models: [{ purpose: "PRACTICE_DECISION", calls: 9, inputTokens: 6300, outputTokens: 54 }],
+		models: [{ purpose: "PRACTICE_DECISION", calls: 9 }],
 	},
 	// The review ended before this program's turn came, so it asked nothing and took no time.
 	notReached: {

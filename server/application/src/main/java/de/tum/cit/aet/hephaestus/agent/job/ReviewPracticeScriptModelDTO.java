@@ -19,10 +19,4 @@ public record ReviewPracticeScriptModelDTO(
         DataHandlingTier tier,
 
         @Schema(requiredMode = RequiredMode.REQUIRED, description = "Calls that the proxy forwarded to this model")
-        long calls,
-
-        @Schema(description = "Input tokens of those calls; absent when any call reported no usage") @Nullable
-        Long inputTokens,
-
-        @Schema(description = "Output tokens of those calls; absent when any call reported no usage") @Nullable
-        Long outputTokens) {}
+        long calls) {}

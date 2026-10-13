@@ -82,15 +82,10 @@ class ReviewPracticeScriptService {
                     .findFirst()
                     .orElse(null);
             if (counted != null) {
-                boolean complete = counted.getReportedCalls() == counted.getCalls();
-                models.add(new ReviewPracticeScriptModelDTO(
-                        purpose,
-                        counted.getDataHandlingTier(),
-                        counted.getCalls(),
-                        complete ? counted.promptTokens() : null,
-                        complete ? counted.getOutputTokens() : null));
+                models.add(
+                        new ReviewPracticeScriptModelDTO(purpose, counted.getDataHandlingTier(), counted.getCalls()));
             } else if (use != null) {
-                models.add(new ReviewPracticeScriptModelDTO(purpose, use.tier(), 0, 0L, 0L));
+                models.add(new ReviewPracticeScriptModelDTO(purpose, use.tier(), 0));
             }
         }
         return new ReviewPracticeScriptsDTO(
