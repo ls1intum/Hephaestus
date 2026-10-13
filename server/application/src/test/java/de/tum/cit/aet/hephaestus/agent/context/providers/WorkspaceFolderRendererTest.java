@@ -48,8 +48,12 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
 import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -96,6 +100,11 @@ class WorkspaceFolderRendererTest extends BaseUnitTest {
     private final PracticeRepository practices = mock(PracticeRepository.class);
 
     private WorkspaceFolderRenderer renderer() {
+        return renderer(new JobEvidenceFiles(
+                new FabricLayout(root.toString()), mock(AgentJobRepository.class), Clock.systemUTC(), personCopies()));
+    }
+
+    private WorkspaceFolderRenderer renderer(JobEvidenceFiles evidenceFiles) {
         when(policies.current()).thenReturn(catalog);
         return new WorkspaceFolderRenderer(
                 scm,
@@ -104,11 +113,7 @@ class WorkspaceFolderRendererTest extends BaseUnitTest {
                 conversations,
                 policies,
                 git,
-                new JobEvidenceFiles(
-                        new FabricLayout(root.toString()),
-                        mock(AgentJobRepository.class),
-                        Clock.systemUTC(),
-                        personCopies()),
+                evidenceFiles,
                 repositories,
                 history,
                 memberPolicy,
@@ -451,8 +456,134 @@ class WorkspaceFolderRendererTest extends BaseUnitTest {
         }
     }
 
+    @Test
+    void shouldMoveTheFreshSnapshotIntoTheFolderWhenBothShareAFileSystem() throws Exception {
+        var source = renderer();
+        var kind = new SourceKind("scm.repository.tree");
+        when(policies.isSourceUsePermitted(catalog.version(), kind, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .thenReturn(true);
+        var repo = new Repository();
+        repo.setId(2L);
+        repo.setDefaultBranch("main");
+        when(repositories.permittedRepositories(1L)).thenReturn(List.of(repo));
+        var key = new RepositoryKey(1L, 2L);
+        when(git.isEnabled()).thenReturn(true);
+        when(git.isRepositoryCloned(key)).thenReturn(true);
+        when(git.resolveBranchHead(key, "main")).thenReturn("head");
+        Path snapshot = Files.createDirectory(root.resolve("snapshot"));
+        Files.createDirectories(snapshot.resolve(".git/refs/remotes/origin"));
+        Files.writeString(snapshot.resolve(".git/HEAD"), "head\n");
+        Files.writeString(snapshot.resolve(".git/refs/remotes/origin/main"), "head\n");
+        Files.writeString(snapshot.resolve(".git/hephaestus-captured-refs"), "commit head refs/remotes/origin/main\n");
+        Path script = Files.writeString(snapshot.resolve("build.sh"), "#!/bin/sh\n");
+        Files.setPosixFilePermissions(script, PosixFilePermissions.fromString("rwxr-xr-x"));
+        Object inode = Files.readAttributes(script, BasicFileAttributes.class).fileKey();
+        assertThat(inode).isNotNull();
+        when(git.readTreeSnapshot(key, "head"))
+                .thenReturn(new GitRepositoryManager.GitTreeSnapshot(snapshot, "head", "tree", 10, 1, true, Set.of()));
+
+        var captured = source.capture(new ContextRequest.DocumentReviewRequest(job()), Set.of(kind));
+        Path target = captured.directories().getFirst().source();
+        try {
+            // The snapshot closed when the capture returned; it no longer owns the moved directory.
+            assertThat(snapshot).doesNotExist();
+            assertThat(Files.readAttributes(target.resolve("build.sh"), BasicFileAttributes.class)
+                            .fileKey())
+                    .isEqualTo(inode);
+            assertThat(Files.readString(target.resolve("build.sh"))).isEqualTo("#!/bin/sh\n");
+            assertThat(Files.getPosixFilePermissions(target.resolve("build.sh")))
+                    .isEqualTo(PosixFilePermissions.fromString("rwxr-xr-x"));
+            assertThat(Files.readString(target.resolve(".git/refs/remotes/origin/main")))
+                    .isEqualTo("head\n");
+            assertThat(Files.readString(captured.filesOnDisk().get("repos/2/.git/HEAD")))
+                    .isEqualTo("head\n");
+            assertThat(Files.readString(captured.filesOnDisk().get("repos/2/.git/hephaestus-captured-refs")))
+                    .isEqualTo("commit head refs/remotes/origin/main\n");
+        } finally {
+            Objects.requireNonNull(captured.cleanup()).close();
+        }
+        assertThat(target).doesNotExist();
+    }
+
+    @Test
+    void shouldDeleteTheMovedSnapshotWhenALaterPartOfTheCaptureFails() throws Exception {
+        var source = renderer();
+        var tree = new SourceKind("scm.repository.tree");
+        var inventory = new SourceKind("workspace.project-inventory");
+        for (var kind : Set.of(tree, inventory))
+            when(policies.isSourceUsePermitted(catalog.version(), kind, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                    .thenReturn(true);
+        var repo = new Repository();
+        repo.setId(2L);
+        repo.setDefaultBranch("main");
+        when(repositories.permittedRepositories(1L)).thenReturn(List.of(repo));
+        var key = new RepositoryKey(1L, 2L);
+        when(git.isEnabled()).thenReturn(true);
+        when(git.isRepositoryCloned(key)).thenReturn(true);
+        when(git.resolveBranchHead(key, "main")).thenReturn("head");
+        Path snapshot = Files.createDirectory(root.resolve("snapshot"));
+        Files.createDirectories(snapshot.resolve(".git"));
+        Files.writeString(snapshot.resolve(".git/HEAD"), "head\n");
+        Files.writeString(snapshot.resolve(".git/hephaestus-captured-refs"), "");
+        when(git.readTreeSnapshot(key, "head"))
+                .thenReturn(new GitRepositoryManager.GitTreeSnapshot(snapshot, "head", "tree", 0, 0, true, Set.of()));
+        doAnswer(invocation -> {
+                    throw new IllegalStateException("inventory unavailable");
+                })
+                .when(scm)
+                .forEachInventoryRecord(eq(1L), eq(2L), any(), any());
+        var job = job();
+
+        var error = catchThrowable(
+                () -> source.capture(new ContextRequest.DocumentReviewRequest(job), Set.of(tree, inventory)));
+
+        assertThat(error).isInstanceOf(IllegalStateException.class).hasMessage("inventory unavailable");
+        assertThat(snapshot).doesNotExist();
+        try (var remnants = Files.list(new FabricLayout(root.toString())
+                .jobsRoot()
+                .resolve("1")
+                .resolve(job.getId().toString()))) {
+            assertThat(remnants.toList()).isEmpty();
+        }
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"oversized", "symlink"})
+    @ValueSource(booleans = {false, true})
+    void shouldRefuseAnExistingTargetWithoutFollowingLinks(boolean symbolicLink) throws Exception {
+        Path rendered = Files.createDirectory(root.resolve("rendered"));
+        Path target = rendered.resolve("repos/2");
+        Files.createDirectories(target.getParent());
+        if (symbolicLink) Files.createSymbolicLink(target, root.resolve("absent"));
+        else Files.createDirectory(target);
+        var evidence = mock(JobEvidenceFiles.class);
+        when(evidence.renderingDirectory(any())).thenReturn(rendered);
+        var source = renderer(evidence);
+        var kind = new SourceKind("scm.repository.tree");
+        when(policies.isSourceUsePermitted(catalog.version(), kind, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .thenReturn(true);
+        var repo = new Repository();
+        repo.setId(2L);
+        repo.setDefaultBranch("main");
+        when(repositories.permittedRepositories(1L)).thenReturn(List.of(repo));
+        var key = new RepositoryKey(1L, 2L);
+        when(git.isEnabled()).thenReturn(true);
+        when(git.isRepositoryCloned(key)).thenReturn(true);
+        when(git.resolveBranchHead(key, "main")).thenReturn("head");
+        Path snapshot = Files.createDirectory(root.resolve("snapshot"));
+        Files.writeString(snapshot.resolve("keep.txt"), "captured bytes");
+        when(git.readTreeSnapshot(key, "head"))
+                .thenReturn(new GitRepositoryManager.GitTreeSnapshot(snapshot, "head", "tree", 14, 1, true, Set.of()));
+
+        var error = catchThrowable(() -> source.capture(new ContextRequest.DocumentReviewRequest(job()), Set.of(kind)));
+
+        assertThat(error).isInstanceOf(UncheckedIOException.class).hasCauseInstanceOf(FileAlreadyExistsException.class);
+        assertThat(snapshot).doesNotExist();
+        assertThat(rendered).doesNotExist();
+        assertThat(root.resolve("absent")).doesNotExist();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"oversized", "symlink", "root-symlink"})
     void unsafeRepositorySnapshotRefusesRenderingAndDeletesBothCopies(String failure) throws Exception {
         var source = renderer();
         var kind = new SourceKind("scm.repository.tree");
@@ -471,15 +602,25 @@ class WorkspaceFolderRendererTest extends BaseUnitTest {
             try (var file = new RandomAccessFile(snapshot.resolve("blob").toFile(), "rw")) {
                 file.setLength(SandboxGatewaySessions.WORKSPACE_BYTE_BUDGET + 1);
             }
-        } else {
+        } else if (failure.equals("symlink")) {
             Files.createSymbolicLink(snapshot.resolve("outside"), root.resolve("outside"));
+        } else {
+            Files.delete(snapshot);
+            Path outside = Files.createDirectory(root.resolve("outside"));
+            Files.writeString(outside.resolve("keep.txt"), "borrowed bytes");
+            Files.createSymbolicLink(snapshot, outside);
         }
         when(git.readTreeSnapshot(key, "head"))
                 .thenReturn(new GitRepositoryManager.GitTreeSnapshot(snapshot, "head", "tree", 0, 1, true, Set.of()));
         var job = job();
         var error = catchThrowable(() -> source.capture(new ContextRequest.IssueReviewRequest(job), Set.of(kind)));
         if (failure.equals("oversized")) assertThat(error).isInstanceOf(WorkspaceBudgetExceededException.class);
-        else assertThat(error).isInstanceOf(UncheckedIOException.class).hasMessageContaining("non-regular file");
+        else if (failure.equals("symlink"))
+            assertThat(error).isInstanceOf(UncheckedIOException.class).hasMessageContaining("non-regular file");
+        else {
+            assertThat(error).isInstanceOf(UncheckedIOException.class).hasCauseInstanceOf(NotDirectoryException.class);
+            assertThat(Files.readString(root.resolve("outside/keep.txt"))).isEqualTo("borrowed bytes");
+        }
         assertThat(snapshot).doesNotExist();
         try (var remnants = Files.list(new FabricLayout(root.toString())
                 .jobsRoot()
