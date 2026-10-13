@@ -727,7 +727,7 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(2L);
         assertThat(jdbc.queryForObject(
                         "SELECT count(*) FROM config_audit_event WHERE entity_type='WORKSPACE_ROLE' AND entity_id='ERASED' "
-                                + "AND old_value->>'role'='MEMBER' AND new_value->>'role'='ADMIN' AND actor_account_id=?",
+                                + "AND (old_value::jsonb)->>'role'='MEMBER' AND (new_value::jsonb)->>'role'='ADMIN' AND actor_account_id=?",
                         Long.class,
                         administrator.getId()))
                 .isEqualTo(2L);
