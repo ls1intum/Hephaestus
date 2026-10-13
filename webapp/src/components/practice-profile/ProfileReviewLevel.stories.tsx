@@ -7,7 +7,7 @@ import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawe
 import { artifactTrace } from "@/components/practice-trace/fixtures";
 import { DrawerBody, DrawerTitle } from "@/components/ui/drawer";
 import { withPageBehind } from "@/stories/decorators";
-import { settledDrawerPanel } from "@/stories/overlay";
+import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
 import { groups } from "@/stories/practice-profile-story-mock-data";
 import {
 	openProfileReviewRun,
@@ -235,8 +235,13 @@ export const FilterOnAMomentNobodyWatches: Story = {
 	args: { filters: { watches: "scm.pull_request.labeled" } },
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
-		const panel = await settledDrawerPanel();
-		await expect(screen.getByLabelText("Reviews when")).toHaveTextContent("Any moment");
+		const moment = await screen.findByLabelText("Reviews when");
+		await expectSettledVisible(moment);
+		const panel = moment.closest<HTMLElement>('[role="dialog"]');
+		if (panel === null) {
+			throw new Error("The review filter has no drawer level.");
+		}
+		await expect(moment).toHaveTextContent("Any moment");
 		await expect(within(practiceTable()).getByText("Clear ownership")).toBeVisible();
 		await expect(panel).not.toHaveTextContent(/scm\./u);
 	},
