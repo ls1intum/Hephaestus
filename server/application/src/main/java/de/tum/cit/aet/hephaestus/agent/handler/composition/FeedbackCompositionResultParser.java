@@ -150,18 +150,18 @@ public class FeedbackCompositionResultParser {
     public @Nullable ComposedReview review(@Nullable JsonNode jobOutput) {
         JsonNode payload = payloadOf(jobOutput);
         if (payload == null) return null;
-        return review(payload.get("review"), payload.get("observations"));
+        return review(payload.get("review"), payload.get("results"));
     }
 
     /**
-     * {@link #review(JsonNode)} for a review submitted on its own, read against observations the server staged: the
+     * {@link #review(JsonNode)} for a review submitted on its own, read against results the server staged: the
      * admission's own projection of its persisted rows, never the submitter's copy of them.
      */
-    public @Nullable ComposedReview review(@Nullable JsonNode review, @Nullable JsonNode stagedObservations) {
+    public @Nullable ComposedReview review(@Nullable JsonNode review, @Nullable JsonNode stagedResults) {
         if (review == null || !review.isObject() || !onlyFields(review, "summary", "inline", "withheld")) {
             return null;
         }
-        Map<String, StagedResult> practiceResults = readResults(payload.get("results"));
+        Map<String, StagedResult> practiceResults = readResults(stagedResults);
         try {
             ComposedReview.Summary summary = null;
             JsonNode summaryNode = review.get("summary");

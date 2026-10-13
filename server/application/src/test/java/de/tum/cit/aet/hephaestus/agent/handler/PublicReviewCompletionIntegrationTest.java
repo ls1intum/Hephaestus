@@ -21,7 +21,7 @@ import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedJobInputsFixtures;
 import de.tum.cit.aet.hephaestus.agent.context.ReviewedWork;
 import de.tum.cit.aet.hephaestus.agent.context.providers.PullRequestContentSource;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService.AdmissionIdentity;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService.AdmissionIdentity;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedReview;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
@@ -62,12 +62,12 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalDecision;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackProposalRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.AdmittedReviewJobFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -89,6 +89,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.StreamSupport;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -137,7 +138,10 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
     private JobTypeHandlerRegistry handlerRegistry;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private PracticeResultRepository practiceResultRepository;
+
+    @Autowired
+    private ResultAdmissionService admission;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -349,7 +353,7 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldCommitTheAutomaticPackageWithItsCompletionAndPostItOnceWhileTheJobRuns() {
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
 
         var outcome = completionService.complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, all()));
 
@@ -380,7 +384,7 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldAcknowledgeAnIdenticalRepeatAndRefuseAChangedReviewWithoutASecondPackage() {
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
         JsonNode review = summaryOn(SUMMARY, all());
 
         var first = completionService.complete(identity(), ADMISSION_DIGEST, review);
@@ -407,10 +411,59 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
     }
 
     @Test
-    void shouldRecordAWhollyQuietReviewWithoutAnyProviderWrite() {
-        admit(ONE_MET_OBSERVATION);
+    void shouldOweNoPublicReviewWhenEveryResultIsMet() {
+        admit(ONE_MET_RESULT);
 
         var outcome = completionService.complete(identity(), ADMISSION_DIGEST, MAPPER.createObjectNode());
+
+        assertThat(outcome.accepted()).isFalse();
+        assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.NOT_OWED);
+        assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                .isFalse();
+        verify(commentPoster, never()).post(any());
+    }
+
+    @Test
+    void shouldKeepTheProblemReferenceWhenTheAcceptedSummaryNamesOneProblem() {
+        admit(BOTH_RESULTS);
+        PracticeResult result = result(Outcome.NOT_MET);
+        JsonNode admitted = admission.admittedResponse(job);
+        String problemId = "";
+        for (JsonNode row : admitted.path("results")) {
+            if (row.path("practiceResultId").asString().equals(result.getId().toString())) {
+                problemId =
+                        row.path("observations").get(0).path("observationId").asString();
+            }
+        }
+        assertThat(problemId).isNotBlank();
+        ObjectNode review = (ObjectNode) summaryOn(SUMMARY, result);
+        ((ObjectNode) review.path("summary").path("basedOn").get(0)).put("observationId", problemId);
+
+        var accepted = completionService.complete(identity(), ADMISSION_DIGEST, review);
+        var repeated = completionService.complete(identity(), ADMISSION_DIGEST, review.deepCopy());
+
+        assertThat(accepted.accepted()).isTrue();
+        assertThat(repeated.reviewDigest()).isEqualTo(accepted.reviewDigest());
+        JsonNode stored = Objects.requireNonNull(completion().getReview())
+                .path("summary")
+                .path("basedOn")
+                .get(0);
+        assertThat(stored.path("practiceResultId").asString())
+                .isEqualTo(result.getId().toString());
+        assertThat(stored.path("observationId").asString()).isEqualTo(problemId);
+        assertThat(jdbc.queryForList(
+                        "SELECT observation_id FROM feedback_evidence WHERE feedback_id = ?",
+                        UUID.class,
+                        rows(FeedbackDeliveryState.DELIVERED).getFirst().getId()))
+                .containsExactly(UUID.fromString(problemId));
+        verify(commentPoster, times(1)).post(any());
+    }
+
+    @Test
+    void shouldRecordAWhollyQuietReviewWithoutAnyProviderWrite() {
+        admit(BOTH_RESULTS);
+
+        var outcome = completionService.complete(identity(), ADMISSION_DIGEST, quietReview());
 
         assertThat(outcome.accepted()).isTrue();
         assertThat(Objects.requireNonNull(completion().getReview())
@@ -419,18 +472,23 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
                 .isTrue();
         assertThat(dispatchRepository.findReviewPackages(workspace.getId(), job.getId()))
                 .isEmpty();
-        assertThat(jobFeedback()).isEmpty();
+        assertThat(jobFeedback()).singleElement().satisfies(row -> {
+            assertThat(row.getDeliveryState()).isEqualTo(FeedbackDeliveryState.SUPPRESSED);
+            assertThat(row.getSuppressionReason()).isEqualTo(FeedbackSuppressionReason.COMPOSER_WITHHELD);
+        });
         verify(commentPoster, never()).post(any());
         assertNoPrivatePreparation();
     }
 
     @Test
     void shouldRecordAnExplicitlyWithheldProblemAsItsOwnSuppressedUnitWithTheCompletion() {
-        admit(BOTH_OBSERVATIONS);
-        Observation problem = observation(Outcome.NOT_MET);
+        admit(BOTH_RESULTS);
+        PracticeResult problem = result(Outcome.NOT_MET);
         ObjectNode review = MAPPER.createObjectNode();
         ObjectNode decision = review.putArray("withheld").addObject();
-        decision.putArray("basedOn").add(problem.getId().toString());
+        decision.putArray("basedOn")
+                .addObject()
+                .put("practiceResultId", problem.getId().toString());
         decision.put("reason", "BELOW_BAR");
 
         var outcome = completionService.complete(identity(), ADMISSION_DIGEST, review);
@@ -442,10 +500,10 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
                 .singleElement()
                 .satisfies(row -> assertThat(row.getPosition()).isEqualTo(2000));
         assertThat(jdbc.queryForList("""
-                        SELECT fo.observation_id FROM feedback_observation fo
-                        JOIN feedback f ON f.id = fo.feedback_id
-                        WHERE f.agent_job_id = ? AND f.delivery_state = 'SUPPRESSED'
-                        """, UUID.class, job.getId())).containsExactly(problem.getId());
+            SELECT fo.practice_result_id FROM feedback_evidence fo
+            JOIN feedback f ON f.id = fo.feedback_id
+            WHERE f.agent_job_id = ? AND f.delivery_state = 'SUPPRESSED'
+            """, UUID.class, job.getId())).containsExactly(problem.getId());
         verify(commentPoster, never()).post(any());
     }
 
@@ -453,7 +511,7 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
     void shouldLeaveAReviewThatRestsOnAnApprovalPracticeAwaitingApprovalWithoutPostingIt() {
         errors.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
         errors = practiceRepository.saveAndFlush(errors);
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
 
         var outcome = completionService.complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, all()));
 
@@ -474,7 +532,7 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
         ensureAdminMembership(workspace);
         errors.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
         errors = practiceRepository.saveAndFlush(errors);
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
         var outcome = completionService.complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, all()));
         assertThat(outcome.accepted()).isTrue();
         Feedback proposal = rows(FeedbackDeliveryState.AWAITING_APPROVAL).getFirst();
@@ -509,7 +567,7 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldKeepARefusedReviewRefusedSoNeitherALaterSubmissionNorTheTerminalOutputCarriesIt() {
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
 
         var wrongAdmission = completionService.complete(identity(), "d".repeat(64), summaryOn(SUMMARY, all()));
         var afterwards = completionService.complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, all()));
@@ -529,10 +587,9 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldRefuseAReviewThatLeavesAPublicProblemUndecidedAndRecordTheRefusal() {
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
 
-        var outcome =
-                completionService.complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, observation(Outcome.MET)));
+        var outcome = completionService.complete(identity(), ADMISSION_DIGEST, MAPPER.createObjectNode());
 
         assertThat(outcome.accepted()).isFalse();
         assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.UNDECIDED);
@@ -544,20 +601,20 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldWriteNothingForAnAttemptThatNoLongerOwnsTheJobOrNamesAnotherWorkspace() {
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
         JsonNode review = summaryOn(SUMMARY, all());
 
         assertThatThrownBy(() -> completionService.complete(
                         new AdmissionIdentity(job.getId(), workspace.getId(), 0, "lost-worker"),
                         ADMISSION_DIGEST,
                         review))
-                .isInstanceOf(ObservationAdmissionService.StaleAttemptException.class);
+                .isInstanceOf(ResultAdmissionService.StaleAttemptException.class);
         assertThatThrownBy(() -> completionService.complete(
                         new AdmissionIdentity(job.getId(), workspace.getId(), 1, WORKER), ADMISSION_DIGEST, review))
-                .isInstanceOf(ObservationAdmissionService.StaleAttemptException.class);
+                .isInstanceOf(ResultAdmissionService.StaleAttemptException.class);
         assertThatThrownBy(() -> completionService.complete(
                         new AdmissionIdentity(job.getId(), workspace.getId() + 1, 0, WORKER), ADMISSION_DIGEST, review))
-                .isInstanceOf(ObservationAdmissionService.StaleAttemptException.class);
+                .isInstanceOf(ResultAdmissionService.StaleAttemptException.class);
 
         assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
                 .isFalse();
@@ -568,11 +625,11 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldAcceptNothingForAReviewCancelledBeforeItsSubmissionArrived() {
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
         jdbc.update("UPDATE agent_job SET status = 'CANCELLED' WHERE id = ?", job.getId());
 
         assertThatThrownBy(() -> completionService.complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, all())))
-                .isInstanceOf(ObservationAdmissionService.StaleAttemptException.class);
+                .isInstanceOf(ResultAdmissionService.StaleAttemptException.class);
 
         assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
                 .isFalse();
@@ -582,7 +639,7 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldWithholdAnAcceptedPackageWhoseReviewWasCancelledBeforeTheDispatcherReservedItsWrite() {
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
         // The provider cannot answer the first lookup, so the package waits for a retry instead of being written.
         when(commentPoster.findExisting(any()))
                 .thenReturn(ExistingDeliveryLookup.unknown())
@@ -615,7 +672,7 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldNeitherDecideAgainNorRepostTheAcceptedReviewFromADifferentTerminalOutput() {
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
         var outcome = completionService.complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, all()));
         assertThat(outcome.accepted()).isTrue();
 
@@ -637,11 +694,11 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldRemoveTheKeptInputsSoNoWriterContinuesAReviewWhoseQuietReviewWasAccepted() {
-        admit(ONE_MET_OBSERVATION);
+        admit(BOTH_RESULTS);
         keepOriginalInputs();
         assertThat(bases.findOriginalCopy(workspace.getId(), job.getId())).isPresent();
 
-        var outcome = completionService.complete(identity(), ADMISSION_DIGEST, MAPPER.createObjectNode());
+        var outcome = completionService.complete(identity(), ADMISSION_DIGEST, quietReview());
 
         assertThat(outcome.accepted()).isTrue();
         assertThat(bases.findOriginalCopy(workspace.getId(), job.getId())).isEmpty();
@@ -649,11 +706,10 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldKeepTheInputsOfAReviewWhoseSubmissionWasRefused() {
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
         keepOriginalInputs();
 
-        var outcome =
-                completionService.complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, observation(Outcome.MET)));
+        var outcome = completionService.complete(identity(), ADMISSION_DIGEST, MAPPER.createObjectNode());
 
         assertThat(outcome.accepted()).isFalse();
         // The refusal, not the deletion, keeps a second writer away: the continuation reads it off the job.
@@ -663,9 +719,10 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldRollBackTheWholeOutcomeWhenCompletionInsertionFailsAndAllowIdenticalRetry() {
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
         jdbc.execute(
-                "ALTER TABLE public_review_completion ADD CONSTRAINT completion_test_fail CHECK (accepted_worker_id <> 'test-worker')");
+                "ALTER TABLE public_review_completion ADD CONSTRAINT completion_test_fail CHECK (accepted_worker_id <>"
+                        + " 'test-worker')");
         try {
             assertThatThrownBy(
                             () -> completionService.complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, all())))
@@ -690,8 +747,8 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldExposeOnlyTheAcceptanceTimeThroughScopedDetailAndBulkListWhileTheQuietJobRuns() {
-        admit(ONE_MET_OBSERVATION);
-        var outcome = completionService.complete(identity(), ADMISSION_DIGEST, MAPPER.createObjectNode());
+        admit(BOTH_RESULTS);
+        var outcome = completionService.complete(identity(), ADMISSION_DIGEST, quietReview());
         assertThat(outcome.accepted()).isTrue();
         var moments = agentJobRepository
                 .findReviewRunMoments(job.getId(), workspace.getId())
@@ -712,7 +769,7 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldRefuseWhenTheOriginalCopyWasRevokedBeforeAcceptance() {
-        admit(BOTH_OBSERVATIONS);
+        admit(BOTH_RESULTS);
         jdbc.update("UPDATE person_evidence_copy SET state='ERASE_REQUESTED' WHERE job_id=?", job.getId());
         var outcome = completionService.complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, all()));
         assertThat(outcome.accepted()).isFalse();
@@ -727,12 +784,10 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldUseTheOriginalAdmittingAttemptWhenAContinuedWriterCompletesTheReview() {
-        admit(ONE_MET_OBSERVATION);
+        admit(BOTH_RESULTS);
         jdbc.update("UPDATE agent_job SET retry_count=1 WHERE id=?", job.getId());
         var outcome = completionService.complete(
-                new AdmissionIdentity(job.getId(), workspace.getId(), 1, WORKER),
-                ADMISSION_DIGEST,
-                MAPPER.createObjectNode());
+                new AdmissionIdentity(job.getId(), workspace.getId(), 1, WORKER), ADMISSION_DIGEST, quietReview());
         assertThat(outcome.accepted()).isTrue();
         assertThat(completion().getAdmissionAttempt()).isZero();
         assertThat(completion().getAcceptedAttempt()).isEqualTo(1);
@@ -741,8 +796,8 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     void shouldStripTheAcceptedProseWhenTheEndedJobPassesItsPayloadRetentionAndKeepItsDigest() {
-        admit(ONE_MET_OBSERVATION);
-        var outcome = completionService.complete(identity(), ADMISSION_DIGEST, MAPPER.createObjectNode());
+        admit(BOTH_RESULTS);
+        var outcome = completionService.complete(identity(), ADMISSION_DIGEST, quietReview());
         jdbc.update(
                 "UPDATE agent_job SET status = 'COMPLETED', completed_at = ? WHERE id = ?",
                 Timestamp.from(Instant.now().minus(Duration.ofDays(30))),
@@ -759,19 +814,28 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     // --- fixtures ----------------------------------------------------------------------------------------------
 
-    private static final String BOTH_OBSERVATIONS = """
-            {"observations": [
-              {"practiceSlug": "pr-description-quality", "summary": "Good PR description", "outcome": "MET",
-               "severity": null, "evidenceRationale": "The description names what changed."},
-              {"practiceSlug": "error-handling", "summary": "Missing null check", "outcome": "NOT_MET",
-               "severity": "MAJOR", "evidenceRationale": "The method does not check for null input."}
-            ]}""";
+    private static final String BOTH_RESULTS = """
+        {"results": [
+          {"practiceSlug": "pr-description-quality", "candidate": {
+            "summary": "Good PR description", "outcome": "MET",
+            "explanation": "The description names what changed."}},
+          {"practiceSlug": "error-handling", "candidate": {
+            "summary": "Missing null check", "outcome": "NOT_MET",
+            "explanation": "The method does not check for null input.",
+            "problems": [{"summary": "Missing null check", "severity": "MAJOR",
+              "explanation": "The new method reads its input without a null check.",
+              "basis": {"type": "duty", "criterionQuote": "Test error-handling", "event": 0,
+                "explanation": "The practice states this duty."}}]}}
+        ]}\
+        """;
 
-    private static final String ONE_MET_OBSERVATION = """
-            {"observations": [
-              {"practiceSlug": "pr-description-quality", "summary": "Good PR description", "outcome": "MET",
-               "severity": null, "evidenceRationale": "The description names what changed."}
-            ]}""";
+    private static final String ONE_MET_RESULT = """
+        {"results": [
+          {"practiceSlug": "pr-description-quality", "candidate": {
+            "summary": "Good PR description", "outcome": "MET",
+            "explanation": "The description names what changed."}}
+        ]}\
+        """;
 
     private AdmissionIdentity identity() {
         return new AdmissionIdentity(job.getId(), workspace.getId(), 0, WORKER);
@@ -782,23 +846,23 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
     }
 
     /**
-     * Admits the observations through the handler's own admission body, with the digest and admitting attempt the
+     * Admits the results through the handler's own admission body, with the digest and admitting attempt the
      * admission records; the job keeps running and has no output.
      */
-    private void admit(String rawObservations) {
-        JsonNode observations = MAPPER.readTree(withEvidence(rawObservations)).path("observations");
-        handler().prepareObservations(job, observations).record(job);
+    private void admit(String rawResults) {
+        JsonNode results = MAPPER.readTree(withEvidence(rawResults)).path("results");
+        handler().prepareResults(job, results).record(job);
         ObjectNode metadata =
                 (ObjectNode) Objects.requireNonNull(reload().getMetadata()).deepCopy();
-        metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, ADMISSION_DIGEST);
-        metadata.put(ObservationAdmissionService.ATTEMPT_METADATA_KEY, 0);
+        metadata.put(ResultAdmissionService.DIGEST_METADATA_KEY, ADMISSION_DIGEST);
+        metadata.put(ResultAdmissionService.ATTEMPT_METADATA_KEY, 0);
         AgentJob admitted = reload();
         admitted.setMetadata(metadata);
         job = agentJobRepository.saveAndFlush(admitted);
         keepOriginalInputs();
     }
 
-    /** The job ended with a terminal output that composed {@code review} against its admitted observations. */
+    /** The job ended with a terminal output that composed {@code review} against its admitted results. */
     private AgentJob endWithOutput(JsonNode review) {
         AgentJob ended = reload();
         ObjectNode output = MAPPER.createObjectNode();
@@ -807,15 +871,7 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
         feedback.put("contractVersion", ComposedReview.CONTRACT_VERSION);
         feedback.putArray("units");
         feedback.putArray("compositionFailures");
-        var staged = feedback.putArray("observations");
-        for (Observation observation : observationRepository.findByAgentJobId(job.getId(), workspace.getId())) {
-            staged.addObject()
-                    .put("id", observation.getId().toString())
-                    .put("practiceSlug", observation.getPractice().getSlug())
-                    .put("outcome", observation.getOutcome().name())
-                    .put("anchorable", false)
-                    .putArray("citations");
-        }
+        feedback.set("results", admission.admittedResponse(ended).path("results"));
         feedback.set("review", review);
         ended.setOutput(output);
         ended.setStatus(AgentJobStatus.COMPLETED);
@@ -823,22 +879,23 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
         return agentJobRepository.saveAndFlush(ended);
     }
 
-    private JsonNode summaryOn(String body, Observation... support) {
+    private JsonNode summaryOn(String body, PracticeResult... support) {
         ObjectNode review = MAPPER.createObjectNode();
         ObjectNode summary = review.putObject("summary").put("body", body);
         var basedOn = summary.putArray("basedOn");
-        for (Observation observation : support) basedOn.add(observation.getId().toString());
+        for (PracticeResult result : support)
+            basedOn.addObject().put("practiceResultId", result.getId().toString());
         return review;
     }
 
-    private Observation[] all() {
-        return observationRepository.findByAgentJobId(job.getId(), workspace.getId()).stream()
-                .filter(observation -> observation.getOutcome().isDecided())
-                .toArray(Observation[]::new);
+    private PracticeResult[] all() {
+        return practiceResultRepository.findByAgentJobId(job.getId(), workspace.getId()).stream()
+                .filter(result -> result.getOutcome() == Outcome.NOT_MET)
+                .toArray(PracticeResult[]::new);
     }
 
-    private Observation observation(Outcome outcome) {
-        return observationRepository.findByAgentJobId(job.getId(), workspace.getId()).stream()
+    private PracticeResult result(Outcome outcome) {
+        return practiceResultRepository.findByAgentJobId(job.getId(), workspace.getId()).stream()
                 .filter(observation -> observation.getOutcome() == outcome)
                 .findFirst()
                 .orElseThrow();
@@ -957,21 +1014,45 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
                 .put("bytes", bytes.length);
     }
 
-    /** Each observation cites the captured description, which admission verifies against the prepared folder. */
-    private static String withEvidence(String rawObservations) {
-        var root = MAPPER.readTree(rawObservations);
-        for (var observation : root.path("observations")) {
-            var citation = ((ObjectNode) observation)
-                    .putObject("evidence")
-                    .putArray("citations")
-                    .addObject();
-            citation.put("sourceKind", "scm.pull-request.core");
-            citation.put("artifactPath", "context/metadata.json");
-            citation.put("path", "body");
-            citation.put("startLine", 1);
-            citation.put("endLine", 1);
-            citation.put("quote", "Test body");
+    private JsonNode quietReview() {
+        ObjectNode review = MAPPER.createObjectNode();
+        ObjectNode decision = review.putArray("withheld").addObject();
+        decision.putArray("basedOn")
+                .addObject()
+                .put("practiceResultId", result(Outcome.NOT_MET).getId().toString());
+        decision.put("reason", "BELOW_BAR");
+        return review;
+    }
+
+    /** Each candidate cites the description captured for this attempt. */
+    private static String withEvidence(String rawResults) {
+        ObjectNode request = (ObjectNode) MAPPER.readTree(rawResults);
+        for (JsonNode result : request.path("results")) {
+            ObjectNode candidate = (ObjectNode) result.path("candidate");
+            candidate.putObject("evidence");
+            candidate.putArray("citations");
+            candidate
+                    .putObject("coverage")
+                    .put("source", "host")
+                    .put("reads", 1)
+                    .put("truncatedReads", 0)
+                    .put("failedReads", 0)
+                    .put("complete", true);
+            List<ObjectNode> cited = "NOT_MET".equals(candidate.path("outcome").asString())
+                    ? StreamSupport.stream(candidate.path("problems").spliterator(), false)
+                            .map(node -> (ObjectNode) node)
+                            .toList()
+                    : List.of(candidate);
+            for (ObjectNode holder : cited) {
+                var citation = holder.putArray("citations").addObject();
+                citation.put("sourceKind", "scm.pull-request.core");
+                citation.put("artifactPath", "context/metadata.json");
+                citation.put("path", "body");
+                citation.put("startLine", 1);
+                citation.put("endLine", 1);
+                citation.put("quote", "Test body");
+            }
         }
-        return MAPPER.writeValueAsString(root);
+        return MAPPER.writeValueAsString(request);
     }
 }

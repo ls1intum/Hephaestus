@@ -179,10 +179,10 @@ public class IssueReviewHandler implements JobTypeHandler {
                 + SandboxLayout.CONTEXT_PREFIX
                 + "comments.json, and "
                 + SandboxLayout.CONTEXT_PREFIX
-                + "project_inventory.json for cross-artifact checks like duplicate/overlapping issues), then "
-                + "evaluate each practice in inputs/practices/ against the issue and persist every justified result via the "
-                + "submit_result tool. Evidence citations should reference the issue thread/metadata, not source files. "
-                + "Follow "
+                + "project_inventory.json for cross-artifact checks like duplicate/overlapping issues), then evaluate"
+                + " each practice in inputs/practices/ against the issue and persist every justified result via the"
+                + " submit_result tool. Evidence citations should reference the issue thread/metadata, not source"
+                + " files. Follow "
                 + SandboxLayout.ORCHESTRATOR_PATH
                 + " for the result schema and rules.";
         log.info("Built issue orchestrator prompt: {} chars, jobId={}", prompt.length(), job.getId());
@@ -199,6 +199,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         deliveryService.requirePublished(job);
         feedbackDeliveryService.requestPrivatePreparation(job);
         if (feedbackDeliveryService.recoverAutomaticPackageIfPresent(job)) return;
+        if (PullRequestReviewHandler.settledWhileRunning(feedbackDeliveryService, job)) return;
         Set<UUID> publicIds = publicReviewEligibility.publicResultIds(job, persisted);
         ComposedReview review = PullRequestReviewHandler.reviewToDeliver(
                 compositionResultParser, job, persisted, publicIds, ISSUE_REVIEW_CHANNELS);
@@ -251,14 +252,6 @@ public class IssueReviewHandler implements JobTypeHandler {
             recordSuppressed(job, delivery, FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
             return;
         }
-        String formatted = commentFormatter.format(sanitized, job);
-        var providerPackage = new ReviewResultParser.DeliveryContent(
-                formatted,
-                delivery.diffNotes(),
-                delivery.withheld(),
-                delivery.summaryContributors(),
-                null,
-                delivery.summaryObservations());
         PracticeFeedbackDispatchService.Result result =
                 dispatchService.dispatchAutomaticPackage(job, providerPackage, contributingPracticeSlugs);
         var dispatch = dispatchService.automaticPackage(job);

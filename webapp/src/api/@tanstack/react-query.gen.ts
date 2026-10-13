@@ -5245,58 +5245,6 @@ export const getPracticeReviewQueueOptions = (options: Options<GetPracticeReview
     queryKey: getPracticeReviewQueueQueryKey(options)
 });
 
-export const listPracticeReviewResultsQueryKey = (options: Options<ListPracticeReviewResultsData>) => createQueryKey('listPracticeReviewResults', options, false, ['Practice reviews']);
-
-/**
- * List practice review results across the workspace
- *
- * Results include linked feedback outcomes and are ordered newest first by default.
- */
-export const listPracticeReviewResultsOptions = (options: Options<ListPracticeReviewResultsData>) => queryOptions<ListPracticeReviewResultsResponse, ListPracticeReviewResultsError, ListPracticeReviewResultsResponse, ReturnType<typeof listPracticeReviewResultsQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await listPracticeReviewResults({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: listPracticeReviewResultsQueryKey(options)
-});
-
-export const listPracticeReviewResultsInfiniteQueryKey = (options: Options<ListPracticeReviewResultsData>): QueryKey<Options<ListPracticeReviewResultsData>> => createQueryKey('listPracticeReviewResults', options, true);
-
-/**
- * List practice review results across the workspace
- *
- * Results include linked feedback outcomes and are ordered newest first by default.
- */
-export const listPracticeReviewResultsInfiniteOptions = (options: Options<ListPracticeReviewResultsData>) => {
-    const opts = infiniteQueryOptions<ListPracticeReviewResultsResponse, ListPracticeReviewResultsError, InfiniteData<ListPracticeReviewResultsResponse>, QueryKey<Options<ListPracticeReviewResultsData>>, number | Pick<QueryKey<Options<ListPracticeReviewResultsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
-    // @ts-ignore
-    {
-        queryFn: async ({ pageParam, queryKey, signal }) => {
-            // @ts-ignore
-            const page: Pick<QueryKey<Options<ListPracticeReviewResultsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
-                query: {
-                    page: pageParam
-                }
-            };
-            const params = createInfiniteParams(queryKey, page);
-            const { data } = await listPracticeReviewResults({
-                ...options,
-                ...params,
-                signal,
-                throwOnError: true
-            });
-            return data;
-        },
-        queryKey: listPracticeReviewResultsInfiniteQueryKey(options)
-    });
-    return opts as Omit<typeof opts, 'initialData'>;
-};
-
 export const listPracticeReviewResultObservationsQueryKey = (options: Options<ListPracticeReviewResultObservationsData>) => createQueryKey('listPracticeReviewResultObservations', options, false, ['Practice reviews']);
 
 /**
@@ -5345,6 +5293,58 @@ export const listPracticeReviewResultObservationsInfiniteOptions = (options: Opt
             return data;
         },
         queryKey: listPracticeReviewResultObservationsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const listPracticeReviewResultsQueryKey = (options: Options<ListPracticeReviewResultsData>) => createQueryKey('listPracticeReviewResults', options, false, ['Practice reviews']);
+
+/**
+ * List practice review results across the workspace
+ *
+ * Results include linked feedback outcomes and are ordered newest first by default.
+ */
+export const listPracticeReviewResultsOptions = (options: Options<ListPracticeReviewResultsData>) => queryOptions<ListPracticeReviewResultsResponse, ListPracticeReviewResultsError, ListPracticeReviewResultsResponse, ReturnType<typeof listPracticeReviewResultsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listPracticeReviewResults({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listPracticeReviewResultsQueryKey(options)
+});
+
+export const listPracticeReviewResultsInfiniteQueryKey = (options: Options<ListPracticeReviewResultsData>): QueryKey<Options<ListPracticeReviewResultsData>> => createQueryKey('listPracticeReviewResults', options, true);
+
+/**
+ * List practice review results across the workspace
+ *
+ * Results include linked feedback outcomes and are ordered newest first by default.
+ */
+export const listPracticeReviewResultsInfiniteOptions = (options: Options<ListPracticeReviewResultsData>) => {
+    const opts = infiniteQueryOptions<ListPracticeReviewResultsResponse, ListPracticeReviewResultsError, InfiniteData<ListPracticeReviewResultsResponse>, QueryKey<Options<ListPracticeReviewResultsData>>, number | Pick<QueryKey<Options<ListPracticeReviewResultsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListPracticeReviewResultsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listPracticeReviewResults({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listPracticeReviewResultsInfiniteQueryKey(options)
     });
     return opts as Omit<typeof opts, 'initialData'>;
 };

@@ -84,6 +84,14 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         }
     }
 
+    @Test
+    void shouldReportIncompleteCompositionWhenTheServerRefusedThePublicReview() {
+        var status = FeedbackCompositionResultParser.compositionStatus(
+                objectMapper.readTree(
+                        "{\"feedback\":{\"compositionFailures\":[{\"phase\":\"PUBLIC_REVIEW\",\"reason\":\"SERVER_REFUSED\"}]}}"));
+        assertThat(status).isEqualTo(FeedbackCompositionResultParser.CompositionStatus.INCOMPLETE);
+    }
+
     @ParameterizedTest
     @ValueSource(
             strings = {
@@ -91,6 +99,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                 "{}",
                 "[null]",
                 "[{\"phase\":\"PUBLIC_REVIEW\",\"reason\":\"PRIVATE_NOT_RECOVERED\"}]",
+                "[{\"phase\":\"PRIVATE_FEEDBACK\",\"reason\":\"SERVER_REFUSED\"}]",
                 "[1]",
                 "[{\"phase\":\"PRIVATE_FEEDBACK\",\"reason\":\"provider secret\"}]",
                 "[{\"phase\":\"MEASUREMENT\",\"reason\":\"MODEL_ERROR\"}]",
@@ -127,12 +136,12 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     @Test
     void shouldReadUnitWhenGroundedInPrimaryAndRelatedPracticeEvidence() {
         List<ComposedFeedbackUnit> units = parser.parse(output("""
-                { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
-                  "basedOn": [%s, %s], "action": "NEW",
-                  "title": "Review readiness breaks across the workflow",
-                  "body": "The change enters review without tests and leaves follow-up work unresolved.",
-                  "nextStep": "Add the test and resolve the linked review thread before requesting review." }
-                """.formatted(P0, R1), "[]"));
+            { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
+              "basedOn": [%s, %s], "action": "NEW",
+              "title": "Review readiness breaks across the workflow",
+              "body": "The change enters review without tests and leaves follow-up work unresolved.",
+              "nextStep": "Add the test and resolve the linked review thread before requesting review." }
+            """.formatted(P0, R1), "[]"));
 
         assertThat(units).singleElement().satisfies(unit -> {
             assertThat(unit.basedOn()).containsExactly("res-0", "res-1");
@@ -143,16 +152,16 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     @Test
     void shouldReadNotesWhenConversationUnitIsValid() {
         List<ComposedFeedbackUnit> units = parser.parse(output("""
-                { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
-                  "basedOn": [%s], "action": "NEW",
-                  "title": "Tests arrive after review",
-                  "notes": {
-                    "situation": "On !18, !20 and !22 the test landed a push after the review comment.",
-                    "capability": "Writing the test last is what leaves the review to find the gap.",
-                    "evidenceSummary": "On the last three changes the test arrived a push later.",
-                    "inConversationSignal": "They name a check they could run before pushing."
-                  } }
-                """.formatted(R0), "[]"));
+            { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
+              "basedOn": [%s], "action": "NEW",
+              "title": "Tests arrive after review",
+              "notes": {
+                "situation": "On !18, !20 and !22 the test landed a push after the review comment.",
+                "capability": "Writing the test last is what leaves the review to find the gap.",
+                "evidenceSummary": "On the last three changes the test arrived a push later.",
+                "inConversationSignal": "They name a check they could run before pushing."
+              } }
+            """.formatted(R0), "[]"));
 
         assertThat(units).singleElement().satisfies(unit -> {
             assertThat(unit.body()).isNull();
@@ -169,40 +178,40 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     @ValueSource(
             strings = {
                 """
-            "situation": "On !18 the test landed a push after the review comment.",
-            "evidenceSummary": "On the last three changes the test arrived a push later.",
-            "inConversationSignal": "They name a check they could run before pushing."
-            """,
+                "situation": "On !18 the test landed a push after the review comment.",
+                "evidenceSummary": "On the last three changes the test arrived a push later.",
+                "inConversationSignal": "They name a check they could run before pushing."
+                """,
                 """
-            "situation": "On !18 the test landed a push after the review comment.",
-            "capability": "   ",
-            "evidenceSummary": "On the last three changes the test arrived a push later.",
-            "inConversationSignal": "They name a check they could run before pushing."
-            """,
+                "situation": "On !18 the test landed a push after the review comment.",
+                "capability": "   ",
+                "evidenceSummary": "On the last three changes the test arrived a push later.",
+                "inConversationSignal": "They name a check they could run before pushing."
+                """,
             })
     void shouldRejectConversationUnitWhenRequiredNoteIsMissing(String notes) {
         assertThat(parser.parse(output("""
-                    { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
-                      "basedOn": [%s], "action": "NEW",
-                      "title": "Tests arrive after review",
-                      "notes": { %s } }
-                    """.formatted(R0, notes), "[]"))).isEmpty();
+            { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
+              "basedOn": [%s], "action": "NEW",
+              "title": "Tests arrive after review",
+              "notes": { %s } }
+            """.formatted(R0, notes), "[]"))).isEmpty();
     }
 
     @Test
     void refusesAnOverlongNoteInsteadOfPersistingAnArbitrarilyTruncatedPlan() {
         String oversized = "x".repeat(ComposedFeedbackUnit.MAX_AIM_LENGTH + 1);
         assertThat(parser.parse(output("""
-                    { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
-                      "basedOn": [%s], "action": "NEW",
-                      "title": "Tests arrive after review",
-                      "notes": {
-                        "situation": "Tests repeatedly arrived after review.",
-                        "capability": "%s",
-                        "evidenceSummary": "Three merge requests show the sequence.",
-                        "inConversationSignal": "The developer can name when the test belongs."
-                      } }
-                    """.formatted(R0, oversized), "[]"))).isEmpty();
+            { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
+              "basedOn": [%s], "action": "NEW",
+              "title": "Tests arrive after review",
+              "notes": {
+                "situation": "Tests repeatedly arrived after review.",
+                "capability": "%s",
+                "evidenceSummary": "Three merge requests show the sequence.",
+                "inConversationSignal": "The developer can name when the test belongs."
+              } }
+            """.formatted(R0, oversized), "[]"))).isEmpty();
     }
 
     @Test
@@ -221,19 +230,19 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     @Test
     void refusesAnAnchorOnALongitudinalLane() {
         assertThat(parser.parse(output("""
-                    { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
-                      "basedOn": [%s], "action": "NEW",
-                      "title": "t", "body": "b", "nextStep": "n",
-                      "placement": { "kind": "DIFF", "observationId": "prob-0", "citationIndex": 0 } }
-                    """.formatted(P0), "[]"))).isEmpty();
+            { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
+              "basedOn": [%s], "action": "NEW",
+              "title": "t", "body": "b", "nextStep": "n",
+              "placement": { "kind": "DIFF", "observationId": "prob-0", "citationIndex": 0 } }
+            """.formatted(P0), "[]"))).isEmpty();
     }
 
     @Test
     void shouldKeepOnlyWithholdWhenReasonIsPresent() {
         assertThat(parser.parse(output("""
-                    { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
-                      "basedOn": [%s], "action": "WITHHOLD", "withholdReason": "ALREADY_SAID" }
-                    """.formatted(P0), "[]")))
+            { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
+              "basedOn": [%s], "action": "WITHHOLD", "withholdReason": "ALREADY_SAID" }
+            """.formatted(P0), "[]")))
                 .singleElement()
                 .satisfies(unit -> {
                     assertThat(unit.action()).isEqualTo(ComposedFeedbackUnit.Action.WITHHOLD);
@@ -243,9 +252,9 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                 });
 
         assertThat(parser.parse(output("""
-                    { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
-                      "basedOn": [%s], "action": "WITHHOLD" }
-                    """.formatted(R0), "[]"))).isEmpty();
+            { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
+              "basedOn": [%s], "action": "WITHHOLD" }
+            """.formatted(R0), "[]"))).isEmpty();
     }
 
     @ParameterizedTest
@@ -263,10 +272,10 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
             })
     void shouldRejectAUnitWhenItsEvidenceIsFromAnotherPracticeUnknownOrNotARef(String reference) {
         assertThat(parser.parse(output("""
-                    { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
-                      "basedOn": [%s], "action": "NEW",
-                      "title": "t", "body": "b", "nextStep": "n" }
-                    """.formatted(reference), "[]"))).isEmpty();
+            { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
+              "basedOn": [%s], "action": "NEW",
+              "title": "t", "body": "b", "nextStep": "n" }
+            """.formatted(reference), "[]"))).isEmpty();
     }
 
     @ParameterizedTest
@@ -289,13 +298,13 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     @Test
     void keepsOnlyTheFirstUnitForAPracticeOnOneChannel() {
         List<ComposedFeedbackUnit> units = parser.parse(outputOf(objectMapper.readTree("""
-                    [
-                      { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change", "basedOn": [%s], "action": "NEW",
-                        "title": "First", "body": "b", "nextStep": "n" },
-                      { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change", "basedOn": [%s], "action": "NEW",
-                        "title": "Second", "body": "b", "nextStep": "n" }
-                    ]
-                    """.formatted(R0, R0)), "[]"));
+            [
+              { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change", "basedOn": [%s], "action": "NEW",
+                "title": "First", "body": "b", "nextStep": "n" },
+              { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change", "basedOn": [%s], "action": "NEW",
+                "title": "Second", "body": "b", "nextStep": "n" }
+            ]
+            """.formatted(R0, R0)), "[]"));
 
         assertThat(units)
                 .singleElement()
@@ -306,13 +315,13 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     @Test
     void filtersByChannelWithoutCollapsingOtherChannels() {
         JsonNode jobOutput = outputOf(objectMapper.readTree("""
-                [
-                  { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
-                    "basedOn": [%s], "action": "NEW", "title": "on the work", "nextStep": "n" },
-                  { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
-                    "basedOn": [%s], "action": "NEW", "title": "on the page", "body": "b", "nextStep": "n" }
-                ]
-                """.formatted(P0, R0)), "[]");
+            [
+              { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
+                "basedOn": [%s], "action": "NEW", "title": "on the work", "nextStep": "n" },
+              { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
+                "basedOn": [%s], "action": "NEW", "title": "on the page", "body": "b", "nextStep": "n" }
+            ]
+            """.formatted(P0, R0)), "[]");
 
         assertThat(parser.parse(jobOutput))
                 .extracting(ComposedFeedbackUnit::channel)
@@ -354,9 +363,9 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     @Test
     void normalisesPracticeSlug() {
         assertThat(parser.parse(output("""
-                    { "channel": "IN_APP", "practiceSlug": "Ships_Tests_With_The_Change", "basedOn": [%s],
-                      "action": "NEW", "title": "t", "body": "b", "nextStep": "n" }
-                    """.formatted(R0), "[]")))
+            { "channel": "IN_APP", "practiceSlug": "Ships_Tests_With_The_Change", "basedOn": [%s],
+              "action": "NEW", "title": "t", "body": "b", "nextStep": "n" }
+            """.formatted(R0), "[]")))
                 .singleElement()
                 .extracting(ComposedFeedbackUnit::practiceSlug)
                 .isEqualTo("ships-tests-with-the-change");
@@ -428,7 +437,8 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                 "{ \"summary\": { \"body\": \"Add the test.\", \"basedOn\": [" + R0 + ", 42] } }",
                 "{ \"summary\": { \"body\": \"Add the test.\", \"basedOn\": " + R0 + " } }",
                 "{ \"summary\": { \"body\": \"Add the test.\", \"basedOn\": [] } }",
-                "{ \"summary\": { \"body\": \"Add the test.\", \"basedOn\": [{ \"practiceResultId\": \"res-missing\" }] } }",
+                "{ \"summary\": { \"body\": \"Add the test.\", \"basedOn\": [{ \"practiceResultId\": \"res-missing\""
+                        + " }] } }",
                 "{ \"summary\": { \"body\": \"Add the test.\", \"basedOn\": [\"res-0\"] } }",
                 "{ \"summary\": { \"body\": \"Add the test.\","
                         + " \"basedOn\": [{ \"practiceResultId\": \"res-0\", \"observationId\": \"prob-1\" }] } }",

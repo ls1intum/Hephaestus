@@ -73,9 +73,6 @@ tags:
   name: Connections
 - description: Up/down votes on mentor assistant messages
   name: Mentor Votes
-- description: "Workspace-admin access to review runs, observations, and feedback\
-    \ delivery history"
-  name: Practice reviews
 - description: GDPR Art. 20 self-service data export
   name: Account
 - description: Instance-administrator access and erasure requests
@@ -94,6 +91,8 @@ tags:
   name: Configuration Readiness
 - description: Identity provider discovery (public)
   name: Auth discovery
+- description: Read-only access to practice evaluation results
+  name: Practice Results
 - description: Global contributor information
   name: Contributors
 - description: User preferences
@@ -120,8 +119,6 @@ tags:
   name: Practice review requests
 - description: Current account transparency and research consent
   name: Consent
-- description: Read-only access to practice evaluation observations
-  name: Practice Observations
 - description: Adopt instance catalog practices into a workspace
   name: Practice Catalog Adoption
 - description: Team management within workspace
@@ -135,6 +132,9 @@ tags:
   name: Workspace LLM
 - description: Active sessions
   name: Account
+- description: "Workspace-admin access to review runs, results, and feedback delivery\
+    \ history"
+  name: Practice reviews
 - description: |-
     GitLab-specific REST endpoints used during the workspace creation wizard. Gated on the
      <code>GITLAB_WORKSPACE_CREATION</code> feature flag.
@@ -4190,6 +4190,40 @@ paths:
       summary: Retry delivery for a completed agent job
       tags:
       - Agent Jobs
+  /workspaces/{workspaceSlug}/agents/jobs/{jobId}/practice-scripts:
+    get:
+      operationId: getAgentJobPracticeScripts
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewPracticeScripts"
+          description: One entry per staged script; empty when no script ran or the
+            attempt has not ended
+        "404":
+          description: Job not found in this workspace
+      summary: List what each practice's script did in the current attempt of a review
+      tags:
+      - Agent Jobs
   /workspaces/{workspaceSlug}/agents/jobs/{jobId}/usage:
     get:
       description: "One entry per attempt with recorded usage, read from the usage\
@@ -4245,6 +4279,9 @@ paths:
           enum:
           - PRACTICE_REVIEW
           - MENTOR
+          - PRACTICE_DECISION
+          - PRACTICE_EMBEDDING
+          - PRACTICE_RERANKING
       - in: query
         name: dataHandlingTier
         required: false
@@ -4281,6 +4318,9 @@ paths:
           enum:
           - PRACTICE_REVIEW
           - MENTOR
+          - PRACTICE_DECISION
+          - PRACTICE_EMBEDDING
+          - PRACTICE_RERANKING
       - in: query
         name: dataHandlingTier
         required: false
@@ -6368,7 +6408,7 @@ paths:
   /workspaces/{workspaceSlug}/practice-groups/standings:
     get:
       description: "Returns every active practice group's standing, direction, guidance,\
-        \ and supporting observations."
+        \ and supporting results."
       operationId: listPracticeGroupStandings
       parameters:
       - description: Workspace slug
@@ -6494,11 +6534,11 @@ paths:
     patch:
       description: "Applies to every practice in the group that holds no autonomy\
         \ of its own; practices that set their own are left alone. OFF stops their\
-        \ reviews entirely. HUMAN_APPROVAL runs them and records every observation,\
-        \ holds feedback on the work for an authorized reviewer, and still writes\
-        \ the developer's practice pages and the mentor, which are read on request.\
-        \ AUTOMATIC sends feedback on the work without asking. Send a null autonomy\
-        \ to clear the group's own setting so it follows the workspace default."
+        \ reviews entirely. HUMAN_APPROVAL runs them and records every result, holds\
+        \ feedback on the work for an authorized reviewer, and still writes the developer's\
+        \ practice pages and the mentor, which are read on request. AUTOMATIC sends\
+        \ feedback on the work without asking. Send a null autonomy to clear the group's\
+        \ own setting so it follows the workspace default."
       operationId: setGroupAutonomy
       parameters:
       - description: Workspace slug
@@ -6537,7 +6577,7 @@ paths:
   /workspaces/{workspaceSlug}/practice-groups/{groupSlug}/review-runs:
     get:
       description: "Returns complete review runs newest first, including visible undecided\
-        \ observations."
+        \ results."
       operationId: listPracticeGroupReviewRuns
       parameters:
       - description: Workspace slug
@@ -6575,6 +6615,9 @@ paths:
           type: array
           items:
             type: string
+            description: "How much a real gap weighs. CRITICAL: act now. MAJOR: fix\
+              \ before the work is done. MINOR: a small gap worth raising. INFO (label:\
+              \ Trivial): a real gap with trivial impact; fix it when it is cheap."
             enum:
             - CRITICAL
             - MAJOR
@@ -6679,10 +6722,10 @@ paths:
       - Practice Profile
   /workspaces/{workspaceSlug}/practice-profile/review-runs:
     get:
-      description: "One row per run that recorded an observation about the calling\
-        \ developer, across every practice group, with what that run found about them.\
-        \ Counts are narrowed to this developer: a run over shared work says nothing\
-        \ here about anybody else."
+      description: "One row per run that recorded a result about the calling developer,\
+        \ across every practice group, with what that run found about them. Counts\
+        \ are narrowed to this developer: a run over shared work says nothing here\
+        \ about anybody else."
       operationId: listPracticeProfileReviewRuns
       parameters:
       - description: Workspace slug
@@ -6718,8 +6761,8 @@ paths:
         required: false
         schema:
           type: string
-      - description: Keep only runs whose newest observation about this developer
-          came after this moment; the bound is exclusive
+      - description: Keep only runs whose newest result about this developer came
+          after this moment; the bound is exclusive
         in: query
         name: since
         required: false
@@ -7251,140 +7294,14 @@ paths:
       summary: Replace the response to delivered feedback
       tags:
       - Feedback Response
-  /workspaces/{workspaceSlug}/practices/observations:
+  /workspaces/{workspaceSlug}/practices/practice-script-needs:
     get:
-      description: Paginated observations for the authenticated developer with optional
-        filters
-      operationId: listObservations
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          maxLength: 51
-          minLength: 3
-          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - description: Filter by practice slug
-        in: query
-        name: practiceSlug
-        required: false
-        schema:
-          type: string
-      - description: Filter by the practice group the observed practice belongs to
-        in: query
-        name: groupSlug
-        required: false
-        schema:
-          type: string
-      - description: Filter by review outcome
-        in: query
-        name: outcome
-        required: false
-        schema:
-          type: string
-          enum:
-          - MET
-          - NOT_MET
-          - NOT_APPLICABLE
-          - UNDETERMINED
-      - description: "Only observations on these kinds of reviewed work, e.g. scm.pull_request\
-          \ (repeatable)"
-        in: query
-        name: artifactKinds
-        required: false
-        schema:
-          type: array
-          items:
-            type: string
-      - description: "Exact reviewed-work kind; requires artifactId, e.g. scm.pull_request\
-          \ or scm.issue"
-        in: query
-        name: artifactKind
-        required: false
-        schema:
-          type: string
-      - description: Exact reviewed-work ID; requires artifactKind
-        in: query
-        name: artifactId
-        required: false
-        schema:
-          type: integer
-          format: int64
-          exclusiveMinimum: 0
-      - description: Only observations with these severities (repeatable); omit for
-          all
-        in: query
-        name: severities
-        required: false
-        schema:
-          type: array
-          items:
-            type: string
-            enum:
-            - CRITICAL
-            - MAJOR
-            - MINOR
-            - INFO
-      - description: Drop NOT_APPLICABLE rows — only observations where the practice
-          actually applied
-        in: query
-        name: displayableOnly
-        required: false
-        schema:
-          type: boolean
-      - description: "Feed ordering: DATE (default) or SEVERITY (most severe first,\
-          \ ties newest-first)"
-        in: query
-        name: sort
-        required: false
-        schema:
-          type: string
-          enum:
-          - DATE
-          - SEVERITY
-      - description: "Ordering direction: for DATE newest/oldest first, for SEVERITY\
-          \ most/least severe first"
-        in: query
-        name: direction
-        required: false
-        schema:
-          type: string
-          enum:
-          - ASC
-          - DESC
-      - description: Zero-based page
-        in: query
-        name: page
-        required: false
-        schema:
-          type: integer
-          format: int32
-          minimum: 0
-      - description: Page size from 1 to 100
-        in: query
-        name: size
-        required: false
-        schema:
-          type: integer
-          format: int32
-          maximum: 100
-          minimum: 1
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageResponseDTOObservationList"
-          description: Paginated observations returned
-      summary: List observations for current user
-      tags:
-      - Practice Observations
-  /workspaces/{workspaceSlug}/practices/observations/summary:
-    get:
-      description: Aggregated observation counts per practice for dashboard cards
-      operationId: getSummary
+      description: "One entry per practice with a practice script: the models the\
+        \ script declared in the newest review that ran it, and for each model the\
+        \ member tiers that no ready binding serves today. A script declares its models\
+        \ only when it runs, so a practice whose script no review ran yet, or whose\
+        \ script changed since, has no needs and no asOf review."
+      operationId: listPracticeScriptNeeds
       parameters:
       - description: Workspace slug
         in: path
@@ -7402,42 +7319,11 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/DeveloperPracticeSummary"
-          description: Practice summaries returned
-      summary: Per-practice summary for current user
+                  $ref: "#/components/schemas/PracticeScriptSummary"
+          description: Practice script needs returned
+      summary: List what each practice's script needs
       tags:
-      - Practice Observations
-  /workspaces/{workspaceSlug}/practices/observations/{observationId}:
-    get:
-      operationId: getObservation
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          maxLength: 51
-          minLength: 3
-          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - in: path
-        name: observationId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ObservationDetail"
-          description: Observation detail returned
-        "404":
-          description: Observation not found or not owned by current user
-      summary: Get observation detail
-      tags:
-      - Practice Observations
+      - Practice Catalog
   /workspaces/{workspaceSlug}/practices/releases:
     get:
       operationId: listPracticeReleases
@@ -7597,6 +7483,195 @@ paths:
       summary: Reorder the practices within a group
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/results:
+    get:
+      description: Paginated results for the authenticated developer with optional
+        filters
+      operationId: listResults
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      - description: Filter by practice slug
+        in: query
+        name: practiceSlug
+        required: false
+        schema:
+          type: string
+      - description: Filter by the practice group the observed practice belongs to
+        in: query
+        name: groupSlug
+        required: false
+        schema:
+          type: string
+      - description: Filter by review outcome
+        in: query
+        name: outcome
+        required: false
+        schema:
+          type: string
+          enum:
+          - MET
+          - NOT_MET
+          - NOT_APPLICABLE
+          - UNDETERMINED
+      - description: "Only results on these kinds of reviewed work, e.g. scm.pull_request\
+          \ (repeatable)"
+        in: query
+        name: artifactKinds
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: "Exact reviewed-work kind; requires artifactId, e.g. scm.pull_request\
+          \ or scm.issue"
+        in: query
+        name: artifactKind
+        required: false
+        schema:
+          type: string
+      - description: Exact reviewed-work ID; requires artifactKind
+        in: query
+        name: artifactId
+        required: false
+        schema:
+          type: integer
+          format: int64
+          exclusiveMinimum: 0
+      - description: Only results with these severities (repeatable); omit for all
+        in: query
+        name: severities
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            description: "How much a real gap weighs. CRITICAL: act now. MAJOR: fix\
+              \ before the work is done. MINOR: a small gap worth raising. INFO (label:\
+              \ Trivial): a real gap with trivial impact; fix it when it is cheap."
+            enum:
+            - CRITICAL
+            - MAJOR
+            - MINOR
+            - INFO
+      - description: Drop NOT_APPLICABLE rows — only results where the practice actually
+          applied
+        in: query
+        name: displayableOnly
+        required: false
+        schema:
+          type: boolean
+      - description: "Feed ordering: DATE (default) or SEVERITY (most severe first,\
+          \ ties newest-first)"
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+          enum:
+          - DATE
+          - SEVERITY
+      - description: "Ordering direction: for DATE newest/oldest first, for SEVERITY\
+          \ most/least severe first"
+        in: query
+        name: direction
+        required: false
+        schema:
+          type: string
+          enum:
+          - ASC
+          - DESC
+      - description: Zero-based page
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - description: Page size from 1 to 100
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseDTOPracticeResultList"
+          description: Paginated results returned
+      summary: List results for current user
+      tags:
+      - Practice Results
+  /workspaces/{workspaceSlug}/practices/results/summary:
+    get:
+      description: Aggregated result counts per practice for dashboard cards
+      operationId: getSummary
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeveloperPracticeSummary"
+          description: Practice summaries returned
+      summary: Per-practice summary for current user
+      tags:
+      - Practice Results
+  /workspaces/{workspaceSlug}/practices/results/{practiceResultId}:
+    get:
+      operationId: getPracticeResult
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      - in: path
+        name: practiceResultId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeResultDetail"
+          description: Result detail returned
+        "404":
+          description: Result not found or not owned by current user
+      summary: Get result detail
+      tags:
+      - Practice Results
   /workspaces/{workspaceSlug}/practices/review-context:
     get:
       description: "Reads the address only: nothing is fetched from it. The address\
@@ -7818,7 +7893,7 @@ paths:
   /workspaces/{workspaceSlug}/practices/reviewed-work/{artifactKind}/{artifactId}/review-runs:
     get:
       description: "Complete review runs newest first, every practice group together,\
-        \ with each observation's feedback response."
+        \ with each result's feedback response."
       operationId: listReviewedWorkReviewRuns
       parameters:
       - description: Workspace slug
@@ -7950,7 +8025,7 @@ paths:
         schema:
           type: string
           format: date-time
-      - description: Keep the reviews that recorded an observation about this developer
+      - description: Keep the reviews that recorded a result about this developer
           that is not marked incorrect
         in: query
         name: subjectUserId
@@ -7959,8 +8034,8 @@ paths:
           type: integer
           format: int64
           exclusiveMinimum: 0
-      - description: Keep the reviews that recorded an observation of any of these
-          practices that is not marked incorrect (repeatable)
+      - description: Keep the reviews that recorded a result of any of these practices
+          that is not marked incorrect (repeatable)
         in: query
         name: practiceSlug
         required: false
@@ -7968,8 +8043,8 @@ paths:
           type: array
           items:
             type: string
-      - description: Keep the reviews that recorded an observation of a practice in
-          any of these groups that is not marked incorrect (repeatable)
+      - description: Keep the reviews that recorded a result of a practice in any
+          of these groups that is not marked incorrect (repeatable)
         in: query
         name: groupSlug
         required: false
@@ -8035,7 +8110,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Invalid filter or pagination
-      summary: List practice reviews with observation and feedback outcomes
+      summary: List practice reviews with result and feedback outcomes
       tags:
       - Practice reviews
   /workspaces/{workspaceSlug}/practices/reviews/evidence-outcomes:
@@ -8196,9 +8271,9 @@ paths:
         schema:
           type: string
           format: uuid
-      - description: Keep the feedback written from this observation
+      - description: Keep the feedback written from this result
         in: query
-        name: observationId
+        name: practiceResultId
         required: false
         schema:
           type: string
@@ -8225,7 +8300,7 @@ paths:
           format: int64
           exclusiveMinimum: 0
       - description: "Practices whose feedback to list (repeatable): feedback bound\
-          \ to an observation of any of them, in any role"
+          \ to a result of any of them, in any role"
         in: query
         name: practiceSlug
         required: false
@@ -8234,7 +8309,7 @@ paths:
           items:
             type: string
       - description: "Practice groups whose feedback to list (repeatable): feedback\
-          \ bound to an observation of a practice in any of them"
+          \ bound to a result of a practice in any of them"
         in: query
         name: groupSlug
         required: false
@@ -8374,9 +8449,9 @@ paths:
         schema:
           type: string
           format: uuid
-      - description: Keep the feedback written from this observation
+      - description: Keep the feedback written from this result
         in: query
-        name: observationId
+        name: practiceResultId
         required: false
         schema:
           type: string
@@ -8403,7 +8478,7 @@ paths:
           format: int64
           exclusiveMinimum: 0
       - description: "Practices whose feedback to list (repeatable): feedback bound\
-          \ to an observation of any of them, in any role"
+          \ to a result of any of them, in any role"
         in: query
         name: practiceSlug
         required: false
@@ -8412,7 +8487,7 @@ paths:
           items:
             type: string
       - description: "Practice groups whose feedback to list (repeatable): feedback\
-          \ bound to an observation of a practice in any of them"
+          \ bound to a result of a practice in any of them"
         in: query
         name: groupSlug
         required: false
@@ -8562,9 +8637,9 @@ paths:
         schema:
           type: string
           format: uuid
-      - description: Keep the feedback written from this observation
+      - description: Keep the feedback written from this result
         in: query
-        name: observationId
+        name: practiceResultId
         required: false
         schema:
           type: string
@@ -8591,7 +8666,7 @@ paths:
           format: int64
           exclusiveMinimum: 0
       - description: "Practices whose feedback to list (repeatable): feedback bound\
-          \ to an observation of any of them, in any role"
+          \ to a result of any of them, in any role"
         in: query
         name: practiceSlug
         required: false
@@ -8600,7 +8675,7 @@ paths:
           items:
             type: string
       - description: "Practice groups whose feedback to list (repeatable): feedback\
-          \ bound to an observation of a practice in any of them"
+          \ bound to a result of a practice in any of them"
         in: query
         name: groupSlug
         required: false
@@ -8678,7 +8753,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Feedback not found in this workspace
-      summary: "Get feedback with its stored body, observations and placements"
+      summary: "Get feedback with its stored body, results and placements"
       tags:
       - Practice reviews
   /workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/approval:
@@ -8799,10 +8874,10 @@ paths:
   /workspaces/{workspaceSlug}/practices/reviews/lineage:
     get:
       description: "Returns the chain from the reviewed work through the review and\
-        \ its observations to the feedback written from them, where it went, whether\
-        \ the developer answered or disputes it (never their rating or private notes)\
-        \ and whether their work resolved it. OBSERVATION, FEEDBACK and REVIEW take\
-        \ `id`; WORK takes `artifactKind` and `artifactId` and traces the newest review\
+        \ its results to the feedback written from them, where it went, whether the\
+        \ developer answered or disputes it (never their rating or private notes)\
+        \ and whether their work resolved it. RESULT, FEEDBACK and REVIEW take `id`;\
+        \ WORK takes `artifactKind` and `artifactId` and traces the newest review\
         \ of that work. Each list is capped and carries a count of what it leaves\
         \ out."
       operationId: getPracticeReviewLineage
@@ -8822,12 +8897,11 @@ paths:
         schema:
           type: string
           enum:
-          - OBSERVATION
+          - RESULT
           - FEEDBACK
           - REVIEW
           - WORK
-      - description: "The observation, feedback or review id; required unless kind\
-          \ is WORK"
+      - description: "The result, feedback or review id; required unless kind is WORK"
         in: query
         name: id
         required: false
@@ -8849,7 +8923,7 @@ paths:
           type: integer
           format: int64
           exclusiveMinimum: 0
-      - description: "true lists the whole review around the record: every observation\
+      - description: "true lists the whole review around the record: every result\
           \ and piece of feedback of the review, up to 100 each, and the work's moments;\
           \ false keeps the short chain"
         in: query
@@ -8883,15 +8957,259 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Nothing of that kind and id was recorded in this workspace
-      summary: "Trace how an observation, piece of feedback, review or piece of work\
-        \ came about"
+      summary: "Trace how a result, piece of feedback, review or piece of work came\
+        \ about"
       tags:
       - Practice reviews
-  /workspaces/{workspaceSlug}/practices/reviews/observations:
+  /workspaces/{workspaceSlug}/practices/reviews/overview:
+    get:
+      description: "In total, over time and by practice. Reviews count by when they\
+        \ were created, results by when they were recorded and feedback by when it\
+        \ was created, as the review, result and feedback lists filter them. The range\
+        \ is split into days, weeks or months, by its length, in the given time zone."
+      operationId: getPracticeReviewOverview
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      - description: Inclusive lower bound; defaults to seven days before to. A range
+          spans at most 400 days.
+        in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - description: Exclusive upper bound; defaults to now
+        in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - description: "The IANA time zone whose midnights start the buckets, such as\
+          \ Europe/Berlin"
+        in: query
+        name: zone
+        required: false
+        schema:
+          type: string
+          default: UTC
+      - description: "True counts all of the workspace's practice reviews: from the\
+          \ first one's request, whatever from says, so the range may span more than\
+          \ 400 days. The response's from says where it started."
+        in: query
+        name: allTime
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeReviewOverview"
+          description: Practice reviews counted
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Invalid range or time zone
+      summary: "Count practice reviews, results and feedback in a time range"
+      tags:
+      - Practice reviews
+  /workspaces/{workspaceSlug}/practices/reviews/queue:
+    get:
+      description: "How many practice reviews run, wait and are held for budget now,\
+        \ the oldest wait, the reviews at the head of the queue, and how many reviews\
+        \ finished in the last hour and the last 24 hours."
+      operationId: getPracticeReviewQueue
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeReviewQueue"
+          description: Practice review queue returned
+      summary: Show the practice review queue as it stands now
+      tags:
+      - Practice reviews
+  /workspaces/{workspaceSlug}/practices/reviews/result-observations:
+    get:
+      description: "Newest result first, then each result's display order. Where the\
+        \ result's detail hides its evidence, the row leaves out its summary and place\
+        \ and sets evidenceHidden."
+      operationId: listPracticeReviewResultObservations
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 100
+          minimum: 1
+      - in: query
+        name: practiceSlug
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - in: query
+        name: groupSlug
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Observation severities to list (repeatable)
+        in: query
+        name: severity
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            description: "How much a real gap weighs. CRITICAL: act now. MAJOR: fix\
+              \ before the work is done. MINOR: a small gap worth raising. INFO (label:\
+              \ Trivial): a real gap with trivial impact; fix it when it is cheap."
+            enum:
+            - CRITICAL
+            - MAJOR
+            - MINOR
+            - INFO
+      - description: "true for only the observations of results an admin has marked\
+          \ incorrect and not restored, false for only the others; omit for both"
+        in: query
+        name: invalidated
+        required: false
+        schema:
+          type: boolean
+      - description: "true for only the observations of results the developer disputes\
+          \ feedback about, false for only the others; omit for both"
+        in: query
+        name: disputed
+        required: false
+        schema:
+          type: boolean
+      - description: Only the observations of this result
+        in: query
+        name: practiceResultId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: agentJobId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - description: "Kind of reviewed work, e.g. scm.pull_request"
+        in: query
+        name: artifactKind
+        required: false
+        schema:
+          type: string
+      - description: Artifact ID; requires artifactKind
+        in: query
+        name: artifactId
+        required: false
+        schema:
+          type: integer
+          format: int64
+          exclusiveMinimum: 0
+      - in: query
+        name: subjectUserId
+        required: false
+        schema:
+          type: integer
+          format: int64
+          exclusiveMinimum: 0
+      - description: "What occasioned the measurement: LIVE, MANUAL or BACKFILL"
+        in: query
+        name: origin
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - LIVE
+            - MANUAL
+            - BACKFILL
+      - description: Inclusive lower bound on when the result was recorded
+        in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - description: Exclusive upper bound on when the result was recorded
+        in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelPracticeReviewObservationRow"
+          description: Paginated observations returned
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Invalid filter or pagination
+      summary: List the observations of practice review results across the workspace
+      tags:
+      - Practice reviews
+  /workspaces/{workspaceSlug}/practices/reviews/results:
     get:
       description: Results include linked feedback outcomes and are ordered newest
         first by default.
-      operationId: listPracticeReviewObservations
+      operationId: listPracticeReviewResults
       parameters:
       - description: Workspace slug
         in: path
@@ -8921,7 +9239,7 @@ paths:
           minimum: 1
       - description: "Sorting strategy. ACTIONABILITY orders NOT_MET by severity (CRITICAL,\
           \ MAJOR, MINOR, INFO), then MET, then NOT_APPLICABLE and UNDETERMINED together.\
-          \ Within each rank, observation time and ID are descending."
+          \ Within each rank, result time and ID are descending."
         in: query
         name: sort
         required: false
@@ -8958,15 +9276,15 @@ paths:
             - NOT_MET
             - NOT_APPLICABLE
             - UNDETERMINED
-      - description: "true for only the observations an admin has marked incorrect\
-          \ and not restored, false for only the others; omit for both"
+      - description: "true for only the results an admin has marked incorrect and\
+          \ not restored, false for only the others; omit for both"
         in: query
         name: invalidated
         required: false
         schema:
           type: boolean
-      - description: "true for only the observations the developer disputes feedback\
-          \ about, false for only the others; omit for both"
+      - description: "true for only the results the developer disputes feedback about,\
+          \ false for only the others; omit for both"
         in: query
         name: disputed
         required: false
@@ -8979,6 +9297,9 @@ paths:
           type: array
           items:
             type: string
+            description: "How much a real gap weighs. CRITICAL: act now. MAJOR: fix\
+              \ before the work is done. MINOR: a small gap worth raising. INFO (label:\
+              \ Trivial): a real gap with trivial impact; fix it when it is cheap."
             enum:
             - CRITICAL
             - MAJOR
@@ -9042,20 +9363,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelReviewObservation"
-          description: Paginated observations returned
+                $ref: "#/components/schemas/PagedModelReviewResult"
+          description: Paginated results returned
         "400":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Invalid filter or pagination
-      summary: List practice review observations across the workspace
+      summary: List practice review results across the workspace
       tags:
       - Practice reviews
-  /workspaces/{workspaceSlug}/practices/reviews/observations/{observationId}:
+  /workspaces/{workspaceSlug}/practices/reviews/results/{practiceResultId}:
     get:
-      operationId: getPracticeReviewObservation
+      operationId: getPracticeReviewResult
       parameters:
       - description: Workspace slug
         in: path
@@ -9067,7 +9388,7 @@ paths:
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
       - in: path
-        name: observationId
+        name: practiceResultId
         required: true
         schema:
           type: string
@@ -9077,23 +9398,23 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ReviewObservationDetail"
-          description: Observation detail returned
+                $ref: "#/components/schemas/ReviewResultDetail"
+          description: Result detail returned
         "404":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: Observation not found in this workspace
-      summary: Get an observation with its evidence and linked feedback
+          description: Result not found in this workspace
+      summary: Get a result with its evidence and linked feedback
       tags:
       - Practice reviews
-  /workspaces/{workspaceSlug}/practices/reviews/observations/{observationId}/validity:
+  /workspaces/{workspaceSlug}/practices/reviews/results/{practiceResultId}/validity:
     patch:
-      description: "Invalidating stops feedback citing the observation that has not\
-        \ reached anyone yet. Feedback already delivered keeps its record, and a comment\
-        \ already posted on the provider stays there. Restoring does not re-send anything."
-      operationId: updatePracticeReviewObservationValidity
+      description: "Invalidating stops feedback citing the result that has not reached\
+        \ anyone yet. Feedback already delivered keeps its record, and a comment already\
+        \ posted on the provider stays there. Restoring does not re-send anything."
+      operationId: updatePracticeReviewResultValidity
       parameters:
       - description: Workspace slug
         in: path
@@ -9105,7 +9426,7 @@ paths:
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
       - in: path
-        name: observationId
+        name: practiceResultId
         required: true
         schema:
           type: string
@@ -9114,121 +9435,28 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateObservationValidityRequest"
+              $ref: "#/components/schemas/UpdatePracticeResultValidityRequest"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ReviewObservationDetail"
-          description: Observation detail after the change
+                $ref: "#/components/schemas/ReviewResultDetail"
+          description: Result detail after the change
         "404":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: Observation not found in this workspace
+          description: Result not found in this workspace
         "409":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: The observation is already in the requested state
-      summary: "Invalidate an observation that was wrong when recorded, or restore\
-        \ it"
-      tags:
-      - Practice reviews
-  /workspaces/{workspaceSlug}/practices/reviews/overview:
-    get:
-      description: "In total, over time and by practice. Reviews count by when they\
-        \ were created, observations by when they were recorded and feedback by when\
-        \ it was created, as the review, observation and feedback lists filter them.\
-        \ The range is split into days, weeks or months, by its length, in the given\
-        \ time zone."
-      operationId: getPracticeReviewOverview
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          maxLength: 51
-          minLength: 3
-          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - description: Inclusive lower bound; defaults to seven days before to. A range
-          spans at most 400 days.
-        in: query
-        name: from
-        required: false
-        schema:
-          type: string
-          format: date-time
-      - description: Exclusive upper bound; defaults to now
-        in: query
-        name: to
-        required: false
-        schema:
-          type: string
-          format: date-time
-      - description: "The IANA time zone whose midnights start the buckets, such as\
-          \ Europe/Berlin"
-        in: query
-        name: zone
-        required: false
-        schema:
-          type: string
-          default: UTC
-      - description: "True counts all of the workspace's practice reviews: from the\
-          \ first one's request, whatever from says, so the range may span more than\
-          \ 400 days. The response's from says where it started."
-        in: query
-        name: allTime
-        required: false
-        schema:
-          type: boolean
-          default: false
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PracticeReviewOverview"
-          description: Practice reviews counted
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: Invalid range or time zone
-      summary: "Count practice reviews, observations and feedback in a time range"
-      tags:
-      - Practice reviews
-  /workspaces/{workspaceSlug}/practices/reviews/queue:
-    get:
-      description: "How many practice reviews run, wait and are held for budget now,\
-        \ the oldest wait, the reviews at the head of the queue, and how many reviews\
-        \ finished in the last hour and the last 24 hours."
-      operationId: getPracticeReviewQueue
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          maxLength: 51
-          minLength: 3
-          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PracticeReviewQueue"
-          description: Practice review queue returned
-      summary: Show the practice review queue as it stands now
+          description: The result is already in the requested state
+      summary: "Invalidate a result that was wrong when recorded, or restore it"
       tags:
       - Practice reviews
   /workspaces/{workspaceSlug}/practices/reviews/runs/{agentJobId}/delivery-checks:
@@ -9388,7 +9616,7 @@ paths:
       - Practice reviews
   /workspaces/{workspaceSlug}/practices/standings:
     get:
-      description: "Returns each practice's standing, direction, supporting observations,\
+      description: "Returns each practice's standing, direction, supporting results,\
         \ and developer guidance."
       operationId: listPracticeStandings
       parameters:
@@ -9655,10 +9883,10 @@ paths:
         \ including the ones that did nothing, each with the recorded reason. Name\
         \ a review and every answer is that review's own. A workspace admin may read\
         \ any work, with or without a review; anyone else must name a review that\
-        \ observed them on this work, and reads only the observations about them and\
-        \ the feedback addressed to them. 404 means nothing about this artifact was\
-        \ ever recorded here, the named review never ran on it, or the caller may\
-        \ not read it."
+        \ observed them on this work, and reads only the results about them and the\
+        \ feedback addressed to them. 404 means nothing about this artifact was ever\
+        \ recorded here, the named review never ran on it, or the caller may not read\
+        \ it."
       operationId: getArtifactTrace
       parameters:
       - description: Workspace slug
@@ -9711,10 +9939,10 @@ paths:
       - Practice review trace
   /workspaces/{workspaceSlug}/practices/trace/{artifactKind}/{artifactId}/own:
     get:
-      description: "Counts only observations about the caller and feedback addressed\
-        \ to them, including when the caller is a workspace admin. The named review\
-        \ must have observed them on this work. An inaccessible review answers the\
-        \ same 404 as an absent one."
+      description: "Counts only results about the caller and feedback addressed to\
+        \ them, including when the caller is a workspace admin. The named review must\
+        \ have observed them on this work. An inaccessible review answers the same\
+        \ 404 as an absent one."
       operationId: getOwnArtifactTrace
       parameters:
       - description: Workspace slug
@@ -9926,12 +10154,12 @@ paths:
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/autonomy:
     patch:
       description: "OFF stops the review entirely. HUMAN_APPROVAL runs it and records\
-        \ every observation, holds feedback on the work for an authorized reviewer,\
-        \ and still writes the developer's practice pages and the mentor, which are\
-        \ read on request. AUTOMATIC sends feedback on the work without asking, as\
-        \ far as this workspace's reach allows. Send a null autonomy to clear the\
-        \ practice's own setting so it follows its group, and through the group the\
-        \ workspace default."
+        \ every result, holds feedback on the work for an authorized reviewer, and\
+        \ still writes the developer's practice pages and the mentor, which are read\
+        \ on request. AUTOMATIC sends feedback on the work without asking, as far\
+        \ as this workspace's reach allows. Send a null autonomy to clear the practice's\
+        \ own setting so it follows its group, and through the group the workspace\
+        \ default."
       operationId: setAutonomy
       parameters:
       - description: Workspace slug
@@ -11712,7 +11940,8 @@ components:
         events:
           type: integer
           format: int64
-          description: "Ledger events (jobs / mentor turns) this month, either purse"
+          description: "Runs this month, either purse: job attempts and mentor turns.\
+            \ Rows of models for practice scripts are not runs."
         instanceBudgetVerdict:
           type: string
           description: "Whether shared-model spend is within the instance cap, has\
@@ -11744,6 +11973,10 @@ components:
           - WITHIN
           - EXHAUSTED
           - UNVERIFIABLE
+        ownProviderInUse:
+          type: boolean
+          description: Whether this month has an own-provider purse to show for the
+            workspace. Same rule as WorkspaceLlmUsageReport.ownProviderInUse.
         ownProviderMonthlyBudgetUsd:
           type: number
           format: decimal
@@ -11770,6 +12003,7 @@ components:
       - instancePaused
       - instanceTotalCostUsd
       - ownProviderBudgetVerdict
+      - ownProviderInUse
       - ownProviderPaused
       - ownProviderTotalCostUsd
       - workspaceSlug
@@ -11840,9 +12074,25 @@ components:
           enum:
           - PRACTICE_REVIEW
           - MENTOR
+          - PRACTICE_DECISION
+          - PRACTICE_EMBEDDING
+          - PRACTICE_RERANKING
         ready:
           type: boolean
           description: True when the bound model is available to run right now
+        servedTiers:
+          type: array
+          description: "The members this binding serves now, named by the tier of\
+            \ their choice: IN_HOUSE and CLOUD for the members who chose them, UNDECLARED\
+            \ for the members who have not chosen. A decision, embedding or reranking\
+            \ binding serves no member whose review model is stricter. Empty when\
+            \ the binding serves no member."
+          items:
+            type: string
+            enum:
+            - IN_HOUSE
+            - CLOUD
+            - UNDECLARED
         timeoutSeconds:
           type: integer
           format: int32
@@ -11854,6 +12104,7 @@ components:
       - enabled
       - purpose
       - ready
+      - servedTiers
     AgentBindingRequest:
       type: object
       description: Bind a model and execution limits to an agent purpose
@@ -11930,6 +12181,15 @@ components:
           type: string
           format: date-time
           description: Timestamp when the job was created
+        dataHandlingTier:
+          type: string
+          description: "Data handling tier of the slot whose model this job was admitted\
+            \ on, frozen at submit time. Absent when the snapshot names no tier that\
+            \ this server knows."
+          enum:
+          - IN_HOUSE
+          - CLOUD
+          - UNDECLARED
         deliveryCommentId:
           type: string
           description: Git provider comment/note ID for posted feedback
@@ -12031,7 +12291,7 @@ components:
             \ which the runner reports only once the job has run."
         output:
           description: Raw output is not returned by administrative job reads; use
-            the authorized observation and feedback endpoints
+            the authorized result and feedback endpoints
         publicReviewAcceptedAt:
           type: string
           format: date-time
@@ -12044,10 +12304,10 @@ components:
           description: Number of retry attempts
         reviewOutcome:
           type: string
-          description: "Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE\
+          description: "Why a COMPLETED run produced the results it did. INSUFFICIENT_EVIDENCE\
             \ means no model ran because required evidence was missing, unreadable,\
-            \ stale, or unauthorized — so no observations means nothing was assessed,\
-            \ not that nothing was wrong. COALESCED means no model ran because a completed\
+            \ stale, or unauthorized — so no results means nothing was assessed, not\
+            \ that nothing was wrong. COALESCED means no model ran because a completed\
             \ review had already answered every ready practice on exactly the same\
             \ code — its answers are listed in answeredPractices, and this run assessed\
             \ nothing anew. SUPERSEDED means the waiting attempt was replaced by an\
@@ -12107,11 +12367,18 @@ components:
           description: "One entry per attempt with recorded usage, first attempt first"
           items:
             $ref: "#/components/schemas/AgentJobUsageAttempt"
+        practiceScriptCostUsd:
+          type: number
+          format: decimal
+          description: "What the models its practice scripts called cost in US dollars,\
+            \ already in totalCostUsd; absent when no script called a model or a call\
+            \ has no known price"
         totalCostUsd:
           type: number
           format: decimal
-          description: The cost of every attempt in US dollars; absent when an attempt
-            has no known price or no usage is recorded
+          description: "The cost of every attempt in US dollars, the models its practice\
+            \ scripts called included; absent when an attempt or a script call has\
+            \ no known price, or no usage is recorded"
         unpricedAttempts:
           type: integer
           format: int32
@@ -12212,8 +12479,8 @@ components:
     AnsweredPractice:
       type: object
       description: "A ready practice this review did not ask, because a completed\
-        \ review had already answered it on exactly the same code. Its observation\
-        \ belongs to that review; this review recorded none for it."
+        \ review had already answered it on exactly the same code. Its result belongs\
+        \ to that review; this review recorded none for it."
       properties:
         practiceSlug:
           type: string
@@ -12221,7 +12488,7 @@ components:
         reviewId:
           type: string
           format: uuid
-          description: The completed review whose observation answers it
+          description: The completed review whose result answers it
         revisionId:
           type: integer
           format: int64
@@ -12444,6 +12711,18 @@ components:
           - PRICED
           - NO_CHARGE
           - UNPRICED
+        purposes:
+          type: array
+          description: "The purposes a binding may assign this model to, from its\
+            \ connection's protocol"
+          items:
+            type: string
+            enum:
+            - PRACTICE_REVIEW
+            - MENTOR
+            - PRACTICE_DECISION
+            - PRACTICE_EMBEDDING
+            - PRACTICE_RERANKING
         reasoningEffort:
           type: string
           description: "Reasoning effort requested of the model; null sends none,\
@@ -12468,6 +12747,7 @@ components:
       - displayName
       - id
       - pricingMode
+      - purposes
       - scope
     BackfillSummary:
       type: object
@@ -12760,6 +13040,41 @@ components:
       required:
       - createdAt
       - id
+    ClaimBasis:
+      type: object
+      description: Why a problem belongs to this work
+      properties:
+        base:
+          type: integer
+          format: int32
+          description: The citation of the earlier state; worsened only
+        criterionQuote:
+          type: string
+          description: The words of the practice's criteria that state the duty; duty
+            only
+        event:
+          type: integer
+          format: int32
+          description: The citation of the event that owed the duty; duty only
+        explanation:
+          type: string
+          description: The basis in words
+        head:
+          type: integer
+          format: int32
+          description: The citation on the reviewed side; introduced and worsened
+            only
+        type:
+          type: string
+          description: "introduced, worsened, duty or state"
+          enum:
+          - introduced
+          - worsened
+          - duty
+          - state
+      required:
+      - explanation
+      - type
     ClientRefreshRequest:
       type: object
       properties:
@@ -13318,9 +13633,13 @@ components:
         apiProtocol:
           type: string
           description: Wire protocol
+          enum:
+          - openai-completions
+          - openai-responses
+          - openai-decisions
+          - openai-embeddings
+          - cohere-rerank
           example: openai-responses
-          minLength: 1
-          pattern: openai-completions|openai-responses
         authMode:
           type: string
           description: Credential shape (default BEARER)
@@ -13562,9 +13881,10 @@ components:
           example: PR Description Quality
           maxLength: 128
           minLength: 3
-        precomputeScript:
+        practiceScript:
           type: string
-          description: TypeScript/Node static analysis run before automated review
+          description: TypeScript review program for this practice that returns one
+            result
           maxLength: 100000
           minLength: 0
         precondition:
@@ -13750,9 +14070,13 @@ components:
         apiProtocol:
           type: string
           description: Wire protocol
+          enum:
+          - openai-completions
+          - openai-responses
+          - openai-decisions
+          - openai-embeddings
+          - cohere-rerank
           example: openai-responses
-          minLength: 1
-          pattern: openai-completions|openai-responses
         authMode:
           type: string
           description: Credential shape (default BEARER)
@@ -14126,7 +14450,7 @@ components:
           $ref: "#/components/schemas/PracticeGuide"
         name:
           type: string
-        precomputeScript:
+        practiceScript:
           type: string
         precondition:
           $ref: "#/components/schemas/PracticePrecondition"
@@ -14208,7 +14532,7 @@ components:
           type: string
           maxLength: 128
           minLength: 3
-        precomputeScript:
+        practiceScript:
           type: string
           maxLength: 100000
           minLength: 0
@@ -14583,33 +14907,33 @@ components:
       - status
     DeveloperPracticeSummary:
       type: object
-      description: Per-practice observation summary for a developer
+      description: Per-practice result summary for a developer
       properties:
         lastObservedAt:
           type: string
           format: date-time
-          description: Timestamp of most recent observation
+          description: Timestamp of most recent result
         met:
           type: integer
           format: int64
-          description: Number of MET observations
+          description: Number of MET results
         notApplicable:
           type: integer
           format: int64
         notMet:
           type: integer
           format: int64
-          description: Number of NOT_MET observations
+          description: Number of NOT_MET results
         practiceName:
           type: string
           description: Practice name
         practiceSlug:
           type: string
           description: Practice slug
-        totalObservations:
+        totalResults:
           type: integer
           format: int64
-          description: Total number of observations
+          description: Total number of results
         undetermined:
           type: integer
           format: int64
@@ -14619,7 +14943,7 @@ components:
       - notMet
       - practiceName
       - practiceSlug
-      - totalObservations
+      - totalResults
       - undetermined
     EmailTestRequest:
       type: object
@@ -14739,19 +15063,6 @@ components:
       - boundary
       - consulted
       - lookedFor
-    EvidenceUndecidability:
-      type: object
-      description: "What the review could not settle, and what would settle it"
-      properties:
-        openQuestion:
-          type: string
-          description: The question this work left open
-        wouldSettleIt:
-          type: string
-          description: What would have answered it
-      required:
-      - openQuestion
-      - wouldSettleIt
     ExportCreated:
       type: object
       description: Acknowledgement returned when a data export is requested.
@@ -15682,6 +15993,12 @@ components:
         apiProtocol:
           type: string
           description: Wire protocol
+          enum:
+          - openai-completions
+          - openai-responses
+          - openai-decisions
+          - openai-embeddings
+          - cohere-rerank
           example: openai-responses
         authMode:
           type: string
@@ -15730,6 +16047,18 @@ components:
           type: integer
           format: int64
           description: Connection ID
+        purposes:
+          type: array
+          description: "The purposes a model on this connection can serve, from its\
+            \ protocol"
+          items:
+            type: string
+            enum:
+            - PRACTICE_REVIEW
+            - MENTOR
+            - PRACTICE_DECISION
+            - PRACTICE_EMBEDDING
+            - PRACTICE_RERANKING
         slug:
           type: string
           description: Unique slug
@@ -15747,6 +16076,7 @@ components:
       - enabled
       - hasApiKey
       - id
+      - purposes
       - slug
     LlmModel:
       type: object
@@ -15946,6 +16276,8 @@ components:
         events:
           type: integer
           format: int64
+          description: "Runs: job attempts and mentor turns. Rows of models for practice\
+            \ scripts are not runs."
         instanceTotalCostUsd:
           type: number
           format: decimal
@@ -15959,8 +16291,9 @@ components:
         unpricedEventCount:
           type: integer
           format: int64
-          description: Calls this day whose price is not yet known. Excluded from
-            both totals above.
+          description: Runs this day with at least one ledger row whose price is not
+            yet known. A practice script row counts toward the run of its review.
+            Those rows are excluded from both totals above.
       required:
       - day
       - events
@@ -15980,7 +16313,8 @@ components:
         events:
           type: integer
           format: int64
-          description: Ledger events (jobs / mentor turns)
+          description: "Runs: job attempts and mentor turns. Rows of models for practice\
+            \ scripts are not runs."
         inputTokens:
           type: integer
           format: int64
@@ -16014,8 +16348,9 @@ components:
         unpricedEventCount:
           type: integer
           format: int64
-          description: Calls for this job type whose price is not yet known. Excluded
-            from both totals above.
+          description: Runs of this job type with at least one ledger row whose price
+            is not yet known. A practice script row counts toward the run of its review.
+            Those rows are excluded from both totals above.
       required:
       - cacheReadTokens
       - cacheWriteTokens
@@ -16026,6 +16361,114 @@ components:
       - outputTokens
       - ownProviderTotalCostUsd
       - totalCalls
+      - unpricedEventCount
+    LlmUsageByPractice:
+      type: object
+      description: "The decision, embedding and reranking calls that one practice's\
+        \ script made in finished reviews this month. The cost of each review's calls\
+        \ is split between its practices by the priced tokens that each used."
+      properties:
+        calls:
+          type: integer
+          format: int64
+        inputTokens:
+          type: integer
+          format: int64
+        instanceTotalCostUsd:
+          type: number
+          format: decimal
+          description: "This practice's share of the spend on shared (instance) models,\
+            \ in USD."
+        outputTokens:
+          type: integer
+          format: int64
+        ownProviderTotalCostUsd:
+          type: number
+          format: decimal
+          description: "This practice's share of the spend on this workspace's own\
+            \ provider(s), in USD."
+        practiceName:
+          type: string
+          description: The practice name. Null when the slug names no current practice.
+        practiceSlug:
+          type: string
+          description: "The practice slug. Null for calls that cannot be split by\
+            \ practice any more, such as those of a deleted review."
+        purposes:
+          type: array
+          description: The models for practice scripts that the script called.
+          items:
+            type: string
+            enum:
+            - PRACTICE_REVIEW
+            - MENTOR
+            - PRACTICE_DECISION
+            - PRACTICE_EMBEDDING
+            - PRACTICE_RERANKING
+        reviews:
+          type: integer
+          format: int64
+          description: Reviews in which the script called a model for practice scripts.
+            A review with several practices counts for each of them.
+        unpricedEventCount:
+          type: integer
+          format: int64
+          description: "Reviews with a practice script ledger row whose price is not\
+            \ yet known and that holds this practice's calls, each review counted\
+            \ once. Those rows are excluded from both totals above. A review with\
+            \ several practices counts for each of them."
+      required:
+      - calls
+      - inputTokens
+      - instanceTotalCostUsd
+      - outputTokens
+      - ownProviderTotalCostUsd
+      - purposes
+      - reviews
+      - unpricedEventCount
+    LlmUsagePracticeScriptTotal:
+      type: object
+      description: "The decision, embedding and reranking calls of finished reviews\
+        \ this month, in total. calls, inputTokens, outputTokens and both costs equal\
+        \ the sums of the byPractice entries. reviews and unpricedEventCount do not:\
+        \ one review can count for several practices there."
+      properties:
+        calls:
+          type: integer
+          format: int64
+        inputTokens:
+          type: integer
+          format: int64
+        instanceTotalCostUsd:
+          type: number
+          format: decimal
+          description: "Confirmed practice script spend on shared (instance) models,\
+            \ in USD."
+        outputTokens:
+          type: integer
+          format: int64
+        ownProviderTotalCostUsd:
+          type: number
+          format: decimal
+          description: "Practice script spend on this workspace's own provider(s),\
+            \ in USD."
+        reviews:
+          type: integer
+          format: int64
+          description: Distinct reviews in which a practice script called a model
+            for practice scripts.
+        unpricedEventCount:
+          type: integer
+          format: int64
+          description: Distinct reviews with a practice script ledger row whose price
+            is not yet known. Those rows are excluded from both totals above.
+      required:
+      - calls
+      - inputTokens
+      - instanceTotalCostUsd
+      - outputTokens
+      - ownProviderTotalCostUsd
+      - reviews
       - unpricedEventCount
     LoginProviderView:
       type: object
@@ -16104,245 +16547,35 @@ components:
       - researchSurveys
       - surveySummaries
       - workspaceAlerts
-    ObservationDetail:
+    Observation:
       type: object
-      description: Full practice observation detail including delivered feedback and
-        evidence
+      description: One located problem of a practice result
       properties:
-        artifactId:
-          type: integer
-          format: int64
-          description: Artifact entity ID
-        artifactKind:
-          type: string
-          description: Artifact type (e.g. PULL_REQUEST)
-        artifactUrl:
-          type: string
-          description: Link to the reviewed artifact on its platform (null when it
-            cannot be resolved)
-        claimCurrentness:
-          type: string
-          description: "Whether an observation's claim still stands: its practice's\
-            \ review rules are unchanged and it was not superseded, which an issue's\
-            \ observations are when a change to its reviewable content is recorded.\
-            \ It says neither whether a later review ran nor whether the work changed\
-            \ since it was reviewed. Earlier observation standards and missing fingerprints\
-            \ are unverifiable under the current whole-practice standard"
-          enum:
-          - CURRENT
-          - STALE
-          - UNVERIFIABLE
-        deliveredFeedback:
-          type: string
-          description: "The summary body of the newest eligible feedback about this\
-            \ observation to this developer (null when no summary body was recorded,\
-            \ including delivery through inline notes only)"
-        evidence:
-          $ref: "#/components/schemas/ObservationEvidence"
-        evidenceRationale:
-          type: string
-          description: Evidence-based rationale for the observation
-        feedbackCommentUrls:
-          type: array
-          description: "Links to the comments on the reviewed work that carry the\
-            \ feedback behind feedbackResponse, summary first (null when that feedback\
-            \ was not delivered on the work or the platform returned no link)"
-          items:
-            type: string
-        feedbackResponse:
-          $ref: "#/components/schemas/FeedbackResponse"
-          description: "The developer's standing answer and response handle for the\
-            \ newest eligible feedback about this observation, including inline-only\
-            \ delivery with no summary body (null when no eligible feedback exists\
-            \ or the newest eligible feedback has failed delivery)"
-        id:
-          type: string
-          format: uuid
-          description: Observation ID
-        invalidatedAt:
-          type: string
-          format: date-time
-          description: When a workspace admin marked this observation as incorrect;
-            null while it stands. An invalidated observation counts toward nothing
-            current.
-        invalidationReason:
-          type: string
-          description: The admin's reason for the invalidation; null while the observation
-            stands
-        nextStep:
-          type: string
-          description: "The next step the review wrote about this observation, whether\
-            \ or not the feedback carrying it was delivered (null when it wrote none)"
-        observedAt:
-          type: string
-          format: date-time
-          description: When the observation was made
-        origin:
-          type: string
-          description: What occasioned the measurement; never mix origins in one trend
-            line
-          enum:
-          - LIVE
-          - MANUAL
-          - BACKFILL
-        outcome:
-          type: string
-          description: Result of the practice review
-          enum:
-          - MET
-          - NOT_MET
-          - NOT_APPLICABLE
-          - UNDETERMINED
-        practiceName:
-          type: string
-          description: Practice name
-        practiceSlug:
-          type: string
-          description: Practice slug
-        recurrenceKey:
-          type: string
-          description: Cross-run locus key; null when continuity is unavailable
-        severity:
-          type: string
-          description: Severity level (null unless outcome is NOT_MET)
-          enum:
-          - CRITICAL
-          - MAJOR
-          - MINOR
-          - INFO
-        summary:
-          type: string
-          description: Observation summary
-      required:
-      - artifactId
-      - artifactKind
-      - claimCurrentness
-      - id
-      - observedAt
-      - origin
-      - outcome
-      - practiceName
-      - practiceSlug
-      - summary
-    ObservationEvidence:
-      type: object
-      description: "Verified, source-bound evidence for an observation"
-      properties:
+        basis:
+          $ref: "#/components/schemas/ClaimBasis"
+          description: Why the problem belongs to this work; null when it was recorded
+            before bases were kept
         citations:
           type: array
+          description: "The verified places of the problem, at least one"
           items:
             $ref: "#/components/schemas/EvidenceCitation"
-        inapplicability:
-          $ref: "#/components/schemas/EvidenceInapplicability"
-          description: Why this practice had nothing to judge here; null unless the
-            review recorded a reason
-        search:
-          $ref: "#/components/schemas/EvidenceSearch"
-          description: Where the review looked when it found nothing; null unless
-            it recorded a search
-        undecidability:
-          $ref: "#/components/schemas/EvidenceUndecidability"
-          description: What the review could not settle; null unless it recorded an
-            open question
-      required:
-      - citations
-    ObservationInvalidation:
-      type: object
-      description: "One correction of an observation by a workspace admin, and its\
-        \ restoration if any"
-      properties:
-        id:
+        explanation:
           type: string
-          format: uuid
-        invalidatedAt:
+        nextStep:
           type: string
-          format: date-time
-        invalidatedBy:
-          type: string
-          description: Who invalidated it; null once that account is erased
-        providerCopy:
-          type: string
-          description: What became of the comments Hephaestus had already posted on
-            the provider
-          enum:
-          - PENDING
-          - NONE
-          - UPDATED
-          - INLINE_REMAINS
-          - UNRESOLVED
-        reason:
-          type: string
-        restorationReason:
-          type: string
-          description: Why it was restored; null while the invalidation is in force
-        restoredAt:
-          type: string
-          format: date-time
-        restoredBy:
-          type: string
-          description: Who restored it; null while in force or once that account is
-            erased
-      required:
-      - id
-      - invalidatedAt
-      - providerCopy
-      - reason
-    ObservationList:
-      type: object
-      description: Practice observation summary for list views
-      properties:
-        artifactId:
-          type: integer
-          format: int64
-          description: Artifact entity ID
-        artifactKind:
-          type: string
-          description: Artifact type (e.g. PULL_REQUEST)
-        claimCurrentness:
-          type: string
-          description: "Whether an observation's claim still stands: its practice's\
-            \ review rules are unchanged and it was not superseded, which an issue's\
-            \ observations are when a change to its reviewable content is recorded.\
-            \ It says neither whether a later review ran nor whether the work changed\
-            \ since it was reviewed. Earlier observation standards and missing fingerprints\
-            \ are unverifiable under the current whole-practice standard"
-          enum:
-          - CURRENT
-          - STALE
-          - UNVERIFIABLE
-        id:
+          description: What would fix it; null when the review wrote none
+        observationId:
           type: string
           format: uuid
           description: Observation ID
-        observedAt:
-          type: string
-          format: date-time
-          description: When the observation was made
-        origin:
-          type: string
-          description: What occasioned the measurement; never mix origins in one trend
-            line
-          enum:
-          - LIVE
-          - MANUAL
-          - BACKFILL
-        outcome:
-          type: string
-          description: Result of the practice review
-          enum:
-          - MET
-          - NOT_MET
-          - NOT_APPLICABLE
-          - UNDETERMINED
-        practiceName:
-          type: string
-          description: Practice name
-        practiceSlug:
-          type: string
-          description: Practice slug
+        position:
+          type: integer
+          format: int32
+          description: "Display order within the result, from 0"
         severity:
           type: string
-          description: Severity level (null unless outcome is NOT_MET)
+          description: How much this problem weighs at its place alone
           enum:
           - CRITICAL
           - MAJOR
@@ -16350,18 +16583,50 @@ components:
           - INFO
         summary:
           type: string
-          description: Observation summary
+          description: One line
       required:
-      - artifactId
-      - artifactKind
-      - claimCurrentness
-      - id
-      - observedAt
-      - origin
-      - outcome
-      - practiceName
-      - practiceSlug
+      - citations
+      - explanation
+      - observationId
+      - position
+      - severity
       - summary
+    ObservationSummary:
+      type: object
+      description: "One problem of a not met result, as a list names it"
+      properties:
+        severity:
+          type: string
+          description: How much this problem weighs at its place alone
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        summary:
+          type: string
+          description: One line
+      required:
+      - severity
+      - summary
+    OpenQuestion:
+      type: object
+      description: "A question the review could not settle, what would settle it,\
+        \ and where it arose"
+      properties:
+        citation:
+          $ref: "#/components/schemas/EvidenceCitation"
+          description: The place in the work the question is about; null when it has
+            none
+        openQuestion:
+          type: string
+          description: The question this work left open
+        wouldSettleIt:
+          type: string
+          description: What would have answered it
+      required:
+      - openQuestion
+      - wouldSettleIt
     OpenWork:
       type: object
       description: What is open for one member right now
@@ -16687,7 +16952,7 @@ components:
         totalPages:
           type: integer
           format: int32
-    PageResponseDTOObservationList:
+    PageResponseDTOPracticeResultList:
       type: object
       description: |-
         Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
@@ -16697,7 +16962,7 @@ components:
         content:
           type: array
           items:
-            $ref: "#/components/schemas/ObservationList"
+            $ref: "#/components/schemas/PracticeResultList"
         empty:
           type: boolean
         first:
@@ -16822,6 +17087,15 @@ components:
             $ref: "#/components/schemas/FeedbackItem"
         page:
           $ref: "#/components/schemas/PageMetadata"
+    PagedModelPracticeReviewObservationRow:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeReviewObservationRow"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
     PagedModelReviewFeedback:
       type: object
       properties:
@@ -16831,13 +17105,13 @@ components:
             $ref: "#/components/schemas/ReviewFeedback"
         page:
           $ref: "#/components/schemas/PageMetadata"
-    PagedModelReviewObservation:
+    PagedModelReviewResult:
       type: object
       properties:
         content:
           type: array
           items:
-            $ref: "#/components/schemas/ReviewObservation"
+            $ref: "#/components/schemas/ReviewResult"
         page:
           $ref: "#/components/schemas/PageMetadata"
     PagedModelReviewRunSummary:
@@ -17032,10 +17306,10 @@ components:
         name:
           type: string
           description: Human-readable name
-        precomputeScript:
+        practiceScript:
           type: string
-          description: TypeScript/Node precompute script for static analysis before
-            AI review
+          description: TypeScript review program for this practice that returns one
+            result
         precondition:
           $ref: "#/components/schemas/PracticePrecondition"
         reviewWhen:
@@ -17197,8 +17471,10 @@ components:
           $ref: "#/components/schemas/PracticeGuide"
         name:
           type: string
-        precomputeScript:
+        practiceScript:
           type: string
+          description: TypeScript review program for this practice that returns one
+            result
         precondition:
           $ref: "#/components/schemas/PracticePrecondition"
         reviewWhen:
@@ -17464,12 +17740,12 @@ components:
       type: object
       description: A complete review run in a developer's practice-group history
       properties:
-        observations:
+        practiceResults:
           type: array
-          description: "Every visible observation of the run, complete enough to open\
-            \ in place"
+          description: "Every visible result of the run, complete enough to open in\
+            \ place"
           items:
-            $ref: "#/components/schemas/ObservationDetail"
+            $ref: "#/components/schemas/PracticeResultDetail"
         reviewId:
           type: string
           format: uuid
@@ -17479,7 +17755,7 @@ components:
         reviewedWork:
           $ref: "#/components/schemas/ReviewedWorkRef"
       required:
-      - observations
+      - practiceResults
       - reviewId
       - reviewedAt
       - reviewedWork
@@ -17518,8 +17794,8 @@ components:
         feedbackSince:
           type: string
           format: date-time
-          description: "Oldest contributing observation, for provenance only (null\
-            \ without a verdict)"
+          description: "Oldest contributing result, for provenance only (null without\
+            \ a verdict)"
         feedbackSpanDays:
           type: integer
           format: int32
@@ -17541,16 +17817,16 @@ components:
           description: How the guidance text was produced (null when there is no guidance)
           enum:
           - RULE_BASED
-        observations:
+        practiceResults:
           type: array
-          description: Supporting observations the standing derives from (problems
-            first); empty without a verdict
+          description: Supporting results the standing derives from (problems first);
+            empty without a verdict
           items:
-            $ref: "#/components/schemas/PracticeStandingObservation"
+            $ref: "#/components/schemas/PracticeStandingResult"
         sources:
           type: array
-          description: "Distinct pieces of reviewed work the observations come from,\
-            \ per kind (provenance, not a score); empty without a verdict"
+          description: "Distinct pieces of reviewed work the results come from, per\
+            \ kind (provenance, not a score); empty without a verdict"
           items:
             $ref: "#/components/schemas/FeedbackSourceCount"
         standing:
@@ -17568,7 +17844,7 @@ components:
       required:
       - groupName
       - groupSlug
-      - observations
+      - practiceResults
       - sources
       - standing
     PracticeGroupTrend:
@@ -17709,7 +17985,7 @@ components:
           - SUBJECT
           - PRECONDITION
           - CRITERIA
-          - PRECOMPUTE_SCRIPT
+          - PRACTICE_SCRIPT
           - AUTOMATED_REVIEW_POLICY
           - WHY_IT_MATTERS
           - WHAT_GOOD_LOOKS_LIKE
@@ -17764,20 +18040,408 @@ components:
       - offered
       - offeredDigest
       - slug
+    PracticeResultCoverage:
+      type: object
+      description: "How much of its scope the review read, and what it left out"
+      properties:
+        checked:
+          type: integer
+          format: int32
+          description: Units the program checked; claimed only
+        complete:
+          type: boolean
+          description: Whether the review read its whole scope
+        failedReads:
+          type: integer
+          format: int32
+          description: Reads that failed; host only
+        omitted:
+          type: array
+          description: "What was left out, and why; empty when complete"
+          items:
+            $ref: "#/components/schemas/PracticeResultCoverageOmission"
+        reads:
+          type: integer
+          format: int32
+          description: Reads the runner counted; host only
+        selected:
+          type: integer
+          format: int32
+          description: Units the program selected; claimed only
+        source:
+          type: string
+          description: host or claimed
+          enum:
+          - host
+          - claimed
+        total:
+          type: integer
+          format: int32
+          description: "Units in the scope, when known; claimed only"
+        truncatedReads:
+          type: integer
+          format: int32
+          description: Reads cut at their limit; host only
+      required:
+      - complete
+      - omitted
+      - source
+    PracticeResultCoverageOmission:
+      type: object
+      description: One part of the scope the review did not read
+      properties:
+        count:
+          type: integer
+          format: int32
+        reason:
+          type: string
+        units:
+          type: array
+          items:
+            type: string
+        what:
+          type: string
+      required:
+      - count
+      - reason
+      - units
+      - what
+    PracticeResultDetail:
+      type: object
+      description: Full practice result detail including delivered feedback and evidence
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+          description: Artifact entity ID
+        artifactKind:
+          type: string
+          description: Artifact type (e.g. PULL_REQUEST)
+        artifactUrl:
+          type: string
+          description: Link to the reviewed artifact on its platform (null when it
+            cannot be resolved)
+        claimCurrentness:
+          type: string
+          description: "Whether a result's claim still stands: its practice's review\
+            \ rules are unchanged and it was not superseded, which an issue's results\
+            \ are when a change to its reviewable content is recorded. It says neither\
+            \ whether a later review ran nor whether the work changed since it was\
+            \ reviewed. Earlier result standards and missing fingerprints are unverifiable\
+            \ under the current whole-practice standard"
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
+        coverage:
+          $ref: "#/components/schemas/PracticeResultCoverage"
+          description: How much of its scope the review read; null for a result recorded
+            before coverage was kept
+        deliveredFeedback:
+          type: string
+          description: "The summary body of the newest eligible feedback about this\
+            \ result to this developer (null when no summary body was recorded, including\
+            \ delivery through inline notes only)"
+        evidence:
+          $ref: "#/components/schemas/PracticeResultEvidence"
+        evidenceRationale:
+          type: string
+          description: Evidence-based rationale for the result
+        example:
+          $ref: "#/components/schemas/PracticeResultExample"
+          description: One place of the work that shows the practice done well; null
+            when none
+        feedbackCommentUrls:
+          type: array
+          description: "Links to the comments on the reviewed work that carry the\
+            \ feedback behind feedbackResponse, summary first (null when that feedback\
+            \ was not delivered on the work or the platform returned no link)"
+          items:
+            type: string
+        feedbackResponse:
+          $ref: "#/components/schemas/FeedbackResponse"
+          description: "The developer's standing answer and response handle for the\
+            \ newest eligible feedback about this result, including inline-only delivery\
+            \ with no summary body (null when no eligible feedback exists or the newest\
+            \ eligible feedback has failed delivery)"
+        id:
+          type: string
+          format: uuid
+          description: Result ID
+        invalidatedAt:
+          type: string
+          format: date-time
+          description: When a workspace admin marked this result as incorrect; null
+            while it stands. An invalidated result counts toward nothing current.
+        invalidationReason:
+          type: string
+          description: The admin's reason for the invalidation; null while the result
+            stands
+        nextStep:
+          type: string
+          description: "The next step the review wrote about this result, whether\
+            \ or not the feedback carrying it was delivered (null when it wrote none)"
+        observations:
+          type: array
+          description: "The located problems of a NOT_MET result, in display order;\
+            \ empty for any other outcome"
+          items:
+            $ref: "#/components/schemas/Observation"
+        observedAt:
+          type: string
+          format: date-time
+          description: When the result was made
+        origin:
+          type: string
+          description: What occasioned the measurement; never mix origins in one trend
+            line
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
+        outcome:
+          type: string
+          description: Result of the practice review
+          enum:
+          - MET
+          - NOT_MET
+          - NOT_APPLICABLE
+          - UNDETERMINED
+        practiceName:
+          type: string
+          description: Practice name
+        practiceSlug:
+          type: string
+          description: Practice slug
+        severity:
+          type: string
+          description: Severity level (null unless outcome is NOT_MET)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        summary:
+          type: string
+          description: Result summary
+      required:
+      - artifactId
+      - artifactKind
+      - claimCurrentness
+      - id
+      - observations
+      - observedAt
+      - origin
+      - outcome
+      - practiceName
+      - practiceSlug
+      - summary
+    PracticeResultEvidence:
+      type: object
+      description: "Verified, source-bound evidence for a result"
+      properties:
+        citations:
+          type: array
+          description: The result's own citations; each problem carries its own places
+          items:
+            $ref: "#/components/schemas/EvidenceCitation"
+        inapplicability:
+          $ref: "#/components/schemas/EvidenceInapplicability"
+          description: Why this practice had nothing to judge here; null unless the
+            review recorded a reason
+        search:
+          $ref: "#/components/schemas/EvidenceSearch"
+          description: Where the review looked when it found nothing; null unless
+            it recorded a search
+        undecidability:
+          type: array
+          description: "What the review could not settle, each where it arose; empty\
+            \ unless it recorded one"
+          items:
+            $ref: "#/components/schemas/OpenQuestion"
+      required:
+      - citations
+      - undecidability
+    PracticeResultExample:
+      type: object
+      description: One place of the work that shows the practice done well
+      properties:
+        citation:
+          $ref: "#/components/schemas/EvidenceCitation"
+        note:
+          type: string
+          description: "About the work, at most 280 characters"
+      required:
+      - citation
+      - note
+    PracticeResultInvalidation:
+      type: object
+      description: "One correction of a result by a workspace admin, and its restoration\
+        \ if any"
+      properties:
+        id:
+          type: string
+          format: uuid
+        invalidatedAt:
+          type: string
+          format: date-time
+        invalidatedBy:
+          type: string
+          description: Who invalidated it; null once that account is erased
+        providerCopy:
+          type: string
+          description: What became of the comments Hephaestus had already posted on
+            the provider
+          enum:
+          - PENDING
+          - NONE
+          - UPDATED
+          - INLINE_REMAINS
+          - UNRESOLVED
+        reason:
+          type: string
+        restorationReason:
+          type: string
+          description: Why it was restored; null while the invalidation is in force
+        restoredAt:
+          type: string
+          format: date-time
+        restoredBy:
+          type: string
+          description: Who restored it; null while in force or once that account is
+            erased
+      required:
+      - id
+      - invalidatedAt
+      - providerCopy
+      - reason
+    PracticeResultList:
+      type: object
+      description: Practice result summary for list views
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+          description: Artifact entity ID
+        artifactKind:
+          type: string
+          description: Artifact type (e.g. PULL_REQUEST)
+        claimCurrentness:
+          type: string
+          description: "Whether a result's claim still stands: its practice's review\
+            \ rules are unchanged and it was not superseded, which an issue's results\
+            \ are when a change to its reviewable content is recorded. It says neither\
+            \ whether a later review ran nor whether the work changed since it was\
+            \ reviewed. Earlier result standards and missing fingerprints are unverifiable\
+            \ under the current whole-practice standard"
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
+        id:
+          type: string
+          format: uuid
+          description: Result ID
+        observedAt:
+          type: string
+          format: date-time
+          description: When the result was made
+        origin:
+          type: string
+          description: What occasioned the measurement; never mix origins in one trend
+            line
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
+        outcome:
+          type: string
+          description: Result of the practice review
+          enum:
+          - MET
+          - NOT_MET
+          - NOT_APPLICABLE
+          - UNDETERMINED
+        practiceName:
+          type: string
+          description: Practice name
+        practiceSlug:
+          type: string
+          description: Practice slug
+        problems:
+          type: array
+          description: "The problems of a NOT_MET result in display order, as the\
+            \ result detail shows them; empty for any other outcome and when the detail\
+            \ would show no evidence"
+          items:
+            $ref: "#/components/schemas/ObservationSummary"
+        severity:
+          type: string
+          description: Severity level (null unless outcome is NOT_MET)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        summary:
+          type: string
+          description: Result summary
+      required:
+      - artifactId
+      - artifactKind
+      - claimCurrentness
+      - id
+      - observedAt
+      - origin
+      - outcome
+      - practiceName
+      - practiceSlug
+      - problems
+      - summary
+    PracticeResultProvenance:
+      type: object
+      description: Where a practice result came from
+      properties:
+        attempt:
+          type: integer
+          format: int32
+        capturedRevision:
+          type: string
+          description: The head commit the capture pinned; null for work without one
+        jobId:
+          type: string
+          format: uuid
+        practiceRevisionId:
+          type: integer
+          format: int64
+          description: The practice revision the result was measured against
+        programDigest:
+          type: string
+          description: SHA-256 of the practice's own script; null for the built-in
+            review
+        programKind:
+          type: string
+          enum:
+          - BUILTIN
+          - CUSTOM
+      required:
+      - attempt
+      - jobId
+      - programKind
     PracticeReviewBucket:
       type: object
-      description: "Practice reviews, observations and feedback in one time bucket\
-        \ of a range"
+      description: "Practice reviews, results and feedback in one time bucket of a\
+        \ range"
       properties:
         feedback:
           type: integer
           format: int64
           description: "Feedback created in the bucket within the range, in any delivery\
             \ state"
-        observations:
+        practiceResults:
           type: integer
           format: int64
-          description: Observations recorded in the bucket within the range
+          description: Results recorded in the bucket within the range
         reviews:
           type: integer
           format: int64
@@ -17791,7 +18455,7 @@ components:
             \ first bucket may start before the range."
       required:
       - feedback
-      - observations
+      - practiceResults
       - reviews
       - start
     PracticeReviewCounts:
@@ -17800,29 +18464,29 @@ components:
       properties:
         feedback:
           $ref: "#/components/schemas/ReviewFeedbackCounts"
-          description: "Feedback created in the range that is bound to an observation\
-            \ of this practice, whenever that observation was recorded; one piece\
-            \ of feedback bound to several practices counts for each"
+          description: "Feedback created in the range that is bound to a result of\
+            \ this practice, whenever that result was recorded; one piece of feedback\
+            \ bound to several practices counts for each"
         group:
           $ref: "#/components/schemas/ReviewPracticeGroup"
           description: Practice group; null when the practice is Unassigned
-        observations:
-          $ref: "#/components/schemas/ReviewObservationCounts"
-          description: Observations of this practice recorded in the range
-        observationsInvalidated:
-          type: integer
-          format: int64
-          description: "Of those observations, the ones an admin has marked incorrect\
-            \ and not restored"
         practiceName:
           type: string
+        practiceResults:
+          $ref: "#/components/schemas/ReviewResultCounts"
+          description: Results of this practice recorded in the range
+        practiceResultsInvalidated:
+          type: integer
+          format: int64
+          description: "Of those results, the ones an admin has marked incorrect and\
+            \ not restored"
         practiceSlug:
           type: string
       required:
       - feedback
-      - observations
-      - observationsInvalidated
       - practiceName
+      - practiceResults
+      - practiceResultsInvalidated
       - practiceSlug
     PracticeReviewCoveragePreview:
       type: object
@@ -17877,10 +18541,115 @@ components:
       - estimateWindowDays
       - monitoredRepositories
       - recentReviewVolume
+    PracticeReviewObservationRow:
+      type: object
+      description: "One observation of a not met result, as the admin list names it"
+      properties:
+        agentJobId:
+          type: string
+          format: uuid
+          description: The review that recorded the result
+        claimCurrentness:
+          type: string
+          description: "Whether a result's claim still stands: its practice's review\
+            \ rules are unchanged and it was not superseded, which an issue's results\
+            \ are when a change to its reviewable content is recorded. It says neither\
+            \ whether a later review ran nor whether the work changed since it was\
+            \ reviewed. Earlier result standards and missing fingerprints are unverifiable\
+            \ under the current whole-practice standard"
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
+        disputedAt:
+          type: string
+          format: date-time
+          description: When the developer last disputed feedback written from this
+            result; null while nothing about it is disputed
+        endLine:
+          type: integer
+          format: int32
+          description: The last line the first citation quotes; null when it gives
+            none or when evidenceHidden is true
+        evidenceHidden:
+          type: boolean
+          description: "true when the result's detail hides its evidence, so the summary\
+            \ and the place are left out"
+        group:
+          $ref: "#/components/schemas/ReviewPracticeGroup"
+          description: Practice group; null when the practice is Unassigned
+        id:
+          type: string
+          format: uuid
+          description: Observation ID
+        invalidatedAt:
+          type: string
+          format: date-time
+          description: When a workspace admin invalidated this result; null while
+            it stands
+        observedAt:
+          type: string
+          format: date-time
+          description: When the result was recorded
+        path:
+          type: string
+          description: The path of the observation's first citation; null when it
+            names none or when evidenceHidden is true
+        practiceName:
+          type: string
+        practiceResultId:
+          type: string
+          format: uuid
+        practiceSlug:
+          type: string
+        reviewedWork:
+          $ref: "#/components/schemas/ReviewedWorkRef"
+        severity:
+          type: string
+          description: How much this observation weighs at its place alone
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        side:
+          type: string
+          description: The first citation's diff side; null when absent or when evidenceHidden
+            is true
+          enum:
+          - OLD
+          - NEW
+        sourceKind:
+          type: string
+          description: The first citation's source kind; null when absent or when
+            evidenceHidden is true
+        startLine:
+          type: integer
+          format: int32
+          description: The first line the first citation quotes; null when it gives
+            none or when evidenceHidden is true
+        subject:
+          $ref: "#/components/schemas/ReviewSubject"
+          description: Whose work the result is about; null when the identity is no
+            longer resolvable
+        summary:
+          type: string
+          description: One line; null only when evidenceHidden is true
+      required:
+      - agentJobId
+      - claimCurrentness
+      - evidenceHidden
+      - id
+      - observedAt
+      - practiceName
+      - practiceResultId
+      - practiceSlug
+      - reviewedWork
+      - severity
     PracticeReviewOverview:
       type: object
-      description: "Practice reviews, observations and feedback in a time range, in\
-        \ total, over time and by practice"
+      description: "Practice reviews, results and feedback in a time range, in total,\
+        \ over time and by practice"
       properties:
         bucket:
           $ref: "#/components/schemas/TimeBucketSize"
@@ -17899,19 +18668,19 @@ components:
           format: date-time
           description: "Inclusive lower bound of the range counted, with its default\
             \ filled in"
-        observations:
-          $ref: "#/components/schemas/ReviewObservationCounts"
-          description: Observations recorded in the range
-        observationsInvalidated:
+        practiceResults:
+          $ref: "#/components/schemas/ReviewResultCounts"
+          description: Results recorded in the range
+        practiceResultsInvalidated:
           type: integer
           format: int64
-          description: "Of those observations, the ones an admin has marked incorrect\
-            \ and not restored"
+          description: "Of those results, the ones an admin has marked incorrect and\
+            \ not restored"
         practices:
           type: array
-          description: "Each practice with an observation recorded in the range or\
-            \ feedback created in the range on one of its observations, the most observed\
-            \ first, then by name"
+          description: "Each practice with a result recorded in the range or feedback\
+            \ created in the range on one of its results, the most observed first,\
+            \ then by name"
           items:
             $ref: "#/components/schemas/PracticeReviewCounts"
         reviews:
@@ -17927,8 +18696,8 @@ components:
       - buckets
       - feedback
       - from
-      - observations
-      - observationsInvalidated
+      - practiceResults
+      - practiceResultsInvalidated
       - practices
       - reviews
       - to
@@ -18252,7 +19021,7 @@ components:
             - SUBJECT
             - PRECONDITION
             - CRITERIA
-            - PRECOMPUTE_SCRIPT
+            - PRACTICE_SCRIPT
             - AUTOMATED_REVIEW_POLICY
             - WHY_IT_MATTERS
             - WHAT_GOOD_LOOKS_LIKE
@@ -18268,7 +19037,7 @@ components:
           format: int64
         reviewRulesChanged:
           type: boolean
-          description: "Whether what a review checks changed, so observations made\
+          description: "Whether what a review checks changed, so results recorded\
             \ before it no longer reflect the practice. A change to the wording around\
             \ it, or to when it runs, does not count."
         revisionNumber:
@@ -18281,6 +19050,186 @@ components:
       - id
       - reviewRulesChanged
       - revisionNumber
+    PracticeScriptAsOf:
+      type: object
+      description: The review whose practice script run reported a practice's needs
+      properties:
+        finishedAt:
+          type: string
+          format: date-time
+        jobId:
+          type: string
+          format: uuid
+      required:
+      - finishedAt
+      - jobId
+    PracticeScriptModelUse:
+      type: object
+      description: "One model a practice script declared, and what became of its calls\
+        \ in one review"
+      properties:
+        bound:
+          type: boolean
+          description: Whether the review had a model bound for this purpose
+        need:
+          type: string
+          enum:
+          - REQUIRED
+          - OPTIONAL
+        notRated:
+          type: array
+          description: "Calls to this model that were not rated, by reason. Empty\
+            \ when every call was rated."
+          items:
+            $ref: "#/components/schemas/PracticeScriptNotRated"
+        purpose:
+          type: string
+          description: The purpose whose binding serves this model
+          enum:
+          - PRACTICE_REVIEW
+          - PRACTICE_DECISION
+          - PRACTICE_EMBEDDING
+          - PRACTICE_RERANKING
+      required:
+      - bound
+      - need
+      - notRated
+      - purpose
+    PracticeScriptNeed:
+      type: object
+      description: "One model a practice's script needs, and for which members no\
+        \ model is ready"
+      properties:
+        need:
+          type: string
+          enum:
+          - REQUIRED
+          - OPTIONAL
+        purpose:
+          type: string
+          description: The purpose whose binding serves this model
+          enum:
+          - PRACTICE_REVIEW
+          - PRACTICE_DECISION
+          - PRACTICE_EMBEDDING
+          - PRACTICE_RERANKING
+        unmetTiers:
+          type: array
+          description: The member tiers that no ready binding of this purpose serves
+            today. UNDECLARED appears only when members may leave their AI choice
+            open.
+          items:
+            type: string
+            enum:
+            - IN_HOUSE
+            - CLOUD
+            - UNDECLARED
+      required:
+      - need
+      - purpose
+      - unmetTiers
+    PracticeScriptNotRated:
+      type: object
+      description: "Model calls that were not rated, for one reason"
+      properties:
+        count:
+          type: integer
+          format: int32
+        reason:
+          type: string
+          enum:
+          - UNAVAILABLE
+          - BUDGET
+          - DEADLINE
+          - TOO_LARGE
+          - OFF_FORMAT
+          - REFUSED
+          - ERROR
+      required:
+      - count
+      - reason
+    PracticeScriptRun:
+      type: object
+      description: What one practice's program did in one review
+      properties:
+        models:
+          type: array
+          description: "The direct models the program declared and what became of\
+            \ their calls. Empty for the built-in program, for a script that declares\
+            \ none, and for one that ended before it declared them."
+          items:
+            $ref: "#/components/schemas/PracticeScriptModelUse"
+        path:
+          type: string
+          description: "How the program reached its result, from the calls it made.\
+            \ Absent when the program did not run, or the runner did not report its\
+            \ calls."
+          enum:
+          - CODE
+          - MODELS
+          - REVIEW
+          - MIXED
+        programKind:
+          type: string
+          description: "The built-in review, or the practice's own script"
+          enum:
+          - BUILTIN
+          - CUSTOM
+        status:
+          type: string
+          enum:
+          - OK
+          - SKIPPED
+          - FAILED
+          - NOT_REACHED
+          - NOT_FINISHED
+        stopReason:
+          type: string
+          description: Why the program stopped without a result. Absent when it returned
+            one.
+          enum:
+          - UNAVAILABLE
+          - BUDGET
+          - DEADLINE
+          - TOO_LARGE
+          - OFF_FORMAT
+          - REFUSED
+          - ERROR
+          - CANCELLED
+          - INVALID_PROGRAM
+          - INVALID_CANDIDATE
+      required:
+      - models
+      - programKind
+      - status
+    PracticeScriptSummary:
+      type: object
+      description: "What one practice's script needs, as its newest review reported\
+        \ it"
+      properties:
+        asOf:
+          $ref: "#/components/schemas/PracticeScriptAsOf"
+          description: The review that reported the needs; null when no review ran
+            the current script yet
+        needs:
+          type: array
+          description: The models the script declared; empty when it declares none
+            or asOf is null
+          items:
+            $ref: "#/components/schemas/PracticeScriptNeed"
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+        scriptChanged:
+          type: boolean
+          description: "True when the newest review ran an earlier version of the\
+            \ script, so its needs are not shown"
+      required:
+      - needs
+      - practiceName
+      - practiceSlug
+      - scriptChanged
     PracticeSignal:
       type: object
       description: A signal and the words a reader sees for it
@@ -18353,12 +19302,12 @@ components:
           type: array
           description: What the developer already does well here
           items:
-            $ref: "#/components/schemas/PracticeStandingObservation"
+            $ref: "#/components/schemas/PracticeStandingResult"
         toWorkOn:
           type: array
           description: Specific feedback to act on (highest-impact first)
           items:
-            $ref: "#/components/schemas/PracticeStandingObservation"
+            $ref: "#/components/schemas/PracticeStandingResult"
         trendSupport:
           $ref: "#/components/schemas/TrendSupport"
           description: Evidence support and provenance for the direction
@@ -18374,26 +19323,22 @@ components:
       - standing
       - strengths
       - toWorkOn
-    PracticeStandingObservation:
+    PracticeStandingResult:
       type: object
       description: A single piece of practice feedback to read and act on
       properties:
         deliveredFeedback:
           type: string
           description: What to do — the text of the newest feedback that said something
-            about this observation to this developer (null if nothing was said)
+            about this result to this developer (null if nothing was said)
         locator:
           type: string
           description: "Where in the work, e.g. \"FrameRecorder.swift:212\", when\
             \ known"
-        observationId:
-          type: string
-          format: uuid
-          description: Observation id — handle to open the full detail
         origin:
           type: string
-          description: "Why this observation was recorded. BACKFILL means it came\
-            \ from a review of past work rather than from something that just happened,\
+          description: "Why this result was recorded. BACKFILL means it came from\
+            \ a review of past work rather than from something that just happened,\
             \ and nothing was posted anywhere at the time."
           enum:
           - LIVE
@@ -18407,6 +19352,10 @@ components:
           - NOT_MET
           - NOT_APPLICABLE
           - UNDETERMINED
+        practiceResultId:
+          type: string
+          format: uuid
+          description: Result id — handle to open the full detail
         reviewedWorkId:
           type: integer
           format: int64
@@ -18426,9 +19375,9 @@ components:
           type: string
           description: The kind of reviewed work this is about
       required:
-      - observationId
       - origin
       - outcome
+      - practiceResultId
       - reviewedWorkId
       - title
       - workKind
@@ -18464,10 +19413,6 @@ components:
           type: string
           description: Slug of the practice group this practice sits in; null for
             a practice the workspace files in no group
-        observationCount:
-          type: integer
-          format: int32
-          description: Measurements this practice produced on this artifact
         occasionedBy:
           $ref: "#/components/schemas/PracticeSignal"
           description: "The signal of the occurrence this answer is about, with its\
@@ -18494,6 +19439,15 @@ components:
           - FAILED
         practiceName:
           type: string
+        practiceResultCount:
+          type: integer
+          format: int32
+          description: Measurements this practice produced on this artifact
+        practiceScript:
+          $ref: "#/components/schemas/PracticeScriptRun"
+          description: What this practice's script did in the named review; null when
+            the practice has no script there or the review reported nothing about
+            it
         practiceSlug:
           type: string
         reviewId:
@@ -18507,7 +19461,7 @@ components:
             $ref: "#/components/schemas/PracticeSignal"
         withheldReasons:
           type: array
-          description: Why prepared feedback was withheld. Non-empty with observations
+          description: Why prepared feedback was withheld. Non-empty with results
             present means we measured and deliberately said nothing.
           items:
             type: string
@@ -18543,9 +19497,9 @@ components:
       - autonomy
       - deliveredCount
       - explanation
-      - observationCount
       - outcome
       - practiceName
+      - practiceResultCount
       - practiceSlug
       - watches
       - withheldReasons
@@ -18757,8 +19711,12 @@ components:
         apiProtocol:
           type: string
           description: Wire protocol
-          minLength: 1
-          pattern: openai-completions|openai-responses
+          enum:
+          - openai-completions
+          - openai-responses
+          - openai-decisions
+          - openai-embeddings
+          - cohere-rerank
         authMode:
           type: string
           description: Credential shape (default BEARER)
@@ -18799,8 +19757,8 @@ components:
         at:
           type: string
           format: date-time
-          description: "When it changed: the observation, the run that composed the\
-            \ feedback, or the response that did it"
+          description: "When it changed: the result, the run that composed the feedback,\
+            \ or the response that did it"
         cleanNeeded:
           type: integer
           format: int32
@@ -18897,8 +19855,7 @@ components:
         reviewedAt:
           type: string
           format: date-time
-          description: When the review recorded its newest observation about this
-            developer
+          description: When the review recorded its newest result about this developer
         reviewedWork:
           $ref: "#/components/schemas/ReviewedWorkRef"
           description: The piece of work the run reviewed
@@ -18936,15 +19893,15 @@ components:
       description: One review run on the developer's own work and what it observed
         about them
       properties:
-        observations:
+        practiceResults:
           type: array
-          description: Every visible observation the run made about this developer
+          description: Every visible result the run made about this developer
           items:
-            $ref: "#/components/schemas/ObservationDetail"
+            $ref: "#/components/schemas/PracticeResultDetail"
         run:
           $ref: "#/components/schemas/ProfileReviewRun"
       required:
-      - observations
+      - practiceResults
       - run
     ProfileReviewRunsPage:
       type: object
@@ -19777,7 +20734,7 @@ components:
       - toAt
     ReviewBoundFeedback:
       type: object
-      description: Feedback composed from an observation
+      description: Feedback composed from a result
       properties:
         agentJobId:
           type: string
@@ -19813,7 +20770,7 @@ components:
           format: uuid
         role:
           type: string
-          description: Whether the observation led the feedback or reinforced it
+          description: Whether the result led the feedback or reinforced it
           enum:
           - PRIMARY
           - SUPPORTING
@@ -19856,18 +20813,18 @@ components:
       - deliveryState
       - feedbackId
       - role
-    ReviewBoundObservation:
+    ReviewBoundResult:
       type: object
-      description: An observation that contributed to a piece of feedback
+      description: A result that contributed to a piece of feedback
       properties:
         claimCurrentness:
           type: string
-          description: "Whether an observation's claim still stands: its practice's\
-            \ review rules are unchanged and it was not superseded, which an issue's\
-            \ observations are when a change to its reviewable content is recorded.\
-            \ It says neither whether a later review ran nor whether the work changed\
-            \ since it was reviewed. Earlier observation standards and missing fingerprints\
-            \ are unverifiable under the current whole-practice standard"
+          description: "Whether a result's claim still stands: its practice's review\
+            \ rules are unchanged and it was not superseded, which an issue's results\
+            \ are when a change to its reviewable content is recorded. It says neither\
+            \ whether a later review ran nor whether the work changed since it was\
+            \ reviewed. Earlier result standards and missing fingerprints are unverifiable\
+            \ under the current whole-practice standard"
           enum:
           - CURRENT
           - STALE
@@ -19875,9 +20832,6 @@ components:
         group:
           $ref: "#/components/schemas/ReviewPracticeGroup"
           description: Practice group; null when the practice is Unassigned
-        observationId:
-          type: string
-          format: uuid
         observedAt:
           type: string
           format: date-time
@@ -19895,11 +20849,14 @@ components:
           - UNDETERMINED
         practiceName:
           type: string
+        practiceResultId:
+          type: string
+          format: uuid
         practiceSlug:
           type: string
         role:
           type: string
-          description: Whether the observation leads the feedback or reinforces it
+          description: Whether the result leads the feedback or reinforces it
           enum:
           - PRIMARY
           - SUPPORTING
@@ -19915,11 +20872,11 @@ components:
           type: string
       required:
       - claimCurrentness
-      - observationId
       - observedAt
       - ordinal
       - outcome
       - practiceName
+      - practiceResultId
       - practiceSlug
       - role
       - summary
@@ -19931,7 +20888,7 @@ components:
         canInspectReviewDetails:
           type: boolean
           description: "Whether the caller may read the review details behind this\
-            \ work — the runs, observations and the delivery of each piece of feedback\
+            \ work — the runs, results and the delivery of each piece of feedback\
             \ — which is a workspace admin's view"
         canRequestReview:
           type: boolean
@@ -19942,7 +20899,7 @@ components:
         work:
           $ref: "#/components/schemas/ReviewedWorkRef"
           description: "The work as this workspace mirrored it; its id and kind address\
-            \ the trace, observations and feedback about it"
+            \ the trace, results and feedback about it"
       required:
       - canInspectReviewDetails
       - canRequestReview
@@ -20000,10 +20957,10 @@ components:
           - SLACK
           - NEXT_CONVERSATION
           - PRACTICE_PAGES
-        observationCount:
+        practiceResultCount:
           type: integer
           format: int64
-          description: Number of observations used to compose the feedback
+          description: Number of results used to compose the feedback
         recipient:
           $ref: "#/components/schemas/ReviewSubject"
           description: Who the feedback is addressed to; null when the identity is
@@ -20058,7 +21015,7 @@ components:
       - deliveryState
       - id
       - location
-      - observationCount
+      - practiceResultCount
     ReviewFeedbackCounts:
       type: object
       description: "Counts of feedback, one per delivery state"
@@ -20194,16 +21151,16 @@ components:
           - SLACK
           - NEXT_CONVERSATION
           - PRACTICE_PAGES
-        observations:
-          type: array
-          description: Source observations in render order
-          items:
-            $ref: "#/components/schemas/ReviewBoundObservation"
         placements:
           type: array
           description: Recorded placements; empty when none
           items:
             $ref: "#/components/schemas/ReviewPlacement"
+        practiceResults:
+          type: array
+          description: Source results in render order
+          items:
+            $ref: "#/components/schemas/ReviewBoundResult"
         proposedPlacements:
           type: array
           description: Exact ordered summary and inline messages covered by the approval
@@ -20277,8 +21234,8 @@ components:
       - dispatches
       - id
       - location
-      - observations
       - placements
+      - practiceResults
       - proposedPlacements
       - withdrawals
     ReviewFeedbackDispatch:
@@ -20434,8 +21391,8 @@ components:
     ReviewLineage:
       type: object
       description: "How one record came about: the reviewed work, the review, its\
-        \ observations, the feedback written from them, where that feedback went and\
-        \ how the developer answered. Bounded: each list is capped and the count beside\
+        \ results, the feedback written from them, where that feedback went and how\
+        \ the developer answered. Bounded: each list is capped and the count beside\
         \ it says how many more there are"
       properties:
         feedback:
@@ -20447,20 +21404,19 @@ components:
           type: integer
           format: int32
           description: Feedback in the chain that the list leaves out
-        moreObservations:
+        moreResults:
           type: integer
           format: int32
-          description: "Observations of the review, or behind the listed feedback,\
-            \ that the list leaves out"
-        observations:
+          description: "Results of the review, or behind the listed feedback, that\
+            \ the list leaves out"
+        results:
           type: array
-          description: "The observations in the chain, the ones the request names\
-            \ first"
+          description: "The results in the chain, the ones the request names first"
           items:
-            $ref: "#/components/schemas/ReviewLineageObservation"
+            $ref: "#/components/schemas/ReviewLineageResult"
         review:
           $ref: "#/components/schemas/ReviewLineageRun"
-          description: The review that recorded the observations; null when its record
+          description: The review that recorded the results; null when its record
             is gone
         reviewTrigger:
           type: string
@@ -20498,8 +21454,8 @@ components:
       required:
       - feedback
       - moreFeedback
-      - moreObservations
-      - observations
+      - moreResults
+      - results
       - workMoments
     ReviewLineageFeedback:
       type: object
@@ -20549,8 +21505,8 @@ components:
           - UNCONFIRMED
         focus:
           type: boolean
-          description: "Whether the request names this feedback, or the observation\
-            \ it names led to it"
+          description: "Whether the request names this feedback, or the result it\
+            \ names led to it"
         id:
           type: string
           format: uuid
@@ -20566,16 +21522,16 @@ components:
           - SLACK
           - NEXT_CONVERSATION
           - PRACTICE_PAGES
-        observationIds:
-          type: array
-          description: "Every observation it was written from, in render order"
-          items:
-            type: string
-            format: uuid
         placementCount:
           type: integer
           format: int32
           description: "How many comments, notes or conversation turns placed it"
+        practiceResultIds:
+          type: array
+          description: "Every result it was written from, in render order"
+          items:
+            type: string
+            format: uuid
         replacedAt:
           type: string
           format: date-time
@@ -20637,8 +21593,8 @@ components:
       - focus
       - id
       - location
-      - observationIds
       - placementCount
+      - practiceResultIds
     ReviewLineageMoment:
       type: object
       description: "One moment on the reviewed work, such as opened, pushed or merged"
@@ -20675,9 +21631,36 @@ components:
       - kind
       - occurredAt
       - startedReview
-    ReviewLineageObservation:
+    ReviewLineageResponse:
       type: object
-      description: An observation in a lineage
+      description: "Whether the developer answered a piece of feedback, whether that\
+        \ answer disputes it, and whether their later work resolved it. Their rating,\
+        \ any other resolution and their private notes are never part of it. At least\
+        \ one of respondedAt and resolvedByWorkAt is set"
+      properties:
+        disputeExplanation:
+          type: string
+          description: "Why the developer disputes it, in their words to the workspace's\
+            \ admins; null unless disputed"
+        disputed:
+          type: boolean
+          description: Whether the answer that stands now disputes the feedback
+        resolvedByWorkAt:
+          type: string
+          format: date-time
+          description: "When their later work resolved it: three clean pieces of work\
+            \ in a row on the practice. Only feedback on their practice pages resolves\
+            \ this way; null while it has not"
+        respondedAt:
+          type: string
+          format: date-time
+          description: When the developer's answer that stands now was given; null
+            when only the work answered
+      required:
+      - disputed
+    ReviewLineageResult:
+      type: object
+      description: A result in a lineage
       properties:
         agentJobId:
           type: string
@@ -20689,8 +21672,8 @@ components:
           description: "How many pieces of feedback were written from it, by any review"
         focus:
           type: boolean
-          description: "Whether the request names this observation, or the feedback\
-            \ it names was written from it"
+          description: "Whether the request names this result, or the feedback it\
+            \ names was written from it"
         id:
           type: string
           format: uuid
@@ -20722,6 +21705,10 @@ components:
           type: string
         practiceSlug:
           type: string
+        problemCount:
+          type: integer
+          format: int32
+          description: How many problems the result records; 0 unless outcome is NOT_MET
         severity:
           type: string
           description: Severity band (null unless outcome is NOT_MET)
@@ -20743,34 +21730,8 @@ components:
       - ownFeedbackCount
       - practiceName
       - practiceSlug
+      - problemCount
       - summary
-    ReviewLineageResponse:
-      type: object
-      description: "Whether the developer answered a piece of feedback, whether that\
-        \ answer disputes it, and whether their later work resolved it. Their rating,\
-        \ any other resolution and their private notes are never part of it. At least\
-        \ one of respondedAt and resolvedByWorkAt is set"
-      properties:
-        disputeExplanation:
-          type: string
-          description: "Why the developer disputes it, in their words to the workspace's\
-            \ admins; null unless disputed"
-        disputed:
-          type: boolean
-          description: Whether the answer that stands now disputes the feedback
-        resolvedByWorkAt:
-          type: string
-          format: date-time
-          description: "When their later work resolved it: three clean pieces of work\
-            \ in a row on the practice. Only feedback on their practice pages resolves\
-            \ this way; null while it has not"
-        respondedAt:
-          type: string
-          format: date-time
-          description: When the developer's answer that stands now was given; null
-            when only the work answered
-      required:
-      - disputed
     ReviewLineageRun:
       type: object
       description: The review in a lineage
@@ -20833,236 +21794,6 @@ components:
       - id
       - phase
       - status
-    ReviewObservation:
-      type: object
-      description: A practice review observation with its linked feedback outcomes
-      properties:
-        agentJobId:
-          type: string
-          format: uuid
-        claimCurrentness:
-          type: string
-          description: "Whether an observation's claim still stands: its practice's\
-            \ review rules are unchanged and it was not superseded, which an issue's\
-            \ observations are when a change to its reviewable content is recorded.\
-            \ It says neither whether a later review ran nor whether the work changed\
-            \ since it was reviewed. Earlier observation standards and missing fingerprints\
-            \ are unverifiable under the current whole-practice standard"
-          enum:
-          - CURRENT
-          - STALE
-          - UNVERIFIABLE
-        disputedAt:
-          type: string
-          format: date-time
-          description: When the developer last disputed feedback written from this
-            observation; null while nothing about it is disputed
-        feedback:
-          $ref: "#/components/schemas/ReviewFeedbackCounts"
-          description: Counts of linked feedback by delivery state
-        group:
-          $ref: "#/components/schemas/ReviewPracticeGroup"
-          description: Practice group; null when the practice is Unassigned
-        id:
-          type: string
-          format: uuid
-        invalidatedAt:
-          type: string
-          format: date-time
-          description: When a workspace admin invalidated this observation; null while
-            it stands
-        observedAt:
-          type: string
-          format: date-time
-        origin:
-          type: string
-          description: "What occasioned the measurement. BACKFILL came from a confirmed\
-            \ campaign over work that already existed, so it is not a point on the\
-            \ live trend line."
-          enum:
-          - LIVE
-          - MANUAL
-          - BACKFILL
-        outcome:
-          type: string
-          description: Result of the practice review
-          enum:
-          - MET
-          - NOT_MET
-          - NOT_APPLICABLE
-          - UNDETERMINED
-        practiceName:
-          type: string
-        practiceSlug:
-          type: string
-        recurrenceKey:
-          type: string
-          description: Cross-run locus key; null when continuity is unavailable
-        reviewedWork:
-          $ref: "#/components/schemas/ReviewedWorkRef"
-        severity:
-          type: string
-          description: Severity band (null unless outcome is NOT_MET)
-          enum:
-          - CRITICAL
-          - MAJOR
-          - MINOR
-          - INFO
-        subject:
-          $ref: "#/components/schemas/ReviewSubject"
-          description: Whose work the observation is about; null when the identity
-            is no longer resolvable
-        summary:
-          type: string
-      required:
-      - agentJobId
-      - claimCurrentness
-      - feedback
-      - id
-      - observedAt
-      - origin
-      - outcome
-      - practiceName
-      - practiceSlug
-      - reviewedWork
-      - summary
-    ReviewObservationCounts:
-      type: object
-      description: Counts of observations by assessment
-      properties:
-        met:
-          type: integer
-          format: int64
-        notApplicable:
-          type: integer
-          format: int64
-          description: Practices whose subject did not occur in this work
-        notMet:
-          type: integer
-          format: int64
-        undetermined:
-          type: integer
-          format: int64
-          description: Practices that looked at the evidence and could not settle
-            the question either way; reported apart from notApplicable because one
-            says there was nothing here to judge and the other says we could not tell
-      required:
-      - met
-      - notApplicable
-      - notMet
-      - undetermined
-    ReviewObservationDetail:
-      type: object
-      description: An observation with evidence and linked feedback
-      properties:
-        agentJobId:
-          type: string
-          format: uuid
-        claimCurrentness:
-          type: string
-          description: "Whether an observation's claim still stands: its practice's\
-            \ review rules are unchanged and it was not superseded, which an issue's\
-            \ observations are when a change to its reviewable content is recorded.\
-            \ It says neither whether a later review ran nor whether the work changed\
-            \ since it was reviewed. Earlier observation standards and missing fingerprints\
-            \ are unverifiable under the current whole-practice standard"
-          enum:
-          - CURRENT
-          - STALE
-          - UNVERIFIABLE
-        disputes:
-          type: array
-          description: "The developer's standing disputes of feedback written from\
-            \ this observation, newest first; empty when nothing about it is disputed"
-          items:
-            $ref: "#/components/schemas/FeedbackDispute"
-        evidence:
-          $ref: "#/components/schemas/ObservationEvidence"
-        evidenceRationale:
-          type: string
-        feedback:
-          type: array
-          description: "Linked feedback, newest first"
-          items:
-            $ref: "#/components/schemas/ReviewBoundFeedback"
-        group:
-          $ref: "#/components/schemas/ReviewPracticeGroup"
-          description: Practice group; null when the practice is Unassigned
-        id:
-          type: string
-          format: uuid
-        invalidations:
-          type: array
-          description: "Every correction by a workspace admin, newest first; the first\
-            \ is in force while it has no restoration"
-          items:
-            $ref: "#/components/schemas/ObservationInvalidation"
-        observedAt:
-          type: string
-          format: date-time
-        origin:
-          type: string
-          description: "How the review that recorded it came about: LIVE from the\
-            \ work itself, MANUAL requested by a person, BACKFILL over work that predates\
-            \ the connection. A recurring sweep records LIVE."
-          enum:
-          - LIVE
-          - MANUAL
-          - BACKFILL
-        outcome:
-          type: string
-          description: Result of the practice review
-          enum:
-          - MET
-          - NOT_MET
-          - NOT_APPLICABLE
-          - UNDETERMINED
-        practiceName:
-          type: string
-        practiceRevisionId:
-          type: integer
-          format: int64
-          description: "Criteria revision selected as of job start, when available"
-        practiceSlug:
-          type: string
-        recurrenceKey:
-          type: string
-          description: Cross-run locus key; null when continuity is unavailable
-        reviewedWork:
-          $ref: "#/components/schemas/ReviewedWorkRef"
-        severity:
-          type: string
-          description: Severity band (null unless outcome is NOT_MET)
-          enum:
-          - CRITICAL
-          - MAJOR
-          - MINOR
-          - INFO
-        subject:
-          $ref: "#/components/schemas/ReviewSubject"
-          description: Whose work the observation is about; null when the identity
-            is no longer resolvable
-        summary:
-          type: string
-        supersededAt:
-          type: string
-          format: date-time
-          description: When a later review of the same work superseded this observation;
-            null while current
-      required:
-      - agentJobId
-      - claimCurrentness
-      - disputes
-      - feedback
-      - id
-      - invalidations
-      - observedAt
-      - origin
-      - outcome
-      - practiceName
-      - practiceSlug
-      - reviewedWork
-      - summary
     ReviewPlacement:
       type: object
       description: A recorded message placement
@@ -21136,10 +21867,10 @@ components:
       type: object
       description: "What one run decided about each practice it observed against the\
         \ practice's whole positive standard, one count per practice however many\
-        \ observations it recorded; an invalidated observation decides nothing, and\
-        \ a met or not-met outcome recorded under an earlier or missing assessment\
-        \ scheme counts as undetermined. The practice profile counts only what the\
-        \ run observed about the calling developer"
+        \ results it recorded; an invalidated result decides nothing, and a met or\
+        \ not-met outcome recorded under an earlier or missing assessment scheme counts\
+        \ as undetermined. The practice profile counts only what the run observed\
+        \ about the calling developer"
       properties:
         met:
           type: integer
@@ -21164,6 +21895,68 @@ components:
       - notApplicable
       - notMet
       - undetermined
+    ReviewPracticeScriptModel:
+      type: object
+      description: "One model that a practice's script could call in one review, with\
+        \ the calls the proxy counted"
+      properties:
+        calls:
+          type: integer
+          format: int64
+          description: Calls that the proxy forwarded to this model
+        purpose:
+          type: string
+          description: The purpose whose binding serves this model
+          enum:
+          - PRACTICE_REVIEW
+          - MENTOR
+          - PRACTICE_DECISION
+          - PRACTICE_EMBEDDING
+          - PRACTICE_RERANKING
+        tier:
+          type: string
+          description: Data handling tier of the slot that served the model in this
+            review. Absent when the attempt froze no tier for the model of this purpose.
+          enum:
+          - IN_HOUSE
+          - CLOUD
+          - UNDECLARED
+      required:
+      - calls
+      - purpose
+    ReviewPracticeScripts:
+      type: object
+      description: What one practice's script did in the latest attempt of one review
+        that recorded practice script runs
+      properties:
+        durationMs:
+          type: integer
+          format: int32
+          description: "How long the script ran, in milliseconds. Absent when the\
+            \ script did not run or did not finish, or the runner did not say."
+        error:
+          type: string
+          description: The first line of the script's error. Set only when the script
+            failed.
+        models:
+          type: array
+          description: "The decision, embedding and reranking models of the script,\
+            \ with the calls the proxy counted for each. Calls to the review's own\
+            \ model count toward the review."
+          items:
+            $ref: "#/components/schemas/ReviewPracticeScriptModel"
+        practiceName:
+          type: string
+          description: The practice's current name. Absent when the practice no longer
+            exists.
+        practiceSlug:
+          type: string
+        run:
+          $ref: "#/components/schemas/PracticeScriptRun"
+      required:
+      - models
+      - practiceSlug
+      - run
     ReviewProposedPlacement:
       type: object
       description: One exact provider message included in a review awaiting approval
@@ -21259,6 +22052,259 @@ components:
           - REFUSED
       required:
       - status
+    ReviewResult:
+      type: object
+      description: A practice review result with its linked feedback outcomes
+      properties:
+        agentJobId:
+          type: string
+          format: uuid
+        claimCurrentness:
+          type: string
+          description: "Whether a result's claim still stands: its practice's review\
+            \ rules are unchanged and it was not superseded, which an issue's results\
+            \ are when a change to its reviewable content is recorded. It says neither\
+            \ whether a later review ran nor whether the work changed since it was\
+            \ reviewed. Earlier result standards and missing fingerprints are unverifiable\
+            \ under the current whole-practice standard"
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
+        disputedAt:
+          type: string
+          format: date-time
+          description: When the developer last disputed feedback written from this
+            result; null while nothing about it is disputed
+        feedback:
+          $ref: "#/components/schemas/ReviewFeedbackCounts"
+          description: Counts of linked feedback by delivery state
+        group:
+          $ref: "#/components/schemas/ReviewPracticeGroup"
+          description: Practice group; null when the practice is Unassigned
+        id:
+          type: string
+          format: uuid
+        invalidatedAt:
+          type: string
+          format: date-time
+          description: When a workspace admin invalidated this result; null while
+            it stands
+        observedAt:
+          type: string
+          format: date-time
+        origin:
+          type: string
+          description: "What occasioned the measurement. BACKFILL came from a confirmed\
+            \ campaign over work that already existed, so it is not a point on the\
+            \ live trend line."
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
+        outcome:
+          type: string
+          description: Result of the practice review
+          enum:
+          - MET
+          - NOT_MET
+          - NOT_APPLICABLE
+          - UNDETERMINED
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+        problemCount:
+          type: integer
+          format: int64
+          description: The located problems of the result; 0 for every outcome but
+            NOT_MET
+        reviewedWork:
+          $ref: "#/components/schemas/ReviewedWorkRef"
+        severity:
+          type: string
+          description: Severity band (null unless outcome is NOT_MET)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        subject:
+          $ref: "#/components/schemas/ReviewSubject"
+          description: Whose work the result is about; null when the identity is no
+            longer resolvable
+        summary:
+          type: string
+      required:
+      - agentJobId
+      - claimCurrentness
+      - feedback
+      - id
+      - observedAt
+      - origin
+      - outcome
+      - practiceName
+      - practiceSlug
+      - problemCount
+      - reviewedWork
+      - summary
+    ReviewResultCounts:
+      type: object
+      description: Counts of results by assessment
+      properties:
+        met:
+          type: integer
+          format: int64
+        notApplicable:
+          type: integer
+          format: int64
+          description: Practices whose subject did not occur in this work
+        notMet:
+          type: integer
+          format: int64
+        undetermined:
+          type: integer
+          format: int64
+          description: Practices that looked at the evidence and could not settle
+            the question either way; reported apart from notApplicable because one
+            says there was nothing here to judge and the other says we could not tell
+      required:
+      - met
+      - notApplicable
+      - notMet
+      - undetermined
+    ReviewResultDetail:
+      type: object
+      description: A result with evidence and linked feedback
+      properties:
+        agentJobId:
+          type: string
+          format: uuid
+        claimCurrentness:
+          type: string
+          description: "Whether a result's claim still stands: its practice's review\
+            \ rules are unchanged and it was not superseded, which an issue's results\
+            \ are when a change to its reviewable content is recorded. It says neither\
+            \ whether a later review ran nor whether the work changed since it was\
+            \ reviewed. Earlier result standards and missing fingerprints are unverifiable\
+            \ under the current whole-practice standard"
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
+        coverage:
+          $ref: "#/components/schemas/PracticeResultCoverage"
+          description: How much of its scope the review read; null for a result recorded
+            before coverage
+        disputes:
+          type: array
+          description: "The developer's standing disputes of feedback written from\
+            \ this result, newest first; empty when nothing about it is disputed"
+          items:
+            $ref: "#/components/schemas/FeedbackDispute"
+        evidence:
+          $ref: "#/components/schemas/PracticeResultEvidence"
+        evidenceHidden:
+          type: boolean
+          description: Whether access to the result's evidence is withheld
+        evidenceRationale:
+          type: string
+        example:
+          $ref: "#/components/schemas/PracticeResultExample"
+          description: One place of the work that shows the practice done well; null
+            when none
+        feedback:
+          type: array
+          description: "Linked feedback, newest first"
+          items:
+            $ref: "#/components/schemas/ReviewBoundFeedback"
+        group:
+          $ref: "#/components/schemas/ReviewPracticeGroup"
+          description: Practice group; null when the practice is Unassigned
+        id:
+          type: string
+          format: uuid
+        invalidations:
+          type: array
+          description: "Every correction by a workspace admin, newest first; the first\
+            \ is in force while it has no restoration"
+          items:
+            $ref: "#/components/schemas/PracticeResultInvalidation"
+        observations:
+          type: array
+          description: "The located problems of a NOT_MET result, in display order;\
+            \ empty for any other outcome"
+          items:
+            $ref: "#/components/schemas/Observation"
+        observedAt:
+          type: string
+          format: date-time
+        origin:
+          type: string
+          description: "How the review that recorded it came about: LIVE from the\
+            \ work itself, MANUAL requested by a person, BACKFILL over work that predates\
+            \ the connection. A recurring sweep records LIVE."
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
+        outcome:
+          type: string
+          description: Result of the practice review
+          enum:
+          - MET
+          - NOT_MET
+          - NOT_APPLICABLE
+          - UNDETERMINED
+        practiceName:
+          type: string
+        practiceRevisionId:
+          type: integer
+          format: int64
+          description: "Criteria revision selected as of job start, when available"
+        practiceSlug:
+          type: string
+        provenance:
+          $ref: "#/components/schemas/PracticeResultProvenance"
+          description: "Where the result came from: job, attempt, revision and program;\
+            \ null before it was kept"
+        reviewedWork:
+          $ref: "#/components/schemas/ReviewedWorkRef"
+        severity:
+          type: string
+          description: Severity band (null unless outcome is NOT_MET)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        subject:
+          $ref: "#/components/schemas/ReviewSubject"
+          description: Whose work the result is about; null when the identity is no
+            longer resolvable
+        summary:
+          type: string
+        supersededAt:
+          type: string
+          format: date-time
+          description: When a later review of the same work superseded this result;
+            null while current
+      required:
+      - agentJobId
+      - claimCurrentness
+      - disputes
+      - evidenceHidden
+      - feedback
+      - id
+      - invalidations
+      - observations
+      - observedAt
+      - origin
+      - outcome
+      - practiceName
+      - practiceSlug
+      - reviewedWork
+      - summary
     ReviewRunCounts:
       type: object
       description: Counts of practice reviews by status
@@ -21295,8 +22341,7 @@ components:
         at:
           type: string
           format: date-time
-          description: When the review recorded its newest observation about this
-            developer
+          description: When the review recorded its newest result about this developer
         reviewId:
           type: string
           format: uuid
@@ -21317,14 +22362,14 @@ components:
       - reviewedWork
     ReviewRunSummary:
       type: object
-      description: A review run with observation and feedback outcome counts
+      description: A review run with result and feedback outcome counts
       properties:
         createdAt:
           type: string
           format: date-time
         developers:
           type: array
-          description: "The developers the run is about: everyone it recorded an observation\
+          description: "The developers the run is about: everyone it recorded a result\
             \ about, or, before it recorded any, the person its work names; empty\
             \ when neither is known"
           items:
@@ -21348,8 +22393,6 @@ components:
         id:
           type: string
           format: uuid
-        observations:
-          $ref: "#/components/schemas/ReviewObservationCounts"
         origin:
           type: string
           description: "What occasioned the run: LIVE as the work arrived, MANUAL\
@@ -21365,6 +22408,8 @@ components:
           format: int32
           description: "The run's place among the practice reviews of its work, counted\
             \ from 1 for the oldest; absent when the run names no work"
+        practiceResults:
+          $ref: "#/components/schemas/ReviewResultCounts"
         practices:
           $ref: "#/components/schemas/ReviewPracticeOutcomes"
         practicesEvaluated:
@@ -21418,7 +22463,7 @@ components:
       - finishedAfterMerge
       - finishedAfterMergeStartedByMerge
       - id
-      - observations
+      - practiceResults
       - practices
       - reviewOutcome
       - slippedPractices
@@ -21512,7 +22557,7 @@ components:
           format: int32
           description: |-
             how far back each sweep looks. Bounded at write time to twice the cadence and
-                 never more than a week, which is what keeps a sweep's observations admissible in the same trend line
+                 never more than a week, which is what keeps a sweep's results admissible in the same trend line
                  as reviews that events triggered.
         nextRunAt:
           type: string
@@ -23013,23 +24058,6 @@ components:
       - researchSurveys
       - surveySummaries
       - workspaceAlerts
-    UpdateObservationValidityRequest:
-      type: object
-      description: "Invalidate an observation that was wrong when recorded, or restore\
-        \ it"
-      properties:
-        reason:
-          type: string
-          description: "Why, kept with the correction; an invalidation reason is shown\
-            \ to the developer"
-          maxLength: 500
-          minLength: 0
-        valid:
-          type: boolean
-          description: false invalidates the observation; true restores it
-      required:
-      - reason
-      - valid
     UpdateOutlineCollectionStateRequest:
       type: object
       description: Transition a mirrored Outline collection to a target mirror state
@@ -23108,7 +24136,7 @@ components:
             type: string
             enum:
             - PRECONDITION
-            - PRECOMPUTE_SCRIPT
+            - PRACTICE_SCRIPT
             - WHY_IT_MATTERS
             - WHAT_GOOD_LOOKS_LIKE
             - VISUAL
@@ -23149,9 +24177,10 @@ components:
           maxLength: 128
           minLength: 3
           pattern: .*\S.*
-        precomputeScript:
+        practiceScript:
           type: string
-          description: TypeScript/Node static analysis run before automated review
+          description: TypeScript review program for this practice that returns one
+            result
           maxLength: 100000
           minLength: 0
         precondition:
@@ -23196,6 +24225,22 @@ components:
           maxLength: 2000
           minLength: 0
           pattern: "[\\s\\S]*\\S[\\s\\S]*"
+    UpdatePracticeResultValidityRequest:
+      type: object
+      description: "Invalidate a result that was wrong when recorded, or restore it"
+      properties:
+        reason:
+          type: string
+          description: "Why, kept with the correction; an invalidation reason is shown\
+            \ to the developer"
+          maxLength: 500
+          minLength: 0
+        valid:
+          type: boolean
+          description: false invalidates the result; true restores it
+      required:
+      - reason
+      - valid
     UpdatePracticeReviewSettingsRequest:
       type: object
       description: Update per-workspace practice-review policy. Null fields unchanged;
@@ -24026,6 +25071,12 @@ components:
         apiProtocol:
           type: string
           description: Wire protocol
+          enum:
+          - openai-completions
+          - openai-responses
+          - openai-decisions
+          - openai-embeddings
+          - cohere-rerank
           example: openai-responses
         authMode:
           type: string
@@ -24074,6 +25125,18 @@ components:
           type: integer
           format: int64
           description: Connection ID
+        purposes:
+          type: array
+          description: "The purposes a model on this connection can serve, from its\
+            \ protocol"
+          items:
+            type: string
+            enum:
+            - PRACTICE_REVIEW
+            - MENTOR
+            - PRACTICE_DECISION
+            - PRACTICE_EMBEDDING
+            - PRACTICE_RERANKING
         slug:
           type: string
           description: Unique slug within the workspace
@@ -24091,6 +25154,7 @@ components:
       - enabled
       - hasApiKey
       - id
+      - purposes
       - slug
     WorkspaceLlmModel:
       type: object
@@ -24235,6 +25299,10 @@ components:
         reachable:
           type: boolean
           description: Whether the provider answered
+        statusCode:
+          type: integer
+          format: int32
+          description: "HTTP status returned by the provider, if any"
       required:
       - modelCount
       - reachable
@@ -24260,6 +25328,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LlmUsageByJobType"
+        byPractice:
+          type: array
+          description: "The decision, embedding and reranking calls of practice scripts,\
+            \ one entry per practice, most spend first. Their spend is already part\
+            \ of byJobType. Chat calls of practice scripts are in each review's own\
+            \ cost and not here."
+          items:
+            $ref: "#/components/schemas/LlmUsageByPractice"
         fx:
           $ref: "#/components/schemas/FxRateInfo"
           description: Display-only conversion when the instance has a display currency.
@@ -24303,6 +25379,14 @@ components:
           - WITHIN
           - EXHAUSTED
           - UNVERIFIABLE
+        ownProviderInUse:
+          type: boolean
+          description: "Whether this month has an own-provider purse to show. True\
+            \ when the month has at least one own-provider call, priced or not, so\
+            \ a month of confirmed $0.00 calls counts. For the current month, also\
+            \ true when the workspace has an enabled own-provider model on an enabled\
+            \ connection, so its admins can set a provider cap before the first call.\
+            \ The spend and cap fields cannot answer this."
         ownProviderMonthlyBudgetUsd:
           type: number
           format: decimal
@@ -24320,22 +25404,30 @@ components:
             \ provider(s), in USD — the figure ownProviderMonthlyBudgetUsd compares\
             \ against. Different money from instanceTotalCostUsd: the two are never\
             \ added together."
+        practiceScriptTotal:
+          $ref: "#/components/schemas/LlmUsagePracticeScriptTotal"
+          description: "The byPractice entries in total, read from the ledger."
         unpricedEventCount:
           type: integer
           format: int64
-          description: "Calls this month (either purse) whose price is not yet known.\
-            \ They are excluded from both totals above, so a non-zero value means\
+          description: "Runs this month (job attempts and mentor turns, either purse)\
+            \ with at least one ledger row whose price is not yet known, each counted\
+            \ once. A practice script row counts toward the run of its review. Those\
+            \ rows are excluded from both totals above, so a non-zero value means\
             \ the real spend may be higher than shown."
       required:
       - byDay
       - byJobType
+      - byPractice
       - instanceBudgetVerdict
       - instancePaused
       - instanceTotalCostUsd
       - month
       - ownProviderBudgetVerdict
+      - ownProviderInUse
       - ownProviderPaused
       - ownProviderTotalCostUsd
+      - practiceScriptTotal
       - unpricedEventCount
     WorkspaceMembership:
       type: object

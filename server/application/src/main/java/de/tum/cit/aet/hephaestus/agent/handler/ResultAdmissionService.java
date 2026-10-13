@@ -82,8 +82,8 @@ public class ResultAdmissionService {
 
     /** Why an admitted job that lost its run is failed instead of measured again. */
     public static final String INTERRUPTED_AFTER_ADMISSION =
-            "The review was interrupted after its results were admitted. No completed feedback was saved. "
-                    + "The results are kept.";
+            "The review was interrupted after its results were admitted. Only a review on the work accepted before the"
+                    + " interruption was saved. The results are kept.";
 
     static boolean practiceResultsWereRefused(AgentJob job) {
         return job.getMetadata() != null

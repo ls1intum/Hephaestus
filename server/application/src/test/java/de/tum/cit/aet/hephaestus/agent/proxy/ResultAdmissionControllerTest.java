@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletionService;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ResultsRefusedException;
@@ -43,7 +44,42 @@ class ResultAdmissionControllerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        controller = new ResultAdmissionController(service, new PracticeReviewRefusalMetrics(meterRegistry));
+        controller = new ResultAdmissionController(
+                service, new PracticeReviewRefusalMetrics(meterRegistry), completion, mapper);
+    }
+
+    @Test
+    void shouldAnswerTheSubmittedReviewOnTheWorkForTheAuthenticatedAttemptOnly() {
+        UUID id = UUID.randomUUID();
+        ObjectNode request = mapper.createObjectNode().put("schemaVersion", 1).put("admissionDigest", "digest");
+        request.putObject("review").putArray("inline");
+        when(completion.complete(eq(identity(id)), eq("digest"), any()))
+                .thenReturn(new PublicReviewCompletionService.Outcome(true, "review-digest", List.of()))
+                .thenReturn(new PublicReviewCompletionService.Outcome(false, null, List.of("A fixed reason.")))
+                .thenThrow(new ResultAdmissionService.StaleAttemptException());
+
+        var accepted = controller.completePublicReview(request, authentication(LlmUsageSourceType.AGENT_JOB, id));
+        assertThat(accepted.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(Objects.requireNonNull(accepted.getBody())
+                        .path("reviewDigest")
+                        .asString())
+                .isEqualTo("review-digest");
+        var refused = controller.completePublicReview(request, authentication(LlmUsageSourceType.AGENT_JOB, id));
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        ObjectNode refusal = Objects.requireNonNull(refused.getBody());
+        assertThat(refusal.path("accepted").asBoolean(true)).isFalse();
+        assertThat(refusal.path("reasons").path(0).asString()).isEqualTo("A fixed reason.");
+        assertStatus(
+                HttpStatus.CONFLICT,
+                () -> controller.completePublicReview(request, authentication(LlmUsageSourceType.AGENT_JOB, id)));
+        assertStatus(
+                HttpStatus.FORBIDDEN,
+                () -> controller.completePublicReview(request, authentication(LlmUsageSourceType.MENTOR_TURN, id)));
+        assertStatus(
+                HttpStatus.BAD_REQUEST,
+                () -> controller.completePublicReview(
+                        mapper.createObjectNode().put("schemaVersion", 1),
+                        authentication(LlmUsageSourceType.AGENT_JOB, id)));
     }
 
     @Test

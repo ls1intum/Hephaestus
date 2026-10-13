@@ -1,4 +1,4 @@
-import { isRecord } from "./pi-observation-normalize.ts";
+import { isRecord } from "./pi-result-normalize.ts";
 import { isRetryableStatus, isTimeoutAbort, retrying } from "./pi-runner-retry.ts";
 
 export type PublicCompletion =

@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService.AdmissionIdentity;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService.ReviewedTarget;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService.AdmissionIdentity;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService.ReviewedTarget;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedReview;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatch;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import java.io.Serial;
 import java.time.Instant;
 import java.util.List;
@@ -52,18 +52,18 @@ public class PublicReviewCompletionService {
     /** The job metadata key that records an explicit refusal; see {@link #wasRefused}. */
     public static final String REFUSAL_METADATA_KEY = "public_review_refusal";
 
-    static final String NOT_ADMITTED = "The review does not rest on this job's admitted observations.";
+    static final String NOT_ADMITTED = "The review does not rest on this job's admitted results.";
     static final String NO_PUBLIC_WORK = "This review has no review on the work.";
     static final String NOT_OWED = "This review owes no review on the work.";
     static final String BREAKS_CONTRACT = "The review breaks the whole-review contract.";
     static final String UNDECIDED = "The review leaves a publicly eligible problem undecided.";
-    static final String UNVERIFIED = "The review rests on an observation whose citations are not verified.";
+    static final String UNVERIFIED = "The review rests on a result whose citations are not verified.";
     static final String INADMISSIBLE = "The review cannot be admitted onto the work as written.";
     static final String COPY_GONE = "The original review inputs no longer authorize this review.";
     static final String PREVIOUSLY_REFUSED = "The review on this work was already refused.";
     static final String CHANGED = "A different review on the work was already accepted.";
 
-    private final ObservationAdmissionService admission;
+    private final ResultAdmissionService admission;
     private final AgentJobRepository jobs;
     private final PublicReviewCompletionInputs inputs;
     private final FeedbackResponseSuppressionFilter responseSuppression;
@@ -77,7 +77,7 @@ public class PublicReviewCompletionService {
     private final TransactionTemplate transactions;
 
     PublicReviewCompletionService(
-            ObservationAdmissionService admission,
+            ResultAdmissionService admission,
             AgentJobRepository jobs,
             PublicReviewCompletionInputs inputs,
             FeedbackResponseSuppressionFilter responseSuppression,
@@ -111,7 +111,7 @@ public class PublicReviewCompletionService {
     /**
      * Accepts {@code review} for the attempt that owns the job, or refuses it with a fixed reason.
      *
-     * @throws ObservationAdmissionService.StaleAttemptException when the attempt no longer owns the job
+     * @throws ResultAdmissionService.StaleAttemptException when the attempt no longer owns the job
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Outcome complete(AdmissionIdentity identity, String admissionDigest, @Nullable JsonNode review) {
@@ -126,7 +126,7 @@ public class PublicReviewCompletionService {
                 if (target != null) pullRequests.lockById(target.pullRequestId());
                 AgentJob job = admission.ownedJob(identity);
                 if (!Objects.equals(target, ReviewedTarget.of(job))) {
-                    throw new ObservationAdmissionService.StaleAttemptException();
+                    throw new ResultAdmissionService.StaleAttemptException();
                 }
                 return accept(identity, job, admissionDigest, review);
             }));
@@ -142,12 +142,12 @@ public class PublicReviewCompletionService {
     private Accepted accept(
             AdmissionIdentity identity, AgentJob job, String admissionDigest, @Nullable JsonNode submitted) {
         if (wasRefused(job)) throw new Refused(PREVIOUSLY_REFUSED, false);
-        String admitted = ObservationAdmissionService.admissionDigest(job);
+        String admitted = ResultAdmissionService.admissionDigest(job);
         if (admitted.isBlank() || !admitted.equals(admissionDigest)) throw new Refused(NOT_ADMITTED, true);
         ArtifactKind artifact = publicWorkOf(job);
         long workspaceId = identity.workspaceId();
         var prepared = inputs.prepare(job, submitted, admission.admittedResponse(job));
-        List<Observation> persisted = prepared.observations();
+        List<PracticeResult> persisted = prepared.results();
         Set<UUID> publicIds = prepared.publicIds();
         Set<FeedbackChannel> channels = ArtifactKinds.ISSUE.equals(artifact)
                 ? IssueReviewHandler.ISSUE_REVIEW_CHANNELS
@@ -165,7 +165,7 @@ public class PublicReviewCompletionService {
         }
         var copy = bases.findOriginalCopy(workspaceId, job.getId()).orElse(null);
         if (copy == null
-                || copy.admissionAttempt() != ObservationAdmissionService.citationAttempt(job)
+                || copy.admissionAttempt() != ResultAdmissionService.citationAttempt(job)
                 || !evidenceFiles.vouchesForOriginalCopy(
                         copy.copyId(), job.getId(), workspaceId, copy.admissionAttempt())
                 || personSuppression.isReviewJobSuppressed(job.getId())) throw new Refused(COPY_GONE, true);
@@ -177,26 +177,20 @@ public class PublicReviewCompletionService {
             throw new Refused(UNDECIDED, true);
         }
 
-        List<ReviewResultParser.ValidatedObservation> recorded;
+        List<ReviewResultParser.ValidatedResult> recorded;
         FeedbackDispatch intent;
         try {
-            recorded = persisted.stream()
-                    .map(observation -> {
-                        CitationVerification.requireVerified(job, observation.getEvidence());
-                        return PullRequestReviewHandler.validated(observation);
-                    })
-                    .toList();
+            recorded = inputs.recorded(job, persisted);
         } catch (JobDeliveryException unverified) {
             throw new Refused(UNVERIFIED, true, unverified);
         }
         try {
             // The terminal delivery's gate sequence, with every row it writes joining this transaction.
-            List<ReviewResultParser.ValidatedObservation> eligible = responseSuppression
+            List<ReviewResultParser.ValidatedResult> eligible = responseSuppression
                     .evaluateInCurrentTransaction(job, recorded)
                     .deliverable();
-            List<ReviewResultParser.ValidatedObservation> proposals =
-                    inContextDeliveryGate.awaitingApproval(job, eligible);
-            List<ReviewResultParser.ValidatedObservation> automatic =
+            List<ReviewResultParser.ValidatedResult> proposals = inContextDeliveryGate.awaitingApproval(job, eligible);
+            List<ReviewResultParser.ValidatedResult> automatic =
                     inContextDeliveryGate.admitInContextInCurrentTransaction(job, eligible);
             AdmittedDelivery decision = AdmittedDelivery.decide(
                     review,
@@ -214,7 +208,7 @@ public class PublicReviewCompletionService {
         completion.setJobId(job.getId());
         completion.setWorkspaceId(workspaceId);
         completion.setContractVersion(ComposedReview.CONTRACT_VERSION);
-        completion.setAdmissionAttempt(ObservationAdmissionService.citationAttempt(job));
+        completion.setAdmissionAttempt(ResultAdmissionService.citationAttempt(job));
         completion.setAdmissionDigest(admitted);
         completion.setAcceptedAttempt(identity.attempt());
         completion.setAcceptedWorkerId(identity.workerId());
@@ -250,7 +244,7 @@ public class PublicReviewCompletionService {
                 job.setMetadata(metadata);
                 jobs.save(job);
             });
-        } catch (ObservationAdmissionService.StaleAttemptException lost) {
+        } catch (ResultAdmissionService.StaleAttemptException lost) {
             // Not this attempt's job any more: its refusal is no fact about the job's review on the work.
         }
     }

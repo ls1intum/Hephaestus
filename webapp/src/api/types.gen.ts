@@ -227,7 +227,7 @@ export type AdminLlmUsageReport = {
 export type AdminWorkspaceLlmUsage = {
     displayName: string;
     /**
-     * Ledger events (jobs / mentor turns) this month, either purse
+     * Runs this month, either purse: job attempts and mentor turns. Rows of models for practice scripts are not runs.
      */
     events: number;
     /**
@@ -250,6 +250,10 @@ export type AdminWorkspaceLlmUsage = {
      * The same verdict for the workspace's own-provider spend against its own cap.
      */
     ownProviderBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
+    /**
+     * Whether this month has an own-provider purse to show for the workspace. Same rule as WorkspaceLlmUsageReport.ownProviderInUse.
+     */
+    ownProviderInUse: boolean;
     /**
      * The workspace's own cap in USD on its own-provider spend; null = uncapped. Read-only here — it governs the workspace's money, so only its own admins may change it.
      */
@@ -292,11 +296,15 @@ export type AgentBinding = {
     enabled: boolean;
     instanceModelId?: number;
     maxConcurrentJobs?: number;
-    purpose: 'PRACTICE_REVIEW' | 'MENTOR';
+    purpose: 'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING';
     /**
      * True when the bound model is available to run right now
      */
     ready: boolean;
+    /**
+     * The members this binding serves now, named by the tier of their choice: IN_HOUSE and CLOUD for the members who chose them, UNDECLARED for the members who have not chosen. A decision, embedding or reranking binding serves no member whose review model is stricter. Empty when the binding serves no member.
+     */
+    servedTiers: Array<'IN_HOUSE' | 'CLOUD' | 'UNDECLARED'>;
     timeoutSeconds?: number;
     workspaceModelId?: number;
 };
@@ -363,6 +371,10 @@ export type AgentJob = {
      * Timestamp when the job was created
      */
     createdAt: Date;
+    /**
+     * Data handling tier of the slot whose model this job was admitted on, frozen at submit time. Absent when the snapshot names no tier that this server knows.
+     */
+    dataHandlingTier?: 'IN_HOUSE' | 'CLOUD' | 'UNDECLARED';
     /**
      * Git provider comment/note ID for posted feedback
      */
@@ -448,7 +460,7 @@ export type AgentJob = {
      */
     model?: string;
     /**
-     * Raw output is not returned by administrative job reads; use the authorized observation and feedback endpoints
+     * Raw output is not returned by administrative job reads; use the authorized result and feedback endpoints
      */
     output?: unknown;
     /**
@@ -460,7 +472,7 @@ export type AgentJob = {
      */
     retryCount: number;
     /**
-     * Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE means no model ran because required evidence was missing, unreadable, stale, or unauthorized — so no observations means nothing was assessed, not that nothing was wrong. COALESCED means no model ran because a completed review had already answered every ready practice on exactly the same code — its answers are listed in answeredPractices, and this run assessed nothing anew. SUPERSEDED means the waiting attempt was replaced by an admitted newer review of the same author's current work, named in coveringJobId, which carries this review's practices and may still be waiting or running; the replacement makes no additional assessment, and earlier attempt history remains. REVIEWED means the model ran against sufficient evidence.
+     * Why a COMPLETED run produced the results it did. INSUFFICIENT_EVIDENCE means no model ran because required evidence was missing, unreadable, stale, or unauthorized — so no results means nothing was assessed, not that nothing was wrong. COALESCED means no model ran because a completed review had already answered every ready practice on exactly the same code — its answers are listed in answeredPractices, and this run assessed nothing anew. SUPERSEDED means the waiting attempt was replaced by an admitted newer review of the same author's current work, named in coveringJobId, which carries this review's practices and may still be waiting or running; the replacement makes no additional assessment, and earlier attempt history remains. REVIEWED means the model ran against sufficient evidence.
      */
     reviewOutcome: 'REVIEWED' | 'INSUFFICIENT_EVIDENCE' | 'COALESCED' | 'SUPERSEDED';
     /**
@@ -494,7 +506,11 @@ export type AgentJobUsage = {
      */
     attempts: Array<AgentJobUsageAttempt>;
     /**
-     * The cost of every attempt in US dollars; absent when an attempt has no known price or no usage is recorded
+     * What the models its practice scripts called cost in US dollars, already in totalCostUsd; absent when no script called a model or a call has no known price
+     */
+    practiceScriptCostUsd?: number;
+    /**
+     * The cost of every attempt in US dollars, the models its practice scripts called included; absent when an attempt or a script call has no known price, or no usage is recorded
      */
     totalCostUsd?: number;
     /**
@@ -550,7 +566,7 @@ export type Answer = {
 };
 
 /**
- * A ready practice this review did not ask, because a completed review had already answered it on exactly the same code. Its observation belongs to that review; this review recorded none for it.
+ * A ready practice this review did not ask, because a completed review had already answered it on exactly the same code. Its result belongs to that review; this review recorded none for it.
  */
 export type AnsweredPractice = {
     /**
@@ -558,7 +574,7 @@ export type AnsweredPractice = {
      */
     practiceSlug: string;
     /**
-     * The completed review whose observation answers it
+     * The completed review whose result answers it
      */
     reviewId: string;
     /**
@@ -708,6 +724,10 @@ export type AvailableLlmModel = {
      * Pricing mode
      */
     pricingMode: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
+    /**
+     * The purposes a binding may assign this model to, from its connection's protocol
+     */
+    purposes: Array<'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING'>;
     /**
      * Reasoning effort requested of the model; null sends none, the provider's default applies
      */
@@ -872,6 +892,36 @@ export type ChatThreadSummary = {
     createdAt: Date;
     id: string;
     title?: string;
+};
+
+/**
+ * Why a problem belongs to this work
+ */
+export type ClaimBasis = {
+    /**
+     * The citation of the earlier state; worsened only
+     */
+    base?: number;
+    /**
+     * The words of the practice's criteria that state the duty; duty only
+     */
+    criterionQuote?: string;
+    /**
+     * The citation of the event that owed the duty; duty only
+     */
+    event?: number;
+    /**
+     * The basis in words
+     */
+    explanation: string;
+    /**
+     * The citation on the reviewed side; introduced and worsened only
+     */
+    head?: number;
+    /**
+     * introduced, worsened, duty or state
+     */
+    type: 'introduced' | 'worsened' | 'duty' | 'state';
 };
 
 export type ClientRefreshRequest = {
@@ -1168,7 +1218,7 @@ export type CreateLlmConnectionRequest = {
     /**
      * Wire protocol
      */
-    apiProtocol: string;
+    apiProtocol: 'openai-completions' | 'openai-responses' | 'openai-decisions' | 'openai-embeddings' | 'cohere-rerank';
     /**
      * Credential shape (default BEARER)
      */
@@ -1323,9 +1373,9 @@ export type CreatePracticeRequest = {
      */
     name: string;
     /**
-     * TypeScript/Node static analysis run before automated review
+     * TypeScript review program for this practice that returns one result
      */
-    precomputeScript?: string;
+    practiceScript?: string;
     precondition?: PracticePrecondition;
     /**
      * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
@@ -1432,7 +1482,7 @@ export type CreateWorkspaceLlmConnectionRequest = {
     /**
      * Wire protocol
      */
-    apiProtocol: string;
+    apiProtocol: 'openai-completions' | 'openai-responses' | 'openai-decisions' | 'openai-embeddings' | 'cohere-rerank';
     /**
      * Credential shape (default BEARER)
      */
@@ -1635,7 +1685,7 @@ export type CuratedPracticeDefinition = {
     groupSlug?: string;
     guide?: PracticeGuide;
     name: string;
-    precomputeScript?: string;
+    practiceScript?: string;
     precondition?: PracticePrecondition;
     /**
      * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
@@ -1671,7 +1721,7 @@ export type CuratedPracticeRequest = {
      */
     guide?: PracticeGuide;
     name: string;
-    precomputeScript?: string;
+    practiceScript?: string;
     precondition?: PracticePrecondition;
     /**
      * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
@@ -1802,20 +1852,20 @@ export type DeliveryPolicyTraceCheck = {
 };
 
 /**
- * Per-practice observation summary for a developer
+ * Per-practice result summary for a developer
  */
 export type DeveloperPracticeSummary = {
     /**
-     * Timestamp of most recent observation
+     * Timestamp of most recent result
      */
     lastObservedAt?: Date;
     /**
-     * Number of MET observations
+     * Number of MET results
      */
     met: number;
     notApplicable: number;
     /**
-     * Number of NOT_MET observations
+     * Number of NOT_MET results
      */
     notMet: number;
     /**
@@ -1827,9 +1877,9 @@ export type DeveloperPracticeSummary = {
      */
     practiceSlug: string;
     /**
-     * Total number of observations
+     * Total number of results
      */
-    totalObservations: number;
+    totalResults: number;
     undetermined: number;
 };
 
@@ -1908,20 +1958,6 @@ export type EvidenceSearch = {
      * What the review looked for in this work
      */
     lookedFor: string;
-};
-
-/**
- * What the review could not settle, and what would settle it
- */
-export type EvidenceUndecidability = {
-    /**
-     * The question this work left open
-     */
-    openQuestion: string;
-    /**
-     * What would have answered it
-     */
-    wouldSettleIt: string;
 };
 
 /**
@@ -2590,7 +2626,7 @@ export type LlmConnection = {
     /**
      * Wire protocol
      */
-    apiProtocol: string;
+    apiProtocol: 'openai-completions' | 'openai-responses' | 'openai-decisions' | 'openai-embeddings' | 'cohere-rerank';
     /**
      * Credential shape
      */
@@ -2623,6 +2659,10 @@ export type LlmConnection = {
      * Connection ID
      */
     id: number;
+    /**
+     * The purposes a model on this connection can serve, from its protocol
+     */
+    purposes: Array<'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING'>;
     /**
      * Unique slug
      */
@@ -2788,6 +2828,9 @@ export type LlmProbeResult = {
  */
 export type LlmUsageByDay = {
     day: Date;
+    /**
+     * Runs: job attempts and mentor turns. Rows of models for practice scripts are not runs.
+     */
     events: number;
     /**
      * Confirmed spend on shared (instance) models for this day, in USD.
@@ -2798,7 +2841,7 @@ export type LlmUsageByDay = {
      */
     ownProviderTotalCostUsd: number;
     /**
-     * Calls this day whose price is not yet known. Excluded from both totals above.
+     * Runs this day with at least one ledger row whose price is not yet known. A practice script row counts toward the run of its review. Those rows are excluded from both totals above.
      */
     unpricedEventCount: number;
 };
@@ -2810,7 +2853,7 @@ export type LlmUsageByJobType = {
     cacheReadTokens: number;
     cacheWriteTokens: number;
     /**
-     * Ledger events (jobs / mentor turns)
+     * Runs: job attempts and mentor turns. Rows of models for practice scripts are not runs.
      */
     events: number;
     inputTokens: number;
@@ -2829,7 +2872,69 @@ export type LlmUsageByJobType = {
      */
     totalCalls: number;
     /**
-     * Calls for this job type whose price is not yet known. Excluded from both totals above.
+     * Runs of this job type with at least one ledger row whose price is not yet known. A practice script row counts toward the run of its review. Those rows are excluded from both totals above.
+     */
+    unpricedEventCount: number;
+};
+
+/**
+ * The decision, embedding and reranking calls that one practice's script made in finished reviews this month. The cost of each review's calls is split between its practices by the priced tokens that each used.
+ */
+export type LlmUsageByPractice = {
+    calls: number;
+    inputTokens: number;
+    /**
+     * This practice's share of the spend on shared (instance) models, in USD.
+     */
+    instanceTotalCostUsd: number;
+    outputTokens: number;
+    /**
+     * This practice's share of the spend on this workspace's own provider(s), in USD.
+     */
+    ownProviderTotalCostUsd: number;
+    /**
+     * The practice name. Null when the slug names no current practice.
+     */
+    practiceName?: string;
+    /**
+     * The practice slug. Null for calls that cannot be split by practice any more, such as those of a deleted review.
+     */
+    practiceSlug?: string;
+    /**
+     * The models for practice scripts that the script called.
+     */
+    purposes: Array<'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING'>;
+    /**
+     * Reviews in which the script called a model for practice scripts. A review with several practices counts for each of them.
+     */
+    reviews: number;
+    /**
+     * Reviews with a practice script ledger row whose price is not yet known and that holds this practice's calls, each review counted once. Those rows are excluded from both totals above. A review with several practices counts for each of them.
+     */
+    unpricedEventCount: number;
+};
+
+/**
+ * The decision, embedding and reranking calls of finished reviews this month, in total. calls, inputTokens, outputTokens and both costs equal the sums of the byPractice entries. reviews and unpricedEventCount do not: one review can count for several practices there.
+ */
+export type LlmUsagePracticeScriptTotal = {
+    calls: number;
+    inputTokens: number;
+    /**
+     * Confirmed practice script spend on shared (instance) models, in USD.
+     */
+    instanceTotalCostUsd: number;
+    outputTokens: number;
+    /**
+     * Practice script spend on this workspace's own provider(s), in USD.
+     */
+    ownProviderTotalCostUsd: number;
+    /**
+     * Distinct reviews in which a practice script called a model for practice scripts.
+     */
+    reviews: number;
+    /**
+     * Distinct reviews with a practice script ledger row whose price is not yet known. Those rows are excluded from both totals above.
      */
     unpricedEventCount: number;
 };
@@ -2875,185 +2980,70 @@ export type NotificationPreferences = {
 };
 
 /**
- * Full practice observation detail including delivered feedback and evidence
+ * One located problem of a practice result
  */
-export type ObservationDetail = {
+export type Observation = {
     /**
-     * Artifact entity ID
+     * Why the problem belongs to this work; null when it was recorded before bases were kept
      */
-    artifactId: number;
+    basis?: ClaimBasis;
     /**
-     * Artifact type (e.g. PULL_REQUEST)
+     * The verified places of the problem, at least one
      */
-    artifactKind: string;
+    citations: Array<EvidenceCitation>;
+    explanation: string;
     /**
-     * Link to the reviewed artifact on its platform (null when it cannot be resolved)
-     */
-    artifactUrl?: string;
-    /**
-     * Whether an observation's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's observations are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier observation standards and missing fingerprints are unverifiable under the current whole-practice standard
-     */
-    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    /**
-     * The summary body of the newest eligible feedback about this observation to this developer (null when no summary body was recorded, including delivery through inline notes only)
-     */
-    deliveredFeedback?: string;
-    evidence?: ObservationEvidence;
-    /**
-     * Evidence-based rationale for the observation
-     */
-    evidenceRationale?: string;
-    /**
-     * Links to the comments on the reviewed work that carry the feedback behind feedbackResponse, summary first (null when that feedback was not delivered on the work or the platform returned no link)
-     */
-    feedbackCommentUrls?: Array<string>;
-    /**
-     * The developer's standing answer and response handle for the newest eligible feedback about this observation, including inline-only delivery with no summary body (null when no eligible feedback exists or the newest eligible feedback has failed delivery)
-     */
-    feedbackResponse?: FeedbackResponse;
-    /**
-     * Observation ID
-     */
-    id: string;
-    /**
-     * When a workspace admin marked this observation as incorrect; null while it stands. An invalidated observation counts toward nothing current.
-     */
-    invalidatedAt?: Date;
-    /**
-     * The admin's reason for the invalidation; null while the observation stands
-     */
-    invalidationReason?: string;
-    /**
-     * The next step the review wrote about this observation, whether or not the feedback carrying it was delivered (null when it wrote none)
+     * What would fix it; null when the review wrote none
      */
     nextStep?: string;
     /**
-     * When the observation was made
-     */
-    observedAt: Date;
-    /**
-     * What occasioned the measurement; never mix origins in one trend line
-     */
-    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
-    /**
-     * Result of the practice review
-     */
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Cross-run locus key; null when continuity is unavailable
-     */
-    recurrenceKey?: string;
-    /**
-     * Severity level (null unless outcome is NOT_MET)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Observation summary
-     */
-    summary: string;
-};
-
-/**
- * Verified, source-bound evidence for an observation
- */
-export type ObservationEvidence = {
-    citations: Array<EvidenceCitation>;
-    /**
-     * Why this practice had nothing to judge here; null unless the review recorded a reason
-     */
-    inapplicability?: EvidenceInapplicability;
-    /**
-     * Where the review looked when it found nothing; null unless it recorded a search
-     */
-    search?: EvidenceSearch;
-    /**
-     * What the review could not settle; null unless it recorded an open question
-     */
-    undecidability?: EvidenceUndecidability;
-};
-
-/**
- * One correction of an observation by a workspace admin, and its restoration if any
- */
-export type ObservationInvalidation = {
-    id: string;
-    invalidatedAt: Date;
-    /**
-     * Who invalidated it; null once that account is erased
-     */
-    invalidatedBy?: string;
-    /**
-     * What became of the comments Hephaestus had already posted on the provider
-     */
-    providerCopy: 'PENDING' | 'NONE' | 'UPDATED' | 'INLINE_REMAINS' | 'UNRESOLVED';
-    reason: string;
-    /**
-     * Why it was restored; null while the invalidation is in force
-     */
-    restorationReason?: string;
-    restoredAt?: Date;
-    /**
-     * Who restored it; null while in force or once that account is erased
-     */
-    restoredBy?: string;
-};
-
-/**
- * Practice observation summary for list views
- */
-export type ObservationList = {
-    /**
-     * Artifact entity ID
-     */
-    artifactId: number;
-    /**
-     * Artifact type (e.g. PULL_REQUEST)
-     */
-    artifactKind: string;
-    /**
-     * Whether an observation's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's observations are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier observation standards and missing fingerprints are unverifiable under the current whole-practice standard
-     */
-    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    /**
      * Observation ID
      */
-    id: string;
+    observationId: string;
     /**
-     * When the observation was made
+     * Display order within the result, from 0
      */
-    observedAt: Date;
+    position: number;
     /**
-     * What occasioned the measurement; never mix origins in one trend line
+     * How much this problem weighs at its place alone
      */
-    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
-     * Result of the practice review
-     */
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Severity level (null unless outcome is NOT_MET)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Observation summary
+     * One line
      */
     summary: string;
+};
+
+/**
+ * One problem of a not met result, as a list names it
+ */
+export type ObservationSummary = {
+    /**
+     * How much this problem weighs at its place alone
+     */
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * One line
+     */
+    summary: string;
+};
+
+/**
+ * A question the review could not settle, what would settle it, and where it arose
+ */
+export type OpenQuestion = {
+    /**
+     * The place in the work the question is about; null when it has none
+     */
+    citation?: EvidenceCitation;
+    /**
+     * The question this work left open
+     */
+    openQuestion: string;
+    /**
+     * What would have answered it
+     */
+    wouldSettleIt: string;
 };
 
 /**
@@ -3299,8 +3289,8 @@ export type PageResponseDtoConfigAuditEntryView = {
  * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
-export type PageResponseDtoObservationList = {
-    content?: Array<ObservationList>;
+export type PageResponseDtoPracticeResultList = {
+    content?: Array<PracticeResultList>;
     empty?: boolean;
     first?: boolean;
     last?: boolean;
@@ -3365,13 +3355,18 @@ export type PagedModelFeedbackItem = {
     page?: PageMetadata;
 };
 
+export type PagedModelPracticeReviewObservationRow = {
+    content?: Array<PracticeReviewObservationRow>;
+    page?: PageMetadata;
+};
+
 export type PagedModelReviewFeedback = {
     content?: Array<ReviewFeedback>;
     page?: PageMetadata;
 };
 
-export type PagedModelReviewObservation = {
-    content?: Array<ReviewObservation>;
+export type PagedModelReviewResult = {
+    content?: Array<ReviewResult>;
     page?: PageMetadata;
 };
 
@@ -3494,9 +3489,9 @@ export type Practice = {
      */
     name: string;
     /**
-     * TypeScript/Node precompute script for static analysis before AI review
+     * TypeScript review program for this practice that returns one result
      */
-    precomputeScript?: string;
+    practiceScript?: string;
     precondition?: PracticePrecondition;
     /**
      * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
@@ -3604,7 +3599,10 @@ export type PracticeDefinition = {
     groupSlug?: string;
     guide?: PracticeGuide;
     name: string;
-    precomputeScript?: string;
+    /**
+     * TypeScript review program for this practice that returns one result
+     */
+    practiceScript?: string;
     precondition?: PracticePrecondition;
     /**
      * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
@@ -3790,9 +3788,9 @@ export type PracticeGroup = {
  */
 export type PracticeGroupReviewRun = {
     /**
-     * Every visible observation of the run, complete enough to open in place
+     * Every visible result of the run, complete enough to open in place
      */
-    observations: Array<ObservationDetail>;
+    practiceResults: Array<PracticeResultDetail>;
     reviewId: string;
     reviewedAt: Date;
     reviewedWork: ReviewedWorkRef;
@@ -3817,7 +3815,7 @@ export type PracticeGroupStanding = {
      */
     direction?: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
     /**
-     * Oldest contributing observation, for provenance only (null without a verdict)
+     * Oldest contributing result, for provenance only (null without a verdict)
      */
     feedbackSince?: Date;
     /**
@@ -3841,11 +3839,11 @@ export type PracticeGroupStanding = {
      */
     guidanceSource?: 'RULE_BASED';
     /**
-     * Supporting observations the standing derives from (problems first); empty without a verdict
+     * Supporting results the standing derives from (problems first); empty without a verdict
      */
-    observations: Array<PracticeStandingObservation>;
+    practiceResults: Array<PracticeStandingResult>;
     /**
-     * Distinct pieces of reviewed work the observations come from, per kind (provenance, not a score); empty without a verdict
+     * Distinct pieces of reviewed work the results come from, per kind (provenance, not a score); empty without a verdict
      */
     sources: Array<FeedbackSourceCount>;
     /**
@@ -3955,7 +3953,7 @@ export type PracticeProfileOverview = {
 
 export type PracticeReleaseField = {
     conflict: boolean;
-    field: 'NAME' | 'SIGNALS' | 'EVIDENCE_REQUIREMENTS' | 'REVIEW_WHEN' | 'SUBJECT' | 'PRECONDITION' | 'CRITERIA' | 'PRECOMPUTE_SCRIPT' | 'AUTOMATED_REVIEW_POLICY' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'GROUP_SLUG' | 'DELIVERY_BEHAVIOR' | 'VISUAL' | 'GUIDE';
+    field: 'NAME' | 'SIGNALS' | 'EVIDENCE_REQUIREMENTS' | 'REVIEW_WHEN' | 'SUBJECT' | 'PRECONDITION' | 'CRITERIA' | 'PRACTICE_SCRIPT' | 'AUTOMATED_REVIEW_POLICY' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'GROUP_SLUG' | 'DELIVERY_BEHAVIOR' | 'VISUAL' | 'GUIDE';
     offeredChanged: boolean;
 };
 
@@ -3975,7 +3973,288 @@ export type PracticeReleaseProposal = {
 };
 
 /**
- * Practice reviews, observations and feedback in one time bucket of a range
+ * How much of its scope the review read, and what it left out
+ */
+export type PracticeResultCoverage = {
+    /**
+     * Units the program checked; claimed only
+     */
+    checked?: number;
+    /**
+     * Whether the review read its whole scope
+     */
+    complete: boolean;
+    /**
+     * Reads that failed; host only
+     */
+    failedReads?: number;
+    /**
+     * What was left out, and why; empty when complete
+     */
+    omitted: Array<PracticeResultCoverageOmission>;
+    /**
+     * Reads the runner counted; host only
+     */
+    reads?: number;
+    /**
+     * Units the program selected; claimed only
+     */
+    selected?: number;
+    /**
+     * host or claimed
+     */
+    source: 'host' | 'claimed';
+    /**
+     * Units in the scope, when known; claimed only
+     */
+    total?: number;
+    /**
+     * Reads cut at their limit; host only
+     */
+    truncatedReads?: number;
+};
+
+/**
+ * One part of the scope the review did not read
+ */
+export type PracticeResultCoverageOmission = {
+    count: number;
+    reason: string;
+    units: Array<string>;
+    what: string;
+};
+
+/**
+ * Full practice result detail including delivered feedback and evidence
+ */
+export type PracticeResultDetail = {
+    /**
+     * Artifact entity ID
+     */
+    artifactId: number;
+    /**
+     * Artifact type (e.g. PULL_REQUEST)
+     */
+    artifactKind: string;
+    /**
+     * Link to the reviewed artifact on its platform (null when it cannot be resolved)
+     */
+    artifactUrl?: string;
+    /**
+     * Whether a result's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's results are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier result standards and missing fingerprints are unverifiable under the current whole-practice standard
+     */
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    /**
+     * How much of its scope the review read; null for a result recorded before coverage was kept
+     */
+    coverage?: PracticeResultCoverage;
+    /**
+     * The summary body of the newest eligible feedback about this result to this developer (null when no summary body was recorded, including delivery through inline notes only)
+     */
+    deliveredFeedback?: string;
+    evidence?: PracticeResultEvidence;
+    /**
+     * Evidence-based rationale for the result
+     */
+    evidenceRationale?: string;
+    /**
+     * One place of the work that shows the practice done well; null when none
+     */
+    example?: PracticeResultExample;
+    /**
+     * Links to the comments on the reviewed work that carry the feedback behind feedbackResponse, summary first (null when that feedback was not delivered on the work or the platform returned no link)
+     */
+    feedbackCommentUrls?: Array<string>;
+    /**
+     * The developer's standing answer and response handle for the newest eligible feedback about this result, including inline-only delivery with no summary body (null when no eligible feedback exists or the newest eligible feedback has failed delivery)
+     */
+    feedbackResponse?: FeedbackResponse;
+    /**
+     * Result ID
+     */
+    id: string;
+    /**
+     * When a workspace admin marked this result as incorrect; null while it stands. An invalidated result counts toward nothing current.
+     */
+    invalidatedAt?: Date;
+    /**
+     * The admin's reason for the invalidation; null while the result stands
+     */
+    invalidationReason?: string;
+    /**
+     * The next step the review wrote about this result, whether or not the feedback carrying it was delivered (null when it wrote none)
+     */
+    nextStep?: string;
+    /**
+     * The located problems of a NOT_MET result, in display order; empty for any other outcome
+     */
+    observations: Array<Observation>;
+    /**
+     * When the result was made
+     */
+    observedAt: Date;
+    /**
+     * What occasioned the measurement; never mix origins in one trend line
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
+     * Result of the practice review
+     */
+    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * Severity level (null unless outcome is NOT_MET)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Result summary
+     */
+    summary: string;
+};
+
+/**
+ * Verified, source-bound evidence for a result
+ */
+export type PracticeResultEvidence = {
+    /**
+     * The result's own citations; each problem carries its own places
+     */
+    citations: Array<EvidenceCitation>;
+    /**
+     * Why this practice had nothing to judge here; null unless the review recorded a reason
+     */
+    inapplicability?: EvidenceInapplicability;
+    /**
+     * Where the review looked when it found nothing; null unless it recorded a search
+     */
+    search?: EvidenceSearch;
+    /**
+     * What the review could not settle, each where it arose; empty unless it recorded one
+     */
+    undecidability: Array<OpenQuestion>;
+};
+
+/**
+ * One place of the work that shows the practice done well
+ */
+export type PracticeResultExample = {
+    citation: EvidenceCitation;
+    /**
+     * About the work, at most 280 characters
+     */
+    note: string;
+};
+
+/**
+ * One correction of a result by a workspace admin, and its restoration if any
+ */
+export type PracticeResultInvalidation = {
+    id: string;
+    invalidatedAt: Date;
+    /**
+     * Who invalidated it; null once that account is erased
+     */
+    invalidatedBy?: string;
+    /**
+     * What became of the comments Hephaestus had already posted on the provider
+     */
+    providerCopy: 'PENDING' | 'NONE' | 'UPDATED' | 'INLINE_REMAINS' | 'UNRESOLVED';
+    reason: string;
+    /**
+     * Why it was restored; null while the invalidation is in force
+     */
+    restorationReason?: string;
+    restoredAt?: Date;
+    /**
+     * Who restored it; null while in force or once that account is erased
+     */
+    restoredBy?: string;
+};
+
+/**
+ * Practice result summary for list views
+ */
+export type PracticeResultList = {
+    /**
+     * Artifact entity ID
+     */
+    artifactId: number;
+    /**
+     * Artifact type (e.g. PULL_REQUEST)
+     */
+    artifactKind: string;
+    /**
+     * Whether a result's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's results are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier result standards and missing fingerprints are unverifiable under the current whole-practice standard
+     */
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    /**
+     * Result ID
+     */
+    id: string;
+    /**
+     * When the result was made
+     */
+    observedAt: Date;
+    /**
+     * What occasioned the measurement; never mix origins in one trend line
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
+     * Result of the practice review
+     */
+    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * The problems of a NOT_MET result in display order, as the result detail shows them; empty for any other outcome and when the detail would show no evidence
+     */
+    problems: Array<ObservationSummary>;
+    /**
+     * Severity level (null unless outcome is NOT_MET)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Result summary
+     */
+    summary: string;
+};
+
+/**
+ * Where a practice result came from
+ */
+export type PracticeResultProvenance = {
+    attempt: number;
+    /**
+     * The head commit the capture pinned; null for work without one
+     */
+    capturedRevision?: string;
+    jobId: string;
+    /**
+     * The practice revision the result was measured against
+     */
+    practiceRevisionId?: number;
+    /**
+     * SHA-256 of the practice's own script; null for the built-in review
+     */
+    programDigest?: string;
+    programKind: 'BUILTIN' | 'CUSTOM';
+};
+
+/**
+ * Practice reviews, results and feedback in one time bucket of a range
  */
 export type PracticeReviewBucket = {
     /**
@@ -3983,9 +4262,9 @@ export type PracticeReviewBucket = {
      */
     feedback: number;
     /**
-     * Observations recorded in the bucket within the range
+     * Results recorded in the bucket within the range
      */
-    observations: number;
+    practiceResults: number;
     /**
      * Practice reviews created in the bucket within the range, in any status
      */
@@ -4001,22 +4280,22 @@ export type PracticeReviewBucket = {
  */
 export type PracticeReviewCounts = {
     /**
-     * Feedback created in the range that is bound to an observation of this practice, whenever that observation was recorded; one piece of feedback bound to several practices counts for each
+     * Feedback created in the range that is bound to a result of this practice, whenever that result was recorded; one piece of feedback bound to several practices counts for each
      */
     feedback: ReviewFeedbackCounts;
     /**
      * Practice group; null when the practice is Unassigned
      */
     group?: ReviewPracticeGroup;
-    /**
-     * Observations of this practice recorded in the range
-     */
-    observations: ReviewObservationCounts;
-    /**
-     * Of those observations, the ones an admin has marked incorrect and not restored
-     */
-    observationsInvalidated: number;
     practiceName: string;
+    /**
+     * Results of this practice recorded in the range
+     */
+    practiceResults: ReviewResultCounts;
+    /**
+     * Of those results, the ones an admin has marked incorrect and not restored
+     */
+    practiceResultsInvalidated: number;
     practiceSlug: string;
 };
 
@@ -4063,7 +4342,81 @@ export type PracticeReviewCoverageSummary = {
 };
 
 /**
- * Practice reviews, observations and feedback in a time range, in total, over time and by practice
+ * One observation of a not met result, as the admin list names it
+ */
+export type PracticeReviewObservationRow = {
+    /**
+     * The review that recorded the result
+     */
+    agentJobId: string;
+    /**
+     * Whether a result's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's results are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier result standards and missing fingerprints are unverifiable under the current whole-practice standard
+     */
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    /**
+     * When the developer last disputed feedback written from this result; null while nothing about it is disputed
+     */
+    disputedAt?: Date;
+    /**
+     * The last line the first citation quotes; null when it gives none or when evidenceHidden is true
+     */
+    endLine?: number;
+    /**
+     * true when the result's detail hides its evidence, so the summary and the place are left out
+     */
+    evidenceHidden: boolean;
+    /**
+     * Practice group; null when the practice is Unassigned
+     */
+    group?: ReviewPracticeGroup;
+    /**
+     * Observation ID
+     */
+    id: string;
+    /**
+     * When a workspace admin invalidated this result; null while it stands
+     */
+    invalidatedAt?: Date;
+    /**
+     * When the result was recorded
+     */
+    observedAt: Date;
+    /**
+     * The path of the observation's first citation; null when it names none or when evidenceHidden is true
+     */
+    path?: string;
+    practiceName: string;
+    practiceResultId: string;
+    practiceSlug: string;
+    reviewedWork: ReviewedWorkRef;
+    /**
+     * How much this observation weighs at its place alone
+     */
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * The first citation's diff side; null when absent or when evidenceHidden is true
+     */
+    side?: 'OLD' | 'NEW';
+    /**
+     * The first citation's source kind; null when absent or when evidenceHidden is true
+     */
+    sourceKind?: string;
+    /**
+     * The first line the first citation quotes; null when it gives none or when evidenceHidden is true
+     */
+    startLine?: number;
+    /**
+     * Whose work the result is about; null when the identity is no longer resolvable
+     */
+    subject?: ReviewSubject;
+    /**
+     * One line; null only when evidenceHidden is true
+     */
+    summary?: string;
+};
+
+/**
+ * Practice reviews, results and feedback in a time range, in total, over time and by practice
  */
 export type PracticeReviewOverview = {
     /**
@@ -4083,15 +4436,15 @@ export type PracticeReviewOverview = {
      */
     from: Date;
     /**
-     * Observations recorded in the range
+     * Results recorded in the range
      */
-    observations: ReviewObservationCounts;
+    practiceResults: ReviewResultCounts;
     /**
-     * Of those observations, the ones an admin has marked incorrect and not restored
+     * Of those results, the ones an admin has marked incorrect and not restored
      */
-    observationsInvalidated: number;
+    practiceResultsInvalidated: number;
     /**
-     * Each practice with an observation recorded in the range or feedback created in the range on one of its observations, the most observed first, then by name
+     * Each practice with a result recorded in the range or feedback created in the range on one of its results, the most observed first, then by name
      */
     practices: Array<PracticeReviewCounts>;
     /**
@@ -4319,17 +4672,110 @@ export type PracticeRevision = {
     /**
      * The parts of the definition that differ from the version before; empty for the first version and for a version recorded again without a change
      */
-    changed: Array<'NAME' | 'SIGNALS' | 'EVIDENCE_REQUIREMENTS' | 'REVIEW_WHEN' | 'SUBJECT' | 'PRECONDITION' | 'CRITERIA' | 'PRECOMPUTE_SCRIPT' | 'AUTOMATED_REVIEW_POLICY' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'GROUP_SLUG' | 'DELIVERY_BEHAVIOR' | 'VISUAL' | 'GUIDE'>;
+    changed: Array<'NAME' | 'SIGNALS' | 'EVIDENCE_REQUIREMENTS' | 'REVIEW_WHEN' | 'SUBJECT' | 'PRECONDITION' | 'CRITERIA' | 'PRACTICE_SCRIPT' | 'AUTOMATED_REVIEW_POLICY' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'GROUP_SLUG' | 'DELIVERY_BEHAVIOR' | 'VISUAL' | 'GUIDE'>;
     createdAt: Date;
     id: number;
     /**
-     * Whether what a review checks changed, so observations made before it no longer reflect the practice. A change to the wording around it, or to when it runs, does not count.
+     * Whether what a review checks changed, so results recorded before it no longer reflect the practice. A change to the wording around it, or to when it runs, does not count.
      */
     reviewRulesChanged: boolean;
     /**
      * 1 for the first version, counting up
      */
     revisionNumber: number;
+};
+
+/**
+ * The review whose practice script run reported a practice's needs
+ */
+export type PracticeScriptAsOf = {
+    finishedAt: Date;
+    jobId: string;
+};
+
+/**
+ * One model a practice script declared, and what became of its calls in one review
+ */
+export type PracticeScriptModelUse = {
+    /**
+     * Whether the review had a model bound for this purpose
+     */
+    bound: boolean;
+    need: 'REQUIRED' | 'OPTIONAL';
+    /**
+     * Calls to this model that were not rated, by reason. Empty when every call was rated.
+     */
+    notRated: Array<PracticeScriptNotRated>;
+    /**
+     * The purpose whose binding serves this model
+     */
+    purpose: 'PRACTICE_REVIEW' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING';
+};
+
+/**
+ * One model a practice's script needs, and for which members no model is ready
+ */
+export type PracticeScriptNeed = {
+    need: 'REQUIRED' | 'OPTIONAL';
+    /**
+     * The purpose whose binding serves this model
+     */
+    purpose: 'PRACTICE_REVIEW' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING';
+    /**
+     * The member tiers that no ready binding of this purpose serves today. UNDECLARED appears only when members may leave their AI choice open.
+     */
+    unmetTiers: Array<'IN_HOUSE' | 'CLOUD' | 'UNDECLARED'>;
+};
+
+/**
+ * Model calls that were not rated, for one reason
+ */
+export type PracticeScriptNotRated = {
+    count: number;
+    reason: 'UNAVAILABLE' | 'BUDGET' | 'DEADLINE' | 'TOO_LARGE' | 'OFF_FORMAT' | 'REFUSED' | 'ERROR';
+};
+
+/**
+ * What one practice's program did in one review
+ */
+export type PracticeScriptRun = {
+    /**
+     * The direct models the program declared and what became of their calls. Empty for the built-in program, for a script that declares none, and for one that ended before it declared them.
+     */
+    models: Array<PracticeScriptModelUse>;
+    /**
+     * How the program reached its result, from the calls it made. Absent when the program did not run, or the runner did not report its calls.
+     */
+    path?: 'CODE' | 'MODELS' | 'REVIEW' | 'MIXED';
+    /**
+     * The built-in review, or the practice's own script
+     */
+    programKind: 'BUILTIN' | 'CUSTOM';
+    status: 'OK' | 'SKIPPED' | 'FAILED' | 'NOT_REACHED' | 'NOT_FINISHED';
+    /**
+     * Why the program stopped without a result. Absent when it returned one.
+     */
+    stopReason?: 'UNAVAILABLE' | 'BUDGET' | 'DEADLINE' | 'TOO_LARGE' | 'OFF_FORMAT' | 'REFUSED' | 'ERROR' | 'CANCELLED' | 'INVALID_PROGRAM' | 'INVALID_CANDIDATE';
+};
+
+/**
+ * What one practice's script needs, as its newest review reported it
+ */
+export type PracticeScriptSummary = {
+    /**
+     * The review that reported the needs; null when no review ran the current script yet
+     */
+    asOf?: PracticeScriptAsOf;
+    /**
+     * The models the script declared; empty when it declares none or asOf is null
+     */
+    needs: Array<PracticeScriptNeed>;
+    practiceName: string;
+    practiceSlug: string;
+    /**
+     * True when the newest review ran an earlier version of the script, so its needs are not shown
+     */
+    scriptChanged: boolean;
 };
 
 /**
@@ -4390,11 +4836,11 @@ export type PracticeStanding = {
     /**
      * What the developer already does well here
      */
-    strengths: Array<PracticeStandingObservation>;
+    strengths: Array<PracticeStandingResult>;
     /**
      * Specific feedback to act on (highest-impact first)
      */
-    toWorkOn: Array<PracticeStandingObservation>;
+    toWorkOn: Array<PracticeStandingResult>;
     /**
      * Evidence support and provenance for the direction
      */
@@ -4412,9 +4858,9 @@ export type PracticeStanding = {
 /**
  * A single piece of practice feedback to read and act on
  */
-export type PracticeStandingObservation = {
+export type PracticeStandingResult = {
     /**
-     * What to do — the text of the newest feedback that said something about this observation to this developer (null if nothing was said)
+     * What to do — the text of the newest feedback that said something about this result to this developer (null if nothing was said)
      */
     deliveredFeedback?: string;
     /**
@@ -4422,17 +4868,17 @@ export type PracticeStandingObservation = {
      */
     locator?: string;
     /**
-     * Observation id — handle to open the full detail
-     */
-    observationId: string;
-    /**
-     * Why this observation was recorded. BACKFILL means it came from a review of past work rather than from something that just happened, and nothing was posted anywhere at the time.
+     * Why this result was recorded. BACKFILL means it came from a review of past work rather than from something that just happened, and nothing was posted anywhere at the time.
      */
     origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
     /**
      * MET or NOT_MET result supporting this standing
      */
     outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
+    /**
+     * Result id — handle to open the full detail
+     */
+    practiceResultId: string;
     /**
      * Identifier of the reviewed work
      */
@@ -4480,10 +4926,6 @@ export type PracticeTraceEntry = {
      */
     groupSlug?: string;
     /**
-     * Measurements this practice produced on this artifact
-     */
-    observationCount: number;
-    /**
      * The signal of the occurrence this answer is about, with its display name; null when nothing it watches happened
      */
     occasionedBy?: PracticeSignal;
@@ -4493,6 +4935,14 @@ export type PracticeTraceEntry = {
     occasionedById?: string;
     outcome: 'REVIEWED' | 'RUNNING' | 'PENDING' | 'SKIPPED' | 'NOT_REACHED' | 'NOT_ASSESSABLE' | 'TURNED_OFF' | 'NOT_OCCASIONED' | 'DORMANT' | 'LAPSED' | 'FAILED';
     practiceName: string;
+    /**
+     * Measurements this practice produced on this artifact
+     */
+    practiceResultCount: number;
+    /**
+     * What this practice's script did in the named review; null when the practice has no script there or the review reported nothing about it
+     */
+    practiceScript?: PracticeScriptRun;
     practiceSlug: string;
     /**
      * The review this answer came from, when one ran
@@ -4503,7 +4953,7 @@ export type PracticeTraceEntry = {
      */
     watches: Array<PracticeSignal>;
     /**
-     * Why prepared feedback was withheld. Non-empty with observations present means we measured and deliberately said nothing.
+     * Why prepared feedback was withheld. Non-empty with results present means we measured and deliberately said nothing.
      */
     withheldReasons: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED'>;
 };
@@ -4618,7 +5068,7 @@ export type ProbeLlmConnectionRequest = {
     /**
      * Wire protocol
      */
-    apiProtocol: string;
+    apiProtocol: 'openai-completions' | 'openai-responses' | 'openai-decisions' | 'openai-embeddings' | 'cohere-rerank';
     /**
      * Credential shape (default BEARER)
      */
@@ -4645,7 +5095,7 @@ export type ProblemDetail = {
  */
 export type ProfileChange = {
     /**
-     * When it changed: the observation, the run that composed the feedback, or the response that did it
+     * When it changed: the result, the run that composed the feedback, or the response that did it
      */
     at: Date;
     /**
@@ -4712,7 +5162,7 @@ export type ProfileReviewRun = {
     practicesEvaluated?: number;
     reviewId: string;
     /**
-     * When the review recorded its newest observation about this developer
+     * When the review recorded its newest result about this developer
      */
     reviewedAt: Date;
     /**
@@ -4738,9 +5188,9 @@ export type ProfileReviewRun = {
  */
 export type ProfileReviewRunDetail = {
     /**
-     * Every visible observation the run made about this developer
+     * Every visible result the run made about this developer
      */
-    observations: Array<ObservationDetail>;
+    practiceResults: Array<PracticeResultDetail>;
     run: ProfileReviewRun;
 };
 
@@ -5184,7 +5634,7 @@ export type ReviewBackfillRun = {
 };
 
 /**
- * Feedback composed from an observation
+ * Feedback composed from a result
  */
 export type ReviewBoundFeedback = {
     agentJobId: string;
@@ -5197,7 +5647,7 @@ export type ReviewBoundFeedback = {
     deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED';
     feedbackId: string;
     /**
-     * Whether the observation led the feedback or reinforced it
+     * Whether the result led the feedback or reinforced it
      */
     role: 'PRIMARY' | 'SUPPORTING';
     /**
@@ -5207,18 +5657,17 @@ export type ReviewBoundFeedback = {
 };
 
 /**
- * An observation that contributed to a piece of feedback
+ * A result that contributed to a piece of feedback
  */
-export type ReviewBoundObservation = {
+export type ReviewBoundResult = {
     /**
-     * Whether an observation's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's observations are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier observation standards and missing fingerprints are unverifiable under the current whole-practice standard
+     * Whether a result's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's results are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier result standards and missing fingerprints are unverifiable under the current whole-practice standard
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
      * Practice group; null when the practice is Unassigned
      */
     group?: ReviewPracticeGroup;
-    observationId: string;
     observedAt: Date;
     /**
      * Render order within the feedback (lower renders earlier)
@@ -5229,9 +5678,10 @@ export type ReviewBoundObservation = {
      */
     outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
     practiceName: string;
+    practiceResultId: string;
     practiceSlug: string;
     /**
-     * Whether the observation leads the feedback or reinforces it
+     * Whether the result leads the feedback or reinforces it
      */
     role: 'PRIMARY' | 'SUPPORTING';
     /**
@@ -5246,7 +5696,7 @@ export type ReviewBoundObservation = {
  */
 export type ReviewContext = {
     /**
-     * Whether the caller may read the review details behind this work — the runs, observations and the delivery of each piece of feedback — which is a workspace admin's view
+     * Whether the caller may read the review details behind this work — the runs, results and the delivery of each piece of feedback — which is a workspace admin's view
      */
     canInspectReviewDetails: boolean;
     /**
@@ -5254,7 +5704,7 @@ export type ReviewContext = {
      */
     canRequestReview: boolean;
     /**
-     * The work as this workspace mirrored it; its id and kind address the trace, observations and feedback about it
+     * The work as this workspace mirrored it; its id and kind address the trace, results and feedback about it
      */
     work: ReviewedWorkRef;
 };
@@ -5279,9 +5729,9 @@ export type ReviewFeedback = {
      */
     location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
     /**
-     * Number of observations used to compose the feedback
+     * Number of results used to compose the feedback
      */
-    observationCount: number;
+    practiceResultCount: number;
     /**
      * Who the feedback is addressed to; null when the identity is no longer resolvable
      */
@@ -5388,13 +5838,13 @@ export type ReviewFeedbackDetail = {
      */
     location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
     /**
-     * Source observations in render order
-     */
-    observations: Array<ReviewBoundObservation>;
-    /**
      * Recorded placements; empty when none
      */
     placements: Array<ReviewPlacement>;
+    /**
+     * Source results in render order
+     */
+    practiceResults: Array<ReviewBoundResult>;
     /**
      * Exact ordered summary and inline messages covered by the approval decision
      */
@@ -5500,7 +5950,7 @@ export type ReviewFeedbackReasonCount = {
 };
 
 /**
- * How one record came about: the reviewed work, the review, its observations, the feedback written from them, where that feedback went and how the developer answered. Bounded: each list is capped and the count beside it says how many more there are
+ * How one record came about: the reviewed work, the review, its results, the feedback written from them, where that feedback went and how the developer answered. Bounded: each list is capped and the count beside it says how many more there are
  */
 export type ReviewLineage = {
     /**
@@ -5512,15 +5962,15 @@ export type ReviewLineage = {
      */
     moreFeedback: number;
     /**
-     * Observations of the review, or behind the listed feedback, that the list leaves out
+     * Results of the review, or behind the listed feedback, that the list leaves out
      */
-    moreObservations: number;
+    moreResults: number;
     /**
-     * The observations in the chain, the ones the request names first
+     * The results in the chain, the ones the request names first
      */
-    observations: Array<ReviewLineageObservation>;
+    results: Array<ReviewLineageResult>;
     /**
-     * The review that recorded the observations; null when its record is gone
+     * The review that recorded the results; null when its record is gone
      */
     review?: ReviewLineageRun;
     /**
@@ -5565,7 +6015,7 @@ export type ReviewLineageFeedback = {
     deliveredAt?: Date;
     deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED';
     /**
-     * Whether the request names this feedback, or the observation it names led to it
+     * Whether the request names this feedback, or the result it names led to it
      */
     focus: boolean;
     id: string;
@@ -5574,13 +6024,13 @@ export type ReviewLineageFeedback = {
      */
     location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
     /**
-     * Every observation it was written from, in render order
-     */
-    observationIds: Array<string>;
-    /**
      * How many comments, notes or conversation turns placed it
      */
     placementCount: number;
+    /**
+     * Every result it was written from, in render order
+     */
+    practiceResultIds: Array<string>;
     /**
      * When the newer feedback that replaced it was written; null while nothing did
      */
@@ -5630,9 +6080,31 @@ export type ReviewLineageMoment = {
 };
 
 /**
- * An observation in a lineage
+ * Whether the developer answered a piece of feedback, whether that answer disputes it, and whether their later work resolved it. Their rating, any other resolution and their private notes are never part of it. At least one of respondedAt and resolvedByWorkAt is set
  */
-export type ReviewLineageObservation = {
+export type ReviewLineageResponse = {
+    /**
+     * Why the developer disputes it, in their words to the workspace's admins; null unless disputed
+     */
+    disputeExplanation?: string;
+    /**
+     * Whether the answer that stands now disputes the feedback
+     */
+    disputed: boolean;
+    /**
+     * When their later work resolved it: three clean pieces of work in a row on the practice. Only feedback on their practice pages resolves this way; null while it has not
+     */
+    resolvedByWorkAt?: Date;
+    /**
+     * When the developer's answer that stands now was given; null when only the work answered
+     */
+    respondedAt?: Date;
+};
+
+/**
+ * A result in a lineage
+ */
+export type ReviewLineageResult = {
     /**
      * The review that recorded it
      */
@@ -5642,7 +6114,7 @@ export type ReviewLineageObservation = {
      */
     feedbackCount: number;
     /**
-     * Whether the request names this observation, or the feedback it names was written from it
+     * Whether the request names this result, or the feedback it names was written from it
      */
     focus: boolean;
     id: string;
@@ -5663,32 +6135,14 @@ export type ReviewLineageObservation = {
     practiceName: string;
     practiceSlug: string;
     /**
+     * How many problems the result records; 0 unless outcome is NOT_MET
+     */
+    problemCount: number;
+    /**
      * Severity band (null unless outcome is NOT_MET)
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     summary: string;
-};
-
-/**
- * Whether the developer answered a piece of feedback, whether that answer disputes it, and whether their later work resolved it. Their rating, any other resolution and their private notes are never part of it. At least one of respondedAt and resolvedByWorkAt is set
- */
-export type ReviewLineageResponse = {
-    /**
-     * Why the developer disputes it, in their words to the workspace's admins; null unless disputed
-     */
-    disputeExplanation?: string;
-    /**
-     * Whether the answer that stands now disputes the feedback
-     */
-    disputed: boolean;
-    /**
-     * When their later work resolved it: three clean pieces of work in a row on the practice. Only feedback on their practice pages resolves this way; null while it has not
-     */
-    resolvedByWorkAt?: Date;
-    /**
-     * When the developer's answer that stands now was given; null when only the work answered
-     */
-    respondedAt?: Date;
 };
 
 /**
@@ -5725,138 +6179,6 @@ export type ReviewLineageRun = {
      */
     startedAt?: Date;
     status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-};
-
-/**
- * A practice review observation with its linked feedback outcomes
- */
-export type ReviewObservation = {
-    agentJobId: string;
-    /**
-     * Whether an observation's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's observations are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier observation standards and missing fingerprints are unverifiable under the current whole-practice standard
-     */
-    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    /**
-     * When the developer last disputed feedback written from this observation; null while nothing about it is disputed
-     */
-    disputedAt?: Date;
-    /**
-     * Counts of linked feedback by delivery state
-     */
-    feedback: ReviewFeedbackCounts;
-    /**
-     * Practice group; null when the practice is Unassigned
-     */
-    group?: ReviewPracticeGroup;
-    id: string;
-    /**
-     * When a workspace admin invalidated this observation; null while it stands
-     */
-    invalidatedAt?: Date;
-    observedAt: Date;
-    /**
-     * What occasioned the measurement. BACKFILL came from a confirmed campaign over work that already existed, so it is not a point on the live trend line.
-     */
-    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
-    /**
-     * Result of the practice review
-     */
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
-    practiceName: string;
-    practiceSlug: string;
-    /**
-     * Cross-run locus key; null when continuity is unavailable
-     */
-    recurrenceKey?: string;
-    reviewedWork: ReviewedWorkRef;
-    /**
-     * Severity band (null unless outcome is NOT_MET)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Whose work the observation is about; null when the identity is no longer resolvable
-     */
-    subject?: ReviewSubject;
-    summary: string;
-};
-
-/**
- * Counts of observations by assessment
- */
-export type ReviewObservationCounts = {
-    met: number;
-    /**
-     * Practices whose subject did not occur in this work
-     */
-    notApplicable: number;
-    notMet: number;
-    /**
-     * Practices that looked at the evidence and could not settle the question either way; reported apart from notApplicable because one says there was nothing here to judge and the other says we could not tell
-     */
-    undetermined: number;
-};
-
-/**
- * An observation with evidence and linked feedback
- */
-export type ReviewObservationDetail = {
-    agentJobId: string;
-    /**
-     * Whether an observation's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's observations are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier observation standards and missing fingerprints are unverifiable under the current whole-practice standard
-     */
-    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    /**
-     * The developer's standing disputes of feedback written from this observation, newest first; empty when nothing about it is disputed
-     */
-    disputes: Array<FeedbackDispute>;
-    evidence?: ObservationEvidence;
-    evidenceRationale?: string;
-    /**
-     * Linked feedback, newest first
-     */
-    feedback: Array<ReviewBoundFeedback>;
-    /**
-     * Practice group; null when the practice is Unassigned
-     */
-    group?: ReviewPracticeGroup;
-    id: string;
-    /**
-     * Every correction by a workspace admin, newest first; the first is in force while it has no restoration
-     */
-    invalidations: Array<ObservationInvalidation>;
-    observedAt: Date;
-    /**
-     * How the review that recorded it came about: LIVE from the work itself, MANUAL requested by a person, BACKFILL over work that predates the connection. A recurring sweep records LIVE.
-     */
-    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
-    /**
-     * Result of the practice review
-     */
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
-    practiceName: string;
-    /**
-     * Criteria revision selected as of job start, when available
-     */
-    practiceRevisionId?: number;
-    practiceSlug: string;
-    /**
-     * Cross-run locus key; null when continuity is unavailable
-     */
-    recurrenceKey?: string;
-    reviewedWork: ReviewedWorkRef;
-    /**
-     * Severity band (null unless outcome is NOT_MET)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Whose work the observation is about; null when the identity is no longer resolvable
-     */
-    subject?: ReviewSubject;
-    summary: string;
-    /**
-     * When a later review of the same work superseded this observation; null while current
-     */
-    supersededAt?: Date;
 };
 
 /**
@@ -5913,7 +6235,7 @@ export type ReviewPracticeGroup = {
 };
 
 /**
- * What one run decided about each practice it observed against the practice's whole positive standard, one count per practice however many observations it recorded; an invalidated observation decides nothing, and a met or not-met outcome recorded under an earlier or missing assessment scheme counts as undetermined. The practice profile counts only what the run observed about the calling developer
+ * What one run decided about each practice it observed against the practice's whole positive standard, one count per practice however many results it recorded; an invalidated result decides nothing, and a met or not-met outcome recorded under an earlier or missing assessment scheme counts as undetermined. The practice profile counts only what the run observed about the calling developer
  */
 export type ReviewPracticeOutcomes = {
     /**
@@ -5932,6 +6254,48 @@ export type ReviewPracticeOutcomes = {
      * Practices the run could not settle: no counted met or not-met outcome, and not only not-applicable outcomes
      */
     undetermined: number;
+};
+
+/**
+ * One model that a practice's script could call in one review, with the calls the proxy counted
+ */
+export type ReviewPracticeScriptModel = {
+    /**
+     * Calls that the proxy forwarded to this model
+     */
+    calls: number;
+    /**
+     * The purpose whose binding serves this model
+     */
+    purpose: 'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING';
+    /**
+     * Data handling tier of the slot that served the model in this review. Absent when the attempt froze no tier for the model of this purpose.
+     */
+    tier?: 'IN_HOUSE' | 'CLOUD' | 'UNDECLARED';
+};
+
+/**
+ * What one practice's script did in the latest attempt of one review that recorded practice script runs
+ */
+export type ReviewPracticeScripts = {
+    /**
+     * How long the script ran, in milliseconds. Absent when the script did not run or did not finish, or the runner did not say.
+     */
+    durationMs?: number;
+    /**
+     * The first line of the script's error. Set only when the script failed.
+     */
+    error?: string;
+    /**
+     * The decision, embedding and reranking models of the script, with the calls the proxy counted for each. Calls to the review's own model count toward the review.
+     */
+    models: Array<ReviewPracticeScriptModel>;
+    /**
+     * The practice's current name. Absent when the practice no longer exists.
+     */
+    practiceName?: string;
+    practiceSlug: string;
+    run: PracticeScriptRun;
 };
 
 /**
@@ -5988,6 +6352,154 @@ export type ReviewRequestOutcome = {
 };
 
 /**
+ * A practice review result with its linked feedback outcomes
+ */
+export type ReviewResult = {
+    agentJobId: string;
+    /**
+     * Whether a result's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's results are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier result standards and missing fingerprints are unverifiable under the current whole-practice standard
+     */
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    /**
+     * When the developer last disputed feedback written from this result; null while nothing about it is disputed
+     */
+    disputedAt?: Date;
+    /**
+     * Counts of linked feedback by delivery state
+     */
+    feedback: ReviewFeedbackCounts;
+    /**
+     * Practice group; null when the practice is Unassigned
+     */
+    group?: ReviewPracticeGroup;
+    id: string;
+    /**
+     * When a workspace admin invalidated this result; null while it stands
+     */
+    invalidatedAt?: Date;
+    observedAt: Date;
+    /**
+     * What occasioned the measurement. BACKFILL came from a confirmed campaign over work that already existed, so it is not a point on the live trend line.
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
+     * Result of the practice review
+     */
+    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
+    practiceName: string;
+    practiceSlug: string;
+    /**
+     * The located problems of the result; 0 for every outcome but NOT_MET
+     */
+    problemCount: number;
+    reviewedWork: ReviewedWorkRef;
+    /**
+     * Severity band (null unless outcome is NOT_MET)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Whose work the result is about; null when the identity is no longer resolvable
+     */
+    subject?: ReviewSubject;
+    summary: string;
+};
+
+/**
+ * Counts of results by assessment
+ */
+export type ReviewResultCounts = {
+    met: number;
+    /**
+     * Practices whose subject did not occur in this work
+     */
+    notApplicable: number;
+    notMet: number;
+    /**
+     * Practices that looked at the evidence and could not settle the question either way; reported apart from notApplicable because one says there was nothing here to judge and the other says we could not tell
+     */
+    undetermined: number;
+};
+
+/**
+ * A result with evidence and linked feedback
+ */
+export type ReviewResultDetail = {
+    agentJobId: string;
+    /**
+     * Whether a result's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's results are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier result standards and missing fingerprints are unverifiable under the current whole-practice standard
+     */
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    /**
+     * How much of its scope the review read; null for a result recorded before coverage
+     */
+    coverage?: PracticeResultCoverage;
+    /**
+     * The developer's standing disputes of feedback written from this result, newest first; empty when nothing about it is disputed
+     */
+    disputes: Array<FeedbackDispute>;
+    evidence?: PracticeResultEvidence;
+    /**
+     * Whether access to the result's evidence is withheld
+     */
+    evidenceHidden: boolean;
+    evidenceRationale?: string;
+    /**
+     * One place of the work that shows the practice done well; null when none
+     */
+    example?: PracticeResultExample;
+    /**
+     * Linked feedback, newest first
+     */
+    feedback: Array<ReviewBoundFeedback>;
+    /**
+     * Practice group; null when the practice is Unassigned
+     */
+    group?: ReviewPracticeGroup;
+    id: string;
+    /**
+     * Every correction by a workspace admin, newest first; the first is in force while it has no restoration
+     */
+    invalidations: Array<PracticeResultInvalidation>;
+    /**
+     * The located problems of a NOT_MET result, in display order; empty for any other outcome
+     */
+    observations: Array<Observation>;
+    observedAt: Date;
+    /**
+     * How the review that recorded it came about: LIVE from the work itself, MANUAL requested by a person, BACKFILL over work that predates the connection. A recurring sweep records LIVE.
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
+     * Result of the practice review
+     */
+    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
+    practiceName: string;
+    /**
+     * Criteria revision selected as of job start, when available
+     */
+    practiceRevisionId?: number;
+    practiceSlug: string;
+    /**
+     * Where the result came from: job, attempt, revision and program; null before it was kept
+     */
+    provenance?: PracticeResultProvenance;
+    reviewedWork: ReviewedWorkRef;
+    /**
+     * Severity band (null unless outcome is NOT_MET)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Whose work the result is about; null when the identity is no longer resolvable
+     */
+    subject?: ReviewSubject;
+    summary: string;
+    /**
+     * When a later review of the same work superseded this result; null while current
+     */
+    supersededAt?: Date;
+};
+
+/**
  * Counts of practice reviews by status
  */
 export type ReviewRunCounts = {
@@ -6004,7 +6516,7 @@ export type ReviewRunCounts = {
  */
 export type ReviewRunRef = {
     /**
-     * When the review recorded its newest observation about this developer
+     * When the review recorded its newest result about this developer
      */
     at: Date;
     reviewId: string;
@@ -6019,12 +6531,12 @@ export type ReviewRunRef = {
 };
 
 /**
- * A review run with observation and feedback outcome counts
+ * A review run with result and feedback outcome counts
  */
 export type ReviewRunSummary = {
     createdAt: Date;
     /**
-     * The developers the run is about: everyone it recorded an observation about, or, before it recorded any, the person its work names; empty when neither is known
+     * The developers the run is about: everyone it recorded a result about, or, before it recorded any, the person its work names; empty when neither is known
      */
     developers: Array<ReviewSubject>;
     feedback: ReviewFeedbackCounts;
@@ -6041,7 +6553,6 @@ export type ReviewRunSummary = {
      */
     holdReason?: string;
     id: string;
-    observations: ReviewObservationCounts;
     /**
      * What occasioned the run: LIVE as the work arrived, MANUAL when somebody asked for it, BACKFILL while catching up on work that predates the connection; absent when the run records an origin this release does not know
      */
@@ -6050,6 +6561,7 @@ export type ReviewRunSummary = {
      * The run's place among the practice reviews of its work, counted from 1 for the oldest; absent when the run names no work
      */
     positionOnWork?: number;
+    practiceResults: ReviewResultCounts;
     practices: ReviewPracticeOutcomes;
     /**
      * How many practices the run measured; absent when it wrote no coverage ledger
@@ -6134,7 +6646,7 @@ export type ReviewSweepSchedule = {
     lastRunAt?: Date;
     /**
      * how far back each sweep looks. Bounded at write time to twice the cadence and
-     * never more than a week, which is what keeps a sweep's observations admissible in the same trend line
+     * never more than a week, which is what keeps a sweep's results admissible in the same trend line
      * as reviews that events triggered.
      */
     lookbackDays: number;
@@ -7154,20 +7666,6 @@ export type UpdateNotificationPreferences = {
 };
 
 /**
- * Invalidate an observation that was wrong when recorded, or restore it
- */
-export type UpdateObservationValidityRequest = {
-    /**
-     * Why, kept with the correction; an invalidation reason is shown to the developer
-     */
-    reason: string;
-    /**
-     * false invalidates the observation; true restores it
-     */
-    valid: boolean;
-};
-
-/**
  * Transition a mirrored Outline collection to a target mirror state (pause / resume)
  */
 export type UpdateOutlineCollectionStateRequest = {
@@ -7228,7 +7726,7 @@ export type UpdatePracticeRequest = {
     /**
      * Optional fields to clear before applying supplied values
      */
-    clear?: Array<'PRECONDITION' | 'PRECOMPUTE_SCRIPT' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'VISUAL' | 'GUIDE'>;
+    clear?: Array<'PRECONDITION' | 'PRACTICE_SCRIPT' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'VISUAL' | 'GUIDE'>;
     /**
      * Practice review criteria
      */
@@ -7252,9 +7750,9 @@ export type UpdatePracticeRequest = {
      */
     name?: string;
     /**
-     * TypeScript/Node static analysis run before automated review
+     * TypeScript review program for this practice that returns one result
      */
-    precomputeScript?: string;
+    practiceScript?: string;
     precondition?: PracticePrecondition;
     /**
      * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
@@ -7276,6 +7774,20 @@ export type UpdatePracticeRequest = {
      * Plain-language rationale shown to the developer
      */
     whyItMatters?: string;
+};
+
+/**
+ * Invalidate a result that was wrong when recorded, or restore it
+ */
+export type UpdatePracticeResultValidityRequest = {
+    /**
+     * Why, kept with the correction; an invalidation reason is shown to the developer
+     */
+    reason: string;
+    /**
+     * false invalidates the result; true restores it
+     */
+    valid: boolean;
 };
 
 /**
@@ -7878,7 +8390,7 @@ export type WorkspaceLlmConnection = {
     /**
      * Wire protocol
      */
-    apiProtocol: string;
+    apiProtocol: 'openai-completions' | 'openai-responses' | 'openai-decisions' | 'openai-embeddings' | 'cohere-rerank';
     /**
      * Credential shape
      */
@@ -7911,6 +8423,10 @@ export type WorkspaceLlmConnection = {
      * Connection ID
      */
     id: number;
+    /**
+     * The purposes a model on this connection can serve, from its protocol
+     */
+    purposes: Array<'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING'>;
     /**
      * Unique slug within the workspace
      */
@@ -8035,6 +8551,10 @@ export type WorkspaceLlmProbeResult = {
      * Whether the provider answered
      */
     reachable: boolean;
+    /**
+     * HTTP status returned by the provider, if any
+     */
+    statusCode?: number;
 };
 
 /**
@@ -8053,6 +8573,10 @@ export type WorkspaceLlmSettings = {
 export type WorkspaceLlmUsageReport = {
     byDay: Array<LlmUsageByDay>;
     byJobType: Array<LlmUsageByJobType>;
+    /**
+     * The decision, embedding and reranking calls of practice scripts, one entry per practice, most spend first. Their spend is already part of byJobType. Chat calls of practice scripts are in each review's own cost and not here.
+     */
+    byPractice: Array<LlmUsageByPractice>;
     /**
      * Display-only conversion when the instance has a display currency. Absent = show USD only.
      */
@@ -8082,6 +8606,10 @@ export type WorkspaceLlmUsageReport = {
      */
     ownProviderBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
     /**
+     * Whether this month has an own-provider purse to show. True when the month has at least one own-provider call, priced or not, so a month of confirmed $0.00 calls counts. For the current month, also true when the workspace has an enabled own-provider model on an enabled connection, so its admins can set a provider cap before the first call. The spend and cap fields cannot answer this.
+     */
+    ownProviderInUse: boolean;
+    /**
      * Monthly cap in USD on spend this workspace pays for through its own connected provider; null = uncapped. Set by this workspace's own admins.
      */
     ownProviderMonthlyBudgetUsd?: number;
@@ -8094,7 +8622,11 @@ export type WorkspaceLlmUsageReport = {
      */
     ownProviderTotalCostUsd: number;
     /**
-     * Calls this month (either purse) whose price is not yet known. They are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
+     * The byPractice entries in total, read from the ledger.
+     */
+    practiceScriptTotal: LlmUsagePracticeScriptTotal;
+    /**
+     * Runs this month (job attempts and mentor turns, either purse) with at least one ledger row whose price is not yet known, each counted once. A practice script row counts toward the run of its review. Those rows are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
      */
     unpricedEventCount: number;
 };
@@ -11552,6 +12084,35 @@ export type RetryAgentJobDeliveryResponses = {
 
 export type RetryAgentJobDeliveryResponse = RetryAgentJobDeliveryResponses[keyof RetryAgentJobDeliveryResponses];
 
+export type GetAgentJobPracticeScriptsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        jobId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/practice-scripts';
+};
+
+export type GetAgentJobPracticeScriptsErrors = {
+    /**
+     * Job not found in this workspace
+     */
+    404: unknown;
+};
+
+export type GetAgentJobPracticeScriptsResponses = {
+    /**
+     * One entry per staged script; empty when no script ran or the attempt has not ended
+     */
+    200: Array<ReviewPracticeScripts>;
+};
+
+export type GetAgentJobPracticeScriptsResponse = GetAgentJobPracticeScriptsResponses[keyof GetAgentJobPracticeScriptsResponses];
+
 export type GetAgentJobUsageData = {
     body?: never;
     path: {
@@ -11588,7 +12149,7 @@ export type DeleteAgentData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        purpose: 'PRACTICE_REVIEW' | 'MENTOR';
+        purpose: 'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING';
     };
     query?: {
         dataHandlingTier?: 'IN_HOUSE' | 'CLOUD' | 'UNDECLARED';
@@ -11612,7 +12173,7 @@ export type ConfigureAgentData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        purpose: 'PRACTICE_REVIEW' | 'MENTOR';
+        purpose: 'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING';
     };
     query?: {
         dataHandlingTier?: 'IN_HOUSE' | 'CLOUD' | 'UNDECLARED';
@@ -13547,7 +14108,7 @@ export type ListPracticeProfileReviewRunsData = {
          */
         kind?: string;
         /**
-         * Keep only runs whose newest observation about this developer came after this moment; the bound is exclusive
+         * Keep only runs whose newest result about this developer came after this moment; the bound is exclusive
          */
         since?: Date;
     };
@@ -13989,77 +14550,7 @@ export type ReplaceFeedbackResponseResponses = {
 
 export type ReplaceFeedbackResponseResponse = ReplaceFeedbackResponseResponses[keyof ReplaceFeedbackResponseResponses];
 
-export type ListObservationsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: {
-        /**
-         * Filter by practice slug
-         */
-        practiceSlug?: string;
-        /**
-         * Filter by the practice group the observed practice belongs to
-         */
-        groupSlug?: string;
-        /**
-         * Filter by review outcome
-         */
-        outcome?: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
-        /**
-         * Only observations on these kinds of reviewed work, e.g. scm.pull_request (repeatable)
-         */
-        artifactKinds?: Array<string>;
-        /**
-         * Exact reviewed-work kind; requires artifactId, e.g. scm.pull_request or scm.issue
-         */
-        artifactKind?: string;
-        /**
-         * Exact reviewed-work ID; requires artifactKind
-         */
-        artifactId?: number;
-        /**
-         * Only observations with these severities (repeatable); omit for all
-         */
-        severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
-        /**
-         * Drop NOT_APPLICABLE rows — only observations where the practice actually applied
-         */
-        displayableOnly?: boolean;
-        /**
-         * Feed ordering: DATE (default) or SEVERITY (most severe first, ties newest-first)
-         */
-        sort?: 'DATE' | 'SEVERITY';
-        /**
-         * Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first
-         */
-        direction?: 'ASC' | 'DESC';
-        /**
-         * Zero-based page
-         */
-        page?: number;
-        /**
-         * Page size from 1 to 100
-         */
-        size?: number;
-    };
-    url: '/workspaces/{workspaceSlug}/practices/observations';
-};
-
-export type ListObservationsResponses = {
-    /**
-     * Paginated observations returned
-     */
-    200: PageResponseDtoObservationList;
-};
-
-export type ListObservationsResponse = ListObservationsResponses[keyof ListObservationsResponses];
-
-export type GetSummaryData = {
+export type ListPracticeScriptNeedsData = {
     body?: never;
     path: {
         /**
@@ -14068,46 +14559,17 @@ export type GetSummaryData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/observations/summary';
+    url: '/workspaces/{workspaceSlug}/practices/practice-script-needs';
 };
 
-export type GetSummaryResponses = {
+export type ListPracticeScriptNeedsResponses = {
     /**
-     * Practice summaries returned
+     * Practice script needs returned
      */
-    200: Array<DeveloperPracticeSummary>;
+    200: Array<PracticeScriptSummary>;
 };
 
-export type GetSummaryResponse = GetSummaryResponses[keyof GetSummaryResponses];
-
-export type GetObservationData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        observationId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/observations/{observationId}';
-};
-
-export type GetObservationErrors = {
-    /**
-     * Observation not found or not owned by current user
-     */
-    404: unknown;
-};
-
-export type GetObservationResponses = {
-    /**
-     * Observation detail returned
-     */
-    200: ObservationDetail;
-};
-
-export type GetObservationResponse = GetObservationResponses[keyof GetObservationResponses];
+export type ListPracticeScriptNeedsResponse = ListPracticeScriptNeedsResponses[keyof ListPracticeScriptNeedsResponses];
 
 export type ListPracticeReleasesData = {
     body?: never;
@@ -14231,6 +14693,126 @@ export type ReorderPracticesResponses = {
 };
 
 export type ReorderPracticesResponse = ReorderPracticesResponses[keyof ReorderPracticesResponses];
+
+export type ListResultsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Filter by practice slug
+         */
+        practiceSlug?: string;
+        /**
+         * Filter by the practice group the observed practice belongs to
+         */
+        groupSlug?: string;
+        /**
+         * Filter by review outcome
+         */
+        outcome?: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
+        /**
+         * Only results on these kinds of reviewed work, e.g. scm.pull_request (repeatable)
+         */
+        artifactKinds?: Array<string>;
+        /**
+         * Exact reviewed-work kind; requires artifactId, e.g. scm.pull_request or scm.issue
+         */
+        artifactKind?: string;
+        /**
+         * Exact reviewed-work ID; requires artifactKind
+         */
+        artifactId?: number;
+        /**
+         * Only results with these severities (repeatable); omit for all
+         */
+        severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
+        /**
+         * Drop NOT_APPLICABLE rows — only results where the practice actually applied
+         */
+        displayableOnly?: boolean;
+        /**
+         * Feed ordering: DATE (default) or SEVERITY (most severe first, ties newest-first)
+         */
+        sort?: 'DATE' | 'SEVERITY';
+        /**
+         * Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first
+         */
+        direction?: 'ASC' | 'DESC';
+        /**
+         * Zero-based page
+         */
+        page?: number;
+        /**
+         * Page size from 1 to 100
+         */
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/results';
+};
+
+export type ListResultsResponses = {
+    /**
+     * Paginated results returned
+     */
+    200: PageResponseDtoPracticeResultList;
+};
+
+export type ListResultsResponse = ListResultsResponses[keyof ListResultsResponses];
+
+export type GetSummaryData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/results/summary';
+};
+
+export type GetSummaryResponses = {
+    /**
+     * Practice summaries returned
+     */
+    200: Array<DeveloperPracticeSummary>;
+};
+
+export type GetSummaryResponse = GetSummaryResponses[keyof GetSummaryResponses];
+
+export type GetPracticeResultData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceResultId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/results/{practiceResultId}';
+};
+
+export type GetPracticeResultErrors = {
+    /**
+     * Result not found or not owned by current user
+     */
+    404: unknown;
+};
+
+export type GetPracticeResultResponses = {
+    /**
+     * Result detail returned
+     */
+    200: PracticeResultDetail;
+};
+
+export type GetPracticeResultResponse = GetPracticeResultResponses[keyof GetPracticeResultResponses];
 
 export type ResolveReviewContextData = {
     body?: never;
@@ -14472,15 +15054,15 @@ export type ListPracticeReviewsData = {
          */
         to?: Date;
         /**
-         * Keep the reviews that recorded an observation about this developer that is not marked incorrect
+         * Keep the reviews that recorded a result about this developer that is not marked incorrect
          */
         subjectUserId?: number;
         /**
-         * Keep the reviews that recorded an observation of any of these practices that is not marked incorrect (repeatable)
+         * Keep the reviews that recorded a result of any of these practices that is not marked incorrect (repeatable)
          */
         practiceSlug?: Array<string>;
         /**
-         * Keep the reviews that recorded an observation of a practice in any of these groups that is not marked incorrect (repeatable)
+         * Keep the reviews that recorded a result of a practice in any of these groups that is not marked incorrect (repeatable)
          */
         groupSlug?: Array<string>;
         /**
@@ -14574,9 +15156,9 @@ export type ListPracticeReviewFeedbackData = {
         location?: Array<'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES'>;
         agentJobId?: string;
         /**
-         * Keep the feedback written from this observation
+         * Keep the feedback written from this result
          */
-        observationId?: string;
+        practiceResultId?: string;
         /**
          * Kind of reviewed work, e.g. scm.pull_request
          */
@@ -14587,11 +15169,11 @@ export type ListPracticeReviewFeedbackData = {
         artifactId?: number;
         recipientUserId?: number;
         /**
-         * Practices whose feedback to list (repeatable): feedback bound to an observation of any of them, in any role
+         * Practices whose feedback to list (repeatable): feedback bound to a result of any of them, in any role
          */
         practiceSlug?: Array<string>;
         /**
-         * Practice groups whose feedback to list (repeatable): feedback bound to an observation of a practice in any of them
+         * Practice groups whose feedback to list (repeatable): feedback bound to a result of a practice in any of them
          */
         groupSlug?: Array<string>;
         /**
@@ -14642,9 +15224,9 @@ export type CountPracticeReviewFeedbackByLocationData = {
         location?: Array<'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES'>;
         agentJobId?: string;
         /**
-         * Keep the feedback written from this observation
+         * Keep the feedback written from this result
          */
-        observationId?: string;
+        practiceResultId?: string;
         /**
          * Kind of reviewed work, e.g. scm.pull_request
          */
@@ -14655,11 +15237,11 @@ export type CountPracticeReviewFeedbackByLocationData = {
         artifactId?: number;
         recipientUserId?: number;
         /**
-         * Practices whose feedback to list (repeatable): feedback bound to an observation of any of them, in any role
+         * Practices whose feedback to list (repeatable): feedback bound to a result of any of them, in any role
          */
         practiceSlug?: Array<string>;
         /**
-         * Practice groups whose feedback to list (repeatable): feedback bound to an observation of a practice in any of them
+         * Practice groups whose feedback to list (repeatable): feedback bound to a result of a practice in any of them
          */
         groupSlug?: Array<string>;
         /**
@@ -14714,9 +15296,9 @@ export type CountPracticeReviewFeedbackByReasonData = {
         location?: Array<'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES'>;
         agentJobId?: string;
         /**
-         * Keep the feedback written from this observation
+         * Keep the feedback written from this result
          */
-        observationId?: string;
+        practiceResultId?: string;
         /**
          * Kind of reviewed work, e.g. scm.pull_request
          */
@@ -14727,11 +15309,11 @@ export type CountPracticeReviewFeedbackByReasonData = {
         artifactId?: number;
         recipientUserId?: number;
         /**
-         * Practices whose feedback to list (repeatable): feedback bound to an observation of any of them, in any role
+         * Practices whose feedback to list (repeatable): feedback bound to a result of any of them, in any role
          */
         practiceSlug?: Array<string>;
         /**
-         * Practice groups whose feedback to list (repeatable): feedback bound to an observation of a practice in any of them
+         * Practice groups whose feedback to list (repeatable): feedback bound to a result of a practice in any of them
          */
         groupSlug?: Array<string>;
         /**
@@ -14887,9 +15469,9 @@ export type GetPracticeReviewLineageData = {
         workspaceSlug: string;
     };
     query: {
-        kind: 'OBSERVATION' | 'FEEDBACK' | 'REVIEW' | 'WORK';
+        kind: 'RESULT' | 'FEEDBACK' | 'REVIEW' | 'WORK';
         /**
-         * The observation, feedback or review id; required unless kind is WORK
+         * The result, feedback or review id; required unless kind is WORK
          */
         id?: string;
         /**
@@ -14901,7 +15483,7 @@ export type GetPracticeReviewLineageData = {
          */
         artifactId?: number;
         /**
-         * true lists the whole review around the record: every observation and piece of feedback of the review, up to 100 each, and the work's moments; false keeps the short chain
+         * true lists the whole review around the record: every result and piece of feedback of the review, up to 100 each, and the work's moments; false keeps the short chain
          */
         whole?: boolean;
     };
@@ -14933,146 +15515,6 @@ export type GetPracticeReviewLineageResponses = {
 };
 
 export type GetPracticeReviewLineageResponse = GetPracticeReviewLineageResponses[keyof GetPracticeReviewLineageResponses];
-
-export type ListPracticeReviewObservationsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: {
-        page?: number;
-        size?: number;
-        /**
-         * Sorting strategy. ACTIONABILITY orders NOT_MET by severity (CRITICAL, MAJOR, MINOR, INFO), then MET, then NOT_APPLICABLE and UNDETERMINED together. Within each rank, observation time and ID are descending.
-         */
-        sort?: 'NEWEST' | 'ACTIONABILITY';
-        practiceSlug?: Array<string>;
-        groupSlug?: Array<string>;
-        /**
-         * Review outcomes to list (repeatable)
-         */
-        outcome?: Array<'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED'>;
-        /**
-         * true for only the observations an admin has marked incorrect and not restored, false for only the others; omit for both
-         */
-        invalidated?: boolean;
-        /**
-         * true for only the observations the developer disputes feedback about, false for only the others; omit for both
-         */
-        disputed?: boolean;
-        severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
-        agentJobId?: string;
-        /**
-         * Kind of reviewed work, e.g. scm.pull_request
-         */
-        artifactKind?: string;
-        /**
-         * Artifact ID; requires artifactKind
-         */
-        artifactId?: number;
-        subjectUserId?: number;
-        /**
-         * What occasioned the measurement: LIVE, MANUAL or BACKFILL
-         */
-        origin?: Array<'LIVE' | 'MANUAL' | 'BACKFILL'>;
-        /**
-         * Inclusive lower bound
-         */
-        from?: Date;
-        /**
-         * Exclusive upper bound
-         */
-        to?: Date;
-    };
-    url: '/workspaces/{workspaceSlug}/practices/reviews/observations';
-};
-
-export type ListPracticeReviewObservationsErrors = {
-    /**
-     * Invalid filter or pagination
-     */
-    400: ProblemDetail;
-};
-
-export type ListPracticeReviewObservationsError = ListPracticeReviewObservationsErrors[keyof ListPracticeReviewObservationsErrors];
-
-export type ListPracticeReviewObservationsResponses = {
-    /**
-     * Paginated observations returned
-     */
-    200: PagedModelReviewObservation;
-};
-
-export type ListPracticeReviewObservationsResponse = ListPracticeReviewObservationsResponses[keyof ListPracticeReviewObservationsResponses];
-
-export type GetPracticeReviewObservationData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        observationId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/reviews/observations/{observationId}';
-};
-
-export type GetPracticeReviewObservationErrors = {
-    /**
-     * Observation not found in this workspace
-     */
-    404: ProblemDetail;
-};
-
-export type GetPracticeReviewObservationError = GetPracticeReviewObservationErrors[keyof GetPracticeReviewObservationErrors];
-
-export type GetPracticeReviewObservationResponses = {
-    /**
-     * Observation detail returned
-     */
-    200: ReviewObservationDetail;
-};
-
-export type GetPracticeReviewObservationResponse = GetPracticeReviewObservationResponses[keyof GetPracticeReviewObservationResponses];
-
-export type UpdatePracticeReviewObservationValidityData = {
-    body: UpdateObservationValidityRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        observationId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/reviews/observations/{observationId}/validity';
-};
-
-export type UpdatePracticeReviewObservationValidityErrors = {
-    /**
-     * Observation not found in this workspace
-     */
-    404: ProblemDetail;
-    /**
-     * The observation is already in the requested state
-     */
-    409: ProblemDetail;
-};
-
-export type UpdatePracticeReviewObservationValidityError = UpdatePracticeReviewObservationValidityErrors[keyof UpdatePracticeReviewObservationValidityErrors];
-
-export type UpdatePracticeReviewObservationValidityResponses = {
-    /**
-     * Observation detail after the change
-     */
-    200: ReviewObservationDetail;
-};
-
-export type UpdatePracticeReviewObservationValidityResponse = UpdatePracticeReviewObservationValidityResponses[keyof UpdatePracticeReviewObservationValidityResponses];
 
 export type GetPracticeReviewOverviewData = {
     body?: never;
@@ -15141,6 +15583,219 @@ export type GetPracticeReviewQueueResponses = {
 };
 
 export type GetPracticeReviewQueueResponse = GetPracticeReviewQueueResponses[keyof GetPracticeReviewQueueResponses];
+
+export type ListPracticeReviewResultObservationsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+        practiceSlug?: Array<string>;
+        groupSlug?: Array<string>;
+        /**
+         * Observation severities to list (repeatable)
+         */
+        severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
+        /**
+         * true for only the observations of results an admin has marked incorrect and not restored, false for only the others; omit for both
+         */
+        invalidated?: boolean;
+        /**
+         * true for only the observations of results the developer disputes feedback about, false for only the others; omit for both
+         */
+        disputed?: boolean;
+        /**
+         * Only the observations of this result
+         */
+        practiceResultId?: string;
+        agentJobId?: string;
+        /**
+         * Kind of reviewed work, e.g. scm.pull_request
+         */
+        artifactKind?: string;
+        /**
+         * Artifact ID; requires artifactKind
+         */
+        artifactId?: number;
+        subjectUserId?: number;
+        /**
+         * What occasioned the measurement: LIVE, MANUAL or BACKFILL
+         */
+        origin?: Array<'LIVE' | 'MANUAL' | 'BACKFILL'>;
+        /**
+         * Inclusive lower bound on when the result was recorded
+         */
+        from?: Date;
+        /**
+         * Exclusive upper bound on when the result was recorded
+         */
+        to?: Date;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/result-observations';
+};
+
+export type ListPracticeReviewResultObservationsErrors = {
+    /**
+     * Invalid filter or pagination
+     */
+    400: ProblemDetail;
+};
+
+export type ListPracticeReviewResultObservationsError = ListPracticeReviewResultObservationsErrors[keyof ListPracticeReviewResultObservationsErrors];
+
+export type ListPracticeReviewResultObservationsResponses = {
+    /**
+     * Paginated observations returned
+     */
+    200: PagedModelPracticeReviewObservationRow;
+};
+
+export type ListPracticeReviewResultObservationsResponse = ListPracticeReviewResultObservationsResponses[keyof ListPracticeReviewResultObservationsResponses];
+
+export type ListPracticeReviewResultsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+        /**
+         * Sorting strategy. ACTIONABILITY orders NOT_MET by severity (CRITICAL, MAJOR, MINOR, INFO), then MET, then NOT_APPLICABLE and UNDETERMINED together. Within each rank, result time and ID are descending.
+         */
+        sort?: 'NEWEST' | 'ACTIONABILITY';
+        practiceSlug?: Array<string>;
+        groupSlug?: Array<string>;
+        /**
+         * Review outcomes to list (repeatable)
+         */
+        outcome?: Array<'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED'>;
+        /**
+         * true for only the results an admin has marked incorrect and not restored, false for only the others; omit for both
+         */
+        invalidated?: boolean;
+        /**
+         * true for only the results the developer disputes feedback about, false for only the others; omit for both
+         */
+        disputed?: boolean;
+        severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
+        agentJobId?: string;
+        /**
+         * Kind of reviewed work, e.g. scm.pull_request
+         */
+        artifactKind?: string;
+        /**
+         * Artifact ID; requires artifactKind
+         */
+        artifactId?: number;
+        subjectUserId?: number;
+        /**
+         * What occasioned the measurement: LIVE, MANUAL or BACKFILL
+         */
+        origin?: Array<'LIVE' | 'MANUAL' | 'BACKFILL'>;
+        /**
+         * Inclusive lower bound
+         */
+        from?: Date;
+        /**
+         * Exclusive upper bound
+         */
+        to?: Date;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/results';
+};
+
+export type ListPracticeReviewResultsErrors = {
+    /**
+     * Invalid filter or pagination
+     */
+    400: ProblemDetail;
+};
+
+export type ListPracticeReviewResultsError = ListPracticeReviewResultsErrors[keyof ListPracticeReviewResultsErrors];
+
+export type ListPracticeReviewResultsResponses = {
+    /**
+     * Paginated results returned
+     */
+    200: PagedModelReviewResult;
+};
+
+export type ListPracticeReviewResultsResponse = ListPracticeReviewResultsResponses[keyof ListPracticeReviewResultsResponses];
+
+export type GetPracticeReviewResultData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceResultId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/results/{practiceResultId}';
+};
+
+export type GetPracticeReviewResultErrors = {
+    /**
+     * Result not found in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetPracticeReviewResultError = GetPracticeReviewResultErrors[keyof GetPracticeReviewResultErrors];
+
+export type GetPracticeReviewResultResponses = {
+    /**
+     * Result detail returned
+     */
+    200: ReviewResultDetail;
+};
+
+export type GetPracticeReviewResultResponse = GetPracticeReviewResultResponses[keyof GetPracticeReviewResultResponses];
+
+export type UpdatePracticeReviewResultValidityData = {
+    body: UpdatePracticeResultValidityRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceResultId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/results/{practiceResultId}/validity';
+};
+
+export type UpdatePracticeReviewResultValidityErrors = {
+    /**
+     * Result not found in this workspace
+     */
+    404: ProblemDetail;
+    /**
+     * The result is already in the requested state
+     */
+    409: ProblemDetail;
+};
+
+export type UpdatePracticeReviewResultValidityError = UpdatePracticeReviewResultValidityErrors[keyof UpdatePracticeReviewResultValidityErrors];
+
+export type UpdatePracticeReviewResultValidityResponses = {
+    /**
+     * Result detail after the change
+     */
+    200: ReviewResultDetail;
+};
+
+export type UpdatePracticeReviewResultValidityResponse = UpdatePracticeReviewResultValidityResponses[keyof UpdatePracticeReviewResultValidityResponses];
 
 export type ListPracticeReviewDeliveryChecksData = {
     body?: never;

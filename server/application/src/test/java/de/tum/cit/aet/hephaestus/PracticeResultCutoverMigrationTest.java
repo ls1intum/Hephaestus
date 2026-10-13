@@ -84,6 +84,11 @@ class PracticeResultCutoverMigrationTest {
         VALUES ('00000000-0000-0000-0000-000000992111',0,'explains-why',992101,992131,'OK',2,'[]',now(),10,NULL),
                ('00000000-0000-0000-0000-000000992112',0,'explains-why',992101,992131,'TIMED_OUT',0,NULL,now(),60000,'Timed out');
         INSERT INTO practice_catalog_installation(workspace_id,installed_at) VALUES (992101, now());
+        INSERT INTO public_review_completion(job_id, workspace_id, contract_version, admission_attempt,
+            admission_digest, accepted_attempt, accepted_worker_id, accepted_at, review_digest, review)
+        VALUES ('00000000-0000-0000-0000-000000992111', 992101, 1, 0, repeat('c',64), 0,
+            'released-worker', now(), repeat('d',64),
+            '{"summary":{"body":"The method needs a null check.","basedOn":["00000000-0000-0000-0000-000000992142"]},"inline":[],"withheld":[]}');
         """;
 
     @BeforeAll
@@ -166,6 +171,22 @@ class PracticeResultCutoverMigrationTest {
         assertThat(column("SELECT count(DISTINCT id) FROM feedback_evidence")).containsExactly("2");
         assertThat(column("SELECT id || '|' || delivery_state FROM feedback")).containsExactly(FEEDBACK + "|DELIVERED");
         assertThat(column("SELECT count(*) FROM agent_job")).containsExactly("2");
+    }
+
+    @Test
+    void shouldKeepTheAcceptedPublicReviewAndItsResultReferenceWhenMigrated() throws Exception {
+        assertThat(column("""
+            SELECT c.job_id || '|' || c.workspace_id || '|' || c.contract_version || '|' || c.admission_digest
+                || '|' || c.review_digest || '|' || r.id
+            FROM public_review_completion c
+            JOIN practice_result r ON r.id::text = c.review->'summary'->'basedOn'->>0
+            WHERE c.job_id = '%s'
+            """.formatted(JOB)))
+                .containsExactly(JOB + "|992101|1|" + "c".repeat(64) + "|" + "d".repeat(64) + "|" + NOT_MET);
+        execute("UPDATE feedback SET suppression_reason = 'REVIEW_CANCELLED' WHERE id = '%s'".formatted(FEEDBACK));
+        assertThat(column("SELECT suppression_reason FROM feedback WHERE id = '%s'".formatted(FEEDBACK)))
+                .containsExactly("REVIEW_CANCELLED");
+        execute("UPDATE feedback SET suppression_reason = NULL WHERE id = '%s'".formatted(FEEDBACK));
     }
 
     @Test

@@ -740,6 +740,13 @@ public class FeedbackLedgerRecorder {
         recordSuppressedAt(job, practiceResult, reason, SUPPRESSED_UNIT_ORDINAL_BASE + index);
     }
 
+    /** {@link #recordSuppressed} in the caller's acceptance transaction. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordSuppressedInCurrentTransaction(
+            AgentJob job, PracticeResult result, FeedbackSuppressionReason reason, int index) {
+        recordSuppressedAt(job, result, reason, SUPPRESSED_UNIT_ORDINAL_BASE + index);
+    }
+
     /**
      * Record a SUPPRESSED {@code IN_CONTEXT} unit for a locus that was measured and recorded but not let
      * through to the artifact — deliberately unsaid. Sits in its own ordinal band
@@ -756,6 +763,13 @@ public class FeedbackLedgerRecorder {
     public void recordWithheld(
             AgentJob job, PracticeResult practiceResult, FeedbackSuppressionReason reason, int index) {
         recordSuppressedAt(job, practiceResult, reason, AUTONOMY_WITHHELD_UNIT_ORDINAL_BASE + index);
+    }
+
+    /** {@link #recordWithheld} in the caller's acceptance transaction. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordWithheldInCurrentTransaction(
+            AgentJob job, PracticeResult result, FeedbackSuppressionReason reason, int index) {
+        recordSuppressedAt(job, result, reason, AUTONOMY_WITHHELD_UNIT_ORDINAL_BASE + index);
     }
 
     /** Stores the exact separately composed human-approval body before any provider side effect. */

@@ -130,7 +130,9 @@ class FeedbackDeliveryService {
                 formatter.format(sanitized, job),
                 delivery.diffNotes(),
                 delivery.withheld(),
-                delivery.summaryContributors());
+                delivery.summaryContributors(),
+                null,
+                delivery.summaryObservations());
     }
 
     void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery) {

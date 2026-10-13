@@ -75,6 +75,18 @@ class InContextDeliveryGate {
     /** The subset of {@code practiceResults} that may be placed on the artifact, in the order given. */
     @Transactional(readOnly = true)
     public List<ValidatedResult> admitInContext(AgentJob job, List<ValidatedResult> practiceResults) {
+        return admitInContext(job, practiceResults, false);
+    }
+
+    /** The same gate with withheld rows in the caller's acceptance transaction. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public List<ValidatedResult> admitInContextInCurrentTransaction(
+            AgentJob job, List<ValidatedResult> practiceResults) {
+        return admitInContext(job, practiceResults, true);
+    }
+
+    private List<ValidatedResult> admitInContext(
+            AgentJob job, List<ValidatedResult> practiceResults, boolean inCurrentTransaction) {
         if (practiceResults.isEmpty()
                 || job.getWorkspace() == null
                 || job.getWorkspace().getId() == null) {
@@ -84,7 +96,7 @@ class InContextDeliveryGate {
         FeedbackSuppressionReason rolloutRefusal =
                 refusalIfRolloutRevisionMoved(job.getPracticeRolloutRevision(), workspaceId);
         if (rolloutRefusal != null) {
-            recordWithheld(job, practiceResults, rolloutRefusal);
+            recordWithheld(job, practiceResults, rolloutRefusal, inCurrentTransaction);
             return List.of();
         }
         ResultOrigin origin = ReviewOutputService.originOf(job.getMetadata());
@@ -94,7 +106,7 @@ class InContextDeliveryGate {
                     practiceResults.size(),
                     origin,
                     job.getId());
-            recordWithheld(job, practiceResults, FeedbackSuppressionReason.BACKFILL_QUIET);
+            recordWithheld(job, practiceResults, FeedbackSuppressionReason.BACKFILL_QUIET, inCurrentTransaction);
             return List.of();
         }
 
@@ -154,7 +166,11 @@ class InContextDeliveryGate {
                 .toList();
     }
 
-    private void recordWithheld(AgentJob job, List<ValidatedResult> withheld, FeedbackSuppressionReason reason) {
+    private void recordWithheld(
+            AgentJob job,
+            List<ValidatedResult> withheld,
+            FeedbackSuppressionReason reason,
+            boolean inCurrentTransaction) {
         Map<String, PracticeResult> byOccurrence = new HashMap<>();
         for (PracticeResult practiceResult : practiceResultRepository.findByAgentJobId(
                 job.getId(), job.getWorkspace().getId())) {
@@ -166,7 +182,8 @@ class InContextDeliveryGate {
             // guard would then read as "already recorded" and drop.
             if (index >= FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
                 log.warn(
-                        "Withheld-feedback ledger band full at {} rows; remaining withheld results are unrecorded: jobId={}",
+                        "Withheld-feedback ledger band full at {} rows; remaining withheld results are unrecorded:"
+                                + " jobId={}",
                         index,
                         job.getId());
                 return;
@@ -181,7 +198,7 @@ class InContextDeliveryGate {
             }
             if (inCurrentTransaction) {
                 // Part of the caller's whole outcome: a failed row fails it rather than leaving it incomplete.
-                feedbackLedgerRecorder.recordWithheldInCurrentTransaction(job, observation, reason, index++);
+                feedbackLedgerRecorder.recordWithheldInCurrentTransaction(job, practiceResult, reason, index++);
                 continue;
             }
             try {

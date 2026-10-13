@@ -57,6 +57,17 @@ class FeedbackResponseSuppressionFilter {
     // persisted results. recordSuppressed writes in its own REQUIRES_NEW tx, so readOnly does not bind it.
     @Transactional(readOnly = true)
     public SuppressionDecision evaluate(AgentJob job, List<ValidatedResult> scopedResults) {
+        return evaluate(job, scopedResults, false);
+    }
+
+    /** The same gate with suppressed rows in the caller's acceptance transaction. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public SuppressionDecision evaluateInCurrentTransaction(AgentJob job, List<ValidatedResult> scopedResults) {
+        return evaluate(job, scopedResults, true);
+    }
+
+    private SuppressionDecision evaluate(
+            AgentJob job, List<ValidatedResult> scopedResults, boolean inCurrentTransaction) {
         long workspaceId = job.getWorkspace().getId();
         List<PracticeResult> persisted = practiceResultRepository.findByAgentJobId(job.getId(), workspaceId);
         if (persisted.isEmpty()) {

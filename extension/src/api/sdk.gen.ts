@@ -2717,6 +2717,17 @@ export const getPracticeReviewQueue = <ThrowOnError extends boolean = false>(opt
 });
 
 /**
+ * List the observations of practice review results across the workspace
+ *
+ * Newest result first, then each result's display order. Where the result's detail hides its evidence, the row leaves out its summary and place and sets evidenceHidden.
+ */
+export const listPracticeReviewResultObservations = <ThrowOnError extends boolean = false>(options: Options<ListPracticeReviewResultObservationsData, ThrowOnError>): RequestResult<ListPracticeReviewResultObservationsResponses, ListPracticeReviewResultObservationsErrors, ThrowOnError> => (options.client ?? client).get<ListPracticeReviewResultObservationsResponses, ListPracticeReviewResultObservationsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/reviews/result-observations',
+    ...options
+});
+
+/**
  * List practice review results across the workspace
  *
  * Results include linked feedback outcomes and are ordered newest first by default.
@@ -2724,17 +2735,6 @@ export const getPracticeReviewQueue = <ThrowOnError extends boolean = false>(opt
 export const listPracticeReviewResults = <ThrowOnError extends boolean = false>(options: Options<ListPracticeReviewResultsData, ThrowOnError>): RequestResult<ListPracticeReviewResultsResponses, ListPracticeReviewResultsErrors, ThrowOnError> => (options.client ?? client).get<ListPracticeReviewResultsResponses, ListPracticeReviewResultsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/reviews/results',
-    ...options
-});
-
-/**
- * List the observations of practice review results across the workspace
- *
- * Newest result first, then each result's display order. Where the result's detail hides its evidence, the row leaves out its summary and place and sets evidenceHidden.
- */
-export const listPracticeReviewResultObservations = <ThrowOnError extends boolean = false>(options: Options<ListPracticeReviewResultObservationsData, ThrowOnError>): RequestResult<ListPracticeReviewResultObservationsResponses, ListPracticeReviewResultObservationsErrors, ThrowOnError> => (options.client ?? client).get<ListPracticeReviewResultObservationsResponses, ListPracticeReviewResultObservationsErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/reviews/results/observations',
     ...options
 });
 

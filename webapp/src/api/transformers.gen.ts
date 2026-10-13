@@ -1638,29 +1638,6 @@ export const getPracticeReviewQueueResponseTransformer = async (data: any): Prom
     return data;
 };
 
-const reviewResultSchemaResponseTransformer = (data: any) => {
-    if (data.disputedAt) {
-        data.disputedAt = new Date(data.disputedAt);
-    }
-    if (data.invalidatedAt) {
-        data.invalidatedAt = new Date(data.invalidatedAt);
-    }
-    data.observedAt = new Date(data.observedAt);
-    return data;
-};
-
-const pagedModelReviewResultSchemaResponseTransformer = (data: any) => {
-    if (data.content) {
-        data.content = data.content.map((item: any) => reviewResultSchemaResponseTransformer(item));
-    }
-    return data;
-};
-
-export const listPracticeReviewResultsResponseTransformer = async (data: any): Promise<ListPracticeReviewResultsResponse> => {
-    data = pagedModelReviewResultSchemaResponseTransformer(data);
-    return data;
-};
-
 const practiceReviewObservationRowSchemaResponseTransformer = (data: any) => {
     if (data.disputedAt) {
         data.disputedAt = new Date(data.disputedAt);
@@ -1681,6 +1658,29 @@ const pagedModelPracticeReviewObservationRowSchemaResponseTransformer = (data: a
 
 export const listPracticeReviewResultObservationsResponseTransformer = async (data: any): Promise<ListPracticeReviewResultObservationsResponse> => {
     data = pagedModelPracticeReviewObservationRowSchemaResponseTransformer(data);
+    return data;
+};
+
+const reviewResultSchemaResponseTransformer = (data: any) => {
+    if (data.disputedAt) {
+        data.disputedAt = new Date(data.disputedAt);
+    }
+    if (data.invalidatedAt) {
+        data.invalidatedAt = new Date(data.invalidatedAt);
+    }
+    data.observedAt = new Date(data.observedAt);
+    return data;
+};
+
+const pagedModelReviewResultSchemaResponseTransformer = (data: any) => {
+    if (data.content) {
+        data.content = data.content.map((item: any) => reviewResultSchemaResponseTransformer(item));
+    }
+    return data;
+};
+
+export const listPracticeReviewResultsResponseTransformer = async (data: any): Promise<ListPracticeReviewResultsResponse> => {
+    data = pagedModelReviewResultSchemaResponseTransformer(data);
     return data;
 };
 

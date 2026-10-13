@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletionService;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ResultsRefusedException;
@@ -39,7 +40,11 @@ public class ResultAdmissionController {
     private final PublicReviewCompletionService completion;
     private final JsonMapper mapper;
 
-    public ResultAdmissionController(ResultAdmissionService admission, PracticeReviewRefusalMetrics refusals) {
+    public ResultAdmissionController(
+            ResultAdmissionService admission,
+            PracticeReviewRefusalMetrics refusals,
+            PublicReviewCompletionService completion,
+            JsonMapper mapper) {
         this.admission = admission;
         this.refusals = refusals;
         this.completion = completion;
@@ -49,7 +54,7 @@ public class ResultAdmissionController {
     /**
      * The whole review on the work of the attempt that owns the job, submitted once its public writer finished. An
      * acceptance answers 200 with the server's review digest, repeated identically for an identical retry; a refusal
-     * answers 422 with fixed reasons and is final. The workspace, recipients and observations come from the attempt's
+     * answers 422 with fixed reasons and is final. The workspace, recipients and results come from the attempt's
      * credential and the job's own records, never from the body.
      */
     @PostMapping("/complete-public-review")
@@ -67,7 +72,7 @@ public class ResultAdmissionController {
         PublicReviewCompletionService.Outcome outcome;
         try {
             outcome = completion.complete(identity, digest.asString(), request.get("review"));
-        } catch (ObservationAdmissionService.StaleAttemptException e) {
+        } catch (ResultAdmissionService.StaleAttemptException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Review attempt no longer owns this job", e);
         } catch (IllegalStateException e) {
             // A fence or store failed, not the submission: a 5xx the runner repeats with the same review.

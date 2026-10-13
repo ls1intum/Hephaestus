@@ -47,6 +47,7 @@ import {
 import { PracticeCoverageLedger } from "./pi-practice-coverage.ts";
 import { executionReport } from "./pi-practice-scripts-report.ts";
 import { loadProviderConfig, reasoningSetting, registerHephaestusProvider } from "./pi-provider.ts";
+import { completePublicReview } from "./pi-public-completion.ts";
 import {
 	CONVERSATION_THREAD,
 	MAX_SUMMARY_CHARS,
