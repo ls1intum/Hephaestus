@@ -61,7 +61,7 @@ public interface ProjectFieldRepository extends JpaRepository<ProjectField, Stri
             id, project_id, name, data_type, options, created_at, updated_at
         )
         VALUES (
-            :id, :projectId, :name, :dataType, CAST(:options AS jsonb), :createdAt, :updatedAt
+            :id, :projectId, :name, :dataType, :options, :createdAt, :updatedAt
         )
         ON CONFLICT (project_id, name) DO UPDATE SET
             data_type = EXCLUDED.data_type,

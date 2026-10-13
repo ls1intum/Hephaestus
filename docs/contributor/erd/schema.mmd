@@ -143,7 +143,7 @@ erDiagram
         BIGINT identity_link_id FK
         INET ip_inet
         VARCHAR(512) user_agent
-        JSONB details
+        TEXT details
         BOOLEAN elevated_via_instance_admin "NOT NULL"
         BIGINT viewed_user_id FK
     }
@@ -252,8 +252,8 @@ erDiagram
         VARCHAR(64) entity_id "NOT NULL"
         VARCHAR(16) action "NOT NULL"
         ARRAY changed_keys "NOT NULL"
-        JSONB old_value
-        JSONB new_value
+        TEXT old_value
+        TEXT new_value
         BOOLEAN elevated_via_instance_admin "NOT NULL"
     }
 
@@ -293,7 +293,7 @@ erDiagram
         VARCHAR(32) actor_kind "NOT NULL"
         VARCHAR(256) actor_ref
         VARCHAR(64) correlation_id
-        JSONB detail
+        TEXT detail
         TIMESTAMPTZ occurred_at "NOT NULL"
         BIGINT actor_account_id FK
     }
@@ -1244,7 +1244,7 @@ erDiagram
         BIGINT project_id FK,UK "NOT NULL"
         VARCHAR(256) name UK "NOT NULL"
         VARCHAR(32) data_type "NOT NULL"
-        JSONB options
+        TEXT options
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
