@@ -4646,6 +4646,26 @@ async function main() {
 					[...PRACTICE_TOOLS, "report_observation"],
 					[reportObservationTool],
 				);
+				// A mixed batch can keep Pi running after this practice records. Finish its tools and native
+				// boundary first; a refused correction still gets its answer before the draft is final here.
+				const { finishTurn } = opened.session.agent;
+				let unresolvedReportRefusal = false;
+				opened.session.agent.finishTurn = async (turn, signal) => {
+					const decision = await finishTurn?.(turn, signal);
+					for (const result of turn.toolResults) {
+						if (result.toolName === "report_observation") {
+							unresolvedReportRefusal = result.isError;
+						}
+					}
+					if (
+						!unresolvedReportRefusal &&
+						reviewState.observations.some((item) => item.practiceSlug === slug)
+					) {
+						opened.session.clearQueue();
+						return { action: "end" };
+					}
+					return decision ?? undefined;
+				};
 				const text = () =>
 					practiceTurnText(
 						`${heading}\nPractice ${index + 1} of ${slugs.length} in this turn.`,
