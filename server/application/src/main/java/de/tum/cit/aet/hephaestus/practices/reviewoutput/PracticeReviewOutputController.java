@@ -155,7 +155,7 @@ public class PracticeReviewOutputController {
         return ResponseEntity.ok(practiceResultQueryService.get(workspaceContext.id(), practiceResultId));
     }
 
-    @GetMapping("/results/observations")
+    @GetMapping("/result-observations")
     @Operation(
             summary = "List the observations of practice review results across the workspace",
             description = "Newest result first, then each result's display order. Where the result's detail hides"

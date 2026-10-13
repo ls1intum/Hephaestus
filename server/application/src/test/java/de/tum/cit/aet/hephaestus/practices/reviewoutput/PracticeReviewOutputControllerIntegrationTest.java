@@ -83,7 +83,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String RESULTS = "/workspaces/{slug}/practices/reviews/results";
-    private static final String OBSERVATIONS = "/workspaces/{slug}/practices/reviews/results/observations";
+    private static final String OBSERVATIONS = "/workspaces/{slug}/practices/reviews/result-observations";
     private static final String FEEDBACK = "/workspaces/{slug}/practices/reviews/feedback";
 
     @Autowired

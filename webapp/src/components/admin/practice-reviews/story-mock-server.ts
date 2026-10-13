@@ -218,14 +218,10 @@ export function reviewHandlers({ results, feedback, requireResultSort }: ReviewM
 			}
 			return page(sortResults(filterResults(resultRows, url), url), url);
 		}),
-		// Before the result detail, which would take `observations` for a result ID.
-		http.get(
-			"*/workspaces/:workspaceSlug/practices/reviews/results/observations",
-			({ request }) => {
-				const url = new URL(request.url);
-				return page(filterObservations(reviewObservations, url), url);
-			},
-		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/result-observations", ({ request }) => {
+			const url = new URL(request.url);
+			return page(filterObservations(reviewObservations, url), url);
+		}),
 		http.get(
 			"*/workspaces/:workspaceSlug/practices/reviews/results/:practiceResultId",
 			({ params }) => HttpResponse.json(resultDetail(String(params.practiceResultId))),

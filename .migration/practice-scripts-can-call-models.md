@@ -65,7 +65,7 @@ Custom clients must use these new names:
 | Schemas `PracticeStandingObservation`, `UpdateObservationValidityRequest` | `PracticeStandingResult`, `UpdatePracticeResultValidityRequest` |
 | `EvidenceUndecidability`, one object | `OpenQuestion[]`, a list of `{ openQuestion, wouldSettleIt, citation? }` |
 
-The problems of results across a workspace are a new list, `GET /workspaces/{workspaceSlug}/practices/reviews/results/observations` (operation `listPracticeReviewResultObservations`).
+The problems of results across a workspace are a new list, `GET /workspaces/{workspaceSlug}/practices/reviews/result-observations` (operation `listPracticeReviewResultObservations`).
 No earlier path or operation name has a new meaning.
 | `observationId` on `PracticeStandingResult` and `ReviewBoundResult` | `practiceResultId` |
 | `observations` on `PracticeGroupReviewRun`, `PracticeGroupStanding`, `PracticeReviewBucket`, `ProfileReviewRunDetail`, `ReviewFeedbackDetail`, `ReviewRunSummary`, `PracticeReviewCounts` and `PracticeReviewOverview` | `practiceResults` |
