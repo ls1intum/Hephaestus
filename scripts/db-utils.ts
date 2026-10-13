@@ -22,18 +22,21 @@ const draft = path.join(server, "application/build/changelog_new.xml");
 interface Config {
 	env: Record<string, string | undefined>;
 	ci: boolean;
+	externalDatabase: boolean;
 	host: string;
 	port: number;
 }
 
 const log = (message: string): void => console.log(`ℹ️  ${message}`);
 
-async function config(): Promise<Config> {
+async function config(externalDatabase: boolean): Promise<Config> {
 	const fileEnv = await readEnvFile(path.join(server, ".env"));
 	const env = { ...fileEnv, ...process.env };
+	const ci = env.CI === "true";
 	return {
 		env,
-		ci: env.CI === "true",
+		ci,
+		externalDatabase: externalDatabase || ci,
 		host: env.POSTGRES_HOST ?? "localhost",
 		port: positivePort(env.POSTGRES_PORT ?? "5432", "POSTGRES_PORT"),
 	};
@@ -42,7 +45,7 @@ async function config(): Promise<Config> {
 async function checkEnvironment(value: Config): Promise<void> {
 	await access(path.join(server, "build.gradle.kts"));
 	await access(path.join(import.meta.dirname, "generate-mermaid-erd.ts"));
-	if (!value.ci) {
+	if (!value.externalDatabase) {
 		if (!(await succeeds("docker", ["info"]))) {
 			throw new Error("Docker is installed but unavailable. Start the Docker daemon, then retry.");
 		}
@@ -50,7 +53,7 @@ async function checkEnvironment(value: Config): Promise<void> {
 			throw new Error("Docker Compose is required for local database utilities.");
 		}
 	} else if (!(await succeeds("pg_isready", ["--version"]))) {
-		throw new Error("CI database utilities require 'pg_isready'.");
+		throw new Error("External database utilities require 'pg_isready'.");
 	}
 }
 
@@ -65,14 +68,14 @@ async function waitForPostgres(value: Config): Promise<void> {
 }
 
 async function startPostgres(value: Config): Promise<void> {
-	if (value.ci) {
+	if (value.externalDatabase) {
 		return waitForPostgres(value);
 	}
 	await run("docker", ["compose", "up", "-d", "--wait", "postgres"], { cwd: server });
 }
 
 async function stopPostgres(value: Config): Promise<void> {
-	if (!value.ci) {
+	if (!value.externalDatabase) {
 		await run("docker", ["compose", "stop", "postgres"], { cwd: server });
 		await run("docker", ["compose", "rm", "-f", "postgres"], { cwd: server });
 	}
@@ -292,7 +295,7 @@ async function withDatabase(
 	value: Config,
 	operation: (signal: AbortSignal) => Promise<void>,
 ): Promise<void> {
-	if (value.ci) {
+	if (value.externalDatabase) {
 		await waitForPostgres(value);
 		await operation(new AbortController().signal);
 		return;
@@ -378,13 +381,13 @@ const commands = {
 } as const;
 
 function usage(): string {
-	return `Usage: node scripts/db-utils.ts <command> [--from-draft <file>]\n${Object.entries(
+	return `Usage: node scripts/db-utils.ts <command> [--external-database] [--from-draft <file>]\n${Object.entries(
 		commands,
 	)
 		.map(([name, help]) => `  ${name.padEnd(16)} ${help}`)
 		.join(
 			"\n",
-		)}\n  --from-draft     draft-changelog only: promote this hand-written draft instead of the JPA diff`;
+		)}\n  --external-database  requires a disposable database supplied through the environment. Leaves Docker Compose and database data directories unchanged.\n  --from-draft         draft-changelog only: promote this hand-written draft instead of the JPA diff`;
 }
 
 /** The command and its draft file; `--from-draft` belongs to `draft-changelog` alone. */
@@ -392,11 +395,16 @@ export function parseCommand(args: string[]): {
 	command: string | undefined;
 	help: boolean;
 	fromDraft: string | undefined;
+	externalDatabase: boolean;
 } {
 	const { positionals, values } = parseArgs({
 		args,
 		allowPositionals: true,
-		options: { help: { type: "boolean", short: "h" }, "from-draft": { type: "string" } },
+		options: {
+			help: { type: "boolean", short: "h" },
+			"from-draft": { type: "string" },
+			"external-database": { type: "boolean" },
+		},
 	});
 	const [command, ...extra] = positionals;
 	if (extra.length > 0) {
@@ -406,11 +414,16 @@ export function parseCommand(args: string[]): {
 	if (fromDraft !== undefined && command !== "draft-changelog") {
 		throw new Error("--from-draft applies only to draft-changelog");
 	}
-	return { command, help: values.help === true || command === "help", fromDraft };
+	return {
+		command,
+		help: values.help === true || command === "help",
+		fromDraft,
+		externalDatabase: values["external-database"] === true,
+	};
 }
 
 async function main(): Promise<void> {
-	const { command, help, fromDraft } = parseCommand(process.argv.slice(2));
+	const { command, help, fromDraft, externalDatabase } = parseCommand(process.argv.slice(2));
 	if (command === undefined || help) {
 		console.log(usage());
 		process.exitCode = help ? 0 : 1;
@@ -425,7 +438,7 @@ async function main(): Promise<void> {
 	if (authored !== undefined) {
 		validateDraft(authored);
 	}
-	const value = await config();
+	const value = await config(externalDatabase);
 	await checkEnvironment(value);
 	if (command === "generate-erd") {
 		log("Regenerating the ERD...");

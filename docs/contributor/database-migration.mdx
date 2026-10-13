@@ -43,6 +43,36 @@ conventions the drift gate reads are in `server/AGENTS.md` § Schema changes.
    without one. Keep the summary user-facing. The release notes flag the migration automatically.
 5. Commit the changelog, the `master.xml` edit, the changeset, and `docs/contributor/erd/schema.mmd`.
 
+## Use an external disposable database
+
+If a developer database must stay available, add `--external-database` to the database command.
+Supply a disposable database from the repository's PostgreSQL image in `docker/postgres`.
+Never use a database that contains data you need to keep.
+These commands apply the changelog chain to the supplied database.
+
+Set `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in the process environment.
+Process variables override values in `server/.env`.
+The external mode requires `pg_isready`.
+It does not call Docker Compose or change database data directories.
+You must start and remove the disposable database yourself.
+
+Use a fresh empty database for each drift check or draft operation.
+For ERD generation, reuse a disposable database only if its applied changelog has not changed.
+Clear `CI` and `GITHUB_ACTIONS` before a local run.
+Only CI mode uses `-PpackagedServer=true`.
+Local external mode compiles the current source.
+
+```bash
+env -u CI -u GITHUB_ACTIONS node scripts/db-utils.ts check-drift --external-database
+env -u CI -u GITHUB_ACTIONS node scripts/db-utils.ts draft-changelog --external-database
+env -u CI -u GITHUB_ACTIONS node scripts/db-utils.ts generate-erd --external-database
+env -u CI -u GITHUB_ACTIONS node scripts/db-utils.ts draft-changelog --external-database --from-draft .context/<name>.xml
+```
+
+The task aliases also accept `--external-database`: `db:check-drift`, `db:draft-changelog`, and `db:generate-erd-docs`.
+Without external mode, drift and draft commands temporarily replace the worktree's Compose database with a disposable database.
+Without external mode, ERD generation starts the configured Compose database and applies the changelog chain there.
+
 ## Native objects the JPA diff does not cover
 
 The JPA diff does not cover native `CHECK` constraints or triggers in this repository. For such a
