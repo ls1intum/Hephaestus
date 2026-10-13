@@ -8,12 +8,13 @@ import {
 } from "@/components/admin/practice-reviews/observation-words";
 
 import {
+	getAgentJobQueryKey,
 	listPracticeReviewsInfiniteQueryKey,
 	listPracticeReviewsQueryKey,
 	listTracedArtifactsInfiniteQueryKey,
 	listTracedArtifactsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
-import type { AgentJob } from "@/api/types.gen";
+import type { AgentJob, ReviewLineage } from "@/api/types.gen";
 import {
 	feedbackDetail,
 	observationDetail,
@@ -25,12 +26,18 @@ import {
 	reviewRuns,
 	workspacePractices,
 } from "@/components/admin/practice-reviews/fixtures";
+import {
+	LINEAGE_REVIEW_ID,
+	lineageObservation,
+	storyLineage,
+} from "@/components/admin/practice-reviews/lineage-fixtures";
 import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
 import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { artifactTrace, tracedArtifacts } from "@/components/practice-trace/fixtures";
 import { browserTimeZone } from "@/lib/dates";
 import { server } from "@/mocks/server";
+import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
@@ -955,4 +962,340 @@ it("keeps denied observation facts and navigation without restoring its text", a
 	expect(panel.queryByText(/Nothing was quoted/u)).toBeNull();
 	await userEvent.click(panel.getByRole("button", { name: "Close" }));
 	await waitFor(() => expect(router.state.location.searchStr).not.toContain("detail="));
+});
+
+it("shows a failed live trace refresh and resumes only after Retry", async () => {
+	vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+	try {
+		const id = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
+		const initial = reviewJob(LINEAGE_REVIEW_ID);
+		const job = {
+			...initial,
+			id,
+			status: "RUNNING",
+			completedAt: undefined,
+			deliveryStatus: undefined,
+		} satisfies AgentJob;
+		const lineage = storyLineage({
+			review: { id, createdAt: job.createdAt, status: "IN_PROGRESS", phase: "RUNNING" },
+			observations: [],
+			feedback: [],
+		});
+		let reply = () => HttpResponse.json(lineage);
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", () => reply()),
+			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () => HttpResponse.json(job)),
+		);
+		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=trace:review:${id}`);
+		await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
+		reply = () =>
+			HttpResponse.json({ status: 503, detail: "Trace temporarily unavailable" }, { status: 503 });
+		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+		const retry = await screen.findByRole("button", { name: "Retry" }, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("group", { name: "How this came about" })).toBeNull();
+		const failedReads = requestsTo("/practices/reviews/lineage").length;
+		await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+		expect(requestsTo("/practices/reviews/lineage")).toHaveLength(failedReads);
+		reply = () => HttpResponse.json(lineage);
+		await userEvent.click(retry);
+		await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
+		const recovered = requestsTo("/practices/reviews/lineage").length;
+		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+		await vi.waitFor(() =>
+			expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(recovered),
+		);
+	} finally {
+		vi.useRealTimers();
+	}
+});
+
+it("keeps the new selected terminal trace when an older active read arrives", async () => {
+	vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+	const release = deferred();
+	try {
+		const firstId = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
+		const secondId = "6f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
+		const base = reviewJob(LINEAGE_REVIEW_ID);
+		const firstJob = {
+			...base,
+			id: firstId,
+			status: "RUNNING",
+			completedAt: undefined,
+			deliveryStatus: undefined,
+		} satisfies AgentJob;
+		const secondJob = {
+			...base,
+			id: secondId,
+			status: "COMPLETED",
+			deliveryStatus: "DELIVERED",
+		} satisfies AgentJob;
+		const first = storyLineage({
+			review: { id: firstId, createdAt: base.createdAt, status: "IN_PROGRESS", phase: "RUNNING" },
+			observations: [],
+			feedback: [],
+		});
+		const work = base.target.reviewedWork;
+		assert(work);
+		const second = storyLineage({
+			work: { ...work, label: "Second selected work" },
+			review: { id: secondId, createdAt: base.createdAt, status: "COMPLETED", phase: "COMPLETED" },
+			observations: [],
+			feedback: [],
+		});
+		const responses = new Map([
+			[firstId, async () => HttpResponse.json(first)],
+			[secondId, async () => HttpResponse.json(second)],
+		]);
+		const jobs = new Map<string, AgentJob>([
+			[firstId, firstJob],
+			[secondId, secondJob],
+		]);
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", async ({ request }) => {
+				const id = new URL(request.url).searchParams.get("id");
+				assert(id !== null);
+				const reply = responses.get(id);
+				assert(reply);
+				return reply();
+			}),
+			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", ({ params }) => {
+				const job = jobs.get(String(params.jobId));
+				assert(job);
+				return HttpResponse.json(job);
+			}),
+		);
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs?detail=trace:review:${firstId}`);
+		await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
+		responses.set(firstId, async () => {
+			await release.promise;
+			return HttpResponse.json(first);
+		});
+		const firstReads = requestsTo("/practices/reviews/lineage").length;
+		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+		await vi.waitFor(() =>
+			expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(firstReads),
+		);
+		await router.navigate({
+			to: ".",
+			search: (previous) => ({ ...previous, detail: `trace:review:${secondId}` }),
+		});
+		await screen.findByRole(
+			"dialog",
+			{ name: "Review of Second selected work" },
+			ROUTE_RENDER_WAIT,
+		);
+		const secondReads = () =>
+			requestsTo("/practices/reviews/lineage").filter(
+				(url) => url.searchParams.get("id") === secondId,
+			).length;
+		const settled = secondReads();
+		release.resolve();
+		await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+		expect(secondReads()).toBe(settled);
+		screen.getByRole("dialog", { name: "Review of Second selected work" });
+		expect(router.state.location.search.detail).toBe(`trace:review:${secondId}`);
+	} finally {
+		release.resolve();
+		vi.useRealTimers();
+	}
+});
+
+it("follows a selected review trace through acceptance and final processing", async () => {
+	vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+	try {
+		const id = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
+		const initial = reviewJob(LINEAGE_REVIEW_ID);
+		let job: AgentJob = {
+			...initial,
+			id,
+			status: "RUNNING",
+			completedAt: undefined,
+			deliveryStatus: undefined,
+			firstFeedbackPostedAt: undefined,
+			firstFeedbackReadAt: undefined,
+		};
+		let lineage: ReviewLineage = storyLineage({
+			review: {
+				id,
+				createdAt: job.createdAt,
+				startedAt: job.startedAt,
+				status: "IN_PROGRESS",
+				phase: "RUNNING",
+			},
+			observations: [],
+			feedback: [],
+		});
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", () =>
+				HttpResponse.json(lineage),
+			),
+			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () => HttpResponse.json(job)),
+		);
+		const { queryClient, router } = renderRouteAtWithRouter(
+			`${REVIEWS}/runs?detail=trace:review:${id}`,
+		);
+		await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
+		const before = requestsTo("/practices/reviews/lineage").length;
+		assert(job.startedAt);
+		const accepted = new Date(job.startedAt);
+		job = { ...job, publicReviewAcceptedAt: accepted };
+		lineage = {
+			...lineage,
+			observations: [
+				lineageObservation("9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c", {
+					agentJobId: id,
+					outcome: "MET",
+					practiceName: "Callback accounts for failure",
+				}),
+			],
+		};
+		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+		await vi.waitFor(() =>
+			expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(before),
+		);
+		const ownJob = () =>
+			queryClient.getQueryData<AgentJob>(
+				getAgentJobQueryKey({ path: { workspaceSlug: "acme", jobId: id } }),
+			);
+		await vi.waitFor(() =>
+			expect(ownJob()?.publicReviewAcceptedAt?.getTime()).toBe(accepted.getTime()),
+		);
+		await vi.waitFor(() =>
+			expect(screen.getByRole("group", { name: "How this came about" }).textContent).toContain(
+				"has recorded 1 observation",
+			),
+		);
+		job = {
+			...job,
+			status: "COMPLETED",
+			completedAt: new Date(accepted.getTime() + 60_000),
+			deliveryStatus: "PENDING",
+		};
+		lineage = {
+			...lineage,
+			review: {
+				...lineage.review,
+				id,
+				createdAt: job.createdAt,
+				status: "COMPLETED",
+				phase: "COMPLETED",
+				finishedAt: job.completedAt,
+			},
+		};
+		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+		await vi.waitFor(() => expect(ownJob()?.deliveryStatus).toBe("PENDING"));
+		await screen.findByText("Results awaiting processing", undefined, ROUTE_RENDER_WAIT);
+		const beforeFinal = requestsTo("/practices/reviews/lineage").length;
+		job = { ...job, deliveryStatus: "FAILED" };
+		lineage = {
+			...lineage,
+			observations: [
+				...lineage.observations,
+				lineageObservation("4c2e8a1b-6d3f-4a5c-9e7b-0f1d2c3b4a5e", {
+					agentJobId: id,
+					outcome: "NOT_MET",
+					practiceName: "Final recorded practice",
+				}),
+			],
+		};
+		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+		await vi.waitFor(() => expect(ownJob()?.deliveryStatus).toBe("FAILED"));
+		await screen.findByText("Result processing failed", undefined, ROUTE_RENDER_WAIT);
+		await vi.waitFor(() =>
+			expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(beforeFinal),
+		);
+		await vi.waitFor(() =>
+			expect(screen.getByRole("group", { name: "How this came about" }).textContent).toContain(
+				"2 observations",
+			),
+		);
+		const settled = requestsTo("/practices/reviews/lineage").length;
+		const jobReads = requestsTo(`/agents/jobs/${id}`).length;
+		await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+		expect(requestsTo("/practices/reviews/lineage")).toHaveLength(settled);
+		expect(requestsTo(`/agents/jobs/${id}`)).toHaveLength(jobReads);
+		expect(
+			requestsTo("/practices/reviews/lineage").every((url) => url.searchParams.get("id") === id),
+		).toBe(true);
+		expect(router.state.location.search.detail).toBe(`trace:review:${id}`);
+	} finally {
+		vi.useRealTimers();
+	}
+});
+
+it("shows a failed selected job refresh and retries its final state", async () => {
+	vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+	try {
+		const id = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
+		const initial = reviewJob(LINEAGE_REVIEW_ID);
+		let job: AgentJob = {
+			...initial,
+			id,
+			status: "RUNNING",
+			completedAt: undefined,
+			deliveryStatus: undefined,
+			firstFeedbackPostedAt: undefined,
+			firstFeedbackReadAt: undefined,
+		};
+		let lineage: ReviewLineage = storyLineage({
+			review: { id, createdAt: job.createdAt, status: "IN_PROGRESS", phase: "RUNNING" },
+			observations: [],
+			feedback: [],
+		});
+		let reply = () => HttpResponse.json(job);
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", () =>
+				HttpResponse.json(lineage),
+			),
+			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () => reply()),
+		);
+		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=trace:review:${id}`);
+		await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
+		await vi.waitFor(() => expect(requestsTo(`/agents/jobs/${id}`)).toHaveLength(1));
+		reply = () =>
+			HttpResponse.json({ status: 503, detail: "Review temporarily unavailable" }, { status: 503 });
+		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+		const retry = await screen.findByRole("button", { name: "Retry" }, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("group", { name: "How this came about" })).toBeNull();
+		const failedReads = requestsTo(`/agents/jobs/${id}`).length;
+		await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+		expect(requestsTo(`/agents/jobs/${id}`)).toHaveLength(failedReads);
+		job = {
+			...job,
+			status: "COMPLETED",
+			completedAt: new Date(job.createdAt.getTime() + 180_000),
+			deliveryStatus: "FAILED",
+		};
+		lineage = {
+			...lineage,
+			review: {
+				id,
+				createdAt: job.createdAt,
+				finishedAt: job.completedAt,
+				status: "COMPLETED",
+				phase: "COMPLETED",
+			},
+			observations: [
+				lineageObservation("9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c", {
+					agentJobId: id,
+					outcome: "MET",
+				}),
+			],
+		};
+		reply = () => HttpResponse.json(job);
+		await userEvent.click(retry);
+		await screen.findByText("Result processing failed", undefined, ROUTE_RENDER_WAIT);
+		await vi.waitFor(() =>
+			expect(screen.getByRole("group", { name: "How this came about" }).textContent).toContain(
+				"1 observation",
+			),
+		);
+		const settledJobs = requestsTo(`/agents/jobs/${id}`).length;
+		const settledLineage = requestsTo("/practices/reviews/lineage").length;
+		await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+		expect(requestsTo(`/agents/jobs/${id}`)).toHaveLength(settledJobs);
+		expect(requestsTo("/practices/reviews/lineage")).toHaveLength(settledLineage);
+	} finally {
+		vi.useRealTimers();
+	}
 });
