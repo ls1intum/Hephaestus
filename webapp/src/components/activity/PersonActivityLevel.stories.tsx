@@ -10,8 +10,10 @@ import { expectNoPanelOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 
 import { personLevel } from "./activity-search";
+import { ActivityTiles } from "./ActivityTiles";
 import { HidePersonAction } from "./HidePersonAction";
 import { PersonActivityLevel } from "./PersonActivityLevel";
+import { memberRepositoryState } from "./PersonActivitySections";
 
 // The level has no page of its own, so every story mounts a real drawer over a real page.
 const meta = {
@@ -24,7 +26,8 @@ const meta = {
 		user: ada,
 		providerType: "GITHUB",
 		period: { kind: "preset", preset: "90d" },
-		overview: readyOverview(OVERVIEW),
+		summary: <ActivityTiles state={readyOverview(OVERVIEW)} providerType="GITHUB" />,
+		repositories: memberRepositoryState(readyOverview(OVERVIEW)),
 		workLog: {
 			status: "ready",
 			stale: false,
@@ -101,7 +104,8 @@ export const Reflow: Story = {
 
 export const Loading: Story = {
 	args: {
-		overview: { status: "loading" },
+		summary: <ActivityTiles state={{ status: "loading" }} providerType="GITHUB" />,
+		repositories: undefined,
 		workLog: { status: "loading" },
 	},
 	play: async () => {
@@ -112,7 +116,15 @@ export const Loading: Story = {
 };
 
 export const UpdatingRepositories: Story = {
-	args: { overview: { status: "ready", overview: OVERVIEW, stale: true } },
+	args: {
+		summary: (
+			<ActivityTiles
+				state={{ status: "ready", overview: OVERVIEW, stale: true }}
+				providerType="GITHUB"
+			/>
+		),
+		repositories: memberRepositoryState({ status: "ready", overview: OVERVIEW, stale: true }),
+	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		const region = panel.getByRole("region", { name: "Repositories" });
@@ -139,7 +151,13 @@ const retry = fn();
 
 export const Failed: Story = {
 	args: {
-		overview: { status: "error", error: new Error("Network down"), onRetry: retry },
+		summary: (
+			<ActivityTiles
+				state={{ status: "error", error: new Error("Network down"), onRetry: retry }}
+				providerType="GITHUB"
+			/>
+		),
+		repositories: undefined,
 		workLog: { status: "error", error: new Error("Network down"), onRetry: retry },
 	},
 	play: async () => {
@@ -166,12 +184,18 @@ export const WithAutomationAction: Story = {
 
 export const GitLab: Story = {
 	decorators: [withProvider("GITLAB")],
-	args: { providerType: "GITLAB" },
+	args: {
+		providerType: "GITLAB",
+		summary: <ActivityTiles state={readyOverview(OVERVIEW)} providerType="GITLAB" />,
+	},
 };
 
 export const GitLabDark: Story = {
 	decorators: [withProvider("GITLAB")],
-	args: { providerType: "GITLAB" },
+	args: {
+		providerType: "GITLAB",
+		summary: <ActivityTiles state={readyOverview(OVERVIEW)} providerType="GITLAB" />,
+	},
 	globals: { theme: "dark" },
 };
 
@@ -191,5 +215,16 @@ export const WithAdminActions: Story = {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByRole("button", { name: "Treat as automation" })).toBeVisible();
 		await expect(panel.getByRole("button", { name: "Hide from activity" })).toBeVisible();
+	},
+};
+
+/** Provider data may have no display name or profile link; neither is fabricated. */
+export const LoginOnly: Story = {
+	args: { user: { login: ada.login, name: "", avatarUrl: "", htmlUrl: "" } },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByRole("heading", { name: /^ada$/u })).toBeVisible();
+		await expect(panel.getByText("ada on GitHub", { exact: true })).toBeVisible();
+		await expect(panel.queryByRole("link", { name: /ada on GitHub/u })).not.toBeInTheDocument();
 	},
 };

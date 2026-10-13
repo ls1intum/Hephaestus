@@ -143,8 +143,16 @@ export const PEOPLE_SEARCH_DEFAULTS = peopleSearchSchema.parse({});
 
 export type PeopleSearch = z.infer<typeof peopleSearchSchema>;
 
-/** The public page opens a person by login and nothing over them: no one's work leaves the server. */
-export const PUBLIC_ACTIVITY_LEVEL_KINDS = ["person"] as const;
+/** Public people open only their published pull request, review and issue details. */
+export const PUBLIC_ACTIVITY_LEVEL_KINDS = ["person", "activity"] as const;
+
+export function parsePublicActivityStack(raw: string[] | undefined): ActivityStackEntry[] {
+	const stack = parseActivityStack(raw, PUBLIC_ACTIVITY_LEVEL_KINDS);
+	const unsupported = stack.findIndex(
+		({ target }) => target.kind === "activity" && target.category === "comments",
+	);
+	return unsupported === -1 ? stack : stack.slice(0, unsupported);
+}
 
 export const publicActivitySearchSchema = peopleSearchSchema.extend(
 	detailStackSchema(PUBLIC_ACTIVITY_LEVEL_KINDS).shape,

@@ -23,31 +23,25 @@ import type { ProviderType } from "@/lib/provider/provider-terms";
 import { capitalise, hasText } from "@/lib/text";
 
 import {
-	type ActivityOverviewState,
 	averagePerBucket,
 	BUCKET_SIZE_DEFS,
 	busiestWeek,
 	type DateSpan,
-	readSpan,
 	utcWeekLabel,
 	utcWeekStartLabel,
-	weekRows,
-	weeksSummary,
+	countedWeeksSummary,
 } from "./activity-buckets";
+import type { ActivityCategoryChart, ActivityCategoryChartState } from "./activity-category-chart";
 import { BAR_RADIUS, BarTooltip, MAX_BAR_SIZE } from "./activity-chart";
 import {
 	ACTIVITY_CATEGORY_DEFS,
 	ACTIVITY_KIND_DEFS,
-	type ActivityCategory,
 	type ActivityCategoryDef,
-	type ActivityKind,
 } from "./activity-kind-defs";
-import type { ActivityOverview } from "./activity-tally";
 import { ACTIVITY_TONES, markTone, STALE } from "./activity-tones";
 
 export interface ActivityTrendChartProps {
-	state: ActivityOverviewState;
-	category: ActivityCategory;
+	state: ActivityCategoryChartState;
 	providerType: ProviderType;
 }
 
@@ -60,7 +54,7 @@ export interface ActivityTrendChartProps {
  * change request's red is a pair a red-green colour-blind reader cannot tell apart. Every value is
  * also in the table under the charts, which is the path that needs no pointer.
  */
-export function ActivityTrendChart({ state, category, providerType }: ActivityTrendChartProps) {
+export function ActivityTrendChart({ state, providerType }: ActivityTrendChartProps) {
 	const nowMs = useNow();
 	const summaryId = useId();
 	if (state.status === "error") {
@@ -81,21 +75,27 @@ export function ActivityTrendChart({ state, category, providerType }: ActivityTr
 			</div>
 		);
 	}
-	const { overview } = state;
-	const span = readSpan(state);
+	const { chart } = state;
+	const span = state.stale ? undefined : state.span;
 	const previous = state.stale ? undefined : state.previous;
-	const def: ActivityCategoryDef = ACTIVITY_CATEGORY_DEFS[category];
+	const def: ActivityCategoryDef = ACTIVITY_CATEGORY_DEFS[chart.category];
 	const size = BUCKET_SIZE_DEFS.WEEK;
-	const headline = def.headline.count(overview.tally);
-	const busiest = busiestWeek(overview.weeks, def.headline.count);
-	const difference = previous && headline - def.headline.count(previous.tally);
+	const headline = chart.total;
+	const busiest = busiestWeek(chart.weeks);
+	const difference = previous && headline - previous.total;
 	const scaleMax = Math.max(
 		0,
-		...def.kinds.flatMap((kind) => overview.weeks.map(({ tally }) => tally[kind])),
+		...chart.weeks.flatMap((week) => week.kinds.map(({ count }) => count)),
 	);
-	const plottedKinds = def.kinds.filter(
-		(kind) => overview.tally[kind] !== 0 || overview.weeks.some((week) => week.tally[kind] !== 0),
-	);
+	const plottedKinds = chart.kinds
+		.filter(
+			({ kind, count }) =>
+				count !== 0 ||
+				chart.weeks.some((week) =>
+					week.kinds.some((value) => value.kind === kind && value.count !== 0),
+				),
+		)
+		.map(({ kind }) => kind);
 	const lastPlottedKind = plottedKinds.at(-1);
 	const label = (start: Date) => capitalise(utcWeekLabel(start, span));
 	return (
@@ -104,7 +104,7 @@ export function ActivityTrendChart({ state, category, providerType }: ActivityTr
 				<Figure term={capitalise(def.headline.qualifier ?? "total")} value={String(headline)} />
 				<Figure
 					term={`Average per ${size.noun}`}
-					value={averagePerBucket(headline, overview.weeks.length)}
+					value={averagePerBucket(headline, chart.weeks.length)}
 				/>
 				{busiest && (
 					<Figure
@@ -120,17 +120,17 @@ export function ActivityTrendChart({ state, category, providerType }: ActivityTr
 			<figure aria-labelledby={summaryId} className="space-y-4">
 				<p className="text-xs text-muted-foreground">Weeks use UTC.</p>
 				<ul className="space-y-4">
-					{def.kinds.map((kind) => (
+					{chart.kinds.map((series) => (
 						<KindRow
-							key={kind}
-							kind={kind}
-							overview={overview}
+							key={series.kind}
+							series={series}
+							weeks={chart.weeks}
 							scaleMax={scaleMax}
 							label={label}
-							plot={plottedKinds.includes(kind)}
+							plot={plottedKinds.includes(series.kind)}
 							nowMs={nowMs}
 							providerType={providerType}
-							last={kind === lastPlottedKind}
+							last={series.kind === lastPlottedKind}
 						/>
 					))}
 				</ul>
@@ -142,10 +142,10 @@ export function ActivityTrendChart({ state, category, providerType }: ActivityTr
 					</Empty>
 				)}
 				<figcaption id={summaryId} className="sr-only">
-					{weeksSummary(overview, span, def.headline.count, def.headline.noun(providerType))}
+					{countedWeeksSummary(chart.total, chart.weeks, span, def.headline.noun(providerType))}
 				</figcaption>
 			</figure>
-			<BucketTable def={def} overview={overview} span={span} providerType={providerType} />
+			<BucketTable def={def} chart={chart} span={span} providerType={providerType} />
 		</div>
 	);
 }
@@ -182,8 +182,8 @@ function Figure({ term, value, note }: { term: string; value: string; note?: str
  * last row only.
  */
 function KindRow({
-	kind,
-	overview,
+	series,
+	weeks,
 	scaleMax,
 	label,
 	plot,
@@ -191,8 +191,8 @@ function KindRow({
 	providerType,
 	last,
 }: {
-	kind: ActivityKind;
-	overview: ActivityOverview;
+	series: ActivityCategoryChart["kinds"][number];
+	weeks: ActivityCategoryChart["weeks"];
 	scaleMax: number;
 	label: (start: Date) => string;
 	plot: boolean;
@@ -200,13 +200,17 @@ function KindRow({
 	providerType: ProviderType;
 	last: boolean;
 }) {
-	const def = ACTIVITY_KIND_DEFS[kind];
+	const def = ACTIVITY_KIND_DEFS[series.kind];
 	const Icon = def.icon(providerType);
 	// The icon keeps the kind's own colour, as everywhere else; only its bars take a mark tone.
 	const tone = ACTIVITY_TONES[markTone(def.tone)];
-	const rows = weekRows(overview.weeks, (tally) => tally[kind]);
+	const rows = weeks.flatMap((week) =>
+		week.kinds
+			.filter(({ kind }) => kind === series.kind)
+			.map(({ count }) => ({ start: week.start.getTime(), count })),
+	);
 	const config = { count: { label: def.label, color: tone.fill } } satisfies ChartConfig;
-	const total = overview.tally[kind];
+	const total = series.count;
 	return (
 		<li className="space-y-1">
 			<p className="flex items-center gap-2 text-sm">
@@ -278,12 +282,12 @@ function KindRow({
  */
 function BucketTable({
 	def,
-	overview,
+	chart,
 	span,
 	providerType,
 }: {
 	def: ActivityCategoryDef;
-	overview: ActivityOverview;
+	chart: ActivityCategoryChart;
 	span: DateSpan | undefined;
 	providerType: ProviderType;
 }) {
@@ -306,7 +310,7 @@ function BucketTable({
 									{capitalise(size.noun)}
 								</span>
 							</TableHead>
-							{def.kinds.map((kind) => (
+							{chart.kinds.map(({ kind }) => (
 								<TableHead key={kind} numeric className="text-right">
 									{ACTIVITY_KIND_DEFS[kind].label}
 								</TableHead>
@@ -319,19 +323,17 @@ function BucketTable({
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{overview.weeks.map((week) => (
+						{chart.weeks.map((week) => (
 							<TableRow key={week.start.getTime()} variant="static">
 								<TableCell className="sticky left-0 z-20 bg-card">
 									<span className="block min-w-28 wrap-anywhere whitespace-normal">
 										{capitalise(utcWeekLabel(week.start, span))}
 									</span>
 								</TableCell>
-								{def.kinds.map((kind) => (
-									<CountCell key={kind} count={week.tally[kind]} />
+								{week.kinds.map(({ kind, count }) => (
+									<CountCell key={kind} count={count} />
 								))}
-								{hasText(def.headline.column) && (
-									<CountCell count={def.headline.count(week.tally)} />
-								)}
+								{hasText(def.headline.column) && <CountCell count={week.count} />}
 							</TableRow>
 						))}
 					</TableBody>

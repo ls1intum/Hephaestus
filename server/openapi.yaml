@@ -2612,6 +2612,155 @@ paths:
       summary: Read human contributions to public repositories
       tags:
       - public-activity
+  /public/workspaces/{slug}/activity/people/{login}:
+    get:
+      operationId: getPublicActivityPerson
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      - description: Activity range
+        in: query
+        name: range
+        required: false
+        schema:
+          type: string
+          enum:
+          - 30d
+          - 90d
+          - 1y
+          - all
+          - custom
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: repo
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicActivityPersonDetail"
+          description: Public contributions counted
+      security: []
+      summary: Read a person's published repository contributions
+      tags:
+      - public-activity
+  /public/workspaces/{slug}/activity/people/{login}/work:
+    get:
+      operationId: getPublicActivityPersonWork
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      - description: Activity range
+        in: query
+        name: range
+        required: false
+        schema:
+          type: string
+          enum:
+          - 30d
+          - 90d
+          - 1y
+          - all
+          - custom
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: repo
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+      - description: Kinds of activity to list (repeatable); omit for every kind
+        in: query
+        name: kinds
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - PULL_REQUEST_OPENED
+            - PULL_REQUEST_MERGED
+            - PULL_REQUEST_CLOSED
+            - REVIEW_APPROVED
+            - REVIEW_CHANGES_REQUESTED
+            - REVIEW_COMMENTED
+            - COMMENTED
+            - CODE_COMMENTED
+            - ISSUE_OPENED
+            - ISSUE_CLOSED
+          uniqueItems: true
+      - description: The previous page's nextCursor; omit for the first page
+        in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - description: Page size from 1 to 100; defaults to 30
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicActivityWorkPage"
+          description: Public work listed
+      security: []
+      summary: Read a person's published work timeline
+      tags:
+      - public-activity
   /user:
     delete:
       operationId: deleteCurrentUser
@@ -18953,6 +19102,101 @@ components:
       - name
       - profileUrl
       - weeks
+    PublicActivityPersonDetail:
+      type: object
+      description: "One published person's public contributions. Excludes account\
+        \ details, teams, automation and private activity."
+      properties:
+        breakdown:
+          $ref: "#/components/schemas/PublicActivityReviewBreakdown"
+        counts:
+          $ref: "#/components/schemas/PublicActivityCounts"
+        firstContributionAt:
+          type: string
+          format: date-time
+        from:
+          type: string
+          format: date-time
+        person:
+          $ref: "#/components/schemas/PublicActivityPersonIdentity"
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicActivityPersonRepository"
+        supportedKinds:
+          type: array
+          items:
+            type: string
+            enum:
+            - PULL_REQUEST_OPENED
+            - PULL_REQUEST_MERGED
+            - PULL_REQUEST_CLOSED
+            - REVIEW_APPROVED
+            - REVIEW_CHANGES_REQUESTED
+            - REVIEW_COMMENTED
+            - COMMENTED
+            - CODE_COMMENTED
+            - ISSUE_OPENED
+            - ISSUE_CLOSED
+        to:
+          type: string
+          format: date-time
+        weeks:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicActivityPersonWeek"
+      required:
+      - breakdown
+      - counts
+      - from
+      - person
+      - repositories
+      - supportedKinds
+      - to
+      - weeks
+    PublicActivityPersonIdentity:
+      type: object
+      properties:
+        avatarUrl:
+          type: string
+        htmlUrl:
+          type: string
+        login:
+          type: string
+        name:
+          type: string
+      required:
+      - avatarUrl
+      - htmlUrl
+      - login
+      - name
+    PublicActivityPersonRepository:
+      type: object
+      properties:
+        counts:
+          $ref: "#/components/schemas/PublicActivityCounts"
+        repository:
+          $ref: "#/components/schemas/PublicActivityRepository"
+        rowKey:
+          type: string
+      required:
+      - counts
+      - repository
+      - rowKey
+    PublicActivityPersonWeek:
+      type: object
+      properties:
+        breakdown:
+          $ref: "#/components/schemas/PublicActivityReviewBreakdown"
+        counts:
+          $ref: "#/components/schemas/PublicActivityCounts"
+        start:
+          type: string
+          format: date-time
+      required:
+      - breakdown
+      - counts
+      - start
     PublicActivityPolicy:
       type: object
       properties:
@@ -18970,6 +19214,87 @@ components:
       required:
       - key
       - name
+    PublicActivityReviewBreakdown:
+      type: object
+      properties:
+        approvals:
+          type: integer
+          format: int64
+        changeRequests:
+          type: integer
+          format: int64
+        commentReviews:
+          type: integer
+          format: int64
+      required:
+      - approvals
+      - changeRequests
+      - commentReviews
+    PublicActivityWork:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityAction"
+        id:
+          type: string
+        lastOccurredAt:
+          type: string
+          format: date-time
+        work:
+          $ref: "#/components/schemas/PublicActivityWorkSummary"
+      required:
+      - actions
+      - id
+      - lastOccurredAt
+      - work
+    PublicActivityWorkPage:
+      type: object
+      description: "One page of the selected person's published work; no account,\
+        \ author or other participant data."
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicActivityWork"
+        nextCursor:
+          type: string
+      required:
+      - content
+    PublicActivityWorkSummary:
+      type: object
+      properties:
+        htmlUrl:
+          type: string
+        isDraft:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        repository:
+          $ref: "#/components/schemas/PublicActivityRepository"
+        state:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+          - MERGED
+        title:
+          type: string
+        type:
+          type: string
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+      required:
+      - htmlUrl
+      - isDraft
+      - number
+      - repository
+      - state
+      - title
+      - type
     PublicActivityWorkspaceSettings:
       type: object
       properties:

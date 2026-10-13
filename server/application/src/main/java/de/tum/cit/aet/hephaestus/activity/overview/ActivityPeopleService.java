@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.activity.overview;
 
+import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityActionDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityBreakdownDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityContributorKind;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityCountsDTO;
@@ -13,8 +14,16 @@ import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityRepositoryDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivitySparklineWeekDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityTeamDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityWeekDTO;
+import de.tum.cit.aet.hephaestus.activity.overview.dto.PublicActivityDTO.PublicActivityRepositoryDTO;
+import de.tum.cit.aet.hephaestus.activity.overview.dto.PublicActivityPersonDetailDTO;
+import de.tum.cit.aet.hephaestus.activity.overview.dto.PublicActivityWorkPageDTO;
+import de.tum.cit.aet.hephaestus.activity.overview.dto.PublicActivityWorkPageDTO.PublicActivityWorkDTO;
+import de.tum.cit.aet.hephaestus.activity.overview.dto.PublicActivityWorkPageDTO.PublicActivityWorkSummaryDTO;
+import de.tum.cit.aet.hephaestus.activity.overview.dto.WorkItemDTO.WorkItemType;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
+import de.tum.cit.aet.hephaestus.core.time.TimeRange;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State;
 import java.time.Clock;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -27,9 +36,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +48,7 @@ public class ActivityPeopleService {
     private final ActivityPeopleQueryRepository queries;
     private final Clock clock;
     private final PublicRepositoryVisibility visibility;
+    private final PublicActivityWorkQueryRepository publicWork;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ActivityPeopleDTO people(
@@ -138,6 +150,16 @@ public class ActivityPeopleService {
         var repositories = queries.repositories(workspace);
         var scope = select(workspace, team, repositoryKeys, queries.teams(workspace), repositories);
         var range = params.resolve(clock, () -> queries.findEarliest(scope));
+        return detail(scope, range, userId, own, contributor, repositories);
+    }
+
+    private ActivityPersonDetailDTO detail(
+            ActivityScope scope,
+            TimeRange range,
+            long userId,
+            boolean own,
+            ActivityPeopleQueryRepository.Contributor contributor,
+            List<ActivityRepositoryDTO> repositories) {
         var rows = queries.people(scope, range, userId, own);
         var total = rows.stream()
                 .filter(ActivityPeopleQueryRepository.PersonCount::total)
@@ -175,6 +197,85 @@ public class ActivityPeopleService {
                 total.breakdown(),
                 weeks,
                 byRepository);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 10)
+    public PublicActivityPersonDetailDTO publicPerson(
+            long workspace, String login, ActivityPeopleRangeParams params, Set<String> repositoryKeys) {
+        var repositories = queries.publicRepositories(workspace, visibility.confirmedAfter());
+        var selected = select(workspace, null, repositoryKeys, List.of(), repositories);
+        var scope = new ActivityScope(workspace, Set.of(), Set.of(), selected.repositoryIds(), true);
+        var contributor = publicContributor(scope, login);
+        var range = params.resolve(clock, () -> queries.findEarliest(scope));
+        return PublicActivityPersonDetailDTO.from(
+                detail(scope, range, contributor.person().id(), false, contributor, repositories));
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 10)
+    public PublicActivityWorkPageDTO publicPersonWork(
+            long workspace,
+            String login,
+            ActivityPeopleRangeParams params,
+            Set<String> repositoryKeys,
+            ActivityWorkFilterParams page) {
+        var repositories = queries.publicRepositories(workspace, visibility.confirmedAfter());
+        var selected = select(workspace, null, repositoryKeys, List.of(), repositories);
+        var scope = new ActivityScope(workspace, Set.of(), Set.of(), selected.repositoryIds(), true);
+        var contributor = publicContributor(scope, login);
+        var kinds = page.kinds() == null || page.kinds().isEmpty()
+                ? PublicActivityPersonDetailDTO.SUPPORTED_KINDS
+                : List.copyOf(page.kinds());
+        if (!PublicActivityPersonDetailDTO.SUPPORTED_KINDS.containsAll(kinds)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This kind is not published in public activity.");
+        }
+        var range = page.range(params, clock, () -> queries.findEarliest(scope));
+        var groups = publicWork.findWork(
+                scope,
+                range,
+                contributor.person().id(),
+                false,
+                new PublicActivityWorkQueryRepository.Selection(
+                        kinds.stream().map(kind -> kind.eventType().name()).toList(), page.pageSize() + 1),
+                page.position(range));
+        boolean hasNext = groups.size() > page.pageSize();
+        var content = hasNext ? groups.subList(0, page.pageSize()) : groups;
+        return new PublicActivityWorkPageDTO(
+                content.stream()
+                        .map(group -> new PublicActivityWorkDTO(
+                                group.getId(),
+                                new PublicActivityWorkSummaryDTO(
+                                        WorkItemType.valueOf(group.getType()),
+                                        group.getNumber(),
+                                        group.getTitle(),
+                                        State.valueOf(group.getState()),
+                                        group.getDraft(),
+                                        group.getHtmlUrl(),
+                                        new PublicActivityRepositoryDTO(
+                                                group.getRepositoryKey(), group.getRepositoryName())),
+                                PublicActivityPersonDetailDTO.SUPPORTED_KINDS.stream()
+                                        .filter(kind -> group.count(kind) > 0)
+                                        .map(kind -> new ActivityActionDTO(kind, Math.toIntExact(group.count(kind))))
+                                        .toList(),
+                                group.getLastOccurredAt()))
+                        .toList(),
+                hasNext
+                        ? new ActivityWorkCursor(
+                                        range.to(),
+                                        content.getLast().getLastOccurredAt(),
+                                        content.getLast().getId())
+                                .encode()
+                        : null);
+    }
+
+    private ActivityPeopleQueryRepository.Contributor publicContributor(ActivityScope scope, String login) {
+        var matches = scope.repositoryIds().isEmpty()
+                ? List.<ActivityPeopleQueryRepository.ContributorRow>of()
+                : queries.findPublicContributor(scope, login);
+        if (matches.size() != 1) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This public activity page is not available.");
+        }
+        var person = matches.getFirst();
+        return new ActivityPeopleQueryRepository.Contributor(person.person(), person.kind());
     }
 
     ActivityScope select(

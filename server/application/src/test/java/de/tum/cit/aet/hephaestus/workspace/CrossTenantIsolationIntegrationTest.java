@@ -535,6 +535,12 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     @DisplayName("Workspace activity roster")
     class WorkspaceActivity {
 
+        @BeforeEach
+        void connectActivitySources() {
+            connectActivitySource(workspaceA, ensureGitHubProvider());
+            connectActivitySource(workspaceB, ensureGitHubProvider());
+        }
+
         @Test
         @WithMentorUser
         void shouldListOnlyWorkspaceContributorsWhenOrganizationsOverlap() {

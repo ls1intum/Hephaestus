@@ -17,9 +17,10 @@ import { getProviderTerms, type ProviderType } from "@/lib/provider/provider-ter
 import type { ActivityOverviewState } from "./activity-buckets";
 import type { ActivityPeriod } from "./activity-period";
 import { ActivityPeriodPicker } from "./ActivityPeriodPicker";
+import { ActivityTiles } from "./ActivityTiles";
 import type { ActivityWorkLogState } from "./ActivityWorkLog";
 import { type OpenWorkReviewNow, OpenWorkSections, type OpenWorkState } from "./OpenWorkSections";
-import { PersonActivitySections } from "./PersonActivitySections";
+import { PersonActivitySections, memberRepositoryState } from "./PersonActivitySections";
 
 /** Whose activity the page reads: the account's login in this workspace, once the membership says. */
 export type ActivityAccount =
@@ -111,7 +112,8 @@ export function ActivityPage({
 						}
 					/>
 				}
-				overview={overview}
+				summary={<ActivityTiles state={overview} providerType={providerType} />}
+				repositories={memberRepositoryState(overview)}
 				workLog={timeline}
 				providerType={providerType}
 				subject={{ people: "one", login }}

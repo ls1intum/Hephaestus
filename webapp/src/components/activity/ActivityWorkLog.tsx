@@ -2,7 +2,7 @@ import { isSameDay, startOfDay, subDays } from "date-fns";
 import { type ReactNode, useId } from "react";
 
 import { cn } from "cn";
-import type { ActivityWork } from "@/api/types.gen";
+import type { ActivityWork, RepositoryInfo, UserInfo, WorkItem } from "@/api/types.gen";
 import { InfiniteListEnd } from "@/components/common/InfiniteListEnd";
 import { InlineLink } from "@/components/common/InlineLink";
 import { MetaRow } from "@/components/common/MetaRow";
@@ -30,13 +30,22 @@ import { ActivityEmpty, HistoryMark } from "./ActivityEmpty";
 import { PeopleStack } from "./PeopleStack";
 import { goneWorkVisual, workStateVisual } from "./work-state-defs";
 
+/** The work facts a timeline renders; public reads need no account or review metadata. */
+export type ActivityWorkLogItem = Pick<ActivityWork, "id" | "actions" | "lastOccurredAt"> & {
+	work?: Pick<WorkItem, "type" | "state" | "isDraft" | "number" | "title" | "htmlUrl"> & {
+		repository?: Pick<RepositoryInfo, "name">;
+		author?: Pick<UserInfo, "login" | "name">;
+	};
+	people?: UserInfo[];
+};
+
 /**
  * A work log once its first page is in: the work loaded so far, the paging, whether it is the
- * previous range's standing in while the range just chosen loads, and `onCopy`, which copies every
- * page of it — so no caller can offer a copy of a list that is not there.
+ * previous range's standing in while the range just chosen loads. A supplied `onCopy` copies every
+ * page; without that capability, the region offers no copy action.
  */
 export type ActivityWorkLogState = PanelState<
-	{ items: ActivityWork[]; stale: boolean; onCopy: () => Promise<void> } & MorePages
+	{ items: ActivityWorkLogItem[]; stale: boolean; onCopy?: () => Promise<void> } & MorePages
 >;
 
 /**
@@ -148,7 +157,7 @@ function WorkLogRow({
 	providerType,
 	subject,
 }: {
-	item: ActivityWork;
+	item: ActivityWorkLogItem;
 	providerType: ProviderType;
 	subject: WorkLogSubject;
 }) {
@@ -184,7 +193,7 @@ function WorkLogRow({
 			</ItemContent>
 			<ItemActions className="flex-wrap gap-x-4 gap-y-2">
 				<ActionChips actions={item.actions} providerType={providerType} display="work" />
-				{subject.people === "several" && item.people.length > 0 && (
+				{subject.people === "several" && item.people !== undefined && item.people.length > 0 && (
 					<PeopleStack
 						people={item.people.map((user) => ({ user }))}
 						providerType={providerType}
@@ -202,8 +211,8 @@ function WorkLogRow({
 	);
 }
 
-function groupByDay(items: ActivityWork[]): { day: Date; items: ActivityWork[] }[] {
-	const groups: { day: Date; items: ActivityWork[] }[] = [];
+function groupByDay(items: ActivityWorkLogItem[]): { day: Date; items: ActivityWorkLogItem[] }[] {
+	const groups: { day: Date; items: ActivityWorkLogItem[] }[] = [];
 	for (const item of items) {
 		const last = groups.at(-1);
 		if (last && isSameDay(last.day, item.lastOccurredAt)) {

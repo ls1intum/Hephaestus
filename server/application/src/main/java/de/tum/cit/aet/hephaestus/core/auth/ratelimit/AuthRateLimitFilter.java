@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.ratelimit;
 
 import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
+import de.tum.cit.aet.hephaestus.core.auth.web.PublicActivityReadRequestMatcher;
 import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
 import io.github.bucket4j.ConsumptionProbe;
 import jakarta.servlet.FilterChain;
@@ -145,7 +146,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             return null;
         }
         String method = request.getMethod();
-        if (("GET".equals(method) || "HEAD".equals(method)) && path.matches("/public/workspaces/[^/]+/activity")) {
+        if (PublicActivityReadRequestMatcher.MATCHER.matches(request)) {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null
                     && authentication.isAuthenticated()

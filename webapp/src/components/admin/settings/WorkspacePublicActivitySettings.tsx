@@ -295,8 +295,11 @@ function PublishDialog({
 									link to their profile
 								</li>
 								<li>
-									the {pullRequests} each person opened and reviewed, the issues they opened, and a
-									weekly line of their activity
+									counts of the {pullRequests} each person opened and reviewed and the issues they
+									opened
+								</li>
+								<li>
+									their public work timeline, with titles and links, and weekly activity counts
 								</li>
 							</ul>
 							<p>

@@ -7,8 +7,7 @@ import type { PublicActivity } from "@/api/types.gen";
 import { publicPeopleRows } from "@/components/activity/activity-people-rows";
 import { periodFromSearch, periodQuery, periodSearch } from "@/components/activity/activity-period";
 import {
-	parseActivityStack,
-	PUBLIC_ACTIVITY_LEVEL_KINDS,
+	parsePublicActivityStack,
 	PUBLIC_ACTIVITY_SEARCH_DEFAULTS,
 	type PeopleSearch,
 	type PublicActivitySearch,
@@ -18,6 +17,7 @@ import {
 	PERIOD_SEARCH_KEYS,
 } from "@/components/activity/activity-search";
 import type { PeopleOrder } from "@/components/activity/ActivityPeopleTable";
+import { publicCategoryKinds } from "@/components/activity/public-person-activity";
 import {
 	PublicActivityPage,
 	PublicActivityPageSkeleton,
@@ -27,6 +27,7 @@ import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-sta
 import { PublicActivityOnboardingDialog } from "@/components/onboarding/PublicActivityOnboardingDialog";
 import { useLoginNavigation } from "@/hooks/use-login-navigation";
 import { usePublicActivityOnboarding } from "@/hooks/use-public-activity-onboarding";
+import { usePublicPersonActivity, usePublicPersonWork } from "@/hooks/use-public-person-activity";
 import { pageTitle } from "@/lib/page-title";
 import { problemStatusOf } from "@/lib/problem-detail";
 import { toScmProviderType } from "@/lib/provider/provider-terms";
@@ -188,8 +189,27 @@ function PublicActivityRoute() {
 	const setView = (view: Partial<PeopleSearch>) => {
 		void setSearch((previous) => ({ ...previous, ...view }), { replace: true });
 	};
-	const detailStack = parseActivityStack(search.detail, PUBLIC_ACTIVITY_LEVEL_KINDS);
+	const detailStack = parsePublicActivityStack(search.detail);
 	const stackControls = useDetailStack();
+	const personEntry = detailStack.find(({ target }) => target.kind === "person");
+	const login = personEntry?.target.kind === "person" ? personEntry.target.login : undefined;
+	const categoryEntry = detailStack.find(({ target }) => target.kind === "activity");
+	const category =
+		categoryEntry?.target.kind === "activity" ? categoryEntry.target.category : undefined;
+	const scope = {
+		workspaceSlug,
+		login,
+		period: periodFromSearch(search),
+		repo: search.repo ?? [],
+		enabled: page !== undefined && login !== undefined,
+	};
+	const person = usePublicPersonActivity(scope);
+	const workLog = usePublicPersonWork(scope);
+	const categoryWorkLog = usePublicPersonWork({
+		...scope,
+		enabled: scope.enabled && category !== undefined,
+		kinds: category === undefined ? undefined : publicCategoryKinds(category),
+	});
 
 	return (
 		<>
@@ -221,7 +241,11 @@ function PublicActivityRoute() {
 							}
 						: undefined
 				}
-				detail={{ stack: detailStack, onClose: stackControls.close }}
+				detail={{
+					stack: detailStack,
+					onClose: stackControls.close,
+				}}
+				personActivity={{ person, workLog, categoryWorkLog }}
 				people={
 					page === undefined
 						? {

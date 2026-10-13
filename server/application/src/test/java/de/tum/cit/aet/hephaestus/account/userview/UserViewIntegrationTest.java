@@ -323,6 +323,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     void shouldReadTheNormalActivityAsTheSelectedAccountlessUser() {
+        connectActivitySource(workspace, viewed.getProvider());
         recordReview(viewed);
 
         sessionRequest("/workspaces/acme/activity/work?login=" + viewed.getLogin())
@@ -372,6 +373,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
         User gitLabNamesake =
                 TestUserFactory.ensureUser(userRepository, viewed.getLogin(), 700_002L, ensureGitLabProvider());
         ensureWorkspaceMembership(workspace, gitLabNamesake, WorkspaceMembership.WorkspaceRole.MEMBER);
+        connectActivitySource(workspace, gitLabNamesake.getProvider());
         recordReview(viewed);
         recordReview(gitLabNamesake);
 
@@ -393,6 +395,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void shouldReadATeammatesActivityAndRecordTheViewWhenViewingAMember() {
         User teammate = persistUser("teammate-activity");
         ensureWorkspaceMembership(workspace, teammate, WorkspaceMembership.WorkspaceRole.MEMBER);
+        connectActivitySource(workspace, teammate.getProvider());
         recordReview(teammate);
 
         sessionRequest("/workspaces/acme/activity/work?login=" + teammate.getLogin())

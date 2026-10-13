@@ -8,7 +8,9 @@ description: Publication settings and privacy controls for public repository act
 
 A public activity page shows human contributions to public GitHub and GitLab repositories.
 It includes pull requests, reviews, and issues from workspace members and outside contributors.
-It excludes private repositories, automation, practices, feedback, Slack, Outline, and AI content.
+A person’s detail shows counts by repository, a public work timeline, and weekly pull request, review, or issue counts.
+Work titles link to the provider.
+It excludes private repositories, account details, automation, practices, feedback, Slack, Outline, and AI content.
 Keep course workspaces private.
 Before publication, verify the activity repair described in the [activity history runbook](./activity-history-repair.mdx).
 
@@ -20,11 +22,11 @@ Visitors see a change when they load the page again.
 A shared cache can delay that by up to a minute.
 A page that is already open in a browser keeps its contents until it loads again.
 
-| Who | Where | Control |
-| --- | --- | --- |
-| Instance administrator | **Instance settings**, **Public activity pages** | **Allow public activity pages** |
+| Who                     | Where                                            | Control                                        |
+| ----------------------- | ------------------------------------------------ | ---------------------------------------------- |
+| Instance administrator  | **Instance settings**, **Public activity pages** | **Allow public activity pages**                |
 | Workspace administrator | **Workspace settings**, **Public activity page** | **Publish the page**, **Allow search engines** |
-| Workspace administrator | **Workspace activity**, a person's level | **Hide from activity** |
+| Workspace administrator | **Workspace activity**, a person's level         | **Hide from activity**                         |
 
 ### Instance administrators
 
@@ -39,7 +41,7 @@ The switch shows the stored choice, not the configured default.
 The confirmation states what becomes public:
 
 - everyone who contributed to the public repositories, members and outside contributors, by name, picture and profile link
-- the pull requests (merge requests on GitLab) each person opened and reviewed, the issues they opened, and a weekly line of their activity
+- the pull requests (merge requests on GitLab) each person opened and reviewed, the issues they opened, their public work timeline, and weekly counts of their activity
 
 It also states that the page shows nothing from private repositories, practices, feedback, AI content, Slack, Outline or automation accounts.
 Turning the page off needs no confirmation.
@@ -152,8 +154,19 @@ A page client can use this state for a one-time Show me / Hide me step.
 
 ## Anonymous responses
 
-Only `GET` and `HEAD /public/workspaces/{slug}/activity` publish workspace data without sign-in.
-It accepts the activity range presets, custom dates, and `repo`, which names public repositories to count and repeats for more than one.
+Three routes publish workspace activity without sign-in, through `GET` and `HEAD`:
+
+| Route                                                    | Published data                                                            |
+| -------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `/public/workspaces/{slug}/activity`                     | People and repository facets                                              |
+| `/public/workspaces/{slug}/activity/people/{login}`      | One person's profile identity, counts, weekly breakdown, and repositories |
+| `/public/workspaces/{slug}/activity/people/{login}/work` | That person's public work timeline, without authors or participants       |
+
+Each accepts activity range presets, custom dates, and `repo`, which names public repositories to count and repeats for more than one.
+The work route also accepts repeated `kinds`, `size` from 1 to 100 (default 30), and the preceding page's `nextCursor` as `cursor`.
+The supported kinds are pull requests opened or merged, reviews approved, requesting changes or commented, and issues opened.
+The person response lists these as `supportedKinds`.
+Comments on code or in conversations, and close events, are not published.
 An unknown repository is a not-found error.
 The response names the provider (`providerType`) so a client can use its words and icons.
 Each query requires stored public visibility and a recent successful repository metadata read for this workspace.

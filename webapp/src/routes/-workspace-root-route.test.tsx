@@ -5,7 +5,16 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http, type PathParams } from "msw";
 import { assert, describe, expect, it, vi } from "vitest";
 
-import type { PublicActivity, PublicActivityOnboardingRequest } from "@/api/types.gen";
+import {
+	getPublicActivityPersonQueryKey,
+	getPublicActivityPersonWorkInfiniteQueryKey,
+} from "@/api/@tanstack/react-query.gen";
+import type {
+	PublicActivity,
+	PublicActivityPersonDetail,
+	PublicActivityWorkPage,
+	PublicActivityOnboardingRequest,
+} from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
 import { ROUTER_SEARCH } from "@/lib/router-search";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
@@ -60,6 +69,76 @@ function publicActivity(overrides: Partial<Wire<PublicActivity>> = {}): Wire<Pub
 		],
 		...overrides,
 	};
+}
+
+function personDetail(
+	login = "ada",
+	overrides: Partial<Wire<PublicActivityPersonDetail>> = {},
+): Wire<PublicActivityPersonDetail> {
+	return {
+		from: "2026-09-01T00:00:00Z",
+		to: "2026-10-01T00:00:00Z",
+		person: {
+			login,
+			name: login === "ada" ? "Ada Lovelace" : "Bob Brenner",
+			avatarUrl: "",
+			htmlUrl: `https://github.com/${login}`,
+		},
+		counts,
+		breakdown: { approvals: 2, changeRequests: 1, commentReviews: 0 },
+		weeks: [
+			{
+				start: "2026-09-21T00:00:00Z",
+				counts,
+				breakdown: { approvals: 2, changeRequests: 1, commentReviews: 0 },
+			},
+		],
+		repositories: [{ rowKey: "1", repository: { key: "acme/api", name: "api" }, counts }],
+		supportedKinds: [
+			"PULL_REQUEST_OPENED",
+			"PULL_REQUEST_MERGED",
+			"REVIEW_APPROVED",
+			"REVIEW_CHANGES_REQUESTED",
+			"REVIEW_COMMENTED",
+			"ISSUE_OPENED",
+		],
+		...overrides,
+	};
+}
+
+function publicWork(title = "Public work", cursor?: string): Wire<PublicActivityWorkPage> {
+	return {
+		content: [
+			{
+				id: "pr:42",
+				lastOccurredAt: "2026-09-21T10:00:00Z",
+				work: {
+					type: "PULL_REQUEST",
+					number: 42,
+					title,
+					state: "OPEN",
+					isDraft: false,
+					htmlUrl: "https://github.com/acme/api/pull/42",
+					repository: { key: "acme/api", name: "api" },
+				},
+				actions: [{ kind: "REVIEW_APPROVED", count: 1 }],
+			},
+		],
+		nextCursor: cursor,
+	};
+}
+
+function publishPerson(reads: URL[] = [], workReads: URL[] = []) {
+	server.use(
+		http.get("*/public/workspaces/:slug/activity/people/:login", ({ request, params }) => {
+			reads.push(new URL(request.url));
+			return HttpResponse.json(personDetail(String(params.login)));
+		}),
+		http.get("*/public/workspaces/:slug/activity/people/:login/work", ({ request }) => {
+			workReads.push(new URL(request.url));
+			return HttpResponse.json(publicWork());
+		}),
+	);
 }
 
 function publish(page: Wire<PublicActivity> = publicActivity(), reads: URL[] = []) {
@@ -197,9 +276,12 @@ describe("the address of a workspace", () => {
 		expect(loadingShown).not.toContain(true);
 	});
 
-	it("opens published person figures without another read, and returns to the same filters", async () => {
+	it("reads the selected public person and work independently, and returns to the same filters", async () => {
 		const user = userEvent.setup();
 		const reads: URL[] = [];
+		const detailReads: URL[] = [];
+		const workReads: URL[] = [];
+		publishPerson(detailReads, workReads);
 		server.use(unauthenticatedUser);
 		publish(publicActivity(), reads);
 		const address = "/w/acme?range=30d&repo=acme/api&sort=name";
@@ -207,9 +289,13 @@ describe("the address of a workspace", () => {
 		await screen.findByRole("heading", { name: "Acme activity" }, ROUTE_RENDER_WAIT);
 
 		await user.click(screen.getByRole("link", { name: "Ada Lovelace" }));
-		const panel = await screen.findByRole("dialog", { name: "Ada Lovelace" });
+		const panel = await screen.findByRole("dialog", { name: "Ada Lovelace" }, ROUTE_RENDER_WAIT);
 		await waitFor(() => expect(router.state.location.search.detail).toBe("person:ada"));
-		const totals = within(panel).getByRole("list", { name: "In this range" });
+		const totals = await within(panel).findByRole(
+			"list",
+			{ name: "Published totals" },
+			ROUTE_RENDER_WAIT,
+		);
 		const contributions = within(totals)
 			.getAllByRole("listitem")
 			.find((tile) => within(tile).queryByText("Contributions") !== null);
@@ -217,6 +303,8 @@ describe("the address of a workspace", () => {
 		expect(
 			within(contributions).getByText(/^\d+$/u, { ignore: "[aria-hidden] *" }).textContent,
 		).toBe("5");
+		expect(within(panel).queryByRole("table", { name: "Contributions by week" })).toBeNull();
+		await user.click(within(panel).getByRole("button", { name: "Show weekly contributions" }));
 		const weeks = within(panel).getByRole("table", { name: "Contributions by week" });
 		expect(within(weeks).getByRole("cell", { name: "5" }).textContent).toBe("5");
 		expect(
@@ -225,6 +313,10 @@ describe("the address of a workspace", () => {
 				.getAttribute("href"),
 		).toBe("https://github.com/ada");
 		expect(reads).toHaveLength(1);
+		expect(detailReads).toHaveLength(1);
+		expect(workReads).toHaveLength(1);
+		expect(detailReads[0]?.searchParams.get("range")).toBe("30d");
+		expect(workReads[0]?.searchParams.getAll("repo")).toStrictEqual(["acme/api"]);
 
 		await act(async () => router.history.back());
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -232,30 +324,123 @@ describe("the address of a workspace", () => {
 		expect(reads).toHaveLength(1);
 	});
 
-	it("removes a person's figures and profile when the published response no longer includes them", async () => {
-		let page = publicActivity();
+	it("loads a direct person URL without a page row while its work read proceeds independently", async () => {
+		const held = deferred<Response>();
+		let workReads = 0;
+		server.use(unauthenticatedUser);
+		publish(publicActivity({ people: [] }));
 		server.use(
-			unauthenticatedUser,
-			http.get("*/public/workspaces/:slug/activity", () => HttpResponse.json(page)),
+			http.get("*/public/workspaces/:slug/activity/people/:login", async () => held.promise),
+			http.get("*/public/workspaces/:slug/activity/people/:login/work", () => {
+				workReads += 1;
+				return HttpResponse.json(publicWork("Independent public work"));
+			}),
 		);
-		const { router } = renderRouteAtWithRouter("/w/acme?detail=person%3Aada");
-		const panel = await screen.findByRole("dialog", { name: "Ada Lovelace" }, ROUTE_RENDER_WAIT);
-		within(panel).getByRole("link", { name: /ada on GitHub/u });
+		renderRouteAtWithRouter("/w/acme?detail=person:ada");
+		await waitFor(() => expect(workReads).toBe(1), ROUTE_RENDER_WAIT);
+		await screen.findByRole("dialog", { name: "ada" }, ROUTE_RENDER_WAIT);
+		const pending = screen.getByRole("dialog", { name: "ada" });
+		within(pending).getByText("Loading this person’s activity…");
+		expect(within(pending).queryByRole("link", { name: /ada on GitHub/u })).toBeNull();
+		held.resolve(HttpResponse.json(personDetail()));
+		await screen.findByRole("dialog", { name: "Ada Lovelace" }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("table", { name: "Repositories" }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("link", { name: /Independent public work/u }, ROUTE_RENDER_WAIT);
+	});
+
+	it("opens the selected person's review timeline with its actual public kinds and preserves navigation filters", async () => {
+		const user = userEvent.setup();
+		const workReads: URL[] = [];
+		server.use(unauthenticatedUser);
+		publish();
+		publishPerson([], workReads);
+		const address = "/w/acme?range=30d&repo=acme/api&detail=person:ada";
+		const { router } = renderRouteAtWithRouter(address);
+		const parent = await screen.findByRole("dialog", { name: "Ada Lovelace" }, ROUTE_RENDER_WAIT);
+		const totals = await within(parent).findByRole(
+			"list",
+			{ name: "Published totals" },
+			ROUTE_RENDER_WAIT,
+		);
+		await user.click(within(totals).getByRole("link", { name: /^Reviews/u }));
+		await screen.findByRole("dialog", { name: "Reviews" }, ROUTE_RENDER_WAIT);
+		await waitFor(() =>
+			expect(workReads.some((url) => url.searchParams.getAll("kinds").length > 0)).toBe(true),
+		);
+		const selected = workReads.find((url) => url.searchParams.getAll("kinds").length > 0);
+		expect(selected?.pathname).toContain("/people/ada/work");
+		expect(selected?.searchParams.getAll("kinds")).toStrictEqual([
+			"REVIEW_APPROVED",
+			"REVIEW_CHANGES_REQUESTED",
+			"REVIEW_COMMENTED",
+		]);
+		expect(selected?.searchParams.getAll("repo")).toStrictEqual(["acme/api"]);
+		await user.keyboard("{Escape}");
+		await waitFor(() => expect(screen.queryByRole("dialog", { name: "Reviews" })).toBeNull());
+		expect(router.state.location.search.detail).toBe("person:ada");
+		await user.click(
+			within(screen.getByRole("dialog", { name: "Ada Lovelace" })).getByRole("button", {
+				name: /^Close$/u,
+			}),
+		);
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+		expect(router.state.location.search.repo).toBe("acme/api");
+		expect(router.state.location.search.range).toBe("30d");
+	});
+
+	it("does not restore denied person data or old work after a later network failure", async () => {
+		let detailResponse: () => Response = () => HttpResponse.json(personDetail());
+		const workResponse: () => Response = () =>
+			HttpResponse.json(publicWork("Previously published work"));
+		server.use(unauthenticatedUser);
+		publish();
 		server.use(
-			http.get("*/public/workspaces/:slug/activity", () => HttpResponse.error(), { once: true }),
+			http.get("*/public/workspaces/:slug/activity/people/:login", () => detailResponse()),
+			http.get("*/public/workspaces/:slug/activity/people/:login/work", () => workResponse()),
 		);
-		await act(async () => router.invalidate());
-		within(screen.getByRole("dialog", { name: "Ada Lovelace" })).getByRole("link", {
-			name: /ada on GitHub/u,
+		const { queryClient, router } = renderRouteAtWithRouter("/w/acme?detail=person:ada");
+		await screen.findByRole("link", { name: /Previously published work/u }, ROUTE_RENDER_WAIT);
+		const detailKey = getPublicActivityPersonQueryKey({
+			path: { slug: "acme", login: "ada" },
+			query: { range: "90d" },
 		});
-		page = publicActivity({ people: [person("bob", "Bob Brenner")] });
-		await act(async () => router.invalidate());
-		await waitFor(() => {
-			const current = screen.getByRole("dialog", { name: "ada" });
-			within(current).getByText("No activity in this range");
-			expect(within(current).queryByRole("link", { name: /on GitHub/u })).toBeNull();
-			expect(within(current).queryByRole("table")).toBeNull();
+		const workKey = getPublicActivityPersonWorkInfiniteQueryKey({
+			path: { slug: "acme", login: "ada" },
+			query: { range: "90d", size: 30 },
 		});
+		detailResponse = () => HttpResponse.json({ status: 404, title: "Not Found" }, { status: 404 });
+		await act(async () => {
+			await queryClient.invalidateQueries({ queryKey: detailKey, exact: true });
+		});
+		await screen.findAllByText("We could not find this person’s activity", {}, ROUTE_RENDER_WAIT);
+		await waitFor(() => expect(queryClient.getQueryData(detailKey)).toBeUndefined());
+		await waitFor(() => expect(queryClient.getQueryData(workKey)).toBeDefined());
+		expect(screen.queryByRole("link", { name: /Previously published work/u })).toBeNull();
+		expect(screen.queryByRole("link", { name: /ada on GitHub/u })).toBeNull();
+		detailResponse = () => HttpResponse.error();
+		await act(async () => {
+			await queryClient.invalidateQueries({ queryKey: detailKey, exact: true });
+		});
+		await screen.findByText("We could not load this person’s activity", {}, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("link", { name: /Previously published work/u })).toBeNull();
+		expect(screen.queryByRole("link", { name: /ada on GitHub/u })).toBeNull();
+		await act(async () => {
+			await router.navigate({
+				to: "/w/$workspaceSlug",
+				params: { workspaceSlug: "acme" },
+				search: {},
+			});
+		});
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+		await act(async () => {
+			await router.navigate({
+				to: "/w/$workspaceSlug",
+				params: { workspaceSlug: "acme" },
+				search: { detail: ["person:ada"] },
+			});
+		});
+		await screen.findByText("We could not load this person’s activity", {}, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("link", { name: /Previously published work/u })).toBeNull();
 	});
 });
 

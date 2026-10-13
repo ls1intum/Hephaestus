@@ -1,4 +1,4 @@
-import type { ActivityRepositoryCounts } from "@/api/types.gen";
+import type { ActivityRepository } from "@/api/types.gen";
 import {
 	Table,
 	TableBody,
@@ -10,10 +10,18 @@ import {
 import type { ProviderType } from "@/lib/provider/provider-terms";
 
 import { NoneMark } from "./ActionChip";
+import type { PersonCounts } from "./activity-people-rows";
 import { ActivityCountCell, ActivityCountHeader, type CountedCategory } from "./ActivityCountCell";
 
+/** Displayed counts with their actual stable row identity, from either supported read. */
+export interface ActivityRepositoryRow {
+	rowKey: string;
+	repository: Pick<ActivityRepository, "key" | "name">;
+	counts: PersonCounts;
+}
+
 export interface ActivityRepositoryTableProps {
-	repositories: readonly ActivityRepositoryCounts[];
+	repositories: readonly ActivityRepositoryRow[];
 	providerType: ProviderType;
 }
 
@@ -54,27 +62,30 @@ export function ActivityRepositoryTable({
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{rows.map(({ repository, counts }) => (
-					<TableRow key={repository.id} variant="static">
-						<TableCell className="sticky left-0 z-20 bg-card pl-3 font-medium">
-							<span className="block min-w-36 wrap-anywhere whitespace-normal">
-								{repository.key}
-							</span>
-						</TableCell>
-						<TableCell numeric className="text-right font-semibold">
-							{counts.contributions === 0 ? <NoneMark /> : counts.contributions}
-						</TableCell>
-						{CATEGORIES.map((category) => (
-							<TableCell key={category} numeric className="text-right last:pr-3">
-								<ActivityCountCell
-									category={category}
-									counts={counts}
-									providerType={providerType}
-								/>
+				{rows.map((row) => {
+					const { repository, counts } = row;
+					return (
+						<TableRow key={row.rowKey} variant="static">
+							<TableCell className="sticky left-0 z-20 bg-card pl-3 font-medium">
+								<span className="block min-w-36 wrap-anywhere whitespace-normal">
+									{repository.key}
+								</span>
 							</TableCell>
-						))}
-					</TableRow>
-				))}
+							<TableCell numeric className="text-right font-semibold">
+								{counts.contributions === 0 ? <NoneMark /> : counts.contributions}
+							</TableCell>
+							{CATEGORIES.map((category) => (
+								<TableCell key={category} numeric className="text-right last:pr-3">
+									<ActivityCountCell
+										category={category}
+										counts={counts}
+										providerType={providerType}
+									/>
+								</TableCell>
+							))}
+						</TableRow>
+					);
+				})}
 			</TableBody>
 		</Table>
 	);

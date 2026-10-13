@@ -12,13 +12,21 @@ const meta = {
 	component: ActivityRepositoryTable,
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
-	args: { repositories: OVERVIEW.repositories, providerType: "GITHUB" },
+	args: {
+		repositories: OVERVIEW.repositories.map(({ repository, counts }) => ({
+			rowKey: String(repository.id),
+			repository: { key: repository.key, name: repository.name },
+			counts,
+		})),
+		providerType: "GITHUB",
+	},
 } satisfies Meta<typeof ActivityRepositoryTable>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 const busyRepositories = OVERVIEW.repositories.map((entry, index) => ({
+	rowKey: String(entry.repository.id),
 	...entry,
 	counts:
 		index === 0

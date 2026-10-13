@@ -9,6 +9,9 @@ import { queryOperationId } from "@/lib/query-operation-id";
  */
 export async function refreshPublicActivity(queryClient: QueryClient): Promise<void> {
 	await queryClient.invalidateQueries({
-		predicate: ({ queryKey }) => queryOperationId(queryKey) === "getPublicActivity",
+		predicate: ({ queryKey }) =>
+			["getPublicActivity", "getPublicActivityPerson", "getPublicActivityPersonWork"].includes(
+				queryOperationId(queryKey) ?? "",
+			),
 	});
 }

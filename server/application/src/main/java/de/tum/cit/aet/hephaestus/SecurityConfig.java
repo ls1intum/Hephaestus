@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceSubdomainProperties;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.clientsession.InstalledClientRegistry;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
+import de.tum.cit.aet.hephaestus.core.auth.web.PublicActivityReadRequestMatcher;
 import de.tum.cit.aet.hephaestus.core.security.SecurityHeaders;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.security.StaleAuthCookieFilter;
@@ -368,10 +369,7 @@ public class SecurityConfig {
             requests.requestMatchers(CLIENT_SESSION_MATCHER).permitAll();
             // Public workspace provider discovery (workspace creation UI)
             requests.requestMatchers(HttpMethod.GET, "/workspaces/providers").permitAll();
-            requests.requestMatchers(HttpMethod.GET, "/public/workspaces/*/activity")
-                    .permitAll();
-            requests.requestMatchers(HttpMethod.HEAD, "/public/workspaces/*/activity")
-                    .permitAll();
+            requests.requestMatchers(PublicActivityReadRequestMatcher.MATCHER).permitAll();
             // Registry/listing stays authenticated to avoid leaking tenant directory.
             requests.requestMatchers(HttpMethod.GET, "/workspaces", "/workspaces/")
                     .authenticated();
@@ -390,14 +388,10 @@ public class SecurityConfig {
 
     /** The cacheable read must not publish a per-client SPA CSRF cookie. */
     private static final class PublicActivityReadFilter extends OncePerRequestFilter {
-        private final RequestMatcher reads = new OrRequestMatcher(
-                PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/public/workspaces/*/activity"),
-                PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.HEAD, "/public/workspaces/*/activity"));
-
         @Override
         protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
                 throws ServletException, IOException {
-            if (reads.matches(request)) {
+            if (PublicActivityReadRequestMatcher.MATCHER.matches(request)) {
                 CsrfFilter.skipRequest(request);
             }
             chain.doFilter(request, response);
