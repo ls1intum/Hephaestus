@@ -8,6 +8,7 @@ import { FOCUS_RING } from "@/components/common/focus";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { SortButton } from "@/components/common/SortButton";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { useNow } from "@/components/common/use-now";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +36,6 @@ import { asDate } from "@/lib/dates";
 import { andList, hasText } from "@/lib/text";
 
 import { freshnessTone, stateLabel } from "./sync-format";
-import { TableRowsSkeleton } from "./TableRowsSkeleton";
 
 type ClassKey = SyncResourceCount["key"];
 

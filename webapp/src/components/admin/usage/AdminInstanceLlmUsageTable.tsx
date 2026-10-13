@@ -1,8 +1,8 @@
 import { ChevronDown, ChevronRight, CircleDollarSign, Info } from "lucide-react";
 
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

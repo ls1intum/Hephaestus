@@ -4,8 +4,8 @@ import { type ReactNode, useState } from "react";
 import type { OutlineCollection } from "@/api/types.gen";
 import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
 import { swallow } from "@/components/admin/integrations/swallow";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {

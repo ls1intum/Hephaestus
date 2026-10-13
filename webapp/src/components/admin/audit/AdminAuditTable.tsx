@@ -5,8 +5,8 @@ import type { AuthEventView } from "@/api/types.gen";
 import { ElevationBadge } from "@/components/admin/audit/ElevationBadge";
 import { FilterLink } from "@/components/admin/audit/FilterLink";
 import { refLabel } from "@/components/admin/audit/ref-label";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

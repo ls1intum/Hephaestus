@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { AdminAccountView } from "@/api/types.gen";
 
@@ -81,7 +81,26 @@ export const ChangeAnotherUsersRole: Story = {
 	},
 };
 
-export const Loading: Story = { args: { users: [], isLoading: true } };
+/**
+ * Placeholder rows under the real header, one cell per column, in the busy table — not an empty
+ * state and not a "0 users" count before the first page is in.
+ */
+export const Loading: Story = {
+	args: { users: [], totalLoaded: 0, isLoading: true },
+	play: async ({ canvas }) => {
+		const table = canvas.getByRole("table", { name: "Application users" });
+		await expect(table).toHaveAttribute("aria-busy", "true");
+		const headers = within(table).getAllByRole("columnheader");
+		await expect(headers).toHaveLength(6);
+		const [, ...bodyRows] = within(table).getAllByRole("row");
+		await expect(bodyRows.length).toBeGreaterThan(0);
+		for (const row of bodyRows) {
+			await expect(within(row).getAllByRole("cell")).toHaveLength(headers.length);
+		}
+		await expect(canvas.queryByText("No users yet")).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/^Showing /u)).not.toBeInTheDocument();
+	},
+};
 
 export const Empty: Story = {
 	args: { users: [], totalLoaded: 0 },

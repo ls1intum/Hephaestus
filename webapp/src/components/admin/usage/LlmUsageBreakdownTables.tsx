@@ -1,5 +1,5 @@
 import type { LlmUsageByJobType, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import {
 	Table,
 	TableBody,

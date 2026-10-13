@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, userEvent } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { TeamInfo } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/stories/reflow";
@@ -177,10 +177,55 @@ export const AtTwoHundredPercentZoom: Story = {
 	play: expectNoPageOverflow,
 };
 
+/**
+ * The busy table under its real header: every placeholder row has one cell per header, so the
+ * columns that arrive line up with the ones already drawn. No empty state and no "0 of 0" count.
+ */
+async function expectLoadingRows(table: HTMLElement, rows: number) {
+	await expect(table).toHaveAttribute("aria-busy", "true");
+	const headers = within(table).getAllByRole("columnheader");
+	const [, ...bodyRows] = within(table).getAllByRole("row");
+	await expect(bodyRows).toHaveLength(rows);
+	for (const row of bodyRows) {
+		await expect(within(row).getAllByRole("cell")).toHaveLength(headers.length);
+	}
+	return headers;
+}
+
 export const Loading: Story = {
 	args: {
 		isLoading: true,
 		users: [],
+	},
+	play: async ({ args, canvas }) => {
+		const table = canvas.getByRole("table", { name: "Workspace members" });
+		await expect(await expectLoadingRows(table, args.view.size)).toHaveLength(2);
+		within(table).getByRole("columnheader", { name: "Username" });
+		await expect(canvas.queryByText("No members found")).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/^Showing /u)).not.toBeInTheDocument();
+
+		// A column the reader hides leaves the placeholders as well as the header.
+		await userEvent.click(canvas.getByRole("button", { name: "Columns" }));
+		await userEvent.click(await screen.findByRole("menuitemcheckbox", { name: "username" }));
+		await userEvent.keyboard("{Escape}");
+		await expect(await expectLoadingRows(table, args.view.size)).toHaveLength(1);
+		await expect(
+			within(table).queryByRole("columnheader", { name: "Username" }),
+		).not.toBeInTheDocument();
+	},
+};
+
+/** With the visibility control, the placeholders keep its column too. */
+export const LoadingWithVisibilityControl: Story = {
+	args: {
+		isLoading: true,
+		users: [],
+		onToggleHidden: fn(),
+	},
+	play: async ({ args, canvas }) => {
+		const table = canvas.getByRole("table", { name: "Workspace members" });
+		await expect(await expectLoadingRows(table, args.view.size)).toHaveLength(3);
+		within(table).getByRole("columnheader", { name: "Visible" });
 	},
 };
 
