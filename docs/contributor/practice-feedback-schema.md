@@ -103,7 +103,7 @@ Additional warrants express the basis for the claim:
 | An absence-based decided claim | `evidence.search` | Sources searched, target, and bounded scope |
 | `NOT_APPLICABLE` | `evidence.inapplicability` | Sources read, prerequisite, and fact excluding it |
 | `UNDETERMINED`, and optionally `NOT_MET` | `evidence.undecidability` | One or more open questions, what would settle each, and an optional citation |
-| Directly evidenced conformance or shortfall | Citations | The actual work supporting the claim |
+| Directly evidenced conformance or problem | Citations | The actual work supporting the claim |
 | Why a problem belongs to this work | `basis` on an observation | Introduced, worsened, or a duty that the criteria state |
 
 A missing, errored, redacted, or inadequate required source is a readiness failure, not an outcome.
@@ -164,8 +164,7 @@ Controllers define who may see each projection:
 
 - developer result list, detail, and summary endpoints, and practice standings are scoped to the authenticated
   developer.
-- the pull-request result projection shows workspace members every relevant result for that pull
-  request.
+- filters for a pull request or merge request do not widen the developer's result scope.
 - the workspace-admin practice-review endpoints expose results, observations, and feedback across that workspace.
 - developer-facing practice projections omit practice criteria by construction.
 

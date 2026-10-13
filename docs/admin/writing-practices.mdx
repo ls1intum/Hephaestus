@@ -77,7 +77,7 @@ They are not mandatory headings or a word-count target.
 | Applicability | What fact makes this expectation relevant? Which ordinary cases are outside it?                              |
 | Standard      | What observable requirements must the reviewed work meet?                                                    |
 | Evidence      | Which captured sources can establish each claim? Who authored them, and when?                                |
-| Conformance   | What evidence establishes the complete standard or a material shortfall?                                     |
+| Conformance   | What evidence establishes the complete standard or a material problem?                                       |
 | Absence       | What complete, bounded search justifies a claim of missing required behavior or absence of harmful behavior? |
 | Uncertainty   | What unresolved question prevents a judgment, even with the required evidence captured?                      |
 | Consequence   | Why does each observation (a problem) matter? What consequence justifies its severity?                       |
@@ -108,11 +108,11 @@ A `MET` or `NOT_MET` result can show one example from the work that shows the pr
 
 One useful instruction alone does not establish conformance to the complete standard.
 Absence claims need a complete bounded search.
-A missing optional improvement is not a shortfall, and the review never records it.
+A missing optional improvement is not a problem, and the review never records it.
 If required capture fails, the review creates no result.
 This is not uncertainty about the developer's work.
 
-1. Do not count inadequate instructions and their missing part as separate shortfalls when both need the same correction.
+1. Do not count inadequate instructions and their missing part as separate problems when both need the same correction.
 
 Severity applies only to `NOT_MET`.
 The severities are **Critical**, **Major**, **Minor**, and **Trivial** (`INFO`), from the most severe.
@@ -158,7 +158,7 @@ The questions above remain the basis for each section's content.
 3. **Occasion** — identify work where the expectation does not apply.
 4. **Sources** — state which captured sources can support each claim and their limits.
 5. **Judge** — state when the complete standard is MET.
-6. State what evidenced shortfall makes it NOT_MET.
+6. State what evidenced problem makes it NOT_MET.
 7. Define the exclusion that supports NOT_APPLICABLE.
 8. Define the unresolved question that supports UNDETERMINED.
 9. Make these conditions distinct.

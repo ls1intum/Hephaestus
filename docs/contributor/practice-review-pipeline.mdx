@@ -12,7 +12,7 @@ Each stage can stop independently and records a different reason.
 ```mermaid
 flowchart TB
     accTitle: Practice review stages and their distinct exits
-    accDescr: Work passes through occasion, evidence capture, result, and delivery. Each stage records a different result when processing stops.
+    accDescr: Work passes through occasion, evidence capture, result, and delivery. Each stage records its own reason when processing stops.
     Work[Something happened to a piece of work] --> Occasion{Occasion: do we look?}
     Occasion -->|no| Refused[artifact_signal.state_reason]
     Occasion -->|yes| Capture{Capture: can we look?}

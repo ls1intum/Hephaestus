@@ -88,6 +88,7 @@ The smallest useful diagnostic sequence is occurrence → readiness → result �
 | Did a job run, fail, or produce results and feedback?             | **Practices → Practice reviews → Reviews**, then open a row |
 | Is in-context feedback waiting for approval?                      | **Practices → Practice reviews**, under **Needs you**       |
 | How does one practice behave: its outcomes and incorrect marks?   | **Practices → Practice reviews**, then select the practice  |
+| Which problems did the reviews record, and where in the work?     | **Practices → Practice reviews → Problems**                 |
 | Which work may start reviews, and may feedback be sent?           | **Practices → Review settings → When and where**            |
 | How far do reviews go without a person?                           | **Practices → Review settings → How much**                  |
 | What does one practice review and which evidence does it require? | **Practices → Practice setup**                              |
@@ -103,7 +104,7 @@ The default is the last 30 days.
 **Today** starts at midnight in your time zone and compares with yesterday.
 
 The overview keeps the range you chose while the browser tab is open.
-When you come back from **Reviews**, **Results** or **Feedback**, it opens at that range again.
+When you come back from **Reviews**, **Results**, **Problems** or **Feedback**, it opens at that range again.
 A link that names a range opens at that range.
 
 **All time** counts every review since the first one in the workspace.
@@ -344,7 +345,7 @@ The table reads this state when it loads, not the state when the results were re
 Select a practice to open its sheet (see [Open a record](#open-a-record)).
 The table is an overview, not a stream, so its rows have no **Track** or **Trace**.
 
-The overview's lists are **Reviews**, **Results**, and **Feedback**.
+The overview's lists are **Reviews**, **Results**, **Problems**, and **Feedback**.
 The tabs share one scope: a developer, practice groups, practices, a date range, and a selection.
 The scope stays when you change tabs.
 Each list tab shows how many records it holds under the scope, for example **Reviews 1,688**.
@@ -360,6 +361,7 @@ Each list applies the parts of the scope that its data supports:
 | --- | --- | --- | --- | --- |
 | **Reviews** | Reviews that recorded a result about the developer | Reviews that recorded a result about the practice | When the review was created (**Created**) | The selected review, the reviews of the selected work, or the review of the selected result |
 | **Results** | The developer the result is about | Yes | When the result was recorded | The results of the selected work or review, or of the review of the selected result |
+| **Problems** | The developer the result is about | Yes | When the result was recorded | The problems of the selected work or review, or of the selected result |
 | **Feedback** | The developer the feedback is for | The practices covered by its results | When the feedback was composed | The feedback of the selected work or review, or the feedback written from the selected result |
 | **No review started** (on **Reviews**) | No | No | When a moment was recorded | The selected work |
 
@@ -394,6 +396,7 @@ These are the reviews that the queue counts as **Waiting**.
 With another status, **On hold** or **Waiting** adds its reviews to that status.
 
 **Results** filters by outcome, **Developer response**, severity, and **Origin**.
+**Problems** filters by severity and **Origin**.
 **Feedback** filters by outcome, channel, and why it was withheld.
 It can list the oldest first.
 
@@ -404,6 +407,13 @@ A chip beside the work shows only for a state that needs a look.
 
 While a loaded review is queued or running, the list reads only the active reviews again every 5 seconds.
 It reads all its rows again when a review starts or stops.
+
+Each row in **Problems** is one problem of a not met result.
+It shows when the result was recorded, with the severity of the problem as its icon.
+It also shows what the problem is, its practice, its place in the work, the work, and the developer.
+If its result is marked incorrect, disputed, or no longer current, the row shows the same mark as the row of the result.
+Select the row to open the sheet of its result, which holds the evidence.
+If the sheet of the result hides its evidence, the row shows **Details hidden** instead of what the problem is and where it is.
 
 Each row in **Feedback** shows when it was composed, the channel, the work, the recipient, and the **Outcome**.
 The row shows no text: the sheet of the feedback holds it.
@@ -482,7 +492,8 @@ An older link that opened a review, a piece of work or a practice as a panel ope
 
 ### Track and trace a record
 
-Each row in **Reviews**, **Results** and **Feedback** has two buttons in its **Actions** column.
+Each row in **Reviews**, **Results**, **Problems** and **Feedback** has two buttons in its **Actions** column.
+On **Problems**, both buttons act on the result of the row.
 A row in **Reviews** has a third button, **Request review**.
 The (i) in the **Actions** header says what each button does.
 No button opens the row, and a click anywhere in the **Actions** column does not open it either.

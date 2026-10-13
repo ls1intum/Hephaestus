@@ -188,10 +188,9 @@ Those names are `ReviewResult`, `ReviewResultDetail`, `ReviewBoundResult`, `prac
 Developer-scoped reads live under `/workspaces/{workspaceSlug}/practices/results`.
 A *finding* in this subsystem is a bug.
 
-Before the practice program contract, *observation* named the verdict that is now a result.
-Each old observation id became the `practiceResultId` of its result, with the same value.
-A saved `data-observation` part in a mentor conversation still reads as a link to a result.
-Persisted values keep the old word, such as `OBSERVATION_INVALIDATED` and the `observation_admission_digest` job metadata key.
+The [database migration guide](./database-migration.mdx#practice-result-transition-before-10) owns the conversion of retained verdict IDs.
+A saved `data-observation` part in a mentor conversation links to a result.
+Persisted values retain literal keys such as `OBSERVATION_INVALIDATED` and the `observation_admission_digest` job metadata key.
 An accepted ADR keeps the word that it used when it was accepted.
 
 **Practice autonomy** and **effective autonomy** are the glossary's ([Practice autonomy](./practice-review-glossary.mdx#practice-autonomy), [Autonomy inheritance](./practice-review-glossary.mdx#autonomy-inheritance)).
@@ -209,7 +208,7 @@ It does not establish a developer's mastery or the correctness of the entire pro
 | Outcome | UI label | Meaning | Severity | Observations |
 | --- | --- | --- | --- | --- |
 | `MET` | Met | The captured evidence establishes conformance to the practice standard. | None | None |
-| `NOT_MET` | Not met | The captured evidence establishes a material shortfall against that standard. | Required | One or more |
+| `NOT_MET` | Not met | The captured evidence establishes a material problem against that standard. | Required | One or more |
 | `NOT_APPLICABLE` | Does not apply | An evidenced fact rules out the occasion to apply the practice. | None | None |
 | `UNDETERMINED` | Could not determine | Adequate captured evidence was read, but a material question remains unresolved. | None | None |
 
@@ -247,8 +246,8 @@ It has these parts:
 - A recurrence key.
 
 Every observation is a problem, and there is no observation kind.
-The summary names the actual shortfall without a second taxonomy.
-Missing an optional improvement is not a shortfall, so Hephaestus never records one.
+The summary names the actual problem without a second taxonomy.
+Missing an optional improvement is not a problem, so Hephaestus never records one.
 
 ### Severity
 

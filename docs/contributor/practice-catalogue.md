@@ -52,7 +52,7 @@ The badge tables an administrator reads for both scopes live in the [Practice Ca
 | Instance administrator     | Curate the library workspaces may adopt from                                                                                | Rewrite existing workspace practices             |
 | Workspace administrator    | Adapt practices, set the workspace default autonomy and override it per group or practice, and scope which work is reviewed | Authorize a new data source for the instance     |
 | Instance operator          | Approve source purposes, privacy, retention, and erasure coverage                                                           | Decide that connected evidence proves a practice |
-| Developer, peer, or mentor | Use observations and available human context in a review                                                                    | Supply hidden context to Hephaestus implicitly   |
+| Developer, peer, or mentor | Use results and available human context in a review                                                                         | Supply hidden context to Hephaestus implicitly   |
 
 ## Authoring experience
 
@@ -449,8 +449,7 @@ A lead that its source does not hold is an error of the script, never dropped.
 
 The host renders one bounded section for each review input, and the review session reads it under that practice's criteria.
 A section holds the practice's directions, leads, facts and `Not rated` lines.
-It has at most 3,000 characters, and the `Not rated` lines keep their own share.
-[Review input](/admin/practice-scripts#review-input) gives what the bound keeps.
+[Review input](/admin/practice-scripts#review-input) owns the section's bound and what it keeps.
 The session can read the whole input in `work/review-input/<slug>.json`.
 A section is an entry point to the evidence, not proof that the model inspected every candidate.
 

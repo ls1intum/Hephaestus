@@ -9,7 +9,6 @@ description: How the review runner hosts the program of each practice, what a pr
 This page describes how the review runner runs the program of each admitted practice.
 The host is `pi-runner.ts` in the review container.
 Its library is `docker/agents/practice-scripts/lib/`, and `lib/program-host.ts` runs one program.
-There is no separate practice script stage, and no second runner process.
 
 ## The contract
 
@@ -95,7 +94,7 @@ The host runs the programs in this order:
 
 A custom program runs in these steps:
 
-1. The host starts `child.ts` with `--permission`, an empty environment and a heap of 256 MiB.
+1. The host starts `child.ts` with the [process grants and limits](./agent/workspace-abi.mdx#practice-script-validation-and-limits).
 2. The host sends the job: the slug, the inputs, the criteria, the pinned files, the time and the deadline.
 3. The child imports the program, checks its default export, and sends `meta` to the host.
 4. The host validates `meta` with `parseMeta` in `lib/contract.ts`.
@@ -120,13 +119,15 @@ These rules apply in `lib/script-run.ts`:
 
 - Each `model`, `read` and `review` request carries a call ID. The host answers each ID once.
 - A message that does not parse stops the program.
-- A message larger than `MAX_IPC_MESSAGE_BYTES`, 512 KiB as JSON, stops the program.
-- More than 32 requests in flight (`MAX_IN_FLIGHT`) stop the program.
+- A message larger than `MAX_IPC_MESSAGE_BYTES` stops the program.
+- More requests in flight than `MAX_IN_FLIGHT` stop the program.
 - A request that uses the ID of an open request stops the program.
 - A `model` or `review` request before `meta` fails the program with `invalid-program`.
 - A child sends exactly one final message, `result` or `failed`. A second final message fails the program.
 - After `abort`, the host answers no request and sends no late reply.
 - No message carries provenance. The server computes the provenance of a result at admission.
+
+[Process grants and limits](./agent/workspace-abi.mdx#practice-script-validation-and-limits) owns the IPC bounds.
 
 ### Reads through the host
 
@@ -212,13 +213,15 @@ The execution report does not carry the count.
 `ctx.review(options)` asks the host for one review of the program's practice.
 The host runs at most one practice and at most one review at a time.
 A concurrent or nested call to `review()` rejects with the reason `refused`.
-The host checks the options with `parseReviewOptions`, and an invalid input fails the program before a review starts.
+The host checks the options with `parseReviewOptions`.
+Invalid options reject the call with `error` before a review starts.
 
 The host prepares the review input in these steps:
 
 1. The host resolves each lead to the line that its source holds, with `lib/leads.ts`.
 2. A lead that its source does not hold is an error of the program, never dropped.
-3. The host renders a section of at most 3,000 characters from the leads, facts, directions, context and limitations.
+3. The host renders a section from the leads, facts, directions, context and limitations.
+   [Review input](/admin/practice-scripts#review-input) owns its bound.
 4. The host writes the whole input to `work/review-input/<slug>.json`, for the session to read past the section.
 
 The host then opens a fresh native session for this call.
@@ -270,18 +273,16 @@ An attempt has one budget for time and one account for direct model calls.
 
 ### Time
 
-The host gets the job timeout less `TIMEOUT_BUFFER_SECONDS`, 60 seconds, as `AGENT_BUDGET_MS`.
-No program stage takes time before the host starts.
+The host receives its work deadline as `AGENT_BUDGET_MS`.
+[Workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) owns the shutdown reserve and program deadlines.
 When composition was requested, the measuring window keeps 85% of that budget, and composition keeps the rest.
-Each program's deadline is the end of the measuring window less `RETURN_MS`, 5 seconds.
-Thus, a program that unwinds at its deadline can still return.
 
 ### Direct model calls
 
 The direct model calls of all practices share one attempt account, `ModelBudget` in `lib/models-host.ts`.
 The host takes its size from `PI_DIRECT_MODEL_TOKENS`.
 The server sets that variable from `hephaestus.practice-review.direct-model-tokens-per-attempt`.
-The environment variable of that setting is `PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT`, and its default is 200000.
+[Cost and limits](/admin/ai-providers#cost-and-limits) owns the environment variable and default of that setting.
 A later practice sees only what the earlier practices left.
 
 The host reserves tokens before each call, and the reservation is an estimate.
@@ -290,18 +291,17 @@ A call that fails, is cancelled, or reports no tokens keeps its reservation, bec
 A call that the account cannot hold does not run, and its reason is `budget`.
 
 The LLM proxy enforces the same token cap again for the attempt.
-It also counts the search units of reranking calls against `direct-model-search-units-per-attempt`, whose default is 1000.
+It also counts the search units of reranking calls against `direct-model-search-units-per-attempt`.
 Past either cap, the proxy refuses further direct calls.
 [Cost and limits](/admin/ai-providers#cost-and-limits) gives the purses that the proxy also enforces.
 
-`MODEL_CONCURRENCY` in `lib/concurrency.ts` limits the direct calls in flight for all practices together to 4.
+`MODEL_CONCURRENCY` in `lib/concurrency.ts` enforces the [direct-call limit](/admin/practice-scripts#limits) for all practices together.
 
 ### Review sessions
 
 The calls of a review session do not spend the direct-model account.
-The runner bounds each turn by `practice-model-calls`, 12 by default, for each practice that the turn carries.
-It also bounds each turn by `practice-output-tokens`, 16000 by default, in the same way.
-A turn gets at least three practices' worth.
+All review sessions in a catalog-group turn share its [work budget](/admin/practice-review-operations#work-budgets).
+A new `ctx.review()` call does not reset that budget.
 
 ### Cancellation
 
@@ -369,7 +369,6 @@ Thus, a token must not be in a process that runs script code:
 | The container's PID 1 and the review host, `pi-runner.ts` | `LLM_PROXY_TOKEN`, the one job token of the attempt |
 | The process of a custom program | None. Its environment is empty. |
 
-There is no second token for practice scripts.
 The direct-model route `/internal/llm/practice-script/{slot}/**` takes the same job token as the review session.
 The proxy refuses a mentor credential on that route with HTTP 403, because the route bills a review attempt.
 

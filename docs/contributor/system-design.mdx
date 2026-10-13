@@ -40,7 +40,7 @@ GitLab, Slack, and Outline each have their own adapter. A deployment syncs one c
 instance.
 Additional login providers do not create additional GitLab sync instances.
 
-`agent` owns review execution and orchestration. `practices` owns practice revisions, observations,
+`agent` owns review execution and orchestration. `practices` owns practice revisions, results, observations,
 feedback, approval, and the review gate. Admission uses `integration.scm.ReviewTargetQuery` for SCM
 identity rather than SCM entities or repositories. Identity lookup does not authorize workspace
 access or feedback delivery.
@@ -86,10 +86,10 @@ before composition and feedback delivery.
 Feedback on the work awaits workspace-admin approval by default. Delivery rechecks policy and
 silent mode independently from measurement.
 
-The [review pipeline](./practice-review-pipeline) owns occasion, capture, observation, composition,
+The [review pipeline](./practice-review-pipeline) owns occasion, capture, result, composition,
 and delivery. [Review runtime](./practice-review-runtime) owns execution and retry boundaries.
 [Workspace ABI](./agent/workspace-abi.mdx) owns the job folder, capture manifest, and output contract.
-Missing required capture produces no observation.
+Missing required capture produces no result.
 
 ## Heph
 
@@ -97,7 +97,7 @@ The server owns HTTP/SSE, Slack delivery, admission, budget checks, thread persi
 `fetch_context`. A connected worker owns the live session, its sandbox, attachment, and eviction.
 [Unified Pi runtime](./unified-pi-runtime) owns placement and conversation checkpoints.
 The UI uses shadcn components over Base UI.
-It renders streamed text, tool activity, and observation feedback without a separate assistant-ui runtime.
+It renders streamed text, tool activity, and result links without a separate assistant-ui runtime.
 
 Heph is available to workspace members only, within their account-wide AI choice. It uses permitted
 recent work, review requests, assigned issues, earlier conversations, practices, and connected

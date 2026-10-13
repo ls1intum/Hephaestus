@@ -90,16 +90,16 @@ This table owns the review terms that produce and check them.
 
 | Term | Plain meaning | Do not use for this concept |
 | --- | --- | --- |
-| **Result** | One practice's one verdict about one piece of reviewed work in one review. Defined in the [practice feedback language](./practice-feedback-language.md#result-outcomes). | observation (for the verdict), finding, verdict row |
-| **Observation** | One problem under a `NOT_MET` result, at a place in the work. Defined in the [practice feedback language](./practice-feedback-language.md#observations). | finding, detection, problem kind |
-| **Example** | The optional place of a `MET` or `NOT_MET` result that shows the practice done well. Defined in the [practice feedback language](./practice-feedback-language.md#examples). | good example, praise, strength |
-| **Open question** | A located doubt in the evidence of a result. Defined in the [practice feedback language](./practice-feedback-language.md#open-questions). | uncertainty finding, question to the developer |
+| **Result** | Defined in the [product vocabulary](./practice-feedback-language.md#result-outcomes). | observation (for the verdict), finding, verdict row |
+| **Observation** | Defined in the [product vocabulary](./practice-feedback-language.md#observations). | finding, detection, problem kind |
+| **Example** | Defined in the [product vocabulary](./practice-feedback-language.md#examples). | good example, praise, strength |
+| **Open question** | Defined in the [product vocabulary](./practice-feedback-language.md#open-questions). | uncertainty finding, question to the developer |
 | **Claim basis** | Why an observation belongs to the reviewed work: the work introduced it, worsened it, or left undone a duty that the criteria state. Each basis names the observation's own citations by index. An observation migrated from before the contract has none. | justification, reason, cause |
 | **Result coverage** | How much of its scope a result read, and what it left out. Host coverage counts the runner's own read receipts. Claimed coverage counts what program code reports. `MET` needs complete coverage. | review coverage, confidence, completeness score |
 | **Practice program** | The code that reviews one admitted practice in one review attempt and returns one candidate result. It is the built-in program or the practice's own practice script. | precompute stage, lead stage, pre-step |
 | **Built-in program** | The practice program of a practice that has no practice script. It calls `ctx.review()` once, with no review input. | default script, fallback review |
 | **Review input** | What a practice program passes to `ctx.review()`: leads, facts, directions, context, and limitations. It guides one review session. It is never a result. | script output, precompute output, leads output |
-| **Candidate result** | The result that a practice program returns, before admission. Its shape depends on the outcome, so an invalid combination cannot be written. | draft observation, script result |
+| **Candidate result** | The result that a practice program returns, before admission. Its permitted fields depend on the outcome. | draft observation, script result |
 | **Admission** | The server step that verifies every candidate result of one review attempt and records the results that pass. Every producer submits through one endpoint. | publication, ingestion, import |
 | **Withheld result** | A candidate result that admission did not record, with a reason code. The other practices of the attempt proceed. | refused result, dropped result |
 
@@ -469,7 +469,7 @@ Pull request reviews do not: every new review posts a new summary, while a retry
 
 ### Recorded review history
 
-The history context contains each recorded result with its observations, and the feedback already delivered or prepared.
+The [workspace ABI](./agent/workspace-abi.mdx#history-records) owns the review history projections.
 A shared location groups results and observations about the same piece of work.
 It does not establish semantic equivalence between their behaviors.
 Comparing outcomes at a shared location or omitting a prior result does not establish that a concern was resolved or regressed.

@@ -121,9 +121,7 @@ For budget state, the copy says what happens ("paused", "resumes"), not which en
 - **`formatCapUsd`** — a cap someone typed, rendered the way they typed it: `$50`, not `$50.00`.
 - **`formatAverageUsd`** — an average spend, such as **Avg per run**.
   One column has one number of decimals, which `averageFractionDigits` takes from all its averages, the total included.
-  Use whole cents when no average is below `$0.01`, three decimals when none is below `$0.001`, and four otherwise.
-  A nonzero average too small for four decimals shows `<$0.0001`, never `$0.0000`.
-  A unit cost below one cent is the point of an average, so it never shows `<$0.01`.
+  The [worked example](/admin/ai-providers#worked-example) owns the decimal places and display thresholds.
 
 `formatRateUsd`, `formatCostUsd` and `formatCapUsd` render an absent value as `—`.
 

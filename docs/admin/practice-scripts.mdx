@@ -214,6 +214,8 @@ It shows each lead with its quote, and one `Not rated` line for the comments wit
 A program can return the result itself when code decides the criteria.
 This version of the TODO practice decides in code where it is certain.
 When the change adds no open-work comment, it asks the review, because code cannot tell if the practice applies.
+It also asks the review when an open-work comment spans several lines.
+A tracking reference in one line does not necessarily track the work in the next.
 
 ```ts
 import {
@@ -240,7 +242,7 @@ export default definePracticeScript({
       throw new UnratedError("unavailable", "the change of this work was not captured");
     }
     const open = addedComments(requireChange(ctx.files)).filter((c) => OPEN_WORK.test(c.text));
-    if (open.length === 0) {
+    if (open.length === 0 || open.some((comment) => comment.at.endLine !== undefined)) {
       return ctx.review();
     }
     const cite = (c: (typeof open)[number]) => change.cite(c.at.change, "NEW", c.at.line, c.at.endLine);
@@ -549,7 +551,6 @@ export default definePracticeScript({
     const todos = addedComments(requireChange(ctx.files)).filter(
       (comment) => OPEN_WORK.test(comment.text) && !TRACKING.test(comment.text),
     );
-    // The leads in the files of `only`, or in the whole change.
     const leads = (only?: ReadonlyMap<string, DiffFile>): ReviewLead[] =>
       todos
         .filter((comment) => only === undefined || only.has(comment.at.change))
@@ -569,7 +570,6 @@ export default definePracticeScript({
       });
     }
     if (cause.signal === "scm.pull_request.synchronized") {
-      // Lead with the files that the new commits changed, when that change is known.
       return ctx.review({ leads: leads(ctx.previous?.changeSince) });
     }
     if (cause.signal === "scm.pull_request.merged") {
@@ -606,13 +606,14 @@ The host and the server stop most of these, but do not try them:
 - Change files, write to a provider, call the database, or reach a provider credential.
   A program reads the captured evidence only.
 - Read the network or start a program.
-  The process of a custom program has no such grant.
+  The container limits network access.
+  The custom program has no child-process grant.
 - Turn a failed read, a missing capture, or a failed model call into an outcome.
   Throw `UnratedError`, or let a call fail, so that the practice stops with its reason.
 - Return met for places that the program did not check.
   Met needs complete coverage.
 - Record an optional improvement as an observation.
-  An observation is a shortfall against the criteria.
+  An observation is a problem against the criteria.
 - Write a duty into an observation that the criteria do not state.
 - Put reviewed text or model text in `directions` or `facts`.
   Put such data in `context`, which the review reads as data and never as instructions.
@@ -715,9 +716,10 @@ To upgrade it:
 4. Give the metrics as `facts` and keep the directions: `return ctx.review({ leads, facts, directions })`.
 5. Run the program on a change, as [Run a program on your own change](#run-a-program-on-your-own-change) tells, and save it.
 
-### Scripts from a preview build
+### Scripts that return leads
 
-A preview build of this release had a leads form: `meta.version: 1`, `meta.kinds`, `meta.tokens`, and a `run` that returned `{ leads, facts, unrated, directions }`.
+`meta.version`, `meta.kinds` and `meta.tokens` belong to a retired contract.
+So does a `run` that returns `{ leads, facts, unrated, directions }`.
 A script in that form fails with this error:
 
 ```text
@@ -769,7 +771,7 @@ A slot that is not declared is never available.
 `meta: {}` declares no direct model, and `ctx.review()` still works.
 
 A `meta` with another field is not valid, and the program fails with the stop reason `invalid-program`.
-A `meta` with `version`, `kinds` or `tokens` fails with the error of [Scripts from a preview build](#scripts-from-a-preview-build).
+A `meta` with `version`, `kinds` or `tokens` fails with the error of [Scripts that return leads](#scripts-that-return-leads).
 
 ### Model slots and needs
 
@@ -874,7 +876,8 @@ The tools have these limits:
 | `listFiles` | 200 entries |
 | `grep` | 50 matches |
 
-`readRecordJson(ctx.evidence, name)` returns a record parsed as JSON, or `null` when the record is absent or is not JSON.
+`readRecordJson(ctx.evidence, name)` returns a record parsed as JSON, or `null` when the record is absent.
+Malformed JSON or a failed read throws `UnratedError("unavailable")`.
 
 #### Narrow the context to a kind
 
@@ -1104,7 +1107,7 @@ Each entry of `problems` becomes one **observation** when the server admits the 
 | --- | --- |
 | `severity` | `CRITICAL`, `MAJOR`, `MINOR` or `INFO`. The weight of this problem alone. `INFO` is a real gap with trivial impact. The app labels it **Trivial**. |
 | `summary` | One line of at most 160 characters. |
-| `explanation` | Why this is a shortfall against the criteria, in at most 4 000 characters. |
+| `explanation` | Why this is a problem against the criteria, in at most 4 000 characters. |
 | `citations` | 1 to 20 citations of the problem's places. |
 | `basis` | Why the problem belongs to this work. See the next table. |
 | `nextStep` | Optional. What the developer can do, in at most 1 000 characters. Composition can use it as data. |
@@ -1309,9 +1312,9 @@ The host also records these stop reasons for a program:
 
 | Limit | Value |
 | --- | --- |
-| Direct model tokens: the tokens of the direct model calls of one review attempt, all practices together | Default 200 000. [Cost and limits](./ai-providers.mdx#cost-and-limits) tells who sets it. |
-| Direct search units: the search units that the direct reranking calls of one review attempt billed | Default 1 000. Only the proxy counts search units, so a call that it refuses is not rated, with `budget`. |
-| Review sessions | The calls of `ctx.review()` share the allowance of the review turn: 12 model calls and 16 000 output tokens for each practice. A new call does not start a new allowance. |
+| Direct model tokens: the tokens of the direct model calls of one review attempt, all practices together | [Cost and limits](./ai-providers.mdx#cost-and-limits) owns the setting and its default. |
+| Direct search units: the search units that the direct reranking calls of one review attempt billed | [Cost and limits](./ai-providers.mdx#cost-and-limits) owns the setting and its default. Only the proxy counts them. A refusal gives `budget`. |
+| Review sessions | All `ctx.review()` calls in one set share its [work budget](./practice-review-operations.mdx#work-budgets). A new session does not start a new allowance. |
 | Time | A program can run until the measuring part of the review attempt ends. `ctx.budget.remaining().ms` gives what is left. |
 | Direct model calls in flight, all programs together | 4 |
 | Requests in flight from one program: model calls, reads and reviews | 32. One more stops the program with an error. |

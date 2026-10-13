@@ -26,6 +26,8 @@ Each workspace enables practice review and selects its own coverage.
 3. Give every server and worker container its own storage under `HEPHAESTUS_FABRIC_ROOT` for repository mirrors and attempt inputs.
 4. Set campaign, request-rate, retry, and retention limits appropriate to the deployment's budget and governance policy.
 
+### Work budgets
+
 A review measures one practice group at a time.
 By default, groups with more than six practices are split into smaller sets.
 Each set has a separate work budget.
@@ -35,11 +37,12 @@ Work, not time, bounds the set.
 `PRACTICE_REVIEW_PRACTICE_MODEL_CALLS` (default 12) and `PRACTICE_REVIEW_PRACTICE_OUTPUT_TOKENS` (default 16000) determine each set's budget.
 Each value is multiplied by the number of practices in the set, with a minimum of three.
 A set of five practices can make 60 model calls and write 80,000 output tokens.
+A set of one practice can make 36 model calls and write 48,000 output tokens.
+All review sessions in the set share this pool.
 
 A practice script that calls `ctx.review()` opens review sessions, and their calls count against these same set budgets.
 The direct model calls of practice scripts have their own limits for each review attempt: a token limit and a search unit limit.
-`PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT` (default 200000) and `PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT` (default 1000) set them.
-See [Cost and limits](./ai-providers.mdx#cost-and-limits).
+[Cost and limits](./ai-providers.mdx#cost-and-limits) owns their settings and defaults.
 [Practice scripts](#practice-scripts) tells you how to read what each practice program did.
 
 The defaults cap excessive work at several times a set's normal use.
@@ -131,7 +134,6 @@ Use them for alerts instead of application logs.
   `instance` names the shared-model budget, and `byo` names the provider cap.
   An admin raises it.
   `practice_script_attempt` names the [direct model token limit or search unit limit of the attempt](./ai-providers.mdx#cost-and-limits).
-  An operator raises them with `PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT` and `PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT`.
 - **`practice.review.occasions`** — live issue-update recording attempts, tagged by `signal` and `outcome` (`deferred` or `duplicate`).
   These exclude issue opening and closing.
 - **`practice.review.refused`** — refused reviews, tagged by `phase` (`submission` or `execution`) and `reason`.
@@ -253,8 +255,7 @@ A token limit, a budget or a cap stops calls in one of these places:
 - **The `maxSteps` of `agent`.**
   The script's author raises it in the script, or makes the script send less.
 - **The direct model token limit or the direct model search unit limit of the attempt.**
-  An operator raises them with `PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT` and `PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT`.
-  See [Cost and limits](./ai-providers.mdx#cost-and-limits).
+  An operator changes them with the settings in [Cost and limits](./ai-providers.mdx#cost-and-limits).
 - **The shared-model budget.**
   Only an instance admin raises it on **Instance admin → AI usage** with **Change budget**.
 - **The provider cap of the workspace's own provider.**
