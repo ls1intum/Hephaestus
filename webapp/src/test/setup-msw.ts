@@ -12,6 +12,9 @@ import { client } from "@/api/client.gen";
 import { server } from "@/mocks/server";
 import { ObserverStub } from "@/test/observers";
 
+// DOM-only route tests exercise the form contract; the production runtime check uses real Monaco.
+vi.mock("@/components/common/CodeEditor", async () => import("./code-editor.mock"));
+
 // The generated hey-api client resolves request paths against `baseUrl` (it does
 // `new URL(path, baseUrl)`); with no baseUrl a relative path like `/user` throws
 // "Failed to parse URL". In the app `client.setConfig` runs in `main.tsx`, which the

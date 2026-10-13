@@ -284,7 +284,10 @@ export default defineConfig({
 			),
 			"verification:webapp-tests": group(["test:webapp"]),
 			"test:webapp": run("vp run --filter webapp test"),
-			"test:webapp:stories": run("vp run --filter webapp test:storybook"),
+			"test:webapp:stories": run([
+				"vp run --filter webapp test:storybook",
+				"vp -C webapp exec node check-code-editor-runtime.ts",
+			]),
 			"build:webapp": run("vp -C webapp build"),
 			"dev:webapp": run("vp -C webapp dev"),
 
