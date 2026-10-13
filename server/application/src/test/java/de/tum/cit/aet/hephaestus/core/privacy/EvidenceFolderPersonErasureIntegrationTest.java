@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.privacy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -15,6 +16,7 @@ import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderLease;
 import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog.CopyUnavailableException;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
@@ -49,6 +51,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -57,7 +60,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -420,6 +427,69 @@ class EvidenceFolderPersonErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldReuseTheOuterReadFenceWhenErasureQueuesBeforeHistoricalAuthorization() throws Exception {
+        databaseTestUtils.cleanDatabase();
+        var recorder = new ExactPersonDataCopyRecorder(jdbc);
+        var catalog = catalog(root, recorder);
+        var running = job("nested-history-fence");
+        var workspace = running.getWorkspace();
+        var source = jobIn(workspace);
+        copy(root, catalog, recorder, source, new PersonCopyIdentity("GITLAB", "https://quoted.example", "7", null))
+                .close();
+        try (var inputs = copy(
+                root,
+                catalog,
+                recorder,
+                running,
+                new PersonCopyIdentity("GITLAB", "https://quoted.example", "8", null))) {
+            assertThat(inputs.filesOnDisk()).isNotEmpty();
+            var pool = Executors.newFixedThreadPool(2);
+            var queuedPid = new AtomicInteger();
+            var erased = new AtomicBoolean();
+            var erasureTask = new AtomicReference<Future<?>>();
+            try {
+                var read = pool.submit(() -> catalog.indexLateRead(
+                        running.getId(),
+                        workspace.getId(),
+                        0,
+                        () -> {
+                            erasureTask.set(pool.submit(() -> {
+                                try (var lease = fence.erase()) {
+                                    assertThat(lease.jdbc()
+                                                    .queryForObject(
+                                                            "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='advisory' AND classid=2165 AND objid=1 AND mode='ExclusiveLock' AND granted)",
+                                                            Boolean.class))
+                                            .isTrue();
+                                    erased.set(true);
+                                }
+                            }));
+                            await().atMost(Duration.ofSeconds(5)).until(() -> {
+                                var waiting = jdbc.queryForList(
+                                        "SELECT pid FROM pg_locks WHERE locktype='advisory' AND classid=2165 AND objid=1 AND mode='ExclusiveLock' AND NOT granted",
+                                        Integer.class);
+                                if (waiting.size() != 1) return false;
+                                queuedPid.set(waiting.getFirst());
+                                return true;
+                            });
+                            assertThat(erased.get()).isFalse();
+                            return catalog.recordVouchedHistoricalJobs(workspace.getId(), Set.of(source.getId()));
+                        },
+                        result -> Set.of(),
+                        result -> Set.of()));
+                assertThat(read.get(10, TimeUnit.SECONDS)).containsExactly(source.getId());
+                Objects.requireNonNull(erasureTask.get()).get(5, TimeUnit.SECONDS);
+                assertThat(erased.get()).isTrue();
+            } finally {
+                // Only this test's exact queued erasure may need cancellation after an assertion timeout.
+                if (!erased.get() && queuedPid.get() != 0)
+                    jdbc.queryForObject("SELECT pg_cancel_backend(?)", Boolean.class, queuedPid.get());
+                pool.shutdownNow();
+                assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+            }
+        }
+    }
+
+    @Test
     void shouldIndexALateReadsPeopleUnderTheFenceBeforeReturningItAndNeverReviveAnErasedReceipt() throws Exception {
         databaseTestUtils.cleanDatabase();
         var provider =
@@ -468,13 +538,14 @@ class EvidenceFolderPersonErasureIntegrationTest extends BaseIntegrationTest {
 
             var legacy = legacyCopy(workspace, new PersonCopyIdentity("GITLAB", "https://legacy.example", "8", null));
             UUID legacySupport = observation(legacy, developerId);
-            catalog.indexLateRead(
-                    running.getId(),
-                    workspace.getId(),
-                    0,
-                    () -> "old support",
-                    read -> Set.of(legacySupport),
-                    read -> Set.of());
+            assertThatThrownBy(() -> catalog.indexLateRead(
+                            running.getId(),
+                            workspace.getId(),
+                            0,
+                            () -> "old support",
+                            read -> Set.of(legacySupport),
+                            read -> Set.of()))
+                    .isInstanceOf(CopyUnavailableException.class);
             catalog.indexLateRead(
                     running.getId(),
                     workspace.getId(),
@@ -483,21 +554,21 @@ class EvidenceFolderPersonErasureIntegrationTest extends BaseIntegrationTest {
                     read -> Set.of(supported),
                     read -> Set.of());
             assertThat(payload(running).path("dependencies").asString())
-                    .as("never upgraded once a dependency could not vouch")
-                    .isEqualTo("UNKNOWN");
+                    .as("refused words never entered the attempt's copy")
+                    .isEqualTo("COMPLETE");
             assertThat(catalog.traceCustody(running.getId(), workspace.getId(), 0))
-                    .isEqualTo(EvidenceFolderPersonDataCatalog.TraceCustody.UNINDEXED_DEPENDENCY);
+                    .isEqualTo(EvidenceFolderPersonDataCatalog.TraceCustody.INDEXED);
 
             jdbc.update("UPDATE person_evidence_copy SET state='ERASE_REQUESTED' WHERE job_id=?", running.getId());
             String before = payload(running).toString();
-            assertThat(catalog.indexLateRead(
+            assertThatThrownBy(() -> catalog.indexLateRead(
                             running.getId(),
                             workspace.getId(),
                             0,
                             () -> "after erasure",
                             read -> Set.of(supported),
                             read -> Set.of()))
-                    .isEqualTo("after erasure");
+                    .isInstanceOf(CopyUnavailableException.class);
             assertThat(jdbc.queryForObject(
                             "SELECT state FROM person_evidence_copy WHERE job_id=?", String.class, running.getId()))
                     .isEqualTo("ERASE_REQUESTED");
@@ -590,37 +661,39 @@ class EvidenceFolderPersonErasureIntegrationTest extends BaseIntegrationTest {
                     .as("a complete late read stays quiet")
                     .isEmpty();
 
-            catalog.indexLateRead(
-                    running.getId(),
-                    workspace.getId(),
-                    0,
-                    () -> "read",
-                    read -> Set.of(supported, vanished),
-                    read -> Set.of());
+            assertThatThrownBy(() -> catalog.indexLateRead(
+                            running.getId(),
+                            workspace.getId(),
+                            0,
+                            () -> "read",
+                            read -> Set.of(supported, vanished),
+                            read -> Set.of()))
+                    .isInstanceOf(CopyUnavailableException.class);
             var missingRow = new HashMap<>(assessed("LATE_READ", 1, 0, 1, 0, 0));
             missingRow.put("evidence.missingRows", 1);
             assertThat(diagnostics.drain()).containsExactly(missingRow);
-            assertThat(payload(running).path("dependencies").asString()).isEqualTo("UNKNOWN");
+            assertThat(payload(running).path("dependencies").asString()).isEqualTo("COMPLETE");
 
             catalog.indexLateRead(
                     running.getId(), workspace.getId(), 0, () -> "read", read -> Set.of(supported), read -> Set.of());
             assertThat(diagnostics.drain()).isEmpty();
             assertThat(payload(running).path("dependencies").asString())
-                    .as("a later complete read never upgrades the receipt")
-                    .isEqualTo("UNKNOWN");
+                    .as("refused words were never copied")
+                    .isEqualTo("COMPLETE");
 
             jdbc.update("UPDATE person_evidence_copy SET state='ERASE_REQUESTED' WHERE job_id=?", running.getId());
             String before = payload(running).toString();
-            catalog.indexLateRead(
-                    running.getId(),
-                    workspace.getId(),
-                    0,
-                    () -> "read",
-                    read -> Set.of(supported, vanished),
-                    read -> Set.of());
+            assertThatThrownBy(() -> catalog.indexLateRead(
+                            running.getId(),
+                            workspace.getId(),
+                            0,
+                            () -> "read",
+                            read -> Set.of(supported, vanished),
+                            read -> Set.of()))
+                    .isInstanceOf(CopyUnavailableException.class);
             assertThat(diagnostics.drain())
-                    .as("the read is assessed whether or not its receipt is still held")
-                    .containsExactly(missingRow);
+                    .as("an unheld current copy refuses the read before disclosure")
+                    .isEmpty();
             assertThat(jdbc.queryForObject(
                             "SELECT state FROM person_evidence_copy WHERE job_id=?", String.class, running.getId()))
                     .isEqualTo("ERASE_REQUESTED");

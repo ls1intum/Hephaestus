@@ -711,6 +711,7 @@ export interface OwnPriorFeedback {
 	body: unknown;
 	recordedClaimCurrentness: unknown;
 	withdrawn: unknown;
+	wordsUnavailable?: "COPY_AUTHORITY_UNAVAILABLE";
 	eligibleForPriorAdvice: boolean;
 	eligibleForAlreadySaid: boolean;
 }
@@ -804,6 +805,9 @@ export function priorPublicFeedback(
 				body,
 				recordedClaimCurrentness,
 				withdrawn,
+				...(entry.wordsUnavailable === "COPY_AUTHORITY_UNAVAILABLE"
+					? { wordsUnavailable: "COPY_AUTHORITY_UNAVAILABLE" as const }
+					: {}),
 				eligibleForPriorAdvice:
 					recorded &&
 					recordedClaimCurrentness === "CURRENT" &&

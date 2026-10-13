@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +52,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
     private final FeedbackRepository feedbackRepository;
     private final ReviewedWorkCoverage reviewedWorkCoverage;
+    private final EvidenceFolderPersonDataCatalog personCopies;
 
     public PreparedConversationFeedbackContentSource(
             FeedbackObservationRepository feedbackObservationRepository,
@@ -60,7 +63,8 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             AgentJobRepository agentJobRepository,
             PracticeFeedbackDeliveryPolicy deliveryPolicy,
             FeedbackRepository feedbackRepository,
-            ReviewedWorkCoverage reviewedWorkCoverage) {
+            ReviewedWorkCoverage reviewedWorkCoverage,
+            EvidenceFolderPersonDataCatalog personCopies) {
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.consentGate = consentGate;
         this.objectMapper = objectMapper;
@@ -70,6 +74,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         this.deliveryPolicy = deliveryPolicy;
         this.feedbackRepository = feedbackRepository;
         this.reviewedWorkCoverage = reviewedWorkCoverage;
+        this.personCopies = personCopies;
     }
 
     @Override
@@ -95,6 +100,16 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         Map<UUID, Observation> observations = observationsById(workspaceId, prepared);
         Set<UUID> visible = visibilityPolicy.permitsForNewDelivery(
                 workspaceId, observations.values(), SourceUsePurpose.CONVERSATIONAL_MENTORING);
+        Set<UUID> vouchedJobs = personCopies.recordVouchedHistoricalJobs(
+                workspaceId,
+                Stream.concat(
+                                prepared.stream()
+                                        .filter(fact -> visible.contains(fact.getObservationId()))
+                                        .map(PreparedConversationFact::getAgentJobId),
+                                observations.values().stream()
+                                        .filter(o -> visible.contains(o.getId()))
+                                        .map(Observation::getAgentJobId))
+                        .toList());
         Map<UUID, ObjectNode> reviewedWork = reviewedWorkCoverage.of(
                 workspaceId,
                 observations.values().stream()
@@ -139,11 +154,19 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             node.put("observationId", fact.getObservationId().toString());
             node.put("practiceSlug", fact.getPracticeSlug());
             node.put("practiceName", fact.getPracticeName());
-            node.put("summary", fact.getSummary());
+            Observation observation = observations.get(fact.getObservationId());
+            boolean wordsAvailable = observation != null
+                    && vouchedJobs.contains(fact.getAgentJobId())
+                    && vouchedJobs.contains(observation.getAgentJobId());
+            if (wordsAvailable) node.put("summary", fact.getSummary());
+            else {
+                node.put("wordsUnavailable", EvidenceFolderPersonDataCatalog.COPY_AUTHORITY_UNAVAILABLE);
+                root.put("wordsCoverage", "PARTIAL");
+            }
             if (fact.getSeverity() != null) {
                 node.put("severity", fact.getSeverity().name());
             }
-            if (fact.getEvidenceRationale() != null) {
+            if (wordsAvailable && fact.getEvidenceRationale() != null) {
                 node.put("evidenceRationale", fact.getEvidenceRationale());
             }
             if (fact.getArtifactKind() != null) {
@@ -155,13 +178,12 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             if (fact.getPreparedAt() != null) {
                 node.put("preparedAt", fact.getPreparedAt().toString());
             }
-            Observation observation = observations.get(fact.getObservationId());
             if (observation != null) {
                 // The review behind the observation, not the job that composed this feedback.
                 node.put("reviewId", observation.getAgentJobId().toString());
 
                 node.put("outcome", observation.getOutcome().name());
-                if (observation.getEvidence() != null) {
+                if (wordsAvailable && observation.getEvidence() != null) {
                     node.set("evidence", observation.getEvidence());
                 }
                 ObjectNode work = reviewedWork.get(observation.getId());
@@ -169,7 +191,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
                     node.set("reviewedWork", work);
                 }
             }
-            writeNotes(node, fact.getBody());
+            if (wordsAvailable) writeNotes(node, fact.getBody());
         }
         root.put("totalPrepared", arr.size());
         try {

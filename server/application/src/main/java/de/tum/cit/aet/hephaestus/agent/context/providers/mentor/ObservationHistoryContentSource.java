@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
@@ -97,6 +98,7 @@ public class ObservationHistoryContentSource implements ContentSource {
     private final ObservationVisibilityPolicy visibilityPolicy;
     private final ReviewedWorkCoverage reviewedWorkCoverage;
     private final ObjectMapper objectMapper;
+    private final EvidenceFolderPersonDataCatalog personCopies;
 
     @Override
     public boolean supports(ContextRequest request) {
@@ -173,8 +175,10 @@ public class ObservationHistoryContentSource implements ContentSource {
         root.put("list", listed.get().getKey());
         Map<UUID, ObjectNode> reviewedWork = reviewedWorkCoverage.of(workspaceId, List.of(observation));
         ObjectNode row = root.putObject("observation");
-        describe(row, observation, reviewedWork);
-        describeEvidence(row, observation);
+        boolean wordsAvailable = selection.vouchedJobs().contains(observation.getAgentJobId());
+        describe(row, observation, reviewedWork, wordsAvailable);
+        if (wordsAvailable) describeEvidence(row, observation);
+        else root.put("wordsCoverage", "PARTIAL");
         return fittedDetail(root, row);
     }
 
@@ -208,7 +212,13 @@ public class ObservationHistoryContentSource implements ContentSource {
                 .stream()
                 .filter(candidate -> outrankedByListedRun(latest, candidate))
                 .toList());
-        return new Selection(preparedAt, since, recent, abstentions, earlier);
+        Set<UUID> vouchedJobs = personCopies.recordVouchedHistoricalJobs(
+                workspaceId,
+                Stream.of(recent, abstentions, earlier)
+                        .flatMap(List::stream)
+                        .map(Observation::getAgentJobId)
+                        .toList());
+        return new Selection(preparedAt, since, recent, abstentions, earlier, vouchedJobs);
     }
 
     private record Selection(
@@ -216,7 +226,8 @@ public class ObservationHistoryContentSource implements ContentSource {
             Instant since,
             List<Observation> recent,
             List<Observation> abstentions,
-            List<Observation> earlier) {
+            List<Observation> earlier,
+            Set<UUID> vouchedJobs) {
 
         /** The lists in the overview's order: verdicts first, earlier runs last. */
         List<Listed> lists() {
@@ -317,6 +328,8 @@ public class ObservationHistoryContentSource implements ContentSource {
         }
         root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
         root.set("coverage", objectMapper.valueToTree(Coverage.of(preparedAt)));
+        if (selection.all().anyMatch(o -> !selection.vouchedJobs().contains(o.getAgentJobId())))
+            root.put("wordsCoverage", "PARTIAL");
         root.putObject("detail")
                 .put("loaded", false)
                 .set(
@@ -354,7 +367,7 @@ public class ObservationHistoryContentSource implements ContentSource {
             ArrayNode into = root.putArray(list.name());
             for (Observation o : list.rows()) {
                 ObjectNode row = into.addObject();
-                describe(row, o, reviewedWork);
+                describe(row, o, reviewedWork, selection.vouchedJobs().contains(o.getAgentJobId()));
                 if (summariesLeftOut.contains(o.getId())) {
                     row.putNull("summary");
                     row.put("summaryNotLoaded", true);
@@ -400,12 +413,14 @@ public class ObservationHistoryContentSource implements ContentSource {
         return root;
     }
 
-    private static void describe(ObjectNode node, Observation o, Map<UUID, ObjectNode> reviewedWork) {
+    private static void describe(
+            ObjectNode node, Observation o, Map<UUID, ObjectNode> reviewedWork, boolean wordsAvailable) {
         node.put("id", o.getId().toString());
         node.put("resource", resourceOf(o.getId()));
         node.put("reviewId", o.getAgentJobId().toString());
         node.put("origin", o.getOrigin().name());
-        node.put("summary", o.getSummary());
+        if (wordsAvailable) node.put("summary", o.getSummary());
+        else node.put("wordsUnavailable", EvidenceFolderPersonDataCatalog.COPY_AUTHORITY_UNAVAILABLE);
         node.put("practiceSlug", o.getPractice().getSlug());
 
         node.put("outcome", o.getOutcome().name());
