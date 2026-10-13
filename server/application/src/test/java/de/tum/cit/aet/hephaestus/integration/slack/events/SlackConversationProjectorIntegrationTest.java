@@ -194,6 +194,55 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldBoundLargeMessageReadsWhileKeepingExactPairsAndAccessGuards() {
+        long workspace = newWorkspace();
+        long otherWorkspace = newWorkspace();
+        seedChannel(workspace, "C1", "ACTIVE");
+        seedChannel(workspace, "C2", "ACTIVE");
+        seedChannel(workspace, "CREVOKED", "REVOKED");
+        seedChannel(otherWorkspace, "C1", "ACTIVE");
+        Set<MessageKey> permitted = new LinkedHashSet<>();
+        for (int index = 0; index < 1001; index++) {
+            String ts = "%d.0".formatted(1_800_000_000L + index);
+            seedMessage(workspace, "C1", ts, null, "permitted");
+            permitted.add(new MessageKey("C1", ts));
+        }
+        seedMessage(workspace, "C2", "1800000001.0", null, "uncited cross-pair");
+        seedMessage(workspace, "C1", "1900000000.0", null, "deleted");
+        messageRepository.tombstone(workspace, "T1", "C1", "1900000000.0", Instant.now());
+        seedMessage(workspace, "C1", "1900000001.0", null, "opted out");
+        jdbc.update(
+                "UPDATE slack_message SET author_slack_user_id='UBOUNDED' WHERE workspace_id=? AND slack_ts='1900000001.0'",
+                workspace);
+        jdbc.update(
+                "INSERT INTO slack_participant_consent(workspace_id,slack_user_id,ingestion_opted_out,decided_at) VALUES (?,'UBOUNDED',TRUE,CURRENT_TIMESTAMP)",
+                workspace);
+        seedMessage(workspace, "CREVOKED", "1900000002.0", null, "revoked");
+        seedMessage(otherWorkspace, "C1", "1900000003.0", null, "foreign");
+        var requested = new ArrayList<>(permitted);
+        requested.addAll(new ArrayList<>(permitted).subList(0, 600));
+        requested.addAll(List.of(
+                new MessageKey("C2", "1800000000.0"),
+                new MessageKey("C1", "1900000000.0"),
+                new MessageKey("C1", "1900000001.0"),
+                new MessageKey("CREVOKED", "1900000002.0"),
+                new MessageKey("C1", "1900000003.0")));
+
+        var measured = reads.measure(() -> projector.readableMessages(workspace, requested));
+
+        assertThat(measured.value()).containsExactlyInAnyOrderElementsOf(permitted);
+        assertThat(measured.sql().stream()
+                        .map(sql -> sql.chars()
+                                .filter(character -> character == '?')
+                                .count())
+                        .toList())
+                .as("Parameters in each message authority read")
+                .allSatisfy(parameters -> assertThat(parameters).isLessThanOrEqualTo(1004));
+        assertThat(measured.cost().statements()).isEqualTo(3);
+        assertThat(measured.cost().entities()).isZero();
+    }
+
+    @Test
     void shouldReadOnlyExactPairsWithoutStringAliasesOrCrossProducts() {
         long workspace = newWorkspace();
         seedChannel(workspace, "C1", "ACTIVE");

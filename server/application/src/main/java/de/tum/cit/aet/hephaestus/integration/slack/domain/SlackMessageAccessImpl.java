@@ -13,6 +13,9 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.transaction.annotation.Transactional;
 
 public class SlackMessageAccessImpl implements SlackMessageAccess {
+    // Each message binds two parameters; bound the predicate tree as well as the parameter count.
+    private static final int MESSAGE_BATCH_SIZE = 500;
+
     @PersistenceContext
     private @Nullable EntityManager entityManager;
 
@@ -22,6 +25,15 @@ public class SlackMessageAccessImpl implements SlackMessageAccess {
             long workspaceId, Collection<SlackMessageKeyRow> messages) {
         if (messages.isEmpty()) return List.of();
         var distinct = new ArrayList<>(new LinkedHashSet<>(messages));
+        var readable = new ArrayList<SlackMessageKeyRow>();
+        for (int from = 0; from < distinct.size(); from += MESSAGE_BATCH_SIZE) {
+            readable.addAll(readBatch(
+                    workspaceId, distinct.subList(from, Math.min(distinct.size(), from + MESSAGE_BATCH_SIZE))));
+        }
+        return readable;
+    }
+
+    private List<SlackMessageKeyRow> readBatch(long workspaceId, List<SlackMessageKeyRow> distinct) {
         // Bind each pair together. Independent IN sets would also read uncited cross-pairs.
         String pairs = IntStream.range(0, distinct.size())
                 .mapToObj(index -> "(m.slackChannelId=:channel" + index + " AND m.slackTs=:message" + index + ")")
