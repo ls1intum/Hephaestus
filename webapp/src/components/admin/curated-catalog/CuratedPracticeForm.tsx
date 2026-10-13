@@ -40,6 +40,8 @@ export interface CuratedPracticeFormInitialValue extends CuratedPracticeFormValu
 interface CuratedPracticeFormBaseProps {
 	groups: readonly { slug: string; name: string }[];
 	isPending: boolean;
+	/** Holds every field while the host replaces the practice from outside the form. */
+	disabled?: boolean;
 	conflict?: boolean;
 	onContinueWithDraft?: () => void;
 	isResetPending?: boolean;
@@ -47,6 +49,8 @@ interface CuratedPracticeFormBaseProps {
 	onUseHephaestusVersion?: () => void;
 	onKeepCurrentDefinition?: () => void;
 	releaseReview?: React.ReactNode;
+	/** The host's alert for a read that failed to refresh while the draft stays open. */
+	refreshAlert?: React.ReactNode;
 	definitionOptions: PracticeDefinitionOptions;
 	/** What "leave without saving" does. The host owns it, because only the host knows where back is. */
 	cancel: React.ReactNode;
@@ -73,6 +77,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 		mode,
 		groups,
 		isPending,
+		disabled = false,
 		conflict,
 		onContinueWithDraft,
 		isResetPending = false,
@@ -82,6 +87,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 		definitionOptions,
 		onKeepCurrentDefinition,
 		releaseReview,
+		refreshAlert,
 		cancel,
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
@@ -89,10 +95,11 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 		mode === "edit" &&
 		canUseHephaestusVersion(initialData.status) &&
 		onUseHephaestusVersion !== undefined;
-	const formDisabled = isResetPending || isKeepPending;
+	const formDisabled = disabled || isResetPending || isKeepPending;
 	/** The host's own banners, handed to the form so they land inside its padded, scrolling body. */
 	const banners = (
 		<>
+			{refreshAlert}
 			{mode === "edit" && initialData.status.state === "UPDATE_WAITING" && releaseReview}
 			{mode === "edit" && initialData.status.state !== "UPDATE_WAITING" && (
 				<HephaestusVersionPanel

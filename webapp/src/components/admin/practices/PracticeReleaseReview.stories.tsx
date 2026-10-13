@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { PracticeDefinition, PracticeReleaseProposal } from "@/api/types.gen";
+import { UnsavedPracticeDraft } from "@/components/admin/practice-editor/unsaved-practice-draft";
 import { mockPullRequestReviewFields, mockPullRequestPolicy } from "@/mocks/fixtures/practice";
 import { bundledGuidance, unthemedVisual } from "@/stories/practice-guidance-story-mock-data";
 import { expectTablesScrollInPlace } from "@/stories/reflow";
@@ -128,6 +129,35 @@ export const Accepting: Story = {
 		for (const choice of screen.getAllByRole("radio")) {
 			await expect(choice).toHaveAttribute("aria-disabled", "true");
 		}
+	},
+};
+
+/**
+ * Accepting reloads the practice form around the review, so an unsaved draft there is discarded only
+ * after the reader confirms. Without a draft, Accept acts at once.
+ */
+export const UnsavedDraft: Story = {
+	args: { proposal: readyProposal },
+	decorators: [
+		(Story) => (
+			<UnsavedPracticeDraft value>
+				<Story />
+			</UnsavedPracticeDraft>
+		),
+	],
+	play: async ({ args }) => {
+		await userEvent.click(screen.getByRole("button", { name: "Accept selected fields" }));
+		const confirmation = await screen.findByRole("alertdialog", {
+			name: "Accept selected fields?",
+		});
+		await expect(args.onAccept).not.toHaveBeenCalled();
+		await userEvent.click(
+			within(confirmation).getByRole("button", { name: "Accept selected fields" }),
+		);
+		await expect(args.onAccept).toHaveBeenCalledWith({
+			CRITERIA: "OFFERED",
+			DELIVERY_BEHAVIOR: "OFFERED",
+		});
 	},
 };
 

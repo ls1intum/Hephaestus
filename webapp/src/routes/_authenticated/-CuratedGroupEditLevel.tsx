@@ -14,11 +14,12 @@ import type { CuratedGroup } from "@/api/types.gen";
 import { CuratedFormLevel } from "@/components/admin/curated-catalog/CuratedFormLevel";
 import { CuratedGroupForm } from "@/components/admin/curated-catalog/CuratedGroupForm";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { QueryErrorAlert, queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
 import { DrawerBody } from "@/components/ui/drawer";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export interface CuratedGroupEditLevelProps {
 	groupSlug: string;
@@ -34,14 +35,36 @@ export function CuratedGroupEditLevel({
 	path,
 	onDone,
 }: CuratedGroupEditLevelProps) {
-	const groupQuery = useQuery({ ...adminGetCuratedGroupOptions({ path: { slug: groupSlug } }) });
+	const groupOptions = adminGetCuratedGroupOptions({ path: { slug: groupSlug } });
+	const groupQuery = useQuery(groupOptions);
+	useQueryReadRefusal(groupOptions.queryKey, groupQuery.isError, groupQuery.error);
+	const retry = () => {
+		void groupQuery.refetch();
+	};
 
 	let body: ReactNode;
-	if (groupQuery.isPending) {
+	// A refusal hides the editor even over cached data. Any other failure leaves a loaded draft open.
+	if (
+		groupQuery.data !== undefined &&
+		(!groupQuery.isError || queryErrorIsRetryable(groupQuery.error))
+	) {
 		body = (
-			<DrawerBody>
-				<PracticeDefinitionSkeleton />
-			</DrawerBody>
+			<LoadedCuratedGroupEditor
+				key={groupSlug}
+				groupSlug={groupSlug}
+				initialGroup={groupQuery.data}
+				refreshAlert={
+					groupQuery.isError ? (
+						<QueryErrorAlert
+							error={groupQuery.error}
+							title="We could not refresh the group"
+							pending={groupQuery.isFetching}
+							onRetry={retry}
+						/>
+					) : undefined
+				}
+				onDone={onDone}
+			/>
 		);
 	} else if (groupQuery.isError) {
 		body = (
@@ -49,20 +72,15 @@ export function CuratedGroupEditLevel({
 				<QueryErrorAlert
 					error={groupQuery.error}
 					title="We could not load the group"
-					onRetry={() => {
-						void groupQuery.refetch();
-					}}
+					onRetry={retry}
 				/>
 			</DrawerBody>
 		);
 	} else {
 		body = (
-			<LoadedCuratedGroupEditor
-				key={groupSlug}
-				groupSlug={groupSlug}
-				initialGroup={groupQuery.data}
-				onDone={onDone}
-			/>
+			<DrawerBody>
+				<PracticeDefinitionSkeleton />
+			</DrawerBody>
 		);
 	}
 
@@ -76,12 +94,14 @@ export function CuratedGroupEditLevel({
 interface LoadedCuratedGroupEditorProps {
 	groupSlug: string;
 	initialGroup: CuratedGroup;
+	refreshAlert: ReactNode;
 	onDone: () => void;
 }
 
 function LoadedCuratedGroupEditor({
 	groupSlug,
 	initialGroup,
+	refreshAlert,
 	onDone,
 }: LoadedCuratedGroupEditorProps) {
 	const queryClient = useQueryClient();
@@ -199,6 +219,7 @@ function LoadedCuratedGroupEditor({
 			isPending={updateGroup.isPending}
 			isResetPending={deleteOverride.isPending}
 			isKeepPending={keepCurrentDefinition.isPending}
+			refreshAlert={refreshAlert}
 			conflict={conflict}
 			onContinueWithDraft={() => {
 				void continueWithDraft();

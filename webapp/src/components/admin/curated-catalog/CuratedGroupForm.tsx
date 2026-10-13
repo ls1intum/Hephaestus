@@ -58,6 +58,8 @@ interface CuratedGroupFormBaseProps {
 	onUseHephaestusVersion?: () => void;
 	onKeepCurrentDefinition?: () => void;
 	onSubmit: (value: CuratedGroupFormValue) => void;
+	/** The host's alert for a read that failed to refresh while the draft stays open. */
+	refreshAlert?: React.ReactNode;
 	/** What "leave without saving" does. The host owns it, because only the host knows where back is. */
 	cancel: React.ReactNode;
 }
@@ -96,6 +98,7 @@ export function CuratedGroupForm(props: CuratedGroupFormProps) {
 		initialData,
 		onKeepCurrentDefinition,
 		onSubmit,
+		refreshAlert,
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
 	const [form, setForm] = useState<FormState>(() => initialState(initialData));
@@ -192,6 +195,7 @@ export function CuratedGroupForm(props: CuratedGroupFormProps) {
 
 			<form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
 				<DrawerBody className="flex flex-col gap-8">
+					{refreshAlert}
 					<FormErrorSummary key={refusals} errors={refusals > 0 ? errorSummary : []} />
 
 					{mode === "edit" && (
