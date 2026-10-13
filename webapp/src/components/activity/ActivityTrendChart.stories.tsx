@@ -156,6 +156,28 @@ export const ReviewsAsTable: Story = {
 	},
 };
 
+export const WideReviewsAsTable: Story = {
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Show as table" }));
+		const table = canvas.getByRole("table", { name: "Reviews by week" });
+		const fullWeek = within(table).getAllByRole("row")[2];
+		if (!fullWeek) {
+			throw new Error("The review table has no full week");
+		}
+		const week = within(fullWeek).getAllByRole("cell")[0];
+		const label = week?.firstElementChild;
+		if (!(label instanceof HTMLElement)) {
+			throw new Error("The full week has no visible date label");
+		}
+		await expect(label).toHaveTextContent("(UTC)");
+		await expect(label.getBoundingClientRect().width).toBeGreaterThan(112);
+		await expect(label.getBoundingClientRect().height).toBeLessThanOrEqual(
+			Number.parseFloat(getComputedStyle(label).lineHeight) + 1,
+		);
+		await expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth + 1);
+	},
+};
+
 /** Two kinds of one neutral tone: each in its own row, in the accent, never grey. */
 export const Comments: Story = { args: { category: "comments" } };
 

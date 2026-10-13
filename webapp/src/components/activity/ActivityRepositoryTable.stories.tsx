@@ -181,6 +181,7 @@ export const LongRepositoryPath: Story = {
 			);
 		});
 		const path = within(name).getByText(NESTED_PATH);
+		await expect(path.getBoundingClientRect().width).toBeLessThanOrEqual(145);
 		await expect(path.getBoundingClientRect().height).toBeGreaterThan(
 			Number.parseFloat(getComputedStyle(path).lineHeight) * 2,
 		);
@@ -198,4 +199,24 @@ export const LongRepositoryPath: Story = {
 			void expect(screen.queryByRole("tooltip")).toBeNull();
 		});
 	},
+};
+
+export const WideRepositoryPath: Story = {
+	decorators: [withProvider("GITLAB")],
+	args: { repositories: nestedRepositories, providerType: "GITLAB" },
+	play: async ({ canvas }) => {
+		const table = canvas.getByRole("table", { name: "Repositories" });
+		const identity = within(table).getByRole("cell", { name: NESTED_PATH });
+		const path = within(identity).getByText(NESTED_PATH);
+		await expect(path.getBoundingClientRect().width).toBeGreaterThan(224);
+		await expect(path.getBoundingClientRect().height).toBeLessThanOrEqual(
+			Number.parseFloat(getComputedStyle(path).lineHeight) + 1,
+		);
+		await expect(path.scrollWidth).toBeLessThanOrEqual(path.clientWidth + 1);
+	},
+};
+
+export const NarrowRepositoryPath: Story = {
+	...LongRepositoryPath,
+	parameters: { chromatic: { viewports: [1440] } },
 };

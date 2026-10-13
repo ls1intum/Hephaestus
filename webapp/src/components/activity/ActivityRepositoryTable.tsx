@@ -57,7 +57,7 @@ export function ActivityRepositoryTable({
 				{rows.map(({ repository, counts }) => (
 					<TableRow key={repository.id} variant="static">
 						<TableCell className="sticky left-0 z-20 bg-card pl-3 font-medium">
-							<span className="block w-36 wrap-anywhere whitespace-normal sm:w-56">
+							<span className="block min-w-36 wrap-anywhere whitespace-normal">
 								{repository.key}
 							</span>
 						</TableCell>

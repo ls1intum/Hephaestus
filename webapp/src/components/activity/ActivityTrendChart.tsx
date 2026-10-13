@@ -302,7 +302,7 @@ function BucketTable({
 					<TableHeader>
 						<TableRow variant="static">
 							<TableHead className="sticky left-0 z-20 bg-card">
-								<span className="block w-28 wrap-anywhere whitespace-normal">
+								<span className="block min-w-28 wrap-anywhere whitespace-normal">
 									{capitalise(size.noun)}
 								</span>
 							</TableHead>
@@ -322,7 +322,7 @@ function BucketTable({
 						{overview.weeks.map((week) => (
 							<TableRow key={week.start.getTime()} variant="static">
 								<TableCell className="sticky left-0 z-20 bg-card">
-									<span className="block w-28 wrap-anywhere whitespace-normal">
+									<span className="block min-w-28 wrap-anywhere whitespace-normal">
 										{capitalise(utcWeekLabel(week.start, span))}
 									</span>
 								</TableCell>
