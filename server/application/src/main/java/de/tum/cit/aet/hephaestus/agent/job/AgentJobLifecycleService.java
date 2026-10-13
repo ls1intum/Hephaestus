@@ -201,27 +201,29 @@ public class AgentJobLifecycleService {
 
         // Reload to read worker_id, which is only set at claim.
         AgentJob fresh = requireJob(workspaceId, jobId);
-        recordUnverifiableUsageIfStarted(workspaceId, fresh);
+        recordCancellationUsageIfStarted(workspaceId, fresh);
         jobTelemetry.terminal(fresh, AgentJobStatus.CANCELLED, AgentJobTelemetry.age(fresh));
         return new CancelOutcome(fresh, true);
     }
 
     /**
-     * Appends an UNPRICED ledger row only once the job crossed {@code execution_started_at}. A non-null
+     * Records the cancelled attempt only once it crossed {@code execution_started_at}. A non-null
      * {@code worker_id} proves only that a worker claimed the row, and preparation before that boundary
      * cannot incur provider usage — booking it would make the workspace's month unverifiable for free.
      */
-    private void recordUnverifiableUsageIfStarted(Long workspaceId, AgentJob job) {
+    private void recordCancellationUsageIfStarted(Long workspaceId, AgentJob job) {
         if (job.getExecutionStartedAt() == null) {
             return;
         }
         ConfigSnapshot snap = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         LlmPriceSnapshot price =
                 snap.priceSnapshot() != null ? snap.priceSnapshot() : LlmPriceSnapshot.unpricedInstance();
-        // A cancel from the API cannot see what the attempt consumed; the executor path that observes
-        // the cancellation bills the proxy-attributed tokens. This row records that the spend is unknown.
-        TerminalUsage.none().appendTo(usageRecorder, workspaceId, job, snap.upstreamModelId(), price);
-        log.info("Recorded UNPRICED usage ledger entry (user-cancel): jobId={}", job.getId());
+        // The terminal update holds the row lock and prevents further proxy accumulations. Read its
+        // committed counters directly; the entity can predate a proxy response. No token evidence stays unknown.
+        TerminalUsage.resolve(
+                        null, agentJobRepository.findLlmUsageById(job.getId()).orElse(null))
+                .appendTo(usageRecorder, workspaceId, job, snap.upstreamModelId(), price);
+        log.info("Recorded cancellation usage: jobId={}", job.getId());
     }
 
     /**
