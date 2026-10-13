@@ -25,6 +25,7 @@ import {
 	abortReasonOf,
 	acceptModels,
 	noCalls,
+	ProgramSettlementError,
 	runCustomProgram,
 	type ProgramExecution,
 	type ProgramServices,
@@ -99,7 +100,7 @@ async function runBuiltin(job: ProgramJob, services: ProgramServices): Promise<P
 		AbortSignal.timeout(Math.max(0, job.deadline - Date.now())),
 	]);
 	const ctx = programContext(job, {
-		read: async (request) => services.reader.answer(request),
+		read: async (request) => services.reader.answer(request, signal),
 		review: async (options) => {
 			const checked = parseReviewOptions(options);
 			if ("error" in checked) {
@@ -164,6 +165,9 @@ export async function runPracticeProgram(
 				? await runBuiltin(job, hosted)
 				: await runCustomProgram(program.script.path, job, hosted);
 	} catch (error) {
+		if (error instanceof ProgramSettlementError) {
+			throw error;
+		}
 		execution = {
 			failure: {
 				stopReason: "error",

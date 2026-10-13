@@ -85,14 +85,21 @@ async function inside(root: string, relative: string): Promise<string> {
 	return full;
 }
 
-/** The lines `start` to `end` of a text, 1-based, or why they cannot be quoted. */
-export function quotedLines(text: string, start: number, end: number): string {
+export function assertCitationRange(start: number, end: number): void {
+	if (start < 1) {
+		throw new UnratedError("error", "a citation starts at line 1 or later");
+	}
 	if (end < start) {
 		throw new UnratedError("error", `the range ${start}-${end} ends before it starts`);
 	}
 	if (end - start >= MAX_CITED_LINES) {
 		throw new UnratedError("too-large", `a citation spans at most ${MAX_CITED_LINES} lines`);
 	}
+}
+
+/** The lines `start` to `end` of a text, 1-based, or why they cannot be quoted. */
+export function quotedLines(text: string, start: number, end: number): string {
+	assertCitationRange(start, end);
 	const lines = text.split("\n");
 	if (end > lines.length) {
 		throw new UnratedError("error", `the source has ${lines.length} lines, not ${end}`);
@@ -114,6 +121,7 @@ export function changeLines(
 	start: number,
 	end: number,
 ): string {
+	assertCitationRange(start, end);
 	if (file === undefined) {
 		throw new UnratedError("error", "the change does not touch that file");
 	}
@@ -164,19 +172,27 @@ export class EvidenceReader {
 	}
 
 	/** Answer one read. A read that cannot be answered throws `UnratedError` with its reason. */
-	async answer<R extends ReadRequest>(request: R): Promise<ReadValues[R["op"]]>;
-	async answer(request: ReadRequest): Promise<ReadValues[keyof ReadValues]> {
+	async answer<R extends ReadRequest>(
+		request: R,
+		signal?: AbortSignal,
+	): Promise<ReadValues[R["op"]]>;
+	async answer(request: ReadRequest, signal?: AbortSignal): Promise<ReadValues[keyof ReadValues]> {
+		signal?.throwIfAborted();
 		if (request.op === "cite") {
-			return this.#cite(request);
+			return this.#cite(request, signal);
 		}
 		this.#receipts.reads += 1;
 		try {
-			const value = await this.#read(request);
+			const value = await this.#read(request, signal);
+			signal?.throwIfAborted();
 			if ("truncated" in value && value.truncated) {
 				this.#receipts.truncatedReads += 1;
 			}
 			return value;
 		} catch (error) {
+			if (signal?.aborted === true) {
+				throw signal.reason;
+			}
 			this.#receipts.failedReads += 1;
 			throw error instanceof UnratedError
 				? error
@@ -196,6 +212,7 @@ export class EvidenceReader {
 
 	async #read(
 		request: Exclude<ReadRequest, { op: "cite" }>,
+		signal?: AbortSignal,
 	): Promise<ReadValues[keyof ReadValues]> {
 		switch (request.op) {
 			case "read": {
@@ -244,12 +261,16 @@ export class EvidenceReader {
 				const repo = this.#repo(request.tree);
 				const maxResults = request.maxResults ?? DEFAULT_GREP_RESULTS;
 				// One match more than asked tells a search that was cut from one that found exactly the bound.
-				const found = await grep(request.pattern, repo, {
-					glob: request.glob,
-					maxResults: maxResults + 1,
-					fixedString: request.fixedString,
-				});
-				const matches = found.filter((match) => !inGitFolder(match.file));
+				const matches = await grep(
+					request.pattern,
+					repo,
+					{
+						glob: request.glob,
+						maxResults: maxResults + 1,
+						fixedString: request.fixedString,
+					},
+					signal,
+				);
 				return { matches: matches.slice(0, maxResults), truncated: matches.length > maxResults };
 			}
 			case "record": {
@@ -276,12 +297,15 @@ export class EvidenceReader {
 						`${request.name} is larger than ${MAX_RECORD_BYTES} bytes`,
 					);
 				}
-				return { status: "FOUND", text: await readFile(file, "utf8") };
+				return { status: "FOUND", text: await readFile(file, { encoding: "utf8", signal }) };
 			}
 		}
 	}
 
-	async #cite(request: Extract<ReadRequest, { op: "cite" }>): Promise<Citation> {
+	async #cite(
+		request: Extract<ReadRequest, { op: "cite" }>,
+		signal?: AbortSignal,
+	): Promise<Citation> {
 		const end = request.endLine ?? request.startLine;
 		switch (request.source) {
 			case "tree": {
@@ -303,7 +327,11 @@ export class EvidenceReader {
 					...(headRevision === null ? {} : { revision: headRevision }),
 					startLine: request.startLine,
 					endLine: end,
-					quote: quotedLines(await readFile(file, "utf8"), request.startLine, end),
+					quote: quotedLines(
+						await readFile(file, { encoding: "utf8", signal }),
+						request.startLine,
+						end,
+					),
 				};
 			}
 			case "change": {
@@ -327,7 +355,7 @@ export class EvidenceReader {
 				if (sourceKind === undefined) {
 					throw new UnratedError("error", `${request.name} is not a captured source`);
 				}
-				const record = await this.#read({ op: "record", name: request.name });
+				const record = await this.#read({ op: "record", name: request.name }, signal);
 				if (!("text" in record) || typeof record.text !== "string") {
 					throw new UnratedError("error", `${request.name} was not captured`);
 				}

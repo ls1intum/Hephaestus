@@ -4,6 +4,8 @@ import path from "node:path";
 import { describe, test } from "node:test";
 import { isDeepStrictEqual } from "node:util";
 
+import { z } from "zod";
+
 import {
 	CANDIDATE_LIMITS,
 	CANDIDATE_REFUSALS,
@@ -53,6 +55,32 @@ function refusalOf(value: unknown): CandidateRefusal | "accepted" {
 }
 
 void describe("the shared practice result fixtures", () => {
+	void test("citation revisions accept exactly the server fixture's lowercase commit ids", async () => {
+		const revisions = z
+			.object({ valid: z.array(z.string()), invalid: z.array(z.string()) })
+			.parse(await fixture("citation-revisions.json"));
+		for (const revision of revisions.valid) {
+			accepted({
+				...notMet(),
+				example: {
+					citation: { ...citation(40, "  throw error;"), revision },
+					note: "This catch rethrows.",
+				},
+			});
+		}
+		for (const revision of revisions.invalid) {
+			assert.equal(
+				refusalOf({
+					...notMet(),
+					example: {
+						citation: { ...citation(40, "  throw error;"), revision },
+						note: "This catch rethrows.",
+					},
+				}),
+				"malformed_candidate",
+			);
+		}
+	});
 	void test("every candidate fixture parses, and keeps its content through a parse", async () => {
 		const files = await names("candidate-");
 		assert.equal(files.length, 4);
@@ -333,6 +361,35 @@ function broken(base: keyof typeof BASES, ...codes: CandidateRefusal[]): Record<
 }
 
 void describe("the candidate rules", () => {
+	void test("a record's display path cannot separate an example from a problem on its artifact", () => {
+		const record = {
+			sourceKind: "scm.pull-request.comments",
+			artifactPath: "context/comments.json",
+			path: "comment label",
+			startLine: 1,
+			endLine: 2,
+			quote: "A comment",
+		};
+		const value = {
+			...notMet(),
+			problems: [problem(1, { citations: [record] })],
+			example: {
+				citation: { ...record, path: "another label", startLine: 2 },
+				note: "The same comment.",
+			},
+		};
+		assert.equal(refusalOf(value), "example_overlaps_problem");
+		assert.equal(
+			refusalOf({
+				...value,
+				example: {
+					citation: { ...record, artifactPath: "context/other-comments.json" },
+					note: "Another artifact.",
+				},
+			}),
+			"accepted",
+		);
+	});
 	void test("each base result is valid", () => {
 		for (const make of Object.values(BASES)) {
 			accepted(make());

@@ -15,6 +15,8 @@ import {
 } from "@ai-sdk/provider";
 import { z } from "zod";
 
+import { hasLanguageUsageReceipt } from "./contract.ts";
+
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 const SYSTEM =
@@ -202,10 +204,12 @@ export function logprobDecisionModel(
 			return {
 				answers,
 				warnings: result.warnings,
-				usage: {
-					inputTokens: result.usage.inputTokens.total,
-					outputTokens: result.usage.outputTokens.total,
-				},
+				usage: hasLanguageUsageReceipt(result.usage)
+					? {
+							inputTokens: result.usage.inputTokens.total,
+							outputTokens: result.usage.outputTokens.total,
+						}
+					: undefined,
 			};
 		},
 	};

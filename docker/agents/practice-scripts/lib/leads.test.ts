@@ -1,17 +1,31 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, test, type TestContext } from "node:test";
 
 import type { ReviewLead, ReviewOptions } from "./contract.ts";
 import { parseDiff } from "./diff-parser.ts";
-import type { EvidenceSources } from "./evidence-reader.ts";
+import { EvidenceReader, noReceipts, type EvidenceSources } from "./evidence-reader.ts";
 import { renderReviewInput, resolveLeads, type QuotedLead } from "./leads.ts";
 import { UnratedError } from "./practice-script.ts";
 
 const FULL_INPUT = "`out/p.json`";
+
+async function plainSources(t: TestContext): Promise<EvidenceSources> {
+	const repo = await mkdtemp(path.join(tmpdir(), "bounded-leads-"));
+	t.after(async () => rm(repo, { recursive: true, force: true }));
+	return {
+		repo,
+		contextDir: repo,
+		headRevision: "a".repeat(40),
+		treeArtifact: "repos/reviewed/.git/HEAD",
+		contextReference: "context",
+		change: null,
+		sourceKindOf: () => undefined,
+	};
+}
 
 const CHANGE = parseDiff(
 	[
@@ -69,6 +83,61 @@ async function sources(t: TestContext) {
 }
 
 void describe("the leads of a review input", () => {
+	void test("file leads and evidence citations both refuse Git files, including an alias", async (t) => {
+		const given = await plainSources(t);
+		assert.ok(given.repo !== null);
+		await mkdir(path.join(given.repo, ".git"));
+		await writeFile(path.join(given.repo, ".git", "config"), "Git metadata\n");
+		await symlink(path.join(given.repo, ".git", "config"), path.join(given.repo, "alias.txt"));
+		const reader = new EvidenceReader(given, noReceipts());
+		for (const file of [".git/config", "alias.txt"]) {
+			await assert.rejects(
+				resolveLeads([{ at: { file, line: 1 }, label: "Git file" }], given),
+				/which its source does not hold/u,
+			);
+			assert.deepEqual(await reader.answer({ op: "read", tree: "head", path: file }), {
+				status: "ABSENT",
+			});
+		}
+		await assert.rejects(
+			resolveLeads(
+				[
+					{
+						at: { file: ".git/config", line: 1, revision: "b".repeat(40) },
+						label: "Git file at base",
+					},
+				],
+				given,
+			),
+			/which its source does not hold/u,
+		);
+	});
+
+	void test("resolved leads reject oversized quotes and ranges before retaining review input", async (t) => {
+		const given = await plainSources(t);
+		assert.ok(given.repo !== null);
+		await writeFile(path.join(given.repo, "large.txt"), "x".repeat(4001));
+		await writeFile(path.join(given.repo, "lines.txt"), "x\n".repeat(201));
+		await writeFile(path.join(given.repo, "bound.txt"), "x".repeat(4000));
+		for (const at of [
+			{ file: "large.txt", line: 1 },
+			{ record: "large.txt", line: 1 },
+			{ file: "lines.txt", line: 1, endLine: 201 },
+			{ change: "lines.txt", line: 1, endLine: 201 },
+		]) {
+			await assert.rejects(resolveLeads([{ at, label: "Oversized" }], given), (error: unknown) => {
+				assert.ok(error instanceof UnratedError);
+				assert.equal(error.reason, "too-large");
+				return true;
+			});
+		}
+		const resolved = await resolveLeads(
+			Array.from({ length: 200 }, () => ({ at: { file: "bound.txt", line: 1 }, label: "Bounded" })),
+			given,
+		);
+		assert.equal(resolved.length, 200);
+		assert.ok(JSON.stringify(resolved).length < 1_000_000);
+	});
 	void test("each lead gets the text its source holds, in the program's order", async (t) => {
 		const { sources: given, earlier } = await sources(t);
 		const leads: ReviewLead[] = [

@@ -34,7 +34,7 @@ import {
 	type ProgramOutcome,
 } from "./program-host.ts";
 import { InputReader } from "./script-inputs.ts";
-import { RETURN_MS } from "./script-run.ts";
+import { ProgramSettlementError, RETURN_MS } from "./script-run.ts";
 
 const roots: string[] = [];
 after(async () =>
@@ -430,6 +430,92 @@ export default definePracticeScript({
 });
 
 void describe("the host's bounds on a program's messages", () => {
+	void test("child shutdown drains model calls and returns a stable report", async () => {
+		let active = 0;
+		const embedding = new MockEmbeddingModelV4({
+			doEmbed: async ({ abortSignal }) => {
+				active += 1;
+				try {
+					assert.ok(abortSignal !== undefined);
+					await once(abortSignal, "abort");
+					await sleep(40);
+					throw new Error("stopped");
+				} finally {
+					active -= 1;
+				}
+			},
+		});
+		const ws = await workspace({ flood: await fixture("flood") });
+		const budget = new ModelBudget(200_000, 4);
+		const { outcome } = await run(ws, "flood", { models: { embedding }, budget });
+		assert.equal(active, 0);
+		assert.equal(outcome.calls.embedding, 4);
+		assert.equal(outcome.models[0]?.notRated.deadline, 32);
+		const snapshot = JSON.stringify(outcome);
+		await sleep(50);
+		assert.equal(JSON.stringify(outcome), snapshot);
+		assert.ok(
+			"value" in
+				(await budget.run(1, new AbortController().signal, async () => ({
+					value: "next practice",
+					tokens: 1,
+				}))),
+		);
+	});
+
+	void test("a pending review settles before the next practice starts", async () => {
+		const candidate = {
+			...REVIEWED,
+			coverage: { source: "claimed", selected: 1, checked: 1, total: 1, complete: true },
+		};
+		const ws = await workspace({
+			first: program(
+				"definePracticeScript",
+				`{ meta: {}, async run(ctx) { void ctx.review(); return ${JSON.stringify(candidate)}; } }`,
+			),
+			next: null,
+		});
+		let active = false;
+		const review = async (_options: ReviewOptions, signal: AbortSignal) => {
+			assert.equal(active, false);
+			active = true;
+			try {
+				await once(signal, "abort");
+				await sleep(40);
+				return REVIEWED;
+			} finally {
+				active = false;
+			}
+		};
+		const first = await run(ws, "first", { review });
+		assert.equal(first.outcome.status, "ok", first.outcome.error);
+		assert.equal(active, false);
+		const next = await run(ws, "next", {
+			review: async () => {
+				assert.equal(active, false);
+				return REVIEWED;
+			},
+		});
+		assert.equal(next.outcome.status, "ok", next.outcome.error);
+	});
+
+	void test("a request that ignores cancellation ends the attempt within the settlement bound", async () => {
+		const pending = Promise.withResolvers<never>();
+		const ws = await workspace({
+			stuck: program(
+				"definePracticeScript",
+				`{ meta: {}, async run(ctx) { void ctx.review(); throw new Error("stop"); } }`,
+			),
+		});
+		try {
+			await assert.rejects(
+				run(ws, "stuck", { review: async () => pending.promise }),
+				ProgramSettlementError,
+			);
+		} finally {
+			pending.reject(new Error("cleanup"));
+		}
+	});
 	void test("a shared-reference object is refused without JSON expansion in the host", async () => {
 		const ws = await workspace({ graph: await fixture("shared-reference-ipc") });
 		const { outcome } = await run(ws, "graph");

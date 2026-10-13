@@ -53,6 +53,20 @@ async function run(files: FileTree, name: string, input: unknown): Promise<unkno
 }
 
 void describe("the read tools of an agent", () => {
+	void test("grep marks a shortened matched line whose match lies beyond the shown prefix", async () => {
+		const { files } = tree();
+		const matched = {
+			...files,
+			grep: async () => ({
+				matches: [{ file: "src/cart.ts", line: 2, content: `${"x".repeat(300)}needle` }],
+				truncated: false,
+			}),
+		};
+		assert.equal(
+			await run(matched, "grep", { pattern: "needle" }),
+			`src/cart.ts:2: ${"x".repeat(299)}…`,
+		);
+	});
 	void test("readFile numbers the lines of a file, bounds them, and names what it cannot show", async () => {
 		const { files } = tree();
 		const read = async (input: { path: string; startLine?: number; endLine?: number }) =>

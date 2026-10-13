@@ -246,6 +246,35 @@ void describe("reads of the head tree", () => {
 });
 
 void describe("listings and searches", () => {
+	for (const glob of [undefined, "**/*.txt"]) {
+		void test(`Git matches do not consume a search bound (${glob ?? "recursive"})`, async (t) => {
+			const { reader, repo } = await captures(t);
+			await writeFile(path.join(repo, ".git", "noise.txt"), "unique-match\n".repeat(20));
+			await writeFile(path.join(repo, "visible.txt"), "unique-match\nunique-match\n");
+			const result = await reader.answer({
+				op: "grep",
+				tree: "head",
+				pattern: "unique-match",
+				maxResults: 1,
+				...(glob === undefined ? {} : { glob }),
+			});
+			assert.deepEqual(result, {
+				matches: [{ file: "visible.txt", line: 1, content: "unique-match" }],
+				truncated: true,
+			});
+		});
+	}
+	void test("an aborted read or search does no work and changes no receipts", async (t) => {
+		const { reader, receipts } = await captures(t);
+		const signal = AbortSignal.abort(new UnratedError("cancelled", "the attempt ended"));
+		for (const request of [
+			{ op: "read", tree: "head", path: "src/cart.ts" },
+			{ op: "grep", tree: "head", pattern: "count" },
+		] as const) {
+			await assert.rejects(reader.answer(request, signal), /the attempt ended/u);
+		}
+		assert.deepEqual(receipts, noReceipts());
+	});
 	void test("a listing leaves out the repository's .git folder, and a long one is cut and says so", async (t) => {
 		const { reader, repo, receipts } = await captures(t);
 		assert.deepEqual(await reader.answer({ op: "list", tree: "head", glob: "src/**" }), {

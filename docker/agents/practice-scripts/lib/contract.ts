@@ -247,6 +247,13 @@ const languageUsageReceipt = z
 			(outputTokens.reasoning ?? 0) <= outputTokens.total,
 	);
 
+export function hasLanguageUsageReceipt(usage: LanguageModelV4GenerateResult["usage"]): boolean {
+	return (
+		languageUsageReceipt.safeParse(usage).success &&
+		(usage.raw === undefined || chatUsageReceipt.safeParse(usage.raw).success)
+	);
+}
+
 function isChatCall(options: Record<string, unknown>): options is CallOptions<"chat"> {
 	return Array.isArray(options.prompt);
 }
@@ -302,11 +309,9 @@ export const MODEL_SLOT_CALLS = {
 			return {
 				value: { slot: "chat", result },
 				// Compatible providers can normalize absent counts to zero; only their raw receipt proves presence.
-				tokens:
-					!languageUsageReceipt.safeParse(result.usage).success ||
-					(result.usage.raw !== undefined && !chatUsageReceipt.safeParse(result.usage.raw).success)
-						? undefined
-						: sum(inputTokens.total, outputTokens.total),
+				tokens: hasLanguageUsageReceipt(result.usage)
+					? sum(inputTokens.total, outputTokens.total)
+					: undefined,
 			};
 		},
 	},
@@ -1072,7 +1077,7 @@ function readCoverage(coverage: Superset["coverage"]): Coverage | string {
 }
 
 function overlaps(a: Citation, b: Citation, resolve?: ResolveCodeCitation): boolean {
-	if (a.path !== b.path || a.startLine > b.endLine || b.startLine > a.endLine) {
+	if (a.startLine > b.endLine || b.startLine > a.endLine) {
 		return false;
 	}
 	const code = (citation: Citation) =>
@@ -1081,12 +1086,17 @@ function overlaps(a: Citation, b: Citation, resolve?: ResolveCodeCitation): bool
 		const left = resolve(a);
 		const right = resolve(b);
 		if (left !== undefined && right !== undefined) {
-			return left.repository === right.repository && left.revision === right.revision;
+			return (
+				left.repository === right.repository &&
+				left.revision === right.revision &&
+				a.path === b.path
+			);
 		}
 	}
 	return (
 		a.sourceKind === b.sourceKind &&
 		a.artifactPath === b.artifactPath &&
+		(!(code(a) || code(b)) || a.path === b.path) &&
 		a.side === b.side &&
 		a.revision === b.revision
 	);

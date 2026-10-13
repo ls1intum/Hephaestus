@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { createInterface } from "node:readline";
 
+import { isRepositoryPath } from "./contract.ts";
 import { globFilesSync } from "./files.ts";
 
 export interface GrepMatch {
@@ -41,19 +42,27 @@ async function collectGrepMatches(
 	args: string[],
 	dir: string,
 	maxResults: number,
+	signal?: AbortSignal,
 ): Promise<GrepMatch[]> {
+	signal?.throwIfAborted();
 	const [command, ...commandArgs] = args;
 	if (command === undefined || command === "") {
 		throw new Error("grep command is empty");
 	}
 	const child = spawn(command, commandArgs, {
 		stdio: ["ignore", "pipe", "ignore"],
+		signal,
 	});
 	let stoppedEarly = false;
+	let failure: Error | undefined;
 	const completed = Promise.withResolvers<undefined>();
-	child.once("error", completed.reject);
+	child.once("error", (error) => {
+		failure = error;
+	});
 	child.once("close", (code) => {
-		if (stoppedEarly || code === 0 || code === 1) {
+		if (failure !== undefined) {
+			completed.reject(failure);
+		} else if (stoppedEarly || code === 0 || code === 1) {
 			completed.resolve(undefined);
 		} else {
 			completed.reject(new Error(`grep exited with status ${String(code)}`));
@@ -62,23 +71,25 @@ async function collectGrepMatches(
 	const matches: GrepMatch[] = [];
 	const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
 
-	try {
-		for await (const line of lines) {
-			const match = parseGrepLine(line, dir);
-			if (!match) {
-				continue;
+	const collected = (async () => {
+		try {
+			for await (const line of lines) {
+				const match = parseGrepLine(line, dir);
+				if (!match) {
+					continue;
+				}
+				matches.push(match);
+				if (matches.length >= maxResults) {
+					stoppedEarly = true;
+					child.kill();
+					break;
+				}
 			}
-			matches.push(match);
-			if (matches.length >= maxResults) {
-				stoppedEarly = true;
-				child.kill();
-				break;
-			}
+		} finally {
+			lines.close();
 		}
-	} finally {
-		lines.close();
-		await completed.promise;
-	}
+	})();
+	await Promise.all([collected, completed.promise]);
 
 	return matches.slice(0, maxResults);
 }
@@ -89,11 +100,16 @@ async function collectMatchesForGlob(
 	grepArgs: string[],
 	glob: string,
 	maxResults: number,
+	signal?: AbortSignal,
 ): Promise<GrepMatch[]> {
 	const matches: GrepMatch[] = [];
 	let batch: string[] = [];
 
 	for (const file of globFilesSync(glob, dir)) {
+		signal?.throwIfAborted();
+		if (!isRepositoryPath(file)) {
+			continue;
+		}
 		batch.push(path.join(dir, file));
 		if (batch.length < GLOB_GREP_BATCH_SIZE) {
 			continue;
@@ -101,7 +117,7 @@ async function collectMatchesForGlob(
 
 		const remaining = maxResults - matches.length;
 		matches.push(
-			...(await collectGrepMatches([...grepArgs, "--", pattern, ...batch], dir, remaining)),
+			...(await collectGrepMatches([...grepArgs, "--", pattern, ...batch], dir, remaining, signal)),
 		);
 		if (matches.length >= maxResults) {
 			return matches.slice(0, maxResults);
@@ -119,7 +135,7 @@ async function collectMatchesForGlob(
 	}
 
 	matches.push(
-		...(await collectGrepMatches([...grepArgs, "--", pattern, ...batch], dir, remaining)),
+		...(await collectGrepMatches([...grepArgs, "--", pattern, ...batch], dir, remaining, signal)),
 	);
 	return matches.slice(0, maxResults);
 }
@@ -137,7 +153,9 @@ export async function grep(
 	pattern: string,
 	dir: string,
 	opts: GrepOptions = {},
+	signal?: AbortSignal,
 ): Promise<GrepMatch[]> {
+	signal?.throwIfAborted();
 	const { glob, maxResults = 500, fixedString = false } = opts;
 	if (maxResults <= 0) {
 		return [];
@@ -148,12 +166,13 @@ export async function grep(
 	if (glob !== undefined && glob !== "") {
 		// A basename-only glob matches only the root dir; prepend "**/" for recursion.
 		const recursiveGlob = glob.includes("/") ? glob : `**/${glob}`;
-		return collectMatchesForGlob(pattern, dir, grepArgs, recursiveGlob, maxResults);
+		return collectMatchesForGlob(pattern, dir, grepArgs, recursiveGlob, maxResults, signal);
 	}
 
 	return collectGrepMatches(
-		["grep", "-r", ...grepArgs.slice(1), "--", pattern, dir],
+		["grep", "-r", "--exclude-dir=.git", ...grepArgs.slice(1), "--", pattern, dir],
 		dir,
 		maxResults,
+		signal,
 	);
 }

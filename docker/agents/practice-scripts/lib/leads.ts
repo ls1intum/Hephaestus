@@ -10,8 +10,18 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { oneLine } from "./bounded-text.ts";
-import type { EvidenceLocation, ReviewLead, ReviewOptions } from "./contract.ts";
-import type { EvidenceSources } from "./evidence-reader.ts";
+import {
+	isRepositoryPath,
+	type EvidenceLocation,
+	type ReviewLead,
+	type ReviewOptions,
+} from "./contract.ts";
+import {
+	assertCitationRange,
+	changeLines,
+	quotedLines,
+	type EvidenceSources,
+} from "./evidence-reader.ts";
 import { UnratedError } from "./practice-script.ts";
 import type { DiffFile } from "./types.ts";
 
@@ -46,9 +56,15 @@ const git = promisify(execFile);
 /** A path inside `root`, symlinks resolved, naming a regular file small enough to quote; otherwise undefined. */
 async function fileInside(root: string, relative: string): Promise<string | undefined> {
 	try {
+		if (!isRepositoryPath(relative)) {
+			return undefined;
+		}
 		const base = await realpath(root);
 		const full = await realpath(path.resolve(base, relative));
 		if (full !== base && !full.startsWith(`${base}${path.sep}`)) {
+			return undefined;
+		}
+		if (!isRepositoryPath(path.relative(base, full))) {
 			return undefined;
 		}
 		const stats = await stat(full);
@@ -58,42 +74,14 @@ async function fileInside(root: string, relative: string): Promise<string | unde
 	}
 }
 
-function linesOf(text: string, start: number, end: number): string | undefined {
-	const lines = text.split("\n");
-	if (end < start || end > lines.length) {
-		return undefined;
-	}
-	return lines.slice(start - 1, end).join("\n");
-}
-
-function diffLines(
-	file: DiffFile | undefined,
-	side: "OLD" | "NEW",
-	start: number,
-	end: number,
-): string | undefined {
-	if (file === undefined || end < start) {
-		return;
-	}
-	const lines = side === "OLD" ? file.removedLines : file.addedLines;
-	const picked: string[] = [];
-	for (let n = start; n <= end; n += 1) {
-		const text = lines.get(n);
-		if (text === undefined) {
-			return;
-		}
-		picked.push(text);
-	}
-	return picked.join("\n");
-}
-
 /** The text at a location, or undefined when its source does not hold it. */
 async function quoteOf(
 	at: EvidenceLocation,
 	sources: EvidenceSources,
+	signal?: AbortSignal,
 ): Promise<string | undefined> {
 	if ("change" in at) {
-		return diffLines(
+		return changeLines(
 			sources.change?.files.get(at.change),
 			at.side ?? "NEW",
 			at.line,
@@ -101,10 +89,11 @@ async function quoteOf(
 		);
 	}
 	if ("file" in at) {
-		if (sources.repo === null) {
+		if (sources.repo === null || !isRepositoryPath(at.file)) {
 			return undefined;
 		}
 		const end = at.endLine ?? at.line;
+		assertCitationRange(at.line, end);
 		if (at.revision !== undefined && at.revision !== sources.headRevision) {
 			try {
 				const { stdout } = await git(
@@ -114,15 +103,22 @@ async function quoteOf(
 						env: GIT_ENV,
 						maxBuffer: MAX_QUOTED_FILE_BYTES,
 						encoding: "utf8",
+						signal,
 					},
 				);
-				return linesOf(stdout, at.line, end);
-			} catch {
+				return quotedLines(stdout, at.line, end);
+			} catch (error) {
+				signal?.throwIfAborted();
+				if (error instanceof UnratedError) {
+					throw error;
+				}
 				return undefined;
 			}
 		}
 		const file = await fileInside(sources.repo, at.file);
-		return file === undefined ? undefined : linesOf(await readFile(file, "utf8"), at.line, end);
+		return file === undefined
+			? undefined
+			: quotedLines(await readFile(file, { encoding: "utf8", signal }), at.line, end);
 	}
 	if (sources.contextDir === null) {
 		return undefined;
@@ -134,7 +130,7 @@ async function quoteOf(
 	// A record cited as a whole (line 0 or none) is quoted by name only.
 	return at.line === undefined || at.line === 0
 		? ""
-		: linesOf(await readFile(file, "utf8"), at.line, at.line);
+		: quotedLines(await readFile(file, { encoding: "utf8", signal }), at.line, at.line);
 }
 
 /**
@@ -179,10 +175,20 @@ export async function resolveLeads(
 	leads: readonly ReviewLead[],
 	sources: EvidenceSources,
 	changeSince?: ReadonlyMap<string, DiffFile>,
+	signal?: AbortSignal,
 ): Promise<QuotedLead[]> {
 	const quoted: QuotedLead[] = [];
 	for (const [index, lead] of leads.entries()) {
-		const quote = await quoteOf(lead.at, sources);
+		signal?.throwIfAborted();
+		let quote: string | undefined;
+		try {
+			quote = await quoteOf(lead.at, sources, signal);
+		} catch (error) {
+			if (!(error instanceof UnratedError) || error.reason !== "error") {
+				throw error;
+			}
+		}
+		signal?.throwIfAborted();
 		if (quote === undefined) {
 			throw new UnratedError(
 				"error",

@@ -216,6 +216,62 @@ void describe("chat usage receipts from the bound provider", () => {
 	});
 });
 
+void describe("logprob decision usage receipts from the bound provider", () => {
+	for (const { usage, tokens } of [
+		{ usage: undefined },
+		{ usage: {} },
+		{ usage: { prompt_tokens: 10 } },
+		{ usage: { completion_tokens: 5 } },
+		{ usage: { prompt_tokens: 0, completion_tokens: 0 }, tokens: 0 },
+		{ usage: { prompt_tokens: 10, completion_tokens: 5 }, tokens: 15 },
+	] satisfies { usage: unknown; tokens?: number }[]) {
+		void test(`a decision adapter preserves the receipt ${JSON.stringify(usage)}`, async (t) => {
+			t.mock.method(globalThis, "fetch", async () =>
+				Response.json({
+					id: "completion",
+					model: "decision",
+					created: 0,
+					choices: [
+						{
+							index: 0,
+							message: { role: "assistant", content: "q1: A" },
+							finish_reason: "stop",
+							logprobs: {
+								content: [
+									{ token: "q1", logprob: 0, top_logprobs: [] },
+									{ token: ":", logprob: 0, top_logprobs: [] },
+									{ token: " A", logprob: 0, top_logprobs: [{ token: " A", logprob: 0 }] },
+								],
+							},
+						},
+					],
+					usage,
+				}),
+			);
+			const { decision } = hostModels(
+				{ decision: { protocol: "openai-completions", modelId: "decision" } },
+				"https://proxy.example/internal/llm",
+				"test-token",
+				"practice",
+			);
+			assert.ok(decision !== undefined);
+			const call = modelCall(
+				"decision",
+				decision,
+				{ state: "work", questions: { q: { type: "boolean", instructions: "Is it met?" } } },
+				never,
+			);
+			assert.ok("run" in call);
+			const budget = new ModelBudget(5000, 1);
+			const outcome = await budget.run(call.reserve, never, call.run);
+			assert.ok("value" in outcome, JSON.stringify(outcome));
+			assert.equal(budget.left, 5000 - (tokens ?? call.reserve));
+			assert.ok(outcome.value.slot === "decision");
+			assert.equal(outcome.value.result.usage === undefined, tokens === undefined);
+		});
+	}
+});
+
 const values = (count: number) => Array.from({ length: count }, (_, i) => `v${i}`);
 
 void describe("a call to a slot's model", () => {

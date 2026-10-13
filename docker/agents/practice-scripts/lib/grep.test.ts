@@ -22,6 +22,14 @@ afterEach(async () => {
 });
 
 void describe("grep", () => {
+	void it("cancels a running search and settles its child process", async () => {
+		const dir = await createTempDir();
+		await writeFile(path.join(dir, "large.txt"), "a line with no match\n".repeat(10_000));
+		const cancelled = new AbortController();
+		const searching = grep("needle", dir, {}, cancelled.signal);
+		cancelled.abort();
+		await assert.rejects(searching, { name: "AbortError" });
+	});
 	void it("treats fixed-string patterns literally without shell interpretation", async () => {
 		const dir = await createTempDir();
 		const nestedDir = path.join(dir, "nested dir");

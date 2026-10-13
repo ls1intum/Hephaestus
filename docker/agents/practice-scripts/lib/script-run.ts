@@ -7,6 +7,7 @@ import { fork } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import {
 	MODEL_SLOTS,
@@ -37,6 +38,10 @@ import { reasonOf, UnratedError } from "./practice-script.ts";
 const CHILD_HEAP_MB = 256;
 /** A program's process is killed this long after its deadline, so a program that unwinds still returns. */
 export const RETURN_MS = 5000;
+
+export class ProgramSettlementError extends Error {
+	override name = "ProgramSettlementError";
+}
 /** Requests a child may have in flight at once. */
 const MAX_IN_FLIGHT = 32;
 /** The most of a failed program's error that its outcome keeps. */
@@ -224,6 +229,7 @@ export async function runCustomProgram(
 	let aborted: AbortReason | undefined;
 	/** Requests the host still owes a reply, by id, each with its own cancellation. */
 	const open = new Map<number, OpenRequest>();
+	const outstanding = new Map<OpenRequest, Promise<void>>();
 	/** Count one model call whose failure the program receives. */
 	const countUnrated = (slot: ModelSlot, reason: Reason) => {
 		const slotReport = report.find((r) => r.slot === slot);
@@ -391,12 +397,15 @@ export async function runCustomProgram(
 		}
 	};
 
-	const answerRead = async (message: Extract<ChildMessage, { kind: "read" }>) => {
+	const answerRead = async (
+		message: Extract<ChildMessage, { kind: "read" }>,
+		call: AbortSignal,
+	) => {
 		try {
 			reply({
 				kind: "read-result",
 				id: message.id,
-				value: await services.reader.answer(message.request),
+				value: await services.reader.answer(message.request, call),
 			});
 		} catch (error) {
 			reply({
@@ -450,12 +459,14 @@ export async function runCustomProgram(
 			if (message.kind === "model") {
 				await answerModel(message, request, callSignal);
 			} else if (message.kind === "read") {
-				await answerRead(message);
+				await answerRead(message, callSignal);
 			} else {
 				await answerReview(message, callSignal);
 			}
 		} catch (error) {
 			fail("error", `the host could not answer a ${message.kind} request: ${messageOf(error)}`);
+		} finally {
+			outstanding.delete(request);
 		}
 	};
 
@@ -564,7 +575,8 @@ export async function runCustomProgram(
 				};
 				open.set(message.id, request);
 				const callSignal = AbortSignal.any([signal, call.signal]);
-				void answerRequest(message, request, callSignal);
+				const answering = answerRequest(message, request, callSignal);
+				outstanding.set(request, answering);
 			}
 		}
 	});
@@ -577,10 +589,22 @@ export async function runCustomProgram(
 	const exit: readonly unknown[] = await closed;
 	clearTimeout(deadlineLimit);
 	clearTimeout(killLater);
+	const drainTimer = new AbortController();
+	try {
+		const drained = await Promise.race([
+			Promise.allSettled(outstanding.values()),
+			sleep(RETURN_MS, null, { signal: drainTimer.signal }),
+		]);
+		if (drained === null) {
+			throw new ProgramSettlementError("the program's requests did not stop after cancellation");
+		}
+	} finally {
+		drainTimer.abort();
+	}
 	const done = (outcome: Omit<ProgramExecution, "models" | "calls">): ProgramExecution => ({
 		...outcome,
-		models: report,
-		calls,
+		models: structuredClone(report),
+		calls: { ...calls },
 	});
 	if (settled !== undefined) {
 		return done(settled);

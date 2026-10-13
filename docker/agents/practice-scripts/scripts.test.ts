@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 
 import { KINDS, type Kind } from "./lib/contract.ts";
 import { isJsonObject } from "./lib/json.ts";
-import { isPracticeScriptDefinition } from "./lib/practice-script.ts";
+import { isPracticeScriptDefinition, UnratedError } from "./lib/practice-script.ts";
 import type { DiffFile } from "./lib/types.ts";
 import {
 	moment,
@@ -333,11 +333,17 @@ void it("linked-work analysis reads only explicitly supplied context, never a re
 		await mkdir(context, { recursive: true });
 		await writeFile(
 			path.join(legacy, "linked_work_items.json"),
-			JSON.stringify({ workItems: [{ body: "- [ ] WRONG CONTEXT" }] }),
+			JSON.stringify({
+				workItems: [{ number: 12, title: "Wrong issue", body: "- [ ] WRONG CONTEXT" }],
+			}),
 		);
 		await writeFile(
 			path.join(context, "linked_work_items.json"),
-			JSON.stringify({ workItems: [{ body: "Acceptance criteria\n- [ ] one\n- [ ] two" }] }),
+			JSON.stringify({
+				workItems: [
+					{ number: 12, title: "Issue", body: "Acceptance criteria\n- [ ] one\n- [ ] two" },
+				],
+			}),
 		);
 		const work = { source_branch: "fix-example", title: "Fixes #12" };
 		const explicit = await runBundled(slug, { work, repo, context });
@@ -350,6 +356,57 @@ void it("linked-work analysis reads only explicitly supplied context, never a re
 	} finally {
 		await rm(root, { recursive: true, force: true });
 	}
+});
+
+void it("linked acceptance criteria require the captured workItems record", async () => {
+	const slug = "honours-linked-issue-acceptance-criteria";
+	for (const record of [
+		{},
+		[],
+		{ items: [] },
+		{ number: 12, title: "Issue", body: "- [ ] task" },
+		{ workItems: [null] },
+		{ workItems: [{ number: 12, title: "Issue", description: "- [ ] task" }] },
+	]) {
+		await assert.rejects(
+			runBundled(slug, { context: { "linked_work_items.json": record } }),
+			(error: unknown) => {
+				assert.ok(error instanceof UnratedError);
+				assert.equal(error.reason, "unavailable");
+				assert.match(error.message, /linked_work_items\.json/u);
+				return true;
+			},
+		);
+	}
+	const result = await runBundled(slug, {
+		context: {
+			"linked_work_items.json": { workItems: [{ number: 12, title: "Issue", body: null }] },
+		},
+	});
+	assert.equal(result.facts?.linkedIssueCount, 1);
+	assert.equal(result.facts.linkedIssueBodyPresent, 0);
+});
+
+void it("a logger under a long repository path stays within the review direction bound", async () => {
+	const file = "App/main.ts";
+	const logger = `${"folder/".repeat(60)}logger.ts`;
+	const source = 'console.log("diagnostic");';
+	const result = await runBundled("logs-through-the-platform-logger", {
+		repo: { [file]: source, [logger]: 'const log = LoggerFactory.getLogger("App");' },
+		change: new Map([
+			[
+				file,
+				{ path: file, addedLines: new Map([[1, source]]), removedLines: new Map(), hunks: [] },
+			],
+		]),
+	});
+	assert.equal(result.leads?.length, 1);
+	const direction = result.directions?.find((text) =>
+		text.includes("the checkout matches a logger"),
+	);
+	assert.ok(direction !== undefined);
+	assert.equal(direction.length, 300);
+	assert.ok(direction.endsWith("…"));
 });
 
 void it("issue-reference syntax in templates remains a candidate rather than an authored closing claim", async () => {

@@ -7,6 +7,7 @@ import type { FileTree } from "./practice-script.ts";
 const MAX_LINES = 200;
 const MAX_ENTRIES = 200;
 const MAX_MATCHES = 50;
+const MAX_MATCH_CHARS = 300;
 
 /** The tools over a tree: each read goes through the host, which keeps its receipt. */
 export function evidenceTools(tree: FileTree | null): ToolSet {
@@ -54,7 +55,7 @@ export function evidenceTools(tree: FileTree | null): ToolSet {
 			},
 		}),
 		grep: tool({
-			description: `Search repository files with an extended regular expression. At most ${MAX_MATCHES} matches, as path:line: text.`,
+			description: `Search repository files with an extended regular expression. At most ${MAX_MATCHES} matches, as path:line: text. Matched text is limited to ${MAX_MATCH_CHARS} characters; … marks a shortened line.`,
 			inputSchema: z.object({
 				pattern: z.string(),
 				glob: z.string().optional().describe('A file glob such as "*.ts"'),
@@ -62,8 +63,15 @@ export function evidenceTools(tree: FileTree | null): ToolSet {
 			execute: async ({ pattern, glob }) => {
 				const { matches, truncated } = await tree.grep(pattern, { glob, maxResults: MAX_MATCHES });
 				const shown =
-					matches.map((m) => `${m.file}:${m.line}: ${m.content.slice(0, 300)}`).join("\n") ||
-					"(no matches)";
+					matches
+						.map((m) => {
+							const text =
+								m.content.length > MAX_MATCH_CHARS
+									? `${m.content.slice(0, MAX_MATCH_CHARS - 1)}…`
+									: m.content;
+							return `${m.file}:${m.line}: ${text}`;
+						})
+						.join("\n") || "(no matches)";
 				return truncated ? `${shown}\n(more matches are not listed)` : shown;
 			},
 		}),
