@@ -14,6 +14,12 @@ import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { mock, test } from "node:test";
 
+import type {
+	AgentSession,
+	AgentToolResult,
+	ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
+
 import {
 	addModelCall,
 	newModelCallTiming,
@@ -354,9 +360,9 @@ const callUsage = (output: number) => ({
 interface CustomTool {
 	name: string;
 	description: string;
-	parameters: unknown;
+	parameters: ToolDefinition["parameters"];
 	prepareArguments?: (args: unknown) => unknown;
-	execute: (id: string, input: unknown) => Promise<unknown>;
+	execute: (id: string, input: unknown) => Promise<AgentToolResult<unknown>>;
 }
 
 const withhold = (
@@ -372,7 +378,26 @@ const withhold = (
 	withholdReason,
 });
 
+type NativeStream = Awaited<ReturnType<AgentSession["agent"]["streamFunction"]>>;
+function isStreamFactory(value: unknown): value is () => NativeStream {
+	return typeof value === "function";
+}
+
+function observationCall(
+	id: string,
+	args: Extract<
+		Awaited<ReturnType<NativeStream["result"]>>["content"][number],
+		{ type: "toolCall" }
+	>["arguments"],
+) {
+	return { type: "toolCall" as const, id, name: "report_observation", arguments: args };
+}
+
 const scenario = process.env.PI_ORCHESTRATION_SCENARIO;
+const nativeSdk =
+	scenario !== undefined && scenario.startsWith("scope-native-")
+		? await import("@earendil-works/pi-coding-agent")
+		: undefined;
 const unavailableContext = process.env.PI_UNAVAILABLE_CONTEXT === "true";
 const counterevidence = process.env.PI_COUNTEREVIDENCE === "true";
 const reviewCompacted = process.env.PI_REVIEW_COMPACTED === "true";
@@ -916,6 +941,150 @@ if (scenario !== undefined && scenario !== "") {
 							found.execute(id, found.prepareArguments?.(args) ?? args),
 					};
 				};
+				if (nativeSdk) {
+					const runtime = await nativeSdk.ModelRuntime.create({
+						authPath: nodePath.join(cwd, "native-auth.json"),
+						modelsPath: null,
+						modelsStorePath: nodePath.join(cwd, "native-models.json"),
+						refreshOnCreate: false,
+						allowModelNetwork: false,
+					});
+					const model = runtime.getModel("openai", "gpt-4.1");
+					assert.ok(model);
+					const settingsManager = nativeSdk.SettingsManager.inMemory(
+						{
+							compaction: { enabled: false },
+							cacheWarming: "off",
+						},
+						{ projectTrusted: false },
+					);
+					const resourceLoader = new nativeSdk.DefaultResourceLoader({
+						cwd,
+						agentDir: cwd,
+						settingsManager,
+						noContextFiles: true,
+						noExtensions: true,
+						noSkills: true,
+						noPromptTemplates: true,
+					});
+					await resourceLoader.reload();
+					const opened = await nativeSdk.createAgentSession({
+						cwd,
+						agentDir: cwd,
+						modelRuntime: runtime,
+						model,
+						settingsManager,
+						resourceLoader,
+						sessionManager: nativeSdk.SessionManager.inMemory(cwd),
+						tools: options.tools,
+						customTools: options.customTools.map((custom) => ({ ...custom, label: custom.name })),
+					});
+					const nativeAi: unknown = await import(
+						import.meta.resolve(
+							"@earendil-works/pi-ai",
+							import.meta.resolve("@earendil-works/pi-coding-agent"),
+						)
+					);
+					assert.ok(
+						isRecord(nativeAi) && isStreamFactory(nativeAi.createAssistantMessageEventStream),
+					);
+					const makeStream = nativeAi.createAssistantMessageEventStream;
+					let requests = 0;
+					const nativeObservation = (slug: string, summary: string, citation = changeCitation) => ({
+						...observation(slug, summary, citation),
+						evidence: { citations: [citation] },
+					});
+
+					opened.session.agent.streamFunction = () => {
+						requests += 1;
+						record(`native-request:${sessionNumber}:${requests}`);
+						const slug = sessionNumber === 1 ? "test-practice" : "second-practice";
+						const refusedRevision = scenario === "scope-native-revision";
+
+						const content: Awaited<ReturnType<NativeStream["result"]>>["content"] = [];
+						if (requests === 1) {
+							content.push(
+								{
+									type: "toolCall",
+									id: "read",
+									name: "read",
+									arguments: { path: "work/change/diff.patch" },
+								},
+								observationCall(
+									"report",
+									nativeObservation(
+										sessionNumber === 1 || refusedRevision ? slug : "test-practice",
+										`Own ${slug}`,
+									),
+								),
+							);
+							if (sessionNumber === 1) {
+								content.push(
+									observationCall("revision", {
+										...nativeObservation(slug, "Revised within the batch"),
+										revises: slug,
+									}),
+								);
+							} else if (refusedRevision) {
+								content.push(
+									observationCall("bad-revision", {
+										...nativeObservation(slug, "Unverified correction", {
+											...changeCitation,
+											quote: "+ notCaptured();",
+										}),
+										revises: slug,
+									}),
+								);
+							}
+						} else if (sessionNumber === 2 && requests === 2) {
+							content.push(
+								observationCall("correction", {
+									...nativeObservation(slug, `Corrected ${slug}`),
+									revises: refusedRevision ? slug : null,
+								}),
+							);
+						} else {
+							content.push({ type: "text", text: "Unnecessary wrap-up." });
+						}
+						const stopReason = content.some((part) => part.type === "toolCall")
+							? "toolUse"
+							: "stop";
+						const message: Awaited<ReturnType<NativeStream["result"]>> = {
+							role: "assistant",
+							api: model.api,
+							provider: model.provider,
+							model: model.id,
+							content,
+							stopReason,
+							timestamp: Date.now(),
+							usage: {
+								...callUsage(20),
+								totalTokens: 1020,
+								cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+							},
+						};
+						const stream = makeStream();
+						stream.push({ type: "done", reason: stopReason, message });
+						return stream;
+					};
+					let nudged = false;
+					opened.session.subscribe((event) => {
+						if (event.type === "message_end" && event.message.role === "assistant" && !nudged) {
+							nudged = true;
+							void (async () => {
+								await opened.session.steer("Record this practice.");
+								await opened.session.followUp("Finish recording this practice.");
+								record(`native-queued:${sessionNumber}:${opened.session.pendingMessageCount}`);
+							})();
+						}
+					});
+					const prompt = opened.session.prompt.bind(opened.session);
+					opened.session.prompt = async (...args) => {
+						await prompt(...args);
+						record(`native-pending:${sessionNumber}:${opened.session.pendingMessageCount}`);
+					};
+					return opened;
+				}
 				return {
 					extensionsResult: { errors: [] },
 					session: {
@@ -2705,6 +2874,8 @@ if (scenario !== undefined && scenario !== "") {
 	await import("../../../main/resources/agent/pi-runner.ts");
 } else {
 	for (const fixture of [
+		"scope-native-completion",
+		"scope-native-revision",
 		"scope-cut-off",
 		"scope-recording-guard",
 		"scope-repeat",
@@ -2833,6 +3004,10 @@ if (scenario !== undefined && scenario !== "") {
 			]).get(fixture) ?? fixture;
 		void test(
 			{
+				"scope-native-completion":
+					"native mixed report and read ends each recorded practice before another model request",
+				"scope-native-revision":
+					"native refused revision stays open until corrected while same-batch valid revision settles",
 				"scope-cut-off":
 					"a truncated response in a prior practice does not consume the next session's correction chance",
 				"scope-recording-guard":
@@ -3252,7 +3427,11 @@ if (scenario !== undefined && scenario !== "") {
 					}
 					const child = spawnSync(
 						process.execPath,
-						["--experimental-test-module-mocks", import.meta.filename],
+						[
+							"--experimental-test-module-mocks",
+							"--experimental-import-meta-resolve",
+							import.meta.filename,
+						],
 						{
 							env: {
 								...process.env,
@@ -3435,6 +3614,25 @@ if (scenario !== undefined && scenario !== "") {
 						return;
 					}
 					switch (stage) {
+						case "scope-native-completion":
+						case "scope-native-revision": {
+							assert.equal(child.status, 0, child.stderr);
+							assert.deepEqual(
+								events.filter((event) => event.startsWith("native-request:")),
+								["native-request:1:1", "native-request:2:1", "native-request:2:2"],
+							);
+							const observations = readObservations(nodePath.join(cwd, "out/result.json"));
+							assert.deepEqual(
+								observations.map((item) => item.summary),
+								["Revised within the batch", "Corrected second-practice"],
+							);
+							for (const session of [1, 2]) {
+								assert.ok(events.includes(`native-queued:${session}:2`));
+								assert.ok(events.includes(`native-pending:${session}:0`));
+							}
+							reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
+							break;
+						}
 						case "compose-private-budget":
 						case "compose-private-complete-error":
 						case "compose-public-error":
