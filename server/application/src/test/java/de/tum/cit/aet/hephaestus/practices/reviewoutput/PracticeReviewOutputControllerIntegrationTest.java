@@ -674,6 +674,46 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .isEqualTo(1);
         }
 
+        @Test
+        @WithAdminUser
+        void shouldCountAndReturnOneParentResultWhenFeedbackBindsTwoOfItsProblems() {
+            UUID result = insertProblem(practiceA, job, alice, "Two problems", "MAJOR");
+            addProblem(result, 0, "MAJOR", "src/Auth.java", 8);
+            addProblem(result, 1, "MINOR", "src/Auth.java", 14);
+            var problems = observationRepository.findByPracticeResultIds(workspace.getId(), List.of(result));
+            Feedback unit = persistUnit(workspace, job, alice, 0, FeedbackDeliveryState.DELIVERED, null, "Both places");
+            for (int ordinal = 0; ordinal < problems.size(); ordinal++) {
+                feedbackEvidenceRepository.insertIfAbsent(
+                        unit.getId(), result, problems.get(ordinal).getId(), "PRIMARY", ordinal);
+            }
+
+            getOk(RESULTS + "?agentJobId={id}", workspace.getWorkspaceSlug(), job.getId())
+                    .jsonPath("$.content[0].feedback.delivered")
+                    .isEqualTo(1);
+            getOk(FEEDBACK + "?agentJobId={id}", workspace.getWorkspaceSlug(), job.getId())
+                    .jsonPath("$.content[0].practiceResultCount")
+                    .isEqualTo(1);
+            getOk(FEEDBACK + "/{id}", workspace.getWorkspaceSlug(), unit.getId())
+                    .jsonPath("$.practiceResults.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$.practiceResults[0].practiceResultId")
+                    .isEqualTo(result.toString())
+                    .jsonPath("$.practiceResults[0].role")
+                    .isEqualTo("PRIMARY")
+                    .jsonPath("$.practiceResults[0].ordinal")
+                    .isEqualTo(0);
+            getOk(
+                            "/workspaces/{slug}/practices/reviews/lineage?kind=FEEDBACK&id={id}",
+                            workspace.getWorkspaceSlug(),
+                            unit.getId())
+                    .jsonPath("$.results.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$.results[0].feedbackCount")
+                    .isEqualTo(1)
+                    .jsonPath("$.feedback[0].practiceResultIds")
+                    .isEqualTo(List.of(result.toString()));
+        }
+
         /** Feedback waiting on an admin, or rejected by one, was still composed from the result. */
         @Test
         @WithAdminUser

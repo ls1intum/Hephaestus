@@ -306,7 +306,7 @@ public interface FeedbackEvidenceRepository extends JpaRepository<FeedbackEviden
             @Param("workspaceId") Long workspaceId, @Param("recipientUserId") Long recipientUserId, Pageable pageable);
 
     @Query("""
-        SELECT fo.practiceResult.id AS practiceResultId, fo.role AS role, fo.ordinal AS ordinal,
+        SELECT fo.practiceResult.id AS practiceResultId, MIN(fo.role) AS role, MIN(fo.ordinal) AS ordinal,
                p.slug AS practiceSlug, p.name AS practiceName, o.summary AS summary,
                pa.slug AS groupSlug, pa.name AS groupName, pa.icon AS groupIcon, pa.color AS groupColor,
                o.outcome AS outcome, o.severity AS severity,
@@ -324,7 +324,11 @@ public interface FeedbackEvidenceRepository extends JpaRepository<FeedbackEviden
         WHERE fo.feedback.id = :feedbackId
           AND fo.feedback.workspaceId = :workspaceId
           AND p.workspace.id = :workspaceId
-        ORDER BY fo.ordinal ASC
+        GROUP BY fo.practiceResult.id, p.slug, p.name, o.summary,
+                 pa.slug, pa.name, pa.icon, pa.color, o.outcome, o.severity,
+                 evaluatedRevision.id, evaluatedRevision.reviewRuleFingerprint,
+                 currentRevision.reviewRuleFingerprint, o.supersededAt, o.observedAt
+        ORDER BY MIN(fo.ordinal) ASC, fo.practiceResult.id
         """)
     List<BoundResult> findBoundResults(@Param("workspaceId") Long workspaceId, @Param("feedbackId") UUID feedbackId);
 

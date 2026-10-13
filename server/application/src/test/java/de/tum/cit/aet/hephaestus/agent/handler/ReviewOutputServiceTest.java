@@ -2206,6 +2206,27 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         }
     }
 
+    @Test
+    void shouldRefuseTheWholeCandidateWhenItsExampleRelabelsAProblemOfTheSameCapturedTurn() {
+        ObjectNode citation = record(
+                "slack.conversation.thread",
+                "context/conversation_thread.json",
+                "conversation_thread.json",
+                9,
+                "It is broken. Fix it.");
+        ObjectNode candidate = notMet(problem(Severity.MINOR, citation));
+        candidate
+                .putObject("example")
+                .put("note", "The reply shows clear communication.")
+                .set("citation", citation.deepCopy().put("path", "same-turn"));
+
+        assertThatThrownBy(() -> publishVerified(testJob, submit("pr-description-quality", candidate)))
+                .isInstanceOfSatisfying(
+                        ResultsRefusedException.class,
+                        refused -> assertThat(refused.reasonCode()).isEqualTo("example_overlaps_problem"));
+        verifyNoInteractions(practiceResultRepository, observationRepository);
+    }
+
     @Nested
     class MetadataValidation {
 

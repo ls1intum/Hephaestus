@@ -4841,7 +4841,9 @@ async function main() {
 				options.leads ?? [],
 				evidenceSources,
 				changeSinceOf.get(slug),
+				signal,
 			);
+			signal.throwIfAborted();
 			const fullInput = `${REVIEW_INPUT_ROOT}/${slug}.json`;
 			const preparing =
 				leads.length > 0 ||

@@ -564,6 +564,33 @@ void test("a named color resolves only to one colorset, exact name first; two ca
 	);
 });
 
+void test("a cut colorset listing cannot establish a unique named asset", async () => {
+	const single = '{"colors":[{"color":{},"idiom":"universal"}]}';
+	const source =
+		'struct Card: View {\n    var body: some View {\n        Text("x").foregroundStyle(Color("Brand"))\n    }\n}\n';
+	const result = await runBundled("uses-adaptive-colors-for-every-appearance", {
+		repo: {
+			"A/Assets.xcassets/Brand.colorset/Contents.json": single,
+			...Object.fromEntries(
+				Array.from({ length: 5000 }, (_, i) => [
+					`B/Assets.xcassets/Noise${String(i).padStart(4, "0")}.colorset/Contents.json`,
+					single,
+				]),
+			),
+			"Z/Assets.xcassets/Brand.colorset/Contents.json":
+				'{"colors":[{"color":{},"appearances":[{"appearance":"luminosity","value":"dark"}]}]}',
+			"App/Card.swift": source,
+		},
+		change: new Map([whole("App/Card.swift", source)]),
+	});
+	assert.equal(result.leads?.[0]?.facts?.hasDarkAppearance, "unknown");
+	assert.equal(result.facts?.assetsWithoutDarkAppearance, 0);
+	assert.equal(result.facts.assetColorsInCheckout, -1);
+	assert.deepEqual(result.limitations, [
+		{ what: "colorset inventory", count: 1, reason: "truncated" },
+	]);
+});
+
 void test("a named color given a bundle is a named asset; the main bundle resolves, another bundle stays unknown", async () => {
 	const source = [
 		"struct Card: View {",

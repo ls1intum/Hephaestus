@@ -106,10 +106,11 @@ function bundleOf(context: string): string | null {
 const COLORSETS_READ = 200;
 
 interface AssetColors {
-	/** Every colorset path of the checkout by color name, read or not. */
+	/** Listed colorset paths by color name, read or not. */
 	paths: Map<string, string[]>;
 	/** The appearances of the colorsets read, by path. */
 	read: Map<string, DarkAppearance>;
+	listing: "complete" | "truncated" | "unavailable";
 }
 
 function colorNameOf(file: string): string {
@@ -126,7 +127,10 @@ function colorNameOf(file: string): string {
  * only one whose name differs in case alone. Two candidates anywhere in the checkout, or one not read,
  * leave it unknown, since nothing here says which target's catalog the view uses.
  */
-function appearanceOf({ paths, read }: AssetColors, name: string): DarkAppearance {
+function appearanceOf({ paths, read, listing }: AssetColors, name: string): DarkAppearance {
+	if (listing !== "complete") {
+		return "unknown";
+	}
 	const exact = paths.get(name);
 	const candidates =
 		exact ??
@@ -139,9 +143,13 @@ function appearanceOf({ paths, read }: AssetColors, name: string): DarkAppearanc
 
 async function assetColors(tree: FileTree | null): Promise<AssetColors> {
 	let all: readonly string[] = [];
+	let listing: AssetColors["listing"] = "unavailable";
 	try {
 		const listed = await tree?.list("**/*.xcassets/**/*.colorset/Contents.json");
 		all = listed?.paths ?? [];
+		if (listed !== undefined) {
+			listing = listed.truncated ? "truncated" : "complete";
+		}
 	} catch {
 		// no readable checkout: no colorset read
 	}
@@ -156,7 +164,7 @@ async function assetColors(tree: FileTree | null): Promise<AssetColors> {
 		const source = await tree?.read(file).catch(() => null);
 		read.set(file, source?.status === "FOUND" ? darkAppearanceOf(source.text) : "unknown");
 	}
-	return { paths, read };
+	return { paths, read, listing };
 }
 
 export const LABELS = {
@@ -256,20 +264,34 @@ export default definePracticeScript({
 				`${String(inOtherBundles)} listed named asset color(s) are looked up in a bundle other than the main one: which asset catalog that bundle holds was not resolved, so their dark appearance is unknown until the catalog is located.`,
 			);
 		}
-		if (namedAssets > 0 && colorsetsFound > COLORSETS_READ) {
+		if (namedAssets > 0 && assets.listing !== "complete") {
+			directions.push(
+				"The colorset inventory is incomplete. An unlisted colorset may share a listed name, so named colors' dark appearance is unknown.",
+			);
+		} else if (namedAssets > 0 && colorsetsFound > COLORSETS_READ) {
 			directions.push(
 				`The checkout holds ${String(colorsetsFound)} colorsets and the first ${String(COLORSETS_READ)} were read: a named color whose colorset was not read is unknown, not missing.`,
 			);
 		}
 		return ctx.review({
 			leads,
+			limitations:
+				namedAssets > 0 && assets.listing !== "complete"
+					? [
+							{
+								what: "colorset inventory",
+								count: 1,
+								reason: assets.listing === "truncated" ? "truncated" : "unavailable",
+							},
+						]
+					: [],
 			facts: {
 				literalColors: literals,
 				systemAdaptiveColors: systemAdaptive,
 				namedAssetColors: namedAssets,
 				colorsToClassify: toClassify,
 				assetsWithoutDarkAppearance,
-				assetColorsInCheckout: colorsetsFound,
+				assetColorsInCheckout: assets.listing === "complete" ? colorsetsFound : -1,
 				filesWithoutCheckout: scan.filesWithoutCheckout,
 				filesScanned: scan.filesScanned,
 				linesAdded: scan.linesAdded,

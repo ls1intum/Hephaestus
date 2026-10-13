@@ -94,16 +94,6 @@ class PracticeCatalogInstallationManager {
      * error, until an admin accepts the offer or rewrites it.
      */
     void upgradePracticeScripts() {
-        List<Long> pending;
-        try {
-            pending = installationRepository.findWorkspaceIdsAwaitingPracticeScriptUpgrade();
-        } catch (RuntimeException exception) {
-            log.error("Could not load workspaces for the practice script upgrade", exception);
-            return;
-        }
-        if (pending.isEmpty()) {
-            return;
-        }
         try {
             int adopted = instanceReleases.adoptShippedPracticeScripts();
             if (adopted > 0) {
@@ -112,6 +102,13 @@ class PracticeCatalogInstallationManager {
         } catch (RuntimeException exception) {
             // Marked against the old instance copies, a workspace copy that follows one would never move.
             log.error("Instance practice script upgrade failed; the workspaces wait for the next start", exception);
+            return;
+        }
+        List<Long> pending;
+        try {
+            pending = installationRepository.findWorkspaceIdsAwaitingPracticeScriptUpgrade();
+        } catch (RuntimeException exception) {
+            log.error("Could not load workspaces for the practice script upgrade", exception);
             return;
         }
         for (Long workspaceId : pending) {

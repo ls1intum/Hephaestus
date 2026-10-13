@@ -44,6 +44,8 @@ import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -152,14 +154,16 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(skipped.getFinishedAt()).isEqualTo(MONDAY);
         assertThat(skipped.attempt()).isEqualTo(job.getRetryCount());
         assertThat(skipped.getModels()).isEqualTo(objectMapper.readTree("""
-                        [{"purpose":"PRACTICE_DECISION","need":"REQUIRED","bound":false,"notRated":[]}]"""));
+            [{"purpose":"PRACTICE_DECISION","need":"REQUIRED","bound":false,"notRated":[]}]\
+            """));
         AgentJobPracticeScriptRun builtin = Objects.requireNonNull(runs.get("naming"));
         assertThat(builtin.getStatus()).isEqualTo(PracticeScriptRunStatus.OK);
         assertThat(builtin.getProgramKind()).isEqualTo(PracticeProgramKind.BUILTIN);
         assertThat(builtin.getProgramDigest()).isNull();
         assertThat(builtin.getStopReason()).isNull();
         assertThat(builtin.getCalls()).isEqualTo(objectMapper.readTree("""
-                        {"review":1,"chat":0,"decision":0,"embedding":0,"reranking":0}"""));
+            {"review":1,"chat":0,"decision":0,"embedding":0,"reranking":0}\
+            """));
         assertThat(builtin.getCoverageReached())
                 .isEqualTo(objectMapper.readTree("{\"reads\":4,\"truncatedReads\":1,\"failedReads\":0}"));
         assertThat(builtin.path()).isEqualTo(PracticeProgramPath.REVIEW);
@@ -207,7 +211,8 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 job,
                 MONDAY,
                 models(calls(entry("comment-quality", PracticeProgramKind.CUSTOM, "ok", null), 0, 0, 2), """
-                        [{"slot":"decision","need":"optional","bound":true,"notRated":{"deadline":5}}]"""),
+                    [{"slot":"decision","need":"optional","bound":true,"notRated":{"deadline":5}}]\
+                    """),
                 calls(entry("naming", PracticeProgramKind.BUILTIN, "ok", null), 1, 0, 0));
 
         ReviewOutcomeLookup.ReviewOutcome outcome = Objects.requireNonNull(reviewOutcomes
@@ -417,8 +422,9 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 MONDAY.plus(1, ChronoUnit.HOURS),
                 failed("error-handling", "TypeError: answer is undefined"),
                 models(calls(entry("comment-quality", PracticeProgramKind.CUSTOM, "ok", null), 0, 2, 4), """
-                                [{"slot":"decision","need":"required","bound":true,"notRated":{"deadline":2}},
-                                 {"slot":"chat","need":"optional","bound":true,"notRated":{}}]""")
+                    [{"slot":"decision","need":"required","bound":true,"notRated":{"deadline":2}},
+                     {"slot":"chat","need":"optional","bound":true,"notRated":{}}]\
+                    """)
                         .put("durationMs", 4200));
         countCalls(job, 1, "comment-quality", ModelKind.DECISION, DataHandlingTier.CLOUD, 4, 120, 8);
         // Chat calls of a script are the review model's calls, which the review counts.
@@ -474,6 +480,39 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .isEqualTo(0)
                 .jsonPath("$[1].error")
                 .isEqualTo("TypeError: answer is undefined");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1,0,0,0", "2,1,120,8", "1,1,0,0"})
+    @WithAdminUser
+    void shouldOmitIncompleteTokenTotalsAndKeepConfirmedZeroWhenListingModelCalls(
+            int calls, int reportedCalls, long input, long output) {
+        Practice practice = persistPractice(workspace, "comment-quality", "Comment quality", "decide()");
+        AgentJob job = persistJob(workspace, practice);
+        record(job, MONDAY, entry("comment-quality", PracticeProgramKind.CUSTOM, "ok", null));
+        countCalls(job, 0, "comment-quality", ModelKind.DECISION, DataHandlingTier.CLOUD, calls, input, output);
+        jdbc.update(
+                "UPDATE agent_job_practice_script_usage SET reported_calls = ? WHERE job_id = ?",
+                reportedCalls,
+                job.getId());
+
+        var response = reviewPracticeScript(workspace, job.getId())
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].models[0].calls")
+                .isEqualTo(calls);
+        if (reportedCalls == calls) {
+            response.jsonPath("$[0].models[0].inputTokens")
+                    .isEqualTo(0)
+                    .jsonPath("$[0].models[0].outputTokens")
+                    .isEqualTo(0);
+        } else {
+            response.jsonPath("$[0].models[0].inputTokens")
+                    .doesNotExist()
+                    .jsonPath("$[0].models[0].outputTokens")
+                    .doesNotExist();
+        }
     }
 
     /**
@@ -638,14 +677,16 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
             long input,
             long output) {
         jdbc.update(
-                "INSERT INTO agent_job_practice_script_usage (job_id, attempt, model_kind, practice_slug, workspace_id, "
-                        + "data_handling_tier, calls, input_tokens, output_tokens) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO agent_job_practice_script_usage (job_id, attempt, model_kind, practice_slug,"
+                        + " workspace_id, data_handling_tier, calls, reported_calls, input_tokens, output_tokens) VALUES"
+                        + " (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 job.getId(),
                 attempt,
                 kind.name(),
                 practice,
                 job.getWorkspace().getId(),
                 tier.name(),
+                calls,
                 calls,
                 input,
                 output);
@@ -708,12 +749,14 @@ class PracticeScriptIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private ObjectNode needingADecisionModel(String slug) {
         return models(entry(slug, PracticeProgramKind.CUSTOM, "ok", null), """
-                [{"slot":"decision","need":"required","bound":true,"notRated":{}}]""");
+            [{"slot":"decision","need":"required","bound":true,"notRated":{}}]\
+            """);
     }
 
     private ObjectNode skippedNeedingA(String slug, String slot) {
         return models(entry(slug, PracticeProgramKind.CUSTOM, "skipped", "unavailable"), """
-                [{"slot":"%s","need":"required","bound":false,"notRated":{}}]""".formatted(slot));
+            [{"slot":"%s","need":"required","bound":false,"notRated":{}}]\
+            """.formatted(slot));
     }
 
     private void record(AgentJob job, Instant finishedAt, ObjectNode... entries) {

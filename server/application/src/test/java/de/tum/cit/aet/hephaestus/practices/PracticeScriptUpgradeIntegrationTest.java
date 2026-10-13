@@ -140,6 +140,21 @@ class PracticeScriptUpgradeIntegrationTest extends AbstractWorkspaceIntegrationT
     }
 
     @Test
+    void shouldUpgradeAnUnchangedInstanceScriptWhenNoWorkspaceAwaitsTheUpgrade() {
+        PracticeDefinition shipped =
+                Objects.requireNonNull(catalog.practice(SLUG).shipped());
+        PracticeDefinition earlier = shipped.withPracticeScript(RETIRED_SCRIPT);
+        customizeInstance(SLUG, earlier, earlier);
+        assertThat(installations.findWorkspaceIdsAwaitingPracticeScriptUpgrade())
+                .isEmpty();
+
+        manager.upgradePracticeScripts();
+
+        assertThat(catalog.practice(SLUG).effective().practiceScript()).isEqualTo(shipped.practiceScript());
+        assertThat(overrides.findBySlug(SLUG).orElseThrow().getAdoptedBase()).isEqualTo(shipped);
+    }
+
+    @Test
     void shouldKeepTheWorkspaceScriptAndOfferWhenItsOriginalBaseIsUnknown() {
         WorkspaceContext ctx = pendingWorkspace("script-upgrade-unknown-workspace-base");
         PracticeDefinition current = catalog.practice(SLUG).effective().withPracticeScript(EDITED_SCRIPT);

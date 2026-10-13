@@ -25,9 +25,11 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal;
+import de.tum.cit.aet.hephaestus.agent.job.TerminalUsageTestFixtures;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
@@ -61,9 +63,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -72,6 +76,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -108,6 +113,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private LlmUsageRecorder usageRecorder;
 
     private JobTokenAuthenticationFilter filter;
     private Workspace workspace;
@@ -368,6 +376,61 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldKeepTheTerminalLedgerUnpricedWhenAReportedCallIsFollowedByATimeout(boolean beforeHeaders)
+            throws Exception {
+        try (MockWebServer upstream = new MockWebServer()) {
+            upstream.start();
+            upstream.enqueue(json("{\"data\":[],\"usage\":{\"prompt_tokens\":10}}"));
+            var delayed = new MockResponse.Builder().code(200).body("{\"data\":[]}");
+            if (beforeHeaders) delayed.headersDelay(3, TimeUnit.SECONDS);
+            else delayed.bodyDelay(3, TimeUnit.SECONDS);
+            upstream.enqueue(delayed.build());
+            AgentJob job = practiceScriptJob(upstream.url("/v1").toString());
+            WebClient client = WebClient.builder()
+                    .clientConnector(new ReactorClientHttpConnector(HttpClient.create()
+                            .responseTimeout(Duration.ofSeconds(1))
+                            .disableRetry(true)))
+                    .build();
+            LlmProxyService service = proxyService(200_000, 1000, client);
+            String path = "/internal/llm/practice-script/embedding/embeddings";
+
+            assertThat(callPracticeScript(service, job, path, PRACTICE, "{}").status())
+                    .isEqualTo(200);
+            assertThat(callPracticeScript(service, job, path, PRACTICE, "{}").status())
+                    .isEqualTo(502);
+            assertThat(upstream.takeRequest(5, TimeUnit.SECONDS)).isNotNull();
+            assertThat(upstream.takeRequest(5, TimeUnit.SECONDS)).isNotNull();
+            assertThat(upstream.getRequestCount()).isEqualTo(2);
+            assertThat(jobRepository.sumPracticeScriptUsageByKind(workspace.getId(), job.getId(), 0))
+                    .containsExactly(new PracticeScriptKindTotal(ModelKind.EMBEDDING, 2, 10, 0, 0, 0, 0, 1));
+
+            transactionTemplate.executeWithoutResult(tx -> {
+                AgentJob ending = jobRepository.findById(job.getId()).orElseThrow();
+                ending.setStatus(AgentJobStatus.COMPLETED);
+                jobRepository.saveAndFlush(ending);
+                TerminalUsageTestFixtures.appendProxyUsage(jobRepository, usageRecorder, ending, objectMapper);
+            });
+
+            var stored = jdbc.queryForMap(
+                    "SELECT total_calls, input_tokens, unreported_calls, pricing_state, cost_usd "
+                            + "FROM llm_usage_event WHERE source_id = ? AND source_type = 'PRACTICE_SCRIPT_EMBEDDING'",
+                    job.getId());
+            assertThat(stored.get("total_calls"))
+                    .isInstanceOfSatisfying(
+                            Number.class, value -> assertThat(value.intValue()).isEqualTo(2));
+            assertThat(stored.get("input_tokens"))
+                    .isInstanceOfSatisfying(
+                            Number.class, value -> assertThat(value.longValue()).isEqualTo(10));
+            assertThat(stored.get("unreported_calls"))
+                    .isInstanceOfSatisfying(
+                            Number.class, value -> assertThat(value.longValue()).isEqualTo(1));
+            assertThat(stored.get("pricing_state")).isEqualTo("UNPRICED");
+            assertThat(stored.get("cost_usd")).isNull();
+        }
+    }
+
     /** Each practice keeps its own row, and the cap judges the attempt over all of them. */
     @Test
     void shouldCountEachPracticeApartAndCapThemTogetherWhenTwoPracticesCallOneModel() throws Exception {
@@ -544,11 +607,15 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     private LlmProxyService proxyService(long maxTokensPerAttempt, long maxSearchUnitsPerAttempt) {
+        return proxyService(maxTokensPerAttempt, maxSearchUnitsPerAttempt, WebClient.create());
+    }
+
+    private LlmProxyService proxyService(long maxTokensPerAttempt, long maxSearchUnitsPerAttempt, WebClient client) {
         ProxyRequestPolicy policy = mock(ProxyRequestPolicy.class);
         when(policy.allows(any())).thenReturn(true);
         return new LlmProxyService(
                 Tracer.NOOP,
-                WebClient.create(),
+                client,
                 modelResolver,
                 objectMapper,
                 new ProxyAccounting(

@@ -1,8 +1,8 @@
 // Finds the issue references in the title, the body and the branch of a pull request, and the
 // acceptance-criteria blocks of the linked issues. It gives facts, never a verdict of compliance.
 import { DIRECTION_CHARS, oneLine } from "../lib/bounded-text.ts";
-import { isJsonObject } from "../lib/json.ts";
-import { definePracticeScript, expectKind, readRecordJson } from "../lib/practice-script.ts";
+import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
+import { readLinkedWorkItems } from "../lib/review.ts";
 
 const CLOSE_KEYWORD = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b/giu;
 // "closes #12", "fixes GH-12", "resolves group/proj#12" — capture the trailing issue number.
@@ -23,58 +23,6 @@ function collect(re: RegExp, text: string, into: Set<string>): void {
 	for (const match of text.matchAll(re)) {
 		into.add(`#${match.groups?.number ?? ""}`);
 	}
-}
-
-interface LinkedWorkItem {
-	number?: number | string;
-	iid?: number | string;
-	title?: string;
-	// The SCM connector (LinkedWorkItemContentSource) emits the issue body under `body`; `description`
-	// is a host-general fallback for other connectors.
-	body?: string;
-	description?: string;
-}
-
-function optionalText(value: unknown): string | undefined {
-	return typeof value === "string" ? value : undefined;
-}
-
-function optionalRef(value: unknown): number | string | undefined {
-	return typeof value === "number" || typeof value === "string" ? value : undefined;
-}
-
-// An entry carrying none of the fields above still counts as a linked item: `linkedIssueCount` reports
-// how many items the connector linked, which is a fact about the tracker, not about how much of each
-// entry this side could read.
-function toLinkedWorkItem(entry: unknown): LinkedWorkItem {
-	if (!isJsonObject(entry)) {
-		return {};
-	}
-	return {
-		number: optionalRef(entry.number),
-		iid: optionalRef(entry.iid),
-		title: optionalText(entry.title),
-		body: optionalText(entry.body),
-		description: optionalText(entry.description),
-	};
-}
-
-// Unwrap whatever shape linked_work_items.json carries into a flat item list (or null if not a usable object).
-function unwrapLinkedItems(data: unknown): LinkedWorkItem[] | null {
-	if (Array.isArray(data)) {
-		return data.map(toLinkedWorkItem);
-	}
-	if (!isJsonObject(data)) {
-		return null;
-	}
-	// The SCM connector wraps items under `workItems`; check it FIRST, then host-general fallbacks.
-	if (Array.isArray(data.workItems)) {
-		return data.workItems.map(toLinkedWorkItem);
-	}
-	if (Array.isArray(data.items)) {
-		return data.items.map(toLinkedWorkItem);
-	}
-	return [toLinkedWorkItem(data)];
 }
 
 // A checkable acceptance-criteria artifact: an AC/DoD heading or a "- [ ]" checklist in the issue body.
@@ -111,15 +59,13 @@ export default definePracticeScript({
 		const keywordHits = (`${title}\n${body}`.match(CLOSE_KEYWORD) ?? []).length;
 		CLOSE_KEYWORD.lastIndex = 0;
 
-		const linked = unwrapLinkedItems(await readRecordJson(ctx.evidence, "linked_work_items.json"));
-		const linkedIssueBodyPresent = linked?.some(
-			(i) => (i.body ?? i.description ?? "").trim().length > 0,
-		);
+		const linked = await readLinkedWorkItems(ctx.evidence);
+		const linkedIssueBodyPresent = linked?.some((i) => i.body.trim().length > 0);
 		let acHeading = false;
 		let acBoxes = 0;
 		if (linked) {
 			for (const i of linked) {
-				const f = acFacts((i.body ?? i.description ?? "").trim());
+				const f = acFacts(i.body.trim());
 				acHeading ||= f.heading;
 				acBoxes += f.boxes;
 			}

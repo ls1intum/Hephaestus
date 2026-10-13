@@ -47,18 +47,18 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
-            value =
-                    "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP, suppression_reason = NULL "
-                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
+            value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP,"
+                    + " suppression_reason = NULL WHERE id = :id AND workspace_id = :workspaceId AND"
+                    + " delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
             nativeQuery = true)
     int markApprovedDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
-            value =
-                    "UPDATE feedback SET delivery_state = 'PARTIALLY_DELIVERED', suppression_reason = :reason "
-                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
+            value = "UPDATE feedback SET delivery_state = 'PARTIALLY_DELIVERED', suppression_reason = :reason WHERE id"
+                    + " = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED',"
+                    + " 'PARTIALLY_DELIVERED')",
             nativeQuery = true)
     int markApprovedPartiallyDelivered(
             @Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("reason") @Nullable String reason);
@@ -75,18 +75,16 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     @Query(
-            value =
-                    "UPDATE feedback SET delivery_state = 'FAILED', suppression_reason = NULL "
-                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
+            value = "UPDATE feedback SET delivery_state = 'FAILED', suppression_reason = NULL WHERE id = :id AND"
+                    + " workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
             nativeQuery = true)
     int markApprovedFailed(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     @Query(
-            value =
-                    "UPDATE feedback SET delivery_state = 'PARTIALLY_FAILED', suppression_reason = NULL "
-                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
+            value = "UPDATE feedback SET delivery_state = 'PARTIALLY_FAILED', suppression_reason = NULL WHERE id = :id"
+                    + " AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
             nativeQuery = true)
     int markApprovedPartiallyFailed(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
@@ -105,16 +103,16 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * columns over {@code f}, so each count matches the operator feedback list filtered to that one state.
      */
     String STATE_COUNTS = """
-               COUNT(*) FILTER (WHERE f.delivery_state = 'AWAITING_APPROVAL') AS "awaitingApproval",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'PREPARED') AS "prepared",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'PARTIALLY_DELIVERED') AS "partiallyDelivered",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'PARTIALLY_FAILED') AS "partiallyFailed",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'DELIVERED') AS "delivered",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPERSEDED') AS "superseded",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPPRESSED') AS "suppressed",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'FAILED') AS "failed",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'DISCARDED') AS "discarded",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'UNCONFIRMED') AS "unconfirmed"
+               COUNT(DISTINCT f.id) FILTER (WHERE f.delivery_state = 'AWAITING_APPROVAL') AS "awaitingApproval",
+               COUNT(DISTINCT f.id) FILTER (WHERE f.delivery_state = 'PREPARED') AS "prepared",
+               COUNT(DISTINCT f.id) FILTER (WHERE f.delivery_state = 'PARTIALLY_DELIVERED') AS "partiallyDelivered",
+               COUNT(DISTINCT f.id) FILTER (WHERE f.delivery_state = 'PARTIALLY_FAILED') AS "partiallyFailed",
+               COUNT(DISTINCT f.id) FILTER (WHERE f.delivery_state = 'DELIVERED') AS "delivered",
+               COUNT(DISTINCT f.id) FILTER (WHERE f.delivery_state = 'SUPERSEDED') AS "superseded",
+               COUNT(DISTINCT f.id) FILTER (WHERE f.delivery_state = 'SUPPRESSED') AS "suppressed",
+               COUNT(DISTINCT f.id) FILTER (WHERE f.delivery_state = 'FAILED') AS "failed",
+               COUNT(DISTINCT f.id) FILTER (WHERE f.delivery_state = 'DISCARDED') AS "discarded",
+               COUNT(DISTINCT f.id) FILTER (WHERE f.delivery_state = 'UNCONFIRMED') AS "unconfirmed"
         """;
 
     /**
@@ -170,15 +168,15 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      */
     @Query(
             value = "SELECT f.practice_id AS \"practiceId\"," + STATE_COUNTS + """
-        FROM (
-            SELECT DISTINCT o.practice_id, f.id, f.delivery_state
-        """ + WITH_BOUND_OBSERVATIONS + """
-            WHERE f.workspace_id = :workspaceId
-        """
+                    FROM (
+                        SELECT DISTINCT o.practice_id, f.id, f.delivery_state
+                    """ + WITH_BOUND_OBSERVATIONS + """
+                        WHERE f.workspace_id = :workspaceId
+                    """
                     + CREATED_IN_RANGE + """
-        ) f
-        GROUP BY f.practice_id
-        """,
+                    ) f
+                    GROUP BY f.practice_id
+                    """,
             nativeQuery = true)
     List<PracticeFeedbackCounts> summarizeFeedbackByPractice(
             @Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
@@ -785,7 +783,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
                  ORDER BY fp.created_at, fp.id
                  LIMIT 1),
                 'NEXT_CONVERSATION')
-        END)""";
+        END)\
+        """;
 
     /**
      * Keeps feedback bound to a result of a practice asked for, by {@link #WITH_BOUND_OBSERVATIONS}. The
@@ -808,23 +807,23 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
             + " AND pg.slug = ANY(CAST(:#{#f.groupSlugArray()} AS text[]))))\n";
 
     String OPERATOR_PREDICATES = """
-          AND (CAST(:#{#f.deliveryStateNames()} AS text[]) IS NULL OR f.delivery_state = ANY(CAST(:#{#f.deliveryStateNames()} AS text[])))
-          AND (CAST(:#{#f.suppressionReasonNames()} AS text[]) IS NULL OR f.suppression_reason = ANY(CAST(:#{#f.suppressionReasonNames()} AS text[])))
-          AND (CAST(:#{#f.channelNames()} AS text[]) IS NULL OR f.channel = ANY(CAST(:#{#f.channelNames()} AS text[])))
-        """ + "  AND (CAST(:#{#f.locationNames()} AS text[]) IS NULL OR " + LOCATION
+              AND (CAST(:#{#f.deliveryStateNames()} AS text[]) IS NULL OR f.delivery_state = ANY(CAST(:#{#f.deliveryStateNames()} AS text[])))
+              AND (CAST(:#{#f.suppressionReasonNames()} AS text[]) IS NULL OR f.suppression_reason = ANY(CAST(:#{#f.suppressionReasonNames()} AS text[])))
+              AND (CAST(:#{#f.channelNames()} AS text[]) IS NULL OR f.channel = ANY(CAST(:#{#f.channelNames()} AS text[])))
+            """ + "  AND (CAST(:#{#f.locationNames()} AS text[]) IS NULL OR " + LOCATION
             + " = ANY(CAST(:#{#f.locationNames()} AS text[])))\n" + """
-          AND (CAST(:#{#f.agentJobId()} AS uuid) IS NULL OR f.agent_job_id = CAST(:#{#f.agentJobId()} AS uuid))
-          AND (CAST(:#{#f.practiceResultId()} AS uuid) IS NULL OR f.id IN (SELECT fo.feedback_id
-              FROM feedback_evidence fo
-              JOIN practice_result o ON o.id = fo.practice_result_id AND o.workspace_id = :workspaceId
-              WHERE fo.workspace_id = :workspaceId
-                AND fo.practice_result_id = CAST(:#{#f.practiceResultId()} AS uuid)))
-          AND (CAST(:#{#f.artifactKindValue()} AS text) IS NULL OR f.artifact_kind = CAST(:#{#f.artifactKindValue()} AS text))
-          AND (CAST(:#{#f.artifactId()} AS bigint) IS NULL OR f.artifact_id = CAST(:#{#f.artifactId()} AS bigint))
-          AND (CAST(:#{#f.recipientUserId()} AS bigint) IS NULL OR f.recipient_user_id = CAST(:#{#f.recipientUserId()} AS bigint))
-          AND (CAST(:#{#f.from()} AS timestamptz) IS NULL OR f.created_at >= CAST(:#{#f.from()} AS timestamptz))
-          AND (CAST(:#{#f.to()} AS timestamptz) IS NULL OR f.created_at < CAST(:#{#f.to()} AS timestamptz))
-        """ + PRACTICE_FILTER + GROUP_FILTER;
+              AND (CAST(:#{#f.agentJobId()} AS uuid) IS NULL OR f.agent_job_id = CAST(:#{#f.agentJobId()} AS uuid))
+              AND (CAST(:#{#f.practiceResultId()} AS uuid) IS NULL OR f.id IN (SELECT fo.feedback_id
+                  FROM feedback_evidence fo
+                  JOIN practice_result o ON o.id = fo.practice_result_id AND o.workspace_id = :workspaceId
+                  WHERE fo.workspace_id = :workspaceId
+                    AND fo.practice_result_id = CAST(:#{#f.practiceResultId()} AS uuid)))
+              AND (CAST(:#{#f.artifactKindValue()} AS text) IS NULL OR f.artifact_kind = CAST(:#{#f.artifactKindValue()} AS text))
+              AND (CAST(:#{#f.artifactId()} AS bigint) IS NULL OR f.artifact_id = CAST(:#{#f.artifactId()} AS bigint))
+              AND (CAST(:#{#f.recipientUserId()} AS bigint) IS NULL OR f.recipient_user_id = CAST(:#{#f.recipientUserId()} AS bigint))
+              AND (CAST(:#{#f.from()} AS timestamptz) IS NULL OR f.created_at >= CAST(:#{#f.from()} AS timestamptz))
+              AND (CAST(:#{#f.to()} AS timestamptz) IS NULL OR f.created_at < CAST(:#{#f.to()} AS timestamptz))
+            """ + PRACTICE_FILTER + GROUP_FILTER;
 
     /**
      * The operator's page of feedback.
@@ -869,7 +868,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
                     + " (f.channel NOT IN ('IN_APP', 'IN_CHAT') AND f.body IS NOT NULL AND length(f.body) > "
                     + BODY_PREVIEW_LENGTH
                     + ") AS \"bodyTruncated\","
-                    + " (SELECT count(*) FROM feedback_evidence fo"
+                    + " (SELECT count(DISTINCT fo.practice_result_id) FROM feedback_evidence fo"
                     + " JOIN practice_result o ON o.id = fo.practice_result_id"
                     + " JOIN practice p ON p.id = o.practice_id"
                     + " WHERE fo.feedback_id = f.id AND p.workspace_id = f.workspace_id) AS \"practiceResultCount\""
@@ -941,16 +940,16 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      */
     @Query(
             value = "SELECT f.location AS \"location\"," + STATE_COUNTS + """
-        FROM (
-            SELECT
-        """ + LOCATION + """
-             AS location, f.delivery_state
-            FROM feedback f WHERE f.workspace_id = :workspaceId
-        """ + OPERATOR_PREDICATES
+                    FROM (
+                        SELECT
+                    """ + LOCATION + """
+                         AS location, f.id, f.delivery_state
+                        FROM feedback f WHERE f.workspace_id = :workspaceId
+                    """ + OPERATOR_PREDICATES
                     + """
-        ) f
-        GROUP BY f.location
-        """,
+                    ) f
+                    GROUP BY f.location
+                    """,
             nativeQuery = true)
     List<LocationFeedbackCounts> summarizeForWorkspaceByLocation(
             @Param("workspaceId") Long workspaceId, @Param("f") FeedbackQueryFilter filter);
@@ -1059,8 +1058,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Query("SELECT f FROM Feedback f WHERE f.workspaceId = :workspaceId AND f.recipientUserId IN :recipientUserIds"
             + READABLE_IN_APP_ROW
             + """
-        ORDER BY f.createdAt DESC, f.id DESC
-        """)
+            ORDER BY f.createdAt DESC, f.id DESC
+            """)
     List<Feedback> findReadableInAppForRecipients(
             @Param("workspaceId") Long workspaceId, @Param("recipientUserIds") Collection<Long> recipientUserIds);
 
@@ -1106,12 +1105,12 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * commits first and the read sees it, or waits until the cards the read shows are recorded as delivered.
      */
     @Query(value = """
-                    SELECT f.id FROM feedback f
-                    WHERE f.workspace_id = :workspaceId AND f.recipient_user_id = :recipientUserId
-                      AND f.channel = 'IN_APP' AND f.delivery_state = 'PREPARED'
-                    ORDER BY f.id
-                    FOR UPDATE
-                    """, nativeQuery = true)
+        SELECT f.id FROM feedback f
+        WHERE f.workspace_id = :workspaceId AND f.recipient_user_id = :recipientUserId
+          AND f.channel = 'IN_APP' AND f.delivery_state = 'PREPARED'
+        ORDER BY f.id
+        FOR UPDATE
+        """, nativeQuery = true)
     List<UUID> lockPreparedInAppForRecipient(
             @Param("workspaceId") Long workspaceId, @Param("recipientUserId") Long recipientUserId);
 
@@ -1133,13 +1132,13 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Modifying
     @Transactional
     @Query(value = """
-                    UPDATE feedback f SET delivery_state = 'DELIVERED', delivered_at = :at
-                    WHERE f.id IN (:ids) AND f.workspace_id = :workspaceId AND f.channel = 'IN_APP'
-                      AND f.delivery_state = 'PREPARED'
-                      AND NOT EXISTS (
-                          SELECT 1 FROM feedback_withdrawal w
-                          WHERE w.feedback_id = f.id AND w.workspace_id = f.workspace_id AND w.restored_at IS NULL)
-                    """, nativeQuery = true)
+        UPDATE feedback f SET delivery_state = 'DELIVERED', delivered_at = :at
+        WHERE f.id IN (:ids) AND f.workspace_id = :workspaceId AND f.channel = 'IN_APP'
+          AND f.delivery_state = 'PREPARED'
+          AND NOT EXISTS (
+              SELECT 1 FROM feedback_withdrawal w
+              WHERE w.feedback_id = f.id AND w.workspace_id = f.workspace_id AND w.restored_at IS NULL)
+        """, nativeQuery = true)
     int markInAppDelivered(
             @Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids, @Param("at") Instant at);
 

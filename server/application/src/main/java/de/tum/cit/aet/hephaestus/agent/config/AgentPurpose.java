@@ -11,11 +11,11 @@ public enum AgentPurpose {
     PRACTICE_REVIEW(ModelKind.CHAT),
     /** Interactive mentor turns (web SSE and Slack). */
     MENTOR(ModelKind.CHAT),
-    /** Closed questions that practice scripts ask before a review. */
+    /** Closed questions that practice scripts ask within a practice review. */
     PRACTICE_DECISION(ModelKind.DECISION),
-    /** Embeddings that practice scripts compute before a review. */
+    /** Embeddings that practice scripts compute within a practice review. */
     PRACTICE_EMBEDDING(ModelKind.EMBEDDING),
-    /** Reranking that practice scripts do before a review. */
+    /** Reranking that practice scripts do within a practice review. */
     PRACTICE_RERANKING(ModelKind.RERANKING);
 
     private static final List<AgentPurpose> PRACTICE_SCRIPT = Arrays.stream(values())

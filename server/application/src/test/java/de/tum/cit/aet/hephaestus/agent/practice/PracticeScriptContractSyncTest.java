@@ -108,10 +108,11 @@ class PracticeScriptContractSyncTest extends BaseUnitTest {
         SimpleMeterRegistry meters = new SimpleMeterRegistry();
         List<String> entries = statuses.stream()
                 .map(status -> """
-                        {"practiceSlug":"practice-%s","program":{"kind":"builtin","digest":null},"models":[],\
-                        "status":"%s","stopReason":%s,\
-                        "calls":{"review":0,"chat":0,"decision":0,"embedding":0,"reranking":0},\
-                        "coverageReached":{"reads":0,"truncatedReads":0,"failedReads":0},"durationMs":null}""".formatted(status, status, status.equals("ok") ? "null" : "\"deadline\""))
+                    {"practiceSlug":"practice-%s","program":{"kind":"builtin","digest":null},"models":[],\
+                    "status":"%s","stopReason":%s,\
+                    "calls":{"review":0,"chat":0,"decision":0,"embedding":0,"reranking":0},\
+                    "coverageReached":{"reads":0,"truncatedReads":0,"failedReads":0},"durationMs":null}\
+                    """.formatted(status, status, status.equals("ok") ? "null" : "\"deadline\""))
                 .toList();
         Map<String, PracticeProgramKind> admitted = statuses.stream()
                 .collect(Collectors.toMap(status -> "practice-" + status, status -> PracticeProgramKind.BUILTIN));
@@ -253,12 +254,10 @@ class PracticeScriptContractSyncTest extends BaseUnitTest {
     @Test
     void shouldStageTheCauseAndPreviousClaimWhereTheHostReadsThem() throws IOException {
         String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
-        String host = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/script-inputs.ts"));
 
         assertThat(contract)
                 .contains("CAUSE_FILE_SUFFIX = \"" + SandboxLayout.PRACTICE_SCRIPT_CAUSE_SUFFIX + "\"")
                 .contains("PREVIOUS_FILE_SUFFIX = \"" + SandboxLayout.PRACTICE_SCRIPT_PREVIOUS_SUFFIX + "\"");
-        assertThat(host).contains("`${slug}${CAUSE_FILE_SUFFIX}`").contains("`${slug}${PREVIOUS_FILE_SUFFIX}`");
     }
 
     private static List<String> names(Enum<?>[] values) {

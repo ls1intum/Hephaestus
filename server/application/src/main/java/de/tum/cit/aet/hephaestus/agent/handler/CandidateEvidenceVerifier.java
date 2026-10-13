@@ -292,7 +292,7 @@ class CandidateEvidenceVerifier {
             JsonNode exampleCitation = example.path("citation");
             for (CandidateProblem problem : candidate.problems()) {
                 for (ObjectNode citation : problem.citations()) {
-                    if (codeLocationsOverlap(citation, exampleCitation)) {
+                    if (locationsOverlap(citation, exampleCitation)) {
                         throw new Unverified(
                                 CandidateRefusal.EXAMPLE_OVERLAPS_PROBLEM.code(),
                                 "The example cites the place of a problem",
@@ -360,14 +360,20 @@ class CandidateEvidenceVerifier {
                 || !expectedRevision.equals(citation.path("revision").asString());
     }
 
-    private static boolean codeLocationsOverlap(JsonNode a, JsonNode b) {
-        return isCodeSource(new SourceKind(a.path("sourceKind").asString()))
-                && isCodeSource(new SourceKind(b.path("sourceKind").asString()))
-                && repositoryRoot(a).equals(repositoryRoot(b))
-                && a.path("revision").asString().equals(b.path("revision").asString())
-                && a.path("path").asString().equals(b.path("path").asString())
-                && a.path("startLine").asInt() <= b.path("endLine").asInt()
-                && b.path("startLine").asInt() <= a.path("endLine").asInt();
+    private static boolean locationsOverlap(JsonNode a, JsonNode b) {
+        if (a.path("startLine").asInt() > b.path("endLine").asInt()
+                || b.path("startLine").asInt() > a.path("endLine").asInt()) return false;
+        SourceKind left = new SourceKind(a.path("sourceKind").asString());
+        SourceKind right = new SourceKind(b.path("sourceKind").asString());
+        if (isCodeSource(left) && isCodeSource(right)) {
+            return repositoryRoot(a).equals(repositoryRoot(b))
+                    && a.path("revision").asString().equals(b.path("revision").asString())
+                    && a.path("path").asString().equals(b.path("path").asString());
+        }
+        return left.equals(right)
+                && a.path("artifactPath")
+                        .asString()
+                        .equals(b.path("artifactPath").asString());
     }
 
     private static String normalized(@Nullable String text) {

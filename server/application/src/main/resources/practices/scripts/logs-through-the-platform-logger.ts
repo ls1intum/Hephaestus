@@ -2,7 +2,7 @@
 // each language. It also tells if a bounded search of the checkout finds a logger. The shapes of each
 // language follow the criteria. The review decides from the file if a print is the output of the
 // program, such as a CLI or a script, or a diagnostic that ships.
-import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
+import { DIRECTION_CHARS, factsOf, noMatchDirections, oneLine } from "../lib/bounded-text.ts";
 import {
 	definePracticeScript,
 	expectKind,
@@ -149,7 +149,10 @@ export default definePracticeScript({
 				: [];
 		if (prints > 0) {
 			directions.push(
-				`${String(prints)} print-style call(s) added (${String(printsInToolPaths)} listed under a tool or script path) against ${String(loggers)} logger call(s); ${existing.length > 0 ? `the checkout matches a logger (${existing[0]?.file ?? ""})` : "a bounded search of the checkout matched no logger definition, which does not show there is none"}.`,
+				oneLine(
+					`${String(prints)} print-style call(s) added (${String(printsInToolPaths)} listed under a tool or script path) against ${String(loggers)} logger call(s); ${existing.length > 0 ? `the checkout matches a logger (${existing[0]?.file ?? ""})` : "a bounded search of the checkout matched no logger definition, which does not show there is none"}.`,
+					DIRECTION_CHARS,
+				),
 				"Read each print's file to decide whether it is the program's output, a DEBUG-only block or a shipped diagnostic.",
 			);
 		} else if (loggers > 0) {

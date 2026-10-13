@@ -84,16 +84,15 @@ class CandidateContractSyncTest extends BaseUnitTest {
         assertThat(runner).containsExactlyElementsOf(CandidateParser.OMISSION_REASONS);
     }
 
-    /** The citation shape rules name these sources, and both sides read a revision as one full commit id. */
+    /** The citation shape names the same code sources on the host and server. */
     @Test
-    void shouldReadCitationSourcesAndRevisionsAlikeWhenTheHostAndAdmissionCheckAShape() throws IOException {
+    void shouldNameCodeCitationSourcesAlikeWhenTheHostAndAdmissionCheckAShape() throws IOException {
         String contract = contract();
 
         assertThat(contract)
                 .contains(
                         "export const DIFF_SOURCE = \"" + CandidateParser.DIFF_SOURCE + "\";",
-                        "export const TREE_SOURCE = \"" + CandidateParser.TREE_SOURCE + "\";",
-                        "const COMMIT = /" + CandidateParser.COMMIT.pattern() + "/u;");
+                        "export const TREE_SOURCE = \"" + CandidateParser.TREE_SOURCE + "\";");
     }
 
     private static List<String> quoted(String text) {

@@ -339,7 +339,9 @@ public final class CandidateParser {
                         .asString()
                         .equals(b.path("artifactPath").asString())
                 && Objects.equals(a.get("revision"), b.get("revision"))
-                && a.path("path").asString().equals(b.path("path").asString())
+                && (!(DIFF_SOURCE.equals(a.path("sourceKind").asString())
+                                || TREE_SOURCE.equals(a.path("sourceKind").asString()))
+                        || a.path("path").asString().equals(b.path("path").asString()))
                 && Objects.equals(sideOf(a), sideOf(b))
                 && a.path("startLine").asInt() <= b.path("endLine").asInt()
                 && b.path("startLine").asInt() <= a.path("endLine").asInt();

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -47,6 +48,29 @@ class CandidateFixturesTest extends BaseUnitTest {
         fixtures.forEach((name, fixture) -> assertThat(CandidateParser.parse(fixture))
                 .as(name)
                 .isInstanceOf(Objects.requireNonNull(CANDIDATES.get(name))));
+    }
+
+    @Test
+    void shouldAcceptOnlyFullLowercaseHexRevisionsWhenTheSharedCorpusIsParsed() throws IOException {
+        ObjectNode corpus = fixture("citation-revisions.json");
+        for (String verdict : List.of("valid", "invalid")) {
+            for (JsonNode revision : corpus.path(verdict)) {
+                ObjectNode candidate = fixture("candidate-met-with-example.json");
+                ((ObjectNode) candidate.path("citations").get(0)).put("revision", revision.asString());
+                if (verdict.equals("valid")) {
+                    assertThatCode(() -> CandidateParser.parse(candidate))
+                            .as(revision.asString())
+                            .doesNotThrowAnyException();
+                } else {
+                    assertThatThrownBy(() -> CandidateParser.parse(candidate))
+                            .as(revision.asString())
+                            .isInstanceOfSatisfying(
+                                    CandidateRefusedException.class,
+                                    refused -> assertThat(refused.refusal())
+                                            .isEqualTo(CandidateRefusal.MALFORMED_CANDIDATE));
+                }
+            }
+        }
     }
 
     @Test

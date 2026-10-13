@@ -303,6 +303,7 @@ class LlmProxyService {
                         upstreamUri, upstreamHeaders, prepared.withoutUsageRequestOrBody(), span, response, tap);
             }
         } catch (WebClientRequestException e) {
+            if (practiceScript != null) accounting.recordUsage(attempt, practiceScript, null);
             log.warn(
                     "LLM upstream unreachable for principal {}: reason={}",
                     routing.principalDescription(),
@@ -310,6 +311,7 @@ class LlmProxyService {
             incrementErrors(routing.apiProtocol());
             return ResponseEntity.status(502).body("Upstream provider unreachable");
         } catch (Exception e) {
+            if (practiceScript != null) accounting.recordUsage(attempt, practiceScript, null);
             log.warn(
                     "LLM upstream request failed for principal {}: reason={}",
                     routing.principalDescription(),
@@ -319,6 +321,7 @@ class LlmProxyService {
         }
 
         if (upstream == null) {
+            if (practiceScript != null) accounting.recordUsage(attempt, practiceScript, null);
             incrementErrors(routing.apiProtocol());
             return ResponseEntity.status(502).body("Upstream provider unavailable");
         }
