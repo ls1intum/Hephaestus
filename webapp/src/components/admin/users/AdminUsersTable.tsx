@@ -1,5 +1,6 @@
 import { LogOut, MoreHorizontal, UserCog, Users } from "lucide-react";
 import type { AdminAccountView } from "@/api/types.gen";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +43,9 @@ export interface AdminUsersTableProps {
 
 const COLUMN_COUNT = 6;
 
+/** ID, name, email, role, status, and the action slot, which has nothing to promise. */
+const SKELETON_COLUMNS = ["w-8", "w-32", "w-44", "w-24", "w-16", null];
+
 function roleBadgeVariant(appRole: AppRole) {
 	return appRole === "APP_ADMIN" ? "default" : "secondary";
 }
@@ -59,10 +63,10 @@ function changeRoleLabel(isSelfAdmin: boolean, appRole: AppRole) {
 }
 
 export function AdminUsersTable({ totalLoaded, onLoadMore, ...rows }: AdminUsersTableProps) {
-	const { users, hasSearch, hasNextPage, isFetchingNextPage } = rows;
+	const { users, isLoading, hasSearch, hasNextPage, isFetchingNextPage } = rows;
 	return (
 		<div className="space-y-4">
-			<Table bordered aria-label="Application users">
+			<Table bordered aria-label="Application users" aria-busy={isLoading || undefined}>
 				<TableHeader>
 					<TableRow>
 						<TableHead scope="col">ID</TableHead>
@@ -75,16 +79,25 @@ export function AdminUsersTable({ totalLoaded, onLoadMore, ...rows }: AdminUsers
 						</TableHead>
 					</TableRow>
 				</TableHeader>
-				<TableBody>
-					<UserRows {...rows} />
-				</TableBody>
+				{isLoading ? (
+					<TableRowsSkeleton columns={SKELETON_COLUMNS} />
+				) : (
+					<TableBody>
+						<UserRows {...rows} />
+					</TableBody>
+				)}
 			</Table>
 
 			<div className="flex flex-col items-center justify-between gap-2 sm:flex-row">
 				<p className="text-sm text-muted-foreground" aria-live="polite">
-					Showing {users.length}
-					{hasSearch ? ` of ${totalLoaded} loaded` : ""}{" "}
-					{(hasSearch ? totalLoaded : users.length) === 1 ? "user" : "users"}
+					{/* No count until the first page is in: "0 users" while loading would read as a result. */}
+					{!isLoading && (
+						<>
+							Showing {users.length}
+							{hasSearch ? ` of ${totalLoaded} loaded` : ""}{" "}
+							{(hasSearch ? totalLoaded : users.length) === 1 ? "user" : "users"}
+						</>
+					)}
 				</p>
 				{hasNextPage && (
 					<Button variant="outline" size="sm" onClick={onLoadMore} disabled={isFetchingNextPage}>
@@ -99,7 +112,6 @@ export function AdminUsersTable({ totalLoaded, onLoadMore, ...rows }: AdminUsers
 
 function UserRows({
 	users,
-	isLoading,
 	isError,
 	hasSearch,
 	currentUserId,
@@ -107,19 +119,7 @@ function UserRows({
 	isFetchingNextPage,
 	onChangeRole,
 	onForceSignOut,
-}: Omit<AdminUsersTableProps, "totalLoaded" | "onLoadMore">) {
-	if (isLoading) {
-		return (
-			<TableRow>
-				<TableCell colSpan={COLUMN_COUNT} className="h-32 text-center">
-					<div className="flex flex-col items-center justify-center gap-2">
-						<Spinner />
-						<p className="text-sm text-muted-foreground">Loading users…</p>
-					</div>
-				</TableCell>
-			</TableRow>
-		);
-	}
+}: Omit<AdminUsersTableProps, "totalLoaded" | "onLoadMore" | "isLoading">) {
 	if (isError) {
 		return (
 			<TableRow>

@@ -8,6 +8,7 @@ import { FOCUS_RING } from "@/components/common/focus";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { TablePagination } from "@/components/common/TablePagination";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Badge, type badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -31,7 +32,6 @@ import {
 	phaseLabel,
 	type SyncJobProgress,
 } from "./sync-format";
-import { TableRowsSkeleton } from "./TableRowsSkeleton";
 
 type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
 
