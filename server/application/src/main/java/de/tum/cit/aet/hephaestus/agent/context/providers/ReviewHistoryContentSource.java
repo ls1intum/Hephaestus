@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
@@ -90,6 +91,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     private final ObjectMapper objectMapper;
     private final PublicReviewEligibility publicReviewEligibility;
     private final PersonDataCopyRecorder personCopies;
+    private final EvidenceFolderPersonDataCatalog copyAuthority;
 
     public ReviewHistoryContentSource(
             ObservationRepository observationRepository,
@@ -103,7 +105,8 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             StagedArtifactNames artifactNames,
             ObjectMapper objectMapper,
             PublicReviewEligibility publicReviewEligibility,
-            PersonDataCopyRecorder personCopies) {
+            PersonDataCopyRecorder personCopies,
+            EvidenceFolderPersonDataCatalog copyAuthority) {
         this.observationRepository = observationRepository;
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
@@ -116,14 +119,15 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         this.objectMapper = objectMapper;
         this.publicReviewEligibility = publicReviewEligibility;
         this.personCopies = personCopies;
+        this.copyAuthority = copyAuthority;
     }
 
     /**
-     * A copied row speaks about its people and may quote whoever its source job copied; that job's own receipt indexes
-     * them. Recorded before the row is formatted.
+     * The row's direct people, recorded after its producing jobs have vouched for every copied identity and before
+     * its words are formatted.
      */
-    private void recordCopy(UUID sourceJob, @Nullable Long... people) {
-        personCopies.recordCopiedJob(sourceJob);
+    private void recordPeople(@Nullable Long... people) {
+
         for (Long person : people) {
             if (person != null) personCopies.recordUser(person);
         }
@@ -194,8 +198,9 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             List<Observation> observations =
                     visibleObservations(workspaceId, subjectUserId, sourceJobExcludedFromHistory(job));
             observationCount = observations.size();
-            files.put(OBSERVATIONS_FILE, serialize(observationsPayload(workspaceId, observations), OBSERVATIONS_FILE));
-            completeness.put(OBSERVATION_HISTORY, SourceCompleteness.COMPLETE);
+            ObjectNode payload = observationsPayload(workspaceId, observations);
+            files.put(OBSERVATIONS_FILE, serialize(payload, OBSERVATIONS_FILE));
+            completeness.put(OBSERVATION_HISTORY, wordsCompleteness(payload));
             // Reported explicitly rather than inferred from file presence: the file is always written,
             // so "there is a file" would wrongly answer NON_EMPTY for a person with no history.
             contentStates.put(
@@ -217,16 +222,18 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             Set<UUID> withdrawn = withdrawalRepository.withdrawnAmong(
                     workspaceId, shown.currentness().keySet());
             feedbackCount = delivered.size();
-            files.put(
-                    FEEDBACK_FILE,
-                    serialize(
-                            feedbackPayload(workspaceId, delivered, shown, withdrawn, Words.CURRENT_CLAIMS),
-                            FEEDBACK_FILE));
+            ObjectNode deliveredPayload =
+                    feedbackPayload(workspaceId, delivered, shown, withdrawn, Words.CURRENT_CLAIMS);
+            files.put(FEEDBACK_FILE, serialize(deliveredPayload, FEEDBACK_FILE));
             preparedCount = queued.size();
-            files.put(
-                    PREPARED_FILE,
-                    serialize(preparedPayload(workspaceId, queued, shown.currentness(), withdrawn), PREPARED_FILE));
-            completeness.put(FEEDBACK_HISTORY, SourceCompleteness.COMPLETE);
+            ObjectNode queuedPayload = preparedPayload(workspaceId, queued, shown.currentness(), withdrawn);
+            files.put(PREPARED_FILE, serialize(queuedPayload, PREPARED_FILE));
+            completeness.put(
+                    FEEDBACK_HISTORY,
+                    wordsCompleteness(deliveredPayload) == SourceCompleteness.PARTIAL
+                                    || wordsCompleteness(queuedPayload) == SourceCompleteness.PARTIAL
+                            ? SourceCompleteness.PARTIAL
+                            : SourceCompleteness.COMPLETE);
             // Prepared feedback does not make the delivered feedback record non-empty.
             contentStates.put(
                     FEEDBACK_HISTORY, delivered.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
@@ -584,9 +591,11 @@ public class ReviewHistoryContentSource implements EvidenceSource {
                                 FeedbackRepository.HeadlinePracticeRow::getFeedbackId,
                                 FeedbackRepository.HeadlinePracticeRow::getPracticeSlug,
                                 (first, second) -> first));
+        Set<UUID> vouched = copyAuthority.recordVouchedHistoricalJobs(
+                workspaceId, queued.stream().map(Feedback::getAgentJobId).collect(Collectors.toSet()));
         ArrayNode items = root.putArray("prepared");
         for (Feedback f : queued) {
-            recordCopy(f.getAgentJobId(), f.getRecipientUserId(), f.getAboutUserId());
+            recordPeople(f.getRecipientUserId(), f.getAboutUserId());
             ObjectNode node = items.addObject();
             node.put("threadKey", f.getThreadKey());
             node.put("practiceSlug", practices.get(f.getId()));
@@ -599,7 +608,8 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             // situation, coaching goal, evidence summary and success signal, and the turn itself is still written live.
             // Null when the run that queued it composed nothing,
             // which leaves only the fact that something is queued.
-            putBody(node, f, shown, withdrawn, Words.CURRENT_CLAIMS);
+            if (vouched.contains(f.getAgentJobId())) putBody(node, f, shown, withdrawn, Words.CURRENT_CLAIMS);
+            else unavailableWords(root, node);
         }
         return root;
     }
@@ -611,28 +621,30 @@ public class ReviewHistoryContentSource implements EvidenceSource {
                 observations.stream()
                         .map(ReviewHistoryContentSource::referenceOf)
                         .toList());
+        Set<UUID> vouched = copyAuthority.recordVouchedHistoricalJobs(
+                workspaceId,
+                observations.stream().map(Observation::getAgentJobId).collect(Collectors.toSet()));
         ArrayNode items = root.putArray("observations");
         for (Observation o : observations) {
-            recordCopy(o.getAgentJobId(), o.getAboutUserId());
+            recordPeople(o.getAboutUserId());
             ObjectNode node = items.addObject();
             // The handle delivered feedback's basedOn names; a trace, not evidence that two observations agree.
             node.put("id", o.getId().toString());
             node.put(
                     "practiceSlug",
                     o.getPractice() == null ? null : o.getPractice().getSlug());
-            node.put("summary", o.getSummary());
+            if (vouched.contains(o.getAgentJobId())) node.put("summary", o.getSummary());
 
             node.put("outcome", o.getOutcome().name());
             node.put(
                     "severity", o.getSeverity() == null ? null : o.getSeverity().name());
             // As recorded, with the qualifications and bounds it carried then; a missing value stays unknown.
-            node.put("evidenceRationale", o.getEvidenceRationale());
-            JsonNode evidence = o.getEvidence();
-            if (evidence == null || evidence.isNull() || evidence.isMissingNode()) {
-                node.putNull("evidence");
-            } else {
-                node.set("evidence", evidence.deepCopy());
-            }
+            if (vouched.contains(o.getAgentJobId())) {
+                node.put("evidenceRationale", o.getEvidenceRationale());
+                JsonNode evidence = o.getEvidence();
+                if (evidence == null || evidence.isNull() || evidence.isMissingNode()) node.putNull("evidence");
+                else node.set("evidence", evidence.deepCopy());
+            } else unavailableWords(root, node);
             putPracticeRevision(node, o.getPracticeRevision());
             names.stageInto(node, o.getArtifactKind(), o.getArtifactId());
             node.put(
@@ -653,11 +665,15 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         StagedArtifactNames.Resolved names = artifactNames.resolve(
                 workspaceId,
                 delivered.stream().map(ReviewHistoryContentSource::referenceOf).toList());
+        Set<UUID> producingJobs =
+                delivered.stream().map(Feedback::getAgentJobId).collect(Collectors.toSet());
+        shown.basedOn().values().forEach(rows -> rows.forEach(row -> producingJobs.add(row.getAgentJobId())));
+        Set<UUID> vouched = copyAuthority.recordVouchedHistoricalJobs(workspaceId, producingJobs);
         ArrayNode items = root.putArray("feedback");
         for (Feedback f : delivered) {
-            recordCopy(f.getAgentJobId(), f.getRecipientUserId(), f.getAboutUserId());
+            recordPeople(f.getRecipientUserId(), f.getAboutUserId());
             for (Observation o : shown.basedOn().getOrDefault(f.getId(), List.of())) {
-                recordCopy(o.getAgentJobId(), o.getAboutUserId());
+                recordPeople(o.getAboutUserId());
             }
             ObjectNode node = items.addObject();
             node.put("id", f.getId().toString());
@@ -681,9 +697,24 @@ public class ReviewHistoryContentSource implements EvidenceSource {
                     "publicEligible",
                     publicReviewEligibility.permitsPublicHistory(
                             f, shown.basedOn().getOrDefault(f.getId(), List.of())));
-            putBody(node, f, shown.currentness(), withdrawn, words);
+            if (vouched.contains(f.getAgentJobId())
+                    && shown.basedOn().getOrDefault(f.getId(), List.of()).stream()
+                            .allMatch(row -> vouched.contains(row.getAgentJobId())))
+                putBody(node, f, shown.currentness(), withdrawn, words);
+            else unavailableWords(root, node);
         }
         return root;
+    }
+
+    private static void unavailableWords(ObjectNode root, ObjectNode row) {
+        row.put("wordsUnavailable", EvidenceFolderPersonDataCatalog.COPY_AUTHORITY_UNAVAILABLE);
+        root.put("wordsCoverage", "PARTIAL");
+    }
+
+    private static SourceCompleteness wordsCompleteness(ObjectNode payload) {
+        return "PARTIAL".equals(payload.path("wordsCoverage").asString())
+                ? SourceCompleteness.PARTIAL
+                : SourceCompleteness.COMPLETE;
     }
 
     private static void putPracticeRevision(ObjectNode node, @Nullable PracticeRevision revision) {

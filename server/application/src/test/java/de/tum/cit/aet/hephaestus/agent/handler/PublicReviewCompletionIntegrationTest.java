@@ -12,15 +12,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
+import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedJobInputsFixtures;
 import de.tum.cit.aet.hephaestus.agent.context.ReviewedWork;
+import de.tum.cit.aet.hephaestus.agent.context.providers.GeneralReviewCommentContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.PullRequestContentSource;
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService.AdmissionIdentity;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedReview;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
@@ -34,6 +39,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig.GitHubAppConfig;
@@ -44,11 +50,16 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.SummaryHandle;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.GitHubIssueCommentProcessor;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
@@ -78,6 +89,8 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -129,6 +142,9 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     private PublicReviewCompletionService completionService;
+
+    @Autowired
+    private ObservationAdmissionService observationAdmission;
 
     @Autowired
     private PublicReviewCompletionRepository completions;
@@ -207,6 +223,21 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     private AccountPreferencesQuery accountPreferencesQuery;
+
+    @Autowired
+    private GeneralReviewCommentContentSource generalComments;
+
+    @Autowired
+    private ReviewHistoryContentSource reviewHistory;
+
+    @Autowired
+    private IssueCommentRepository issueComments;
+
+    @Autowired
+    private GitHubIssueCommentProcessor commentProcessor;
+
+    @Autowired
+    private PersonDataCopyRecorder personCopies;
 
     private final Map<String, byte[]> capturedFiles = new LinkedHashMap<>();
     private final List<PreparedJobInputs> preparedEvidence = new ArrayList<>();
@@ -345,6 +376,273 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
                 .resolve(workspace.getId().toString())
                 .resolve(job.getId().toString())
                 .toFile());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing-before", "missing-after", "unknown-after", "complete-after"})
+    void shouldWithholdUnvouchedHistoricalWordsAfterTheirDiscussionAuthorDisappears(String custody) {
+        String quotedWords = "split persistence out so each unit is testable";
+        var pr = pullRequestRepository.findByIdWithAuthorAndRepository(prId).orElseThrow();
+        var repo = Objects.requireNonNull(pr.getRepository());
+        var provider = repo.getProvider();
+        Long authorId = Objects.requireNonNull(pr.getAuthor()).getId();
+        User reviewer = userRepository.save(TestUserFactory.createUser(511L, "earlier-reviewer", provider));
+        IssueComment comment = new IssueComment();
+        comment.setNativeId(9011L);
+        comment.setProvider(provider);
+        comment.setIssue(pr);
+        comment.setAuthor(reviewer);
+        comment.setBody(quotedWords);
+        comment.setHtmlUrl(pr.getHtmlUrl() + "#issuecomment-9011");
+        comment.setAuthorAssociation(AuthorAssociation.NONE);
+        comment.setCreatedAt(Instant.now());
+        comment.setUpdatedAt(Instant.now());
+        issueComments.saveAndFlush(comment);
+
+        AgentJob current = job;
+        AgentJob earlier = new AgentJob();
+        earlier.setWorkspace(workspace);
+        earlier.setWorkerId(WORKER);
+        earlier.setPurpose(job.getPurpose());
+        earlier.setJobType(job.getJobType());
+        earlier.setArtifactKind(job.getArtifactKind());
+        earlier.setStatus(AgentJobStatus.RUNNING);
+        earlier.setConfigSnapshot(job.getConfigSnapshot());
+        earlier.setMetadata(Objects.requireNonNull(job.getMetadata()).deepCopy());
+        earlier.setEvidenceSnapshot(job.getEvidenceSnapshot());
+        job = agentJobRepository.saveAndFlush(earlier);
+        evidenceFiles.beginPersonCapture(job);
+        var previousFiles = new LinkedHashMap<>(capturedFiles);
+        previousFiles.putAll(generalComments
+                .capture(new ContextRequest.PracticeReviewRequest(job), generalComments.sourceKinds())
+                .files());
+        assertThat(new String(previousFiles.get("context/general_comments.json"), StandardCharsets.UTF_8))
+                .contains(quotedWords);
+        // These are the actual participants of the captured discussion, recorded before freezing its bytes.
+        personCopies.recordUser(reviewer.getId());
+        personCopies.recordUser(authorId);
+        preparedEvidence.add(evidenceFiles.prepare(job, new PreparedEvidence(previousFiles, null), null));
+        String earlierDigest = admitLive();
+        String priorBody =
+                "The description makes the new boundary clear. The earlier reviewer asked to '" + quotedWords + "'.";
+        assertThat(completionService
+                        .complete(identity(), earlierDigest, summaryOn(priorBody, all()))
+                        .accepted())
+                .isTrue();
+        UUID earlierJob = job.getId();
+        assertThat(reviewHistory
+                        .publicSameWorkFeedback(workspace.getId(), authorId, ArtifactKinds.PULL_REQUEST, prId)
+                        .toString())
+                .contains(priorBody);
+
+        commentProcessor.delete(
+                comment.getNativeId(), ProcessingContext.forWebhook(workspace.getId(), repo, "deleted"));
+        assertThat(issueComments.findByNativeIdAndProviderId(9011L, Objects.requireNonNull(provider.getId())))
+                .isEmpty();
+        // A's retained guidance still rests on the valid core source after B's discussion is deleted.
+        assertThat(reviewHistory
+                        .publicSameWorkFeedback(workspace.getId(), authorId, ArtifactKinds.PULL_REQUEST, prId)
+                        .toString())
+                .contains(priorBody);
+        if (custody.startsWith("missing")) jdbc.update("DELETE FROM person_evidence_copy WHERE job_id=?", earlierJob);
+        if (custody.startsWith("unknown"))
+            jdbc.update(
+                    "UPDATE person_evidence_copy SET payload=jsonb_set(payload,'{dependencies}','\"UNKNOWN\"'::jsonb) WHERE job_id=?",
+                    earlierJob);
+        job = current;
+        String digest = admitLive();
+        UUID suppression = UUID.randomUUID();
+        try {
+            if (custody.endsWith("before")) suppressReviewer(suppression, reviewer);
+            ObjectNode read = observationAdmission.publicFeedbackHistory(identity());
+            assertThat(read.path("history").path("feedback")).isNotEmpty();
+            if (custody.startsWith("complete")) assertThat(read.toString()).contains(quotedWords);
+            else {
+                assertThat(read.toString()).doesNotContain(quotedWords).contains("COPY_AUTHORITY_UNAVAILABLE");
+                assertThat(read.path("history").path("wordsCoverage").asString())
+                        .isEqualTo("PARTIAL");
+            }
+            if (custody.endsWith("after")) suppressReviewer(suppression, reviewer);
+            var completed = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+            assertThat(completed.accepted()).isEqualTo(!custody.startsWith("complete"));
+            if (custody.startsWith("complete")) {
+                assertThat(completions.findByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                        .isEmpty();
+            }
+        } finally {
+            jdbc.update("DELETE FROM person_suppression WHERE id=?", suppression);
+        }
+    }
+
+    private void suppressReviewer(UUID request, User reviewer) {
+        jdbc.update(
+                "INSERT INTO person_suppression(id,provider_id,subject,team_key) SELECT ?,provider_id,native_id::text,'' FROM \"user\" WHERE id=?",
+                request,
+                reviewer.getId());
+    }
+
+    @Test
+    void shouldRefusePublicHistoryExplicitlyWhenTheCurrentCopyIsRevoked() {
+        admitLive();
+        jdbc.update("UPDATE person_evidence_copy SET state='ERASE_REQUESTED' WHERE job_id=?", job.getId());
+        assertThatThrownBy(() -> observationAdmission.publicFeedbackHistory(identity()))
+                .isInstanceOf(ObservationAdmissionService.PublicHistoryRefusedException.class)
+                .hasMessage("Review history copy authority is unavailable")
+                .hasCauseInstanceOf(EvidenceFolderPersonDataCatalog.CopyUnavailableException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldAcceptTheLiveAdmittingWriterWithoutRetainedRecoveryInputs(boolean unknownLineage) {
+        if (unknownLineage) leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        assertThat(bases.findOriginalCopy(workspace.getId(), job.getId())).isEmpty();
+
+        var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+
+        assertThat(outcome.accepted()).isTrue();
+        assertThat(completion().getAdmissionAttempt()).isZero();
+        assertThat(automaticPackage().getState()).isEqualTo(FeedbackDispatchState.SENT);
+        assertThat(reload().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        verify(commentPoster, times(1)).post(any());
+        if (unknownLineage)
+            assertThat(evidenceFiles.completeReceipt(identity())).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "absent",
+                "revoked",
+                "foreign-store",
+                "wrong-attempt",
+                "wrong-workspace",
+                "ambiguous",
+                "malformed-identities"
+            })
+    void shouldRefuseTheLiveWriterWithoutItsExactReadyCapture(String invalidation) {
+        leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        switch (invalidation) {
+            case "absent" -> jdbc.update("DELETE FROM person_evidence_copy WHERE job_id=?", job.getId());
+            case "revoked" ->
+                jdbc.update("UPDATE person_evidence_copy SET state='ERASE_REQUESTED' WHERE job_id=?", job.getId());
+            case "foreign-store" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET store_id=? WHERE job_id=?", UUID.randomUUID(), job.getId());
+            case "wrong-attempt" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET payload=jsonb_set(payload,'{attempt}','1'::jsonb) WHERE job_id=?",
+                        job.getId());
+            case "wrong-workspace" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET workspace_id=? WHERE job_id=?",
+                        workspace.getId() + 1,
+                        job.getId());
+            case "ambiguous" ->
+                jdbc.update(
+                        "INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload) SELECT ?,workspace_id,job_id,store_id,state,payload FROM person_evidence_copy WHERE job_id=?",
+                        UUID.randomUUID(),
+                        job.getId());
+            case "malformed-identities" ->
+                jdbc.update(
+                        "UPDATE person_evidence_copy SET payload=jsonb_set(payload,'{identities}','[\"invalid\"]'::jsonb) WHERE job_id=?",
+                        job.getId());
+            default -> throw new IllegalArgumentException("Unknown capture invalidation");
+        }
+
+        var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+
+        assertThat(outcome.accepted()).isFalse();
+        assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+        assertThat(PublicReviewCompletionService.wasRefused(reload())).isTrue();
+        assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                .isFalse();
+        assertThat(jobFeedback()).isEmpty();
+        verify(commentPoster, never()).post(any());
+    }
+
+    @Test
+    void shouldRefuseTheLiveWriterWhenACopiedPersonIsSuppressedAfterAdmission() {
+        leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        Observation about = observation(Outcome.MET);
+        evidenceFiles.indexLateRead(
+                identity(), () -> Set.of(about.getId()), ids -> new JobEvidenceFiles.LateCopies(ids, Set.of()));
+        UUID suppression = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO person_suppression(id,provider_id,subject,team_key) SELECT ?,provider_id,native_id::text,'' FROM \"user\" WHERE id=?",
+                suppression,
+                about.getAboutUserId());
+        try {
+            var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+            assertThat(outcome.accepted()).isFalse();
+            assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+            assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                    .isFalse();
+            assertThat(jobFeedback()).isEmpty();
+            verify(commentPoster, never()).post(any());
+        } finally {
+            jdbc.update("DELETE FROM person_suppression WHERE id=?", suppression);
+        }
+    }
+
+    @Test
+    void shouldRefuseTheLiveWriterWhileItsJobIsSelectedByAnUnfinishedErasure() {
+        leaveCaptureLineageUnknown();
+        String digest = admitLive();
+        UUID request = UUID.randomUUID();
+        ObjectNode selections = MAPPER.createObjectNode();
+        selections
+                .putObject("agent_job")
+                .putArray("rows")
+                .addObject()
+                .putObject("columns")
+                .put("id", job.getId().toString());
+        jdbc.update(
+                "INSERT INTO person_data_request(id,state,selections_json,counts_json,completed_json,created_at,expires_at,version) VALUES (?,'FAILED',?,'{}','{}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+INTERVAL '1 day',0)",
+                request,
+                MAPPER.writeValueAsString(selections));
+        try {
+            var outcome = completionService.complete(identity(), digest, summaryOn(SUMMARY, all()));
+            assertThat(outcome.accepted()).isFalse();
+            assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+            assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                    .isFalse();
+            assertThat(jobFeedback()).isEmpty();
+            verify(commentPoster, never()).post(any());
+        } finally {
+            jdbc.update("DELETE FROM person_data_request WHERE id=?", request);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"unknown-lineage", "expired", "absent"})
+    void shouldRefuseAContinuedWriterWithoutVouchingUnexpiredOriginalInputs(String invalidation) {
+        admit(BOTH_OBSERVATIONS);
+        switch (invalidation) {
+            case "unknown-lineage" -> leaveCaptureLineageUnknown();
+            case "expired" ->
+                jdbc.update(
+                        "UPDATE review_composition_basis SET expires_at=? WHERE job_id=?",
+                        Timestamp.from(Instant.EPOCH),
+                        job.getId());
+            case "absent" -> jdbc.update("DELETE FROM review_composition_basis WHERE job_id=?", job.getId());
+            default -> throw new IllegalArgumentException("Unknown recovery invalidation");
+        }
+        jdbc.update("UPDATE agent_job SET retry_count=1 WHERE id=?", job.getId());
+
+        var outcome = completionService.complete(
+                new AdmissionIdentity(job.getId(), workspace.getId(), 1, WORKER),
+                ADMISSION_DIGEST,
+                summaryOn(SUMMARY, all()));
+
+        assertThat(outcome.accepted()).isFalse();
+        assertThat(outcome.reasons()).containsExactly(PublicReviewCompletionService.COPY_GONE);
+        assertThat(completions.existsByWorkspaceIdAndJobId(workspace.getId(), job.getId()))
+                .isFalse();
+        assertThat(jobFeedback()).isEmpty();
+        verify(commentPoster, never()).post(any());
     }
 
     @Test
@@ -772,6 +1070,33 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
               {"practiceSlug": "pr-description-quality", "summary": "Good PR description", "outcome": "MET",
                "severity": null, "evidenceRationale": "The description names what changed."}
             ]}""";
+
+    private void leaveCaptureLineageUnknown() {
+        preparedEvidence.forEach(PreparedJobInputs::close);
+        preparedEvidence.clear();
+        try {
+            FileUtils.deleteDirectory(evidenceLayout
+                    .jobsRoot()
+                    .resolve(workspace.getId().toString())
+                    .resolve(job.getId().toString())
+                    .toFile());
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
+        }
+        jdbc.update("DELETE FROM person_evidence_copy WHERE job_id=?", job.getId());
+        evidenceFiles.beginPersonCapture(job);
+        // A copied source job without a retained receipt makes capture lineage UNKNOWN before runtime admission.
+        personCopies.recordCopiedJob(UUID.randomUUID());
+        preparedEvidence.add(evidenceFiles.prepare(job, new PreparedEvidence(capturedFiles, null), null));
+        assertThat(evidenceFiles.completeReceipt(identity())).isEmpty();
+    }
+
+    private String admitLive() {
+        JsonNode response = observationAdmission.admit(
+                identity(), MAPPER.readTree(withEvidence(BOTH_OBSERVATIONS)).path("observations"));
+        job = reload();
+        return response.path("admissionDigest").asString();
+    }
 
     private AdmissionIdentity identity() {
         return new AdmissionIdentity(job.getId(), workspace.getId(), 0, WORKER);

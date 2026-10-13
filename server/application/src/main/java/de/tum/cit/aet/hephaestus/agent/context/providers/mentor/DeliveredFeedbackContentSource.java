@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
@@ -19,11 +20,13 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPoli
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
@@ -51,6 +54,7 @@ public class DeliveredFeedbackContentSource implements ContentSource {
     private final ConversationConsentGate conversationConsentGate;
     private final ObservationVisibilityPolicy visibilityPolicy;
     private final ObjectMapper objectMapper;
+    private final EvidenceFolderPersonDataCatalog personCopies;
 
     @Override
     public boolean supports(ContextRequest request) {
@@ -100,6 +104,9 @@ public class DeliveredFeedbackContentSource implements ContentSource {
             last = rows.getLast();
         }
         sample = sample.subList(0, Math.min(sample.size(), MAX_FEEDBACK));
+        Set<UUID> vouchedJobs = personCopies.recordVouchedHistoricalJobs(
+                workspaceId,
+                sample.stream().flatMap(usable -> usable.sourceJobs().stream()).toList());
 
         ObjectNode root = objectMapper.createObjectNode();
         // Untrusted-content quarantine: only when a Slack-derived (attacker-controllable) row survives the gate does
@@ -111,13 +118,16 @@ public class DeliveredFeedbackContentSource implements ContentSource {
         }
         root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
         root.set("coverage", objectMapper.valueToTree(Coverage.of(preparedAt)));
+        if (sample.stream().anyMatch(usable -> !vouchedJobs.containsAll(usable.sourceJobs())))
+            root.put("wordsCoverage", "PARTIAL");
 
         ArrayNode delivered = root.putArray("deliveredFeedback");
         ArrayNode states = root.putArray("feedbackStates");
         for (Usable usable : sample) {
             RecipientFeedbackRow row = usable.row();
             // A withdrawn card keeps its record but not its words: an admin took them back as wrong.
-            String body = usable.withdrawn() ? null : deliveredText(row);
+            boolean wordsAvailable = vouchedJobs.containsAll(usable.sourceJobs());
+            String body = usable.withdrawn() || !wordsAvailable ? null : deliveredText(row);
             if (body != null) {
                 describe(delivered.addObject(), row).put("body", body);
             }
@@ -128,6 +138,8 @@ public class DeliveredFeedbackContentSource implements ContentSource {
             if (usable.withdrawn()) {
                 state.put("withdrawn", true);
             }
+            if (!wordsAvailable)
+                state.put("wordsUnavailable", EvidenceFolderPersonDataCatalog.COPY_AUTHORITY_UNAVAILABLE);
         }
         return root;
     }
@@ -166,7 +178,8 @@ public class DeliveredFeedbackContentSource implements ContentSource {
      * A row this conversation may use, whether every review behind it is still current, and whether a workspace
      * admin withdrew it from the practice page.
      */
-    private record Usable(RecipientFeedbackRow row, ReviewClaimCurrentness evidence, boolean withdrawn) {}
+    private record Usable(
+            RecipientFeedbackRow row, ReviewClaimCurrentness evidence, boolean withdrawn, Set<UUID> sourceJobs) {}
 
     /**
      * The rows whose every bound observation may still be shown to the developer, as on their practice page, and
@@ -194,12 +207,23 @@ public class DeliveredFeedbackContentSource implements ContentSource {
                         .filter(Objects::nonNull)
                         .toList());
         Set<UUID> withdrawn = withdrawalRepository.withdrawnAmong(workspaceId, shown.keySet());
+        Map<UUID, Set<UUID>> jobsByFeedback = bindings.stream()
+                .collect(Collectors.groupingBy(
+                        FeedbackObservationVisibility::getFeedbackId,
+                        Collectors.mapping(binding -> binding.getObservation().getAgentJobId(), Collectors.toSet())));
         return rows.stream()
                 .filter(row -> shown.containsKey(row.getId()))
                 .filter(row -> !ArtifactKinds.CONVERSATION_THREAD.equals(row.getArtifactKind())
                         || (row.getArtifactId() != null && activeThreadIds.contains(row.getArtifactId())))
-                .map(row -> new Usable(
-                        row, Objects.requireNonNull(shown.get(row.getId())), withdrawn.contains(row.getId())))
+                .map(row -> {
+                    var sourceJobs = new HashSet<>(jobsByFeedback.getOrDefault(row.getId(), Set.of()));
+                    sourceJobs.add(row.getAgentJobId());
+                    return new Usable(
+                            row,
+                            Objects.requireNonNull(shown.get(row.getId())),
+                            withdrawn.contains(row.getId()),
+                            sourceJobs);
+                })
                 .toList();
     }
 

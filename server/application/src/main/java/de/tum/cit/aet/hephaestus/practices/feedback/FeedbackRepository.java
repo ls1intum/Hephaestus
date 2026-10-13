@@ -365,7 +365,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * cannot shift it.
      */
     @Query("""
-        SELECT f.id AS id, f.channel AS channel, f.deliveryState AS deliveryState,
+        SELECT f.id AS id, f.agentJobId AS agentJobId, f.channel AS channel, f.deliveryState AS deliveryState,
                f.artifactKind AS artifactKind, f.artifactId AS artifactId,
                f.createdAt AS createdAt, f.deliveredAt AS deliveredAt,
                CASE WHEN f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
@@ -397,6 +397,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
     interface RecipientFeedbackRow {
         UUID getId();
+
+        UUID getAgentJobId();
 
         FeedbackChannel getChannel();
 

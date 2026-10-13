@@ -1815,6 +1815,41 @@ void test("public history excludes unqualified legacy and reviewer advice while 
 	);
 });
 
+void test("unavailable historical words retain the delivery fact without supplying a novelty witness", () => {
+	const artifact = {
+		kind: "scm.pull_request",
+		url: "https://gitlab.example/group/repo/-/merge_requests/3",
+	};
+	const view = priorPublicFeedback(
+		{
+			feedback: [
+				{
+					id: historyFeedbackId(1),
+					channel: "IN_CONTEXT",
+					publicEligible: true,
+					artifact,
+					deliveredAt: "2026-10-05T09:00:00Z",
+					recordedClaimCurrentness: "CURRENT",
+					wordsUnavailable: "COPY_AUTHORITY_UNAVAILABLE",
+				},
+			],
+		},
+		`${artifact.kind}:${artifact.url}`,
+		"2026-10-06T09:00:00Z",
+	);
+	assert.equal(view.feedback.length, 1);
+	const [row] = view.feedback;
+	assert.ok(row);
+	assert.equal(row.wordsUnavailable, "COPY_AUTHORITY_UNAVAILABLE");
+	assert.equal(row.body, undefined);
+	assert.equal(row.eligibleForAlreadySaid, false);
+	assert.equal(row.eligibleForPriorAdvice, false);
+	assert.deepEqual(
+		priorAdviceWitnesses(view.feedback, []).get(`feedback:${historyFeedbackId(1)}`),
+		{ eligibleForPriorAdvice: false, eligibleForAlreadySaid: false },
+	);
+});
+
 void test("a delivery after work capture informs novelty without becoming advice the captured work answered", () => {
 	const artifact = {
 		kind: "scm.pull_request",

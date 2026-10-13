@@ -52,6 +52,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -105,6 +106,9 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     @Autowired
     private FeedbackPlacementRepository feedbackPlacementRepository;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     private Practice practice;
     private Repository monitoredRepository;
     private PullRequest pullRequest;
@@ -144,6 +148,39 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
         practice.setCurrentRevision(revision);
         practice = practiceRepository.saveAndFlush(practice);
+    }
+
+    @Test
+    void shouldKeepPreparedFactsButWithholdNotesWhenTheirCopyAuthorityIsLost() {
+        long threadId = seedThread("C-copy-authority", "100.0", ConsentState.ACTIVE);
+        AgentJob job = conversationJob(threadId);
+        Observation observation = saveConversationObservation(job, "occ-copy-authority", threadId);
+        preparer.prepare(
+                job.getId(), workspace.getId(), List.of(observation), List.of(conversationUnit(List.of(observation))));
+        assertThat(contribute().path("preparedConversationFeedback").get(0).has("notes"))
+                .isTrue();
+        jdbc.update(
+                "DELETE FROM person_evidence_copy WHERE job_id=? AND workspace_id=?", job.getId(), workspace.getId());
+
+        JsonNode root = contribute();
+        JsonNode fact = root.path("preparedConversationFeedback").get(0);
+
+        assertThat(root.path("totalPrepared").asInt()).isEqualTo(1);
+        assertThat(fact.path("observationId").asString())
+                .isEqualTo(observation.getId().toString());
+        assertThat(fact.path("outcome").asString()).isEqualTo("NOT_MET");
+        assertThat(fact.path("wordsUnavailable").asString()).isEqualTo("COPY_AUTHORITY_UNAVAILABLE");
+        assertThat(fact.has("summary")).isFalse();
+        assertThat(fact.has("evidenceRationale")).isFalse();
+        assertThat(fact.has("evidence")).isFalse();
+        assertThat(fact.has("topic")).isFalse();
+        assertThat(fact.has("notes")).isFalse();
+        assertThat(root.path("wordsCoverage").asString()).isEqualTo("PARTIAL");
+        assertThat(feedbackRepository.findRecentPreparedConversationForRecipient(
+                        workspace.getId(), recipient.getId(), PageRequest.of(0, 10)))
+                .singleElement()
+                .extracting(Feedback::getDeliveryState)
+                .isEqualTo(FeedbackDeliveryState.PREPARED);
     }
 
     @Test
@@ -417,7 +454,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         metadata.put("slack_channel_id", thread.getSlackChannelId());
         metadata.put("slack_thread_ts", thread.getSlackThreadTs());
         job.setMetadata(metadata);
-        return agentJobRepository.saveAndFlush(job);
+        return saveWithCopyReceipt(job);
     }
 
     private AgentJob pullRequestJob() {
@@ -434,7 +471,11 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         metadata.put("repository_id", monitoredRepository.getId());
         metadata.put("repository_full_name", monitoredRepository.getNameWithOwner());
         job.setMetadata(metadata);
-        return agentJobRepository.saveAndFlush(job);
+        return saveWithCopyReceipt(job);
+    }
+
+    private AgentJob saveWithCopyReceipt(AgentJob job) {
+        return captureCopiedPeople(job, recipient);
     }
 
     private PullRequest persistPullRequest(long nativeId, int number) {

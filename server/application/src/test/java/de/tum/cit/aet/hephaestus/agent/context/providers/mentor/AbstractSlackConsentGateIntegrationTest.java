@@ -1,12 +1,17 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -72,6 +77,12 @@ abstract class AbstractSlackConsentGateIntegrationTest extends BaseIntegrationTe
     @Autowired
     SlackMonitoredChannelRepository slackMonitoredChannelRepository;
 
+    @Autowired
+    EvidenceFolderPersonDataCatalog personCopies;
+
+    @Autowired
+    PersonDataCopyRecorder copyRecorder;
+
     Workspace workspace = new Workspace();
     User recipient = new User();
 
@@ -122,5 +133,20 @@ abstract class AbstractSlackConsentGateIntegrationTest extends BaseIntegrationTe
                 OM));
         job.setEvidenceSnapshot(OM.readTree("{\"manifest\":{\"contractVersion\":\"1.2.0\"}}"));
         return agentJobRepository.save(job);
+    }
+
+    /** The fixture's copied people pass through the same capture and receipt writer as review inputs. */
+    AgentJob captureCopiedPeople(AgentJob job, User... copiedPeople) {
+        job.setStatus(AgentJobStatus.RUNNING);
+        AgentJob saved = agentJobRepository.saveAndFlush(job);
+        personCopies.beginCapture(saved);
+        try {
+            for (User person : copiedPeople) copyRecorder.recordUser(person.getId());
+            assertDoesNotThrow(() -> personCopies.finishCapture(saved).close());
+            return saved;
+        } catch (RuntimeException | Error failure) {
+            personCopies.abortCapture(saved);
+            throw failure;
+        }
     }
 }
