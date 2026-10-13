@@ -103,16 +103,20 @@ export function typicalReview(timing: PracticeReviewTiming): TypicalReview | und
 		return {
 			until: "comment",
 			timing: toComment,
-			stages: stagesOf(timing.totalShares, toComment),
+			stages: stagesOf(timing.totalShares, toComment, "comment"),
 		};
 	}
 	const toEnd = measured(timing.finished);
 	return toEnd === undefined
 		? undefined
-		: { until: "end", timing: toEnd, stages: stagesOf(timing.finishedShares, toEnd) };
+		: { until: "end", timing: toEnd, stages: stagesOf(timing.finishedShares, toEnd, "end") };
 }
 
-function stagesOf(shares: ReviewTimeShares | undefined, timing: MeasuredTiming): MeasuredStage[] {
+function stagesOf(
+	shares: ReviewTimeShares | undefined,
+	timing: MeasuredTiming,
+	until: TypicalReview["until"],
+): MeasuredStage[] {
 	if (shares === undefined) {
 		return [];
 	}
@@ -125,6 +129,18 @@ function stagesOf(shares: ReviewTimeShares | undefined, timing: MeasuredTiming):
 		if (def.optional === true && share <= 0) {
 			return [];
 		}
-		return [{ def, share, seconds: share * timing.medianSeconds }];
+		let measuredDef = def;
+		if (until === "comment" && def.key === "execution") {
+			measuredDef = {
+				...def,
+				text: "from the start of the execution until the review on the work is accepted (the review’s end for older runs).",
+			};
+		} else if (until === "comment" && def.key === "delivery") {
+			measuredDef = {
+				...def,
+				text: "from acceptance of the review on the work until its first comment (from the review’s end for older runs).",
+			};
+		}
+		return [{ def: measuredDef, share, seconds: share * timing.medianSeconds }];
 	});
 }

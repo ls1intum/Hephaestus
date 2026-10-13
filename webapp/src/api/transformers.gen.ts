@@ -619,6 +619,9 @@ const agentJobSchemaResponseTransformer = (data: any) => {
     if (data.firstFeedbackReadAt) {
         data.firstFeedbackReadAt = new Date(data.firstFeedbackReadAt);
     }
+    if (data.publicReviewAcceptedAt) {
+        data.publicReviewAcceptedAt = new Date(data.publicReviewAcceptedAt);
+    }
     if (data.startedAt) {
         data.startedAt = new Date(data.startedAt);
     }

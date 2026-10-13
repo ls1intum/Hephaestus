@@ -385,6 +385,12 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
 
     private void keepCompositionInputs(DerivedConversation derived) {
         jdbc.update("""
+                INSERT INTO public_review_completion(job_id,workspace_id,contract_version,admission_attempt,
+                    admission_digest,accepted_attempt,accepted_worker_id,review_digest,review,accepted_at)
+                VALUES (?,?,1,0,?,0,'privacy-fixture',?,'{"summary":"PUBLIC-COMPLETION-CANARY"}'::jsonb,now())
+                """, derived.jobId(), derived.workspaceId(), "a".repeat(64), "b".repeat(64));
+
+        jdbc.update("""
                 INSERT INTO review_composition_basis(job_id,workspace_id,admission_attempt,admission_digest,
                     basis_version,basis_digest,copy_id,byte_size,created_at,expires_at,payload)
                 VALUES (?,?,0,?,1,?,?,32,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP + INTERVAL '1 hour',
@@ -906,6 +912,9 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
         Map<String, Long> counts = mapper.readValue(preview.request().getCountsJson(), new TypeReference<>() {});
         assertThat(counts.get("agent_job_evidence_copy")).isEqualTo(2L);
         assertThat(counts.get("review_composition_basis")).isEqualTo(2L);
+        assertThat(counts.get("public_review_completion")).isEqualTo(2L);
+        assertThat(export.path("stores").path("public_review_completion").toString())
+                .doesNotContain("PUBLIC-COMPLETION-CANARY");
         assertThat(export.path("stores").path("review_composition_basis").toString())
                 .doesNotContain("ORIGINAL-BASIS-CANARY");
         assertThat(export.path("stores").path("agent_job")).isEmpty();
@@ -913,6 +922,7 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(export.path("stores").path("chat_thread_runtime_journal")).isEmpty();
         assertThat(export.toString())
                 .doesNotContain(
+                        "PUBLIC-COMPLETION-CANARY",
                         "OTHER-PROFILE-CANARY",
                         "credential-canary",
                         "Practice guidance for developer",
@@ -925,6 +935,11 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
         personData.run(requestId);
         assertThat(personData.get(requestId).request().getState()).isEqualTo(PersonDataRequest.State.COMPLETE);
         for (var derived : affected) {
+            assertThat(jdbc.queryForObject(
+                            "SELECT count(*) FROM public_review_completion WHERE job_id=?",
+                            Integer.class,
+                            derived.jobId()))
+                    .isZero();
             assertThat(jdbc.queryForObject(
                             "SELECT count(*) FROM review_composition_basis WHERE job_id=?",
                             Integer.class,

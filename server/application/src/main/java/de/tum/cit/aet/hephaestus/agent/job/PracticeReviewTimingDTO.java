@@ -38,8 +38,9 @@ public record PracticeReviewTimingDTO(
 
         @NonNull
         @Schema(
-                description = "From the end of the review until it first posted feedback on the work by itself;"
-                        + " feedback that waited for an admin's approval is left out")
+                description =
+                        "From acceptance of the review on the work (the end of the review for legacy runs) until it first posted feedback by itself;"
+                                + " feedback that waited for an admin's approval is left out")
         ReviewStageTimingDTO posted,
 
         @NonNull
@@ -50,8 +51,9 @@ public record PracticeReviewTimingDTO(
         ReviewStageTimingDTO total,
 
         @Schema(
-                description = "Each stage's part of the time of the reviews that total measures; absent when no"
-                        + " review posted a comment")
+                description =
+                        "Each stage's part of the time of the reviews that total measures; public execution ends at acceptance, even while private composition continues; absent when no"
+                                + " review posted a comment")
         @Nullable
         ReviewTimeSharesDTO totalShares,
 

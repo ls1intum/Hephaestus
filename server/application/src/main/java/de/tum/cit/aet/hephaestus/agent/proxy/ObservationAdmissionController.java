@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
@@ -11,6 +12,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 @RestController
@@ -31,11 +34,59 @@ public class ObservationAdmissionController {
 
     private final ObservationAdmissionService admission;
     private final PracticeReviewRefusalMetrics refusals;
+    private final PublicReviewCompletionService completion;
+    private final JsonMapper mapper;
 
     public ObservationAdmissionController(
-            ObservationAdmissionService admission, PracticeReviewRefusalMetrics refusals) {
+            ObservationAdmissionService admission,
+            PracticeReviewRefusalMetrics refusals,
+            PublicReviewCompletionService completion,
+            JsonMapper mapper) {
         this.admission = admission;
         this.refusals = refusals;
+        this.completion = completion;
+        this.mapper = mapper;
+    }
+
+    /**
+     * The whole review on the work of the attempt that owns the job, submitted once its public writer finished. An
+     * acceptance answers 200 with the server's review digest, repeated identically for an identical retry; a refusal
+     * answers 422 with fixed reasons and is final. The workspace, recipients and observations come from the attempt's
+     * credential and the job's own records, never from the body.
+     */
+    @PostMapping("/complete-public-review")
+    @WorkspaceAgnostic("Authenticated sandbox token carries and constrains workspace route")
+    public ResponseEntity<ObjectNode> completePublicReview(
+            @RequestBody JsonNode request, Authentication authentication) {
+        JsonNode digest = request.path("admissionDigest");
+        if (request.path("schemaVersion").asInt(-1) != 1
+                || !digest.isString()
+                || !request.path("review").isObject()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Expected schemaVersion 1, an admissionDigest and a review object");
+        }
+        var identity = attemptOf(authentication);
+        PublicReviewCompletionService.Outcome outcome;
+        try {
+            outcome = completion.complete(identity, digest.asString(), request.get("review"));
+        } catch (ObservationAdmissionService.StaleAttemptException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Review attempt no longer owns this job", e);
+        } catch (IllegalStateException e) {
+            // A fence or store failed, not the submission: a 5xx the runner repeats with the same review.
+            log.error("Public review completion could not be recorded: jobId={}", identity.jobId(), e);
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR, "Public review completion could not be recorded", e);
+        }
+        ObjectNode answer = mapper.createObjectNode();
+        answer.put("schemaVersion", 1);
+        answer.put("accepted", outcome.accepted());
+        if (outcome.accepted()) {
+            answer.put("reviewDigest", outcome.reviewDigest());
+            return ResponseEntity.ok(answer);
+        }
+        outcome.reasons().forEach(answer.putArray("reasons")::add);
+        log.info("Refused this review's review on the work: jobId={}, reasons={}", identity.jobId(), outcome.reasons());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(answer);
     }
 
     @PostMapping("/admit-observations")

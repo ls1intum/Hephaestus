@@ -72,8 +72,8 @@ public class ObservationAdmissionService {
 
     /** Why an admitted job that lost its run is failed instead of measured again. */
     public static final String INTERRUPTED_AFTER_ADMISSION =
-            "The review was interrupted after its observations were admitted. No completed feedback was saved. "
-                    + "The observations are kept.";
+            "The review was interrupted after its observations were admitted. Only a review on the work accepted "
+                    + "before the interruption was saved. The observations are kept.";
 
     static boolean observationsWereRefused(AgentJob job) {
         return job.getMetadata() != null
@@ -461,7 +461,7 @@ public class ObservationAdmissionService {
         return basis;
     }
 
-    private static String admissionDigest(AgentJob job) {
+    static String admissionDigest(AgentJob job) {
         return job.getMetadata() == null
                 ? ""
                 : job.getMetadata().path(DIGEST_METADATA_KEY).asString();
@@ -487,7 +487,11 @@ public class ObservationAdmissionService {
         });
     }
 
-    private AgentJob ownedJob(AdmissionIdentity identity) {
+    /**
+     * The job locked for this exact owning attempt, in the caller's transaction; any other state is a lost attempt.
+     * Public because a Spring proxy forwards only what it can override.
+     */
+    public AgentJob ownedJob(AdmissionIdentity identity) {
         AgentJob job = jobs.findByIdWithWorkspaceForUpdate(identity.jobId()).orElseThrow(StaleAttemptException::new);
         if (job.getStatus() != AgentJobStatus.RUNNING
                 || !job.getWorkspace().getId().equals(identity.workspaceId())

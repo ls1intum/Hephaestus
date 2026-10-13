@@ -1008,6 +1008,40 @@ Per-channel preparation marks distinguish successful empty preparation from unfi
 The sweeper retries preparation from retained outputs, not model composition.
 Its [recovery window is bounded](/admin/practice-review-operations#limits-you-should-know-about).
 
+## Acceptance before private composition finishes
+
+Once the public writer finishes, the runner submits the whole review on the work through its owned sandbox capability.
+The server checks the attempt, original admitted observations, their citation attempt, and the original ready and complete copy receipt under the existing erasure fence.
+The workspace, recipient and support come from those persisted records.
+
+One short transaction records the normalized whole review together with its automatic dispatch intent, approval item, or quiet and withheld outcome.
+No provider request runs in this transaction.
+The existing dispatcher checks consent, freshness and cancellation before it writes, and recovers a committed intent if the submitting process stops.
+An accepted review remains authoritative while its dispatch is pending or uncertain, and when it is quiet or awaits approval.
+No continuation writes another public review.
+
+An identical resubmission acknowledges the original digest.
+A different review cannot replace it.
+A committed refusal blocks later public submissions and terminal fallback.
+If acceptance wins a concurrent decision first, its completion remains authoritative.
+An unavailable response establishes neither acceptance nor refusal.
+The runner keeps the same decision for bounded transport retries and terminal reconciliation, which checks for the accepted record before considering a fallback.
+
+Existing attempts that did not use this capability keep their terminal delivery path.
+
+Private composition, job completion and usage accounting still settle at the terminal boundary.
+Early acceptance does not mark private lanes prepared or claim delivery.
+Administration shows the acceptance timestamp separately from each piece's delivery and the job's status.
+
+Time to the first automatic comment ends at that comment, even while private composition runs.
+Its stage shares split public execution from dispatch at acceptance.
+Older reviews use job completion.
+Whole-run model time and finished-review time still end at job completion.
+Quiet acceptance and human approval waits do not enter the automatic-comment cohort.
+
+Its cold payload is absent from queue and administration projections.
+Job payload retention clears its prose, and person erasure and workspace removal delete the row through the existing job scope.
+
 ## Delivery and human approval
 
 Composition creates immutable feedback units before release authority is applied.

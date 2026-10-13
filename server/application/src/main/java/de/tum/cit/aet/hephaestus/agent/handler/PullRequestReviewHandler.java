@@ -264,6 +264,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         if (scopedObservations.isEmpty()) throw new JobDeliveryException("Admitted observation set is empty");
         feedbackService.requestPrivatePreparation(job);
         if (feedbackService.recoverAutomaticPackageIfPresent(job)) return;
+        if (settledWhileRunning(feedbackService, job)) return;
         Set<UUID> publicIds = publicReviewEligibility.publicObservationIds(job, persisted);
         ComposedReview review = reviewToDeliver(
                 compositionResultParser, job, persisted, publicIds, FeedbackCompositionInputs.EVENT_REVIEW_CHANNELS);
@@ -297,13 +298,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             List<Observation> persisted,
             Set<UUID> publicIds,
             Set<FeedbackChannel> stagedChannels) {
-        // A backfill stages no composition (FeedbackCompositionInputs), so it never owes a review.
-        boolean reviewOwed = ReviewOutputService.originOf(job.getMetadata()) != ObservationOrigin.BACKFILL
-                && stagedChannels.contains(FeedbackChannel.IN_CONTEXT)
-                && persisted.stream()
-                        .anyMatch(observation ->
-                                observation.getOutcome().isDecided() && publicIds.contains(observation.getId()));
-        if (!reviewOwed) return ComposedReview.empty();
+        if (!reviewOwed(job, persisted, publicIds, stagedChannels)) return ComposedReview.empty();
         if (!parser.writtenWhole(job.getOutput())) {
             throw new JobDeliveryException(
                     "The review on the work was composed before it was written whole; it is not delivered. jobId="
@@ -315,15 +310,46 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                     "The review on the work was owed and not written as its contract requires; nothing is delivered. jobId="
                             + job.getId());
         }
-        Set<String> decided = review.decidedObservationIds();
-        if (persisted.stream()
-                .anyMatch(observation -> observation.getOutcome() == Outcome.NOT_MET
-                        && publicIds.contains(observation.getId())
-                        && !decided.contains(observation.getId().toString()))) {
+        if (leavesUndecided(review, persisted, publicIds)) {
             throw new JobDeliveryException(
                     "Public feedback composition left an eligible observation undecided; jobId=" + job.getId());
         }
         return review;
+    }
+
+    /** Whether the run owes a review on the work; {@link #reviewToDeliver} names the cases that owe none. */
+    static boolean reviewOwed(
+            AgentJob job, List<Observation> persisted, Set<UUID> publicIds, Set<FeedbackChannel> stagedChannels) {
+        // A backfill stages no composition (FeedbackCompositionInputs), so it never owes a review.
+        return ReviewOutputService.originOf(job.getMetadata()) != ObservationOrigin.BACKFILL
+                && stagedChannels.contains(FeedbackChannel.IN_CONTEXT)
+                && persisted.stream()
+                        .anyMatch(observation ->
+                                observation.getOutcome().isDecided() && publicIds.contains(observation.getId()));
+    }
+
+    /** Whether a publicly eligible problem is neither said nor explicitly withheld by the review. */
+    static boolean leavesUndecided(ComposedReview review, List<Observation> persisted, Set<UUID> publicIds) {
+        Set<String> decided = review.decidedObservationIds();
+        return persisted.stream()
+                .anyMatch(observation -> observation.getOutcome() == Outcome.NOT_MET
+                        && publicIds.contains(observation.getId())
+                        && !decided.contains(observation.getId().toString()));
+    }
+
+    /**
+     * Whether the review on the work was settled while the job ran: accepted, so its outcome went on its way with
+     * that acceptance and is neither decided again nor posted from the terminal output, or refused, so the terminal
+     * output carries no other way onto the work.
+     */
+    static boolean settledWhileRunning(FeedbackDeliveryService feedbackService, AgentJob job) {
+        if (feedbackService.publicReviewAccepted(job)) return true;
+        if (PublicReviewCompletionService.wasRefused(job)) {
+            throw new JobDeliveryException(
+                    "The review on the work was refused when it was submitted; it is not delivered. jobId="
+                            + job.getId());
+        }
+        return false;
     }
 
     /** The author each publicly eligible observation is about, by its persisted id. */
@@ -337,7 +363,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return subjects;
     }
 
-    private ReviewResultParser.ValidatedObservation validated(Observation observation) {
+    static ReviewResultParser.ValidatedObservation validated(Observation observation) {
         return new ReviewResultParser.ValidatedObservation(
                 observation.getPractice().getSlug(),
                 observation.getSummary(),

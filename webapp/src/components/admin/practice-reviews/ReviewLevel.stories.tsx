@@ -6,6 +6,7 @@ import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { levelsOpenedBy } from "@/test/detail-stack";
+import { precedes } from "@/test/dom";
 
 import {
 	mockJobCancelledOnBudget,
@@ -97,6 +98,9 @@ export const Default: Story = {
 		const status = panelElement.querySelector("[data-sheet-status]");
 		await expect(status).toHaveTextContent(/Completed.*ran 5 min.*finished 28 July/u);
 		await expect(panel.getAllByText(/ran 5 min/u)).toHaveLength(1);
+		const history = within(panel.getByRole("list", { name: "History" }));
+		history.getByText("1 min after it finished");
+		await expect(history.queryByText("Review on the work accepted")).toBeNull();
 		// The moment that started it is the review's; the other moments on the work are the work's.
 		panel.getByText("Started by");
 		// Technical is open by default.
@@ -149,8 +153,63 @@ export const Running: Story = {
 		);
 		await expect(panel.queryByText("Not yet")).toBeNull();
 		panel.getByText("Started");
+		await expect(panel.queryByText("Review on the work accepted")).toBeNull();
 		panel.getByRole("button", { name: "Cancel review" });
 		await expect(panel.queryByRole("button", { name: "Request another review" })).toBeNull();
+	},
+};
+
+/** Acceptance records the public decision, including a quiet one; the job can keep running. */
+export const PublicDecisionAcceptedWhileRunning: Story = {
+	args: {
+		...Running.args,
+		job: {
+			status: "ready",
+			job: {
+				...mockJobRunning,
+				publicReviewAcceptedAt: new Date(mockJobRunning.createdAt.getTime() + 120_000),
+			},
+		},
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		const history = within(panel.getByRole("list", { name: "History" }));
+		history.getByText("Review on the work accepted");
+		history.getByText(
+			"The public decision is recorded. Each piece of feedback records its own delivery state.",
+		);
+		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(/Running/u);
+		await expect(history.queryByText("Completed")).toBeNull();
+		await expect(history.queryByText("First comment posted")).toBeNull();
+		panel.getByRole("button", { name: "Cancel review" });
+	},
+};
+
+/** Public acceptance and posting can precede the whole review's completion. */
+export const PublicCommentBeforeCompletion: Story = {
+	args: {
+		job: {
+			status: "ready",
+			job: {
+				...job,
+				publicReviewAcceptedAt: new Date(job.createdAt.getTime() + 120_000),
+				firstFeedbackPostedAt: new Date(job.createdAt.getTime() + 150_000),
+			},
+		},
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		const history = within(panel.getByRole("list", { name: "History" }));
+		const accepted = history.getByText("Review on the work accepted");
+		const posted = history.getByText("First comment posted");
+		const completed = history.getByText("Completed");
+		await expect(precedes(accepted, posted)).toBe(true);
+		await expect(precedes(posted, completed)).toBe(true);
+		history.getByText("while the review was still running");
+		await expect(history.queryByText(/after it finished/u)).toBeNull();
+		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(/Completed/u);
 	},
 };
 

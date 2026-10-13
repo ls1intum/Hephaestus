@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.BoundedBatchPass;
+import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletionRepository;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -36,6 +37,7 @@ public class AgentJobRetentionService {
 
     private final AgentJobRepository jobRepository;
     private final ReviewCompositionBasisRepository basisRepository;
+    private final PublicReviewCompletionRepository completionRepository;
     private final AgentProperties agentProperties;
     private final Clock clock;
     private final BoundedBatchPass pass;
@@ -46,12 +48,14 @@ public class AgentJobRetentionService {
     public AgentJobRetentionService(
             AgentJobRepository jobRepository,
             ReviewCompositionBasisRepository basisRepository,
+            PublicReviewCompletionRepository completionRepository,
             AgentProperties agentProperties,
             Clock clock,
             TransactionTemplate transactionTemplate,
             MeterRegistry meterRegistry) {
         this.jobRepository = jobRepository;
         this.basisRepository = basisRepository;
+        this.completionRepository = completionRepository;
         this.agentProperties = agentProperties;
         this.clock = clock;
         this.pass = new BoundedBatchPass(clock);
@@ -92,6 +96,15 @@ public class AgentJobRetentionService {
 
     private void stripPayloads() {
         Instant cutoff = clock.instant().minus(agentProperties.payloadRetention());
+        // An accepted review on the work is the job's own payload too; its digest stays so it is never written again.
+        BoundedBatchPass.Result reviews = pass.run(log, "strip-public-reviews", () -> {
+            Integer updated = transactionTemplate.execute(
+                    status -> completionRepository.stripEndedReviews(cutoff, pass.batchSize()));
+            return updated != null ? updated : 0;
+        });
+        if (reviews.affected() > 0) {
+            log.info("Retention: stripped the accepted review on the work of {} ended review(s)", reviews.affected());
+        }
         BoundedBatchPass.Result result = pass.run(log, "strip", () -> {
             Integer updated = transactionTemplate.execute(
                     status -> jobRepository.stripTerminalPayloads(cutoff, pass.batchSize()));

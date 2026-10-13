@@ -11,14 +11,17 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletionRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -33,6 +36,9 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
 
     @Mock
     private ReviewCompositionBasisRepository basisRepository;
+
+    @Mock
+    private PublicReviewCompletionRepository completionRepository;
 
     @Mock
     private TransactionTemplate transactionTemplate;
@@ -52,7 +58,27 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
             return cb.doInTransaction(mock(TransactionStatus.class));
         });
         service = new AgentJobRetentionService(
-                jobRepository, basisRepository, AGENT_PROPS, Clock.systemUTC(), transactionTemplate, meterRegistry);
+                jobRepository,
+                basisRepository,
+                completionRepository,
+                AGENT_PROPS,
+                Clock.systemUTC(),
+                transactionTemplate,
+                meterRegistry);
+    }
+
+    @Test
+    @DisplayName("an accepted review on the work loses its prose at the job's own payload cutoff, batch by batch")
+    void shouldStripAcceptedReviewProseWhenTheJobPayloadRetentionPasses() {
+        when(completionRepository.stripEndedReviews(any(), anyInt())).thenReturn(BATCH_SIZE, 2);
+        ArgumentCaptor<Instant> cutoffs = ArgumentCaptor.forClass(Instant.class);
+
+        service.runRetention();
+
+        verify(completionRepository, times(2)).stripEndedReviews(cutoffs.capture(), eq(BATCH_SIZE));
+        ArgumentCaptor<Instant> payloadCutoff = ArgumentCaptor.forClass(Instant.class);
+        verify(jobRepository).stripTerminalPayloads(payloadCutoff.capture(), eq(BATCH_SIZE));
+        assertThat(cutoffs.getValue()).isEqualTo(payloadCutoff.getValue());
     }
 
     @Test

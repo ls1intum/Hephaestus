@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
@@ -16,6 +17,8 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.PracticeReviewRefusalMe
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,13 +36,51 @@ class ObservationAdmissionControllerTest extends BaseUnitTest {
     @Mock
     private ObservationAdmissionService service;
 
+    @Mock
+    private PublicReviewCompletionService completion;
+
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
     private final JsonMapper mapper = JsonMapper.builder().build();
     private ObservationAdmissionController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new ObservationAdmissionController(service, new PracticeReviewRefusalMetrics(meterRegistry));
+        controller = new ObservationAdmissionController(
+                service, new PracticeReviewRefusalMetrics(meterRegistry), completion, mapper);
+    }
+
+    @Test
+    void shouldAnswerTheSubmittedReviewOnTheWorkForTheAuthenticatedAttemptOnly() {
+        UUID id = UUID.randomUUID();
+        ObjectNode request = mapper.createObjectNode().put("schemaVersion", 1).put("admissionDigest", "digest");
+        request.putObject("review").putArray("inline");
+        when(completion.complete(eq(identity(id)), eq("digest"), any()))
+                .thenReturn(new PublicReviewCompletionService.Outcome(true, "review-digest", List.of()))
+                .thenReturn(new PublicReviewCompletionService.Outcome(false, null, List.of("A fixed reason.")))
+                .thenThrow(new ObservationAdmissionService.StaleAttemptException());
+
+        var accepted = controller.completePublicReview(request, authentication(LlmUsageSourceType.AGENT_JOB, id));
+        assertThat(accepted.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(Objects.requireNonNull(accepted.getBody())
+                        .path("reviewDigest")
+                        .asString())
+                .isEqualTo("review-digest");
+        var refused = controller.completePublicReview(request, authentication(LlmUsageSourceType.AGENT_JOB, id));
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        ObjectNode refusal = Objects.requireNonNull(refused.getBody());
+        assertThat(refusal.path("accepted").asBoolean(true)).isFalse();
+        assertThat(refusal.path("reasons").path(0).asString()).isEqualTo("A fixed reason.");
+        assertStatus(
+                HttpStatus.CONFLICT,
+                () -> controller.completePublicReview(request, authentication(LlmUsageSourceType.AGENT_JOB, id)));
+        assertStatus(
+                HttpStatus.FORBIDDEN,
+                () -> controller.completePublicReview(request, authentication(LlmUsageSourceType.MENTOR_TURN, id)));
+        assertStatus(
+                HttpStatus.BAD_REQUEST,
+                () -> controller.completePublicReview(
+                        mapper.createObjectNode().put("schemaVersion", 1),
+                        authentication(LlmUsageSourceType.AGENT_JOB, id)));
     }
 
     @Test

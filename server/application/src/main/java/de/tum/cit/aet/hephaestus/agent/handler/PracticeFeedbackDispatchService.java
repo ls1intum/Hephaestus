@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.DeliveredSignal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.SummaryHandle;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -96,6 +97,21 @@ class PracticeFeedbackDispatchService {
                                 contributingPracticeSlugs,
                                 packageContent),
                         job));
+    }
+
+    /**
+     * The automatic package's dispatch intent alone, in the caller's transaction, so it commits with what decided it.
+     * Nothing is sent here: {@link #recover} sends it after that commit, or the recovery scan does.
+     */
+    FeedbackDispatch automaticIntent(
+            AgentJob job, DeliveryContent packageContent, Set<String> contributingPracticeSlugs) {
+        return insertIfAbsentAndLoad(
+                job,
+                null,
+                "review:" + job.getId(),
+                FeedbackDispatchDestination.AUTOMATIC_REVIEW_PACKAGE,
+                contributingPracticeSlugs,
+                packageContent);
     }
 
     Result dispatchApproved(AgentJob job, Feedback feedback) {
@@ -666,6 +682,13 @@ class PracticeFeedbackDispatchService {
     private PracticeFeedbackDeliveryPolicy.Decision<PracticeFeedbackDeliveryPolicy.ReviewedRevision> lockedDecision(
             FeedbackDispatch dispatch, AgentJob job, @Nullable String proposalRevision) {
         var revision = policy.lockedReviewedRevision(job, proposalRevision);
+        // After the work lock, as cancellation orders it: an accepted package may now exist while its job still runs,
+        // and a review cancelled before this reservation writes nothing new.
+        if (repository
+                .lockReviewStatus(dispatch.getAgentJobId(), dispatch.getWorkspaceId())
+                .contains(AgentJobStatus.CANCELLED.name())) {
+            return PracticeFeedbackDeliveryPolicy.Decision.suppressed(FeedbackSuppressionReason.REVIEW_CANCELLED);
+        }
         if (isIssue(job)) return PracticeFeedbackDeliveryPolicy.Decision.allowed(revision);
         var decision = evaluateAtEgress(dispatch, job);
         return decision.allowed()
@@ -740,7 +763,16 @@ class PracticeFeedbackDispatchService {
     }
 
     boolean projectApproved(Feedback feedback, Runnable projection) {
-        return projectByKey("approved:" + feedback.getId(), feedback.getWorkspaceId(), projection);
+        String destinationKey = "approved:" + feedback.getId();
+        Long workspaceId = feedback.getWorkspaceId();
+        String owner = UUID.randomUUID().toString();
+        Integer claimed = transactionTemplate.execute(status -> repository.claimProjectionByKey(
+                destinationKey, workspaceId, owner, Instant.now().plus(LEASE)));
+        if (claimed == null || claimed != 1) return false;
+        projection.run();
+        Integer projected = transactionTemplate.execute(
+                status -> repository.markProjectedByKey(destinationKey, workspaceId, owner));
+        return projected != null && projected == 1;
     }
 
     boolean projectRecovered(FeedbackDispatch dispatch, Runnable projection) {
@@ -754,17 +786,6 @@ class PracticeFeedbackDispatchService {
         projection.run();
         Integer projected = transactionTemplate.execute(
                 status -> repository.markProjected(dispatch.getId(), dispatch.getWorkspaceId(), owner));
-        return projected != null && projected == 1;
-    }
-
-    private boolean projectByKey(String destinationKey, Long workspaceId, Runnable projection) {
-        String owner = UUID.randomUUID().toString();
-        Integer claimed = transactionTemplate.execute(status -> repository.claimProjectionByKey(
-                destinationKey, workspaceId, owner, Instant.now().plus(LEASE)));
-        if (claimed == null || claimed != 1) return false;
-        projection.run();
-        Integer projected = transactionTemplate.execute(
-                status -> repository.markProjectedByKey(destinationKey, workspaceId, owner));
         return projected != null && projected == 1;
     }
 

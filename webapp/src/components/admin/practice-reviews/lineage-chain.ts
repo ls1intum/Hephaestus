@@ -116,6 +116,7 @@ export function lowerFirst(value: string): string {
  */
 const SHORT_REASON: Record<WithholdingReason, string> = {
 	ARTIFACT_MERGED: "already merged",
+	REVIEW_CANCELLED: "review cancelled",
 	ARTIFACT_CLOSED: "work closed",
 	ARTIFACT_GONE: "work gone",
 	ARTIFACT_DRAFT: "still a draft",

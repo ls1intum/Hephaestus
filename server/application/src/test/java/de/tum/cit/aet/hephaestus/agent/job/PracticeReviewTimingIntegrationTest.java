@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.within;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletion;
+import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletionRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -54,6 +56,9 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     @Autowired
     private FeedbackRepository feedbackRepository;
+
+    @Autowired
+    private PublicReviewCompletionRepository completionRepository;
 
     @Autowired
     private RepositoryRepository repositoryRepository;
@@ -251,6 +256,61 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .isEqualTo("2026-03-10T10:09:00Z")
                 .jsonPath("$.firstFeedbackReadAt")
                 .isEqualTo("2026-03-11T10:08:00Z");
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldMeasureEarlyPostingWhilePrivateCompositionStillRunsAndKeepWholeRunTimingSeparate() {
+        long work = pullRequest(9, null);
+        AgentJob running = review(workspace, work, "2026-03-10T10:00:00Z", AgentJobStatus.RUNNING);
+        running.setStartedAt(Instant.parse("2026-03-10T10:01:00Z"));
+        running.setExecutionStartedAt(Instant.parse("2026-03-10T10:02:00Z"));
+        jobRepository.save(running);
+        accepted(running, "2026-03-10T10:06:00Z");
+        feedback(workspace, running, "2026-03-10T10:06:00Z", "2026-03-10T10:07:00Z", null);
+
+        // Acceptance alone is not delivery, and a human approval wait is not the review's time.
+        AgentJob quiet = review(workspace, work, "2026-03-10T11:00:00Z", AgentJobStatus.RUNNING);
+        accepted(quiet, "2026-03-10T11:06:00Z");
+        AgentJob approval = review(workspace, work, "2026-03-10T12:00:00Z", AgentJobStatus.RUNNING);
+        accepted(approval, "2026-03-10T12:06:00Z");
+        Feedback approvedFeedback = feedback(
+                workspace, approval, FeedbackChannel.IN_CONTEXT, "2026-03-10T12:06:00Z", "2026-03-10T12:10:00Z", null);
+        approved(workspace, approvedFeedback, "2026-03-10T12:09:00Z");
+
+        PracticeReviewTimingDTO early = timing();
+        assertThat(early.total()).isEqualTo(new ReviewStageTimingDTO(1L, 420L, 420L));
+        assertThat(early.posted()).isEqualTo(new ReviewStageTimingDTO(1L, 60L, 60L));
+        assertThat(early.totalShares())
+                .isEqualTo(new ReviewTimeSharesDTO(0.0, 60 / 420.0, 60 / 420.0, 240 / 420.0, 0.0, 60 / 420.0));
+        assertThat(early.model()).isEqualTo(new ReviewStageTimingDTO(0L, null, null));
+        assertThat(early.finished()).isEqualTo(new ReviewStageTimingDTO(0L, null, null));
+
+        running.setStatus(AgentJobStatus.COMPLETED);
+        running.setCompletedAt(Instant.parse("2026-03-10T10:32:00Z"));
+        jobRepository.save(running);
+        PracticeReviewTimingDTO finished = timing();
+        assertThat(finished.total()).isEqualTo(early.total());
+        assertThat(finished.posted()).isEqualTo(early.posted());
+        assertThat(finished.totalShares()).isEqualTo(early.totalShares());
+        assertThat(finished.model()).isEqualTo(new ReviewStageTimingDTO(1L, 1800L, 1800L));
+        assertThat(finished.finished()).isEqualTo(new ReviewStageTimingDTO(1L, 1920L, 1920L));
+        assertThat(finished.finishedShares())
+                .isEqualTo(new ReviewTimeSharesDTO(0.0, 60 / 1920.0, 60 / 1920.0, 1800 / 1920.0, 0.0, null));
+    }
+
+    private void accepted(AgentJob job, String acceptedAt) {
+        PublicReviewCompletion completion = new PublicReviewCompletion();
+        completion.setJobId(job.getId());
+        completion.setWorkspaceId(workspace.getId());
+        completion.setContractVersion(1);
+        completion.setAdmissionAttempt(0);
+        completion.setAdmissionDigest("a".repeat(64));
+        completion.setAcceptedAttempt(0);
+        completion.setAcceptedWorkerId("timing-worker");
+        completion.setReviewDigest("b".repeat(64));
+        completion.setAcceptedAt(Instant.parse(acceptedAt));
+        completionRepository.save(completion);
     }
 
     /**

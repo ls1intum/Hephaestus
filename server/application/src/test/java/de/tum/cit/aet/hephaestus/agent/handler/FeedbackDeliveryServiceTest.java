@@ -64,12 +64,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     @Mock
     private AgentJobRepository jobRepository;
 
+    @Mock
+    private PublicReviewCompletionRepository completions;
+
     private FeedbackDeliveryService service;
 
     @BeforeEach
     void setUp() {
         service = new FeedbackDeliveryService(
-                deliveryPolicy, ledgerRecorder, commentFormatter, dispatchService, jobRepository);
+                deliveryPolicy, ledgerRecorder, commentFormatter, dispatchService, jobRepository, completions);
     }
 
     @Test

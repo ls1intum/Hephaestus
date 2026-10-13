@@ -21,6 +21,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Holds back feedback about observations the developer disputed or called not applicable. */
@@ -51,6 +52,21 @@ class FeedbackResponseSuppressionFilter {
     // persisted observations. recordSuppressed writes in its own REQUIRES_NEW tx, so readOnly does not bind it.
     @Transactional(readOnly = true)
     public SuppressionDecision evaluate(AgentJob job, List<ValidatedObservation> scopedObservations) {
+        return evaluate(job, scopedObservations, false);
+    }
+
+    /**
+     * {@link #evaluate(AgentJob, List)} whose suppressed rows commit or roll back with the caller's transaction, as an
+     * accepted review on the work commits its whole outcome at once.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public SuppressionDecision evaluateInCurrentTransaction(
+            AgentJob job, List<ValidatedObservation> scopedObservations) {
+        return evaluate(job, scopedObservations, true);
+    }
+
+    private SuppressionDecision evaluate(
+            AgentJob job, List<ValidatedObservation> scopedObservations, boolean inCurrentTransaction) {
         long workspaceId = job.getWorkspace().getId();
         List<Observation> persisted = observationRepository.findByAgentJobId(job.getId(), workspaceId);
         if (persisted.isEmpty()) {
@@ -85,6 +101,13 @@ class FeedbackResponseSuppressionFilter {
                     .map(answer -> FeedbackResolution.valueOf(answer.getResolution()))
                     .orElse(null);
             if (action != null && SUPPRESS_ACTIONS.contains(action)) {
+                if (inCurrentTransaction) {
+                    // Part of the caller's whole outcome: a failed row fails it rather than leaving it incomplete.
+                    feedbackLedgerRecorder.recordSuppressedInCurrentTransaction(
+                            job, pf, reasonFor(action), suppressedIndex++);
+                    suppressed++;
+                    continue;
+                }
                 try {
                     feedbackLedgerRecorder.recordSuppressed(job, pf, reasonFor(action), suppressedIndex++);
                 } catch (RuntimeException e) {

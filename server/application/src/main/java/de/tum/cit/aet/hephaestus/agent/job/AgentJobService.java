@@ -125,7 +125,10 @@ public class AgentJobService {
         return agentJobRepository
                 .findReviewRunMoments(jobId, workspaceId)
                 .map(row -> new AgentJobDTO.ReviewMoments(
-                        row.getFirstFeedbackPostedAt(), row.getFirstFeedbackReadAt(), row.getWorkMergedAt()))
+                        row.getFirstFeedbackPostedAt(),
+                        row.getFirstFeedbackReadAt(),
+                        row.getWorkMergedAt(),
+                        row.getPublicReviewAcceptedAt()))
                 .orElse(AgentJobDTO.ReviewMoments.NONE);
     }
 

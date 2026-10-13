@@ -32,18 +32,105 @@ class FeedbackDeliveryService {
     private final PracticeFeedbackCommentFormatter commentFormatter;
     private final PracticeFeedbackDispatchService dispatchService;
     private final AgentJobRepository agentJobRepository;
+    private final PublicReviewCompletionRepository completions;
 
     FeedbackDeliveryService(
             PracticeFeedbackDeliveryPolicy deliveryPolicy,
             FeedbackLedgerRecorder feedbackLedgerRecorder,
             PracticeFeedbackCommentFormatter commentFormatter,
             PracticeFeedbackDispatchService dispatchService,
-            AgentJobRepository agentJobRepository) {
+            AgentJobRepository agentJobRepository,
+            PublicReviewCompletionRepository completions) {
         this.deliveryPolicy = deliveryPolicy;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
         this.commentFormatter = commentFormatter;
         this.dispatchService = dispatchService;
         this.agentJobRepository = agentJobRepository;
+        this.completions = completions;
+    }
+
+    /**
+     * Whether the review on the work was already accepted while the job ran. Its outcome then went on its way with that
+     * acceptance, so the terminal output neither decides it again nor posts it.
+     */
+    boolean publicReviewAccepted(AgentJob job) {
+        return completions.existsByWorkspaceIdAndJobId(job.getWorkspace().getId(), job.getId());
+    }
+
+    /**
+     * Records what an accepted review on the work puts on its way, in the accepting transaction and without any
+     * provider call or lane wake: the approval item, the quiet or withheld rows, or the automatic package's dispatch
+     * intent. The delivery policy is left to the dispatcher's egress check and final reservation, which decide the
+     * write. Every write here joins the caller's transaction.
+     *
+     * @return the dispatch intent to send once the transaction commits, or null when nothing is to be written
+     */
+    @Nullable
+    FeedbackDispatch prepareAcceptedOutcome(AgentJob job, ArtifactKind artifact, AdmittedDelivery decision) {
+        return switch (decision) {
+            case AdmittedDelivery.Proposed proposed -> {
+                feedbackLedgerRecorder.recordProposalInCurrentTransaction(job, proposed.content());
+                yield null;
+            }
+            case AdmittedDelivery.Automatic automatic ->
+                prepareAutomatic(job, artifact, automatic.content(), automatic.contributingPracticeSlugs());
+        };
+    }
+
+    private @Nullable FeedbackDispatch prepareAutomatic(
+            AgentJob job,
+            ArtifactKind artifact,
+            @Nullable DeliveryContent delivery,
+            Set<String> contributingPracticeSlugs) {
+        boolean issue = ArtifactKinds.ISSUE.equals(artifact);
+        if (delivery == null
+                || (delivery.mrNote() == null && (issue || delivery.diffNotes().isEmpty()))) {
+            feedbackLedgerRecorder.recordNothingToPostWithinTransaction(job, delivery);
+            return null;
+        }
+        // No policy read here: it records its evaluation in a transaction of its own, which would wait on the job this
+        // one holds. The dispatcher evaluates the same policy at egress and again at its final reservation, and a
+        // refusal there settles the package and its ledger row as it would for any automatic package.
+        @Nullable
+        DeliveryContent providerPackage =
+                issue ? issuePackage(commentFormatter, job, delivery) : providerPackage(job, delivery);
+        if (providerPackage == null
+                || (providerPackage.mrNote() == null
+                        && providerPackage.diffNotes().stream()
+                                .allMatch(note -> note.body().isBlank()))) {
+            feedbackLedgerRecorder.recordSuppressedUnitInCurrentTransaction(
+                    job, delivery, FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
+            return null;
+        }
+        return dispatchService.automaticIntent(job, providerPackage, contributingPracticeSlugs);
+    }
+
+    /**
+     * Sends a committed accepted package through the dispatcher and records what it placed, as the recovery scan would.
+     * Any failure leaves the intent to that scan; the acceptance stands either way.
+     */
+    void sendAcceptedPackage(AgentJob job, FeedbackDispatch intent) {
+        try {
+            dispatchService.recover(intent, job);
+            recordAutomaticPackage(job, dispatchService.automaticPackage(job));
+        } catch (RuntimeException e) {
+            log.warn("Accepted review package left to dispatch recovery: jobId={}", job.getId(), e);
+        }
+    }
+
+    /**
+     * The issue comment as the provider will show it: the sanitized summary with its disclosure. Null when nothing is
+     * left to post; an issue takes no line notes.
+     */
+    static @Nullable DeliveryContent issuePackage(
+            PracticeFeedbackCommentFormatter formatter, AgentJob job, DeliveryContent delivery) {
+        String sanitized = delivery.mrNote() == null ? "" : PullRequestCommentPoster.sanitize(delivery.mrNote());
+        if (sanitized.isBlank()) return null;
+        return new DeliveryContent(
+                formatter.format(sanitized, job),
+                delivery.diffNotes(),
+                delivery.withheld(),
+                delivery.summaryContributors());
     }
 
     void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery) {

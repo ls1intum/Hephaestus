@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalFeedbackPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeFeedbackPreparationRequestedEvent;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor.DiffAnchor;
@@ -399,6 +400,12 @@ public class FeedbackLedgerRecorder {
      * checked at the mentor turn by {@code ConversationalDeliveryReconciler}.
      */
     private void publishFeedbackLaneTrigger(AgentJob job) {
+        // The lanes read the job's final output and record that they ran even when it holds nothing. Only a review on
+        // the work accepted while its job still runs reaches the ledger before that output exists; the terminal
+        // delivery wakes the lanes once it does.
+        if (job.getStatus() == AgentJobStatus.RUNNING) {
+            return;
+        }
         try {
             eventPublisher.publishEvent(new PracticeFeedbackPreparationRequestedEvent(
                     job.getId(), job.getWorkspace().getId()));
@@ -423,6 +430,15 @@ public class FeedbackLedgerRecorder {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordNothingToPost(AgentJob job, @Nullable DeliveryContent delivery) {
         publishFeedbackLaneTrigger(job);
+        recordWithheldOnly(job, delivery);
+    }
+
+    /**
+     * {@link #recordNothingToPost} in the caller's transaction, waking no lane: a review on the work accepted while
+     * its job still runs commits these rows with its acceptance.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordNothingToPostWithinTransaction(AgentJob job, @Nullable DeliveryContent delivery) {
         recordWithheldOnly(job, delivery);
     }
 
@@ -495,7 +511,7 @@ public class FeedbackLedgerRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordSuppressedUnit(AgentJob job, DeliveryContent delivery, FeedbackSuppressionReason reason) {
-        recordSuppressedUnitInCurrentTransaction(job, delivery, reason);
+        recordSuppressedUnitRows(job, delivery, reason);
         if (NOTE_ON_WORK_ONLY.contains(reason)) {
             publishFeedbackLaneTrigger(job);
         }
@@ -515,8 +531,14 @@ public class FeedbackLedgerRecorder {
             FeedbackSuppressionReason.ISSUE_SNAPSHOT_CHANGED,
             FeedbackSuppressionReason.REVIEWED_REVISION_CHANGED);
 
-    private void recordSuppressedUnitInCurrentTransaction(
+    /** {@link #recordSuppressedUnit} in the caller's transaction, waking no lane. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordSuppressedUnitInCurrentTransaction(
             AgentJob job, DeliveryContent delivery, FeedbackSuppressionReason reason) {
+        recordSuppressedUnitRows(job, delivery, reason);
+    }
+
+    private void recordSuppressedUnitRows(AgentJob job, DeliveryContent delivery, FeedbackSuppressionReason reason) {
         if (delivery == null || job.getWorkspace() == null) {
             return;
         }
@@ -668,6 +690,18 @@ public class FeedbackLedgerRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordSuppressed(AgentJob job, Observation observation, FeedbackSuppressionReason reason, int index) {
+        recordSuppressedObservation(job, observation, reason, index);
+    }
+
+    /** {@link #recordSuppressed} in the caller's transaction, so its row commits or rolls back with the caller's. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordSuppressedInCurrentTransaction(
+            AgentJob job, Observation observation, FeedbackSuppressionReason reason, int index) {
+        recordSuppressedObservation(job, observation, reason, index);
+    }
+
+    private void recordSuppressedObservation(
+            AgentJob job, Observation observation, FeedbackSuppressionReason reason, int index) {
         recordSuppressedAt(job, observation, reason, SUPPRESSED_UNIT_ORDINAL_BASE + index);
     }
 
@@ -685,6 +719,18 @@ public class FeedbackLedgerRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordWithheld(AgentJob job, Observation observation, FeedbackSuppressionReason reason, int index) {
+        recordWithheldObservation(job, observation, reason, index);
+    }
+
+    /** {@link #recordWithheld} in the caller's transaction, so its row commits or rolls back with the caller's. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordWithheldInCurrentTransaction(
+            AgentJob job, Observation observation, FeedbackSuppressionReason reason, int index) {
+        recordWithheldObservation(job, observation, reason, index);
+    }
+
+    private void recordWithheldObservation(
+            AgentJob job, Observation observation, FeedbackSuppressionReason reason, int index) {
         recordSuppressedAt(job, observation, reason, AUTONOMY_WITHHELD_UNIT_ORDINAL_BASE + index);
     }
 
@@ -692,6 +738,19 @@ public class FeedbackLedgerRecorder {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordProposal(AgentJob job, @Nullable DeliveryContent delivery) {
         publishFeedbackLaneTrigger(job);
+        recordProposalRows(job, delivery);
+    }
+
+    /**
+     * {@link #recordProposal} in the caller's transaction, waking no lane: a review on the work accepted while its job
+     * still runs commits its approval item with its acceptance.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordProposalInCurrentTransaction(AgentJob job, @Nullable DeliveryContent delivery) {
+        recordProposalRows(job, delivery);
+    }
+
+    private void recordProposalRows(AgentJob job, @Nullable DeliveryContent delivery) {
         final int position = APPROVAL_UNIT_ORDINAL;
         if (delivery == null
                 || (delivery.mrNote() == null && delivery.diffNotes().isEmpty())) {
@@ -703,7 +762,7 @@ public class FeedbackLedgerRecorder {
         String providerSummary = body == null || body.isBlank() ? null : commentFormatter.appendDisclosure(body, job);
         List<ProposedPlacement> placements = proposedPlacements(job, delivery, providerSummary);
         if (placements.isEmpty()) {
-            recordSuppressedUnitInCurrentTransaction(job, delivery, FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
+            recordSuppressedUnitRows(job, delivery, FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
             return;
         }
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), position)) return;
@@ -855,7 +914,7 @@ public class FeedbackLedgerRecorder {
             return; // nothing to post on the work; the lanes above are already awake
         }
         if (!deliveryAllowed()) {
-            recordSuppressedUnitInCurrentTransaction(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
+            recordSuppressedUnitRows(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
             return;
         }
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), UNDELIVERED_UNIT_ORDINAL)) {

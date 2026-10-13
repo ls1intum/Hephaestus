@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
+import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
@@ -83,6 +84,9 @@ public class ReviewCompositionContinuation {
     /** Reuses the original copy's suppression authority before any accounting reset or token rotation. */
     @Transactional(propagation = Propagation.MANDATORY)
     public int requeue(AgentJob job, String workerId, AgentJobRepository.CompositionRequeue request) {
+        // A review on the work that was accepted removed the kept inputs with its acceptance; one that was refused
+        // stays refused rather than being written again by another writer.
+        if (PublicReviewCompletionService.wasRefused(job)) return 0;
         long workspaceId = job.getWorkspace().getId();
         var copy = bases.findOriginalCopy(workspaceId, job.getId()).orElse(null);
         if (copy == null

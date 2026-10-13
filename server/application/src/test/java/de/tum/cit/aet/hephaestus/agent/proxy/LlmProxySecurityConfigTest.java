@@ -115,6 +115,8 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
                 .isEqualTo(404);
         assertThat(answerTo("POST", "/internal/llm/admit-observations", APPLICATION_PORT))
                 .isEqualTo(404);
+        assertThat(answerTo("POST", "/internal/llm/complete-public-review", APPLICATION_PORT))
+                .isEqualTo(404);
     }
 
     /**
@@ -166,7 +168,8 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
                 "/internal/llm/responses",
                 "/internal/llm/chat/completions",
                 "/internal/llm/admit-observations",
-                "/internal/llm/public-feedback-history")) {
+                "/internal/llm/public-feedback-history",
+                "/internal/llm/complete-public-review")) {
             MockHttpServletRequest request = request("POST", path, GATEWAY_PORT);
             request.setCookies(
                     new Cookie("__Host-HEPHAESTUS_AT", "current-attempt"), new Cookie("JSESSIONID", "current-attempt"));
