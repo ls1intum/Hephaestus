@@ -1189,6 +1189,49 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldKeepCommunicationFactsWhenHistoricalWordsAreUnavailable() {
+        Feedback unavailable = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
+        Feedback trusted = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
+        Feedback prepared = queued("in-chat:7:subtasks", "Unavailable mentor words");
+        boundTo.put(unavailable.getId(), List.of(boundObservation(true)));
+        Observation trustedSupport = boundObservation(false);
+        boundTo.put(trusted.getId(), List.of(trustedSupport));
+        when(feedbackRepository.findDeliveredForPublicWorkHistory(
+                        WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
+                .thenReturn(List.of(unavailable, trusted));
+        when(publicEligibility.permitsPublicHistory(eq(unavailable), any())).thenReturn(true);
+        when(publicEligibility.permitsPublicHistory(eq(trusted), any())).thenReturn(true);
+        when(feedbackRepository.findDeliveredForPersonHistory(any(), any())).thenReturn(List.of(unavailable, trusted));
+        when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(List.of(prepared));
+        when(withdrawalRepository.withdrawnAmong(eq(WORKSPACE_ID), any())).thenReturn(Set.of(prepared.getId()));
+        doReturn(Set.of(trusted.getAgentJobId(), trustedSupport.getAgentJobId()))
+                .when(copyAuthority)
+                .recordVouchedHistoricalJobs(anyLong(), any());
+
+        JsonNode publicHistory = provider.publicSameWorkFeedback(
+                WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
+        var captured = captureFeedbackHistory();
+        JsonNode personHistory = read(captured.files().get("inputs/history/feedback.json"));
+        JsonNode preparedHistory = read(captured.files().get("inputs/history/prepared.json"));
+        for (JsonNode history : List.of(publicHistory, personHistory, preparedHistory)) {
+            JsonNode rows = history.path(history.has("prepared") ? "prepared" : "feedback");
+            JsonNode row = rows.get(0);
+            assertThat(row.path("recordedClaimCurrentness").asString())
+                    .isEqualTo(history.has("prepared") ? "CURRENT" : "STALE");
+            assertThat(row.path("withdrawn").asBoolean()).isEqualTo(history.has("prepared"));
+            assertThat(row.has("body") || row.has("bodyRole")).isFalse();
+            assertThat(row.path("wordsUnavailable").asString()).isEqualTo("COPY_AUTHORITY_UNAVAILABLE");
+            assertThat(history.path("wordsCoverage").asString()).isEqualTo("PARTIAL");
+        }
+        assertThat(publicHistory.path("feedback").get(1).path("body").asString())
+                .isEqualTo(trusted.getBody());
+        assertThat(personHistory.path("feedback").get(1).path("body").asString())
+                .isEqualTo(trusted.getBody());
+        assertThat(captured.completeness())
+                .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceCompleteness.PARTIAL);
+    }
+
+    @Test
     void freshPublicHistoryKeepsOnlyAuthorizedPublicDeliveriesOnThisWork() {
         Feedback author = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
         Feedback replaced = Feedback.builder()
