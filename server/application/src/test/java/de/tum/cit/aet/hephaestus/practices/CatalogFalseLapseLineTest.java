@@ -18,6 +18,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 /**
  * Pins, for each false-lapse or false-credit pattern the criteria decide, the sentence that places the
  * work on the right side of the line. Patterns a precompute script caused are pinned by its spec instead.
+ * Error handling source contrasts are defined in practices/criteria-cases.json.
  */
 class CatalogFalseLapseLineTest extends BaseUnitTest {
 
@@ -85,10 +86,6 @@ class CatalogFalseLapseLineTest extends BaseUnitTest {
             records-significant-decisions-with-rationale | dependency edits have one owner | Dependency edits belong only to `changes-dependencies-deliberately`.
             records-significant-decisions-with-rationale | independent architecture stays in scope | A separate architectural decision in the same change remains in scope here.
             changes-dependencies-deliberately | a package name supplies no reason | A package name or an edit label is not a reason
-            handles-errors-instead-of-swallowing-them | a fixed valid URL drops no runtime failure | A valid fixed URL has no runtime-dependent parse failure
-            handles-errors-instead-of-swallowing-them | runtime input and transport can fail | Do not extend this exception to a URL from runtime input, or to a network request that uses the URL.
-            handles-errors-instead-of-swallowing-them | a guarantee comes from a type or contract | never from the guard itself or a name; where the sources leave it open, the case stays possible.
-            handles-errors-instead-of-swallowing-them | recorded failures are not swallowed twice | A later check on an empty value does not swallow a failure already recorded by its handler.
             keeps-views-free-of-networking-and-persistence | framework view storage belongs in views | Core Data's `@FetchRequest`, and SwiftUI's `@AppStorage` and `@SceneStorage`
             declares-permissions-truthfully-at-point-of-use | the root view can present the feature | A root view can be that feature.
             uses-structured-concurrency-safely | error handling has its own practice | Swallowed errors in async code belong to `handles-errors-instead-of-swallowing-them`
