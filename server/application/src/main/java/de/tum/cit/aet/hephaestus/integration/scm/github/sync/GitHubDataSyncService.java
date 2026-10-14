@@ -564,13 +564,13 @@ public class GitHubDataSyncService {
 
     /**
      * Same as {@link #syncAllRepositories(Long)}, additionally threading a {@link SyncExecutionHandle} for
-     * the manual "reconcile now" sync-job path ({@code GitHubIntegrationSyncRunner}): cooperative
+     * tracked sync jobs: cooperative
      * cancellation is checked between repositories (and inside the rate-limit wait, in bounded
      * slices — see {@link #waitForRateLimitReset(Long, BooleanSupplier)}), and coarse
      * repos-done/repos-total progress is reported after each repository.
      *
      * @param scopeId the scope ID
-     * @param handle  the tracked sync job's cancellation/progress handle, or {@code null} for untracked callers
+     * @param handle  the tracked sync job's execution handle, or {@code null} for untracked callers
      */
     public void syncAllRepositories(Long scopeId, @Nullable SyncExecutionHandle handle) {
         // Fail fast for a suspended installation so no threads are spawned for it at all.
@@ -672,7 +672,9 @@ public class GitHubDataSyncService {
                     }
                 }
                 if (shouldSync(target)) {
-                    syncSyncTarget(target);
+                    if (!syncSyncTarget(target) && handle != null) {
+                        handle.reportWarnings();
+                    }
                 }
                 reposProcessed++;
                 if (handle != null) {
