@@ -8,12 +8,14 @@ import { getMemberOnboardingOptions } from "@/api/@tanstack/react-query.gen";
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
-import { useMentorChat } from "@/hooks/use-mentor-chat";
+import { type MentorChatSession, useMentorChat } from "@/hooks/use-mentor-chat";
 import { mentorPreferenceReason } from "@/lib/mentor-preference";
+import { useLiveMentorChat } from "@/runtime/mentor/MentorChatProvider";
 
 /**
- * Keyed on the workspace so a conversation never carries over into the next workspace, and gated on
- * the member's own AI choice there: "No AI" hides the composer rather than letting a send fail.
+ * The conversation is the workspace's panel conversation, so it never carries over into the next
+ * workspace and outlives the panel. Gated on the member's own AI choice there: "No AI" hides the
+ * composer rather than letting a send fail.
  */
 export default function GlobalCopilot() {
 	const { workspaceSlug } = useActiveWorkspaceSlug();
@@ -22,20 +24,28 @@ export default function GlobalCopilot() {
 		...getMemberOnboardingOptions({ path: { workspaceSlug: workspaceSlug ?? "" } }),
 		enabled: Boolean(workspaceSlug),
 	});
+	const session = useLiveMentorChat(workspaceSlug ?? "");
 	if (
 		!hasText(workspaceSlug) ||
 		isLoading ||
 		!isAuthenticated ||
 		!preference.isSuccess ||
-		mentorPreferenceReason(preference.data)
+		mentorPreferenceReason(preference.data) ||
+		session === undefined
 	) {
 		return null;
 	}
-	return <WorkspaceCopilot key={workspaceSlug} workspaceSlug={workspaceSlug} />;
+	return <WorkspaceCopilot key={workspaceSlug} workspaceSlug={workspaceSlug} session={session} />;
 }
 
-function WorkspaceCopilot({ workspaceSlug }: { workspaceSlug: string }) {
-	const mentorChat = useMentorChat({});
+function WorkspaceCopilot({
+	workspaceSlug,
+	session,
+}: {
+	workspaceSlug: string;
+	session: MentorChatSession;
+}) {
+	const mentorChat = useMentorChat(session);
 
 	const router = useRouter();
 
