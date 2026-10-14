@@ -52,6 +52,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import { BudgetExhaustedAlert } from "./BudgetExhaustedAlert";
 import { ModelPicker, type ModelSelection } from "./ModelPicker";
@@ -165,6 +166,8 @@ export interface AgentBindingsPageProps {
 	isLoading: boolean;
 	isError: boolean;
 	loadError: unknown;
+	/** A read failed to refresh after the page loaded; the rows, and any unsaved changes, stay. */
+	refreshFailure?: RefreshFailure;
 	/** Rows with a save or clear in flight, keyed by {@link bindingTargetKey}. */
 	pendingTargets: ReadonlySet<string>;
 	/** Bumped after a write lands so the row reseeds from what the server returned. */
@@ -187,6 +190,7 @@ export function AgentBindingsPage({
 	isLoading,
 	isError,
 	loadError,
+	refreshFailure,
 	pendingTargets,
 	saveRevisions,
 	saveErrors,
@@ -240,6 +244,14 @@ export function AgentBindingsPage({
 				)}
 				{!isError && !isLoading && (
 					<div className="space-y-6">
+						{refreshFailure !== undefined && (
+							<QueryErrorAlert
+								error={refreshFailure.error}
+								title="We could not refresh AI models"
+								pending={refreshFailure.pending}
+								onRetry={refreshFailure.onRetry}
+							/>
+						)}
 						<section className="space-y-4">
 							<div className="space-y-1">
 								<h2 className="text-lg font-semibold">Model assignments</h2>

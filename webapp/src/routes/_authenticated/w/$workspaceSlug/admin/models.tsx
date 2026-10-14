@@ -24,6 +24,7 @@ import {
 	PURPOSE_TITLES,
 } from "@/components/admin/workspace-llm/AgentBindingsPage";
 import { WorkspaceLlmProviderPanel } from "@/components/admin/workspace-llm/WorkspaceLlmProviderPanel";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import {
 	DATA_HANDLING_DEFS,
 	DATA_HANDLING_TIERS,
@@ -33,6 +34,7 @@ import { usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { isRecord } from "@/lib/is-record";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/models")({
 	head: workspaceAdminHead("AI models"),
@@ -84,14 +86,36 @@ function ModelsContainer() {
 	const queryClient = useQueryClient();
 	const agentWriteKey = [...AGENT_WRITE_MUTATION_KEY, workspaceSlug];
 
-	const bindingsQuery = useQuery(listAgentsOptions({ path: { workspaceSlug } }));
-	const workspaceQuery = useQuery(getWorkspaceOptions({ path: { workspaceSlug } }));
-	const llmSettingsQuery = useQuery(workspaceGetLlmSettingsOptions({ path: { workspaceSlug } }));
-	const availableModelsQuery = useQuery(
-		workspaceListAvailableLlmModelsOptions({ path: { workspaceSlug } }),
+	const bindingsOptions = listAgentsOptions({ path: { workspaceSlug } });
+	const workspaceOptions = getWorkspaceOptions({ path: { workspaceSlug } });
+	const llmSettingsOptions = workspaceGetLlmSettingsOptions({ path: { workspaceSlug } });
+	const availableModelsOptions = workspaceListAvailableLlmModelsOptions({
+		path: { workspaceSlug },
+	});
+	const onboardingSettingsOptions = getMemberOnboardingSettingsOptions({
+		path: { workspaceSlug },
+	});
+	const bindingsQuery = useQuery(bindingsOptions);
+	const workspaceQuery = useQuery(workspaceOptions);
+	const llmSettingsQuery = useQuery(llmSettingsOptions);
+	const availableModelsQuery = useQuery(availableModelsOptions);
+	const onboardingSettingsQuery = useQuery(onboardingSettingsOptions);
+	useQueryReadRefusal(bindingsOptions.queryKey, bindingsQuery.isError, bindingsQuery.error);
+	useQueryReadRefusal(workspaceOptions.queryKey, workspaceQuery.isError, workspaceQuery.error);
+	useQueryReadRefusal(
+		llmSettingsOptions.queryKey,
+		llmSettingsQuery.isError,
+		llmSettingsQuery.error,
 	);
-	const onboardingSettingsQuery = useQuery(
-		getMemberOnboardingSettingsOptions({ path: { workspaceSlug } }),
+	useQueryReadRefusal(
+		availableModelsOptions.queryKey,
+		availableModelsQuery.isError,
+		availableModelsQuery.error,
+	);
+	useQueryReadRefusal(
+		onboardingSettingsOptions.queryKey,
+		onboardingSettingsQuery.isError,
+		onboardingSettingsQuery.error,
 	);
 	const usageQuery = useQuery({
 		...getLlmUsageReportOptions({ path: { workspaceSlug }, query: { month: currentMonthUtc() } }),
@@ -105,6 +129,18 @@ function ModelsContainer() {
 		availableModelsQuery,
 		onboardingSettingsQuery,
 	];
+	const failedQueries = pageQueries.filter((query) => query.isError);
+	const loaded = pageQueries.every((query) => query.data !== undefined);
+	// A refusal hides the page even over cached data. Any other failure leaves loaded rows, and the
+	// drafts in them, on screen beside the retry; a failure before anything loaded still blocks.
+	const blockingFailure =
+		failedQueries.find((query) => !queryErrorIsRetryable(query.error)) ??
+		(loaded ? undefined : failedQueries[0]);
+	const retryFailed = () => {
+		for (const query of failedQueries) {
+			void query.refetch();
+		}
+	};
 
 	const agentsKey = listAgentsQueryKey({ path: { workspaceSlug } });
 	// Readiness per AI choice lives on the member setup, which decides whether Heph is in the navigation.
@@ -205,17 +241,22 @@ function ModelsContainer() {
 				/>
 			}
 			usage={usageQuery.data}
-			isLoading={pageQueries.some((query) => query.isLoading)}
-			isError={pageQueries.some((query) => query.isError)}
-			loadError={pageQueries.find((query) => query.error != null)?.error}
+			isLoading={!loaded}
+			isError={blockingFailure !== undefined}
+			loadError={blockingFailure?.error}
+			refreshFailure={
+				blockingFailure === undefined && failedQueries.length > 0
+					? {
+							error: failedQueries[0]?.error,
+							pending: failedQueries.some((query) => query.isFetching),
+							onRetry: retryFailed,
+						}
+					: undefined
+			}
 			pendingTargets={pendingTargets}
 			saveRevisions={saveRevisions}
 			saveErrors={saveErrors}
-			onRetry={() => {
-				for (const query of pageQueries) {
-					void query.refetch();
-				}
-			}}
+			onRetry={retryFailed}
 			onSave={(target, body) => {
 				setSaveError(target, undefined);
 				saveBinding.mutate({ target, body });
