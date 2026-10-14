@@ -242,6 +242,140 @@ describe("the address of a workspace", () => {
 		expect(names()).toHaveLength(2);
 	});
 
+	it("offers a retry inside a direct public person drawer when its parent page fails", async () => {
+		const user = userEvent.setup();
+		const parentRetry = deferred<Response>();
+		const detailReads: URL[] = [];
+		const workReads: URL[] = [];
+		let parentReads = 0;
+		server.use(unauthenticatedUser);
+		publishPerson(detailReads, workReads);
+		// The first read fails; the retry is held until the test answers it.
+		server.use(
+			http.get(
+				"*/public/workspaces/:slug/activity",
+				() => {
+					parentReads += 1;
+					return HttpResponse.json({ status: 503, title: "Service unavailable" }, { status: 503 });
+				},
+				{ once: true },
+			),
+			http.get("*/public/workspaces/:slug/activity", async () => {
+				parentReads += 1;
+				return parentRetry.promise;
+			}),
+		);
+		const address = "/w/acme?range=30d&repo=acme/api&sort=name&detail=person:ada";
+		const { router } = renderRouteAtWithRouter(address);
+		try {
+			const panel = await screen.findByRole("dialog", { name: "ada" }, ROUTE_RENDER_WAIT);
+			await waitFor(() => expect(router.state.isLoading).toBe(false));
+			expect(parentReads).toBe(1);
+			expect(detailReads).toHaveLength(0);
+			expect(workReads).toHaveLength(0);
+			await within(panel).findAllByText("We could not load this person’s activity");
+			expect(within(panel).queryByText("Loading this person’s activity…")).toBeNull();
+			expect(within(panel).queryByText("Loading activity…")).toBeNull();
+			const [retry] = within(panel).getAllByRole("button", { name: "Retry" });
+			assert(retry);
+			await user.click(retry);
+			await waitFor(() => expect(parentReads).toBe(2));
+			// While the retry is out, the level shows its loading shape, not the earlier failure.
+			const retrying = screen.getByRole("dialog", { name: "ada" });
+			await within(retrying).findByText("Loading this person’s activity…");
+			expect(within(retrying).queryByText("We could not load this person’s activity")).toBeNull();
+			expect(detailReads).toHaveLength(0);
+			expect(workReads).toHaveLength(0);
+			parentRetry.resolve(HttpResponse.json(publicActivity()));
+			await screen.findByRole("dialog", { name: "Ada Lovelace" }, ROUTE_RENDER_WAIT);
+			await screen.findByRole("link", { name: /Public work/u }, ROUTE_RENDER_WAIT);
+			expect(detailReads).toHaveLength(1);
+			expect(workReads).toHaveLength(1);
+			expect(router.state.location.href).toBe(address);
+		} finally {
+			parentRetry.resolve(HttpResponse.json(publicActivity()));
+		}
+	});
+
+	it("offers the same retry on a direct category level when its parent page cannot be reached", async () => {
+		const user = userEvent.setup();
+		const detailReads: URL[] = [];
+		const workReads: URL[] = [];
+		server.use(unauthenticatedUser);
+		publishPerson(detailReads, workReads);
+		publish();
+		// Added last, so it answers first: the page fails once on the network and then reads.
+		server.use(
+			http.get("*/public/workspaces/:slug/activity", () => HttpResponse.error(), { once: true }),
+		);
+		const address = "/w/acme?range=30d&repo=acme/api&detail=person:ada&detail=activity:reviews";
+		const { router } = renderRouteAtWithRouter(address);
+
+		const level = await screen.findByRole("dialog", { name: "Reviews" }, ROUTE_RENDER_WAIT);
+		await within(level).findByText("We could not load activity", undefined, ROUTE_RENDER_WAIT);
+		expect(within(level).queryByText("Loading activity…")).toBeNull();
+		expect(detailReads).toHaveLength(0);
+		expect(workReads).toHaveLength(0);
+		const [retry] = within(level).getAllByRole("button", { name: "Retry" });
+		assert(retry);
+		await user.click(retry);
+
+		await screen.findByRole("link", { name: /Public work/u }, ROUTE_RENDER_WAIT);
+		expect(workReads.some((url) => url.searchParams.getAll("kinds").length > 0)).toBe(true);
+		expect(router.state.location.href).toBe(address);
+	});
+
+	it("says a direct person level is refused, and keeps it refused after a later network failure", async () => {
+		const detailReads: URL[] = [];
+		const workReads: URL[] = [];
+		server.use(unauthenticatedUser);
+		publish();
+		publishPerson(detailReads, workReads);
+		const { router } = renderRouteAtWithRouter("/w/acme?detail=person:ada");
+		await screen.findByRole("dialog", { name: "Ada Lovelace" }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("link", { name: /Public work/u }, ROUTE_RENDER_WAIT);
+		const reads = [detailReads.length, workReads.length];
+
+		server.use(
+			http.get("*/public/workspaces/:slug/activity", () =>
+				HttpResponse.json({ status: 403 }, { status: 403 }),
+			),
+		);
+		await act(async () => {
+			await router.invalidate();
+		});
+		const refused = await screen.findByRole("dialog", { name: "ada" }, ROUTE_RENDER_WAIT);
+		await within(refused).findAllByText("You do not have access to this person’s activity");
+		expect(within(refused).queryByRole("button", { name: "Retry" })).toBeNull();
+		expect(screen.queryByText("Ada Lovelace")).toBeNull();
+		expect(screen.queryByRole("link", { name: /ada on GitHub/u })).toBeNull();
+		expect(screen.queryByRole("link", { name: /Public work/u })).toBeNull();
+
+		server.use(http.get("*/public/workspaces/:slug/activity", () => HttpResponse.error()));
+		await act(async () => {
+			await router.invalidate();
+		});
+		const failed = await screen.findByRole("dialog", { name: "ada" }, ROUTE_RENDER_WAIT);
+		await within(failed).findAllByText("We could not load this person’s activity");
+		expect(screen.queryByText("Ada Lovelace")).toBeNull();
+		expect(screen.queryByRole("link", { name: /Public work/u })).toBeNull();
+		expect([detailReads.length, workReads.length]).toStrictEqual(reads);
+	});
+
+	it("sends a direct person address of a workspace that publishes nothing to sign in, reading no person", async () => {
+		const detailReads: URL[] = [];
+		const workReads: URL[] = [];
+		server.use(unauthenticatedUser);
+		publishPerson(detailReads, workReads);
+		const { router } = renderRouteAtWithRouter("/w/private?detail=person:ada");
+
+		await waitFor(() => expect(router.state.location.pathname).toBe("/login"), ROUTE_RENDER_WAIT);
+		expect(router.state.location.search.returnTo).toBe("/w/private?detail=person:ada");
+		expect(screen.queryByRole("dialog", { name: "ada" })).toBeNull();
+		expect(detailReads).toHaveLength(0);
+		expect(workReads).toHaveLength(0);
+	});
+
 	// The router's own delays decide this: nothing for a read under a second, then the page's shape.
 	it("shows the page's shape while a slow first read is out, then the page", async () => {
 		const response = deferred<Response>();

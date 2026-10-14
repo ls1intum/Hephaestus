@@ -17,7 +17,10 @@ import {
 	PERIOD_SEARCH_KEYS,
 } from "@/components/activity/activity-search";
 import type { PeopleOrder } from "@/components/activity/ActivityPeopleTable";
-import { publicCategoryKinds } from "@/components/activity/public-person-activity";
+import {
+	publicCategoryKinds,
+	type PublicPersonActivityState,
+} from "@/components/activity/public-person-activity";
 import {
 	PublicActivityPage,
 	PublicActivityPageSkeleton,
@@ -210,6 +213,15 @@ function PublicActivityRoute() {
 		enabled: scope.enabled && category !== undefined,
 		kinds: category === undefined ? undefined : publicCategoryKinds(category),
 	});
+	const retry = () => {
+		void router.invalidate();
+	};
+	// Without the page no person is read, so the page's failure and its Retry stand in the levels.
+	// While a retry is out, the levels show their loading shape instead of the earlier failure.
+	const detailPerson: PublicPersonActivityState =
+		page === undefined && load.status === "error" && !updating
+			? { status: "error", error: load.error, onRetry: retry, seedAllowed: false }
+			: person;
 
 	return (
 		<>
@@ -234,9 +246,7 @@ function PublicActivityRoute() {
 					retained !== undefined && load.status === "error"
 						? {
 								error: load.error,
-								onRetry: () => {
-									void router.invalidate();
-								},
+								onRetry: retry,
 								pending: updating,
 							}
 						: undefined
@@ -245,15 +255,13 @@ function PublicActivityRoute() {
 					stack: detailStack,
 					onClose: stackControls.close,
 				}}
-				personActivity={{ person, workLog, categoryWorkLog }}
+				personActivity={{ person: detailPerson, workLog, categoryWorkLog }}
 				people={
 					page === undefined
 						? {
 								status: "error",
 								error: load.status === "error" ? load.error : undefined,
-								onRetry: () => {
-									void router.invalidate();
-								},
+								onRetry: retry,
 							}
 						: { status: "ready", people: publicPeopleRows(page), stale: false }
 				}

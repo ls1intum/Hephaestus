@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, within } from "storybook/test";
+import { expect, fn, screen, waitFor, within } from "storybook/test";
 
 import {
 	AUTOMATION,
@@ -250,14 +250,32 @@ export const SwitchViews: Story = {
 	play: async ({ canvas, userEvent }) => {
 		const search = canvas.getByRole("searchbox", { name: "Search people" });
 		await userEvent.type(search, "Ada");
-		await expect(
-			canvas.getByRole("table", { name: "People" }).querySelectorAll("tbody tr"),
-		).toHaveLength(1);
+		// The People panel stays mounted to keep the search, so it is hidden, not removed. Base UI
+		// hides it only once its closing transition completes, so the play waits for that.
+		const peoplePanel = canvas.getByRole("tabpanel", { name: "People" });
+		const table = canvas.getByRole("table", { name: "People" });
+		await expect(table.querySelectorAll("tbody tr")).toHaveLength(1);
 		await userEvent.click(canvas.getByRole("tab", { name: "Timeline" }));
-		await expect(canvas.queryByRole("table", { name: "People" })).not.toBeInTheDocument();
+		await expect(canvas.getByRole("tab", { name: "Timeline" })).toHaveAttribute(
+			"aria-selected",
+			"true",
+		);
+		await waitFor(async () => {
+			await expect(canvas.getByRole("tabpanel", { name: "Timeline" })).toBeVisible();
+			await expect(peoplePanel).not.toBeVisible();
+			await expect(table).not.toBeVisible();
+		});
 		await expect(canvas.getByRole("combobox", { name: "Repository" })).toBeVisible();
 		await expect(canvas.getByRole("button", { name: /Copy as Markdown/u })).toBeVisible();
 		await userEvent.click(canvas.getByRole("tab", { name: "People" }));
+		await expect(canvas.getByRole("tab", { name: "People" })).toHaveAttribute(
+			"aria-selected",
+			"true",
+		);
+		await waitFor(async () => {
+			await expect(peoplePanel).toBeVisible();
+			await expect(table).toBeVisible();
+		});
 		await expect(canvas.getByRole("searchbox", { name: "Search people" })).toHaveValue("Ada");
 		await expect(
 			canvas.getByRole("table", { name: "People" }).querySelectorAll("tbody tr"),
