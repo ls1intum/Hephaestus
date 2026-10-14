@@ -1,8 +1,12 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+	getActivityPersonWorkInfiniteQueryKey,
+	getActivityWorkInfiniteQueryKey,
+} from "@/api/@tanstack/react-query.gen";
 import type {
 	ActivityPeople,
 	ActivityWork,
@@ -523,6 +527,56 @@ function unknownRepository(request: Request) {
 		? HttpResponse.json({ title: "Not Found", status: 404 }, { status: 404 })
 		: HttpResponse.json(people);
 }
+
+type WorkAnswer = { status: 200; page: Wire<ActivityWorkPage> } | { status: 403 | 503 };
+
+const earlierWork: WorkAnswer = { status: 200, page: { content: [workItem(101)] } };
+const laterWork: WorkAnswer = { status: 200, page: { content: [workItem(202)] } };
+
+/** Each answer once, in order, and the last for every read after it; `served` records each status. */
+function workAnswers(path: string, served: number[], answers: readonly WorkAnswer[]) {
+	return answers.map((answer, index) =>
+		http.get(
+			path,
+			() => {
+				served.push(answer.status);
+				return answer.status === 200
+					? HttpResponse.json(answer.page)
+					: HttpResponse.json(
+							{ status: answer.status, title: "Not now" },
+							{ status: answer.status },
+						);
+			},
+			{ once: index < answers.length - 1 },
+		),
+	);
+}
+
+/** Both timelines one hook reads: everyone's on the page, and one person's on their level. */
+const TIMELINES = [
+	[
+		"everyone's timeline",
+		"/w/acme/workspace-activity?view=timeline",
+		"*/workspaces/acme/activity/work",
+		() =>
+			getActivityWorkInfiniteQueryKey({
+				path: { workspaceSlug: "acme" },
+				query: { range: "90d", size: 30 },
+			}),
+		async () => document.body,
+	],
+	[
+		"a person's timeline",
+		"/w/acme/workspace-activity?detail=person:bob",
+		"*/workspaces/acme/activity/people/8/work",
+		() =>
+			getActivityPersonWorkInfiniteQueryKey({
+				path: { workspaceSlug: "acme", userId: 8 },
+				query: { range: "90d", size: 30 },
+			}),
+		async () => screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT),
+	],
+] as const;
 
 describe("Workspace activity", () => {
 	let reads: URL[] = [];
@@ -1201,5 +1255,72 @@ describe("Workspace activity", () => {
 		expect(router.state.location.href).toBe(
 			"/w/acme/practice-profile?detail=practice-group:review-ready-work",
 		);
+	});
+
+	describe.each(TIMELINES)("%s", (_timeline, address, path, queryKeyOf, regionOf) => {
+		async function openWithAnswers(answers: readonly WorkAnswer[]) {
+			const served: number[] = [];
+			server.use(...workAnswers(path, served, answers));
+			const { queryClient } = renderRouteAtWithRouter(address);
+			const region = await regionOf();
+			await within(region).findByText("Pull request 101", undefined, ROUTE_RENDER_WAIT);
+			const refresh = async () => {
+				await act(async () => {
+					await queryClient.invalidateQueries({ queryKey: queryKeyOf(), exact: true });
+				});
+			};
+			return { served, region, refresh, stateOf: () => queryClient.getQueryState(queryKeyOf()) };
+		}
+
+		it("keeps refused work hidden through a later failure, until an authorized read", async () => {
+			const { served, region, refresh } = await openWithAnswers([
+				earlierWork,
+				{ status: 403 },
+				{ status: 503 },
+				laterWork,
+			]);
+			const refusal = /Ask a workspace admin or instance admin for access/u;
+			expect(served).toStrictEqual([200]);
+
+			await refresh();
+			expect(served).toStrictEqual([200, 403]);
+			await within(region).findByText(refusal);
+			expect(within(region).queryByText("Pull request 101")).toBeNull();
+
+			await refresh();
+			expect(served).toStrictEqual([200, 403, 503]);
+			// The query settles before its observers hear of it, so the screen has caught up once the
+			// refusal it was showing is gone.
+			await waitFor(() => expect(within(region).queryByText(refusal)).toBeNull());
+			expect(within(region).queryByText("Pull request 101")).toBeNull();
+			expect(within(region).queryByRole("button", { name: /Copy as Markdown/u })).toBeNull();
+
+			await refresh();
+			expect(served).toStrictEqual([200, 403, 503, 200]);
+			await within(region).findByText("Pull request 202");
+			expect(within(region).queryByText("Pull request 101")).toBeNull();
+		});
+
+		it("keeps its work through a failed refresh and retries the visible warning", async () => {
+			const user = userEvent.setup();
+			const { served, region, refresh, stateOf } = await openWithAnswers([
+				earlierWork,
+				{ status: 503 },
+				laterWork,
+			]);
+			expect(served).toStrictEqual([200]);
+
+			await refresh();
+			expect(served).toStrictEqual([200, 503]);
+			expect(stateOf()?.status).toBe("error");
+			expect(within(region).queryByText("Pull request 101")).not.toBeNull();
+			expect(within(region).queryByRole("button", { name: /Copy as Markdown/u })).not.toBeNull();
+
+			await within(region).findByText("We could not refresh activity");
+			await user.click(within(region).getByRole("button", { name: "Retry" }));
+			expect(served).toStrictEqual([200, 503, 200]);
+			await within(region).findByText("Pull request 202");
+			expect(within(region).queryByText("Pull request 101")).toBeNull();
+		});
 	});
 });
