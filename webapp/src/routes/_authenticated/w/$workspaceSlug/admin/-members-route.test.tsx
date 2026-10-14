@@ -7,9 +7,10 @@ import { describe, expect, it, vi } from "vitest";
 import { getAllTeamsQueryKey, getUsersWithTeamsQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { TeamInfo, UserTeams } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
+import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { QUERY_STALE_TIME_MS } from "@/runtime/tanstack-query/query-defaults";
-import { deferred } from "@/test/async";
+import { deferred, pending } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 15_000 });
@@ -326,5 +327,120 @@ describe("workspace members route", () => {
 		await screen.findByRole("option", { name: "Backend Team" }, SETTLE);
 		expect(screen.queryByText("We could not load teams")).toBeNull();
 		expect(reads.users).toBe(1);
+	});
+});
+
+/**
+ * Answers the first read. A later read could only come from another workspace's change, so it never
+ * answers, and a read that was not owed stays visible as one in flight.
+ */
+function answerOnce(reply: () => Response) {
+	let reads = 0;
+	return async () => {
+		reads += 1;
+		return reads === 1 ? reply() : pending<Response>();
+	};
+}
+
+describe("a member's visibility belongs to its workspace", () => {
+	it("refreshes the workspace a member was hidden in after the admin switched, and leaves the other alone", async () => {
+		const user = userEvent.setup();
+		const response = deferred<Response>();
+		const hidden = new Set<number>();
+		const changes: string[] = [];
+		const acme = workspaceListItem("acme", { id: 1 });
+		const beta = workspaceListItem("beta", { id: 2 });
+		// The production client's freshness: an unchanged read is not asked for again within 30 s.
+		const client = new QueryClient({
+			defaultOptions: {
+				queries: { staleTime: QUERY_STALE_TIME_MS, retry: false },
+				mutations: { retry: false },
+			},
+		});
+		mockMembersRoute();
+		server.use(
+			http.get("*/workspaces", () => HttpResponse.json([acme, beta])),
+			http.get("*/workspaces/acme", () => HttpResponse.json(acme)),
+			http.get("*/workspaces/beta", () => HttpResponse.json(beta)),
+			http.get("*/workspaces/acme/users", () =>
+				HttpResponse.json(USERS.map((member) => ({ ...member, hidden: hidden.has(member.id) }))),
+			),
+			http.get(
+				"*/workspaces/beta/users",
+				answerOnce(() =>
+					HttpResponse.json([
+						{
+							id: 21,
+							login: "katherine",
+							name: "Katherine Johnson",
+							url: "https://github.com/katherine",
+							teams: [],
+						},
+					] satisfies Wire<UserTeams>[]),
+				),
+			),
+			http.patch("*/workspaces/acme/members/:userId/hidden", async ({ request }) => {
+				const url = new URL(request.url);
+				changes.push(`${url.pathname}${url.search}`);
+				return response.promise;
+			}),
+		);
+		const betaUsers = getUsersWithTeamsQueryKey({ path: { workspaceSlug: "beta" } });
+		const { router, queryClient } = renderRouteAtWithRouter("/w/acme/admin/members", client);
+		try {
+			await user.click(
+				await screen.findByRole(
+					"button",
+					{ name: "Hide Ada Lovelace from workspace activity" },
+					ROUTE_RENDER_WAIT,
+				),
+			);
+			await waitFor(() =>
+				expect(changes).toStrictEqual(["/workspaces/acme/members/11/hidden?hidden=true"]),
+			);
+			await act(async () => {
+				await router.navigate({
+					to: "/w/$workspaceSlug/admin/members",
+					params: { workspaceSlug: "beta" },
+				});
+			});
+			await screen.findByText("Katherine Johnson", undefined, SETTLE);
+
+			hidden.add(11);
+			await act(async () => {
+				response.resolve(
+					HttpResponse.json({
+						userId: 11,
+						userLogin: "ada",
+						role: "MEMBER",
+						hidden: true,
+						eligibleForPracticeReview: true,
+						createdAt: "2026-01-01T00:00:00Z",
+					}),
+				);
+			});
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			// Beta's members are not read again: acme's change says nothing about them.
+			expect(queryClient.getQueryState(betaUsers)).toMatchObject({
+				fetchStatus: "idle",
+				isInvalidated: false,
+			});
+			screen.getByText("Katherine Johnson");
+
+			// Back within the freshness window, acme reads its members again and shows Ada hidden.
+			await act(async () => {
+				await router.navigate({
+					to: "/w/$workspaceSlug/admin/members",
+					params: { workspaceSlug: "acme" },
+				});
+			});
+			await screen.findByRole(
+				"button",
+				{ name: "Show Ada Lovelace in workspace activity" },
+				SETTLE,
+			);
+		} finally {
+			response.resolve(new HttpResponse(null, { status: 500 }));
+		}
 	});
 });

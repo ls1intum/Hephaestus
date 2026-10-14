@@ -16,6 +16,7 @@ import type { WorkspaceMembersTableView } from "@/components/admin/members/Works
 import { NoWorkspace } from "@/components/common/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { problemDetailOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
 import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
@@ -70,14 +71,16 @@ function AdminMembersContainer() {
 	const queryClient = useQueryClient();
 	const toggleHidden = useMutation({
 		...updateMemberVisibilityMutation(),
-		onSuccess: () => {
+		onSuccess: (_data, variables) => {
 			void queryClient.invalidateQueries({
-				queryKey: getUsersWithTeamsQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+				queryKey: getUsersWithTeamsQueryKey({
+					path: { workspaceSlug: variables.path.workspaceSlug },
+				}),
 			});
 		},
-		onError: (error) => {
+		onError: (error, variables) => {
 			toast.error("We could not update visibility in workspace activity", {
-				description: error.message,
+				description: `${problemDetailOf(error)} ${inWorkspace(variables.path.workspaceSlug)}`,
 			});
 		},
 	});
@@ -187,4 +190,8 @@ function AdminMembersContainer() {
 			)}
 		/>
 	);
+}
+
+function inWorkspace(workspaceSlug: string): string {
+	return `In workspace ${workspaceSlug}.`;
 }
