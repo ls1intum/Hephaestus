@@ -167,7 +167,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "FeedbackCopyRepository.recordConversationOutcome",
                     "FeedbackRepository.recordFirstRead",
                     "FeedbackSendRepository.settle",
-                    "ItemEventRepository.decide",
                     "ItemEventRepository.insertIfAbsent",
                     "ResultRepository.findReuseCandidate");
 

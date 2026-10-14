@@ -52,7 +52,6 @@ function Activity() {
 
 	const period = periodFromSearch(search);
 	const userId = membership.data === undefined ? undefined : Number(membership.data.account.id);
-	// Your own activity by your account, which the server counts even while you are hidden.
 	const scope = {
 		workspaceSlug,
 		period,

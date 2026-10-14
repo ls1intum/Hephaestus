@@ -28,7 +28,7 @@ class PracticeV1ConversationReceiptDatabaseTest {
                 database, "SELECT feedback_content_digest('00000000-0000-0000-0000-000000998161')");
         reject(
                 database,
-                "UPDATE feedback_copy SET chat_message_id='00000000-0000-0000-0000-000000992192'" + " WHERE id='" + COPY
+                "UPDATE feedback_copy SET chat_message_id='00000000-0000-0000-0000-000000978052'" + " WHERE id='" + COPY
                         + "'",
                 "55000");
         reject(database, "UPDATE feedback_copy SET chat_message_id=NULL WHERE id='" + COPY + "'", "55000");
@@ -100,7 +100,7 @@ class PracticeV1ConversationReceiptDatabaseTest {
                 .containsExactly("true|POSTED|Actual shown words.|true");
         reject(
                 database,
-                "UPDATE feedback_copy SET chat_message_id='00000000-0000-0000-0000-000000992192'" + " WHERE id='" + COPY
+                "UPDATE feedback_copy SET chat_message_id='00000000-0000-0000-0000-000000978052'" + " WHERE id='" + COPY
                         + "'",
                 "55000");
         reject(
@@ -115,7 +115,7 @@ class PracticeV1ConversationReceiptDatabaseTest {
         var database = prepared(context);
         PracticeMigrationFixture.execute(database, """
             INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,body,path,start_line,end_line,side,state,write_key,write_marker)
-            VALUES('00000000-0000-0000-0000-000000998173',992101,'00000000-0000-0000-0000-000000992161',
+            VALUES('00000000-0000-0000-0000-000000998173',978001,'00000000-0000-0000-0000-000000978041',
                 'LINE_NOTE',1,'Explain the retry.','retry.ts',10,12,'NEW','PLANNED','fixed-note-key','fixed-note-marker');
             UPDATE feedback_copy SET state='WRITE_STARTED',write_started_at='2026-02-01T00:00:00Z'
             WHERE id='00000000-0000-0000-0000-000000998173';
@@ -142,22 +142,22 @@ class PracticeV1ConversationReceiptDatabaseTest {
     }
 
     private static TestDatabase prepared(String context) throws Exception {
-        var database = PracticeMigrationFixture.migratedDatabase(context);
+        var database = NativePracticeFixture.feedbackParent(context);
         PracticeMigrationFixture.execute(database, """
             INSERT INTO feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,body)
             SELECT '00000000-0000-0000-0000-000000998161',workspace_id,review_id,item_id,developer_id,
-                'CONVERSATION','READY','Prepared brief.' FROM feedback WHERE id='00000000-0000-0000-0000-000000992193';
+                'CONVERSATION','READY','Prepared brief.' FROM feedback WHERE id='00000000-0000-0000-0000-000000978044';
             INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,state,write_key,write_marker)
-            VALUES('00000000-0000-0000-0000-000000998172',992101,'00000000-0000-0000-0000-000000998161',
+            VALUES('00000000-0000-0000-0000-000000998172',978001,'00000000-0000-0000-0000-000000998161',
                 'CHAT_TURN',0,'PLANNED','fixed-chat-key','fixed-chat-marker');
             INSERT INTO chat_message(id,workspace_id,thread_id,role,status,parts,created_at)
-            VALUES('00000000-0000-0000-0000-000000998192',992101,'00000000-0000-0000-0000-000000992191',
+            VALUES('00000000-0000-0000-0000-000000998192',978001,'00000000-0000-0000-0000-000000978051',
                 'ASSISTANT','in_flight','[]'::jsonb,'2026-02-01T00:00:00Z');
             INSERT INTO chat_thread(id,workspace_id,account_id,surface,created_at)
-            SELECT '00000000-0000-0000-0000-000000998193',992101,account_id,'WEB','2026-02-01T00:00:00Z'
-                FROM membership WHERE workspace_id=992101 AND account_id<>992106 LIMIT 1;
+            SELECT '00000000-0000-0000-0000-000000998193',978001,account_id,'WEB','2026-02-01T00:00:00Z'
+                FROM membership WHERE workspace_id=978001 AND account_id<>978003 LIMIT 1;
             INSERT INTO chat_message(id,workspace_id,thread_id,role,status,parts,created_at)
-            VALUES('00000000-0000-0000-0000-000000998194',992101,'00000000-0000-0000-0000-000000998193',
+            VALUES('00000000-0000-0000-0000-000000998194',978001,'00000000-0000-0000-0000-000000998193',
                 'ASSISTANT','completed','[{"type":"text","text":"Another developer."}]'::jsonb,'2026-02-01T00:00:00Z');
             """);
         return database;

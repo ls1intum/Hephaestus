@@ -147,4 +147,4 @@ which needs them anyway.
 
 `agent_job` is `review_job`. `AgentJobExecutor`, `AgentJobService`, `AgentJobZombieSweeper` and
 `AgentJobRetentionService` are `ReviewJobExecutor`, `ReviewJobService`, `ReviewJobZombieSweeper` and
-`ReviewJobRetentionService`. The decision above is unchanged.
+`ReviewJobRetentionService`.

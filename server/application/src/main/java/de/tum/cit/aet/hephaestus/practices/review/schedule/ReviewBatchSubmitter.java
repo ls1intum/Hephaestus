@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.practices.review.schedule;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewRequestRejected;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBatchPauseReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestRejected;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import java.util.List;
@@ -46,27 +46,24 @@ public class ReviewBatchSubmitter {
             return new SubmissionOutcome.Submitted();
         var remaining = spend.remaining(batch);
         try {
-            reviews.request(new ReviewRequest(
-                    batch.getWorkspaceId(),
-                    itemId,
-                    kind,
-                    null,
-                    ReviewBatchOrigins.origin(batch),
-                    null,
-                    null,
-                    batch.getId(),
-                    remaining.remainingUsd(),
-                    null,
-                    null,
-                    List.of(),
-                    true));
+            reviews.request(ReviewRequest.builder()
+                    .workspaceId(batch.getWorkspaceId())
+                    .itemId(itemId)
+                    .kind(kind)
+                    .origin(ReviewBatchOrigins.origin(batch))
+                    .batchId(batch.getId())
+                    .budgetUsd(remaining.remainingUsd())
+                    .practiceIds(List.of())
+                    .reuse(true)
+                    .build());
         } catch (ReviewRequestRejected refusal) {
             return switch (refusal.reason()) {
                 case BUDGET_UNAVAILABLE -> new SubmissionOutcome.Paused(ReviewBatchPauseReason.BUDGET_EXHAUSTED);
                 case WORKSPACE_INACTIVE -> new SubmissionOutcome.Paused(ReviewBatchPauseReason.WORKSPACE_UNAVAILABLE);
                 case MODEL_UNAVAILABLE -> new SubmissionOutcome.Paused(ReviewBatchPauseReason.REVIEW_MODEL_UNBOUND);
-                case SCAN_ACTIVE, SOURCE_UNAVAILABLE -> new SubmissionOutcome.Deferred();
-                case ITEM_INELIGIBLE, REQUEST_CONFLICT -> new SubmissionOutcome.Skipped();
+                case SCAN_ACTIVE -> new SubmissionOutcome.Deferred();
+                case SOURCE_UNAVAILABLE, ITEM_INELIGIBLE, REQUEST_CONFLICT, REF_UNSUPPORTED, VERSION_CHANGED ->
+                    new SubmissionOutcome.Skipped();
             };
         }
         return new SubmissionOutcome.Submitted();

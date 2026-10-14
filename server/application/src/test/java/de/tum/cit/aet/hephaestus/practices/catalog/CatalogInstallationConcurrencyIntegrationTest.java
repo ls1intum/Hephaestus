@@ -1,25 +1,28 @@
 package de.tum.cit.aet.hephaestus.practices.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.practices.PracticeCatalogInstallationManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
-import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeUpdateDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionOperations;
 
 class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -43,6 +46,9 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
 
     @Autowired
     WorkspaceRepository workspaces;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Test
     void shouldKeepTheFirstInstallReceiptWhenTheInstallationIsRequestedAgain() {
@@ -88,37 +94,42 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
         var writeReady = new CountDownLatch(1);
         var allowCommit = new CountDownLatch(1);
         var installerStarted = new CountDownLatch(1);
+        var writerPid = new AtomicInteger();
+        var installerPid = new AtomicInteger();
         var writer = CompletableFuture.runAsync(() -> transactions.executeWithoutResult(ignored -> {
             customization.updatePractice(
                     current.slug(),
-                    new CatalogPracticeInputDTO(
-                            current.slug(),
+                    new CatalogPracticeUpdateDTO(
                             current.effective().kind().value(),
                             current.effective().groupSlug(),
                             updated,
                             current.position()),
                     EntityTagPrecondition.parse(EntityTagPrecondition.format(current.etag())));
+            writerPid.set(Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
             writeReady.countDown();
-            await(allowCommit);
+            awaitCommit(allowCommit);
         }));
+        CompletableFuture<Void> installing = null;
         try {
             assertThat(writeReady.await(10, TimeUnit.SECONDS)).isTrue();
-            var installing = CompletableFuture.runAsync(() -> {
+            installing = CompletableFuture.runAsync(() -> transactions.executeWithoutResult(ignored -> {
+                installerPid.set(Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
                 installerStarted.countDown();
                 installer.install(workspace.getId());
-            });
-            try {
-                assertThat(installerStarted.await(10, TimeUnit.SECONDS)).isTrue();
-                assertThatThrownBy(() -> installing.get(250, TimeUnit.MILLISECONDS))
-                        .isInstanceOf(TimeoutException.class);
-            } finally {
-                allowCommit.countDown();
-            }
-            writer.get(10, TimeUnit.SECONDS);
-            installing.get(10, TimeUnit.SECONDS);
+            }));
+            assertThat(installerStarted.await(10, TimeUnit.SECONDS)).isTrue();
+            Awaitility.await()
+                    .atMost(Duration.ofSeconds(10))
+                    .untilAsserted(() -> assertThat(jdbc.queryForObject(
+                                    "SELECT ? = ANY(pg_blocking_pids(?))",
+                                    Boolean.class,
+                                    writerPid.get(),
+                                    installerPid.get()))
+                            .isTrue());
         } finally {
             allowCommit.countDown();
             writer.get(10, TimeUnit.SECONDS);
+            if (installing != null) installing.get(10, TimeUnit.SECONDS);
         }
         var installed = practices
                 .findByWorkspaceIdAndSlug(workspace.getId(), current.slug())
@@ -130,7 +141,7 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
         assertThat(versions.history(installed)).hasSize(1);
     }
 
-    private static void await(CountDownLatch latch) {
+    private static void awaitCommit(CountDownLatch latch) {
         try {
             if (!latch.await(10, TimeUnit.SECONDS))
                 throw new IllegalStateException("Timed out waiting for catalog commit");

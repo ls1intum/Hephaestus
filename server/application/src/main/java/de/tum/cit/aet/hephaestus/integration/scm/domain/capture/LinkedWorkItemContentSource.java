@@ -241,8 +241,7 @@ public class LinkedWorkItemContentSource {
 
     private static String text(Issue issue) {
         String body = issue.getBody() == null ? "" : issue.getBody();
-        // The dates as a quotable line, so a review can cite the opening or the close from the text
-        // it reads.
+        // Dates need quotable text so the review can cite when the issue opened or closed.
         String dates = "Opened "
                 + (issue.getCreatedAt() == null ? "at an unknown time" : issue.getCreatedAt())
                 + (issue.getClosedAt() == null ? "" : ", closed " + issue.getClosedAt())
@@ -270,10 +269,8 @@ public class LinkedWorkItemContentSource {
                 if (label != null && label.getName() != null) labels.add(label.getName());
             }
         }
-        // The provider's own rollup when it syncs one (GitHub); otherwise counted from the children
-        // this repository stores, since GitLab's sync links a child to its parent and never totals
-        // them. `subIssuesSource` says which, so a reader knows whether the count is the provider's
-        // word.
+        // GitHub supplies totals; GitLab supplies child relationships.
+        // subIssuesSource distinguishes provider totals from counts of stored children.
         if (issue.getSubIssuesTotal() != null && issue.getSubIssuesCompleted() != null) {
             node.put("subIssuesTotal", issue.getSubIssuesTotal());
             node.put("subIssuesCompleted", issue.getSubIssuesCompleted());

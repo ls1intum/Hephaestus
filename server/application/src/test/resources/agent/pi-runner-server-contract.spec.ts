@@ -8,6 +8,7 @@ import {
 	compositionRequestSchema,
 	executionReportSchema,
 } from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
+import { practiceIndexSchema } from "../../../../../../docker/agents/practice-scripts/lib/core/runtime-inputs.ts";
 import { AUTHENTICATION_CRITERION, PRACTICES_DIR } from "./golden-review-workspace.ts";
 import {
 	directProgram,
@@ -162,4 +163,11 @@ void test("the runner reads the composition request the server stages", () => {
 	);
 
 	assert.deepEqual(compositionRequestSchema.parse(request), request);
+});
+
+void test("the runner reads the assigned practice index", () => {
+	const index: unknown = JSON.parse(
+		readFileSync(new URL("practice-index.json", import.meta.url), "utf8"),
+	);
+	assert.deepEqual(practiceIndexSchema.parse(index), index);
 });

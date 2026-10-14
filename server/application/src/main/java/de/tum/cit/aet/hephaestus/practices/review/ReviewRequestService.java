@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.workspace.authorization.WorkspaceAccessService;
 import java.util.List;
-import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,25 +52,16 @@ public class ReviewRequestService {
                     "Only the author or an assignee, or a workspace admin, can request this review.");
         var refusal = policy.refusal(workspaceId, itemId, accountId);
         if (refusal.isPresent())
-            return new ReviewRequestOutcomeDTO(
-                    ReviewRequestStatus.REFUSED,
-                    null,
-                    refusal.orElseThrow(),
-                    refusal.orElseThrow().name().replace('_', ' ').toLowerCase(Locale.ROOT));
-        var id = reviews.request(new ReviewRequest(
-                workspaceId,
-                itemId,
-                ReviewKind.ITEM,
-                pinned.version(),
-                ReviewOrigin.REQUEST,
-                null,
-                accountId,
-                null,
-                null,
-                null,
-                null,
-                List.of(),
-                false));
-        return new ReviewRequestOutcomeDTO(ReviewRequestStatus.SUBMITTED, id, null, null);
+            return new ReviewRequestOutcomeDTO(ReviewRequestStatus.REFUSED, null, refusal.orElseThrow());
+        var id = reviews.request(ReviewRequest.builder()
+                .workspaceId(workspaceId)
+                .itemId(itemId)
+                .kind(ReviewKind.ITEM)
+                .version(pinned.version())
+                .origin(ReviewOrigin.REQUEST)
+                .requestedById(accountId)
+                .practiceIds(List.of())
+                .build());
+        return new ReviewRequestOutcomeDTO(ReviewRequestStatus.SUBMITTED, id, null);
     }
 }

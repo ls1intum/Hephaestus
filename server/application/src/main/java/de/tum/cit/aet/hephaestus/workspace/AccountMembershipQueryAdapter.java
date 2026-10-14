@@ -14,13 +14,17 @@ public class AccountMembershipQueryAdapter implements AccountMembershipQuery {
 
     @Override
     public List<MembershipView> membershipsForAccount(long accountId) {
-        return memberships.findByAccount_Id(accountId).stream()
+        return memberships.findById_AccountId(accountId).stream()
                 .filter(member -> member.getLeftAt() == null)
                 .map(member -> new MembershipView(
                         member.getWorkspace().getId(),
                         member.getWorkspace().getWorkspaceSlug(),
                         member.getWorkspace().getDisplayName(),
-                        member.getRole().name()))
+                        switch (member.getRole()) {
+                            case OWNER -> Role.OWNER;
+                            case ADMIN -> Role.ADMIN;
+                            case MEMBER -> Role.MEMBER;
+                        }))
                 .toList();
     }
 

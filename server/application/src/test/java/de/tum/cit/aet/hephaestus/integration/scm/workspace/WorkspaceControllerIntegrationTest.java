@@ -213,7 +213,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).containsOnly(IdentityProviderType.GITHUB);
 
         var membership = workspaceMembershipRepository
-                .findByWorkspace_IdAndAccount_Id(workspace.id(), accountId(owner))
+                .findByWorkspace_IdAndId_AccountId(workspace.id(), accountId(owner))
                 .orElseThrow(() -> new AssertionError("Owner membership not created"));
         assertThat(membership.getRole()).isEqualTo(Membership.WorkspaceRole.OWNER);
     }

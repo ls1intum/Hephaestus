@@ -54,11 +54,11 @@ public interface ReviewOverviewRepository extends Repository<Review, UUID> {
           SELECT 'REVIEW' AS kind,created_at AS at FROM review WHERE workspace_id=:ws AND created_at>=:from AND created_at<:to
           UNION ALL SELECT 'RESULT',recorded_at FROM result WHERE workspace_id=:ws AND recorded_at>=:from AND recorded_at<:to
           UNION ALL SELECT 'FEEDBACK',created_at FROM feedback WHERE workspace_id=:ws AND created_at>=:from AND created_at<:to)
-        SELECT width_bucket(extract(epoch FROM at),ARRAY(SELECT value::numeric FROM jsonb_array_elements_text(CAST(:starts AS jsonb)))) AS bucket,
+        SELECT width_bucket(CAST(extract(epoch FROM at) AS float8), CAST(:starts AS float8[])) AS bucket,
           count(*) FILTER(WHERE kind='REVIEW') AS reviews,count(*) FILTER(WHERE kind='RESULT') AS results,
           count(*) FILTER(WHERE kind='FEEDBACK') AS feedback FROM dates GROUP BY bucket
         """, nativeQuery = true)
-    List<BucketCount> buckets(long ws, Instant from, Instant to, String starts);
+    List<BucketCount> buckets(long ws, Instant from, Instant to, Long[] starts);
 
     @Query(value = """
         SELECT m.practice_id AS practiceId,m.state,count(*) AS count FROM review_item m JOIN review q

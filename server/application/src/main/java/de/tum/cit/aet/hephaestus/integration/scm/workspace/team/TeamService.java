@@ -57,7 +57,6 @@ public class TeamService {
         List<Team> teams = teamRepository.findWithCollectionsByOrganizationIgnoreCaseAndProviderId(
                 scope.accountLogin(), scope.providerId());
 
-        // Batch fetch all label filters in ONE query instead of N queries (N+1 fix)
         Set<Long> teamIds = teams.stream().map(Team::getId).collect(Collectors.toSet());
         Map<Long, Set<Label>> labelFiltersByTeam =
                 workspaceTeamSettingsService.getTeamLabelFiltersForTeams(workspaceId, teamIds);

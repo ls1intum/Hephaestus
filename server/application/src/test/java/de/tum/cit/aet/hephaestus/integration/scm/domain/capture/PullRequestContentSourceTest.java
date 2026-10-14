@@ -87,13 +87,23 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     private DeliveredPullRequestCommentLookup deliveredCommentLookup;
 
     private PullRequestContentSource provider;
+    private @Nullable PullRequest mirroredPullRequest;
+    private List<PullRequestReviewComment> mirroredComments = List.of();
+    private DeliveredPullRequestCommentLookup.CommentIds deliveredComments =
+            new DeliveredPullRequestCommentLookup.CommentIds(Set.of(), Set.of());
 
     @BeforeEach
     void setUp() {
+        mirroredPullRequest = pullRequest();
         lenient()
                 .when(deliveredCommentLookup.findForPullRequest(anyLong(), anyLong()))
-                .thenReturn(new DeliveredPullRequestCommentLookup.CommentIds(Set.of(), Set.of()));
-        lenient().when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(pullRequest()));
+                .thenAnswer(invocation -> deliveredComments);
+        lenient()
+                .when(pullRequestRepository.findByIdForReviewContext(456L))
+                .thenAnswer(invocation -> Optional.ofNullable(mirroredPullRequest));
+        lenient()
+                .when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
+                .thenAnswer(invocation -> mirroredComments);
         provider = new PullRequestContentSource(
                 objectMapper,
                 gitRepositoryManager,
@@ -231,8 +241,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         @Test
         void writesMetadataJson() throws Exception {
             stubGit();
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(List.of());
 
             Map<String, byte[]> files = captureFiles(request(sampleMetadata()));
 
@@ -256,7 +264,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             for (var repository : List.of(admitted, moved)) {
                 PullRequest pr = pullRequest();
                 pr.setRepository(repository);
-                when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(pr));
+                mirroredPullRequest = pr;
 
                 JsonNode metadataJson = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
                         .files()
@@ -287,9 +295,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             pr.setAuthor(author);
 
             stubGit();
-            when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(pr));
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(List.of());
+            mirroredPullRequest = pr;
 
             Map<String, byte[]> files = captureFiles(request(sampleMetadata()));
 
@@ -312,7 +318,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             pr.setMergedAt(Instant.parse("2026-04-10T09:00:00Z"));
             pr.setReviewDecision(ReviewDecision.APPROVED);
             pr.setLastSyncAt(Instant.parse("2026-04-10T10:00:00Z"));
-            when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(pr));
+            mirroredPullRequest = pr;
             ScmCaptureContext original = jobWith(sampleMetadata());
             ScmCaptureContext job = new ScmCaptureContext(
                     original.pinned(),
@@ -362,7 +368,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             pr.setReviewDecision(ReviewDecision.APPROVED);
 
             stubGit();
-            when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(pr));
+            mirroredPullRequest = pr;
 
             JsonNode metadataJson = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
                     .files()
@@ -395,7 +401,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             token.setType(User.Type.BOT);
             pr.setAuthor(token);
             stubGit();
-            when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(pr));
+            mirroredPullRequest = pr;
 
             JsonNode metadataJson = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
                     .files()
@@ -419,21 +425,21 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             stale.observeHeadChecks("e".repeat(40), CheckState.SUCCESS, true);
             stubGit();
 
-            when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(reviewed));
+            mirroredPullRequest = reviewed;
             JsonNode fresh = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
                     .files()
                     .get("context/metadata.json"));
             assertThat(fresh.get("commit_sha").asString()).isEqualTo(HEAD);
             assertThat(fresh.get("head_checks").asString()).isEqualTo("FAILURE");
 
-            when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(moved));
+            mirroredPullRequest = moved;
             JsonNode newerHead = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
                     .files()
                     .get("context/metadata.json"));
             assertThat(newerHead.get("commit_sha").asString()).isEqualTo(HEAD);
             assertThat(newerHead.has("head_checks")).isFalse();
 
-            when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(stale));
+            mirroredPullRequest = stale;
             JsonNode outdated = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
                     .files()
                     .get("context/metadata.json"));
@@ -468,10 +474,8 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             human.setBody(own.getBody());
             PullRequestReviewComment unknownId = new PullRequestReviewComment();
             unknownId.setBody(own.getBody());
-            when(deliveredCommentLookup.findForPullRequest(WORKSPACE_ID, 456L))
-                    .thenReturn(new DeliveredPullRequestCommentLookup.CommentIds(Set.of(82L), Set.of(81L)));
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(List.of(own, human, unknownId));
+            deliveredComments = new DeliveredPullRequestCommentLookup.CommentIds(Set.of(82L), Set.of(81L));
+            mirroredComments = List.of(own, human, unknownId);
 
             var captured = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
             JsonNode comments = objectMapper.readTree(captured.files().get("context/comments.json"));
@@ -487,10 +491,8 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             PullRequestReviewComment own = new PullRequestReviewComment();
             own.setNativeId(81L);
             own.setBody("Explain how to try the timer.");
-            when(deliveredCommentLookup.findForPullRequest(WORKSPACE_ID, 456L))
-                    .thenReturn(new DeliveredPullRequestCommentLookup.CommentIds(Set.of(), Set.of(81L)));
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(List.of(own));
+            deliveredComments = new DeliveredPullRequestCommentLookup.CommentIds(Set.of(), Set.of(81L));
+            mirroredComments = List.of(own);
 
             var captured = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
 
@@ -525,8 +527,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             automated.setAuthor(token);
 
             stubGit();
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(List.of(full, minimal, automated));
+            mirroredComments = List.of(full, minimal, automated);
 
             Map<String, byte[]> files = captureFiles(request(sampleMetadata()));
 
@@ -567,8 +568,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             reply.setBody("Yes, see the description.");
             reply.setCreatedAt(Instant.parse("2025-06-01T13:00:00Z"));
 
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(List.of(reply, root));
+            mirroredComments = List.of(reply, root);
 
             JsonNode comments = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(COMMENTS))
                     .files()
@@ -627,8 +627,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             comment.setCommitId(current);
             comment.setPath("src/Main.java");
             comment.setBody("Use the shared helper here.");
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(List.of(comment));
+            mirroredComments = List.of(comment);
 
             JsonNode captured = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(COMMENTS))
                     .files()
@@ -654,8 +653,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             Collections.reverse(comments);
 
             stubGit();
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(comments);
+            mirroredComments = comments;
 
             Map<String, byte[]> files = captureFiles(request(sampleMetadata()));
 
@@ -672,8 +670,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                 comment.setBody("Comment " + i);
                 comments.add(comment);
             }
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(comments);
+            mirroredComments = comments;
             assertThat(provider.capture(request(sampleMetadata()), Set.of(COMMENTS))
                             .completeness()
                             .get(COMMENTS))
@@ -774,8 +771,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
         @Test
         void shouldStageNoCommitsWhenTheCloneIsNotPrepared() {
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(List.of());
 
             var captured = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
 
@@ -829,8 +824,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
         @Test
         void shouldNotPinAChangeWhenOnlyCommentsAreSelected() {
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(List.of());
 
             var captured = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
 
@@ -882,7 +875,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
     @Test
     void shouldReportUnavailableThenAllowCaptureWhenArtifactReturns() {
-        when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.empty());
+        mirroredPullRequest = null;
         for (var kind : provider.sourceKinds()) {
             var captured = provider.capture(request(sampleMetadata()), Set.of(kind));
             assertThat(captured.files()).isEmpty();
@@ -893,7 +886,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                             Map.of(kind, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)));
         }
         var artifact = pullRequest();
-        when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(artifact));
+        mirroredPullRequest = artifact;
         var restored = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
         assertThat(restored.stateOverrides()).isEmpty();
         assertThat(restored.files()).isNotEmpty();
@@ -903,7 +896,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     void shouldSkipGitPreparationWhenTheParentIsUnavailable() {
         var deleted = pullRequest();
         deleted.setDeletedAt(Instant.parse("2026-09-05T00:00:00Z"));
-        when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(deleted));
+        mirroredPullRequest = deleted;
 
         var captured = provider.capture(request(sampleMetadata()), Set.of(DIFF));
 

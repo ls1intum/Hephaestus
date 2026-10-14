@@ -7,7 +7,6 @@ import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.io.Serializable;
@@ -18,7 +17,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
@@ -51,13 +52,15 @@ public class CatalogEntry {
     @Column(name = "excluded_at")
     private @Nullable Instant excludedAt;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     @ColumnDefault("CURRENT_TIMESTAMP")
-    private Instant createdAt;
+    private @Nullable Instant createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     @ColumnDefault("CURRENT_TIMESTAMP")
-    private Instant updatedAt;
+    private @Nullable Instant updatedAt;
 
     @Version
     @Column(nullable = false)
@@ -66,13 +69,6 @@ public class CatalogEntry {
 
     public CatalogEntry(CatalogEntryType type, String slug) {
         this.id = new Id(type, slug);
-        this.createdAt = Instant.now();
-        this.updatedAt = createdAt;
-    }
-
-    @PreUpdate
-    void preUpdate() {
-        updatedAt = Instant.now();
     }
 
     @Embeddable

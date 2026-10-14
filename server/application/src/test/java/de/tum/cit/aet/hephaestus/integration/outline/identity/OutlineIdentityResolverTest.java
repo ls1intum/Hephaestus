@@ -48,7 +48,8 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     }
 
     private static AccountMembershipQuery.MembershipView membership(long workspaceId) {
-        return new AccountMembershipQuery.MembershipView(workspaceId, "ws", "Workspace", "MEMBER");
+        return new AccountMembershipQuery.MembershipView(
+                workspaceId, "ws", "Workspace", AccountMembershipQuery.Role.MEMBER);
     }
 
     @Test

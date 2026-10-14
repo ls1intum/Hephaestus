@@ -30,9 +30,15 @@ public interface ScmMemberRepository extends Repository<User, Long> {
         """)
     Set<Long> findHiddenUserIdsByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
-    default Optional<User> findMemberByLogin(long workspaceId, String login) {
-        return findHumanUsersWithTeamsByWorkspaceId(workspaceId).stream()
-                .filter(actor -> actor.getLogin().equalsIgnoreCase(login))
-                .findFirst();
-    }
+    @Query("""
+        SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.teamMemberships tm LEFT JOIN FETCH tm.team
+        WHERE u.type = 'USER' AND u.provider.id = :providerId AND LOWER(u.login) = LOWER(:login)
+          AND EXISTS (
+            SELECT m.id.accountId FROM Membership m, Identity i WHERE m.workspace.id = :workspaceId
+            AND m.leftAt IS NULL AND i.account.id = m.id.accountId AND i.disabledAt IS NULL
+            AND i.teamKey = '' AND i.providerId = u.provider.id
+            AND i.providerUserKey = CAST(u.nativeId AS string))
+        """)
+    Optional<User> findMemberByLogin(
+            @Param("workspaceId") long workspaceId, @Param("login") String login, @Param("providerId") long providerId);
 }

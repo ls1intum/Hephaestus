@@ -10,13 +10,18 @@ public record GroupDefinition(
         @Nullable String description,
         @Nullable String icon,
         @Nullable String color) implements ClosedPracticeInput {
+    public static final int NAME_MAX_LENGTH = 128;
+    public static final int DESCRIPTION_MAX_LENGTH = 2000;
+    public static final int ICON_MAX_LENGTH = 64;
+    public static final int COLOR_MAX_LENGTH = 32;
+
     public GroupDefinition {
         Objects.requireNonNull(name);
         if (name.isBlank()
-                || name.length() > 128
-                || (description != null && description.length() > 2000)
-                || (icon != null && icon.length() > 64)
-                || (color != null && color.length() > 32)) {
+                || name.length() > NAME_MAX_LENGTH
+                || (description != null && description.length() > DESCRIPTION_MAX_LENGTH)
+                || (icon != null && icon.length() > ICON_MAX_LENGTH)
+                || (color != null && color.length() > COLOR_MAX_LENGTH)) {
             throw new IllegalArgumentException("Use a group name and metadata within the supported lengths.");
         }
     }

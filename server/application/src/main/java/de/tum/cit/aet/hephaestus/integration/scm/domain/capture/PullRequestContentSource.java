@@ -346,8 +346,7 @@ public class PullRequestContentSource {
         result.put("commit_sha", reviewedHead);
         result.put("subject_role", work.reviewSourceId() == null ? "AUTHOR" : "REVIEWER");
 
-        // Absent key: the job does not carry the text, which is unknown, never the current text
-        // instead.
+        // An absent admission key means unknown text; current words cannot replace it.
         result.put("title", work.title());
         result.put("body", work.body());
         if (pullRequest.getState() != null) {

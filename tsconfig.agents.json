@@ -18,8 +18,7 @@
 		"forceConsistentCasingInFileNames": true,
 		"skipLibCheck": true,
 		"noEmit": true,
-		// Relative imports resolve beside each staged script, across lib/core and domain kits.
-		// through the link the runtime creates to the toolkit (`PracticeRunnerProfile.setupCommands`).
+		// Match the runtime's toolkit link so relative imports resolve in source and staged layouts.
 		"rootDirs": [
 			"server/application/src/main/resources/practices",
 			"server/application/src/main/resources/agent/work/practice-scripts",

@@ -542,9 +542,11 @@ describe("what the trace shows", () => {
 		await waitFor(() => expect(steps.querySelectorAll("time")).toHaveLength(0));
 
 		await userEvent.click(showToggle(sheet, "System info"));
-		await waitFor(() => expect(sheet.querySelector("[data-step-facts]")).not.toBeNull());
+		await waitFor(() =>
+			expect(sheet.querySelector('[data-here="true"] [data-step-facts]')).not.toBeNull(),
+		);
+		expect(sheet.querySelector('[data-here="false"] [data-step-facts]')).toBeNull();
 		await userEvent.click(within(sheet).getByRole("button", { name: "Expand all" }));
-		// Expanded steps show their own facts.
 		for (const piece of steps.querySelectorAll('[data-step="feedback"]')) {
 			expect(piece.querySelector("dl")).not.toBeNull();
 		}

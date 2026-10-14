@@ -6,5 +6,9 @@ public enum ItemEventState {
     STARTED,
     WITHHELD,
     BLOCKED,
-    EXPIRED
+    EXPIRED;
+
+    public boolean isTerminal() {
+        return this == STARTED || this == WITHHELD || this == EXPIRED;
+    }
 }

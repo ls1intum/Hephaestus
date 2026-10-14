@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Objects;
@@ -47,11 +48,15 @@ public class GitLabPullRequestReviewCommentProcessor {
     private final PullRequestReviewRepository reviewRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    private final Clock clock;
+
     public GitLabPullRequestReviewCommentProcessor(
             PullRequestReviewCommentRepository commentRepository,
             PullRequestRepository pullRequestRepository,
             PullRequestReviewRepository reviewRepository,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            Clock clock) {
+        this.clock = clock;
         this.commentRepository = commentRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.reviewRepository = reviewRepository;
@@ -149,8 +154,7 @@ public class GitLabPullRequestReviewCommentProcessor {
 
         Optional<PullRequestReviewComment> existing =
                 commentRepository.findByNativeIdAndProviderId(nativeId, providerId);
-        // A note id is unique on the instance: a diff note stored under another merge request is
-        // never moved here.
+        // Instance-wide note ids cannot move a diff note to another merge request.
         if (existing.map(PullRequestReviewComment::getPullRequest)
                 .filter(parent -> !parent.getId().equals(context.pr().getId()))
                 .isPresent()) {
@@ -299,10 +303,11 @@ public class GitLabPullRequestReviewCommentProcessor {
         return saved;
     }
 
-    private static EventContext createSyncContext(PullRequest pr, Long scopeId) {
+    private EventContext createSyncContext(PullRequest pr, Long scopeId) {
         RepositoryRef repoRef =
                 pr.getRepository() != null ? Objects.requireNonNull(RepositoryRef.from(pr.getRepository())) : null;
-        return EventContext.forSync(scopeId, Objects.requireNonNull(repoRef), IdentityProviderType.GITLAB);
+        return EventContext.forSync(
+                scopeId, Objects.requireNonNull(repoRef), IdentityProviderType.GITLAB, clock.instant());
     }
 
     /**

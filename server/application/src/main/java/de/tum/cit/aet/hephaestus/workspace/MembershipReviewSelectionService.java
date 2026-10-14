@@ -20,8 +20,21 @@ public class MembershipReviewSelectionService implements MembershipReviewSelecti
     @Override
     @Transactional(readOnly = true)
     public Set<Long> eligibleAccountIds(long workspaceId) {
+        return eligible(workspaceId, List.of(), true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Set<Long> eligibleAccountIds(long workspaceId, Collection<Long> accountIds) {
+        return accountIds.isEmpty() ? Set.of() : eligible(workspaceId, accountIds, false);
+    }
+
+    private Set<Long> eligible(long workspaceId, Collection<Long> accountIds, boolean allAccounts) {
         return memberships.findEligibleAccountIds(
-                workspaceId, actors.connectedProviderId(workspaceId).orElse(null));
+                workspaceId,
+                accountIds,
+                allAccounts,
+                actors.connectedProviderId(workspaceId).orElse(null));
     }
 
     @Override
@@ -37,6 +50,5 @@ public class MembershipReviewSelectionService implements MembershipReviewSelecti
         memberships
                 .findReviewSelectionMembers(workspaceId, selected)
                 .forEach(member -> member.setReviewSelected(selected.contains(member.getAccountId())));
-        memberships.flush();
     }
 }

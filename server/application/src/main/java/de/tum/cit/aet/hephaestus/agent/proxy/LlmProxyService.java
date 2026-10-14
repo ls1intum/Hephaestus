@@ -170,7 +170,7 @@ class LlmProxyService {
         return "'" + field + "' must hold at most " + max + " entries";
     }
 
-    /** @param practiceScript {@code null} for a call of the review or of Heph */
+    // A null practiceScript denotes a review or Heph call.
     @SuppressWarnings("try") // The scope installs the current span and restores it on close.
     private @Nullable ResponseEntity<?> serve(
             ProxyRouting routing,

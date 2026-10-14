@@ -112,11 +112,11 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         workspace.setId(1L);
         lenient().when(workspaces.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
         when(memberships.membershipsForAccount(10L))
-                .thenReturn(
-                        List.of(new AccountMembershipQuery.MembershipView(1L, "engineering", "Engineering", "MEMBER")));
+                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(
+                        1L, "engineering", "Engineering", AccountMembershipQuery.Role.MEMBER)));
         var membership = new Membership();
         membership.setWorkspace(workspace);
-        lenient().when(members.findByWorkspace_IdAndAccount_Id(1L, 10L)).thenReturn(Optional.of(membership));
+        lenient().when(members.findByWorkspace_IdAndId_AccountId(1L, 10L)).thenReturn(Optional.of(membership));
         return workspace;
     }
 
@@ -138,7 +138,7 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         var publicStep = new Membership();
 
         publicStep.setPublicActivitySeen(true);
-        when(members.findByWorkspace_IdAndAccount_Id(1L, 10L)).thenReturn(Optional.of(publicStep));
+        when(members.findByWorkspace_IdAndId_AccountId(1L, 10L)).thenReturn(Optional.of(publicStep));
         when(links.options(1L, 10L, List.of())).thenReturn(List.of(OPEN_SLACK));
         assertThat(service.state(context, 10L).needsSetup()).isTrue();
         chose(AiChoice.NO_AI);
@@ -160,7 +160,7 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         var row = new Membership();
         row.setWorkspace(workspace);
         row.setOnboardingSeenRevision(revision);
-        when(members.findByWorkspace_IdAndAccount_Id(1L, 10L)).thenReturn(Optional.of(row));
+        when(members.findByWorkspace_IdAndId_AccountId(1L, 10L)).thenReturn(Optional.of(row));
         return row;
     }
 

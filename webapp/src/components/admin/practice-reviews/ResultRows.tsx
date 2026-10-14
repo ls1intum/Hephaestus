@@ -152,10 +152,7 @@ export interface ResultRowProps {
 	withDay?: boolean;
 }
 
-/**
- * Only a costly not met result names its severity in the row: a minor or trivial one is the ordinary
- * case, and the result's sheet says it.
- */
+// Reserve row severity labels for costly problems; ordinary severities remain in the detail sheet.
 function costlySeverity(result: ReviewResult) {
 	return result.outcome === "NOT_MET" &&
 		(result.severity === "CRITICAL" || result.severity === "MAJOR")

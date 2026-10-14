@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceLinkService;
+import java.time.Clock;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -58,6 +59,8 @@ public class GitLabNoteReconciliationService {
     private final WebClient client;
     private final ApplicationEventPublisher events;
 
+    private final Clock clock;
+
     public GitLabNoteReconciliationService(
             IssueRepository issues,
             IssueCommentRepository comments,
@@ -68,7 +71,9 @@ public class GitLabNoteReconciliationService {
             TransactionTemplate transactions,
             WebClient.Builder builder,
             GitLabWorkspaceLinkService workspaceLinks,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events,
+            Clock clock) {
+        this.clock = clock;
         this.workspaceLinks = workspaceLinks;
         this.events = events;
         this.issues = issues;
@@ -90,9 +95,8 @@ public class GitLabNoteReconciliationService {
         if (!workspaceLinks.mayWriteRepository(workspaceId, repository)) return new Outcome(0, true);
         int removed = 0;
         boolean skipped = false;
-        // Traverse local live parents, not just the incremental updated-at window: deleting a note
-        // need not update its parent. Keyset pagination also tolerates parent inserts during this
-        // pass.
+        // Note deletion need not update its parent; inspect all stored live parents.
+        // Keyset pagination tolerates parents inserted during the traversal.
         long after = 0;
         while (!cancelled(handle)) {
             List<Issue> parents = issues.findLiveNoteParents(repository.getId(), after, PageRequest.of(0, 100));
@@ -113,8 +117,7 @@ public class GitLabNoteReconciliationService {
         if (parent.getRepository() == null
                 || !parent.getRepository().getId().equals(repository.getId())
                 || !workspaceLinks.mayWriteRepository(workspaceId, repository)) return new Outcome(0, true);
-        // Capture candidates BEFORE the first network call. Never remove a concurrently inserted
-        // note.
+        // Snapshot candidates before network reads so concurrent inserts cannot be deleted.
         var localComments = comments.findNoteIdsByParentId(parent.getId());
         var localDiff = parent instanceof PullRequest
                 ? diffComments.findNoteIdsByParentId(parent.getId())
@@ -175,7 +178,8 @@ public class GitLabNoteReconciliationService {
                                 EventContext.forSync(
                                         workspaceId,
                                         Objects.requireNonNull(RepositoryRef.from(repository)),
-                                        IdentityProviderType.GITLAB)));
+                                        IdentityProviderType.GITLAB,
+                                        clock.instant())));
                     for (long id : staleDiff)
                         events.publishEvent(new ScmDomainEvent.ReviewCommentDeleted(
                                 id,
@@ -183,7 +187,8 @@ public class GitLabNoteReconciliationService {
                                 EventContext.forSync(
                                         workspaceId,
                                         Objects.requireNonNull(RepositoryRef.from(repository)),
-                                        IdentityProviderType.GITLAB)));
+                                        IdentityProviderType.GITLAB,
+                                        clock.instant())));
                 }
                 return count;
             });

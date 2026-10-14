@@ -15,10 +15,6 @@ export interface ResultListProps {
 	onRetry: () => void;
 }
 
-/**
- * Labels and icons come from the shared outcome registry; the problem count and the severity apply
- * only to Not met.
- */
 function verdict(row: ResultRow) {
 	let tone = "text-muted-foreground";
 	if (row.outcome === "MET") {

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.exception.PreconditionFailedException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupService;
 import de.tum.cit.aet.hephaestus.practices.PracticeService;
@@ -52,9 +53,9 @@ public class CatalogAdoptionService {
         try {
             plan = plans.plan(context, slug);
         } catch (EntityNotFoundException exception) {
-            throw new StaleCatalogAdoptionPlanException(exception);
+            throw new PreconditionFailedException(exception);
         }
-        requireCurrentPlan(ifMatch, plan.etag());
+        EntityTagPrecondition.requireExact(EntityTagPrecondition.parse(ifMatch), plan.etag());
         if (plan.availability() != CatalogAdoptionAvailability.AVAILABLE) {
             throw new PracticeSlugConflictException(
                     "A practice with slug “" + slug + "” already exists in this workspace.");
@@ -78,9 +79,9 @@ public class CatalogAdoptionService {
         try {
             plan = plans.groupPlan(context, slug);
         } catch (EntityNotFoundException exception) {
-            throw new StaleCatalogAdoptionPlanException(exception);
+            throw new PreconditionFailedException(exception);
         }
-        requireCurrentPlan(ifMatch, plan.etag());
+        EntityTagPrecondition.requireExact(EntityTagPrecondition.parse(ifMatch), plan.etag());
         if (plan.disposition() == CatalogGroupDisposition.CREATE_CATALOG_GROUP) {
             groupService.adoptGroupFromCatalog(context, slug, plan.definition(), plan.position());
         }
@@ -109,21 +110,5 @@ public class CatalogAdoptionService {
         if (workspaceRepository.findByIdForUpdate(context.id()).isEmpty()) {
             throw new EntityNotFoundException("Workspace", context.slug());
         }
-    }
-
-    private static void requireCurrentPlan(String ifMatch, String currentEtag) {
-        EntityTagPrecondition precondition;
-        try {
-            precondition = EntityTagPrecondition.parse(ifMatch);
-        } catch (IllegalArgumentException exception) {
-            throw new StaleCatalogAdoptionPlanException(exception);
-        }
-        if (!precondition.matchesExact(currentEtag)) {
-            throw new StaleCatalogAdoptionPlanException();
-        }
-    }
-
-    static String formatted(String etag) {
-        return EntityTagPrecondition.format(etag);
     }
 }

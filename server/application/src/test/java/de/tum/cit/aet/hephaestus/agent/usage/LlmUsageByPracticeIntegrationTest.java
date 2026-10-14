@@ -54,7 +54,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     private static final String COMMENTS = "comment-quality";
     private static final String TESTS = "test-coverage";
-    private static final String RETIRED = "retired-practice";
+    private static final String ANOTHER = "another-practice";
 
     private static final LlmPriceSnapshot INSTANCE_DECISION = new LlmPriceSnapshot(
             UsageFundingSource.INSTANCE,
@@ -140,9 +140,10 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         ledger(workspace, review, 1, UsageSourceType.REVIEW_JOB, INSTANCE_DECISION, 9_000, 1_000, 4, MONTH);
         ledger(workspace, review, 1, UsageSourceType.PRACTICE_SCRIPT_DECISION, OWN_DECISION, 3, 0, 2);
 
-        ReviewJob retired = runningJob(workspace);
-        calls(retired, "DECISION", RETIRED, 10_000, 0, 1);
-        ledger(workspace, retired, 0, UsageSourceType.PRACTICE_SCRIPT_DECISION, INSTANCE_DECISION, 10_000, 0, 1);
+        practice(workspace, ANOTHER, "Another practice");
+        ReviewJob another = runningJob(workspace);
+        calls(another, "DECISION", ANOTHER, 10_000, 0, 1);
+        ledger(workspace, another, 0, UsageSourceType.PRACTICE_SCRIPT_DECISION, INSTANCE_DECISION, 10_000, 0, 1);
 
         ReviewJob deleted = runningJob(workspace);
         calls(deleted, "DECISION", COMMENTS, 20_000, 0, 1);
@@ -171,7 +172,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(report.byPractice())
                 .extracting(LlmUsageByPracticeDTO::practiceSlug)
                 .as("most spend first, whatever the purse")
-                .containsExactly(COMMENTS, TESTS, null, RETIRED);
+                .containsExactly(COMMENTS, TESTS, null, ANOTHER);
         List<LlmUsageByPracticeDTO> rows = report.byPractice();
 
         // Decision, attempt 0: weights 0.3M·2 + 0.05M·8 = 1.0 and 0.1M·2 + 0.05M·8 = 0.6 of a $1.60 row.
@@ -193,7 +194,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
                 new Usage(1, 4, 100_002, 50_000, "0.600000", "0.000007", 1));
         assertPractice(
                 rows.get(3),
-                null,
+                "Another practice",
                 List.of(AgentPurpose.PRACTICE_DECISION),
                 new Usage(1, 1, 10_000, 0, "0.020000", "0", 0));
         assertPractice(

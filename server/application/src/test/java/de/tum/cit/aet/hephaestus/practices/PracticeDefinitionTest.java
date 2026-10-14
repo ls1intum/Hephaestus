@@ -118,13 +118,15 @@ class PracticeDefinitionTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRequireAnExplicitFeedbackModeAndUniqueReleaseChoices() {
+    void shouldRequireExplicitFeedbackModeAndKnownReleaseFields() {
         var mapper = JsonMapper.builder().build();
         assertThatThrownBy(() -> mapper.readValue("{}", SetFeedbackModeRequestDTO.class))
                 .isInstanceOf(RuntimeException.class);
-        var choice =
-                new AcceptPracticeReleaseRequestDTO.Choice(PracticeDefinitionField.NAME, PracticeReleaseChoice.OFFERED);
-        assertThatThrownBy(() -> new AcceptPracticeReleaseRequestDTO(List.of(choice, choice)))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> mapper.readValue(
+                        "{\"choices\":{\"UNKNOWN\":\"OFFERED\"}}", AcceptPracticeReleaseRequestDTO.class))
+                .isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(
+                        () -> mapper.readValue("{\"choices\":{\"NAME\":null}}", AcceptPracticeReleaseRequestDTO.class))
+                .isInstanceOf(RuntimeException.class);
     }
 }

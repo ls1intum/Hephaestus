@@ -7,6 +7,8 @@ import java.util.Set;
 public interface MembershipReviewSelection {
     Set<Long> eligibleAccountIds(long workspaceId);
 
+    Set<Long> eligibleAccountIds(long workspaceId, Collection<Long> accountIds);
+
     List<Long> selectedAccountIds(long workspaceId);
 
     void replaceSelection(long workspaceId, Collection<Long> accountIds);

@@ -95,10 +95,6 @@ export function ReviewPractices({ workspaceSlug, review }: ReviewPracticesProps)
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-/**
- * Why a practice stands as it does in this review, in the review's own terms: its recorded reason
- * where it has one, otherwise what it recorded. A withheld practice says its reason, never a result.
- */
 function practiceReason(entry: ReviewPractice): string | undefined {
 	if (hasText(entry.reason)) {
 		return entry.reason;

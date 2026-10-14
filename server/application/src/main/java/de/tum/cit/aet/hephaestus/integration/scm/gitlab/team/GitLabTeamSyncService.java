@@ -515,9 +515,7 @@ public class GitLabTeamSyncService {
         List<GitLabGroupMemberResponse> allMembers = new ArrayList<>();
         boolean memberSyncComplete = fetchAllGroupMembers(client, scopeId, groupFullPath, allMembers);
 
-        // Phase C.2: Read the whole listing before writing anything. A failed page, or an entry
-        // without a readable user or access level, leaves every stored membership and role of this
-        // team as it was.
+        // An incomplete listing cannot change stored memberships or roles.
         if (!memberSyncComplete) {
             log.warn("Skipped team membership changes: reason=incompleteListing, groupPath={}", groupFullPath);
             return new MemberSync(0, false);
@@ -913,8 +911,7 @@ public class GitLabTeamSyncService {
         var request = graphQlClientProvider.forScope(scopeId).documentName(document);
         variables.forEach(request::variable);
         ClientGraphQlResponse response = request.execute().block(gitLabProperties.graphqlTimeout());
-        // A partial answer is no answer: an errored field would otherwise read as an absent group
-        // or member.
+        // An errored field cannot prove a group or member absent.
         if (responseHandler.handle(response, context, log).action()
                         != GitLabGraphQlResponseHandler.HandleResult.Action.CONTINUE
                 || !Objects.requireNonNull(response).getErrors().isEmpty()) {

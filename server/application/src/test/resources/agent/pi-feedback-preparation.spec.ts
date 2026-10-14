@@ -9,7 +9,8 @@ const digest = "a".repeat(64);
 const payload = {
 	reviewId: "11111111-1111-4111-8111-111111111111",
 	jobId: "22222222-2222-4222-8222-222222222222",
-	attempt: 0,
+	attempt: 1,
+	publicComposition: true,
 	basisResultIds: ["00000000-0000-4000-8000-000000000011"],
 	composition: [
 		{

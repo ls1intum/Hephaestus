@@ -57,10 +57,7 @@ import {
 
 const PAGE_SIZE = 25;
 
-/**
- * Repeated params and comma-joined params both, because which one the generated client emits is its
- * business and a mock that guesses wrong silently ignores the filter.
- */
+// Match repeated and comma-separated values supported by the generated client.
 function values(url: URL, name: string): string[] {
 	return url.searchParams
 		.getAll(name)
@@ -100,7 +97,7 @@ function withinScope(url: URL, row: { reviewId: string; item: ItemRef | null }) 
 	);
 }
 
-/** `from` inclusive, `to` exclusive. */
+// Date filters include from and exclude to.
 function withinDates(url: URL, at: Date) {
 	const from = single(url, "from");
 	const to = single(url, "to");

@@ -531,7 +531,7 @@ function ScopeImpact({ preview }: { preview: PracticeReviewScopePreview }) {
 	);
 }
 
-/** Selected with nothing chosen is a real answer, and it is never "all". */
+// An empty selected scope must remain distinct from all.
 function EmptySelection({ noun, allLabel }: { noun: "repositories" | "people"; allLabel: string }) {
 	return (
 		<Alert variant="warning" role="status">

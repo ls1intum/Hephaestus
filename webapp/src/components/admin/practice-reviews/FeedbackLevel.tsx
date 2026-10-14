@@ -96,10 +96,7 @@ function inOrder(copies: readonly FeedbackCopy[]): FeedbackCopy[] {
 	return [...copies].sort((a, b) => a.position - b.position);
 }
 
-/**
- * The title a piece of feedback is known by: its first line, whole. The header wraps it to three
- * lines at most. Text at a private destination is the developer's, so the destination names it.
- */
+// Private feedback belongs to the developer; identify it by destination rather than its text.
 function feedbackTitle(feedback: FeedbackRecord): string {
 	const body =
 		feedback.body ?? inOrder(feedback.copies).find((copy) => hasText(copy.body))?.body ?? undefined;
@@ -446,10 +443,6 @@ function attemptsLabel(count: number): string {
 	return count === 1 ? "1 attempt" : `${count} attempts`;
 }
 
-/**
- * The developer's own response, in their words: what they did, whether it helped, and why they
- * disagree. It is theirs, never an admin's mark on the feedback. A cleared response has none.
- */
 function responseEvent(feedback: FeedbackRecord): SheetEvent | undefined {
 	const { response } = feedback;
 	const answer = developerAnswer(response);

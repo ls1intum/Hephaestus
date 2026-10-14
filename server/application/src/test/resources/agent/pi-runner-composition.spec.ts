@@ -58,7 +58,7 @@ void test("an envelope that lists the threads its feedback supersede delivers al
 	assert.deepEqual(undeliverableFeedback(envelope), []);
 });
 
-void test("only the piece naming an unlisted or other-lane thread is undeliverable", () => {
+void test("only a piece naming an unlisted thread or a thread from another destination is undeliverable", () => {
 	assert.deepEqual(
 		undeliverableFeedback({
 			preparedTargets: [target("t-1")],
@@ -1501,6 +1501,9 @@ for (const value of [null, [], "", JSON.stringify(quiet)]) {
 }
 for (const summary of ["", false, 0, [], {}, { body: "Point", basedOn: [] }]) {
   assert.throws(() => validate(tool.parameters, { ...quiet, summary }));
+}
+for (const inline of ["", false, 0, {}]) {
+  assert.throws(() => validate(tool.parameters, { ...quiet, inline }));
 }
 let payload;
 const model = { id: "configured-model", name: "configured-model", api: "openai-responses", provider: "hephaestus", baseUrl: "http://127.0.0.1:9/v1", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128000, maxTokens: 1000 };

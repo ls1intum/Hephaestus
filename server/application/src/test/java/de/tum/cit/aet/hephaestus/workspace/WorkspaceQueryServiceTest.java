@@ -60,7 +60,8 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
 
         WorkspaceQueryService service = newService();
 
-        when(workspaceMembershipRepository.findByAccount_Id(42L)).thenReturn(List.of(bravoMembership, alphaMembership));
+        when(workspaceMembershipRepository.findById_AccountId(42L))
+                .thenReturn(List.of(bravoMembership, alphaMembership));
         when(workspaceRepository.findAllById(List.of(2L, 1L))).thenReturn(List.of(bravoWorkspace, alphaWorkspace));
 
         List<Workspace> workspaces = service.findAccessibleWorkspaces();
@@ -81,7 +82,7 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
     void shouldKeepAccountMembershipWhenProviderMirrorsAreAbsent() {
         authenticate();
         var workspace = workspace(1L, "gh-space", "Workspace", false);
-        when(workspaceMembershipRepository.findByAccount_Id(42L)).thenReturn(List.of(membership(workspace)));
+        when(workspaceMembershipRepository.findById_AccountId(42L)).thenReturn(List.of(membership(workspace)));
         when(workspaceRepository.findAllById(List.of(1L))).thenReturn(List.of(workspace));
         assertThat(newService().findAccessibleWorkspaces()).containsExactly(workspace);
     }

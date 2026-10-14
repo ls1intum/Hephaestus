@@ -13,7 +13,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken;
 
-/** Checks credential validity and ownership of the current attempt without loading model configuration. */
+// Credential checks must not initialize model configuration.
 final class JobTokenAuthenticationProvider implements AuthenticationProvider {
     private final ReviewJobRepository jobs;
     private final WorkerJwtVerifier verifier;

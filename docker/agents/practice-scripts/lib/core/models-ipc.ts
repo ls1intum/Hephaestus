@@ -9,7 +9,7 @@ type ModelCall = (
 	signal: AbortSignal | undefined,
 ) => Promise<SlotAnswer>;
 
-/** What crosses a process boundary: no abort signal, no functions. */
+// Functions and abort signals cannot cross the process boundary.
 function portable(options: object): unknown {
 	return JSON.parse(
 		JSON.stringify(options, (key, value: unknown) =>

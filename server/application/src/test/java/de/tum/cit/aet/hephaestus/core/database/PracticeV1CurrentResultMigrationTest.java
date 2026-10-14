@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.core.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.sql.SQLException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -68,5 +70,16 @@ class PracticeV1CurrentResultMigrationTest {
                         database,
                         "SELECT ordered_at::date::text FROM review WHERE id='00000000-0000-0000-0000-000000994111'"))
                 .containsExactly("2026-01-02");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldRefuseReuseOfReleasedEvidenceWithoutNativeAdmissionProof(String context) throws Exception {
+        var database = PracticeMigrationFixture.migratedDatabase(context);
+        assertThatThrownBy(() -> PracticeMigrationFixture.execute(
+                        database,
+                        "UPDATE review_item SET state='REUSED' WHERE review_id='00000000-0000-0000-0000-000000992111'"))
+                .hasRootCauseInstanceOf(SQLException.class)
+                .hasMessageContaining("cannot reuse legacy evidence");
     }
 }

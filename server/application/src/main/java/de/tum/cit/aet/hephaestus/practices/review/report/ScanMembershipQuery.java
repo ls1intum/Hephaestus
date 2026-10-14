@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.review.report;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
-import de.tum.cit.aet.hephaestus.practices.scan.ScanQueryService;
+import de.tum.cit.aet.hephaestus.practices.scan.ScanReportItemsService;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemBaselineState;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,6 +12,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.support.SqlArrayValue;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -21,7 +22,7 @@ public class ScanMembershipQuery {
     private final JdbcClient jdbc;
 
     public List<ItemKey> items(
-            Review review, @Nullable ScanReportCursor after, int size, ScanQueryService.ItemFilter filter) {
+            Review review, @Nullable ScanReportCursor after, int size, ScanReportItemsService.ItemFilter filter) {
         var where = new StringBuilder(" WHERE m.workspace_id=:ws AND m.review_id=:scan ");
         var params = params(review, size);
         add(where, params, "p.slug=:practice", "practice", filter.practiceSlug());
@@ -89,7 +90,7 @@ public class ScanMembershipQuery {
         """;
 
     public List<ProblemKey> problems(
-            Review review, @Nullable ScanReportCursor after, int size, ScanQueryService.ProblemFilter filter) {
+            Review review, @Nullable ScanReportCursor after, int size, ScanReportItemsService.ProblemFilter filter) {
         var params = params(review, size);
         var where = new StringBuilder(" WHERE true ");
         add(where, params, "owner.slug=:practice", "practice", filter.practiceSlug());
@@ -109,9 +110,9 @@ public class ScanMembershipQuery {
         if (filter.openOnly())
             where.append(
                     " AND COALESCE(x.baseline_state,'')<>'ABSENT' AND r.outcome='NOT_MET' AND r.ended_at IS NULL AND"
-                            + " pinned.review_digest=current.review_digest AND NOT EXISTS(SELECT 1 FROM result_mark mark"
-                            + " WHERE mark.workspace_id=r.workspace_id AND mark.result_id=r.id AND mark.removed_at IS"
-                            + " NULL)");
+                        + " pinned.review_digest=current.review_digest AND NOT EXISTS(SELECT 1 FROM result_mark mark"
+                        + " WHERE mark.workspace_id=r.workspace_id AND mark.result_id=r.id AND mark.removed_at IS"
+                        + " NULL)");
         if (after != null) {
             where.append(
                     " AND (x.path,x.practice_id,x.item_id,x.position,x.problem_id::text)>(:lastPath,:lastPractice,:lastItem,:lastPosition,:lastProblem)");
@@ -147,8 +148,22 @@ public class ScanMembershipQuery {
 
     public List<UUID> proofIds(
             Review review, @Nullable UUID after, int limit, @Nullable Long practiceId, boolean openOnly) {
-        var params = params(review, limit);
-        var where = new StringBuilder(" WHERE m.workspace_id=:ws AND m.review_id=:scan AND m.result_id IS NOT NULL ");
+        return proofIds(review.getWorkspaceId(), List.of(review.getId()), after, limit, practiceId, openOnly);
+    }
+
+    public List<UUID> proofIds(
+            long workspaceId,
+            List<UUID> reviewIds,
+            @Nullable UUID after,
+            int limit,
+            @Nullable Long practiceId,
+            boolean openOnly) {
+        var params = new LinkedHashMap<String, Object>();
+        params.put("ws", workspaceId);
+        params.put("scans", new SqlArrayValue("uuid", reviewIds.toArray()));
+        params.put("limit", limit);
+        var where =
+                new StringBuilder(" WHERE m.workspace_id=:ws AND m.review_id=ANY(:scans) AND m.result_id IS NOT NULL ");
         if (after != null) {
             where.append(" AND r.id::text>:last");
             params.put("last", after.toString());
@@ -157,8 +172,8 @@ public class ScanMembershipQuery {
         if (openOnly)
             where.append(
                     " AND r.outcome='NOT_MET' AND r.ended_at IS NULL AND pinned.review_digest=current.review_digest"
-                            + " AND NOT EXISTS(SELECT 1 FROM result_mark mark WHERE mark.workspace_id=r.workspace_id AND"
-                            + " mark.result_id=r.id AND mark.removed_at IS NULL)");
+                        + " AND NOT EXISTS(SELECT 1 FROM result_mark mark WHERE mark.workspace_id=r.workspace_id AND"
+                        + " mark.result_id=r.id AND mark.removed_at IS NULL)");
         return jdbc.sql("SELECT DISTINCT r.id,r.id::text AS ordering FROM review_item m JOIN result r ON"
                         + " r.id=m.result_id AND r.workspace_id=m.workspace_id JOIN practice p ON"
                         + " p.id=r.practice_id AND p.workspace_id=r.workspace_id LEFT JOIN practice_version pinned"

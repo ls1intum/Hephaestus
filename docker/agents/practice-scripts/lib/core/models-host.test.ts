@@ -2,21 +2,15 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
 import { setImmediate } from "node:timers/promises";
+import { chatOptionsSchema } from "./model-options.ts";
 
 import { InvalidResponseDataError } from "@ai-sdk/provider";
 
-import { MockEmbeddingModelV4 } from "ai/test";
+import { MockEmbeddingModelV4, MockLanguageModelV4 } from "ai/test";
 
 import { boundModelsSchema, MODEL_SLOT_CAPS } from "./contract.ts";
 import { answerTokens } from "./decision-logprobs.ts";
-import {
-	allowedOptions,
-	hostModels,
-	MAX_OUTPUT_TOKENS,
-	modelCall,
-	ModelBudget,
-	reservationOf,
-} from "./models-host.ts";
+import { hostModels, modelCall, ModelBudget, reservationOf } from "./models-host.ts";
 
 void test("the models file in the shape the server writes gives every slot a model", async () => {
 	const file = new URL("../../test/practice-script-models.json", import.meta.url);
@@ -130,10 +124,10 @@ void describe("the attempt's direct model account", () => {
 
 void describe("the request allowlist", () => {
 	for (const asked of [-1_000_000, 0.5, "4096"]) {
-		void test(`an output limit of ${JSON.stringify(asked)} is the cap, so the reservation cannot shrink`, () => {
-			const kept = allowedOptions("chat", { prompt: [], maxOutputTokens: asked });
-			assert.equal(kept.maxOutputTokens, MAX_OUTPUT_TOKENS);
-			assert.ok(reservationOf("chat", kept) > MAX_OUTPUT_TOKENS);
+		void test(`an invalid output limit ${JSON.stringify(asked)} is refused before reserving tokens`, () => {
+			assert.throws(() => chatOptionsSchema.parse({ prompt: [], maxOutputTokens: asked }), {
+				name: "ZodError",
+			});
 		});
 	}
 
@@ -353,8 +347,55 @@ void describe("a call to a slot's model", () => {
 			)[slot];
 			assert.ok(model !== undefined);
 			assert.throws(() => modelCall(slot, model, options, never), {
-				message: `its options are not a ${slot} call`,
+				name: "ZodError",
 			});
 		});
 	}
+});
+
+void test("chat credentials and provider features cannot be supplied through messages or tools", async () => {
+	const chat = new MockLanguageModelV4({
+		doGenerate: {
+			content: [],
+			finishReason: { unified: "stop", raw: "stop" },
+			usage: {
+				inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: 0 },
+				outputTokens: { total: 0, text: 0, reasoning: 0 },
+			},
+			warnings: [],
+		},
+	});
+	const providerOptions = { upstream: { privileged: true } };
+	const call = modelCall(
+		"chat",
+		chat,
+		{
+			prompt: [
+				{
+					role: "user",
+					providerOptions,
+					content: [{ type: "text", text: "Review this.", providerOptions }],
+				},
+			],
+			headers: { authorization: "script-supplied" },
+			providerOptions,
+			tools: [
+				{ type: "function", name: "read", inputSchema: { type: "object" }, providerOptions },
+				{ type: "provider", id: "upstream.browser", name: "browse", args: {} },
+			],
+		},
+		never,
+	);
+	assert.ok("run" in call);
+	await call.run();
+	const [received] = chat.doGenerateCalls;
+	assert.ok(received !== undefined);
+	assert.equal(received.headers, undefined);
+	assert.equal(received.providerOptions, undefined);
+	assert.deepEqual(received.prompt, [
+		{ role: "user", content: [{ type: "text", text: "Review this." }] },
+	]);
+	assert.deepEqual(received.tools, [
+		{ type: "function", name: "read", inputSchema: { type: "object" } },
+	]);
 });

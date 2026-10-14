@@ -95,7 +95,6 @@ export function subjectLeads(facts: readonly SubjectFacts[], label: string): Rev
 // Bound per-commit text so large renames cannot crowd edited files out of the prompt.
 const LISTED_FILES = 8;
 
-/** Renamed with no line changed: a move, which is known only where the record counts the lines. */
 function isMove(file: ChangedFile): boolean {
 	return file.status === "R" && file.additions === 0 && file.deletions === 0;
 }

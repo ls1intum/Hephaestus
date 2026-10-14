@@ -77,7 +77,7 @@ public class PracticeService {
                 ctx,
                 request.slug(),
                 new ItemKind(request.kind()),
-                request.definition(),
+                request.definition().toDefinition(),
                 request.groupSlug(),
                 request.position(),
                 null,
@@ -159,7 +159,7 @@ public class PracticeService {
         var before = PracticeDefinitionSnapshot.of(practice);
         versions.append(
                 practice,
-                request.definition(),
+                request.definition().toDefinition(),
                 SecurityUtils.getCurrentAccountId().orElseThrow());
         record(ctx, practice, before);
         return practice;

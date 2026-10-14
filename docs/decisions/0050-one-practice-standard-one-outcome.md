@@ -91,4 +91,4 @@ contracts for signals within one practice. Do not add states only to encode feed
 
 ## Update — 2026-10-14 (#2656): the 1.0 practice model
 
-[ADR 0056](0056-one-practice-model-for-items-and-scans.md) supersedes the result and outcome model of this record.
+Superseded in part by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for result identity and current claims.

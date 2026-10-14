@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionField;
-import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntryState;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogEntryState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jspecify.annotations.Nullable;

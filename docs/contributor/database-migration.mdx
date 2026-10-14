@@ -58,8 +58,8 @@ You must start and remove the disposable database yourself.
 
 Use a fresh empty database for each drift check or draft operation.
 For ERD generation, reuse a disposable database only if its applied changelog has not changed.
-Only CI mode uses `-PpackagedServer=true`.
-Local external mode compiles the current source.
+The external-database flag does not select precompiled server classes.
+The [CI build procedure](./ci-cd.mdx#build-once) owns artifact consumption.
 
 ```bash
 node scripts/db-utils.ts check-drift --external-database

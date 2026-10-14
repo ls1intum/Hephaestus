@@ -87,9 +87,7 @@ public class GitLabSummaryWriter implements SummaryWriter {
         } catch (OutboundEgressSuppressedException e) {
             throw e;
         } catch (RuntimeException e) {
-            // A transport/timeout error must surface as the adapter's typed exception (consistent
-            // with updateSummary) so ScmSummaryPoster's catch(FeedbackDeliveryException) wraps it
-            // uniformly.
+            // Transport failures use the typed exception that ScmSummaryPoster handles.
             throw new FeedbackDeliveryException("createNote transport error: " + e.getMessage(), e);
         }
 

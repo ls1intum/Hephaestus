@@ -4,6 +4,8 @@ import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
+import de.tum.cit.aet.hephaestus.core.exception.PreconditionFailedException;
+import de.tum.cit.aet.hephaestus.core.exception.PreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import java.time.Instant;
@@ -92,13 +94,9 @@ public class InstanceSettingsService implements SilentModeQuery {
 
     private InstanceSettings release(
             @Nullable Long actor, Instant changedAt, @Nullable EntityTagPrecondition precondition) {
+        if (precondition == null) throw new PreconditionRequiredException();
         InstanceSettings settings = currentSettings();
-        if (precondition == null) {
-            throw new InstanceSettingsPreconditionRequiredException();
-        }
-        if (!precondition.matches(Long.toString(settings.getVersion()))) {
-            throw new StaleInstanceSettingsException();
-        }
+        EntityTagPrecondition.requireExact(precondition, Long.toString(settings.getVersion()));
         settings.setSilentModeEngaged(false);
         settings.setSilentModeReason(null);
         settings.setSilentModeChangedAt(changedAt);
@@ -106,7 +104,7 @@ public class InstanceSettingsService implements SilentModeQuery {
         try {
             return repository.saveAndFlush(settings);
         } catch (ObjectOptimisticLockingFailureException exception) {
-            throw new StaleInstanceSettingsException(exception);
+            throw new PreconditionFailedException(exception);
         }
     }
 

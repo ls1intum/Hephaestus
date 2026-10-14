@@ -76,7 +76,6 @@ function recordServerReads(reads: string[], scope = "/practices/") {
 	};
 }
 
-/** The recorded requests to `path` under a workspace, as parsed addresses. */
 function readsOf(reads: string[], path: string): URL[] {
 	return reads.map((url) => new URL(url)).filter((url) => url.pathname.endsWith(path));
 }

@@ -48,9 +48,9 @@ import org.springframework.data.web.PagedModel;
         info =
                 @Info(
                         title = "Hephaestus API",
-                        description = "API documentation for Hephaestus. Changed practice-review bigint ids and "
+                        description = "API documentation for Hephaestus. Practice review bigint ids and "
                                 + "monetary amounts are decimal strings. Monetary fields are USD; clients read "
-                                + "server-computed totals and budget decisions. Existing provider mirror ids retain "
+                                + "server-computed totals and budget decisions. Provider mirror ids retain "
                                 + "their numeric contract. Required nullable response fields are present with null.",
                         version = "0.0.0-development",
                         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
@@ -285,14 +285,6 @@ public class OpenAPIConfiguration {
                 }
             });
         });
-
-        // Also normalize refs inside component schemas (not only request/response bodies)
-        if (openApi.getComponents() != null && openApi.getComponents().getSchemas() != null) {
-            openApi.getComponents()
-                    .getSchemas()
-                    .values()
-                    .forEach(schema -> normalizeSchemaReferences(schema, schemaNames));
-        }
     }
 
     /*

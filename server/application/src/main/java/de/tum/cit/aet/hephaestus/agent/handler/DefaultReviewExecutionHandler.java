@@ -22,6 +22,8 @@ import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
@@ -57,6 +59,7 @@ public class DefaultReviewExecutionHandler {
     private final PracticeScriptInputs inputs;
     private final ReviewHistoryContentSource history;
     private final ReviewAssignmentStore capture;
+    private final ItemCatalog items;
     private final ObjectMapper mapper;
     private final Clock clock;
 
@@ -186,6 +189,10 @@ public class DefaultReviewExecutionHandler {
                                 FeedbackDestination.ON_WORK,
                                 FeedbackDestination.PRACTICE_PAGE,
                                 FeedbackDestination.CONVERSATION),
+                        items.descriptorFor(item.kind())
+                                .map(ItemDescriptor::copyCapabilities)
+                                .orElseThrow(
+                                        () -> new IllegalStateException("The captured item kind has no descriptor")),
                         mapper);
                 var prepared = files.prepare(job, evidence.withFiles(staged), report);
                 if (ready.isEmpty())

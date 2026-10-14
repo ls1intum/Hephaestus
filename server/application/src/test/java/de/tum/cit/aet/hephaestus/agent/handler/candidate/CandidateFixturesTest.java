@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.practices.spi.ClaimedCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
@@ -63,8 +64,8 @@ class CandidateFixturesTest extends BaseUnitTest {
                 .containsExactly(Severity.MAJOR, Severity.MINOR);
         assertThat(candidate.example()).isNotNull();
         assertThat(candidate.openQuestions()).hasSize(1);
-        assertThat(candidate.coverage()).isInstanceOf(ClaimedCoverage.class);
-        assertThat(((ClaimedCoverage) candidate.coverage()).complete()).isFalse();
+        assertThat(candidate.coverage()).isInstanceOf(HostCoverage.class);
+        assertThat(((HostCoverage) candidate.coverage()).complete()).isFalse();
     }
 
     @Test

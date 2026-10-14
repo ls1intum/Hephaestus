@@ -28,7 +28,7 @@ class PublicActivityOnboardingService {
     public PublicActivityOnboardingController.PublicActivityOnboardingDTO get(long account, String slug) {
         var workspace = requireWorkspace(slug);
         boolean seen = onboarding
-                .findByWorkspace_IdAndAccount_Id(workspace.getId(), account)
+                .findByWorkspace_IdAndId_AccountId(workspace.getId(), account)
                 .map(Membership::isPublicActivitySeen)
                 .orElse(false);
         return new PublicActivityOnboardingController.PublicActivityOnboardingDTO(seen, choice.visible(account));
@@ -41,7 +41,7 @@ class PublicActivityOnboardingService {
         // The workspace lock serializes first answers with the existing onboarding writer.
         var workspace = workspaces.findByIdForUpdate(selected.getId()).orElseThrow();
         var row = onboarding
-                .findByWorkspace_IdAndAccount_Id(workspace.getId(), account)
+                .findByWorkspace_IdAndId_AccountId(workspace.getId(), account)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.FORBIDDEN, "Join this workspace before you save its onboarding" + " choices."));
         choice.setVisible(account, visible);

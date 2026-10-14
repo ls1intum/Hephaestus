@@ -60,6 +60,7 @@ class RepositoryTreeStagingLiveTest {
     /** A tree large enough that any per-file ceiling would have to reject it. */
     private static final int TREE_FILE_COUNT = 25_000;
 
+    private final String owner = "live-" + UUID.randomUUID();
     private LiveSandboxGateway gateway;
     private DockerSandboxAdapter sandboxAdapter;
     private SandboxContainerManager containerManager;
@@ -80,7 +81,7 @@ class RepositoryTreeStagingLiveTest {
     void setUp() throws Exception {
         gateway = new LiveSandboxGateway();
         SandboxProperties properties = new SandboxProperties(5, 10, 300, null);
-        var dockerProperties = new DockerSandboxProperties("unix:///var/run/docker.sock", false, null, null, "default");
+        var dockerProperties = new DockerSandboxProperties("unix:///var/run/docker.sock", false, null, null, owner);
         var dockerClient = DockerClientImpl.getInstance(
                 DefaultDockerClientConfig.createDefaultConfigBuilder().build(),
                 new ApacheDockerHttpClient.Builder()
@@ -89,7 +90,7 @@ class RepositoryTreeStagingLiveTest {
         DockerClientOperations dockerOps = new DockerClientOperations(dockerClient, dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
         containerManager =
-                new SandboxContainerManager(dockerOps, image -> {}, properties, "default", dockerWaitExecutor);
+                new SandboxContainerManager(dockerOps, image -> {}, properties, owner, dockerWaitExecutor);
         networkManager = new SandboxNetworkManager(dockerOps, dockerProperties, new SandboxCreator(dockerOps));
         sandboxAdapter = new DockerSandboxAdapter(
                 networkManager,

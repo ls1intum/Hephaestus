@@ -179,4 +179,4 @@ Everything else in this ADR stands. The contract lives in `agent/review-composer
 
 ## Update — 2026-10-14 (#2656): the 1.0 practice model
 
-[ADR 0056](0056-one-practice-model-for-items-and-scans.md) supersedes this record. Feedback is composed after result admission and keeps its exact result and problem support at each destination.
+Superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for feedback basis and destinations.

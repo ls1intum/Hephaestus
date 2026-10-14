@@ -70,7 +70,7 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
     private FeedbackRepository feedback;
 
     @Autowired
-    private FeedbackCopyRepository placements;
+    private FeedbackCopyRepository copies;
 
     private Workspace workspace;
     private Workspace elsewhere;
@@ -95,38 +95,28 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
         for (long note : new long[] {201, 202, 209}) inline(work, note);
         general(otherWork, 301, "Another merge request");
 
-        placement(
-                save(workspace, work, FeedbackState.REPLACED), FeedbackCopyKind.SUMMARY, "gid://gitlab/Note/101", null);
-        placement(
-                save(workspace, work, FeedbackState.FAILED), FeedbackCopyKind.FILE_NOTE, "gid://gitlab/Note/102", null);
-        placement(
+        copy(save(workspace, work, FeedbackState.REPLACED), FeedbackCopyKind.SUMMARY, "gid://gitlab/Note/101", null);
+        copy(save(workspace, work, FeedbackState.FAILED), FeedbackCopyKind.FILE_NOTE, "gid://gitlab/Note/102", null);
+        copy(
                 save(workspace, work, FeedbackState.DELIVERED),
                 FeedbackCopyKind.LINE_NOTE,
                 "gid://gitlab/DiffNote/201",
                 null);
-        placement(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, null, null);
-        placement(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "103", null);
-        placement(
-                save(workspace, work, FeedbackState.DELIVERED),
-                FeedbackCopyKind.SUMMARY,
-                "gid://gitlab/Note/104",
-                null);
-        placement(
+        copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, null, null);
+        copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "103", null);
+        copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "gid://gitlab/Note/104", null);
+        copy(
                 save(workspace, work, FeedbackState.DELIVERED),
                 FeedbackCopyKind.LINE_NOTE,
                 "gid://gitlab/DiffNote/202",
                 null);
         // Identities that exist on this merge request, but were recorded for other work or another workspace.
-        placement(
+        copy(
                 save(workspace, otherWork, FeedbackState.DELIVERED),
                 FeedbackCopyKind.SUMMARY,
                 "gid://gitlab/Note/109",
                 null);
-        placement(
-                save(elsewhere, work, FeedbackState.DELIVERED),
-                FeedbackCopyKind.LINE_NOTE,
-                "gid://gitlab/Note/209",
-                null);
+        copy(save(elsewhere, work, FeedbackState.DELIVERED), FeedbackCopyKind.LINE_NOTE, "gid://gitlab/Note/209", null);
 
         assertThat(lookup.findForPullRequest(workspace.getId(), work.getId()))
                 .isEqualTo(new CommentIds(Set.of(101L, 102L, 103L, 104L), Set.of(201L, 202L)));
@@ -146,23 +136,19 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
         inline(work, 5_001);
         inline(work, 6_001);
 
-        placement(
+        copy(
                 save(workspace, work, FeedbackState.REPLACED),
                 FeedbackCopyKind.SUMMARY,
                 "IC_kwDOsummary",
                 url + "#issuecomment-5001");
-        placement(
+        copy(
                 save(workspace, work, FeedbackState.DELIVERED),
                 FeedbackCopyKind.LINE_NOTE,
                 "PRRC_kwDOinline",
                 url + "#discussion_r6001");
         // Neither a GitLab identity nor an opaque reference without its permalink names a GitHub comment.
-        placement(
-                save(workspace, work, FeedbackState.DELIVERED),
-                FeedbackCopyKind.SUMMARY,
-                "gid://gitlab/Note/7001",
-                null);
-        placement(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "IC_kwDOunmapped", null);
+        copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "gid://gitlab/Note/7001", null);
+        copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "IC_kwDOunmapped", null);
 
         assertThat(lookup.findForPullRequest(workspace.getId(), work.getId()))
                 .isEqualTo(new CommentIds(Set.of(5_001L), Set.of(6_001L)));
@@ -227,7 +213,7 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
         return RetainedFeedbackTestData.onWork(jdbc, feedback, item, recipientAccountId, state);
     }
 
-    private void placement(Feedback parent, FeedbackCopyKind type, @Nullable String ref, @Nullable String url) {
-        placements.saveAndFlush(RetainedFeedbackTestData.posted(parent, type, 0, ref, url));
+    private void copy(Feedback parent, FeedbackCopyKind type, @Nullable String ref, @Nullable String url) {
+        copies.saveAndFlush(RetainedFeedbackTestData.posted(parent, type, 0, ref, url));
     }
 }

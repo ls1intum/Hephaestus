@@ -35,8 +35,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -131,8 +133,10 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
                 mock(RepositoryScopeFilter.class),
                 mock(GitLabProperties.class),
                 pullRequests,
-                new GitLabPullRequestReviewThreadProcessor(reviewThreads, pullRequests, publisher),
-                new GitLabPullRequestReviewCommentProcessor(reviewComments, pullRequests, reviews, publisher),
+                new GitLabPullRequestReviewThreadProcessor(
+                        reviewThreads, pullRequests, publisher, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)),
+                new GitLabPullRequestReviewCommentProcessor(
+                        reviewComments, pullRequests, reviews, publisher, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)),
                 reviewComments,
                 new GitLabReviewReconciler(reviews, pullRequests, publisher));
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
@@ -254,8 +258,14 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
         var service = new GitLabDiscussionSyncService(
                 clients,
                 responses,
-                new GitLabPullRequestReviewThreadProcessor(reviewThreads, pullRequests, ignoredEvents),
-                new GitLabPullRequestReviewCommentProcessor(reviewComments, pullRequests, reviews, ignoredEvents),
+                new GitLabPullRequestReviewThreadProcessor(
+                        reviewThreads, pullRequests, ignoredEvents, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)),
+                new GitLabPullRequestReviewCommentProcessor(
+                        reviewComments,
+                        pullRequests,
+                        reviews,
+                        ignoredEvents,
+                        Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)),
                 userLookup,
                 new GitLabReviewReconciler(reviews, pullRequests, ignoredEvents),
                 properties);

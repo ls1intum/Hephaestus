@@ -97,4 +97,4 @@ has the schema, including the name the `ExternalActor` rename § Decision antici
 
 ## Update — 2026-10-14 (#2656): the 1.0 practice model
 
-[ADR 0056](0056-one-practice-model-for-items-and-scans.md) supersedes the membership model of this record. Membership uses accounts and keeps its history after logical removal.
+Superseded in part by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for membership ownership and retention.

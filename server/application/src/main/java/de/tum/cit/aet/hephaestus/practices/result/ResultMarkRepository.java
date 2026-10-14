@@ -9,6 +9,8 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ResultMarkRepository extends JpaRepository<ResultMark, UUID> {
+    Optional<ResultMark> findByIdAndWorkspaceId(UUID id, long workspaceId);
+
     Optional<ResultMark> findByIdAndResultIdAndWorkspaceId(UUID id, UUID resultId, long workspaceId);
 
     List<ResultMark> findByWorkspaceIdAndResultIdOrderByCreatedAtDescIdDesc(long workspaceId, UUID resultId);

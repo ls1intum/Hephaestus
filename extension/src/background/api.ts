@@ -227,7 +227,6 @@ export class AuthenticatedApi {
 		);
 	}
 
-	/** The reader's own membership: its role decides whether the web app shows them every developer's reviews. */
 	async membership(workspaceSlug: string): Promise<WorkspaceMembership> {
 		return body(
 			await this.#call(async (client) => getOwnMembership({ client, path: { workspaceSlug } })),

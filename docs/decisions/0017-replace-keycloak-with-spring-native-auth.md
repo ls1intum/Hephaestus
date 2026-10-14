@@ -185,4 +185,4 @@ Decision and rejected alternatives:
 
 ## Update — 2026-10-14 (#2656): the 1.0 practice model
 
-[ADR 0056](0056-one-practice-model-for-items-and-scans.md) supersedes the person and membership model of this record. Accounts identify people across provider identities and workspaces, and roster sync can create unclaimed accounts that sign-in claims.
+Superseded in part by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for accounts, provider identities and memberships.

@@ -236,7 +236,7 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
         assertThat(response.role()).isEqualTo(WorkspaceRole.ADMIN);
 
         Membership updated = workspaceMembershipRepository
-                .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(targetUser))
+                .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(targetUser))
                 .orElseThrow();
         assertThat(updated.getRole()).isEqualTo(WorkspaceRole.ADMIN);
     }
@@ -430,7 +430,8 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         assertThat(hidden).isNotNull();
         assertThat(hidden.hidden()).isTrue();
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(target)))
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
+                        workspace.getId(), accountId(target)))
                 .get()
                 .extracting(Membership::isHidden)
                 .isEqualTo(true);
@@ -455,12 +456,12 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         workspaceMembershipService.syncWorkspaceMembers(workspace, desiredRoles);
 
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
                         workspace.getId(), accountId(hiddenUser)))
                 .get()
                 .extracting(Membership::getLeftAt)
                 .isNotNull();
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
                         workspace.getId(), accountId(visibleUser)))
                 .get()
                 .extracting(Membership::getLeftAt)
@@ -469,7 +470,7 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
         desiredRoles.put(hiddenUser.getId(), WorkspaceRole.MEMBER);
         workspaceMembershipService.syncWorkspaceMembers(workspace, desiredRoles);
 
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
                         workspace.getId(), accountId(hiddenUser)))
                 .get()
                 .extracting(Membership::isHidden)
@@ -498,13 +499,13 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         workspaceMembershipService.syncWorkspaceMembers(workspace, desiredRoles);
 
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
                         workspace.getId(), accountId(hiddenUser)))
                 .get()
                 .extracting(Membership::isHidden)
                 .isEqualTo(true);
 
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
                         workspace.getId(), accountId(promoted)))
                 .get()
                 .extracting(Membership::getRole)

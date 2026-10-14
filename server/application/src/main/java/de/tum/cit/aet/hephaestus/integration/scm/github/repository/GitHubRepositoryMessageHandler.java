@@ -238,8 +238,7 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
             return;
         }
 
-        // Both rows are this provider's: a native id or a name is unique only on its provider
-        // instance.
+        // Native ids and repository names are unique only within a provider instance.
         Long providerId = gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
                 .map(IdentityProvider::getId)

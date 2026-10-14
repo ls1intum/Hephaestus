@@ -80,11 +80,7 @@ function refusalProperty(error: unknown, key: string): string | undefined {
 	return typeof value === "string" ? value : undefined;
 }
 
-/**
- * Whether the server answered, so a repeat of the same request cannot change the outcome. No answer
- * at all, or a server failure, may not have reached the point where the scan was recorded: only the
- * same Idempotency-Key can safely ask again.
- */
+// A missing answer or server failure may conceal a recorded scan; retries must reuse its Idempotency-Key.
 function isDefinitive(error: unknown): boolean {
 	const status = problemStatusOf(error);
 	return status !== undefined && status >= 400 && status < 500;

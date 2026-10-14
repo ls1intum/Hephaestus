@@ -74,6 +74,21 @@ export function codingAgentExports(
 	};
 }
 
+export function mockPiCodingAgent(
+	cwd: string,
+	manager: unknown,
+	overrides: Record<string, unknown>,
+	onResourceLoad?: Parameters<typeof codingAgentExports>[2],
+	beforeRuntime?: Parameters<typeof codingAgentExports>[3],
+) {
+	mock.module("@earendil-works/pi-coding-agent", {
+		namedExports: {
+			...codingAgentExports(cwd, manager, onResourceLoad, beforeRuntime),
+			...overrides,
+		},
+	});
+}
+
 export type SessionBehaviour = "submit" | "silent" | "hang";
 
 export interface StagedPractice {
@@ -292,6 +307,7 @@ if (scenario !== undefined && scenario !== "") {
 		return Response.json({
 			contractVersion: 3,
 			admissionDigest: "digest",
+			publicReviewed: false,
 			admitted: [],
 			withheld: [],
 		});
@@ -309,119 +325,116 @@ if (scenario !== undefined && scenario !== "") {
 		execute: (id: string, input: unknown) => Promise<unknown>;
 	}
 	let sessionCount = 0;
-	mock.module("@earendil-works/pi-coding-agent", {
-		namedExports: {
-			...codingAgentExports(cwd, manager),
-			async createAgentSession(options: { customTools: CustomTool[] }) {
-				sessionCount += 1;
-				const session = sessionCount;
-				const handlers = new Set<(event: unknown) => void>();
-				const emit = (event: unknown) => {
-					for (const handler of handlers) {
-						handler(event);
-					}
-				};
-				const submit = options.customTools.find((tool) => tool.name === "submit_result");
-				assert.ok(submit, "submit_result is registered");
-				let sessionSlug: string | undefined;
-				return {
-					extensionsResult: { errors: [] },
-					session: {
-						state: { messages: [] },
-						agent: { state: { tools: [] }, finishTurn: async () => ({ action: "continue" }) },
-						systemPrompt: "",
-						model: { contextWindow: 128_000, maxTokens: 16_384 },
-						settingsManager: { getCompactionSettings: () => ({ reserveTokens: 16_384 }) },
-						sessionManager: manager,
-						subscribe(handler: (event: unknown) => void) {
-							handlers.add(handler);
-							return () => {
-								handlers.delete(handler);
-							};
-						},
-						clearQueue: () => undefined,
-						pendingMessageCount: 0,
-						getContextUsage: () => ({ tokens: 1000, contextWindow: 128_000, percent: 0 }),
-						compact: async () => ({}),
-						isIdle: true,
-						isStreaming: false,
-						waitForIdle: async () => undefined,
-						abortCompaction: () => undefined,
-						abort: async () => undefined,
-						dispose: () => undefined,
-						steer: async () => undefined,
-						async prompt(
-							text: string,
-							promptOptions?: { preflightResult?: (disposition: string) => void },
-						) {
-							promptOptions?.preflightResult?.("started");
-							sessionSlug ??= /Submit one result for (?<slug>[a-z0-9-]+) with submit_result/u.exec(
-								text,
-							)?.groups?.slug;
-							const slug = sessionSlug;
-							assert.ok(slug !== undefined, "the session's first turn names its practice");
-							const behaviour = behaviourOf(slug);
-							capture("prompts", {
-								session,
-								slug,
-								reviewInput: existsSync(nodePath.join(cwd, `work/review-input/${slug}.json`)),
-							});
-							if (behaviour === "hang") {
-								await Promise.withResolvers<never>().promise;
-							}
-							emit({
-								type: "tool_execution_start",
-								toolCallId: `read-${session}`,
-								toolName: "read",
-								args: { path: "evidence/metadata.json" },
-							});
-							emit({
-								type: "tool_execution_end",
-								toolCallId: `read-${session}`,
-								toolName: "read",
-								result: { content: [{ type: "text", text: "[L1] {}" }], details: {} },
-								isError: false,
-							});
-							const submits = behaviour === "submit";
-							emit({
-								type: "message_end",
-								message: {
-									role: "assistant",
-									stopReason: submits ? "toolUse" : "stop",
-									usage: {
-										input: 1000,
-										output: 100,
-										cacheRead: 0,
-										cacheWrite: 0,
-										cost: { total: 0 },
-									},
-									content: submits
-										? [
-												{
-													type: "toolCall",
-													id: `submit-${session}`,
-													name: "submit_result",
-													arguments: {},
-												},
-											]
-										: [{ type: "text", text: "Done." }],
-								},
-							});
-							emit({ type: "turn_end" });
-							if (submits) {
-								const candidate: unknown = hasText(process.env.PI_HOST_SESSION_CANDIDATE)
-									? parseJson(process.env.PI_HOST_SESSION_CANDIDATE)
-									: SESSION_CANDIDATE;
-								const reply = await submit.execute(
-									`submit-${session}`,
-									submit.prepareArguments?.(candidate) ?? candidate,
-								);
-								capture("submitted", { slug, reply });
-							}
-						},
+	mockPiCodingAgent(cwd, manager, {
+		async createAgentSession(options: { customTools: CustomTool[] }) {
+			sessionCount += 1;
+			const session = sessionCount;
+			const handlers = new Set<(event: unknown) => void>();
+			const emit = (event: unknown) => {
+				for (const handler of handlers) {
+					handler(event);
+				}
+			};
+			const submit = options.customTools.find((tool) => tool.name === "submit_result");
+			assert.ok(submit, "submit_result is registered");
+			let sessionSlug: string | undefined;
+			return {
+				extensionsResult: { errors: [] },
+				session: {
+					state: { messages: [] },
+					agent: { state: { tools: [] }, finishTurn: async () => ({ action: "continue" }) },
+					systemPrompt: "",
+					model: { contextWindow: 128_000, maxTokens: 16_384 },
+					settingsManager: { getCompactionSettings: () => ({ reserveTokens: 16_384 }) },
+					sessionManager: manager,
+					subscribe(handler: (event: unknown) => void) {
+						handlers.add(handler);
+						return () => {
+							handlers.delete(handler);
+						};
 					},
-				};
-			},
+					clearQueue: () => undefined,
+					pendingMessageCount: 0,
+					getContextUsage: () => ({ tokens: 1000, contextWindow: 128_000, percent: 0 }),
+					compact: async () => ({}),
+					isIdle: true,
+					isStreaming: false,
+					waitForIdle: async () => undefined,
+					abortCompaction: () => undefined,
+					abort: async () => undefined,
+					dispose: () => undefined,
+					steer: async () => undefined,
+					async prompt(
+						text: string,
+						promptOptions?: { preflightResult?: (disposition: string) => void },
+					) {
+						promptOptions?.preflightResult?.("started");
+						sessionSlug ??= /Submit one result for (?<slug>[a-z0-9-]+) with submit_result/u.exec(
+							text,
+						)?.groups?.slug;
+						const slug = sessionSlug;
+						assert.ok(slug !== undefined, "the session's first turn names its practice");
+						const behaviour = behaviourOf(slug);
+						capture("prompts", {
+							session,
+							slug,
+							reviewInput: existsSync(nodePath.join(cwd, `work/review-input/${slug}.json`)),
+						});
+						if (behaviour === "hang") {
+							await Promise.withResolvers<never>().promise;
+						}
+						emit({
+							type: "tool_execution_start",
+							toolCallId: `read-${session}`,
+							toolName: "read",
+							args: { path: "evidence/metadata.json" },
+						});
+						emit({
+							type: "tool_execution_end",
+							toolCallId: `read-${session}`,
+							toolName: "read",
+							result: { content: [{ type: "text", text: "[L1] {}" }], details: {} },
+							isError: false,
+						});
+						const submits = behaviour === "submit";
+						emit({
+							type: "message_end",
+							message: {
+								role: "assistant",
+								stopReason: submits ? "toolUse" : "stop",
+								usage: {
+									input: 1000,
+									output: 100,
+									cacheRead: 0,
+									cacheWrite: 0,
+									cost: { total: 0 },
+								},
+								content: submits
+									? [
+											{
+												type: "toolCall",
+												id: `submit-${session}`,
+												name: "submit_result",
+												arguments: {},
+											},
+										]
+									: [{ type: "text", text: "Done." }],
+							},
+						});
+						emit({ type: "turn_end" });
+						if (submits) {
+							const candidate: unknown = hasText(process.env.PI_HOST_SESSION_CANDIDATE)
+								? parseJson(process.env.PI_HOST_SESSION_CANDIDATE)
+								: SESSION_CANDIDATE;
+							const reply = await submit.execute(
+								`submit-${session}`,
+								submit.prepareArguments?.(candidate) ?? candidate,
+							);
+							capture("submitted", { slug, reply });
+						}
+					},
+				},
+			};
 		},
 	});
 	const { runReviewJob } = await import("../../../main/resources/agent/pi-runner.ts");

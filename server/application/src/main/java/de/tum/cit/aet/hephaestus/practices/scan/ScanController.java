@@ -47,6 +47,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequestMapping("/practices/scans")
 public class ScanController {
     private final ScanQueryService query;
+    private final ScanExportService exports;
+    private final ScanRequestService requests;
+    private final ScanReportItemsService items;
 
     @GetMapping
     @Operation(operationId = "listScans", summary = "List repository scans")
@@ -71,7 +74,8 @@ public class ScanController {
             WorkspaceContext context,
             @RequestHeader("Idempotency-Key") UUID key,
             @Valid @RequestBody StartScanRequestDTO request) {
-        var scan = query.start(context.id(), SecurityUtils.getCurrentAccountId().orElseThrow(), key, request);
+        var scan =
+                requests.start(context.id(), SecurityUtils.getCurrentAccountId().orElseThrow(), key, request);
         return ResponseEntity.accepted()
                 .location(URI.create("/workspaces/" + context.slug() + "/practices/scans/" + scan.id()))
                 .body(scan);
@@ -111,7 +115,7 @@ public class ScanController {
             WorkspaceContext context,
             @PathVariable UUID scanId,
             @Valid @ParameterObject ScanReportItemFilterParams filter) {
-        return query.items(context.id(), scanId, filter.getCursor(), filter.getSize(), filter.filter());
+        return items.items(context.id(), scanId, filter.getCursor(), filter.getSize(), filter.filter());
     }
 
     @GetMapping("/{scanId}/report/problems")
@@ -120,7 +124,7 @@ public class ScanController {
             WorkspaceContext context,
             @PathVariable UUID scanId,
             @Valid @ParameterObject ScanReportProblemFilterParams filter) {
-        return query.problems(context.id(), scanId, filter.getCursor(), filter.getSize(), filter.filter());
+        return items.problems(context.id(), scanId, filter.getCursor(), filter.getSize(), filter.filter());
     }
 
     @GetMapping(value = "/{scanId}/report/sarif", produces = "application/sarif+json")
@@ -131,6 +135,6 @@ public class ScanController {
                 .header(
                         HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"hephaestus-scan-" + scanId + ".sarif\"")
-                .body(query.sarif(context.id(), scanId));
+                .body(exports.sarif(context.id(), scanId));
     }
 }

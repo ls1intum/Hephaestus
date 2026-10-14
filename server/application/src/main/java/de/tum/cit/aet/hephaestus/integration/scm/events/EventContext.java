@@ -54,7 +54,7 @@ public record EventContext(
         }
         return new EventContext(
                 UUID.randomUUID(),
-                Instant.now(),
+                ctx.observedAt(),
                 ctx.scopeId(),
                 ctx.repository() != null ? RepositoryRef.from(ctx.repository()) : null,
                 ctx.source(),
@@ -64,22 +64,14 @@ public record EventContext(
                 ctx.actorUserId());
     }
 
-    public static EventContext forSync(Long scopeId, RepositoryRef repository) {
+    public static EventContext forSync(
+            @Nullable Long scopeId,
+            @Nullable RepositoryRef repository,
+            @Nullable IdentityProviderType providerType,
+            Instant occurredAt) {
         return new EventContext(
                 UUID.randomUUID(),
-                Instant.now(),
-                scopeId,
-                repository,
-                DataSource.GRAPHQL_SYNC,
-                null,
-                UUID.randomUUID().toString(),
-                null);
-    }
-
-    public static EventContext forSync(Long scopeId, RepositoryRef repository, IdentityProviderType providerType) {
-        return new EventContext(
-                UUID.randomUUID(),
-                Instant.now(),
+                occurredAt,
                 scopeId,
                 repository,
                 DataSource.GRAPHQL_SYNC,

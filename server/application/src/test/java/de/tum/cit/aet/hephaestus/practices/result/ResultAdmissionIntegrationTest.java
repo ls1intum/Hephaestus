@@ -19,8 +19,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
@@ -30,6 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewAdmissionData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewPracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewRequestRejected;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmissionReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
@@ -61,7 +60,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestRejected;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
@@ -71,6 +70,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.practices.spi.WithheldItem;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -510,14 +510,17 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
     void shouldRetainMissingRoleWithholdingWithoutGrantingAnonymousModelAuthority() {
         var workspace = scenario.workspace().getId();
         var ref = productItems.require(workspace, scenario.item().getId());
-        var pinned = new ItemSnapshot(
-                ref,
-                new ItemVersion("selected-version", null),
-                new IntegrationRef(IntegrationKind.GITHUB, workspace, "https://github.com", null),
-                Map.of("state", "OPEN", "draft", "false"),
-                List.of(),
-                new ItemLabel(
-                        ref.itemId(), "Selected pull request", "pull request", 1, null, null, IntegrationKind.GITHUB));
+        var pinned = ItemFixtures.snapshot(ref, Map.of("state", "OPEN", "draft", "false"))
+                .version(new ItemVersion("selected-version", null))
+                .integration(new IntegrationRef(IntegrationKind.GITHUB, workspace, "https://github.com", null))
+                .label(ItemFixtures.label()
+                        .itemId(ref.itemId())
+                        .title("Selected pull request")
+                        .noun("pull request")
+                        .number(1)
+                        .integration(IntegrationKind.GITHUB)
+                        .build())
+                .build();
         doReturn(pinned).when(productItems).pin(eq(ref), isNull());
         when(budget.canRequest(workspace, ReviewKind.ITEM, null)).thenReturn(true);
         when(models.models(workspace, List.of()))
@@ -614,14 +617,17 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
         long workspace = scenario.workspace().getId();
         var ref = productItems.require(workspace, scenario.item().getId());
         var version = new ItemVersion("event-version", null);
-        var snapshot = new ItemSnapshot(
-                ref,
-                version,
-                new IntegrationRef(IntegrationKind.GITHUB, workspace, "https://github.com", null),
-                Map.of(),
-                List.of(),
-                new ItemLabel(
-                        ref.itemId(), "Event pull request", "pull request", 1, null, null, IntegrationKind.GITHUB));
+        var snapshot = ItemFixtures.snapshot(ref, Map.of())
+                .version(version)
+                .integration(new IntegrationRef(IntegrationKind.GITHUB, workspace, "https://github.com", null))
+                .label(ItemFixtures.label()
+                        .itemId(ref.itemId())
+                        .title("Event pull request")
+                        .noun("pull request")
+                        .number(1)
+                        .integration(IntegrationKind.GITHUB)
+                        .build())
+                .build();
         doReturn(snapshot).when(productItems).pin(eq(ref), eq(version));
         when(budget.canRequest(workspace, ReviewKind.ITEM, null)).thenReturn(true);
         when(models.models(eq(workspace), anyList()))
@@ -678,7 +684,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
         var id = itemEvents.record(input);
         var waiting = eventRows.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
         assertThat(waiting.getState()).isEqualTo(ItemEventState.WAITING);
-        assertThat(waiting.getReason()).isEqualTo("BUDGET_EXHAUSTED");
+        assertThat(waiting.getReason()).isEqualTo(ReviewRequestReason.BUDGET_EXHAUSTED);
         assertThat(waiting.getRetryAt()).isNotNull();
         assertThat(Objects.requireNonNull(waiting.getRetryAt()))
                 .isBetween(
@@ -709,7 +715,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
         var id = itemEvents.record(input);
         var decision = eventRows.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
         assertThat(decision.getState()).isEqualTo(ItemEventState.WITHHELD);
-        assertThat(decision.getReason()).isEqualTo("PRACTICES_DISABLED");
+        assertThat(decision.getReason()).isEqualTo(ReviewRequestReason.PRACTICES_DISABLED);
         assertThat(decision.getRetryAt()).isNull();
         assertThat(reviews.findByWorkspaceIdAndEventId(input.workspaceId(), id)).isEmpty();
     }
@@ -719,18 +725,23 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
         var input = eventInput();
         var ref = productItems.require(input.workspaceId(), input.itemId());
         var wanted = new ItemVersion(input.itemVersion(), null);
-        var mismatch = new ItemSnapshot(
-                ref,
-                new ItemVersion("different-version", null),
-                new IntegrationRef(IntegrationKind.GITHUB, input.workspaceId(), "https://github.com", null),
-                Map.of(),
-                List.of(),
-                new ItemLabel(ref.itemId(), "Event work", "pull request", 1, null, null, IntegrationKind.GITHUB));
+        var mismatch = ItemFixtures.snapshot(ref, Map.of())
+                .version(new ItemVersion("different-version", null))
+                .integration(
+                        new IntegrationRef(IntegrationKind.GITHUB, input.workspaceId(), "https://github.com", null))
+                .label(ItemFixtures.label()
+                        .itemId(ref.itemId())
+                        .title("Event work")
+                        .noun("pull request")
+                        .number(1)
+                        .integration(IntegrationKind.GITHUB)
+                        .build())
+                .build();
         doReturn(mismatch).when(productItems).pin(eq(ref), eq(wanted));
         var id = itemEvents.record(input);
         var decision = eventRows.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
         assertThat(decision.getState()).isEqualTo(ItemEventState.WITHHELD);
-        assertThat(decision.getReason()).isEqualTo("ITEM_NOT_VISIBLE");
+        assertThat(decision.getReason()).isEqualTo(ReviewRequestReason.VERSION_SUPERSEDED);
         assertThat(decision.getRetryAt()).isNull();
         assertThat(reviews.findByWorkspaceIdAndEventId(input.workspaceId(), id)).isEmpty();
     }

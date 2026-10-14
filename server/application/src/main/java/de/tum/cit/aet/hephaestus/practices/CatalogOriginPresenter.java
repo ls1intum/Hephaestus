@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogEntryState;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogPracticeDocument;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
 import de.tum.cit.aet.hephaestus.practices.catalog.EffectiveCatalog;
-import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntryState;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogOriginDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.FeedbackModeAssignmentDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;

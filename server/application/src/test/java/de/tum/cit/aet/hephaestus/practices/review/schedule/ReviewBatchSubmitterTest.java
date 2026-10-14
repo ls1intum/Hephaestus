@@ -9,21 +9,18 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewRequestRejected;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBatchOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestRejected;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -73,13 +70,17 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
         batch.setBudgetUsd(reserved);
         var ref = new ItemRef(1, 7, new ItemKind(kind), 7L, null, null);
         when(items.find(1, 7)).thenReturn(Optional.of(ref));
-        var snapshot = new ItemSnapshot(
-                ref,
-                new ItemVersion("v1", null),
-                new IntegrationRef(IntegrationKind.GITHUB, 1, "test", null),
-                Map.of("defaultBranch", "main"),
-                List.of(),
-                new ItemLabel(7, "Item", "Item", 1, "Container", null, IntegrationKind.GITHUB));
+        var snapshot = ItemFixtures.snapshot(ref, Map.of("defaultBranch", "main"))
+                .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, "test", null))
+                .label(ItemFixtures.label()
+                        .itemId(7)
+                        .title("Item")
+                        .noun("Item")
+                        .number(1)
+                        .container("Container")
+                        .integration(IntegrationKind.GITHUB)
+                        .build())
+                .build();
         when(items.current(ref)).thenReturn(Optional.of(snapshot));
         when(spend.remaining(batch)).thenReturn(new ReviewBatchSpend.Snapshot(reserved, true));
         var id = UUID.randomUUID();
@@ -108,9 +109,9 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldDeferAnUnavailableSourceWithoutConsumingTheTarget() {
+    void shouldSkipAnUnavailableSourceForTheNextBatch() {
         assertThat(refusal(ReviewRequestRejected.Reason.SOURCE_UNAVAILABLE))
-                .isEqualTo(new ReviewBatchSubmitter.SubmissionOutcome.Deferred());
+                .isEqualTo(new ReviewBatchSubmitter.SubmissionOutcome.Skipped());
     }
 
     @Test
@@ -124,13 +125,17 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
         var ref = new ItemRef(1, 7, new ItemKind("scm.pull_request"), 7L, null, null);
         when(items.find(1, 7)).thenReturn(Optional.of(ref));
         when(items.current(ref))
-                .thenReturn(Optional.of(new ItemSnapshot(
-                        ref,
-                        new ItemVersion("v1", null),
-                        new IntegrationRef(IntegrationKind.GITHUB, 1, "test", null),
-                        Map.of(),
-                        List.of(),
-                        new ItemLabel(7, "Item", "Item", 1, "Container", null, IntegrationKind.GITHUB))));
+                .thenReturn(Optional.of(ItemFixtures.snapshot(ref, Map.of())
+                        .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, "test", null))
+                        .label(ItemFixtures.label()
+                                .itemId(7)
+                                .title("Item")
+                                .noun("Item")
+                                .number(1)
+                                .container("Container")
+                                .integration(IntegrationKind.GITHUB)
+                                .build())
+                        .build()));
         when(spend.remaining(batch)).thenReturn(new ReviewBatchSpend.Snapshot(null, true));
         when(reviews.request(ArgumentMatchers.any())).thenThrow(new ReviewRequestRejected(reason, "Unavailable"));
         return submitter.offer(batch, 7);

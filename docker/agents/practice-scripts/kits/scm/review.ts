@@ -208,11 +208,7 @@ export async function readLinkedWorkItems(
 	return capture?.items ?? null;
 }
 
-/**
- * The comments of a comments record, and the line of each comment's `body`. The server writes the
- * record with one key on each line, so the n-th `"body"` line is the n-th comment's. When the lines
- * do not pair one to one, each line is 0.
- */
+// Server records place each key on its own line. Map body lines only when they match comments one to one.
 async function readCommentRecord<T>(
 	evidence: Pick<Evidence, "record">,
 	name: string,
@@ -351,7 +347,6 @@ interface ReviewerCommentRow {
 	thread?: ReviewThread;
 }
 
-/** Two comments of one thread: the record's `thread` id where both carry one, the same path and line otherwise. */
 function sameThread(a: ReviewComment, b: ReviewComment): boolean {
 	return a.thread !== undefined && b.thread !== undefined
 		? a.thread === b.thread

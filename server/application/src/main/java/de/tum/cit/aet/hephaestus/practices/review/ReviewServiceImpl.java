@@ -23,7 +23,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestRejected;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequested;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
@@ -83,8 +82,7 @@ public class ReviewServiceImpl implements ReviewService {
             var existing = reviews.findByWorkspaceIdAndRequestKey(request.workspaceId(), request.requestKey());
             if (existing.isPresent()) {
                 if (!Objects.equals(existing.orElseThrow().getRequestDigest(), request.requestDigest()))
-                    throw new ReviewRequestRejected(
-                            ReviewRequestRejected.Reason.REQUEST_CONFLICT, "This request key has a different body.");
+                    throw replayConflict(existing.orElseThrow());
                 return existing.orElseThrow().getId();
             }
         }
@@ -93,8 +91,7 @@ public class ReviewServiceImpl implements ReviewService {
             var existing = reviews.findByWorkspaceIdAndRequestKey(request.workspaceId(), request.requestKey());
             if (existing.isPresent()) {
                 if (!Objects.equals(existing.orElseThrow().getRequestDigest(), request.requestDigest()))
-                    throw new ReviewRequestRejected(
-                            ReviewRequestRejected.Reason.REQUEST_CONFLICT, "This request key has a different body.");
+                    throw replayConflict(existing.orElseThrow());
                 return existing.orElseThrow().getId();
             }
         }
@@ -105,11 +102,17 @@ public class ReviewServiceImpl implements ReviewService {
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE)
             throw new ReviewRequestRejected(
                     ReviewRequestRejected.Reason.WORKSPACE_INACTIVE, "The workspace is inactive.");
-        if (request.kind() == ReviewKind.SCAN
-                && reviews.existsByWorkspaceIdAndKindAndStatusIn(
-                        request.workspaceId(), ReviewKind.SCAN, List.of(ReviewStatus.QUEUED, ReviewStatus.RUNNING)))
-            throw new ReviewRequestRejected(
-                    ReviewRequestRejected.Reason.SCAN_ACTIVE, "A scan is already active in this workspace.");
+        if (request.kind() == ReviewKind.SCAN) {
+            var active = reviews.findFirstByWorkspaceIdAndKindAndStatusInOrderByCreatedAtAsc(
+                    request.workspaceId(), ReviewKind.SCAN, List.of(ReviewStatus.QUEUED, ReviewStatus.RUNNING));
+            if (active.isPresent()) {
+                var refusal = new ReviewRequestRejected(
+                        ReviewRequestRejected.Reason.SCAN_ACTIVE, "A scan is already active in this workspace.");
+                refusal.getBody()
+                        .setProperty("activeScanId", active.orElseThrow().getId());
+                throw refusal;
+            }
+        }
         if (!budget.canRequest(request.workspaceId(), request.kind(), request.budgetUsd()))
             throw new ReviewRequestRejected(
                     ReviewRequestRejected.Reason.BUDGET_UNAVAILABLE, "The review budget is unavailable.");
@@ -280,6 +283,13 @@ public class ReviewServiceImpl implements ReviewService {
             review.setCompletedAt(now);
         } else events.publishEvent(new ReviewRequested(review.getId(), request.workspaceId()));
         return review.getId();
+    }
+
+    private static ReviewRequestRejected replayConflict(Review prior) {
+        var refusal = new ReviewRequestRejected(
+                ReviewRequestRejected.Reason.REQUEST_CONFLICT, "This request key has a different body.");
+        if (prior.getKind() == ReviewKind.SCAN) refusal.getBody().setProperty("scanId", prior.getId());
+        return refusal;
     }
 
     private SelectedPractice selection(Workspace workspace, Practice practice, ReviewKind kind, ItemSnapshot pinned) {

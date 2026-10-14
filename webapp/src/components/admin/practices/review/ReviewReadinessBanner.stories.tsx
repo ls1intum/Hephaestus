@@ -28,7 +28,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Ready: Story = {
 	play: async ({ canvas }) => {
-		const status = canvas.getByRole("status");
+		const status = canvas.getByRole("note", { name: "Practice review readiness" });
 		await expect(status).toHaveTextContent("Reviews can start");
 		await expect(status).toHaveTextContent("a review model declared as In-house is ready");
 	},
@@ -45,7 +45,9 @@ export const Unconfirmed: Story = {
 export const Blocked: Story = {
 	args: { readiness: { enabled: true, model: { status: "ready" } } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("status")).toHaveTextContent("Reviews cannot start");
+		await expect(canvas.getByRole("note", { name: "Practice review readiness" })).toHaveTextContent(
+			"Reviews cannot start",
+		);
 	},
 };
 
@@ -54,6 +56,8 @@ export const Off: Story = {
 		readiness: { enabled: false, model: { status: "ready", ...readyModel } },
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("status")).toHaveTextContent("Reviews are off");
+		await expect(canvas.getByRole("note", { name: "Practice review readiness" })).toHaveTextContent(
+			"Reviews are off",
+		);
 	},
 };

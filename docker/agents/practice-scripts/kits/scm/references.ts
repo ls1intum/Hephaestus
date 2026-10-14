@@ -38,7 +38,7 @@ function matched(pattern: RegExp, text: string): number[] {
 	return [...found];
 }
 
-/** Raw text, where a comment is still in the string; parsed prose already has it as its own node. */
+// Raw Markdown comments remain in text; parsed prose separates them into nodes.
 function numbers(pattern: RegExp, text: string): number[] {
 	return matched(pattern, withoutHtmlComments(text));
 }
@@ -75,10 +75,7 @@ interface MarkdownNode {
 	children?: MarkdownNode[];
 }
 
-/**
- * The runs of the author's own text in one paragraph or heading. Code or HTML inside it ends a run
- * rather than vanishing, so the words on either side never join into a phrase nobody wrote.
- */
+// Code and HTML must separate prose so adjacent words cannot form an invented phrase.
 function runs(node: MarkdownNode): string[] {
 	const found = [""];
 	const walk = (parent: MarkdownNode) => {
@@ -96,7 +93,7 @@ function runs(node: MarkdownNode): string[] {
 	return found;
 }
 
-/** The author's own prose, each paragraph or heading apart, so no phrase runs from one into the next. */
+// Paragraph and heading boundaries must not create cross-boundary phrases.
 function blocks(node: MarkdownNode): string[] {
 	if (SHOWN.has(node.type)) {
 		return [];

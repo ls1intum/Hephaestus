@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
@@ -29,6 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequested;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -66,13 +66,17 @@ class SlackThreadEventSchedulerTest extends BaseUnitTest {
     }
 
     private ItemSnapshot snapshot(ItemVersion frozen) {
-        return new ItemSnapshot(
-                item,
-                frozen,
-                new IntegrationRef(IntegrationKind.SLACK, 7L, "T1", 21L),
-                Map.of(),
-                List.of(),
-                new ItemLabel(41L, "Thread", "thread", null, "Channel", null, IntegrationKind.SLACK));
+        return ItemFixtures.snapshot(item, Map.of())
+                .version(frozen)
+                .integration(new IntegrationRef(IntegrationKind.SLACK, 7L, "T1", 21L))
+                .label(ItemFixtures.label()
+                        .itemId(41L)
+                        .title("Thread")
+                        .noun("thread")
+                        .container("Channel")
+                        .integration(IntegrationKind.SLACK)
+                        .build())
+                .build();
     }
 
     @Test

@@ -107,7 +107,7 @@ public class PracticeVersion {
     public PracticeVersion(Practice practice, int number, JsonNode definition, @Nullable Long createdByAccountId) {
         this.practice = Objects.requireNonNull(practice);
         this.workspaceId = Objects.requireNonNull(practice.getWorkspace().getId());
-        if (number < 1 || !definition.isObject() || !definition.has("criteria")) {
+        if (number < 1 || !definition.isObject()) {
             throw new IllegalArgumentException("A practice version needs a positive number and a definition.");
         }
         this.number = number;

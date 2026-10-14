@@ -319,7 +319,7 @@ export function sameItem(itemId: string | undefined, context: Pick<ReadyContext,
 	return itemId === context.item.id;
 }
 
-/** An unusable total is unknown, not proof that a downloaded first page is the complete result. */
+// Invalid totals cannot prove that the downloaded page is complete.
 function requiredTotal(total: number, returned: number): number {
 	if (!Number.isSafeInteger(total) || total < returned || (returned === 0 && total !== 0)) {
 		throw new WorkerError("server", "Hephaestus returned an incomplete answer. Try again.");

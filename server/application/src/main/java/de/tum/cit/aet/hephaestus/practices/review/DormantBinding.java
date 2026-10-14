@@ -23,17 +23,9 @@ public record DormantBinding(Long practiceId, Set<ItemEventName> events, Set<Int
         raisedByAnyOf = Set.copyOf(raisedByAnyOf);
     }
 
-    /**
-     * The fact, in the words a reader knows: each signal and integration by its display name, never by its
-     * identifier. Stated rather than phrased as the fix, by the rule {@code SignalStateReason#describe()}
-     * keeps: a developer reads it on the trace of their own work and cannot connect an integration.
-     *
-     * @param signalName      a signal's display name
-     * @param integrationName an integration's display name
-     */
-    public String reason(
-            Function<ItemEventName, String> signalName, Function<IntegrationKind, String> integrationName) {
-        String moments = events.stream().map(signalName).distinct().sorted().collect(Collectors.joining(", "));
+    /** Use display names because developers cannot configure workspace integrations. */
+    public String reason(Function<ItemEventName, String> eventName, Function<IntegrationKind, String> integrationName) {
+        String moments = events.stream().map(eventName).distinct().sorted().collect(Collectors.joining(", "));
         if (raisedByAnyOf.isEmpty()) {
             return "Nothing that Hephaestus can connect reports the moments this practice watches for (" + moments
                     + "), so no review ever covers this practice.";

@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @WorkspaceScopedController
 @RequestMapping("/practices/releases")
-@Tag(name = "Practice Catalog", description = "Review catalogue changes before they affect a workspace")
+@Tag(name = "Practice Catalog", description = "Review catalog changes before they affect a workspace")
 @RequiredArgsConstructor
 @ConditionalOnServerRole
 public class PracticeReleaseController {
@@ -66,7 +66,7 @@ public class PracticeReleaseController {
             @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
                     String ifMatch,
             @Valid @RequestBody AcceptPracticeReleaseRequestDTO request) {
-        Practice practice = releases.accept(ctx, slug, precondition(ifMatch), request.asMap());
+        Practice practice = releases.accept(ctx, slug, precondition(ifMatch), request.choices());
         return ResponseEntity.ok(presenter.present(ctx.id(), practice));
     }
 

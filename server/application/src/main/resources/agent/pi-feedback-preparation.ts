@@ -1,16 +1,17 @@
 import { isRetryableStatus, isTimeoutAbort, retrying } from "./pi-runner-retry.ts";
-import { isRecord } from "./pi-text.ts";
+import { z } from "./work/practice-scripts/lib/core/practice-script.ts";
 
 export type FeedbackPreparation =
 	| { state: "PREPARED"; receipt: FeedbackPreparationReceipt }
 	| { state: "REFUSED" }
 	| { state: "UNAVAILABLE" };
 
-export interface FeedbackPreparationReceipt {
-	feedbackIds: string[];
-	preparedAt: string;
-	contentDigest: string;
-}
+const preparationReceiptSchema = z.strictObject({
+	feedbackIds: z.array(z.uuid()),
+	preparedAt: z.iso.datetime({ offset: true }),
+	contentDigest: z.string().regex(/^[0-9a-f]{64}$/u),
+});
+export type FeedbackPreparationReceipt = z.infer<typeof preparationReceiptSchema>;
 
 export interface FeedbackComposition {
 	destination: "ON_WORK" | "PRACTICE_PAGE" | "CONVERSATION";
@@ -25,6 +26,7 @@ export interface FeedbackPreparationRequest {
 	attempt: number;
 	basisResultIds: string[];
 	composition: FeedbackComposition[];
+	publicComposition: boolean;
 }
 
 interface PreparationRequest {
@@ -85,22 +87,11 @@ export async function prepareFeedback(request: PreparationRequest): Promise<Feed
 		} catch {
 			throw new PreparationError("UNAVAILABLE", "Feedback preparation acknowledgement unavailable");
 		}
-		if (
-			!isRecord(answer) ||
-			!Array.isArray(answer.feedbackIds) ||
-			!answer.feedbackIds.every((id) => typeof id === "string" && id !== "") ||
-			typeof answer.preparedAt !== "string" ||
-			!Number.isFinite(Date.parse(answer.preparedAt)) ||
-			typeof answer.contentDigest !== "string" ||
-			!/^[0-9a-f]{64}$/u.test(answer.contentDigest)
-		) {
+		const parsed = preparationReceiptSchema.safeParse(answer);
+		if (!parsed.success) {
 			throw new PreparationError("UNAVAILABLE", "Feedback preparation acknowledgement unavailable");
 		}
-		return {
-			feedbackIds: answer.feedbackIds,
-			preparedAt: answer.preparedAt,
-			contentDigest: answer.contentDigest,
-		};
+		return parsed.data;
 	};
 	try {
 		return {

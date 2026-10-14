@@ -11,13 +11,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.List;
@@ -135,12 +135,15 @@ class ScmItemRecordTest extends BaseUnitTest {
                                 BASE, HEAD, "Title", null, new ScmVersion.ReviewContent(HEAD, "Review", "COMMENTED"));
                     default -> new ItemVersion("opaque", null);
                 };
-        return new ItemSnapshot(
-                item,
-                version,
-                new IntegrationRef(IntegrationKind.GITHUB, 1, null),
-                Map.of(),
-                List.of(),
-                new ItemLabel(2, "Work", "item", null, null, null, IntegrationKind.GITHUB));
+        return ItemFixtures.snapshot(item, Map.of())
+                .version(version)
+                .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, null))
+                .label(ItemFixtures.label()
+                        .itemId(2)
+                        .title("Work")
+                        .noun("item")
+                        .integration(IntegrationKind.GITHUB)
+                        .build())
+                .build();
     }
 }

@@ -11,13 +11,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import de.tum.cit.aet.hephaestus.workspace.authorization.WorkspaceAccessService;
 import java.util.List;
 import java.util.Map;
@@ -78,12 +77,17 @@ class ReviewRequestServiceTest extends BaseUnitTest {
 
     ItemSnapshot snapshot(long ws, AboutRole role, boolean human) {
         var person = new PersonIdentity(1, "native-user", null);
-        return new ItemSnapshot(
-                new ItemRef(ws, 3, new ItemKind("scm.pull_request"), 3L, null, null),
-                new ItemVersion("v1", null),
-                new IntegrationRef(IntegrationKind.GITHUB, 1, "Test", null),
-                Map.of(),
-                List.of(new RoleHolder(role, person, human)),
-                new ItemLabel(3, "Item", "Pull request", 1, "Repository", null, IntegrationKind.GITHUB));
+        return ItemFixtures.snapshot(new ItemRef(ws, 3, new ItemKind("scm.pull_request"), 3L, null, null), Map.of())
+                .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, "Test", null))
+                .roles(List.of(new RoleHolder(role, person, human)))
+                .label(ItemFixtures.label()
+                        .itemId(3)
+                        .title("Item")
+                        .noun("Pull request")
+                        .number(1)
+                        .container("Repository")
+                        .integration(IntegrationKind.GITHUB)
+                        .build())
+                .build();
     }
 }

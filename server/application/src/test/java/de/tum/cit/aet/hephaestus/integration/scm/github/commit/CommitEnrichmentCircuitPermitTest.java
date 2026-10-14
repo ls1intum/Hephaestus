@@ -33,6 +33,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -196,7 +199,8 @@ class CommitEnrichmentCircuitPermitTest extends BaseUnitTest {
                 coordinator,
                 exceptionClassifier,
                 userProcessor,
-                eventPublisher);
+                eventPublisher,
+                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
         when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(REPO_ID))
                 .thenReturn(List.of("dev@example.com"));
         when(authorResolver.resolveByEmail(eq("dev@example.com"), any())).thenReturn(null);
@@ -319,7 +323,8 @@ class CommitEnrichmentCircuitPermitTest extends BaseUnitTest {
                 coordinator,
                 exceptionClassifier,
                 userProcessor,
-                eventPublisher);
+                eventPublisher,
+                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
     }
 
     private void abortsUnclassifiedFailures() {

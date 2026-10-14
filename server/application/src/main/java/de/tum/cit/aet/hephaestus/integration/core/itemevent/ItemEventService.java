@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
@@ -24,6 +25,7 @@ public class ItemEventService {
     private final ItemRepository items;
     private final ApplicationEventPublisher publisher;
     private final Clock clock;
+    private final ItemEventLedgerProperties properties;
 
     @Transactional(readOnly = true)
     public Optional<ItemEventView> find(long workspaceId, UUID eventId) {
@@ -66,15 +68,23 @@ public class ItemEventService {
             UUID eventId,
             ItemEventState from,
             ItemEventState to,
-            @Nullable String reason,
-            @Nullable Instant retryAt) {
-        if (from == ItemEventState.STARTED || from == ItemEventState.WITHHELD || from == ItemEventState.EXPIRED)
-            throw new IllegalArgumentException("Terminal event decisions cannot be reopened");
+            @Nullable ReviewRequestReason reason) {
+        if (from.isTerminal()) return false;
         if ((to == ItemEventState.WAITING
                         || to == ItemEventState.WITHHELD
                         || to == ItemEventState.BLOCKED
                         || to == ItemEventState.EXPIRED)
                 && reason == null) throw new IllegalArgumentException("Event decision requires a reason");
-        return repository.decide(workspaceId, eventId, from, to, reason, clock.instant(), retryAt) == 1;
+        Instant now = clock.instant();
+        return repository.decide(
+                        workspaceId,
+                        eventId,
+                        new ItemEventRepository.Decision(
+                                from,
+                                to,
+                                reason,
+                                now,
+                                to == ItemEventState.WAITING ? now.plus(properties.pendingRetryAfter()) : null))
+                == 1;
     }
 }

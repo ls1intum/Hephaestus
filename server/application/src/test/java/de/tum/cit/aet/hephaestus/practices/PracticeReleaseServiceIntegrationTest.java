@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.exception.PreconditionFailedException;
+import de.tum.cit.aet.hephaestus.core.exception.PreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogCustomizationService;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
-import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeUpdateDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -60,8 +62,7 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
                 "Each change states its purpose and its verified result.");
         customization.updatePractice(
                 source.slug(),
-                new CatalogPracticeInputDTO(
-                        source.slug(),
+                new CatalogPracticeUpdateDTO(
                         source.effective().kind().value(),
                         source.effective().groupSlug(),
                         offeredDefinition,
@@ -113,12 +114,8 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
         var changed = DefinitionTestFixtures.rename(source.effective().definition(), "Updated catalog name");
         customization.updatePractice(
                 source.slug(),
-                new CatalogPracticeInputDTO(
-                        source.slug(),
-                        source.effective().kind().value(),
-                        source.effective().groupSlug(),
-                        changed,
-                        source.position()),
+                new CatalogPracticeUpdateDTO(
+                        source.effective().kind().value(), source.effective().groupSlug(), changed, source.position()),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(source.etag())));
         var ctx = WorkspaceContext.fromWorkspace(workspace, Set.of(), null);
         service.setFeedbackMode(ctx, source.slug(), FeedbackMode.OFF);
@@ -135,10 +132,10 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
         assertThat(service.getPractice(ctx, source.slug()).getGroup()).isNull();
         var declinedProposal = releases.get(ctx, source.slug());
         assertThatThrownBy(() -> releases.reset(ctx, source.slug(), null))
-                .isInstanceOf(PracticeReleasePreconditionRequiredException.class);
+                .isInstanceOf(PreconditionRequiredException.class);
         assertThatThrownBy(() -> releases.reset(
                         ctx, source.slug(), EntityTagPrecondition.parse(EntityTagPrecondition.format(proposal.etag()))))
-                .isInstanceOf(StalePracticeReleaseException.class);
+                .isInstanceOf(PreconditionFailedException.class);
         var reset = releases.reset(
                 ctx, source.slug(), EntityTagPrecondition.parse(EntityTagPrecondition.format(declinedProposal.etag())));
         assertThat(reset.getCurrentVersion().getId()).isNotEqualTo(first.getId());

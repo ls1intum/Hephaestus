@@ -161,7 +161,7 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
 
     protected Membership ensureMembership(Workspace workspace, User user, Membership.WorkspaceRole role) {
         return workspaceMembershipRepository
-                .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(user))
+                .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(user))
                 .orElseGet(() -> workspaceMembershipService.createMembership(workspace, accountId(user), role));
     }
 

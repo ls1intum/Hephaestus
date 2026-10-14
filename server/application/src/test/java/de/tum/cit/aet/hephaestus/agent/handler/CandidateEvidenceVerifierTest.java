@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContract;
@@ -66,7 +67,9 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
     private CandidateEvidenceVerifier verifier() {
         job.setWorkspaceId(1);
         var policy = mock(SourceContract.class);
-        when(catalogs.requireSource(SOURCE)).thenReturn(policy);
+        var catalog = mock(SourceCatalog.class);
+        when(catalogs.current()).thenReturn(catalog);
+        when(catalog.source(SOURCE)).thenReturn(Optional.of(policy));
         when(policy.appliesTo(KIND.value())).thenReturn(true);
         when(policy.citation())
                 .thenReturn(new CitationCapabilities(CitationRequirement.FORBIDDEN, CitationRequirement.FORBIDDEN));
@@ -140,6 +143,25 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
         var check = ArgumentCaptor.forClass(CitationCheck.class);
         verify(domain).verify(check.capture());
         assertThat(check.getValue().citations().getFirst().startLine()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldRefuseAnExampleAtTheProblemWhenDeclaredLinesHideTheOverlap() {
+        var verifier = verifier(TEXT);
+        var candidate = CandidateParser.parse(MAPPER.readTree("""
+            {"outcome":"NOT_MET","summary":"A problem","explanation":"The body has a problem","citations":[],
+             "problems":[{"severity":"MINOR","summary":"A problem","explanation":"The body has a problem",
+              "citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt","path":"document/body",
+                "startLine":1,"endLine":1,"quote":"Exact quote"}],"basis":{"type":"duty","criterionQuote":"Use clear names.","event":0,"explanation":"The body is the witness"}}],
+             "example":{"citation":{"sourceKind":"docs.document.core","sourcePath":"context/body.txt","path":"document/body",
+                "startLine":999,"endLine":999,"quote":"Exact quote"},"note":"The same quote is called an example"},
+             "evidence":{},"coverage":{"source":"claimed","selected":1,"checked":1,"total":1,"complete":true}}
+            """));
+        assertThatThrownBy(
+                        () -> verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate, captured(true)))
+                .isInstanceOf(CandidateEvidenceVerifier.Unverified.class)
+                .satisfies(failure -> assertThat(((CandidateEvidenceVerifier.Unverified) failure).refusal())
+                        .isEqualTo(CandidateRefusal.EXAMPLE_OVERLAPS_PROBLEM));
     }
 
     @Test
@@ -227,7 +249,9 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseAnUnknownSourceForItsCandidateInsteadOfFailingTheEnvelope() {
-        when(catalogs.requireSource(SOURCE)).thenThrow(new IllegalArgumentException("Unknown source"));
+        var catalog = mock(SourceCatalog.class);
+        when(catalogs.current()).thenReturn(catalog);
+        when(catalog.source(SOURCE)).thenReturn(Optional.empty());
         var verifier = new CandidateEvidenceVerifier(files, catalogs, List.of());
         assertThatThrownBy(
                         () -> verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate(), captured(true)))

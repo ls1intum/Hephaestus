@@ -37,6 +37,27 @@ class PracticeReviewItemFactsIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldListOnlyWorkspaceItemsAndApplyTheKindFilter() {
+        data.scenario();
+        get("/practices/items?itemKind=scm.pull_request")
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.totalElements")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(scenario.item().getId().toString());
+        get("/practices/items?itemKind=scm.repository")
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.totalElements")
+                .isEqualTo(0)
+                .jsonPath("$.content.length()")
+                .isEqualTo(0);
+    }
+
+    @Test
     void itemReferenceUsesTheCanonicalId() {
         get("/practices/items/" + scenario.item().getId())
                 .expectStatus()

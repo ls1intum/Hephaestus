@@ -7,18 +7,22 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.IssueEvidenceVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -41,6 +45,12 @@ class LinkedWorkItemContentSourceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private IssueEvidenceVersion versions;
+
+    @Autowired
+    private TransactionTemplate transactions;
 
     private IdentityProvider provider;
     private Repository repository;
@@ -127,11 +137,16 @@ class LinkedWorkItemContentSourceIntegrationTest extends BaseIntegrationTest {
         assertThat(captured.has("sub_issues_source")).isFalse();
     }
 
-    private JsonNode captureIssueMetadata(Issue issue) throws Exception {
-        ScmCaptureContext job =
-                ScmCaptureFixtures.context(objectMapper.createObjectNode().put("issue_id", issue.getId()), 1L, true);
-        var captured = issueContentSource.capture(job, Set.of(IssueContentSource.CORE));
-        return objectMapper.readTree(captured.files().get("context/metadata.json"));
+    private JsonNode captureIssueMetadata(Issue issue) {
+        return Objects.requireNonNull(transactions.execute(status -> {
+            var current = issueRepository.findByIdWithRepository(issue.getId()).orElseThrow();
+            var job = ScmCaptureFixtures.context(
+                    objectMapper.createObjectNode().put("issue_id", current.getId()), 1L, true);
+            var pinned = ScmCaptureFixtures.withVersion(job, versions.of(ScmEventPayload.IssueData.from(current)));
+            var captured = issueContentSource.capture(pinned, Set.of(IssueContentSource.CORE));
+            assertThat(captured.files()).containsKey("context/metadata.json");
+            return objectMapper.readTree(Objects.requireNonNull(captured.files().get("context/metadata.json")));
+        }));
     }
 
     @Test

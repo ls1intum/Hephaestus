@@ -6,12 +6,15 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
@@ -23,12 +26,15 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 class PullRequestContentSourceIntegrationTest extends BaseIntegrationTest {
 
@@ -55,6 +61,18 @@ class PullRequestContentSourceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IdentityProviderRepository gitProviderRepository;
+
+    @Autowired
+    private PullRequestReviewRepository reviews;
+
+    @Autowired
+    private ReviewThreadContentSource threadSource;
+
+    @Autowired
+    private TransactionTemplate transactions;
+
+    @Autowired
+    private ObjectMapper mapper;
 
     private IdentityProvider provider;
     private Repository repository;
@@ -151,6 +169,41 @@ class PullRequestContentSourceIntegrationTest extends BaseIntegrationTest {
 
     private long nextNativeId() {
         return nativeIdSeq++;
+    }
+
+    @Test
+    void shouldStageStoredThreadStateAndReviewWordsWithTheirAuthor() {
+        transactions.executeWithoutResult(status -> {
+            var pull = persistPullRequest(23);
+            var reviewer = persistUser("reviewer-thread");
+            var thread = persistThread(pull);
+            thread.setState(PullRequestReviewThread.State.RESOLVED);
+            thread.setResolvedBy(reviewer);
+            threadRepository.saveAndFlush(thread);
+            var review = new PullRequestReview();
+            review.setProvider(provider);
+            review.setNativeId(nextNativeId());
+            review.setPullRequest(pull);
+            review.setAuthor(reviewer);
+            review.setState(PullRequestReview.State.APPROVED);
+            review.setBody("The boundary is clear. β");
+            reviews.saveAndFlush(review);
+            var metadata = mapper.createObjectNode().put("pull_request_id", pull.getId());
+            var context = ScmCaptureFixtures.context(metadata, 1L, false);
+            var captured = threadSource.capture(context, Set.of(ReviewThreadContentSource.KIND));
+            var staged = mapper.readTree(Objects.requireNonNull(captured.files().get("context/review_threads.json")));
+            assertThat(staged.path("threads").get(0).path("state").asString()).isEqualTo("RESOLVED");
+            assertThat(staged.path("threads").get(0).path("resolvedBy").asString())
+                    .isEqualTo("reviewer-thread");
+            assertThat(staged.path("reviewDecisions").get(0).path("body").asString())
+                    .isEqualTo("The boundary is clear. β");
+            assertThat(staged.path("reviewDecisions").get(0).path("author").asString())
+                    .isEqualTo("reviewer-thread");
+            assertThat(captured.citableTexts()).isNotEmpty().allSatisfy(text -> {
+                var bytes = Objects.requireNonNull(captured.files().get(text.stagedPath()));
+                assertThat(text.sha256()).isEqualTo(ScmVersion.contentHash(bytes));
+            });
+        });
     }
 
     private PullRequest persistPullRequest(int number) {

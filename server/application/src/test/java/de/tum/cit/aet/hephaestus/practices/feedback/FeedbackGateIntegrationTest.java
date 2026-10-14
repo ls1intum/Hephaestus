@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
@@ -20,10 +19,10 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
-import java.util.List;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -43,7 +42,8 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
     @MockitoBean
     EvidenceAuthorization authorization;
 
-    @Nullable Feedback supportedFeedback;
+    @Nullable
+    Feedback supportedFeedback;
 
     ItemRef supportedItem;
     long supportedPracticeId;
@@ -85,13 +85,16 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
     }
 
     private static ItemSnapshot snapshot(ItemRef item, String state, String version) {
-        return new ItemSnapshot(
-                item,
-                new ItemVersion(version, null),
-                new IntegrationRef(IntegrationKind.GITHUB, 1, null),
-                Map.of("state", state),
-                List.of(),
-                new ItemLabel(item.itemId(), "Change", "pull request", null, null, null, IntegrationKind.GITHUB));
+        return ItemFixtures.snapshot(item, Map.of("state", state))
+                .version(new ItemVersion(version, null))
+                .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, null))
+                .label(ItemFixtures.label()
+                        .itemId(item.itemId())
+                        .title("Change")
+                        .noun("pull request")
+                        .integration(IntegrationKind.GITHUB)
+                        .build())
+                .build();
     }
 
     @Test

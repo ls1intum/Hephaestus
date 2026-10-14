@@ -4,10 +4,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupService;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecisionRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.page.FeedbackClosure;
-import de.tum.cit.aet.hephaestus.practices.feedback.page.PracticePageFeedbackBasis;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.OverviewWindowDTO;
@@ -26,13 +23,11 @@ import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution.Work;
 import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
-import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
 import de.tum.cit.aet.hephaestus.practices.spi.ProfileChangeResolvedBy;
 import de.tum.cit.aet.hephaestus.practices.spi.ProfileChangeType;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -47,7 +42,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,13 +57,11 @@ public class PracticeProfileOverviewService {
     private final ResultReadQuery read;
     private final ResultViewQuery views;
     private final ResultVisibilityPolicy visibility;
-    private final FeedbackRepository feedbackRepository;
-    private final FeedbackDecisionRepository decisions;
-    private final PracticePageFeedbackBasis feedbackEvidence;
     private final ProductReferenceQuery references;
-    private final JdbcClient jdbc;
     private final GoingWellQueryService goingWell;
     private final Clock clock;
+    private final ProfileFeedbackQuery feedbackFacts;
+    private final ProfileOverviewRepository ledger;
 
     public PracticeProfileOverviewDTO getOverview(WorkspaceContext ws) {
         var now = clock.instant();
@@ -101,18 +93,11 @@ public class PracticeProfileOverviewService {
                 .collect(Collectors.groupingBy(v -> v.practice().getSlug()))
                 .forEach((slug, v) ->
                         windowWork.put(slug, Work.newestFirst(v.stream().map(Work::of))));
-        var first = jdbc
-                .sql("SELECT p.slug,min(r.recorded_at) FROM result r JOIN practice p ON p.id=r.practice_id AND"
-                        + " p.workspace_id=r.workspace_id WHERE r.workspace_id=:ws AND r.developer_id=:account"
-                        + " GROUP BY p.slug")
-                .param("ws", ws.id())
-                .param("account", account.get())
-                .query((rs, n) -> Map.entry(
-                        rs.getString(1), rs.getObject(2, OffsetDateTime.class).toInstant()))
-                .list()
-                .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        var feedback = readFeedback(ws.id(), account.get(), now, window);
+        var first = ledger.firstOpportunities(ws.id(), account.get()).stream()
+                .collect(Collectors.toMap(
+                        ProfileOverviewRepository.FirstOpportunity::getSlug,
+                        ProfileOverviewRepository.FirstOpportunity::getRecordedAt));
+        var feedback = feedbackFacts.find(ws.id(), account.get(), now, window);
         var cited = new LinkedHashSet<Long>();
         projected.forEach(v -> cited.add(v.result().getItemId()));
         feedback.evidenceByFeedback()
@@ -161,66 +146,8 @@ public class PracticeProfileOverviewService {
                 reviewed);
     }
 
-    private record FeedbackFacts(
-            List<Feedback> recent,
-            Map<UUID, Instant> reviewedAtByRun,
-            Map<UUID, List<ResultView>> evidenceByFeedback,
-            Map<UUID, WorkResolution> resolutionByFeedback,
-            Map<UUID, WorkResolution> resolutionBeforeByFeedback,
-            Map<UUID, Instant> addressedAt,
-            Map<UUID, Instant> practiceChangedAt) {}
-
-    private FeedbackFacts readFeedback(long ws, long account, Instant now, OverviewWindow window) {
-        var readable = feedbackRepository.findReadablePracticePage(ws, List.of(account)).stream()
-                .filter(f -> !f.getCreatedAt().isBefore(now.minus(OverviewWindow.LOOKBACK)))
-                .toList();
-        var withdrawn = readable.isEmpty()
-                ? Set.<UUID>of()
-                : decisions
-                        .findCurrentVisibilityForFeedbackIds(
-                                ws, readable.stream().map(Feedback::getId).toList())
-                        .stream()
-                        .filter(d -> d.getAction() == FeedbackDecisionAction.WITHDRAW)
-                        .map(d -> d.getFeedbackId())
-                        .collect(Collectors.toSet());
-        var recent =
-                readable.stream().filter(f -> !withdrawn.contains(f.getId())).toList();
-        var ids = recent.stream().map(Feedback::getId).toList();
-        var raw = feedbackEvidence.visibleEvidence(ws, ids);
-        var changed = feedbackEvidence.practiceChangedAt(raw);
-        var projected = new LinkedHashMap<UUID, List<ResultView>>();
-        raw.forEach((id, r) -> projected.put(id, views.views(ws, r)));
-        Map<UUID, Instant> addressed = ids.isEmpty()
-                ? Map.of()
-                : jdbc
-                        .sql("SELECT feedback_id,min(created_at) FROM feedback_response WHERE workspace_id=:ws AND"
-                                + " feedback_id IN (:ids) AND resolution IN ('ADDRESSED','NOT_APPLICABLE') AND"
-                                + " created_at<=:until GROUP BY feedback_id")
-                        .param("ws", ws)
-                        .param("ids", ids)
-                        .param("until", window.until())
-                        .query((rs, n) -> Map.entry(
-                                rs.getObject(1, UUID.class),
-                                rs.getObject(2, OffsetDateTime.class).toInstant()))
-                        .list()
-                        .stream()
-                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        var at = new LinkedHashMap<UUID, Instant>();
-        recent.stream()
-                .filter(f -> window.contains(f.getCreatedAt()))
-                .forEach(f -> at.put(f.getReviewId(), f.getCreatedAt()));
-        return new FeedbackFacts(
-                recent,
-                at,
-                projected,
-                feedbackEvidence.workResolutions(ws, recent, raw, changed, window.until()),
-                feedbackEvidence.workResolutions(ws, recent, raw, changed, window.since()),
-                addressed,
-                changed);
-    }
-
     private static List<ProfileChangeDTO> feedbackChanges(
-            FeedbackFacts facts, OverviewWindow window, Map<Long, ItemRefDTO> targets) {
+            ProfileFeedbackQuery.Facts facts, OverviewWindow window, Map<Long, ItemRefDTO> targets) {
         List<ProfileChangeDTO> changes = new ArrayList<>();
         for (Feedback feedback : facts.recent()) {
             Instant preparedByRunAt = facts.reviewedAtByRun().get(feedback.getReviewId());
@@ -255,7 +182,7 @@ public class PracticeProfileOverviewService {
      * {@link WorkResolution} puts it.
      */
     private static @Nullable ProfileChangeDTO feedbackReset(
-            FeedbackFacts facts, Feedback feedback, OverviewWindow window, Map<Long, ItemRefDTO> targets) {
+            ProfileFeedbackQuery.Facts facts, Feedback feedback, OverviewWindow window, Map<Long, ItemRefDTO> targets) {
         UUID feedbackId = feedback.getId();
         WorkResolution atTheEnd = facts.resolutionByFeedback().get(feedbackId);
         WorkResolution atTheStart = facts.resolutionBeforeByFeedback().get(feedbackId);
@@ -290,7 +217,7 @@ public class PracticeProfileOverviewService {
 
     /** The resolution its card reports, when it falls inside the window. */
     private static @Nullable ProfileChangeDTO feedbackResolved(
-            FeedbackFacts facts, UUID feedbackId, OverviewWindow window, Map<Long, ItemRefDTO> targets) {
+            ProfileFeedbackQuery.Facts facts, UUID feedbackId, OverviewWindow window, Map<Long, ItemRefDTO> targets) {
         List<ResultView> evidence = facts.evidenceByFeedback().get(feedbackId);
         WorkResolution resolution = facts.resolutionByFeedback().getOrDefault(feedbackId, WorkResolution.NONE);
         FeedbackClosure closure = FeedbackClosure.of(

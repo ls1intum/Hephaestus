@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeGroupDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeGroupsRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.SetFeedbackModeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
@@ -99,8 +99,7 @@ public class PracticeGroupController {
     @PatchMapping("/reorder")
     @AuditExempt(reason = "Order changes presentation only")
     @Operation(operationId = "reorderPracticeGroups")
-    public List<PracticeGroupDTO> reorder(
-            WorkspaceContext ctx, @RequestBody @Valid ReorderPracticeGroupsRequestDTO input) {
+    public List<PracticeGroupDTO> reorder(WorkspaceContext ctx, @RequestBody @Valid ReorderRequestDTO input) {
         groups.reorder(ctx, input.slugs());
         return presenter.presentGroups(ctx.id(), groups.listGroups(ctx, null));
     }

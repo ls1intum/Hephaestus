@@ -24,7 +24,7 @@ public class ScanReportItemFilterParams {
     private @Nullable Boolean reused;
     private @Nullable String path;
 
-    ScanQueryService.ItemFilter filter() {
-        return new ScanQueryService.ItemFilter(practiceSlug, outcome, status, reused, path);
+    ScanReportItemsService.ItemFilter filter() {
+        return new ScanReportItemsService.ItemFilter(practiceSlug, outcome, status, reused, path);
     }
 }

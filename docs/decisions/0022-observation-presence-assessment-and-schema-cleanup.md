@@ -151,4 +151,4 @@ observation incorrect or withdraw the feedback.
 
 ## Update — 2026-10-14 (#2656): the 1.0 practice model
 
-[ADR 0056](0056-one-practice-model-for-items-and-scans.md) supersedes this record. A result has one of four outcomes and optional located problems.
+Superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for outcomes and problem records.

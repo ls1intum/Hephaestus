@@ -11,7 +11,7 @@ import jakarta.validation.constraints.Pattern;
 
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public record UpdatePracticeRequestDTO(
-        @JsonProperty(required = true) @NotNull @Valid PracticeDefinition definition,
+        @JsonProperty(required = true) @NotNull @Valid PracticeDefinitionInputDTO definition,
 
         @Schema(pattern = "^[1-9][0-9]*$", requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty(required = true)

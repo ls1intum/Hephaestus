@@ -15,7 +15,4 @@ public record ReviewRequestOutcomeDTO(
         UUID reviewId,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
-        ReviewRequestReason reason,
-
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
-        String reasonDescription) {}
+        ReviewRequestReason reason) {}

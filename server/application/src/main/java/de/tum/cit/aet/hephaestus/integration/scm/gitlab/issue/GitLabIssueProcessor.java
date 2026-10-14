@@ -111,9 +111,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Long milestoneId = resolveWebhookMilestoneId(
                 attrs.milestoneId(), providerId, Objects.requireNonNull(context.repository()));
         Issue.State issueState = convertState(attrs.state());
-        // Resolved exactly as the GraphQL sync resolves them: the issue review version digests
-        // both, so a field only one path fills would make a no-op sync look like an edit of the
-        // reviewed issue.
+        // Webhook and sync must resolve both version inputs identically.
+        // Otherwise an unchanged issue appears edited.
         String stateReason = resolveStateReason(issueState, attrs.duplicatedToId() != null);
         String issueTypeId = resolveIssueTypeId(attrs.type(), Objects.requireNonNull(context.repository()));
         Issue issue = upsertIssue(

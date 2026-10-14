@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -21,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.spi.ScmTokenSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -104,13 +104,12 @@ class ReviewRepositoryPreparerIntegrationTest extends BaseIntegrationTest {
                 false);
         var previous = context.pinned();
         context = new ScmCaptureContext(
-                new ItemSnapshot(
-                        previous.item(),
-                        previous.version(),
-                        new IntegrationRef(IntegrationKind.GITLAB, workspaceId, null),
-                        previous.state(),
-                        previous.roles(),
-                        previous.label()),
+                ItemFixtures.snapshot(previous.item(), previous.state())
+                        .version(previous.version())
+                        .integration(new IntegrationRef(IntegrationKind.GITLAB, workspaceId, null))
+                        .roles(previous.roles())
+                        .label(previous.label())
+                        .build(),
                 context.request(),
                 context.work(),
                 context.preparation(),

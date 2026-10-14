@@ -29,7 +29,6 @@ export interface StandIn {
 const ROUTE =
 	/^\/practice-script\/(?<slot>chat|decision|embedding|reranking)\/(?<operation>chat\/completions|responses|decisions|embeddings|rerank)$/u;
 
-/** A parsed JSON body the tests read by key: any object, an array included. */
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }

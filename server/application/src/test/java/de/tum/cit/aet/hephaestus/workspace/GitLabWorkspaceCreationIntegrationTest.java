@@ -277,7 +277,8 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         User instanceActor = userRepository
                 .findByLoginAndProviderId("mentor", persistedId(instance.getId()))
                 .orElseThrow();
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(workspace.id(), instanceActor.getId()))
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
+                        workspace.id(), instanceActor.getId()))
                 .hasValueSatisfying(
                         membership -> assertThat(membership.getRole()).isEqualTo(Membership.WorkspaceRole.OWNER));
     }
@@ -423,11 +424,11 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         WorkspaceDTO workspace = Objects.requireNonNull(created);
 
         var membership = workspaceMembershipRepository
-                .findByWorkspace_IdAndAccount_Id(
+                .findByWorkspace_IdAndId_AccountId(
                         workspace.id(), persistedId(caller.scmUser().getId()))
                 .orElseThrow(() -> new AssertionError("Owner membership not created"));
         assertThat(membership.getRole()).isEqualTo(Membership.WorkspaceRole.OWNER);
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(workspace.id(), namesake.getId()))
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(workspace.id(), namesake.getId()))
                 .isEmpty();
     }
 

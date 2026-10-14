@@ -28,7 +28,7 @@ import {
 
 // Run each golden capture in its own process; runner paths and state are module-local.
 
-import { codingAgentExports } from "./program-host-runner.ts";
+import { mockPiCodingAgent } from "./program-host-runner.ts";
 
 const GOLDEN = nodePath.join(import.meta.dirname, "golden-prompts");
 const LIB = nodePath.resolve(
@@ -232,6 +232,7 @@ if (scenario !== undefined && scenario !== "") {
 		return Response.json({
 			contractVersion: 3,
 			admissionDigest: "golden-digest",
+			publicReviewed: false,
 			admitted: [],
 			withheld: [],
 		});
@@ -251,11 +252,10 @@ if (scenario !== undefined && scenario !== "") {
 		prepareArguments?: (args: unknown) => unknown;
 		execute: (id: string, input: unknown) => Promise<unknown>;
 	}
-	mock.module("@earendil-works/pi-coding-agent", {
-		namedExports: {
-			...codingAgentExports(cwd, manager, (options) =>
-				capture("system-prompt.md", options.systemPrompt),
-			),
+	mockPiCodingAgent(
+		cwd,
+		manager,
+		{
 			async createAgentSession(options: { tools: string[]; customTools: CustomTool[] }) {
 				const handlers = new Set<(event: unknown) => void>();
 				const emit = (event: unknown) => {
@@ -452,7 +452,8 @@ if (scenario !== undefined && scenario !== "") {
 				};
 			},
 		},
-	});
+		(options) => capture("system-prompt.md", options.systemPrompt),
+	);
 	const { runReviewJob } = await import("../../../main/resources/agent/pi-runner.ts");
 	await runReviewJob();
 } else {

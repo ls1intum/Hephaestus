@@ -134,7 +134,7 @@ public class ReviewSummaryController {
             @ParameterObject TimeBucketParams range,
             @Parameter(description = ALL_TIME_DESCRIPTION) @RequestParam(defaultValue = "false") boolean allTime) {
         TimeBuckets buckets = allTime
-                ? range.toBuckets(overviewService.allTime(workspaceContext.id(), range.to(), clock))
+                ? range.toBuckets(overviewService.allTime(workspaceContext.id(), range.to()))
                 : range.toBuckets(clock);
         return ResponseEntity.ok(overviewService.overview(workspaceContext.id(), buckets));
     }
@@ -159,7 +159,7 @@ public class ReviewSummaryController {
             @ParameterObject TimeRangeFilterParams range,
             @Parameter(description = ALL_TIME_DESCRIPTION) @RequestParam(defaultValue = "false") boolean allTime) {
         TimeRange measured =
-                allTime ? overviewService.allTime(workspaceContext.id(), range.to(), clock) : range.toRange(clock);
+                allTime ? overviewService.allTime(workspaceContext.id(), range.to()) : range.toRange(clock);
         return ResponseEntity.ok(timingService.timing(workspaceContext.id(), measured));
     }
 

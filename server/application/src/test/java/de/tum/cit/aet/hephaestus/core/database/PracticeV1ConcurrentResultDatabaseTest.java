@@ -18,13 +18,13 @@ class PracticeV1ConcurrentResultDatabaseTest {
     @ParameterizedTest
     @ValueSource(ints = {Connection.TRANSACTION_READ_COMMITTED, Connection.TRANSACTION_REPEATABLE_READ})
     void shouldPreventConcurrentDeletionOfTheLastTwoProblems(int isolation) throws Exception {
-        var database = PracticeV1ConstraintDatabaseTest.prepared("prod");
+        var database = NativePracticeFixture.resultParent("prod");
         PracticeMigrationFixture.execute(
-                database, "BEGIN; " + PracticeV1ConstraintDatabaseTest.insert("NOT_MET", "NULL") + ";" + """
+                database, "BEGIN; " + NativePracticeFixture.insertResult("NOT_MET", "NULL") + ";" + """
                     INSERT INTO problem(id,workspace_id,result_id,position,severity,summary,explanation,citations,basis)
-                    VALUES('00000000-0000-0000-0000-000000995151',992101,'00000000-0000-0000-0000-000000995141',
+                    VALUES('00000000-0000-0000-0000-000000978031',978001,'00000000-0000-0000-0000-000000978021',
                         0,'CRITICAL','First defect','First explanation','[{"quote":"first"}]','{}'),
-                      ('00000000-0000-0000-0000-000000995152',992101,'00000000-0000-0000-0000-000000995141',
+                      ('00000000-0000-0000-0000-000000978032',978001,'00000000-0000-0000-0000-000000978021',
                         1,'MINOR','Second defect','Second explanation','[{"quote":"second"}]','{}');
                     COMMIT;
                     """);
@@ -35,7 +35,7 @@ class PracticeV1ConcurrentResultDatabaseTest {
             first.setTransactionIsolation(isolation);
             try (var statement = first.createStatement()) {
                 statement.execute("SET LOCAL statement_timeout='5s'");
-                statement.execute("DELETE FROM problem WHERE id='00000000-0000-0000-0000-000000995151'");
+                statement.execute("DELETE FROM problem WHERE id='00000000-0000-0000-0000-000000978031'");
             }
             var second = executor.submit(() -> {
                 try (var connection =
@@ -45,12 +45,12 @@ class PracticeV1ConcurrentResultDatabaseTest {
                     try (var statement = connection.createStatement()) {
                         statement.execute("SET LOCAL statement_timeout='5s'");
                         try (var rows = statement.executeQuery("SELECT count(*) FROM problem WHERE"
-                                + " result_id='00000000-0000-0000-0000-000000995141'")) {
+                                + " result_id='00000000-0000-0000-0000-000000978021'")) {
                             assertThat(rows.next()).isTrue();
                             assertThat(rows.getInt(1)).isEqualTo(2);
                         }
                         secondSnapshot.countDown();
-                        statement.execute("DELETE FROM problem WHERE id='00000000-0000-0000-0000-000000995152'");
+                        statement.execute("DELETE FROM problem WHERE id='00000000-0000-0000-0000-000000978032'");
                         connection.commit();
                         return "committed";
                     } catch (SQLException exception) {
@@ -65,12 +65,12 @@ class PracticeV1ConcurrentResultDatabaseTest {
         }
         assertThat(PracticeMigrationFixture.column(
                         database,
-                        "SELECT count(*)::text FROM problem WHERE result_id='00000000-0000-0000-0000-000000995141'"))
+                        "SELECT count(*)::text FROM problem WHERE result_id='00000000-0000-0000-0000-000000978021'"))
                 .containsExactly("1");
         assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT outcome || '|' || severity FROM result WHERE"
-                                + " id='00000000-0000-0000-0000-000000995141'"))
+                                + " id='00000000-0000-0000-0000-000000978021'"))
                 .containsExactly("NOT_MET|MINOR");
     }
 }

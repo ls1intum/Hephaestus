@@ -7,15 +7,14 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemListRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,13 +35,16 @@ class ScmItemListerTest extends BaseUnitTest {
         repository.setNameWithOwner("owner/repository");
         var key = new RepositoryKey(1L, 3L);
         var integration = new IntegrationRef(IntegrationKind.GITHUB, 1, "test");
-        var snapshot = new ItemSnapshot(
-                holder,
-                version,
-                integration,
-                Map.of(),
-                List.of(),
-                new ItemLabel(2, "repo", "repository", null, null, null, IntegrationKind.GITHUB));
+        var snapshot = ItemFixtures.snapshot(holder, Map.of())
+                .version(version)
+                .integration(integration)
+                .label(ItemFixtures.label()
+                        .itemId(2)
+                        .title("repo")
+                        .noun("repository")
+                        .integration(IntegrationKind.GITHUB)
+                        .build())
+                .build();
         when(items.pin(holder, version)).thenReturn(snapshot);
         when(repositories.findById(3L)).thenReturn(Optional.of(repository));
         when(access.prepare(1, repository)).thenReturn(key);
@@ -66,7 +68,11 @@ class ScmItemListerTest extends BaseUnitTest {
         assertThat(last.items()).extracting(i -> i.item().path()).containsExactly("B.java");
         var changed = new ItemVersion("d".repeat(40), null);
         when(items.pin(holder, changed))
-                .thenReturn(new ItemSnapshot(holder, changed, integration, Map.of(), List.of(), snapshot.label()));
+                .thenReturn(ItemFixtures.snapshot(holder, Map.of())
+                        .version(changed)
+                        .integration(integration)
+                        .label(snapshot.label())
+                        .build());
         when(tree.inventory(key, changed.value())).thenReturn(List.of());
         assertThatThrownBy(() ->
                         lister.list(new ItemListRequest(holder, changed, ScmItemEvents.FILE, first.nextCursor(), 1)))

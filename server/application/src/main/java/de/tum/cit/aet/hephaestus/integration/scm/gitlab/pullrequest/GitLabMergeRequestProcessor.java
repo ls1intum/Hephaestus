@@ -623,9 +623,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         changed |= updateAssignees(
                 event.currentAssignees(), pr.getAssignees(), Objects.requireNonNull(context.providerId()));
         changed |= updateRequestedReviewers(event.currentReviewers(), pr, context);
-        // GitLab names the previous head only when the update pushed commits, and not always then,
-        // so a moved head counts too; a sync that stored the new head first still leaves oldrev to
-        // say so.
+        // GitLab can omit oldrev, so a changed stored head also proves a push.
+        // oldrev still identifies a push when sync has already stored the new head.
         boolean pushed = !isNew
                 && headRefOid != null
                 && (attrs.oldrev() != null || (previousHead != null && !previousHead.equals(headRefOid)));
@@ -692,9 +691,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     public PullRequest processMerged(GitLabMergeRequestEventDTO event, ProcessingContext context) {
         Issue.State before = getExistingState(event, context);
         PullRequest pr = processInternal(event, context);
-        // Only the close is announced here. The merge itself, the event a review is judged on, is
-        // offered by offerMerge once the read after this hook has had its chance to record who
-        // merged.
+        // Merge admission waits for the follow-up read to identify the merger.
         if (pr != null
                 && pr.getState() == Issue.State.MERGED
                 && before != Issue.State.CLOSED
@@ -945,8 +942,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                     fetchedUpdatedAt);
             return stored;
         }
-        // Read before the upsert below overwrites the row; it's the only place the prior draft
-        // state survives.
+        // The upsert replaces the prior draft state; retain it for transition detection.
         Boolean wasDraft = existingOpt.map(PullRequest::isDraft).orElse(null);
         Issue.State previousState = existingOpt.map(PullRequest::getState).orElse(null);
         String previousTitle = existingOpt.map(PullRequest::getTitle).orElse(null);
@@ -1068,9 +1064,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         boolean changed = false;
         if (reviewsCurrent) {
             changed |= recordReviewSnapshot(pr, reviewDecision, settling ? null : data.mergeable(), mergeStateStatus);
-            // Only the accepted read can store its pair (see GitLabMergeRequestFields#diffRefs). An
-            // older page cannot replace a newer read. The upsert above cleared any base whose head
-            // or target changed.
+            // Only the accepted read may store its base/head pair; stale pages cannot replace it.
+            // The upsert clears the base when its head or target changes.
             String pairedBase = data.baseSha();
             String storedHead = pr.getHeadRefOid();
             if (pairedBase != null
@@ -1117,8 +1112,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
             log.debug("Created merge request from sync: nativeId={}, iid={}", nativeId, data.iid());
         } else {
-            // The sync also names a moved head and changed closing issues, which merged work has no
-            // other event for.
+            // Merged work has no later webhook for head or closing-issue changes; sync records them.
             Set<String> changedFields = authoredChanges(previousTitle, previousBody, pr);
             if (headMoved) changedFields.add("headRefOid");
             if (closingIssuesChanged) {
@@ -1137,8 +1131,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             log.debug("Updated merge request from sync: nativeId={}, iid={}", nativeId, data.iid());
         }
 
-        // Sync raises the same draft transition a missed webhook would have, so reconciliation
-        // can't skip it.
+        // Reconciliation must recover draft transitions from missed webhooks.
         if (wasDraft != null) {
             if (wasDraft && !data.draft()) {
                 eventPublisher.publishEvent(new ScmDomainEvent.PullRequestReady(prData, eventCtx));
@@ -1437,8 +1430,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         review.setProvider(pr.getProvider());
         review.setState(PullRequestReview.State.APPROVED);
         review.setHtmlUrl(pr.getHtmlUrl() + "#approvals");
-        // approvedBy names who currently approves; it names neither the approved head nor when.
-        // Both stay unknown.
+        // approvedBy names the approver, but proves neither the approved head nor its date.
         review.setAuthor(approver);
         review.setPullRequest(pr);
         return review;

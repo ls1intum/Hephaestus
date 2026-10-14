@@ -45,7 +45,6 @@ import { hasText } from "@/lib/text";
 
 const UNASSIGNED = "__unassigned__";
 
-/** What a reset was shown: the group's details and the catalog version it compared them against. */
 function groupResetBasis(group: PracticeGroup) {
 	const { name, description, icon, color, catalogOrigin } = group;
 	return JSON.stringify([name, description, icon, color, catalogOrigin.offeredDigest]);

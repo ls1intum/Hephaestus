@@ -4,12 +4,10 @@ import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -56,13 +54,18 @@ public final class ScmCaptureFixtures {
                 null);
         var version = new ItemVersion(fixture.path("itemVersion").asString("fixture"), null);
         var integration = new IntegrationRef(IntegrationKind.GITHUB, workspaceId, null);
-        var snapshot = new ItemSnapshot(
-                item,
-                version,
-                integration,
-                Map.of(),
-                List.of(),
-                new ItemLabel(item.itemId(), "Work", "Pull request", 1, "owner/repo", null, IntegrationKind.GITHUB));
+        var snapshot = ItemFixtures.snapshot(item, Map.of())
+                .version(version)
+                .integration(integration)
+                .label(ItemFixtures.label()
+                        .itemId(item.itemId())
+                        .title("Work")
+                        .noun("Pull request")
+                        .number(1)
+                        .container("owner/repo")
+                        .integration(IntegrationKind.GITHUB)
+                        .build())
+                .build();
         var request = new CaptureRequest(UUID.randomUUID(), UUID.randomUUID(), 1, Set.of(), "2.0.0", 3);
         return new ScmCaptureContext(snapshot, request, work, new ScmCapturePreparation(), Instant.now());
     }
@@ -70,13 +73,12 @@ public final class ScmCaptureFixtures {
     public static ScmCaptureContext withVersion(ScmCaptureContext context, ItemVersion version) {
         var previous = context.pinned();
         return new ScmCaptureContext(
-                new ItemSnapshot(
-                        previous.item(),
-                        version,
-                        previous.integration(),
-                        previous.state(),
-                        previous.roles(),
-                        previous.label()),
+                ItemFixtures.snapshot(previous.item(), previous.state())
+                        .version(version)
+                        .integration(previous.integration())
+                        .roles(previous.roles())
+                        .label(previous.label())
+                        .build(),
                 context.request(),
                 context.work(),
                 context.preparation(),

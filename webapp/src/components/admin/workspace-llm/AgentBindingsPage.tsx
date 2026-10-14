@@ -116,7 +116,6 @@ const TIER_COLUMNS: readonly TierColumn[] = [
 	{ tier: "UNDECLARED", label: "Not chosen", icon: CircleHelpIcon },
 ];
 
-/** The column for members who have not chosen exists only while choosing is optional. */
 function tierColumns(aiChoiceRequired: boolean): readonly TierColumn[] {
 	return aiChoiceRequired
 		? TIER_COLUMNS.filter((column) => column.tier !== "UNDECLARED")
@@ -559,7 +558,6 @@ interface PurposeGroupSectionProps {
 	rowProps: RowProps;
 }
 
-/** A deep link lands on its row as soon as the row is drawn, and again for each new link. */
 function scrollToRow(node: HTMLElement | null) {
 	node?.scrollIntoView({ block: "start" });
 }
@@ -614,10 +612,7 @@ function usedByLine(usedBy: UsedBy[]): string {
 	return `Used by ${count} ${count === 1 ? "practice" : "practices"}`;
 }
 
-/**
- * The model one column's members get. The tier prefix is for a screen reader, which hears the cells
- * without the header above them. A Cloud member served by an In-house model sees that model's tier.
- */
+// Screen readers need the tier label because table headers may not be read with cells.
 function TierCellView({ id, cell }: { id: string; cell: TierCell }) {
 	const { column, binding, model, unused } = cell;
 	const ColumnIcon = column.icon;

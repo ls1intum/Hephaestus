@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequiredArgsConstructor
 public class ItemTraceController {
     private final ItemTraceQueryService query;
+    private final OwnItemTraceQueryService own;
 
     @GetMapping("/{itemId}/trace")
     @RequireAtLeastWorkspaceAdmin
@@ -33,6 +34,6 @@ public class ItemTraceController {
     @PreAuthorize("@workspaceSecure.isMember()")
     @Operation(operationId = "getOwnItemTrace", summary = "Trace your results from an item review")
     public OwnItemTraceDTO own(WorkspaceContext ws, @PathVariable long itemId, @RequestParam UUID reviewId) {
-        return query.own(ws.id(), itemId, reviewId);
+        return own.own(ws.id(), itemId, reviewId);
     }
 }

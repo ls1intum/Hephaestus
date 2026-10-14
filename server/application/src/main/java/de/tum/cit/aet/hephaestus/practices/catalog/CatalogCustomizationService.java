@@ -14,9 +14,9 @@ import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionMerge;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import de.tum.cit.aet.hephaestus.practices.PracticeReleaseChoice;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupInputDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupUpdateDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.PositiveOrZero;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeUpdateDTO;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,16 +27,14 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.validation.annotation.Validated;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
-@Validated
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @ConditionalOnServerRole
 public class CatalogCustomizationService {
-    private final CatalogService offers;
+    private final CatalogService catalogService;
     private final CatalogEntryRepository entries;
     private final PracticeDefinitionValidator validator;
     private final CatalogLock lock;
@@ -44,69 +42,81 @@ public class CatalogCustomizationService {
     private final ConfigAuditPort audit;
 
     @Transactional
-    public CatalogOffer<CatalogPracticeDocument> createPractice(@Valid CatalogPracticeInputDTO input) {
+    public CatalogOffer<CatalogPracticeDocument> createPractice(CatalogPracticeInputDTO input) {
         lock.acquire();
-        var catalog = offers.effectiveCatalog();
+        var catalog = catalogService.effectiveCatalog();
         if (catalog.practice(input.slug()).isPresent())
             throw new CatalogConflictException("This catalog slug already exists.");
-        return writePractice(catalog, input.slug(), input);
+        return writePractice(
+                catalog,
+                input.slug(),
+                new CatalogPracticeDocument(new ItemKind(input.kind()), input.groupSlug(), input.definition().toDefinition()),
+                input.position());
     }
 
     @Transactional
     public CatalogOffer<CatalogPracticeDocument> updatePractice(
-            String slug, @Valid CatalogPracticeInputDTO input, @Nullable EntityTagPrecondition precondition) {
+            String slug, CatalogPracticeUpdateDTO input, @Nullable EntityTagPrecondition precondition) {
         lock.acquire();
-        var catalog = offers.effectiveCatalog();
-        require(precondition, practice(catalog, slug).etag());
-        return writePractice(catalog, slug, input);
+        var catalog = catalogService.effectiveCatalog();
+        EntityTagPrecondition.requireExact(precondition, practice(catalog, slug).etag());
+        return writePractice(
+                catalog,
+                slug,
+                new CatalogPracticeDocument(new ItemKind(input.kind()), input.groupSlug(), input.definition().toDefinition()),
+                input.position());
     }
 
     private CatalogOffer<CatalogPracticeDocument> writePractice(
-            EffectiveCatalog catalog, String slug, CatalogPracticeInputDTO input) {
-        if (!slug.equals(input.slug())) throw new IllegalArgumentException("The catalog slug must match the route.");
+            EffectiveCatalog catalog, String slug, CatalogPracticeDocument document, @Nullable Integer position) {
         var current = catalog.practice(slug);
-        ItemKind kind = new ItemKind(input.kind());
+        ItemKind kind = document.kind();
         if (current.isPresent() && !current.get().effective().kind().equals(kind))
             throw new IllegalArgumentException("A catalog practice keeps its item kind.");
-        validator.validate(kind, input.definition());
-        if (input.groupSlug() != null) group(catalog, input.groupSlug());
-        var entry = authoredEntry(catalog, CatalogEntryType.PRACTICE, slug, input.position());
+        validator.validate(kind, document.definition());
+        if (document.groupSlug() != null) group(catalog, document.groupSlug());
+        var entry = authoredEntry(catalog, CatalogEntryType.PRACTICE, slug, position);
         entry.setKind(kind);
-        entry.setDefinition(
-                mapper.valueToTree(new CatalogPracticeDocument(kind, input.groupSlug(), input.definition()).content()));
+        entry.setDefinition(mapper.valueToTree(document.content()));
         entries.saveAndFlush(entry);
-        var result = practice(offers.effectiveCatalog(), slug);
+        var result = practice(catalogService.effectiveCatalog(), slug);
         record(CatalogEntryType.PRACTICE, slug, current.map(this::snapshot).orElse(null), snapshot(result));
         return result;
     }
 
     @Transactional
-    public CatalogOffer<GroupDefinition> createGroup(@Valid CatalogGroupInputDTO input) {
+    public CatalogOffer<GroupDefinition> createGroup(CatalogGroupInputDTO input) {
         lock.acquire();
-        var catalog = offers.effectiveCatalog();
+        var catalog = catalogService.effectiveCatalog();
         if (catalog.group(input.slug()).isPresent())
             throw new CatalogConflictException("This catalog slug already exists.");
-        return writeGroup(catalog, input.slug(), input);
+        return writeGroup(
+                catalog,
+                input.slug(),
+                new GroupDefinition(input.name(), input.description(), input.icon(), input.color()),
+                input.position());
     }
 
     @Transactional
     public CatalogOffer<GroupDefinition> updateGroup(
-            String slug, @Valid CatalogGroupInputDTO input, @Nullable EntityTagPrecondition precondition) {
+            String slug, CatalogGroupUpdateDTO input, @Nullable EntityTagPrecondition precondition) {
         lock.acquire();
-        var catalog = offers.effectiveCatalog();
-        require(precondition, group(catalog, slug).etag());
-        return writeGroup(catalog, slug, input);
+        var catalog = catalogService.effectiveCatalog();
+        EntityTagPrecondition.requireExact(precondition, group(catalog, slug).etag());
+        return writeGroup(
+                catalog,
+                slug,
+                new GroupDefinition(input.name(), input.description(), input.icon(), input.color()),
+                input.position());
     }
 
     private CatalogOffer<GroupDefinition> writeGroup(
-            EffectiveCatalog catalog, String slug, CatalogGroupInputDTO input) {
-        if (!slug.equals(input.slug())) throw new IllegalArgumentException("The catalog slug must match the route.");
+            EffectiveCatalog catalog, String slug, GroupDefinition definition, @Nullable Integer position) {
         var current = catalog.group(slug);
-        var entry = authoredEntry(catalog, CatalogEntryType.GROUP, slug, input.position());
-        entry.setDefinition(mapper.valueToTree(
-                new GroupDefinition(input.name(), input.description(), input.icon(), input.color())));
+        var entry = authoredEntry(catalog, CatalogEntryType.GROUP, slug, position);
+        entry.setDefinition(mapper.valueToTree(definition));
         entries.saveAndFlush(entry);
-        var result = group(offers.effectiveCatalog(), slug);
+        var result = group(catalogService.effectiveCatalog(), slug);
         record(CatalogEntryType.GROUP, slug, current.map(this::snapshot).orElse(null), snapshot(result));
         return result;
     }
@@ -130,24 +140,24 @@ public class CatalogCustomizationService {
     public void setExcluded(
             CatalogEntryType type, String slug, boolean excluded, @Nullable EntityTagPrecondition precondition) {
         lock.acquire();
-        var catalog = offers.effectiveCatalog();
+        var catalog = catalogService.effectiveCatalog();
         var current = offer(catalog, type, slug);
-        require(precondition, current.etag());
+        EntityTagPrecondition.requireExact(precondition, current.etag());
         CatalogSnapshot before = snapshot(current);
         CatalogEntry entry = row(type, slug);
         if (excluded != (entry.getExcludedAt() != null)) {
             entry.setExcludedAt(excluded ? Instant.now() : null);
             entries.saveAndFlush(entry);
-            record(type, slug, before, snapshot(offer(offers.effectiveCatalog(), type, slug)));
+            record(type, slug, before, snapshot(offer(catalogService.effectiveCatalog(), type, slug)));
         }
     }
 
     @Transactional
     public void reset(CatalogEntryType type, String slug, @Nullable EntityTagPrecondition precondition) {
         lock.acquire();
-        var catalog = offers.effectiveCatalog();
+        var catalog = catalogService.effectiveCatalog();
         var current = offer(catalog, type, slug);
-        require(precondition, current.etag());
+        EntityTagPrecondition.requireExact(precondition, current.etag());
         CatalogSnapshot before = snapshot(current);
         CatalogEntry entry = row(type, slug);
         if (current.shipped() == null) {
@@ -163,15 +173,15 @@ public class CatalogCustomizationService {
         entry.setDefinition(null);
         entry.setBase(null);
         entries.saveAndFlush(entry);
-        record(type, slug, before, snapshot(offer(offers.effectiveCatalog(), type, slug)));
+        record(type, slug, before, snapshot(offer(catalogService.effectiveCatalog(), type, slug)));
     }
 
     @Transactional
     public void acknowledge(CatalogEntryType type, String slug, @Nullable EntityTagPrecondition precondition) {
         lock.acquire();
-        var catalog = offers.effectiveCatalog();
+        var catalog = catalogService.effectiveCatalog();
         var current = offer(catalog, type, slug);
-        require(precondition, current.etag());
+        EntityTagPrecondition.requireExact(precondition, current.etag());
         CatalogSnapshot before = snapshot(current);
         CatalogEntry entry = row(type, slug);
         Object shipped = current.shipped();
@@ -179,15 +189,15 @@ public class CatalogCustomizationService {
         if (entry.getDefinition() != null) {
             entry.setBase(mapper.valueToTree(shipped));
             entries.saveAndFlush(entry);
-            record(type, slug, before, snapshot(offer(offers.effectiveCatalog(), type, slug)));
+            record(type, slug, before, snapshot(offer(catalogService.effectiveCatalog(), type, slug)));
         }
     }
 
     @Transactional
     public void reorder(CatalogEntryType type, List<String> slugs, @Nullable EntityTagPrecondition precondition) {
         lock.acquire();
-        var catalog = offers.effectiveCatalog();
-        require(precondition, catalog.etag());
+        var catalog = catalogService.effectiveCatalog();
+        EntityTagPrecondition.requireExact(precondition, catalog.etag());
         List<String> existing = type == CatalogEntryType.PRACTICE
                 ? catalog.practices().stream().map(CatalogOffer::slug).toList()
                 : catalog.groups().stream().map(CatalogOffer::slug).toList();
@@ -205,12 +215,9 @@ public class CatalogCustomizationService {
     @Transactional
     public void resetOrder(@Nullable EntityTagPrecondition precondition) {
         lock.acquire();
-        require(precondition, offers.effectiveCatalog().etag());
-        for (CatalogEntry entry : entries.findAll()) {
-            entry.setPosition(null);
-            entries.save(entry);
-        }
-        entries.flush();
+        EntityTagPrecondition.requireExact(
+                precondition, catalogService.effectiveCatalog().etag());
+        entries.clearPositions(Instant.now());
     }
 
     private CatalogEntry row(CatalogEntryType type, String slug) {
@@ -229,20 +236,15 @@ public class CatalogCustomizationService {
         return catalog.group(slug).orElseThrow(() -> new EntityNotFoundException("Catalog group", slug));
     }
 
-    public static void require(@Nullable EntityTagPrecondition precondition, String tag) {
-        if (precondition == null) throw new CatalogPreconditionRequiredException();
-        if (!precondition.matchesExact(tag)) throw new StaleCatalogEntryException();
-    }
-
     @Transactional
     public CatalogOffer<CatalogPracticeDocument> applyRelease(
             String slug,
             Map<PracticeDefinitionField, PracticeReleaseChoice> choices,
             @Nullable EntityTagPrecondition precondition) {
         lock.acquire();
-        var catalog = offers.effectiveCatalog();
+        var catalog = catalogService.effectiveCatalog();
         var current = practice(catalog, slug);
-        require(precondition, current.etag());
+        EntityTagPrecondition.requireExact(precondition, current.etag());
         var shipped = current.shipped();
         if (shipped == null) throw new EntityNotFoundException("Catalog practice release", slug);
         var definition = PracticeDefinitionMerge.apply(
@@ -259,20 +261,17 @@ public class CatalogCustomizationService {
                 .content()));
         entry.setBase(mapper.valueToTree(shipped));
         entries.saveAndFlush(entry);
-        var result = offers.practice(slug);
+        var result = catalogService.practice(slug);
         record(CatalogEntryType.PRACTICE, slug, before, snapshot(result));
         return result;
     }
 
     @Transactional
     public void move(
-            String slug,
-            @Nullable String groupSlug,
-            @PositiveOrZero int position,
-            @Nullable EntityTagPrecondition precondition) {
+            String slug, @Nullable String groupSlug, int position, @Nullable EntityTagPrecondition precondition) {
         lock.acquire();
-        var catalog = offers.effectiveCatalog();
-        require(precondition, catalog.etag());
+        var catalog = catalogService.effectiveCatalog();
+        EntityTagPrecondition.requireExact(precondition, catalog.etag());
         var current = practice(catalog, slug);
         var before = snapshot(current);
         if (groupSlug != null) group(catalog, groupSlug);
@@ -284,7 +283,7 @@ public class CatalogCustomizationService {
         if (entry.getBase() == null)
             entry.setBase(current.shipped() == null ? null : mapper.valueToTree(current.shipped()));
         entries.saveAndFlush(entry);
-        var changed = offers.effectiveCatalog();
+        var changed = catalogService.effectiveCatalog();
         var peers = new ArrayList<>(changed.practices().stream()
                 .filter(offer -> !offer.slug().equals(slug)
                         && Objects.equals(offer.effective().groupSlug(), groupSlug))
@@ -297,7 +296,7 @@ public class CatalogCustomizationService {
                     .toList());
         }
         entries.flush();
-        record(CatalogEntryType.PRACTICE, slug, before, snapshot(offers.practice(slug)));
+        record(CatalogEntryType.PRACTICE, slug, before, snapshot(catalogService.practice(slug)));
     }
 
     private void resequence(List<CatalogOffer<CatalogPracticeDocument>> offers) {
@@ -309,34 +308,20 @@ public class CatalogCustomizationService {
     }
 
     private static int nextPosition(EffectiveCatalog catalog, CatalogEntryType type) {
-        return type == CatalogEntryType.PRACTICE
-                ? catalog.practices().stream()
-                                .mapToInt(CatalogOffer::position)
-                                .max()
-                                .orElse(-1)
-                        + 1
-                : catalog.groups().stream()
-                                .mapToInt(CatalogOffer::position)
-                                .max()
-                                .orElse(-1)
-                        + 1;
+        List<? extends CatalogOffer<?>> entries =
+                type == CatalogEntryType.PRACTICE ? catalog.practices() : catalog.groups();
+        return entries.stream().mapToInt(CatalogOffer::position).max().orElse(-1) + 1;
     }
 
-    private String definitionDigest(CatalogOffer<?> offer) {
-        return new CanonicalDigest()
-                .add(mapper.writeValueAsString(offer.effective()))
-                .hex();
+    private String digest(Object definition) {
+        return new CanonicalDigest().add(mapper.writeValueAsString(definition)).hex();
     }
 
     private CatalogSnapshot snapshot(CatalogOffer<?> offer) {
         return new CatalogSnapshot(
                 offer.slug(),
-                definitionDigest(offer),
-                offer.base() == null
-                        ? null
-                        : new CanonicalDigest()
-                                .add(mapper.writeValueAsString(offer.base()))
-                                .hex(),
+                digest(offer.effective()),
+                offer.base() == null ? null : digest(offer.base()),
                 offer.position(),
                 offer.excluded());
     }

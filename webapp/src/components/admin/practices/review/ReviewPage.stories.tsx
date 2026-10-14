@@ -93,7 +93,9 @@ export const PastWork: Story = {
 export const NoModelIsReady: Story = {
 	args: { readiness: { enabled: true, model: { status: "ready" } } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("status")).toHaveTextContent("Reviews cannot start");
+		await expect(canvas.getByRole("note", { name: "Practice review readiness" })).toHaveTextContent(
+			"Reviews cannot start",
+		);
 	},
 };
 

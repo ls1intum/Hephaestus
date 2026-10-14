@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -32,22 +33,31 @@ import de.tum.cit.aet.hephaestus.workspace.adapter.WorkspaceSyncTargetProvider;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryProviderNotConnectedException;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.Future;
+import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private static final long INSTALLATION_ID = 9912345L;
 
@@ -216,28 +226,12 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         Connection connection = connectionRepository
                 .findActive(workspace.getId(), IntegrationKind.GITHUB)
                 .orElseThrow();
-        CountDownLatch erased = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        try (var threads = Executors.newFixedThreadPool(2)) {
-            var disconnect = threads.submit(() -> transactionTemplate.executeWithoutResult(status -> {
-                disconnect(connection);
-                erased.countDown();
-                awaitRelease(release);
-            }));
-            try {
-                assertThat(erased.await(20, SECONDS)).isTrue();
-                var creator = threads.submit(() -> workspaceRepositoryMonitorService.addRepositoryToMonitor(
-                        workspace.getWorkspaceSlug(), SHARED_NAME));
-                assertThatThrownBy(() -> creator.get(1, SECONDS)).isInstanceOf(TimeoutException.class);
-                release.countDown();
-                disconnect.get(20, SECONDS);
-                assertThatThrownBy(() -> creator.get(20, SECONDS))
-                        .isInstanceOf(ExecutionException.class)
-                        .hasCauseInstanceOf(RepositoryProviderNotConnectedException.class);
-            } finally {
-                release.countDown();
-            }
-        }
+        assertThatThrownBy(() -> holdLockWhile(() -> disconnect(connection), List.of(status -> {
+                    workspaceRepositoryMonitorService.addRepositoryToMonitor(workspace.getWorkspaceSlug(), SHARED_NAME);
+                    return true;
+                })))
+                .isInstanceOf(ExecutionException.class)
+                .hasCauseInstanceOf(RepositoryProviderNotConnectedException.class);
         assertThat(connectionRepository
                         .findById(connection.getId())
                         .orElseThrow()
@@ -257,25 +251,13 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         Connection connection = connectionRepository
                 .findActive(workspace.getId(), IntegrationKind.GITHUB)
                 .orElseThrow();
-        CountDownLatch created = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        try (var threads = Executors.newFixedThreadPool(2)) {
-            var creator = threads.submit(() -> transactionTemplate.executeWithoutResult(status -> {
-                workspaceRepositoryMonitorService.addRepositoryToMonitor(workspace.getWorkspaceSlug(), SHARED_NAME);
-                created.countDown();
-                awaitRelease(release);
-            }));
-            try {
-                assertThat(created.await(20, SECONDS)).isTrue();
-                var disconnect = threads.submit(() -> disconnect(connection));
-                assertThatThrownBy(() -> disconnect.get(1, SECONDS)).isInstanceOf(TimeoutException.class);
-                release.countDown();
-                creator.get(20, SECONDS);
-                disconnect.get(20, SECONDS);
-            } finally {
-                release.countDown();
-            }
-        }
+        holdLockWhile(
+                () -> workspaceRepositoryMonitorService.addRepositoryToMonitor(
+                        workspace.getWorkspaceSlug(), SHARED_NAME),
+                List.of(status -> {
+                    disconnect(connection);
+                    return true;
+                }));
         assertThat(connectionRepository
                         .findById(connection.getId())
                         .orElseThrow()
@@ -293,33 +275,23 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         Connection connection = connectionRepository
                 .findActive(workspace.getId(), IntegrationKind.GITHUB)
                 .orElseThrow();
-        CountDownLatch locked = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        try (var threads = Executors.newFixedThreadPool(2)) {
-            var update = threads.submit(() -> transactionTemplate.executeWithoutResult(status -> {
-                connectionRepository.acquireLifecycleLock(connection.getId(), workspace.getId());
-                Connection current =
-                        connectionRepository.findById(connection.getId()).orElseThrow();
-                current.setConfig(new ConnectionConfig.GitHubAppConfig(
-                        INSTALLATION_ID, workspace.getAccountLogin(), null, Set.of()));
-                connectionRepository.saveAndFlush(current);
-                locked.countDown();
-                awaitRelease(release);
-            }));
-            try {
-                assertThat(locked.await(20, SECONDS)).isTrue();
-                var creator = threads.submit(() -> workspaceRepositoryMonitorService.addRepositoryToMonitor(
-                        workspace.getWorkspaceSlug(), SHARED_NAME));
-                assertThatThrownBy(() -> creator.get(1, SECONDS)).isInstanceOf(TimeoutException.class);
-                release.countDown();
-                update.get(20, SECONDS);
-                assertThatThrownBy(() -> creator.get(20, SECONDS))
-                        .isInstanceOf(ExecutionException.class)
-                        .hasCauseInstanceOf(RepositoryManagementNotAllowedException.class);
-            } finally {
-                release.countDown();
-            }
-        }
+        assertThatThrownBy(() -> holdLockWhile(
+                        () -> {
+                            connectionRepository.acquireLifecycleLock(connection.getId(), workspace.getId());
+                            var current = connectionRepository
+                                    .findById(connection.getId())
+                                    .orElseThrow();
+                            current.setConfig(new ConnectionConfig.GitHubAppConfig(
+                                    INSTALLATION_ID, workspace.getAccountLogin(), null, Set.of()));
+                            connectionRepository.saveAndFlush(current);
+                        },
+                        List.of(status -> {
+                            workspaceRepositoryMonitorService.addRepositoryToMonitor(
+                                    workspace.getWorkspaceSlug(), SHARED_NAME);
+                            return true;
+                        })))
+                .isInstanceOf(ExecutionException.class)
+                .hasCauseInstanceOf(RepositoryManagementNotAllowedException.class);
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
                 .isEmpty();
     }
@@ -331,39 +303,22 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         Connection connection = connectionRepository
                 .findActive(workspace.getId(), IntegrationKind.GITHUB)
                 .orElseThrow();
-        CountDownLatch locked = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        try (var threads = Executors.newFixedThreadPool(3)) {
-            var holder = threads.submit(() -> transactionTemplate.executeWithoutResult(status -> {
-                connectionRepository.acquireLifecycleLock(connection.getId(), workspace.getId());
-                locked.countDown();
-                awaitRelease(release);
-            }));
+        Function<TransactionStatus, Boolean> create = status -> {
             try {
-                assertThat(locked.await(20, SECONDS)).isTrue();
-                var first = threads.submit(() -> addPatMonitor(workspace));
-                var second = threads.submit(() -> addPatMonitor(workspace));
-                assertThatThrownBy(() -> first.get(1, SECONDS)).isInstanceOf(TimeoutException.class);
-                release.countDown();
-                holder.get(20, SECONDS);
-                assertThat(List.of(first.get(20, SECONDS), second.get(20, SECONDS)))
-                        .containsExactlyInAnyOrder(true, false);
-            } finally {
-                release.countDown();
+                workspaceRepositoryMonitorService.addRepositoryToMonitor(workspace.getWorkspaceSlug(), SHARED_NAME);
+                return true;
+            } catch (RepositoryAlreadyMonitoredException exception) {
+                status.setRollbackOnly();
+                return false;
             }
-        }
+        };
+        assertThat(holdLockWhile(
+                        () -> connectionRepository.acquireLifecycleLock(connection.getId(), workspace.getId()),
+                        List.of(create, create)))
+                .containsExactlyInAnyOrder(true, false);
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
                 .singleElement()
                 .satisfies(monitor -> assertThat(monitor.getNativeId()).isEqualTo(9001L));
-    }
-
-    private boolean addPatMonitor(Workspace workspace) {
-        try {
-            workspaceRepositoryMonitorService.addRepositoryToMonitor(workspace.getWorkspaceSlug(), SHARED_NAME);
-            return true;
-        } catch (RepositoryAlreadyMonitoredException e) {
-            return false;
-        }
     }
 
     private void disconnect(Connection connection) {
@@ -385,6 +340,54 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
                         UUID.randomUUID().toString(),
                         null),
                 strategy);
+    }
+
+    private <T> List<T> holdLockWhile(Runnable holder, List<Function<TransactionStatus, T>> contenders)
+            throws Exception {
+        var release = new CountDownLatch(1);
+        var blocker = new CompletableFuture<Integer>();
+        try (var threads = Executors.newFixedThreadPool(contenders.size() + 1)) {
+            var holding = threads.submit(() -> {
+                try {
+                    transactionTemplate.executeWithoutResult(status -> {
+                        holder.run();
+                        blocker.complete(
+                                Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
+                        awaitRelease(release);
+                    });
+                } catch (RuntimeException error) {
+                    blocker.completeExceptionally(error);
+                    throw error;
+                }
+            });
+            try {
+                int holderPid = blocker.get(20, SECONDS);
+                var pending = new ArrayList<Future<T>>();
+                for (var operation : contenders) {
+                    var contender = new CompletableFuture<Integer>();
+                    pending.add(threads.submit(() -> Objects.requireNonNull(transactionTemplate.execute(status -> {
+                        contender.complete(
+                                Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
+                        return operation.apply(status);
+                    }))));
+                    int contenderPid = contender.get(20, SECONDS);
+                    await().atMost(Duration.ofSeconds(20))
+                            .untilAsserted(() -> assertThat(jdbc.queryForObject(
+                                            "SELECT ? = ANY(pg_blocking_pids(?))",
+                                            Boolean.class,
+                                            holderPid,
+                                            contenderPid))
+                                    .isTrue());
+                }
+                release.countDown();
+                holding.get(20, SECONDS);
+                var results = new ArrayList<T>();
+                for (var future : pending) results.add(future.get(20, SECONDS));
+                return results;
+            } finally {
+                release.countDown();
+            }
+        }
     }
 
     private static void awaitRelease(CountDownLatch release) {

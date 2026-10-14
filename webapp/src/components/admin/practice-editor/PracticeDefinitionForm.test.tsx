@@ -202,10 +202,8 @@ describe("Applies when", () => {
 });
 
 describe("the kind a practice is created for", () => {
-	it("restores each kind's conditions instead of submitting another kind's", async () => {
-		const onSubmit = vi.fn<Submit>();
-		await renderCreateForm(onSubmit);
-		await fillValidDraft();
+	it("restores each kind's conditions when the item kind changes", async () => {
+		await renderCreateForm(vi.fn());
 		fireEvent.click(screen.getByRole("radio", { name: /^Pull request review/u }));
 		fireEvent.change(appliesWhenField(), {
 			target: { value: '[{"hasItems":"scm.review-threads"}]' },

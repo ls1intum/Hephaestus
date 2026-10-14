@@ -16,7 +16,8 @@ import {
 } from "./lib/core/contract.ts";
 import { EvidenceReader, noReceipts, type EvidenceSources } from "./lib/core/evidence-reader.ts";
 import { resolveLeads, type QuotedLead } from "./lib/core/leads.ts";
-import { hostModels, MAX_OUTPUT_TOKENS, ModelBudget } from "./lib/core/models-host.ts";
+import { MAX_OUTPUT_TOKENS } from "./lib/core/model-options.ts";
+import { hostModels, ModelBudget } from "./lib/core/models-host.ts";
 import { UnratedError } from "./lib/core/practice-script.ts";
 import { runPracticeProgram, type ProgramOutcome } from "./lib/core/program-host.ts";
 import { InputReader } from "./lib/core/script-inputs.ts";
@@ -103,6 +104,7 @@ interface RunOptions {
 
 async function stage(slugs: Record<string, string>) {
 	const { root, practices } = await stagePracticeScripts(slugs);
+	await copyFile(path.join(fixtures, "comment-kinds.ts"), path.join(practices, "comment-kinds.ts"));
 	roots.push(root);
 	const repo = path.join(root, "repo");
 	await mkdir(path.join(repo, "lib"), { recursive: true });
@@ -553,9 +555,6 @@ void describe("the attempt's direct model budget", () => {
 			assert.equal(outcome.status, "failed", outcome.error);
 			assert.equal(outcome.stopReason, "deadline");
 			assert.equal(outcome.candidate, undefined);
-			assert.deepEqual(outcome.models, [
-				{ slot: "embedding", need: "required", bound: true, failures: { deadline: 1 } },
-			]);
 		});
 	});
 

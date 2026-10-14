@@ -2,10 +2,6 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogConflictException;
-import de.tum.cit.aet.hephaestus.practices.catalog.CatalogPreconditionRequiredException;
-import de.tum.cit.aet.hephaestus.practices.catalog.StaleCatalogEntryException;
-import de.tum.cit.aet.hephaestus.practices.curated.adoption.CatalogAdoptionPreconditionRequiredException;
-import de.tum.cit.aet.hephaestus.practices.curated.adoption.StaleCatalogAdoptionPlanException;
 import de.tum.cit.aet.hephaestus.practices.review.InvalidReviewScopeException;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewPreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.review.StalePracticeReviewSettingsException;
@@ -57,38 +53,6 @@ public class PracticesControllerAdvice {
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 
-    @ExceptionHandler(StaleCatalogEntryException.class)
-    ProblemDetail handleStaleCatalogEntry(StaleCatalogEntryException exception) {
-        return problem(
-                HttpStatus.CONFLICT,
-                "Practice catalog changed",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
-    @ExceptionHandler(CatalogPreconditionRequiredException.class)
-    ProblemDetail handleCatalogPreconditionRequired(CatalogPreconditionRequiredException exception) {
-        return problem(
-                HttpStatus.PRECONDITION_REQUIRED,
-                "Practice catalog version required",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
-    @ExceptionHandler(StaleCatalogAdoptionPlanException.class)
-    ProblemDetail handleStaleAdoptionPlan(StaleCatalogAdoptionPlanException exception) {
-        return problem(
-                HttpStatus.CONFLICT,
-                "Practice adoption preview changed",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
-    @ExceptionHandler(CatalogAdoptionPreconditionRequiredException.class)
-    ProblemDetail handleAdoptionPreconditionRequired(CatalogAdoptionPreconditionRequiredException exception) {
-        return problem(
-                HttpStatus.PRECONDITION_REQUIRED,
-                "Practice adoption preview required",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
     @ExceptionHandler(StalePracticeReviewSettingsException.class)
     ProblemDetail handleStaleReviewSettings(StalePracticeReviewSettingsException exception) {
         return problem(
@@ -102,22 +66,6 @@ public class PracticesControllerAdvice {
         return problem(
                 HttpStatus.PRECONDITION_REQUIRED,
                 "Practice review settings version required",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
-    @ExceptionHandler(PracticeReleasePreconditionRequiredException.class)
-    ProblemDetail handleReleasePreconditionRequired(PracticeReleasePreconditionRequiredException exception) {
-        return problem(
-                HttpStatus.PRECONDITION_REQUIRED,
-                "Practice release version required",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
-    @ExceptionHandler(StalePracticeReleaseException.class)
-    ProblemDetail handleStaleRelease(StalePracticeReleaseException exception) {
-        return problem(
-                HttpStatus.CONFLICT,
-                "Practice release changed",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 

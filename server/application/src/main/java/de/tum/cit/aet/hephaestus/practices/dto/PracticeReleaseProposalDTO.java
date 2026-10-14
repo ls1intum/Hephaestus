@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 public record PracticeReleaseProposalDTO(
         String practiceSlug,
 
-        @Schema(pattern = "^[1-9][0-9]*$", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(pattern = "^[1-9][0-9]*$", requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @Nullable
         String currentVersionId,
 
         PracticeDefinition current,

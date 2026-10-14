@@ -61,7 +61,7 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(incoming.getWorkspaceSlug()).isNotEqualTo(existing.getWorkspaceSlug());
         assertThat(connectionService.findActiveGitHubAppConfig(existing.getId()))
                 .isEmpty();
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
                         incoming.getId(), formerAccount.getId()))
                 .isEmpty();
 
@@ -91,10 +91,10 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         Objects.requireNonNull(ensureGitHubProvider().getId()))
                 .orElseThrow();
         assertThat(installedActor.getId()).isNotEqualTo(formerLoginOwner.getId());
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
                         workspace.getId(), installedActor.getId()))
                 .hasValueSatisfying(member -> assertThat(member.getRole()).isEqualTo(Membership.WorkspaceRole.OWNER));
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
                         workspace.getId(), formerLoginOwner.getId()))
                 .isEmpty();
     }
@@ -117,7 +117,7 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(workspace.getAccountType()).isEqualTo(AccountType.ORG);
 
         var membership = workspaceMembershipRepository
-                .findByWorkspace_IdAndAccount_Id(workspace.getId(), owner.getId())
+                .findByWorkspace_IdAndId_AccountId(workspace.getId(), owner.getId())
                 .orElseThrow();
         assertThat(membership.getRole()).isEqualTo(Membership.WorkspaceRole.OWNER);
     }

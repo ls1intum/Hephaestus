@@ -76,7 +76,7 @@ The [pipeline](../contributor/practice-review-pipeline.mdx) owns stage boundarie
 All roles, runtime images and clients upgrade together.
 One atomic migration transforms the released schema directly to this model.
 It preserves retained identifiers, independent feedback pieces, unknown proof and provider write receipts.
-Earlier queued runtime contracts are cancelled, not decoded by a compatibility path.
+The migration cancels queued jobs that use an unsupported runtime contract.
 A digest does not reassess historical work.
 
 The [migration procedure](../contributor/database-migration.mdx#prove-the-released-state-upgrade) owns upgrade verification.

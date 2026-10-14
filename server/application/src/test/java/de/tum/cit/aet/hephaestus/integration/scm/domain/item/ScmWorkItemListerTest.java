@@ -9,14 +9,13 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemListRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,13 +38,18 @@ class ScmWorkItemListerTest extends BaseUnitTest {
             var version = item.kind().equals(ScmItemEvents.REPOSITORY)
                     ? commit
                     : new ItemVersion(revision.get() + ":" + item.sourceId(), null);
-            return new ItemSnapshot(
-                    item,
-                    version,
-                    new IntegrationRef(IntegrationKind.GITHUB, 1, null),
-                    Map.of(),
-                    List.of(),
-                    new ItemLabel(item.itemId(), "Work", "Issue", 1, "owner/repo", null, IntegrationKind.GITHUB));
+            return ItemFixtures.snapshot(item, Map.of())
+                    .version(version)
+                    .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, null))
+                    .label(ItemFixtures.label()
+                            .itemId(item.itemId())
+                            .title("Work")
+                            .noun("Issue")
+                            .number(1)
+                            .container("owner/repo")
+                            .integration(IntegrationKind.GITHUB)
+                            .build())
+                    .build();
         });
         when(writer.upsert(any())).thenAnswer(call -> {
             ItemRegistration registration = call.getArgument(0);

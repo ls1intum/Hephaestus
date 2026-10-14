@@ -5,11 +5,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogChangeKind;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogEntryState;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogOffer;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
 import de.tum.cit.aet.hephaestus.practices.catalog.EffectiveCatalog;
-import de.tum.cit.aet.hephaestus.practices.curated.CatalogChangeKind;
-import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntryState;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeVersionDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
@@ -28,7 +28,6 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
         var definition = new GroupDefinition("Review", "Review practices", null, null);
         var offer = new CatalogOffer<>(
                 "review",
-                null,
                 definition,
                 definition,
                 definition,

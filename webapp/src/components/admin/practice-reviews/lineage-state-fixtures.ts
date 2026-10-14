@@ -10,12 +10,17 @@ import type {
 } from "@/api/types.gen";
 
 import {
+	boundFeedbackOf,
+	boundResultOf,
+	feedbackDetail,
 	gitlabMergeRequest,
 	outlineDocument,
 	practiceNameOf,
 	pullRequestReviewItem,
 	reviewAccounts,
+	resultDetail,
 	reviewDetail,
+	reviewRefOf,
 	reviewDetailScanManyJobs,
 	reviewDevelopers,
 	reviewItem,
@@ -65,20 +70,14 @@ function stateResult(
 ): LineageResultSpec {
 	const practiceSlug = overrides.practiceSlug ?? "errors-carry-context";
 	return {
-		result: {
-			id: resultId,
-			reviewId: LINEAGE_REVIEW_ID,
-			item: reviewItem,
-			developer: reviewDevelopers.ada,
-			practiceSlug,
-			practiceName: practiceNameOf(practiceSlug),
-			outcome: "NOT_MET",
-			severity: "MAJOR",
-			summary: "A cache miss and a permission failure come back as the same 404",
-			recordedAt: at("13:39:00"),
-			currentness: "CURRENT",
-			...overrides,
-		},
+		result: boundResultOf(
+			resultDetail({
+				id: resultId,
+				practiceSlug,
+				practiceName: practiceNameOf(practiceSlug),
+				...overrides,
+			}),
+		),
 		problems,
 	};
 }
@@ -116,14 +115,14 @@ function stateFeedback(
 	overrides: Partial<ReviewBoundFeedback> = {},
 ): LineageFeedbackSpec {
 	return {
-		feedback: {
-			id: feedbackId,
-			destination: "ON_WORK",
-			state: "DELIVERED",
-			deliveredAt: at("13:41:30"),
-			withdrawn: false,
-			...overrides,
-		},
+		feedback: boundFeedbackOf(
+			feedbackDetail({
+				id: feedbackId,
+				state: "DELIVERED",
+				deliveredAt: at("13:41:30"),
+				...overrides,
+			}),
+		),
 		basis,
 	};
 }
@@ -131,16 +130,9 @@ function stateFeedback(
 const oneComment = (overrides: Partial<ReviewBoundFeedback> = {}) =>
 	stateFeedback(FEEDBACK_A, [RESULT_A], overrides);
 
-const baseReview: ReviewRef = {
-	id: LINEAGE_REVIEW_ID,
-	kind: "ITEM",
-	item: reviewItem,
-	itemVersion: "27f4e88c9f5a",
-	origin: "EVENT",
-	status: "COMPLETE",
-	createdAt: at("13:35:00"),
-	completedAt: at("13:44:00"),
-};
+const baseReview = reviewRefOf(
+	reviewDetail({ id: LINEAGE_REVIEW_ID, completedAt: at("13:44:00") }),
+);
 
 interface ChainSpec {
 	item?: ItemRef;
@@ -192,10 +184,6 @@ const withCase = (
 	lineage: ReviewLineage,
 	review?: (lineage: ReviewLineage) => ReviewDetail,
 ): LineageStateCase => ({ key, title, lineage, review: review?.(lineage) });
-
-// ------------------------------------------------------------------------------------------------
-// The review: where it is or how it ended
-// ------------------------------------------------------------------------------------------------
 
 const withheldPractice: ReviewPractice = {
 	practiceSlug: "product-language",
@@ -289,10 +277,6 @@ const reviewCases: LineageStateCase[] = [
 	},
 	withCase("record-gone", "The record of the review is gone", chain({ review: null })),
 ];
-
-// ------------------------------------------------------------------------------------------------
-// What started it
-// ------------------------------------------------------------------------------------------------
 
 const originCases: LineageStateCase[] = [
 	withCase("origin-event", "Started by an event", chain()),
@@ -558,10 +542,6 @@ const deliveryCases: LineageStateCase[] = [
 		),
 	),
 ];
-
-// ------------------------------------------------------------------------------------------------
-// Volume
-// ------------------------------------------------------------------------------------------------
 
 const volumeCases: LineageStateCase[] = [
 	withCase(

@@ -65,22 +65,22 @@ class WorkspaceOnboardingLifecycleIntegrationTest extends AbstractWorkspaceInteg
         assertThat(exported.aiChoice()).isEqualTo("NO_AI");
 
         new TransactionTemplate(transactions).executeWithoutResult(status -> lifecycle.eraseAccount(account));
-        assertThat(members.findByAccount_Id(account)).isEmpty();
-        assertThat(members.findByWorkspace_IdAndAccount_Id(first.getId(), account))
+        assertThat(members.findById_AccountId(account)).isEmpty();
+        assertThat(members.findByWorkspace_IdAndId_AccountId(first.getId(), account))
                 .isEmpty();
         var otherExport = exports.choice(other);
         assertThat(otherExport).isNotNull();
         assertThat(otherExport.aiChoice()).isEqualTo("IN_HOUSE_ONLY");
-        assertThat(members.findByWorkspace_IdAndAccount_Id(first.getId(), other))
+        assertThat(members.findByWorkspace_IdAndId_AccountId(first.getId(), other))
                 .isPresent();
         assertThat(settings.findByWorkspaceId(first.getId())).isPresent();
 
         new TransactionTemplate(transactions)
                 .executeWithoutResult(status -> lifecycle.deleteWorkspaceData(first.getId()));
         assertThat(settings.findByWorkspaceId(first.getId())).isEmpty();
-        assertThat(members.findByWorkspace_IdAndAccount_Id(first.getId(), other))
+        assertThat(members.findByWorkspace_IdAndId_AccountId(first.getId(), other))
                 .isEmpty();
-        assertThat(members.findByWorkspace_IdAndAccount_Id(second.getId(), other))
+        assertThat(members.findByWorkspace_IdAndId_AccountId(second.getId(), other))
                 .isPresent();
         // Purging a workspace never touches a member's account-level answer.
         assertThat(exports.choice(other)).isNotNull();

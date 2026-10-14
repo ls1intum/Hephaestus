@@ -229,6 +229,8 @@ final class LiveRunnerWorkspace {
                 .put("versionId", Long.toString(revisionId))
                 .put("reviewDigest", "a".repeat(64));
         entry.set("definition", MAPPER.valueToTree(definition));
+        var reads = entry.putArray("readsSources");
+        definition.reads().sources().forEach(source -> reads.add(source.source().value()));
         Files.write(practices.resolve("index.json"), MAPPER.writeValueAsBytes(List.of(entry)));
         Files.writeString(practices.resolve(slug + ".md"), criteria);
     }

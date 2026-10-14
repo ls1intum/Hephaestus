@@ -15,7 +15,12 @@ import type {
 } from "@ai-sdk/provider";
 import { z } from "zod";
 
-import { isJsonObject } from "./json.ts";
+import {
+	chatOptionsSchema,
+	decisionOptionsSchema,
+	embeddingOptionsSchema,
+	rerankingOptionsSchema,
+} from "./model-options.ts";
 
 export const NOT_A_DEFINITION_ERROR =
 	"The script's default export is not a practice script. Write it with definePracticeScript.";
@@ -169,33 +174,16 @@ export type SlotAnswer<S extends ModelSlot = ModelSlot> = {
 	[K in S]: { slot: K; result: SlotTypes[K]["result"] };
 }[S];
 
-type CallOptions<S extends ModelSlot> = SlotTypes[S]["options"] & Record<string, unknown>;
-
 export interface SlotCall<S extends ModelSlot> {
-	/** The options a program may set. Provider options and headers stay with the host. */
-	options: readonly string[];
-	/**
-	 * Whether the options hold each field that a call to this slot's model requires, as a list, a record
-	 * or text. It also checks the entries of embedding values and rerank documents, and the type and
-	 * instructions of each decision question. It does not check a chat prompt's messages, what a
-	 * decision state holds, or the optional fields: the provider client checks them, and a call that it
-	 * refuses is not rated, with "error".
-	 */
-	accepts: (options: Record<string, unknown>) => options is CallOptions<S>;
+	/** Parsed program options exclude host-only provider configuration. */
+	options: z.ZodType<SlotTypes[S]["options"]>;
 	/** The items a call holds, and the most that one call may hold. */
-	items?: { count: (options: Record<string, unknown>) => number; max: number };
+	items?: { count: (options: SlotTypes[S]["options"]) => number; max: number };
 	/** Call the model. The tokens are input and output together, or undefined when it reports none. */
 	call: (
 		model: SlotTypes[S]["model"],
 		options: SlotTypes[S]["options"],
 	) => Promise<{ value: SlotAnswer; tokens: number | undefined }>;
-}
-
-function size(value: unknown): number {
-	if (Array.isArray(value)) {
-		return value.length;
-	}
-	return isJsonObject(value) ? Object.keys(value).length : 0;
 }
 
 const sum = (...counts: (number | undefined)[]): number | undefined =>
@@ -235,54 +223,9 @@ export function hasLanguageUsageReceipt(usage: LanguageModelV4GenerateResult["us
 	);
 }
 
-function isChatCall(options: Record<string, unknown>): options is CallOptions<"chat"> {
-	return Array.isArray(options.prompt);
-}
-
-const QUESTION_TYPES = new Set<unknown>(["boolean", "choice", "score"]);
-
-function isDecisionCall(options: Record<string, unknown>): options is CallOptions<"decision"> {
-	const { state, questions } = options;
-	return (
-		(typeof state === "string" || (typeof state === "object" && state !== null)) &&
-		isJsonObject(questions) &&
-		Object.values(questions).every(
-			(question) =>
-				isJsonObject(question) &&
-				QUESTION_TYPES.has(question.type) &&
-				question.instructions !== undefined,
-		)
-	);
-}
-
-function isEmbeddingCall(options: Record<string, unknown>): options is CallOptions<"embedding"> {
-	return Array.isArray(options.values) && options.values.every((v) => typeof v === "string");
-}
-
-function isRerankingCall(options: Record<string, unknown>): options is CallOptions<"reranking"> {
-	const { query, documents } = options;
-	if (typeof query !== "string" || !isJsonObject(documents) || !Array.isArray(documents.values)) {
-		return false;
-	}
-	return documents.type === "text"
-		? documents.values.every((v) => typeof v === "string")
-		: documents.type === "object" && documents.values.every(isJsonObject);
-}
-
 export const MODEL_SLOT_CALLS = {
 	chat: {
-		options: [
-			"prompt",
-			"tools",
-			"toolChoice",
-			"responseFormat",
-			"temperature",
-			"topP",
-			"seed",
-			"stopSequences",
-			"maxOutputTokens",
-		],
-		accepts: isChatCall,
+		options: chatOptionsSchema,
 		call: async (model, options) => {
 			const result = await model.doGenerate(options);
 			const { inputTokens, outputTokens } = result.usage;
@@ -296,9 +239,11 @@ export const MODEL_SLOT_CALLS = {
 		},
 	},
 	decision: {
-		options: ["state", "questions"],
-		accepts: isDecisionCall,
-		items: { count: (options) => size(options.questions), max: MODEL_SLOT_CAPS.decision },
+		options: decisionOptionsSchema,
+		items: {
+			count: (options) => Object.keys(options.questions).length,
+			max: MODEL_SLOT_CAPS.decision,
+		},
 		call: async (model, options) => {
 			const result = await model.doDecide(options);
 			return {
@@ -308,20 +253,17 @@ export const MODEL_SLOT_CALLS = {
 		},
 	},
 	embedding: {
-		options: ["values"],
-		accepts: isEmbeddingCall,
-		items: { count: (options) => size(options.values), max: MODEL_SLOT_CAPS.embedding },
+		options: embeddingOptionsSchema,
+		items: { count: (options) => options.values.length, max: MODEL_SLOT_CAPS.embedding },
 		call: async (model, options) => {
 			const result = await model.doEmbed(options);
 			return { value: { slot: "embedding", result }, tokens: result.usage?.tokens };
 		},
 	},
 	reranking: {
-		options: ["documents", "query", "topN"],
-		accepts: isRerankingCall,
+		options: rerankingOptionsSchema,
 		items: {
-			count: (options) =>
-				size(isJsonObject(options.documents) ? options.documents.values : undefined),
+			count: (options) => options.documents.values.length,
 			max: MODEL_SLOT_CAPS.reranking,
 		},
 		call: async (model, options) => {
@@ -521,34 +463,7 @@ export type ReadReceipt = z.infer<typeof readReceiptSchema>;
 
 export type Coverage = z.infer<typeof coverageShape> & Completeness;
 
-type ResultBase = Pick<Superset, "summary" | "explanation"> & { coverage: Coverage };
-export type Candidate = ResultBase &
-	(
-		| {
-				outcome: "MET";
-				citations: NonEmpty<Citation>;
-				coverage: { complete: true };
-				example?: Example;
-				evidence: { search?: SearchWarrant };
-		  }
-		| {
-				outcome: "NOT_MET";
-				citations: readonly Citation[];
-				problems: NonEmpty<Problem>;
-				example?: Example;
-				evidence: { search?: SearchWarrant; openQuestions?: NonEmpty<OpenQuestion> };
-		  }
-		| {
-				outcome: "DOES_NOT_APPLY";
-				citations: NonEmpty<Citation>;
-				evidence: { inapplicability: InapplicabilityWarrant };
-		  }
-		| {
-				outcome: "COULD_NOT_DETERMINE";
-				citations: NonEmpty<Citation>;
-				evidence: { search?: SearchWarrant; openQuestions: NonEmpty<OpenQuestion> };
-		  }
-	);
+export type Candidate = NonNullable<ReturnType<typeof candidateOf>>;
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 /** What a review session submits: a candidate without numbers. The host adds the coverage it measured. */
 export type SessionCandidate = DistributiveOmit<Candidate, "coverage">;
@@ -684,7 +599,7 @@ const supersetShape = z.strictObject({
 	outcome: z.enum(OUTCOMES),
 	summary: line(CANDIDATE_LIMITS.summaryChars),
 	explanation: bounded(CANDIDATE_LIMITS.explanationChars),
-	citations: listOf(citationShape, CANDIDATE_LIMITS.resultCitations),
+	citations: listOf(citationShape, CANDIDATE_LIMITS.resultCitations).readonly(),
 	problems: listOf(problemShape, CANDIDATE_LIMITS.problems).optional(),
 	example: exampleShape.optional(),
 	evidence: z.strictObject({
@@ -712,7 +627,6 @@ const refuse = (reasonCode: CandidateRefusal, message: string): Refusal => ({
 	message,
 });
 
-/** The coverage as typed, or why its counts and its completeness contradict each other. */
 function readCoverage(coverage: Superset["coverage"]): Coverage | string {
 	const omissions = nonEmpty(coverage.omitted ?? []);
 	if (coverage.complete !== (omissions === undefined)) {
@@ -853,7 +767,7 @@ const WARRANT_RULES: Readonly<
 	COULD_NOT_DETERMINE: {
 		holds: (e) => e.inapplicability === undefined && e.openQuestions !== undefined,
 		message:
-			"an COULD_NOT_DETERMINE result carries its open questions, and a search warrant at most",
+			"a COULD_NOT_DETERMINE result carries its open questions, and a search warrant at most",
 	},
 };
 
@@ -927,7 +841,7 @@ export const sessionCandidateSchema = supersetShape
 	});
 export type ParsedSessionCandidate = z.infer<typeof sessionCandidateSchema>;
 
-function candidateOf(sent: Superset, coverage: Coverage): Candidate | undefined {
+function candidateOf(sent: Superset, coverage: Coverage) {
 	const { outcome, summary, explanation, example } = sent;
 	const { search, inapplicability, openQuestions } = sent.evidence;
 	const base = { summary, explanation };
@@ -936,7 +850,7 @@ function candidateOf(sent: Superset, coverage: Coverage): Candidate | undefined 
 	const searched = search === undefined ? {} : { search };
 	const exemplified = example === undefined ? {} : { example };
 	if (outcome === "MET" && citations !== undefined && coverage.complete) {
-		return { ...base, outcome, citations, coverage, ...exemplified, evidence: searched };
+		return { ...base, outcome, citations, coverage, ...exemplified, evidence: searched } as const;
 	}
 	if (outcome === "NOT_MET" && problems !== undefined) {
 		return {
@@ -947,15 +861,21 @@ function candidateOf(sent: Superset, coverage: Coverage): Candidate | undefined 
 			...exemplified,
 			coverage,
 			evidence: { ...searched, ...(openQuestions === undefined ? {} : { openQuestions }) },
-		};
+		} as const;
 	}
 	if (outcome === "DOES_NOT_APPLY" && citations !== undefined && inapplicability !== undefined) {
-		return { ...base, outcome, citations, coverage, evidence: { inapplicability } };
+		return { ...base, outcome, citations, coverage, evidence: { inapplicability } } as const;
 	}
 	if (outcome === "COULD_NOT_DETERMINE" && citations !== undefined && openQuestions !== undefined) {
-		return { ...base, outcome, citations, coverage, evidence: { ...searched, openQuestions } };
+		return {
+			...base,
+			outcome,
+			citations,
+			coverage,
+			evidence: { ...searched, openQuestions },
+		} as const;
 	}
-	return undefined;
+	return null;
 }
 
 /**
@@ -1001,7 +921,7 @@ export function parseCandidate(
 		return after;
 	}
 	const candidate = candidateOf(sent, coverage);
-	return candidate === undefined
+	return candidate === null
 		? refuse("malformed_candidate", "the candidate matches no outcome")
 		: { ok: true, candidate };
 }

@@ -4,8 +4,10 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import lombok.Builder;
 import org.jspecify.annotations.Nullable;
 
+@Builder
 public record ReviewRequest(
         long workspaceId,
         long itemId,

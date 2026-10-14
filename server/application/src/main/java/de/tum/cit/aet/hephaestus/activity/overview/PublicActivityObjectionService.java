@@ -51,7 +51,7 @@ class PublicActivityObjectionService {
         long accountId = memberVisibility.accountIdForUser(userId);
         if (!writeFence.holdForAccountWrite(accountId)) throw new EntityNotFoundException("Contributor", userId);
         var workspace = workspaces.findByIdForUpdate(workspaceId).orElseThrow();
-        var member = memberships.findByWorkspace_IdAndAccount_Id(workspaceId, accountId);
+        var member = memberships.findByWorkspace_IdAndId_AccountId(workspaceId, accountId);
         boolean before = member.map(Membership::isHidden).orElse(false);
         if (before == hide) return;
         if (member.isPresent() && member.get().getLeftAt() == null) {

@@ -522,10 +522,7 @@
 			"rules": { "unicorn/no-process-exit": "off" }
 		},
 		{
-			// The runner's tools answer per item, so a validator is one guard per rule of a contract, and
-			// a practice script is one guard per shape it recognises; at the default 20 the rule grades
-			// how many rules the contract has. Forty is the line between that and a function doing several
-			// functions' work. An orchestration scenario is one linear story per stage, and is not graded.
+			// Per-item validators branch on each contract rule; orchestration specs use a separate override.
 			"files": [
 				"server/application/src/main/resources/agent/**",
 				"server/application/src/main/resources/practices/scripts/**",

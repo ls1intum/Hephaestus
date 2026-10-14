@@ -81,7 +81,7 @@ class AccountExportServiceTest extends BaseUnitTest {
         when(featureRepo.findFlagsByAccountId(ACCOUNT_ID)).thenReturn(List.of("notification_access"));
         when(authEventRepo.findByAccountSince(eq(ACCOUNT_ID), any())).thenReturn(List.of());
         when(membershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(new MembershipView(7L, "tum-ase", "TUM ASE", "MEMBER")));
+                .thenReturn(List.of(new MembershipView(7L, "tum-ase", "TUM ASE", AccountMembershipQuery.Role.MEMBER)));
         when(preferencesQuery.preferencesForAccount(ACCOUNT_ID))
                 .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(!participating, false)));
 

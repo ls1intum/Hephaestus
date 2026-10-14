@@ -139,7 +139,7 @@ class WorkspaceProvisioningServiceTest {
 
         when(workspaceRepository.count()).thenReturn(0L);
         when(workspaceMembershipService.accountIdForUser(admin.getId())).thenReturn(199L);
-        when(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(1L, 199L))
+        when(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(1L, 199L))
                 .thenReturn(Optional.empty());
         when(workspaceService.createWorkspace(anyString(), anyString(), anyString(), any(AccountType.class), anyLong()))
                 .thenReturn(workspace);
@@ -215,7 +215,7 @@ class WorkspaceProvisioningServiceTest {
         when(workspaceRepository.findAll()).thenReturn(List.of(workspace));
         when(userRepository.findByLogin("admin")).thenReturn(Optional.of(admin));
         when(workspaceMembershipService.accountIdForUser(admin.getId())).thenReturn(199L);
-        when(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(workspace.getId(), 199L))
+        when(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(workspace.getId(), 199L))
                 .thenReturn(Optional.empty());
 
         provisioningService.bootstrapDefaultPatWorkspace();

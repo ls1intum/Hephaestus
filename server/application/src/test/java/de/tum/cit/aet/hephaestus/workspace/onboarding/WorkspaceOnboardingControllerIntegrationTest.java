@@ -73,11 +73,11 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .extracting(Account::getAiChoice)
                 .isEqualTo(AiChoice.NO_AI);
         // Answering is not finishing a workspace's setup; neither workspace gets a setup row.
-        assertThat(members.findByWorkspace_IdAndAccount_Id(first.getId(), accountId(user)))
+        assertThat(members.findByWorkspace_IdAndId_AccountId(first.getId(), accountId(user)))
                 .get()
                 .extracting(Membership::getOnboardingSeenRevision)
                 .isNull();
-        assertThat(members.findByWorkspace_IdAndAccount_Id(second.getId(), accountId(user)))
+        assertThat(members.findByWorkspace_IdAndId_AccountId(second.getId(), accountId(user)))
                 .get()
                 .extracting(Membership::getOnboardingSeenRevision)
                 .isNull();
@@ -87,7 +87,7 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .isFalse();
         // A developer no account resolves to has not answered; the choice is optional here.
         assertThat(preferences.forDeveloper(first.getId(), null).permitsAi()).isTrue();
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(first.getId(), accountId(user)))
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(first.getId(), accountId(user)))
                 .isPresent();
 
         // The account endpoint reads and writes the same answer without a workspace.
@@ -269,7 +269,7 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .jsonPath("$.needsSetup")
                 .isEqualTo(false);
 
-        assertThat(members.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(user)))
+        assertThat(members.findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(user)))
                 .isPresent();
         assertThat(preferences.forDeveloper(workspace.getId(), accountId(user)).permitsAi())
                 .isTrue();
@@ -297,7 +297,7 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .isEqualTo(false)
                 .jsonPath("$.aiChoice")
                 .doesNotExist();
-        var member = members.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(user))
+        var member = members.findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(user))
                 .orElseThrow();
         assertThat(member.getOnboardingSeenRevision()).isEqualTo(policy.getRevision());
         assertThat(choices.findById(accountId(user)))

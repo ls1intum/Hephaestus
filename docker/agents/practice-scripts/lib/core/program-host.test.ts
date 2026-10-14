@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
+import { chatOptionsSchema } from "./model-options.ts";
 
 import { MockEmbeddingModelV4, MockLanguageModelV4 } from "ai/test";
 
@@ -21,7 +22,7 @@ import {
 } from "./contract.ts";
 import { EvidenceReader, noReceipts, type EvidenceSources } from "./evidence-reader.ts";
 import { MAX_IPC_MESSAGE_BYTES } from "./ipc.ts";
-import { allowedOptions, ModelBudget, reservationOf } from "./models-host.ts";
+import { ModelBudget, reservationOf } from "./models-host.ts";
 import { UnratedError } from "./practice-script.ts";
 import {
 	notReached,
@@ -102,6 +103,7 @@ interface Workspace {
 
 async function workspace(scripts: Record<string, string | null>): Promise<Workspace> {
 	const { root, practices } = await stagePracticeScripts(scripts);
+	await copyFile(path.join(FIXTURES, "comment-kinds.ts"), path.join(practices, "comment-kinds.ts"));
 	roots.push(root);
 	const repo = path.join(root, "repo");
 	await mkdir(path.join(repo, "src"), { recursive: true });
@@ -689,7 +691,7 @@ void test("direct model calls share the attempt's budget: a later practice sees 
 		prompt: [{ role: "user", content: [{ type: "text", text: "Say hi." }] }],
 		maxOutputTokens: 1000,
 	};
-	const reserve = reservationOf("chat", allowedOptions("chat", call));
+	const reserve = reservationOf("chat", chatOptionsSchema.parse(call));
 	const chat = new MockLanguageModelV4({
 		doGenerate: {
 			content: [{ type: "text", text: "hi" }],

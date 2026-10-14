@@ -81,10 +81,7 @@ function askedOf(questions: Experimental_DecisionModelV4CallOptions["questions"]
 	});
 }
 
-/**
- * The distribution over a question's letters at its answer position, normalized over those letters.
- * Undefined when the model wrote a token outside them: the remaining mass would only be noise.
- */
+// An answer outside the offered letters makes their remaining probability mass unusable.
 function distribution(
 	asked: Asked,
 	sampled: string,

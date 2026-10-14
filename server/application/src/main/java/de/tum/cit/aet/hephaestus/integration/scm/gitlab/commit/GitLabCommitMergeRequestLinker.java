@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstan
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -74,6 +75,8 @@ public class GitLabCommitMergeRequestLinker {
     private final GitLabRouteAdmission routeAdmission;
     private final TransactionTemplate transactions;
 
+    private final Clock clock;
+
     public GitLabCommitMergeRequestLinker(
             CommitRepository commitRepository,
             CommitContributorRepository commitContributorRepository,
@@ -83,7 +86,9 @@ public class GitLabCommitMergeRequestLinker {
             GitLabProperties gitLabProperties,
             ApplicationEventPublisher eventPublisher,
             GitLabRouteAdmission routeAdmission,
-            TransactionTemplate transactions) {
+            TransactionTemplate transactions,
+            Clock clock) {
+        this.clock = clock;
         this.commitRepository = commitRepository;
         this.commitContributorRepository = commitContributorRepository;
         this.userRepository = userRepository;
@@ -680,7 +685,8 @@ public class GitLabCommitMergeRequestLinker {
                     EventContext.forSync(
                             scopeId,
                             Objects.requireNonNull(RepositoryRef.from(repository)),
-                            IdentityProviderType.GITLAB)));
+                            IdentityProviderType.GITLAB,
+                            clock.instant())));
         }
 
         if (contributorRowsUpdated > 0

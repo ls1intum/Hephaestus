@@ -64,7 +64,8 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
 
     @Query("""
         SELECT m.id.accountId FROM Membership m JOIN Account a ON a.id = m.id.accountId
-        WHERE m.workspace.id = :workspaceId AND m.leftAt IS NULL AND m.hidden = false
+        WHERE m.workspace.id = :workspaceId AND (:allAccounts = true OR m.id.accountId IN :accountIds)
+          AND m.leftAt IS NULL AND m.hidden = false
           AND (a.aiChoice IS NULL OR a.aiChoice <> de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice.NO_AI)
           AND a.status IN (de.tum.cit.aet.hephaestus.core.auth.domain.Account.Status.ACTIVE,
                            de.tum.cit.aet.hephaestus.core.auth.domain.Account.Status.UNCLAIMED)
@@ -72,7 +73,10 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
                WHERE i.account.id = a.id AND i.providerId = :providerId AND i.disabledAt IS NULL))
         """)
     Set<Long> findEligibleAccountIds(
-            @Param("workspaceId") long workspaceId, @Param("providerId") @Nullable Long providerId);
+            @Param("workspaceId") long workspaceId,
+            @Param("accountIds") Collection<Long> accountIds,
+            @Param("allAccounts") boolean allAccounts,
+            @Param("providerId") @Nullable Long providerId);
 
     @Modifying
     @WorkspaceAgnostic("Account absorption spans workspaces")
@@ -94,22 +98,12 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
         """, nativeQuery = true)
     int absorbAccount(@Param("target") long target, @Param("source") long source);
 
-    @Query("""
-            SELECT wm FROM Membership wm
-            WHERE wm.workspace.id = :workspaceId
-        """)
-    Page<Membership> findAllByWorkspace_Id(@Param("workspaceId") Long workspaceId, Pageable pageable);
+    Page<Membership> findByWorkspace_Id(Long workspaceId, Pageable pageable);
 
-    @Query("""
-            SELECT wm FROM Membership wm
-            WHERE wm.workspace.id = :workspaceId AND wm.id.accountId = :accountId
-        """)
-    Optional<Membership> findByWorkspace_IdAndAccount_Id(
-            @Param("workspaceId") Long workspaceId, @Param("accountId") Long accountId);
+    Optional<Membership> findByWorkspace_IdAndId_AccountId(Long workspaceId, Long accountId);
 
     @WorkspaceAgnostic("An account reads its memberships across workspaces")
-    @Query("SELECT m FROM Membership m WHERE m.id.accountId = :accountId")
-    List<Membership> findByAccount_Id(@Param("accountId") Long accountId);
+    List<Membership> findById_AccountId(Long accountId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @WorkspaceAgnostic("Account absorption locks memberships across workspaces")

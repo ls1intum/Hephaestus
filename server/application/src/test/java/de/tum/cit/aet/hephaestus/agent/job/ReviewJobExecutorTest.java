@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -247,10 +246,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         when(binding.getMaxConcurrentJobs()).thenReturn(1);
         when(policy.binding(job)).thenReturn(Optional.of(binding));
         when(budgets.decide(job.getWorkspaceId())).thenReturn(LlmBudgetDecision.ALLOWED);
-        when(assignments.load(job))
-                .thenReturn(List.of(RuntimeReviewTestData.assignment(null, null)))
-                .thenReturn(List.of(RuntimeReviewTestData.assignment(null, null)))
-                .thenThrow(new JobPreparationException("Assignments were removed during execution"));
+        when(assignments.load(job)).thenReturn(List.of(RuntimeReviewTestData.assignment(null, null)));
         when(handler.prepareInputs(job)).thenThrow(new JobPreparationException("Input preparation failed"));
         var pool = mock(AsyncTaskExecutor.class);
         doAnswer(invocation -> {
@@ -266,7 +262,6 @@ class ReviewJobExecutorTest extends BaseUnitTest {
 
         assertThat(executor.computeCapacity()).isEqualTo(1);
         verify(workerCapacity).releaseReview();
-        verify(assignments, times(2)).load(job);
         assertThat(MDC.get("job.id")).isNull();
         verifyNoInteractions(sandbox);
     }

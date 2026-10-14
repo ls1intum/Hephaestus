@@ -9,9 +9,15 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
@@ -21,6 +27,8 @@ import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +68,12 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
     private MembershipService service;
 
     @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private ConnectionService connectionService;
+
+    @Autowired
     private EntityManager entityManager;
 
     @Test
@@ -78,6 +92,7 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
         assertThat(member.isReviewSelected()).isFalse();
         var memberId = member.getId();
         var foreignId = foreign.getId();
+        entityManager.flush();
         entityManager.clear();
         assertThat(memberships.findById(memberId))
                 .get()
@@ -180,13 +195,13 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
         long humanId = Objects.requireNonNull(human.getId());
         long unclaimedId = Objects.requireNonNull(unclaimed.getId());
         var ids = List.of(humanId, unclaimedId);
-        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), provider.getId()))
+        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), ids, false, provider.getId()))
                 .containsExactly(human.getId());
-        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), null))
+        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), ids, false, null))
                 .containsExactlyInAnyOrderElementsOf(ids);
         identity.setDisabledAt(Instant.now());
         identities.saveAndFlush(identity);
-        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), provider.getId()))
+        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), ids, false, provider.getId()))
                 .isEmpty();
     }
 
@@ -197,7 +212,8 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
         var hidden = accounts.saveAndFlush(new Account("Hidden developer"));
         addMember(member.getWorkspace(), hidden, Membership.WorkspaceRole.MEMBER, null);
         memberships
-                .findByWorkspace_IdAndAccount_Id(member.getWorkspace().getId(), Objects.requireNonNull(hidden.getId()))
+                .findByWorkspace_IdAndId_AccountId(
+                        member.getWorkspace().getId(), Objects.requireNonNull(hidden.getId()))
                 .orElseThrow()
                 .setHidden(true);
         var noAi = new Account("No AI developer");
@@ -212,6 +228,40 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
         assertThat(service.eligibleAccountIds(member.getWorkspace().getId(), ids))
                 .containsExactly(visible.getId());
         assertThat(coverage.eligibleAccountIds(member.getWorkspace().getId())).containsExactly(visible.getId());
+    }
+
+    @Test
+    void shouldRequireTheConnectedProviderIdentityThroughBothEligibilityReaders() {
+        var linked = accounts.saveAndFlush(new Account("Linked developer"));
+        var member = membership(linked, "connected-eligibility");
+        var workspace = member.getWorkspace();
+        var unlinked = accounts.saveAndFlush(new Account("Unlinked developer"));
+        addMember(workspace, unlinked, Membership.WorkspaceRole.MEMBER, null);
+        var provider = providers.saveAndFlush(
+                new IdentityProvider(IdentityProviderType.GITHUB, "https://eligibility.example.com"));
+        var identity = new Identity();
+        identity.setAccount(linked);
+        identity.setProviderId(Objects.requireNonNull(provider.getId()));
+        identity.setProviderUserKey("123");
+        identities.saveAndFlush(identity);
+        var connection = connections.saveAndFlush(new Connection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "eligibility",
+                new ConnectionConfig.GitHubAppConfig(
+                        workspace.getId(), workspace.getAccountLogin(), provider.getServerUrl(), Set.of())));
+        connectionService.transition(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "eligibility",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
+        var ids = List.of(Objects.requireNonNull(linked.getId()), Objects.requireNonNull(unlinked.getId()));
+        assertThat(service.eligibleAccountIds(workspace.getId(), ids)).containsExactly(linked.getId());
+        assertThat(coverage.eligibleAccountIds(workspace.getId())).containsExactly(linked.getId());
     }
 
     @Test

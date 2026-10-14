@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.practices.CanonicalDigest;
 import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import java.util.List;
@@ -40,6 +41,6 @@ record CatalogGroupAdoptionPlan(
                 disposition,
                 practices.stream().map(CatalogAdoptionPlan::preview).toList(),
                 actions,
-                CatalogAdoptionService.formatted(etag));
+                EntityTagPrecondition.format(etag));
     }
 }

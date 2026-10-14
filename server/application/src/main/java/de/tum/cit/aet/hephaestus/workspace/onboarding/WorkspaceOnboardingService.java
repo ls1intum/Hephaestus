@@ -55,7 +55,7 @@ class WorkspaceOnboardingService {
                 .orElse(null);
         var linkOptions = links.options(context.id(), accountId, policy.getRequiredConnectionIds());
         @Nullable
-        Long seenRevision = members.findByWorkspace_IdAndAccount_Id(context.id(), accountId)
+        Long seenRevision = members.findByWorkspace_IdAndId_AccountId(context.id(), accountId)
                 .map(Membership::getOnboardingSeenRevision)
                 .orElse(null);
         // A member who has already answered, and whom this workspace asks nothing else of, never
@@ -132,7 +132,7 @@ class WorkspaceOnboardingService {
     }
 
     private void markSeen(Workspace workspace, long accountId, long revision) {
-        var member = members.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId)
+        var member = members.findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId)
                 .orElseThrow();
         member.setOnboardingSeenRevision(revision);
         members.save(member);

@@ -1,16 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.review.report;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
-import de.tum.cit.aet.hephaestus.practices.model.ResultMark;
-import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ResultMarkRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ResultProofMapper;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
-import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewOrder;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewPracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
@@ -24,28 +18,24 @@ import de.tum.cit.aet.hephaestus.practices.scan.dto.ProblemChangesDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.RemovalGuardDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanPracticeReportDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.AdmittedProblemSnapshot;
-import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.Comparison;
-import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemBaselineState;
 import de.tum.cit.aet.hephaestus.practices.spi.RemovalGuardState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -59,7 +49,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 @Service
 @ConditionalOnServerRole
@@ -70,19 +59,18 @@ public class ScanReportService {
     private static final int READ_BATCH = 256;
     private final ReviewRepository reviews;
     private final ReviewPracticeRepository assignments;
-    private final ReviewItemRepository memberships;
     private final ResultRepository results;
-    private final ProblemRepository problems;
-    private final ResultMarkRepository marks;
     private final PracticeVersionRepository versions;
-    private final ResultProofMapper proof;
-    private final EvidenceAuthorization authorization;
     private final ProblemComparison comparison;
+    private final ScanEvidencePolicy eligibility;
+    private final ScanComparisonService pairComparison;
     private final ScanMembershipQuery queries;
     private final JdbcClient jdbc;
     private final JsonMapper json;
     private final Clock clock;
-    private final EntityManager entities;
+
+    @PersistenceContext
+    private @Nullable EntityManager entities;
 
     @Transactional
     public FrozenScanReport freeze(long workspaceId, UUID reviewId) {
@@ -116,25 +104,6 @@ public class ScanReportService {
         if (expired(review)) throw new ResponseStatusException(HttpStatus.GONE, "The scan's raw proof has expired.");
     }
 
-    public Set<UUID> permitted(Review review, Collection<Result> rows) {
-        return authorization.permitsAll(review.getWorkspaceId(), rows, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW);
-    }
-
-    public Set<UUID> unmarked(Review review, Collection<Result> rows) {
-        if (rows.isEmpty()) return Set.of();
-        var marked = marks
-                .findByWorkspaceIdAndResultIdInAndRemovedAtIsNull(
-                        review.getWorkspaceId(),
-                        rows.stream().map(Result::getId).toList())
-                .stream()
-                .map(ResultMark::getResultId)
-                .collect(Collectors.toSet());
-        return rows.stream()
-                .filter(r -> !marked.contains(r.getId()))
-                .map(Result::getId)
-                .collect(Collectors.toSet());
-    }
-
     public Map<String, Long> markedCounts(Review review) {
         return jdbc
                 .sql("SELECT mark.kind,COUNT(DISTINCT mark.result_id) AS count FROM result_mark mark JOIN"
@@ -152,6 +121,41 @@ public class ScanReportService {
     public ScanCountsDTO currentCounts(Review review) {
         var count = recorded(review).recordedCounts();
         return withOpen(count, expired(review) ? 0 : openProblems(review, null));
+    }
+
+    public Map<UUID, ScanCountsDTO> currentCounts(long workspaceId, Map<Review, FrozenScanReport> recorded) {
+        var reviewIds = recorded.keySet().stream()
+                .filter(r -> !expired(r))
+                .map(Review::getId)
+                .toList();
+        var open = new HashMap<UUID, Integer>();
+        UUID after = null;
+        while (!reviewIds.isEmpty()) {
+            var ids = queries.proofIds(workspaceId, reviewIds, after, READ_BATCH, null, true);
+            if (ids.isEmpty()) break;
+            var rows = results.findByWorkspaceIdAndIdIn(workspaceId, ids);
+            var allowed = eligibility.permitted(workspaceId, rows);
+            if (!allowed.isEmpty()) {
+                jdbc.sql("SELECT m.review_id,count(*) AS count FROM review_item m JOIN problem p ON"
+                                + " p.workspace_id=m.workspace_id AND p.result_id=m.result_id WHERE m.workspace_id=:ws"
+                                + " AND m.review_id=ANY(:scans) AND m.result_id=ANY(:results) GROUP BY m.review_id")
+                        .param("ws", workspaceId)
+                        .param("scans", new SqlArrayValue("uuid", reviewIds.toArray()))
+                        .param("results", new SqlArrayValue("uuid", allowed.toArray()))
+                        .query((rs, n) -> Map.entry(rs.getObject("review_id", UUID.class), rs.getInt("count")))
+                        .list()
+                        .forEach(e -> open.merge(e.getKey(), e.getValue(), Math::addExact));
+            }
+            rows.forEach(this::detach);
+            if (ids.size() < READ_BATCH) break;
+            after = ids.getLast();
+        }
+        return recorded.entrySet().stream()
+                .collect(Collectors.toMap(
+                        e -> e.getKey().getId(),
+                        e -> withOpen(
+                                e.getValue().recordedCounts(),
+                                open.getOrDefault(e.getKey().getId(), 0))));
     }
 
     public ScanPracticeReportDTO currentPractice(Review review, ScanPracticeReportDTO practice) {
@@ -191,7 +195,7 @@ public class ScanReportService {
     private int openProblems(Review review, @Nullable Long practiceId) {
         int[] count = {0};
         eachProof(review, practiceId, true, rows -> {
-            var allowed = permitted(review, rows);
+            var allowed = eligibility.permitted(review, rows);
             if (allowed.isEmpty()) return;
             count[0] = Math.addExact(
                     count[0],
@@ -212,7 +216,8 @@ public class ScanReportService {
                 null,
                 false,
                 rows -> denied[0] = Math.addExact(
-                        denied[0], rows.size() - permitted(review, rows).size()));
+                        denied[0],
+                        rows.size() - eligibility.permitted(review, rows).size()));
         return denied[0];
     }
 
@@ -330,7 +335,7 @@ public class ScanReportService {
                     assignment.getReason()));
         }
         var changes = close
-                ? comparePairs(review, baseline, comparisons)
+                ? pairComparison.compare(review, baseline, comparisons)
                 : new EnumMap<ProblemBaselineState, Integer>(ProblemBaselineState.class);
         var kinds = comparisons.values().stream().distinct().toList();
         var comparable = !close
@@ -365,123 +370,6 @@ public class ScanReportService {
                 false,
                 0,
                 0);
-    }
-
-    private Map<ProblemBaselineState, Integer> comparePairs(
-            Review review, @Nullable Review baseline, Map<Long, Comparison> comparisons) {
-        var changes = new EnumMap<ProblemBaselineState, Integer>(ProblemBaselineState.class);
-        ScanReportCursor after = null;
-        while (true) {
-            var pairs = queries.comparisonPairs(review, baseline == null ? null : baseline.getId(), after, READ_BATCH);
-            if (pairs.isEmpty()) break;
-            for (var key : pairs) {
-                var member = memberships
-                        .findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(
-                                review.getWorkspaceId(), review.getId(), key.practiceId(), key.itemId())
-                        .orElseThrow();
-                var result = results.findByIdAndWorkspaceId(
-                                Objects.requireNonNull(member.getResultId()), review.getWorkspaceId())
-                        .orElseThrow();
-                var rows = new ArrayList<Result>();
-                rows.add(result);
-                var priorMember = baseline == null
-                        ? null
-                        : memberships
-                                .findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(
-                                        review.getWorkspaceId(), baseline.getId(), key.practiceId(), key.itemId())
-                                .orElse(null);
-                var previous = priorMember == null || priorMember.getResultId() == null
-                        ? null
-                        : results.findByIdAndWorkspaceId(priorMember.getResultId(), review.getWorkspaceId())
-                                .orElse(null);
-                if (previous != null) rows.add(previous);
-                var allowed = permitted(review, rows);
-                var unmarked = unmarked(review, rows);
-                var comparisonFacts = new ArrayList<ScanProblemComparison>();
-                if (result.getEvidenceVersion() == 1 && allowed.contains(result.getId())) {
-                    var current = proof.snapshot(result);
-                    var currentKeys = identities(current, key.path());
-                    var old =
-                            previous != null && previous.getEvidenceVersion() == 1 && allowed.contains(previous.getId())
-                                    ? proof.snapshot(previous)
-                                    : null;
-                    var previousKeys =
-                            old == null ? Map.<String, AdmittedProblemSnapshot>of() : identities(old, key.path());
-                    boolean comparable = comparisons.get(member.getPracticeId()) == Comparison.COMPARABLE;
-                    for (var entry : currentKeys.entrySet()) {
-                        var prior = comparable ? previousKeys.get(entry.getKey()) : null;
-                        var state = prior == null
-                                ? ProblemBaselineState.NEW
-                                : comparison
-                                                .content(prior.candidate())
-                                                .equals(comparison.content(
-                                                        entry.getValue().candidate()))
-                                        ? ProblemBaselineState.UNCHANGED
-                                        : ProblemBaselineState.UPDATED;
-                        comparisonFacts.add(new ScanProblemComparison(
-                                entry.getValue().id(), state, prior == null ? null : prior.id()));
-                        changes.merge(state, 1, Integer::sum);
-                    }
-                    if (old != null
-                            && previous != null
-                            && ProblemComparison.provesAbsence(
-                                    old.candidate(),
-                                    current.candidate(),
-                                    comparable,
-                                    member.getState() == ReviewItemState.JUDGED,
-                                    !unmarked.contains(result.getId()) || !unmarked.contains(previous.getId()),
-                                    allowed.contains(result.getId()) && allowed.contains(previous.getId())))
-                        for (var prior : previousKeys.entrySet())
-                            if (!currentKeys.containsKey(prior.getKey())) {
-                                comparisonFacts.add(new ScanProblemComparison(
-                                        prior.getValue().id(),
-                                        ProblemBaselineState.ABSENT,
-                                        prior.getValue().id()));
-                                changes.merge(ProblemBaselineState.ABSENT, 1, Integer::sum);
-                            }
-                }
-                ObjectNode detail = member.getDetail() == null
-                        ? json.createObjectNode()
-                        : (ObjectNode) member.getDetail().deepCopy();
-                detail.set("problemComparison", json.valueToTree(comparisonFacts));
-                member.setDetail(detail);
-                memberships.saveAndFlush(member);
-                for (var row : rows) {
-                    problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(review.getWorkspaceId(), row.getId())
-                            .forEach(this::detach);
-                    detach(row);
-                }
-                detach(member);
-                if (priorMember != null) detach(priorMember);
-            }
-            if (pairs.size() < READ_BATCH) break;
-            after = pairs.getLast();
-        }
-        return changes;
-    }
-
-    public Map<String, AdmittedProblemSnapshot> identities(AdmittedResultSnapshot result, String ownPath) {
-        var ordinals = new HashMap<String, Integer>();
-        var keys = new LinkedHashMap<String, AdmittedProblemSnapshot>();
-        for (var problem : result.problems()) {
-            var own = problem.candidate().citations().stream()
-                    .filter(c -> c.path().equals(ownPath))
-                    .findFirst();
-            if (problem.candidate().key() == null && own.isEmpty()) continue;
-            var quote = own.isEmpty()
-                    ? ""
-                    : ProblemComparison.normalize(own.orElseThrow().quote());
-            int ordinal = ordinals.merge(quote, 1, Integer::sum) - 1;
-            keys.put(
-                    comparison.identity(
-                            result.candidate().practiceId(),
-                            result.candidate().itemId(),
-                            problem.candidate(),
-                            ownPath,
-                            ordinal),
-                    problem);
-        }
-        return keys;
     }
 
     private ProblemComparison.@Nullable Standard standard(@Nullable ReviewPractice assignment) {
@@ -556,7 +444,8 @@ public class ScanReportService {
     }
 
     private void detach(Object entity) {
-        if (entities.contains(entity)) entities.detach(entity);
+        var context = Objects.requireNonNull(entities);
+        if (context.contains(entity)) context.detach(entity);
     }
 
     @Transactional

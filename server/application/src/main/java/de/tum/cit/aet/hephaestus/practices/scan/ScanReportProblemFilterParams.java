@@ -27,7 +27,7 @@ public class ScanReportProblemFilterParams {
     @Schema(defaultValue = "true")
     private boolean openOnly = true;
 
-    ScanQueryService.ProblemFilter filter() {
-        return new ScanQueryService.ProblemFilter(practiceSlug, severity, path, baselineState, openOnly);
+    ScanReportItemsService.ProblemFilter filter() {
+        return new ScanReportItemsService.ProblemFilter(practiceSlug, severity, path, baselineState, openOnly);
     }
 }

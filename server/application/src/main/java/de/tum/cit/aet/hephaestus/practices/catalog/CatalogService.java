@@ -2,21 +2,17 @@ package de.tum.cit.aet.hephaestus.practices.catalog;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.CanonicalDigest;
 import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionMerge;
 import de.tum.cit.aet.hephaestus.practices.PracticeReviewDigest;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalogLoader;
-import de.tum.cit.aet.hephaestus.practices.curated.CatalogChangeKind;
-import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntryState;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupDefinitionDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeReleaseProposalDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeReleaseFieldDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeReleaseProposalDTO;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -24,10 +20,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -49,14 +46,18 @@ public class CatalogService {
                 CatalogEntryType.GROUP,
                 bundle.groups(),
                 GroupDefinition.class,
-                value -> null,
-                entry -> mapper.treeToValue(Objects.requireNonNull(entry.getDefinition()), GroupDefinition.class));
+                entry -> mapper.treeToValue(Objects.requireNonNull(entry.getDefinition()), GroupDefinition.class),
+                Set.of());
+        Set<String> offeredGroups = groups.stream()
+                .filter(CatalogOffer::offered)
+                .map(CatalogOffer::slug)
+                .collect(Collectors.toUnmodifiableSet());
         var practices = compose(
                 CatalogEntryType.PRACTICE,
                 bundle.practices(),
                 CatalogPracticeDocument.class,
-                CatalogPracticeDocument::kind,
-                this::localPractice);
+                this::localPractice,
+                offeredGroups);
         CanonicalDigest digest = new CanonicalDigest();
         groups.forEach(entry -> digest.add(entry.etag()));
         practices.forEach(entry -> digest.add(entry.etag()));
@@ -67,8 +68,8 @@ public class CatalogService {
             CatalogEntryType type,
             List<BundledPracticeCatalog.BundledEntry<D>> shipped,
             Class<D> shape,
-            Function<D, @Nullable ItemKind> kind,
-            Function<CatalogEntry, D> authoredDefinition) {
+            Function<CatalogEntry, D> authoredDefinition,
+            Set<String> offeredGroups) {
         Map<String, D> bundle = new LinkedHashMap<>();
         Map<String, Integer> positions = new HashMap<>();
         shipped.forEach(entry -> {
@@ -99,11 +100,9 @@ public class CatalogService {
                     ? CatalogEntryState.FROM_HEPHAESTUS
                     : original == null
                             ? baseNode == null ? CatalogEntryState.YOURS : CatalogEntryState.NO_LONGER_SHIPPED
-                            : Objects.equals(effective, original)
+                            : Objects.equals(effective, original) || Objects.equals(original, base)
                                     ? CatalogEntryState.EDITED_HERE
-                                    : Objects.equals(original, base)
-                                            ? CatalogEntryState.EDITED_HERE
-                                            : CatalogEntryState.UPDATE_WAITING;
+                                    : CatalogEntryState.UPDATE_WAITING;
             CatalogChangeKind change = CatalogChangeKind.NONE;
             if (original != null && !Objects.equals(effective, original)) {
                 if (effective instanceof CatalogPracticeDocument current
@@ -117,14 +116,13 @@ public class CatalogService {
                     .add(slug)
                     .add(mapper.writeValueAsString(effective))
                     .addNullable(original == null ? null : mapper.writeValueAsString(original))
-                    .addNullable(baseNode == null ? null : mapper.writeValueAsString(base == null ? baseNode : base))
+                    .addNullable(baseNode == null ? null : mapper.writeValueAsString(base))
                     .addInt(position)
                     .addInt(excluded ? 1 : 0)
                     .add(entry == null ? "0" : Long.toString(entry.getVersion()))
                     .hex();
             offers.add(new CatalogOffer<>(
                     slug,
-                    kind.apply(effective),
                     effective,
                     original,
                     base,
@@ -133,7 +131,10 @@ public class CatalogService {
                     state,
                     change,
                     tag,
-                    !excluded));
+                    !excluded
+                            && (!(effective instanceof CatalogPracticeDocument document)
+                                    || document.groupSlug() == null
+                                    || offeredGroups.contains(document.groupSlug()))));
         }
         return offers.stream()
                 .sorted(Comparator.comparingInt(CatalogOffer<D>::position).thenComparing(CatalogOffer::slug))
@@ -192,10 +193,7 @@ public class CatalogService {
                 definition.description(),
                 definition.icon(),
                 definition.color(),
-                shipped == null
-                        ? null
-                        : new CatalogGroupDefinitionDTO(
-                                shipped.name(), shipped.description(), shipped.icon(), shipped.color()),
+                shipped,
                 entry.position(),
                 entry.excluded(),
                 entry.state(),
@@ -204,12 +202,13 @@ public class CatalogService {
                 entry.etag());
     }
 
-    public CatalogPracticeReleaseProposalDTO proposal(String slug) {
+    public PracticeReleaseProposalDTO proposal(String slug) {
         var entry = practice(slug);
         var shipped = entry.shipped();
         if (shipped == null) throw new EntityNotFoundException("Catalog practice release", slug);
-        return new CatalogPracticeReleaseProposalDTO(
+        return new PracticeReleaseProposalDTO(
                 slug,
+                null,
                 entry.effective().definition(),
                 entry.base() == null ? null : entry.base().definition(),
                 shipped.definition(),

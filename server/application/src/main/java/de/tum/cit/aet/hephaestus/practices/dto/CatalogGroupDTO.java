@@ -1,8 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import de.tum.cit.aet.hephaestus.practices.curated.CatalogChangeKind;
-import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntryState;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogChangeKind;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogEntryState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
@@ -21,7 +22,7 @@ public record CatalogGroupDTO(
         String color,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @Nullable
-        CatalogGroupDefinitionDTO shipped,
+        GroupDefinition shipped,
 
         int position,
         boolean excluded,

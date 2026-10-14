@@ -1,4 +1,3 @@
-import { addedComments, commentKinds, type AddedComment } from "../kits/scm/comment-kinds.ts";
 import { scm, expectKind, requireChange, type DiffFile } from "../kits/scm/index.ts";
 import {
 	agent,
@@ -16,6 +15,7 @@ import {
 	type PracticeScriptContext,
 	type ReviewLead,
 } from "../lib/core/practice-script.ts";
+import { addedComments, commentKinds, type AddedComment } from "./comment-kinds.ts";
 
 export const LABELS = {
 	untrackedTodo: "A TODO without a tracking reference.",
@@ -35,7 +35,6 @@ const NEEDS_A_LOOK = new Set([
 const OPEN_WORK = /\b(?:TODO|FIXME|HACK|XXX)\b/u;
 const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
 
-/** How many pairs of vectors are nearly the same direction. */
 function similarPairs(vectors: readonly number[][]): number {
 	let similar = 0;
 	for (const [i, a] of vectors.entries()) {

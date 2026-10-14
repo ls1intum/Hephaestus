@@ -54,14 +54,14 @@ public class PracticeGroupStandingService {
     public List<PracticeGroupStandingDTO> summarize(
             List<PracticeGroup> groups, PracticeStandingService.StandingSnapshot snapshot) {
         Map<String, List<PracticeStandingDTO>> cardsByGroup = cardsByGroup(snapshot.dtos());
-        Map<String, GroupSignal> signalsByGroup = groupSignals(snapshot);
+        Map<String, GroupStandingInput> inputsByGroup = groupInputs(snapshot);
         return groups.stream()
                 .map(group -> toGroupStanding(
                         group,
                         cardsByGroup.getOrDefault(group.getSlug(), List.of()),
                         snapshot.practices(),
                         Set.copyOf(snapshot.eligiblePracticesByGroup().getOrDefault(group.getSlug(), List.of())),
-                        signalsByGroup.getOrDefault(group.getSlug(), GroupSignal.NONE)))
+                        inputsByGroup.getOrDefault(group.getSlug(), GroupStandingInput.NONE)))
                 .toList();
     }
 
@@ -82,7 +82,7 @@ public class PracticeGroupStandingService {
             List<PracticeStandingDTO> cards,
             Map<String, PracticeStandingSnapshot> practices,
             Set<String> eligiblePracticeSlugs,
-            GroupSignal signal) {
+            GroupStandingInput input) {
         List<PracticeStandingDTO> verdicts = votingVerdicts(cards, eligiblePracticeSlugs);
         PracticeStanding standing = groupStanding(cards, verdicts, practices);
         boolean hasDisplayableData = StandingScale.isVerdict(standing);
@@ -100,12 +100,12 @@ public class PracticeGroupStandingService {
                 standing,
                 guidance,
                 guidanceSource,
-                signal.direction(),
-                signal.trendSupport(),
-                hasDisplayableData ? signal.feedbackSpanDays() : null,
-                hasDisplayableData ? signal.feedbackSince() : null,
+                input.direction(),
+                input.trendSupport(),
+                hasDisplayableData ? input.feedbackSpanDays() : null,
+                hasDisplayableData ? input.feedbackSince() : null,
                 groupEvidence(cards, hasProblems, hasStrengths),
-                hasDisplayableData ? signal.sources() : List.of());
+                hasDisplayableData ? input.sources() : List.of());
     }
 
     private static List<PracticeStandingDTO> votingVerdicts(
@@ -150,16 +150,16 @@ public class PracticeGroupStandingService {
                 .toList();
     }
 
-    private record GroupSignal(
+    private record GroupStandingInput(
             @Nullable TrendDirection direction,
             @Nullable TrendSupportDTO trendSupport,
             @Nullable Integer feedbackSpanDays,
             @Nullable Instant feedbackSince,
             List<FeedbackSourceCountDTO> sources) {
-        private static final GroupSignal NONE = new GroupSignal(null, null, null, null, List.of());
+        private static final GroupStandingInput NONE = new GroupStandingInput(null, null, null, null, List.of());
     }
 
-    private Map<String, GroupSignal> groupSignals(PracticeStandingService.StandingSnapshot snapshot) {
+    private Map<String, GroupStandingInput> groupInputs(PracticeStandingService.StandingSnapshot snapshot) {
         Map<String, List<ResultView>> evidenceByGroup = new LinkedHashMap<>();
         Map<String, List<PracticeTrend>> trendsByGroup = new LinkedHashMap<>();
         Set<String> eligibleSlugs = snapshot.eligiblePracticesByGroup().values().stream()
@@ -184,7 +184,7 @@ public class PracticeGroupStandingService {
         }
 
         Instant now = clock.instant();
-        Map<String, GroupSignal> signals = new HashMap<>();
+        Map<String, GroupStandingInput> inputs = new HashMap<>();
         Set<String> groupSlugs = new LinkedHashSet<>(evidenceByGroup.keySet());
         groupSlugs.addAll(snapshot.eligiblePracticesByGroup().keySet());
         for (String groupSlug : groupSlugs) {
@@ -196,9 +196,9 @@ public class PracticeGroupStandingService {
             PracticeTrend direction = practiceTrendService.calculateGroup(
                     snapshot.eligiblePracticesByGroup().getOrDefault(groupSlug, List.of()),
                     trendsByGroup.getOrDefault(groupSlug, List.of()));
-            signals.put(
+            inputs.put(
                     groupSlug,
-                    new GroupSignal(
+                    new GroupStandingInput(
                             direction.direction(),
                             TrendSupportDTO.from(direction.support()),
                             oldest == null
@@ -209,7 +209,7 @@ public class PracticeGroupStandingService {
                             oldest,
                             sourceCounts(evidence)));
         }
-        return signals;
+        return inputs;
     }
 
     private static List<FeedbackSourceCountDTO> sourceCounts(List<ResultView> evidence) {

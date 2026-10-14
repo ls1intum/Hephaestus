@@ -1,6 +1,6 @@
-import { addedComments } from "../kits/scm/comment-kinds.ts";
 import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
 import { definePracticeScript } from "../lib/core/practice-script.ts";
+import { addedComments } from "./comment-kinds.ts";
 
 export default definePracticeScript({
 	meta: {},

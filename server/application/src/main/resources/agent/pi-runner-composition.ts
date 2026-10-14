@@ -410,17 +410,8 @@ function listOf(value: unknown): unknown[] | null {
 }
 
 function idsOf(value: unknown): string[] | null {
-	if (!Array.isArray(value)) {
-		return null;
-	}
-	const ids: string[] = [];
-	for (const id of value) {
-		if (typeof id !== "string" || id.trim() === "") {
-			return null;
-		}
-		ids.push(id.trim());
-	}
-	return ids;
+	const parsed = feedbackIdsSchema.safeParse(value);
+	return parsed.success ? parsed.data : null;
 }
 
 const NOT_AN_ID_LIST =
@@ -599,6 +590,11 @@ const reviewInputSchema = z.strictObject({
 	summary: z.unknown().optional(),
 	inline: z.unknown().optional(),
 });
+const reviewToolInputSchema = reviewInputSchema.extend({
+	decisions: z.array(reviewDecisionSchema),
+	summary: reviewSummarySchema.nullish(),
+	inline: z.array(inlineNoteSchema).nullish(),
+});
 const schemaErrors = (issues: readonly z.core.$ZodIssue[], prefix: string) =>
 	issues.map(
 		(issue) =>
@@ -686,17 +682,9 @@ function readDecisions(
 	return { decided, named, errors };
 }
 
-/** Keep an explicit no-summary distinct from a primitive the SDK could coerce to null. */
-export function prepareReviewArguments(value: unknown) {
-	if (!isRecord(value)) {
-		throw new Error("the review is one object with decisions, summary and inline");
-	}
-	if (value.summary !== undefined && value.summary !== null && !isRecord(value.summary)) {
-		throw new Error(
-			"summary is one object with body and basedOn, or null when there is no comment",
-		);
-	}
-	return value;
+/** Validate before the SDK can coerce a malformed text or list into an empty review. */
+export function prepareReviewArguments(value: unknown): Record<string, unknown> {
+	return reviewToolInputSchema.parse(value);
 }
 
 /** Store the review whole: a refused part cannot be dropped while retaining decisions written with it. */

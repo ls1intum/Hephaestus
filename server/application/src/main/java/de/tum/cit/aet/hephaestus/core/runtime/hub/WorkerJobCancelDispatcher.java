@@ -20,23 +20,20 @@ public class WorkerJobCancelDispatcher {
     /**
      * Send a {@link CancelJob} to {@code workerId} if it has a live session on this hub.
      *
-     * @return {@code true} if the frame was dispatched to a connected worker
+     * @return {@code true} if the stop request was sent to a connected worker
      */
-    public boolean dispatch(@Nullable String workerId, UUID jobId, String reason) {
+    public boolean stopContainer(@Nullable String workerId, UUID jobId, String reason) {
         if (workerId == null || workerId.isBlank()) {
             return false;
         }
         return registry.findByWorkerId(workerId)
                 .map(session -> {
                     session.send(new CancelJob(jobId.toString(), reason));
-                    log.info("Dispatched CancelJob for {} to worker {}", jobId, workerId);
+                    log.info("Sent container stop request for {} to worker {}", jobId, workerId);
                     return true;
                 })
                 .orElseGet(() -> {
-                    log.debug(
-                            "No live session for worker {} to cancel job {}; relying on DB" + " + backstops",
-                            workerId,
-                            jobId);
+                    log.debug("Worker {} is disconnected; stop request for {} was not sent", workerId, jobId);
                     return false;
                 });
     }

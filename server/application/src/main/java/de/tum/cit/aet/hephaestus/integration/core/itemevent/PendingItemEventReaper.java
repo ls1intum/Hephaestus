@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.itemevent;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
@@ -30,7 +31,8 @@ public class PendingItemEventReaper {
     @Transactional
     public void sweep() {
         Instant now = clock.instant();
-        repository.expire(now.minus(properties.pendingLapseAfter()), now);
+        repository.expire(
+                now.minus(properties.pendingLapseAfter()), now, ReviewRequestReason.PENDING_DEADLINE_EXCEEDED);
         repository.deleteUnreferenced(now.minus(properties.retainFor()), properties.sweepBatchSize());
         for (var event : repository.claimDue(now, properties.sweepBatchSize())) {
             repository.attempted(event.getWorkspaceId(), event.getId(), now, now.plus(properties.pendingRetryAfter()));

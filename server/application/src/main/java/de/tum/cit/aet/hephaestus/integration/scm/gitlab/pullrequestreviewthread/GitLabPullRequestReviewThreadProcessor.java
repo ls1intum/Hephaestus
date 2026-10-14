@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -58,10 +59,14 @@ public class GitLabPullRequestReviewThreadProcessor {
     private final PullRequestRepository pullRequestRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    private final Clock clock;
+
     public GitLabPullRequestReviewThreadProcessor(
             PullRequestReviewThreadRepository threadRepository,
             PullRequestRepository pullRequestRepository,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            Clock clock) {
+        this.clock = clock;
         this.threadRepository = threadRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.eventPublisher = eventPublisher;
@@ -284,8 +289,7 @@ public class GitLabPullRequestReviewThreadProcessor {
             });
         } else {
             existing = threadRepository.findByNativeIdAndProviderId(data.noteNativeId(), providerId);
-            // A note id is unique on the instance: a thread stored under another merge request is
-            // not this one's.
+            // Instance-wide note ids cannot move a thread to another merge request.
             PullRequest parent =
                     existing.map(PullRequestReviewThread::getPullRequest).orElse(null);
             if (existing.isPresent() && (parent == null || !parent.getId().equals(pr.getId()))) {
@@ -335,8 +339,7 @@ public class GitLabPullRequestReviewThreadProcessor {
             existing.setState(newState);
             changed = true;
         }
-        // The read names who resolved it as it stands: a reopening and a new resolution between
-        // reads leave no trace.
+        // The read proves the current resolver; intervening reopenings remain unknown.
         User resolver = data.resolvedBy();
         User storedResolver = existing.getResolvedBy();
         if (Boolean.TRUE.equals(resolved)
@@ -452,7 +455,7 @@ public class GitLabPullRequestReviewThreadProcessor {
             if (repoRef == null) {
                 return;
             }
-            EventContext ctx = EventContext.forSync(scopeId, repoRef, IdentityProviderType.GITLAB);
+            EventContext ctx = EventContext.forSync(scopeId, repoRef, IdentityProviderType.GITLAB, clock.instant());
 
             if (thread.getState() == PullRequestReviewThread.State.RESOLVED) {
                 eventPublisher.publishEvent(new ScmDomainEvent.ReviewThreadResolved(threadData, ctx));

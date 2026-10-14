@@ -9,10 +9,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -23,6 +21,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
 import java.util.List;
@@ -165,12 +164,16 @@ class ReviewGateTest {
     }
 
     private static ItemSnapshot snapshot(Map<String, String> state) {
-        return new ItemSnapshot(
-                new ItemRef(1, 1, new ItemKind("scm.pull_request"), 1L, null, null),
-                new ItemVersion("v1", null),
-                new IntegrationRef(IntegrationKind.GITHUB, 1, "test", null),
-                state,
-                List.of(),
-                new ItemLabel(1, "Review", "Pull request", 1, "project", null, IntegrationKind.GITHUB));
+        return ItemFixtures.snapshot(new ItemRef(1, 1, new ItemKind("scm.pull_request"), 1L, null, null), state)
+                .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, "test", null))
+                .label(ItemFixtures.label()
+                        .itemId(1)
+                        .title("Review")
+                        .noun("Pull request")
+                        .number(1)
+                        .container("project")
+                        .integration(IntegrationKind.GITHUB)
+                        .build())
+                .build();
     }
 }

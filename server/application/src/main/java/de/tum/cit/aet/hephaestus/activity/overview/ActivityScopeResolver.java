@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmMemberRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceTeamScopeResolver;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.text.Collator;
 import java.util.Comparator;
@@ -28,6 +29,7 @@ class ActivityScopeResolver {
             .thenComparing(User::getLogin, NAMES);
 
     private final ScmMemberRepository memberships;
+    private final WorkspaceActorSelector actorSelector;
     private final WorkspaceRepository workspaces;
     private final WorkspaceTeamScopeResolver teamScopes;
     private final TeamRepository teams;
@@ -35,8 +37,9 @@ class ActivityScopeResolver {
     /** A member of the workspace by login, including one hidden from workspace activity. */
     @Transactional(readOnly = true)
     public User member(long workspaceId, String login) {
-        return memberships
-                .findMemberByLogin(workspaceId, login)
+        return actorSelector
+                .connectedProviderId(workspaceId)
+                .flatMap(providerId -> memberships.findMemberByLogin(workspaceId, login, providerId))
                 .orElseThrow(() -> new EntityNotFoundException("Member", login));
     }
 

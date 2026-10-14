@@ -195,4 +195,19 @@ class ReviewBatchDriverTest extends BaseUnitTest {
         assertThat(batch.getPauseReason()).isEqualTo(ReviewBatchPauseReason.PAUSED_BY_ADMIN);
         verifyNoInteractions(submitter, scope);
     }
+
+    @Test
+    void shouldAdvancePastAnUnavailableRepository() {
+        batch.setKind("scm.repository");
+        when(budget.canRequest(1, ReviewKind.SCAN, null)).thenReturn(true);
+        when(scope.next(1, batch.getId(), null, 1)).thenReturn(List.of(6L));
+        when(submitter.offer(batch, 6)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Skipped());
+        driver.advance(batch);
+        assertThat(batch.getCursorItemId()).isEqualTo(6L);
+        assertThat(batch.getSkippedCount()).isOne();
+        assertThat(batch.getFailedCount()).isZero();
+        when(scope.next(1, batch.getId(), 6L, 1)).thenReturn(List.of());
+        driver.advance(batch);
+        assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.COMPLETED);
+    }
 }

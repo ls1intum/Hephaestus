@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.review.report;
 
 import de.tum.cit.aet.hephaestus.practices.review.ScanReuseCandidateQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.AdmittedProblemSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.Comparison;
 import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemCandidate;
@@ -10,7 +12,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -43,6 +47,30 @@ public class ProblemComparison {
                         primary.sourceKind().value(),
                         normalize(primary.quote()),
                         ordinal)));
+    }
+
+    public Map<String, AdmittedProblemSnapshot> identities(AdmittedResultSnapshot result, String ownPath) {
+        var ordinals = new HashMap<String, Integer>();
+        var keys = new LinkedHashMap<String, AdmittedProblemSnapshot>();
+        for (var problem : result.problems()) {
+            var own = problem.candidate().citations().stream()
+                    .filter(c -> c.path().equals(ownPath))
+                    .findFirst();
+            if (problem.candidate().key() == null && own.isEmpty()) continue;
+            var quote = own.isEmpty()
+                    ? ""
+                    : ProblemComparison.normalize(own.orElseThrow().quote());
+            int ordinal = ordinals.merge(quote, 1, Integer::sum) - 1;
+            keys.put(
+                    identity(
+                            result.candidate().practiceId(),
+                            result.candidate().itemId(),
+                            problem.candidate(),
+                            ownPath,
+                            ordinal),
+                    problem);
+        }
+        return keys;
     }
 
     public static String normalize(String quote) {

@@ -12,13 +12,14 @@ import de.tum.cit.aet.hephaestus.practices.dto.AcceptPracticeReleaseRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupInputDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupUpdateDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeReleaseProposalDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeUpdateDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.MovePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeGroupsRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeReleaseProposalDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.SetCatalogStatusRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -92,7 +93,7 @@ public class CatalogAdminController {
     @Operation(operationId = "updateCatalogPractice")
     public CatalogPracticeDTO updatePractice(
             @PathVariable String slug,
-            @RequestBody @Valid CatalogPracticeInputDTO input,
+            @RequestBody @Valid CatalogPracticeUpdateDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
         return catalog.practiceView(customization.updatePractice(slug, input, precondition(ifMatch)));
     }
@@ -113,14 +114,14 @@ public class CatalogAdminController {
     @Operation(operationId = "updateCatalogGroup")
     public CatalogGroupDTO updateGroup(
             @PathVariable String slug,
-            @RequestBody @Valid CatalogGroupInputDTO input,
+            @RequestBody @Valid CatalogGroupUpdateDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
         return catalog.groupView(customization.updateGroup(slug, input, precondition(ifMatch)));
     }
 
     @GetMapping("/practices/{slug}/release")
     @Operation(operationId = "getCatalogPracticeRelease")
-    public CatalogPracticeReleaseProposalDTO release(@PathVariable String slug) {
+    public PracticeReleaseProposalDTO release(@PathVariable String slug) {
         return catalog.proposal(slug);
     }
 
@@ -131,16 +132,7 @@ public class CatalogAdminController {
             @PathVariable String slug,
             @RequestBody @Valid AcceptPracticeReleaseRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        return catalog.practiceView(customization.applyRelease(slug, input.asMap(), precondition(ifMatch)));
-    }
-
-    @DeleteMapping("/practices/{slug}/release")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_PRACTICE")
-    @Operation(operationId = "declineCatalogPracticeRelease")
-    public CatalogPracticeDTO decline(
-            @PathVariable String slug, @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        customization.acknowledge(CatalogEntryType.PRACTICE, slug, precondition(ifMatch));
-        return catalog.practiceView(catalog.practice(slug));
+        return catalog.practiceView(customization.applyRelease(slug, input.choices(), precondition(ifMatch)));
     }
 
     @PatchMapping("/practices/{slug}/status")
@@ -205,7 +197,7 @@ public class CatalogAdminController {
     @AuditExempt(reason = "Order changes presentation only")
     @Operation(operationId = "reorderCatalogPractices")
     public CatalogDTO reorderPractices(
-            @RequestBody @Valid ReorderPracticesRequestDTO input,
+            @RequestBody @Valid ReorderRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
         customization.reorder(CatalogEntryType.PRACTICE, input.slugs(), precondition(ifMatch));
         return catalog.view();
@@ -215,7 +207,7 @@ public class CatalogAdminController {
     @AuditExempt(reason = "Order changes presentation only")
     @Operation(operationId = "reorderCatalogGroups")
     public CatalogDTO reorderGroups(
-            @RequestBody @Valid ReorderPracticeGroupsRequestDTO input,
+            @RequestBody @Valid ReorderRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
         customization.reorder(CatalogEntryType.GROUP, input.slugs(), precondition(ifMatch));
         return catalog.view();

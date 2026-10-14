@@ -444,10 +444,6 @@ public class OutlineDocumentSyncService {
         }
     }
 
-    /**
-     * One {@code collections.list} call: refresh every mirrored row's human-facing catalog fields and
-     * return the live collections by id (the visibility input for the reconcile).
-     */
     private Map<String, OutlineCollectionModel> refreshCatalog(SyncContext ctx) {
         Map<String, OutlineCollectionModel> live = new LinkedHashMap<>();
         for (OutlineCollectionModel collection : outlineApiClient.listCollections(ctx.serverUrl(), ctx.token())) {

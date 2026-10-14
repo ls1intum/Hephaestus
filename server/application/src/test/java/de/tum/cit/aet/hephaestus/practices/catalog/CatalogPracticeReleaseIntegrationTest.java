@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeReviewDigest;
-import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeUpdateDTO;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,8 +30,7 @@ class CatalogPracticeReleaseIntegrationTest extends AbstractWorkspaceIntegration
                 DefinitionTestFixtures.withCriteria(original.effective().definition(), "Locally authored criteria.");
         var edited = customization.updatePractice(
                 original.slug(),
-                new CatalogPracticeInputDTO(
-                        original.slug(),
+                new CatalogPracticeUpdateDTO(
                         original.effective().kind().value(),
                         original.effective().groupSlug(),
                         local,

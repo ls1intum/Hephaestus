@@ -149,7 +149,7 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
                 savedWorkspace,
                 IntegrationKind.GITHUB,
                 "pat",
-                new ConnectionConfig.GitHubPatConfig(accountLogin,  null, Set.of()),
+                new ConnectionConfig.GitHubPatConfig(accountLogin, null, Set.of()),
                 token,
                 "bootstrap-pat-workspace-" + savedWorkspace.getId());
 
@@ -437,7 +437,7 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
     private void ensureAdminMembership(Workspace workspace) {
         userRepository.findByLogin("admin").ifPresent(adminUser -> {
             boolean alreadyMember = workspaceMembershipRepository
-                    .findByWorkspace_IdAndAccount_Id(
+                    .findByWorkspace_IdAndId_AccountId(
                             workspace.getId(), workspaceMembershipService.accountIdForUser(adminUser.getId()))
                     .isPresent();
             if (alreadyMember) {
@@ -496,17 +496,7 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
         userRepository.acquireLoginLock(login, providerId);
         userRepository.freeLoginConflicts(login, userInfo.id(), providerId);
         userRepository.upsertUser(
-                userInfo.id(),
-                providerId,
-                login,
-                name,
-                avatar,
-                htmlUrl,
-                User.Type.USER.name(),
-                null, 
-                null, 
-                null 
-                );
+                userInfo.id(), providerId, login, name, avatar, htmlUrl, User.Type.USER.name(), null, null, null);
         log.info(
                 "Upserted user for PAT workspace bootstrap: userLogin={}, nativeId={}",
                 LoggingUtils.sanitizeForLog(login),

@@ -74,10 +74,6 @@ import { minutesAfter, minutesBefore, STORY_NOW } from "@/stories/story-clock";
 import type { OutcomeScope } from "./review-outcomes";
 import type { OverviewRegionState } from "./review-states";
 
-// ---------------------------------------------------------------------------------------------
-// People
-// ---------------------------------------------------------------------------------------------
-
 type Provider = AccountRef["identities"][number]["provider"];
 
 function account(
@@ -148,10 +144,6 @@ export const workspaceMembers: WorkspaceMembership[] = Object.entries(reviewAcco
 		eligibleForPracticeReview: true,
 	}),
 );
-
-// ---------------------------------------------------------------------------------------------
-// The work under review
-// ---------------------------------------------------------------------------------------------
 
 export function itemRef(
 	fields: Pick<ItemRef, "id" | "kind" | "label"> & Partial<ItemRef>,
@@ -332,11 +324,6 @@ interface PracticeSpec {
 	feedbackMode: FeedbackMode;
 }
 
-/**
- * A practice as the workspace serves it. `whyItMatters` and `whatGoodLooksLike` are the prose a
- * practice hover card shows: a fixture without them renders a bare link and its story passes while
- * proving nothing.
- */
 function practiceFixture(spec: PracticeSpec, position: number): Practice {
 	return mockPracticeOf({
 		id: spec.id,
@@ -475,10 +462,6 @@ function groupRefOf(practiceSlug: string) {
 		? null
 		: { slug: found.slug, name: found.name, icon: found.icon, color: found.color };
 }
-
-// ---------------------------------------------------------------------------------------------
-// The spec
-// ---------------------------------------------------------------------------------------------
 
 type FeedbackState = ReviewFeedback["state"];
 type StopReason = NonNullable<ReviewFeedback["stopReason"]>;
@@ -1881,7 +1864,6 @@ function toProblemRows(review: ReviewSpec, spec: ResultSpec): ReviewProblem[] {
 	});
 }
 
-/** Newest first, as the list endpoint returns them. */
 export const reviewResults: ReviewResult[] = allResultSpecs
 	.map(({ review, result }) => toResult(review, result))
 	.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
@@ -2176,7 +2158,6 @@ function toFeedback(review: ReviewSpec, spec: FeedbackSpec): ReviewFeedback {
 	};
 }
 
-/** Newest first, as the list endpoint returns them. */
 export const reviewFeedback: ReviewFeedback[] = allFeedbackSpecs
 	.map(({ review, item }) => toFeedback(review, item))
 	.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -2268,7 +2249,7 @@ export const markedIncorrectFeedbackDetail: ReviewFeedbackDetail = feedbackDetai
 	"eeeeeeee-3333-3333-3333-333333333333",
 );
 
-function boundFeedbackOf(feedback: ReviewFeedback): ReviewBoundFeedback {
+export function boundFeedbackOf(feedback: ReviewFeedback): ReviewBoundFeedback {
 	return {
 		id: feedback.id,
 		destination: feedback.destination,
@@ -2441,7 +2422,6 @@ function toReview(review: ReviewSpec): ReviewSummary {
 	};
 }
 
-/** Newest first, as the list endpoint returns them. */
 export const reviews: ReviewSummary[] = allReviews
 	.map(toReview)
 	.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -2715,10 +2695,6 @@ export const reviewUsageUnpriced: ReviewUsage = {
 	priced: false,
 };
 
-// ---------------------------------------------------------------------------------------------
-// A page that does not fit on one page
-// ---------------------------------------------------------------------------------------------
-
 function cycled<T>(specs: readonly T[], index: number): T {
 	const spec = specs[index % specs.length];
 	if (spec === undefined) {
@@ -2809,10 +2785,6 @@ export function selects(
 		(hasText(actual) && selected.includes(actual))
 	);
 }
-
-// ---------------------------------------------------------------------------------------------
-// The overview: thirty days of reviews, counted
-// ---------------------------------------------------------------------------------------------
 
 const outcomeCounts = (
 	met: number,
@@ -2938,7 +2910,6 @@ export const quietPracticeReviewOverview: ReviewOverview = {
 	practices: [],
 };
 
-/** The overview once it is in and current. */
 export function readyReviewOverview(
 	overview: ReviewOverview = practiceReviewOverview,
 ): OverviewRegionState {
@@ -2950,10 +2921,6 @@ export const reviewOverviewScope: OutcomeScope = {
 	from: toDayParam(OVERVIEW_FROM),
 	to: toDayParam(new Date(STORY_NOW)),
 };
-
-// ---------------------------------------------------------------------------------------------
-// Where the time of the overview's reviews went
-// ---------------------------------------------------------------------------------------------
 
 export const practiceReviewTiming: ReviewTiming = {
 	from: OVERVIEW_FROM,
@@ -2987,10 +2954,6 @@ export const practiceReviewTiming: ReviewTiming = {
 	finishedAfterMergeStartedByMerge: 0,
 	feedbackWithheldAsMerged: 0,
 };
-
-// ---------------------------------------------------------------------------------------------
-// The queue right now
-// ---------------------------------------------------------------------------------------------
 
 const queueItem = (
 	index: number,
@@ -3042,14 +3005,6 @@ export const busyReviewQueue: ReviewQueue = {
 	head: Object.values(reviewQueueHead),
 };
 
-// ---------------------------------------------------------------------------------------------
-// What the overview says needs an admin
-// ---------------------------------------------------------------------------------------------
-
-/**
- * Feedback held for a decision. Restated from delivered and withheld rows rather than written
- * afresh, so each one still names a real review, work and developer.
- */
 export const awaitingApprovalFeedback: ReviewFeedback[] = reviewFeedback
 	.filter((item) => item.state === "DELIVERED" || item.state === "WITHHELD")
 	.slice(0, 3)
@@ -3126,7 +3081,6 @@ export const mergedPullRequestFacts: ItemFacts = {
 	],
 };
 
-/** An issue still open, with no branches, size or checks. */
 export const openIssueFacts: ItemFacts = {
 	item: trackerIssue,
 	facts: [

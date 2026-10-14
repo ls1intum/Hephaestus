@@ -1,0 +1,10 @@
+[
+	{
+		"slug": "clear-names",
+		"name": "Clear names",
+		"versionId": "32",
+		"readsSources": ["docs.document.core"],
+		"exhaustiveSources": [],
+		"knownLimitations": []
+	}
+]

@@ -282,11 +282,6 @@ public class PracticeStandingService {
 
     private record PracticeEvidence(
             Practice practice, List<ResultView> problems, List<ResultView> strengths, List<ResultView> withoutVerdict) {
-        /**
-         * Partitions each result by its own kind; both positive shapes support the standing. Every problem
-         * is kept, worst severity first: a recurrence key hashes the artifact, so a locus is single-artifact
-         * by construction and nothing is withheld for lack of corroboration.
-         */
         static PracticeEvidence classify(List<ResultView> group) {
             Practice practice = group.get(0).practice();
             Map<ResultOutcome, List<ResultView>> byOutcome = group.stream()
@@ -307,15 +302,7 @@ public class PracticeStandingService {
             return byOutcome.getOrDefault(outcome, List.of());
         }
 
-        /**
-         * Everything the practice's latest runs said, verdict or not. This is the trend's input.
-         *
-         * <p>The verdictless rows belong here even though they can never move a direction: the bundler drops
-         * an opportunity that produced no verdict, so they change no share and no posterior, but a piece of
-         * reviewed work the practice looked at and could not judge is visible as an opportunity that yielded
-         * nothing rather than as work that was never reviewed. That is the same distinction
-         * {@code NO_OPPORTUNITY} draws one level up.
-         */
+        // Preserve verdictless reviewed work so it remains distinct from work never reviewed.
         List<ResultView> observed() {
             return Stream.concat(Stream.concat(problems.stream(), strengths.stream()), withoutVerdict.stream())
                     .toList();

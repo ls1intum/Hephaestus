@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
@@ -13,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDraft;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedFeedback;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -104,6 +107,69 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
         assertThat(reviews.findById(reviewId).orElseThrow().getPublicReviewAt()).isNull();
         assertThat(store.prepareAll(workspace.getId(), reviewId, List.of(conversation(developerId))))
                 .isEqualTo(prepared);
+    }
+
+    @Test
+    void shouldPersistTheExactBasisAndCopyBeforeQueueingThePreparedFeedback() {
+        var proposal = draft(true);
+        store.prepareAll(workspace.getId(), reviewId, List.of(proposal));
+        assertThat(jdbc.queryForList(
+                        "SELECT body FROM feedback WHERE workspace_id=? AND id=?",
+                        String.class,
+                        workspace.getId(),
+                        feedbackId))
+                .containsExactly("Add a focused regression test.");
+        assertThat(jdbc.queryForList(
+                        "SELECT result_id FROM feedback_basis WHERE workspace_id=? AND feedback_id=?",
+                        UUID.class,
+                        workspace.getId(),
+                        feedbackId))
+                .containsExactly(supportingResult.getId());
+        assertThat(children())
+                .extracting(copy -> copy.getId())
+                .containsExactlyElementsOf(
+                        proposal.copies().stream().map(FeedbackCopyInput::id).toList());
+        assertThat(jdbc.queryForList(
+                        "SELECT action || '|' || state FROM feedback_send WHERE workspace_id=? AND feedback_id=?",
+                        String.class,
+                        workspace.getId(),
+                        feedbackId))
+                .containsExactly("POST|PENDING");
+    }
+
+    @Test
+    void shouldRetainThePublicCompletionAndOtherChecksWhenRecordingPreparation() {
+        var publicAt = AT.plusSeconds(60);
+        jdbc.update(
+                "UPDATE review SET public_review_at=?,checks=jsonb_build_object('cancellationRequested',false) WHERE"
+                        + " workspace_id=? AND id=?",
+                Timestamp.from(publicAt),
+                workspace.getId(),
+                reviewId);
+        var receipt = store.prepareAll(workspace.getId(), reviewId, List.of(draft(false)));
+        var retained = reviews.findById(reviewId).orElseThrow();
+        assertThat(retained.getPublicReviewAt()).isEqualTo(publicAt);
+        assertThat(retained.getChecks().path("cancellationRequested").asBoolean())
+                .isFalse();
+        assertThat(retained.getChecks()
+                        .path("feedbackPreparationReceipts")
+                        .path(receipt.packageDigest())
+                        .asString())
+                .isEqualTo(receipt.preparedAt().toString());
+    }
+
+    @Test
+    void shouldRequireApprovalWithoutQueueingAPostWhenTheCurrentPolicyRequiresIt() {
+        when(gate.requiresApproval(any())).thenReturn(true);
+        store.prepareAll(workspace.getId(), reviewId, List.of(draft(false)));
+        assertThat(current().getState()).isEqualTo(FeedbackState.AWAITING_APPROVAL);
+        assertThat(children()).hasSize(1);
+        assertThat(jdbc.queryForList(
+                        "SELECT id FROM feedback_send WHERE workspace_id=? AND feedback_id=?",
+                        UUID.class,
+                        workspace.getId(),
+                        feedbackId))
+                .isEmpty();
     }
 
     private FeedbackDraft conversation(long developer) {

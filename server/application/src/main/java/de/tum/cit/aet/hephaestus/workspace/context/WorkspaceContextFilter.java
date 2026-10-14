@@ -246,7 +246,7 @@ public class WorkspaceContextFilter implements Filter {
                 viewed == null ? SecurityUtils.getCurrentAccountId().orElse(null) : Long.valueOf(viewed.accountId());
         if (accountId == null) return MembershipResolution.EMPTY;
         var member = workspaceMembershipRepository
-                .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId)
+                .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId)
                 .filter(candidate -> candidate.getLeftAt() == null);
         if (member.isEmpty() && maySeed) member = membershipAutoSeeder.seedFirstUserWhenEmpty(workspace, users);
         if (member.isEmpty()) return MembershipResolution.EMPTY;
@@ -281,7 +281,7 @@ public class WorkspaceContextFilter implements Filter {
         var accountId = SecurityUtils.getCurrentAccountId().orElse(null);
         boolean hasMembership = accountId != null
                 && workspaceMembershipRepository
-                        .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId)
+                        .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId)
                         .filter(member -> member.getLeftAt() == null)
                         .isPresent();
 

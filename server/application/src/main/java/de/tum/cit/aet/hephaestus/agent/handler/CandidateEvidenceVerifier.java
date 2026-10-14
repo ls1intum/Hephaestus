@@ -97,6 +97,7 @@ class CandidateEvidenceVerifier {
         var verifier = verifiers.get(assignment.item().kind());
         List<EvidenceCitation> located = candidate.allCitations();
         Map<EvidenceCitation, EvidenceCitation> verified = new HashMap<>();
+        Map<EvidenceCitation, QuoteLocation> locations = new HashMap<>();
         List<CitationToCheck> checks = new ArrayList<>();
         for (int i = 0; i < located.size(); i++) {
             EvidenceCitation citation = located.get(i);
@@ -165,7 +166,21 @@ class CandidateEvidenceVerifier {
                             proof.sha256(),
                             ProvenanceDigest.sha256Hex(quote.getBytes(StandardCharsets.UTF_8))));
             verified.put(citation, annotated);
+            locations.put(citation, new QuoteLocation(proof.stagedPath(), side, revision, firstLine, lastLine));
             checks.add(new CitationToCheck(i, source.value(), path, side, revision, firstLine, lastLine, quote));
+        }
+        var example = candidate.example();
+        if (example != null) {
+            var exampleLocation = Objects.requireNonNull(locations.get(example.citation()));
+            for (var problem : candidate.problems()) {
+                for (var citation : problem.citations()) {
+                    if (exampleLocation.overlaps(Objects.requireNonNull(locations.get(citation))))
+                        throw new Unverified(
+                                CandidateRefusal.EXAMPLE_OVERLAPS_PROBLEM,
+                                "The example cites the place of a problem",
+                                example.citation());
+                }
+            }
         }
         var search = candidate.search();
         if (search != null) requireConsulted(search.consulted(), captured);
@@ -232,6 +247,17 @@ class CandidateEvidenceVerifier {
             }
         }
         return candidate.withCitations(citation -> Objects.requireNonNull(verified.get(citation)));
+    }
+
+    private record QuoteLocation(
+            String stagedPath, CitationSide side, @Nullable String revision, int startLine, int endLine) {
+        boolean overlaps(QuoteLocation other) {
+            return stagedPath.equals(other.stagedPath)
+                    && side == other.side
+                    && Objects.equals(revision, other.revision)
+                    && startLine <= other.endLine
+                    && other.startLine <= endLine;
+        }
     }
 
     private static void requireChangeVerifier(ReviewKind scope, @Nullable CitationVerifier verifier) {

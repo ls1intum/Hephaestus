@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionInputDTO;
+import tools.jackson.databind.json.JsonMapper;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
@@ -12,6 +14,10 @@ import org.jspecify.annotations.Nullable;
 
 public final class DefinitionTestFixtures {
     private DefinitionTestFixtures() {}
+
+    public static PracticeDefinitionInputDTO authoring(PracticeDefinition definition) {
+        return JsonMapper.builder().build().convertValue(definition, PracticeDefinitionInputDTO.class);
+    }
 
     public static PracticeDefinition definition() {
         return definition("Describe the change", "Explain the change and its purpose.");

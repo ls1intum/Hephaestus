@@ -32,7 +32,7 @@ import { GOLDEN_INPUTS, PRACTICES_DIR } from "./golden-review-workspace.ts";
 
 // Each child process mocks the SDK and drives one isolated review through runReviewJob.
 
-import { codingAgentExports } from "./program-host-runner.ts";
+import { mockPiCodingAgent } from "./program-host-runner.ts";
 
 const LIB = nodePath.resolve(
 	import.meta.dirname,
@@ -209,7 +209,7 @@ const changeCitation = {
 
 const OVERLONG_SUMMARY = "A summary that runs on ".repeat(8).trim();
 
-/** Words only the person's history holds: they may reach the private lanes and never the review on the work. */
+/** Words only the person's history holds: they may reach the private destinations and never the review on the work. */
 const PRIVATE_HISTORY_SENTENCE = "Earlier reviews told this person about the insecure call twice.";
 
 /** What the staged history establishes, as the server writes it on both history files. */
@@ -219,7 +219,6 @@ const HISTORY_COVERAGE = {
 	communicationHistory: "NOT_ESTABLISHED",
 };
 
-/** The person's prepared feedback, as the server stages it for the private lanes, byte for byte. */
 const STAGED_PREPARED_HISTORY = JSON.stringify({
 	coverage: HISTORY_COVERAGE,
 	recordRole: "PREPARED_NOT_DELIVERED",
@@ -242,7 +241,6 @@ const STAGED_PREPARED_HISTORY = JSON.stringify({
 	],
 });
 
-/** The person's delivered feedback, as the server stages it for the private lanes, byte for byte. */
 const STAGED_FEEDBACK_HISTORY = JSON.stringify({
 	coverage: HISTORY_COVERAGE,
 	recordRole: "RECORDED_DELIVERY",
@@ -761,6 +759,12 @@ if (scenario !== undefined && scenario !== "") {
 		}
 		if (String(input).endsWith("/prepare-feedback")) {
 			publicCompletionAttempts += 1;
+			const preparationBody = init?.body;
+			assert.ok(typeof preparationBody === "string");
+			const preparation: unknown = JSON.parse(preparationBody);
+			assert.ok(isRecord(preparation));
+			assert.equal(typeof preparation.publicComposition, "boolean");
+			record(`prepare-public:${String(preparation.publicComposition)}`);
 			const mode = process.env.PI_PUBLIC_COMPLETION_MODE;
 			if (mode !== undefined) {
 				const body = init?.body;
@@ -1024,6 +1028,7 @@ if (scenario !== undefined && scenario !== "") {
 		return Response.json({
 			contractVersion: 3,
 			admissionDigest: "admitted-digest",
+			publicReviewed: false,
 			admitted: rows.map(admissionDto),
 			withheld: [],
 			practicePageSupport: support,
@@ -1074,38 +1079,10 @@ if (scenario !== undefined && scenario !== "") {
 		settleIdle();
 		await promise;
 	};
-	mock.module("@earendil-works/pi-coding-agent", {
-		namedExports: {
-			...codingAgentExports(
-				cwd,
-				manager,
-				(options) => {
-					assert.ok(cwd !== "");
-					const first = !existsSync(nodePath.join(cwd, "system-prompt.md"));
-					const privateComposition = options.systemPrompt.includes(
-						"Compose from admitted problems.",
-					);
-					if (first) {
-						writeFileSync(nodePath.join(cwd, "system-prompt.md"), options.systemPrompt);
-					} else {
-						writeFileSync(
-							nodePath.join(
-								cwd,
-								privateComposition ? "private-system-prompt.md" : "review-system-prompt.md",
-							),
-							options.systemPrompt,
-						);
-						record(`review-loader extensions=${String(options.extensionFactories?.length)}`);
-					}
-					assert.ok(options.agentsFilesOverride);
-					assert.deepEqual(options.agentsFilesOverride(), { agentsFiles: [] });
-				},
-				() => {
-					if (scenario === "setup") {
-						now += PAST_SAFETY_MS;
-					}
-				},
-			),
+	mockPiCodingAgent(
+		cwd,
+		manager,
+		{
 			async createAgentSession(options: {
 				tools: string[];
 				customTools: CustomTool[];
@@ -2917,7 +2894,31 @@ if (scenario !== undefined && scenario !== "") {
 				};
 			},
 		},
-	});
+		(options) => {
+			assert.ok(cwd !== "");
+			const first = !existsSync(nodePath.join(cwd, "system-prompt.md"));
+			const privateComposition = options.systemPrompt.includes("Compose from admitted problems.");
+			if (first) {
+				writeFileSync(nodePath.join(cwd, "system-prompt.md"), options.systemPrompt);
+			} else {
+				writeFileSync(
+					nodePath.join(
+						cwd,
+						privateComposition ? "private-system-prompt.md" : "review-system-prompt.md",
+					),
+					options.systemPrompt,
+				);
+				record(`review-loader extensions=${String(options.extensionFactories?.length)}`);
+			}
+			assert.ok(options.agentsFilesOverride);
+			assert.deepEqual(options.agentsFilesOverride(), { agentsFiles: [] });
+		},
+		() => {
+			if (scenario === "setup") {
+				now += PAST_SAFETY_MS;
+			}
+		},
+	);
 	const { runReviewJob } = await import("../../../main/resources/agent/pi-runner.ts");
 	await runReviewJob();
 } else {
@@ -2993,6 +2994,7 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-completion-refused",
 		"compose-completion-lost-ack",
 		"compose-continuation",
+		"compose-continuation-reviewed",
 		"compose-fresh-history",
 		"compose-history-unavailable-words",
 		"compose-history-missing-currentness",
@@ -3024,6 +3026,7 @@ if (scenario !== undefined && scenario !== "") {
 	]) {
 		const stage =
 			new Map([
+				["compose-continuation-reviewed", "compose-continuation"],
 				["compose-completion-accepted", "compose"],
 				["compose-completion-refused", "compose"],
 				["compose-completion-lost-ack", "compose"],
@@ -3137,6 +3140,8 @@ if (scenario !== undefined && scenario !== "") {
 					"uses selected native issue and merge request identities while retaining current-only piece grounding",
 				"compose-foreign-provider":
 					"keeps distinct native work identities separate from provider URL text",
+				"compose-continuation-reviewed":
+					"an accepted public review is never recomposed by its continuation",
 				"compose-continuation":
 					"continues an admitted review by composing only the review on the work, measuring and admitting nothing",
 				"compose-overflow":
@@ -3171,13 +3176,13 @@ if (scenario !== undefined && scenario !== "") {
 				"compose-already-said":
 					"withholds as already said only on the destination and practice that captured delivered feedback records",
 				"compose-already-said-inline":
-					"refuses even a withholding on an open lane for a practice the server routed elsewhere",
+					"refuses even a withholding on an open destination for a practice the server routed elsewhere",
 				"compose-support-cooldown":
-					"composes conversation notes for an unanchored problem while the page's cooldown closes its lane",
+					"composes conversation notes for an unanchored problem while the page's cooldown closes its destination",
 				"compose-support-inline":
-					"opens no private session when every lane refuses the practice, keeping the review and every result",
+					"opens no private session when every destination refuses the practice, keeping the review and every result",
 				"compose-support-routing-missing":
-					"closes only the conversation lane, as a failure, when its routing read is missing",
+					"closes only the conversation destination, as a failure, when its routing read is missing",
 				"compose-abstention":
 					"composes no review on the work from a MET result and abstentions, and keeps every admitted result",
 				"compose-unknown-outcome":
@@ -3204,7 +3209,7 @@ if (scenario !== undefined && scenario !== "") {
 					writeFileSync(nodePath.join(cwd, "review-composer.md"), "Write the review on the work.");
 					writeFileSync(nodePath.join(cwd, "feedback-style.md"), "Write clear, useful feedback.");
 					if (stage === "compose" || stage === "compose-foreign-provider") {
-						// The person's history, staged as the server stages it for the measurement and private lanes.
+						// The person's history, staged as the server stages it for the measurement and private destinations.
 						mkdirSync(nodePath.join(cwd, "history"), { recursive: true });
 						writeFileSync(nodePath.join(cwd, "history/feedback.json"), STAGED_FEEDBACK_HISTORY);
 						writeFileSync(nodePath.join(cwd, "history/prepared.json"), STAGED_PREPARED_HISTORY);
@@ -3283,6 +3288,10 @@ if (scenario !== undefined && scenario !== "") {
 						writeFileSync(nodePath.join(cwd, PRACTICES_DIR, "test-practice.ts"), LEADS_PROGRAM);
 					}
 					if (stage.startsWith("compose") || stage === "draft-revision") {
+						const onWorkCopyForms = stage === "compose-continuation" ? [] : ["FILE_NOTE"];
+						if (stage === "compose" || stage === "compose-foreign-provider") {
+							onWorkCopyForms.push("LINE_NOTE");
+						}
 						writeFileSync(
 							nodePath.join(cwd, "evidence/composition.json"),
 							JSON.stringify(
@@ -3302,10 +3311,7 @@ if (scenario !== undefined && scenario !== "") {
 														}
 													: {}),
 											},
-											onWorkCopyForms:
-												stage === "compose" || stage === "compose-foreign-provider"
-													? ["FILE_NOTE", "LINE_NOTE"]
-													: ["FILE_NOTE"],
+											onWorkCopyForms,
 										},
 							),
 						);
@@ -3317,6 +3323,7 @@ if (scenario !== undefined && scenario !== "") {
 							JSON.stringify({
 								contractVersion: 3,
 								admissionDigest: "continued-digest",
+								publicReviewed: fixture === "compose-continuation-reviewed",
 								admitted: [admissionDto(admittedResult)],
 								withheld: [],
 							}),
@@ -3741,6 +3748,7 @@ if (scenario !== undefined && scenario !== "") {
 					}
 					if (fixture === "compose-reviewer-only") {
 						assert.equal(child.status, 0, child.stderr);
+						assert.ok(events.includes("prepare-public:false"), events.join("\n"));
 						assert.equal(
 							events.filter(
 								(event) => event.startsWith("create:") && event.endsWith("tools=report_review"),
@@ -4811,7 +4819,7 @@ for (const item of nullableCases) {
 									["duplicate", ["WITHHOLD"]],
 								]).get(mode) ?? [],
 							);
-							// A lane the server refuses is decided; only an unknown read is a failure.
+							// A destination the server refuses is decided; only an unknown read is a failure.
 							assert.deepEqual(
 								payload.compositionFailures,
 								[
@@ -4993,7 +5001,7 @@ for (const item of nullableCases) {
 								);
 							}
 
-							// Measurement, then the review on the work in a fresh session, then the private lanes in
+							// Measurement, then the review on the work in a fresh session, then the private destinations in
 							// a third fresh session.
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("prompt:")),
@@ -5613,7 +5621,7 @@ for (const item of nullableCases) {
 								second,
 								/#2: stored a CONVERSATION piece for second-practice \(WITHHOLD\); 0\/1 used on that destination\./u,
 							);
-							// test-practice's problem is on the diff: the open lane refuses even a withholding for it.
+							// test-practice's problem is on the diff: the open destination refuses even a withholding for it.
 							const inline = fixture === "compose-already-said-inline";
 							assert.match(
 								second,
@@ -5847,6 +5855,15 @@ for (const item of nullableCases) {
 						}
 						case "compose-continuation": {
 							assert.equal(child.status, 0, child.stderr);
+							if (fixture === "compose-continuation-reviewed") {
+								assert.deepEqual(
+									events.filter((event) => event.startsWith("create:session")),
+									[],
+								);
+								assert.ok(!events.some((event) => event.startsWith("public-completion:")));
+								assert.ok(!existsSync(nodePath.join(cwd, "admission.json")));
+								break;
+							}
 							// One session, the review composer's: no practice is assessed and nothing can be recorded.
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("create:session")),
@@ -5870,7 +5887,7 @@ for (const item of nullableCases) {
 							assert.equal(feedback.admissionDigest, "continued-digest");
 							assert.ok(feedback.review !== null);
 							assert.deepEqual(feedback.feedback, []);
-							// The private lane was open and its negative stays undecided: that is said, not dropped.
+							// A continuing public writer cannot reconstruct the earlier private context.
 							assert.deepEqual(feedback.compositionFailures, [
 								{ phase: "PRIVATE_FEEDBACK", reason: "PRIVATE_NOT_RECOVERED" },
 							]);

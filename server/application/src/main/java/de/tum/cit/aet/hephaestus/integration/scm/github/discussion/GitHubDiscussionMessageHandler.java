@@ -98,10 +98,7 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
                     GitHubEventAction.Discussion.UNANSWERED,
                     GitHubEventAction.Discussion.LABELED,
                     GitHubEventAction.Discussion.UNLABELED -> discussionProcessor.process(discussionDto, context);
-            // Unknown/unmapped actions SKIP rather than upsert. A future action that means
-            // "removed" must not fall through to an upsert that re-creates a phantom — the explicit
-            // cases above already cover every real upsert action, so the safe default is to ack and
-            // ignore.
+            // Unknown actions must not upsert: a removal could recreate a deleted discussion.
             default -> log.debug("Skipped discussion event: reason=unhandledAction, action={}", event.action());
         }
     }

@@ -110,4 +110,4 @@ This ADR owns the separation and its invariants, not field inventories. Current 
 
 ## Update — 2026-10-14 (#2656): the 1.0 practice model
 
-[ADR 0056](0056-one-practice-model-for-items-and-scans.md) supersedes this record. Results and feedback stay separate records, and delivery cannot change a measured outcome.
+Superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for result admission and feedback delivery.

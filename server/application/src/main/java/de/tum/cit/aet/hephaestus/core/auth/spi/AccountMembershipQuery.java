@@ -9,5 +9,11 @@ public interface AccountMembershipQuery {
 
     boolean isAdministrator(long workspaceId, long accountId);
 
-    record MembershipView(Long workspaceId, String workspaceSlug, String workspaceName, String role) {}
+    record MembershipView(Long workspaceId, String workspaceSlug, String workspaceName, Role role) {}
+
+    enum Role {
+        OWNER,
+        ADMIN,
+        MEMBER
+    }
 }

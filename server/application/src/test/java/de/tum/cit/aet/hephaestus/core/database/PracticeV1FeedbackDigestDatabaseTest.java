@@ -10,16 +10,16 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("database")
 class PracticeV1FeedbackDigestDatabaseTest {
-    private static final String WORK = "00000000-0000-0000-0000-000000992161";
-    private static final String CHAT = "00000000-0000-0000-0000-000000992193";
+    private static final String WORK = "00000000-0000-0000-0000-000000978041";
+    private static final String CHAT = "00000000-0000-0000-0000-000000978044";
 
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldKeepApprovalThroughFallbackAndBindThePreparedWordsAndSide(String context) throws Exception {
-        var database = PracticeMigrationFixture.migratedDatabase(context);
+        var database = NativePracticeFixture.feedbackParent(context);
         PracticeMigrationFixture.execute(database, """
             INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,body,path,start_line,end_line,side,state,write_key,write_marker)
-            VALUES('00000000-0000-0000-0000-000000997171',992101,'00000000-0000-0000-0000-000000992161',
+            VALUES('00000000-0000-0000-0000-000000997171',978001,'00000000-0000-0000-0000-000000978041',
                 'LINE_NOTE',1,'Explain the retry.','retry.ts',10,12,'OLD','PLANNED',
                 '00000000-0000-0000-0000-000000997171','<!-- hephaestus-feedback-copy:00000000-0000-0000-0000-000000997171 -->');
             """);
@@ -33,7 +33,7 @@ class PracticeV1FeedbackDigestDatabaseTest {
         // These changes occur before a fence; admitted receipt facts remain immutable.
         PracticeMigrationFixture.execute(database, """
             INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,body,path,start_line,end_line,side,state,write_key)
-            VALUES('00000000-0000-0000-0000-000000997172',992101,'00000000-0000-0000-0000-000000992161',
+            VALUES('00000000-0000-0000-0000-000000997172',978001,'00000000-0000-0000-0000-000000978041',
                 'LINE_NOTE',2,'Explain the delay.','retry.ts',20,22,'NEW','PLANNED','00000000-0000-0000-0000-000000997172');
             """);
         var planned = PracticeMigrationFixture.column(database, "SELECT feedback_content_digest('" + WORK + "')");
@@ -52,7 +52,7 @@ class PracticeV1FeedbackDigestDatabaseTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldKeepShownChatWordsSeparateFromThePreparedBrief(String context) throws Exception {
-        var database = PracticeMigrationFixture.migratedDatabase(context);
+        var database = NativePracticeFixture.feedbackParent(context);
         var prepared = PracticeMigrationFixture.column(database, "SELECT feedback_content_digest('" + CHAT + "')");
         PracticeMigrationFixture.execute(
                 database, "UPDATE feedback_copy SET body='Actual shown words.' WHERE feedback_id='" + CHAT + "'");
@@ -67,7 +67,7 @@ class PracticeV1FeedbackDigestDatabaseTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldHashAllPreparedPiecesInTheirInputOrder(String context) throws Exception {
-        var database = PracticeMigrationFixture.migratedDatabase(context);
+        var database = NativePracticeFixture.feedbackParent(context);
         assertThat(PracticeMigrationFixture.column(database, """
             SELECT feedback_package_digest(digests) FROM (VALUES
                 (1,ARRAY[]::text[]),

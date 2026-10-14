@@ -328,7 +328,7 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         answer("GetGroupMembers " + COURSE, page(false, member(STUDENT, "student", 30)));
         memberSync.syncGroupMemberships(workspace.getId(), COURSE, course);
         Membership hidden = memberships
-                .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(userId(STUDENT)))
+                .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
                 .orElseThrow();
         hidden.setHidden(true);
         memberships.save(hidden);
@@ -338,7 +338,7 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         assertThat(workspaceRoleOf(STUDENT)).isEmpty();
         assertThat(eligibleAccounts()).doesNotContain(accountId(userId(STUDENT)));
         assertThat(memberships
-                        .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(userId(STUDENT)))
+                        .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
                         .map(member -> member.isHidden() && member.getLeftAt() != null)
                         .orElse(false))
                 .isTrue();
@@ -346,11 +346,11 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         answer("GetGroupMembers " + COURSE, page(false, member(STUDENT, "student", 30)));
         memberSync.syncGroupMemberships(workspace.getId(), COURSE, course);
         assertThat(memberships
-                        .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(userId(STUDENT)))
+                        .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
                         .map(Membership::isHidden))
                 .contains(true);
         assertThat(memberships
-                        .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(userId(STUDENT)))
+                        .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
                         .map(member -> member.isHidden() && member.getLeftAt() != null)
                         .orElse(false))
                 .isFalse();
@@ -536,7 +536,7 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
                 page(false, member(STUDENT, "student", 30), member(ASSISTANT, "assistant", 40)));
         memberSync.syncGroupMemberships(workspace.getId(), COURSE, course);
         Membership hidden = memberships
-                .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(userId(STUDENT)))
+                .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
                 .orElseThrow();
         hidden.setHidden(true);
         memberships.save(hidden);
@@ -547,7 +547,7 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         assertThat(groupRoleOf(STUDENT)).isEmpty();
         assertThat(workspaceRoleOf(STUDENT)).isEmpty();
         assertThat(memberships
-                        .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(userId(STUDENT)))
+                        .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
                         .map(member -> member.isHidden() && member.getLeftAt() != null)
                         .orElse(false))
                 .isTrue();
@@ -559,7 +559,7 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         organizationMembershipListener.onMemberAdded(
                 new MembershipChangedEvent(course.getId(), COURSE, userId(STUDENT), "student", "DEVELOPER"));
         assertThat(memberships
-                        .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(userId(STUDENT)))
+                        .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
                         .map(Membership::isHidden))
                 .contains(true);
     }
@@ -622,7 +622,7 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
 
     private Optional<WorkspaceRole> workspaceRoleOf(User user) {
         return accountId(user)
-                .flatMap(id -> memberships.findByWorkspace_IdAndAccount_Id(workspace.getId(), id))
+                .flatMap(id -> memberships.findByWorkspace_IdAndId_AccountId(workspace.getId(), id))
                 .filter(member -> member.getLeftAt() == null)
                 .map(Membership::getRole);
     }

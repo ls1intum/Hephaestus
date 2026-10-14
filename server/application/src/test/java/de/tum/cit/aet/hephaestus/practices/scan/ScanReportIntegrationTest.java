@@ -64,8 +64,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -80,6 +83,12 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     ScanQueryService query;
+
+    @Autowired
+    ScanReportItemsService reportItems;
+
+    @Autowired
+    WebTestClient http;
 
     @Autowired
     ReviewScanStore store;
@@ -159,6 +168,53 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         });
         when(authorization.permits(anyLong(), any(), any()))
                 .thenAnswer(call -> ((Result) call.getArgument(1)).getWorkspaceId() == (long) call.getArgument(0));
+    }
+
+    @Test
+    void shouldReturnTheActiveScanAsAStandardProblemResponse() {
+        var scan = data.scan(scenario, ReviewStatus.RUNNING, Instant.now());
+        http.post()
+                .uri("/workspaces/" + scenario.owner().workspace().getWorkspaceSlug() + "/practices/scans")
+                .headers(h -> h.setBearerAuth(ReviewIntegrationData.memberToken(scenario.owner())))
+                .header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(
+                        Map.of("repositoryItemId", scenario.repository().getId().toString(), "budgetUsd", "1.0000"))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.title")
+                .isEqualTo("Conflict")
+                .jsonPath("$.status")
+                .isEqualTo(409)
+                .jsonPath("$.activeScanId")
+                .isEqualTo(scan.getId().toString());
+    }
+
+    @Test
+    void shouldListScopedScanCountsAndRecheckCurrentEvidencePermission() {
+        var scan = data.scan(scenario, ReviewStatus.COMPLETE, Instant.now().minusSeconds(60));
+        data.result(scenario, scan);
+        var foreign = data.scenario();
+        var foreignScan =
+                data.scan(foreign, ReviewStatus.COMPLETE, Instant.now().minusSeconds(60));
+        data.result(foreign, foreignScan);
+        var page = query.list(scan.getWorkspaceId(), null, null, PageRequest.of(0, 20));
+        assertThat(page.getContent()).singleElement().satisfies(summary -> {
+            assertThat(summary.id()).isEqualTo(scan.getId());
+            assertThat(summary.practiceCount()).isOne();
+            assertThat(summary.counts()).isEqualTo(query.summary(scan).counts());
+            assertThat(summary.counts().openProblems()).isEqualTo(2);
+        });
+        when(authorization.permitsAll(anyLong(), anyCollection(), any())).thenReturn(Set.of());
+        assertThat(query.list(scan.getWorkspaceId(), null, null, PageRequest.of(0, 20))
+                        .getContent())
+                .singleElement()
+                .satisfies(summary -> {
+                    assertThat(summary.counts().openProblems()).isZero();
+                    assertThat(summary.counts().problems()).isEqualTo(2);
+                });
     }
 
     @Test
@@ -444,20 +500,22 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         assertThat(after.recordedCounts()).isEqualTo(before.recordedCounts());
         assertThat(after.problemChanges()).isEqualTo(before.problemChanges());
         assertThat(after.practices().getFirst().counts().openProblems()).isZero();
-        assertThat(query.problems(
+        assertThat(reportItems
+                        .problems(
                                 scan.getWorkspaceId(),
                                 scan.getId(),
                                 null,
                                 20,
-                                new ScanQueryService.ProblemFilter(null, null, null, null, true))
+                                new ScanReportItemsService.ProblemFilter(null, null, null, null, true))
                         .content())
                 .isEmpty();
-        assertThat(query.problems(
+        assertThat(reportItems
+                        .problems(
                                 scan.getWorkspaceId(),
                                 scan.getId(),
                                 null,
                                 20,
-                                new ScanQueryService.ProblemFilter(null, null, null, null, false))
+                                new ScanReportItemsService.ProblemFilter(null, null, null, null, false))
                         .content())
                 .hasSize(2);
     }
@@ -476,12 +534,12 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         var id = new ReviewAssignmentId(current.getId(), result.getPracticeId(), result.getItemId());
         assertThat(store.reuse(current.getWorkspaceId(), id)).contains(result.getId());
         data.terminal(current, ReviewStatus.COMPLETE, null);
-        var page = query.items(
+        var page = reportItems.items(
                 current.getWorkspaceId(),
                 current.getId(),
                 null,
                 10,
-                new ScanQueryService.ItemFilter(null, null, null, null, null));
+                new ScanReportItemsService.ItemFilter(null, null, null, null, null));
         assertThat(page.content()).hasSize(1);
         assertThat(page.content().getFirst()).isInstanceOf(ReusedScanReportItemDTO.class);
         var report = query.report(current.getWorkspaceId(), current.getId());
@@ -520,12 +578,13 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         assertThat(report.availability().withheldProofPairs()).isOne();
         assertThat(report.counts().problems()).isEqualTo(2);
         assertThat(report.counts().openProblems()).isZero();
-        assertThat(query.problems(
+        assertThat(reportItems
+                        .problems(
                                 scan.getWorkspaceId(),
                                 scan.getId(),
                                 null,
                                 20,
-                                new ScanQueryService.ProblemFilter(null, null, null, null, false))
+                                new ScanReportItemsService.ProblemFilter(null, null, null, null, false))
                         .content())
                 .isEmpty();
     }
@@ -540,12 +599,12 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         var recorded = report.recordedCounts();
         assertThat(recorded).isNotNull();
         assertThat(recorded.problems()).isEqualTo(2);
-        assertThatThrownBy(() -> query.items(
+        assertThatThrownBy(() -> reportItems.items(
                         scan.getWorkspaceId(),
                         scan.getId(),
                         null,
                         20,
-                        new ScanQueryService.ItemFilter(null, null, null, null, null)))
+                        new ScanReportItemsService.ItemFilter(null, null, null, null, null)))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(error -> assertThat(((ResponseStatusException) error)
                                 .getStatusCode()
@@ -557,20 +616,20 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
     void problemCursorCannotBeReplayedAgainstAnotherScan() {
         var first = data.scan(scenario, ReviewStatus.COMPLETE, Instant.now().minusSeconds(60));
         data.result(scenario, first);
-        var page = query.problems(
+        var page = reportItems.problems(
                 first.getWorkspaceId(),
                 first.getId(),
                 null,
                 1,
-                new ScanQueryService.ProblemFilter(null, null, null, null, false));
+                new ScanReportItemsService.ProblemFilter(null, null, null, null, false));
         assertThat(page.hasNext()).isTrue();
         var second = data.scan(scenario, ReviewStatus.COMPLETE, Instant.now());
-        assertThatThrownBy(() -> query.problems(
+        assertThatThrownBy(() -> reportItems.problems(
                         second.getWorkspaceId(),
                         second.getId(),
                         page.nextCursor(),
                         1,
-                        new ScanQueryService.ProblemFilter(null, null, null, null, false)))
+                        new ScanReportItemsService.ProblemFilter(null, null, null, null, false)))
                 .isInstanceOf(ResponseStatusException.class);
     }
 
@@ -584,12 +643,13 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         var after = query.report(scan.getWorkspaceId(), scan.getId());
         assertThat(after.recordedCounts()).isEqualTo(before.recordedCounts());
         assertThat(after.availability().withheldProofPairs()).isOne();
-        assertThat(query.items(
+        assertThat(reportItems
+                        .items(
                                 scan.getWorkspaceId(),
                                 scan.getId(),
                                 null,
                                 20,
-                                new ScanQueryService.ItemFilter(null, null, null, null, null))
+                                new ScanReportItemsService.ItemFilter(null, null, null, null, null))
                         .content())
                 .isEmpty();
     }

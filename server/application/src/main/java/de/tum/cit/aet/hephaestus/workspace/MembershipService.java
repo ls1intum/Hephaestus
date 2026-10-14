@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
 import java.time.Clock;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -75,7 +74,7 @@ public class MembershipService {
             desired.merge(accountIdFor(actor.get()), entry.getValue(), Membership.WorkspaceRole::highest);
         }
         for (var entry : desired.entrySet()) {
-            var existing = memberships.findByWorkspace_IdAndAccount_Id(workspace.getId(), entry.getKey());
+            var existing = memberships.findByWorkspace_IdAndId_AccountId(workspace.getId(), entry.getKey());
             if (existing.isEmpty()) createMembership(workspace, entry.getKey(), entry.getValue());
             else {
                 var member = existing.get();
@@ -92,7 +91,7 @@ public class MembershipService {
 
     public void applyProviderGrant(Workspace workspace, Long scmUserId, Membership.@Nullable WorkspaceRole role) {
         long accountId = accountIdForUser(scmUserId);
-        var existing = memberships.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId);
+        var existing = memberships.findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId);
         if (existing.isPresent() && existing.get().getRole() == Membership.WorkspaceRole.OWNER) return;
         if (role == null) existing.ifPresent(member -> member.setLeftAt(clock.instant()));
         else if (existing.isPresent()) {
@@ -102,7 +101,7 @@ public class MembershipService {
     }
 
     public Membership createMembership(Workspace workspace, Long accountId, Membership.WorkspaceRole role) {
-        var existing = memberships.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId);
+        var existing = memberships.findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId);
         if (existing.isPresent()) {
             var member = existing.get();
             if (member.getLeftAt() == null) throw new IllegalArgumentException("This account is already a member.");
@@ -122,7 +121,7 @@ public class MembershipService {
     public Membership assignRole(Long workspaceId, Long accountId, Membership.WorkspaceRole role) {
         var workspace = lockForMembershipChange(workspaceId);
         requireCanManageRole(workspace, role);
-        var existing = memberships.findByWorkspace_IdAndAccount_Id(workspaceId, accountId);
+        var existing = memberships.findByWorkspace_IdAndId_AccountId(workspaceId, accountId);
         if (existing.isEmpty()) {
             var member = createMembership(workspace, accountId, role);
             configAudit.record(ConfigAuditEntry.created(
@@ -167,25 +166,26 @@ public class MembershipService {
 
     private Membership requireMembership(Long workspaceId, Long accountId) {
         return memberships
-                .findByWorkspace_IdAndAccount_Id(workspaceId, accountId)
+                .findByWorkspace_IdAndId_AccountId(workspaceId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Membership", accountId));
     }
 
     @Transactional(readOnly = true)
     public Page<Membership> listMembers(Long workspaceId, Pageable pageable) {
-        return memberships.findAllByWorkspace_Id(workspaceId, pageable);
+        return memberships.findByWorkspace_Id(workspaceId, pageable);
     }
 
     @Transactional(readOnly = true)
     public Set<Long> eligibleAccountIds(Long workspaceId, Collection<Long> accountIds) {
-        var eligible = new HashSet<>(selection.getObject().eligibleAccountIds(workspaceId));
-        eligible.retainAll(accountIds);
-        return Set.copyOf(eligible);
+        return selection.getObject().eligibleAccountIds(workspaceId, accountIds);
     }
 
     @Transactional(readOnly = true)
     public boolean isPracticeReviewEligible(Long workspaceId, Long accountId) {
-        return selection.getObject().eligibleAccountIds(workspaceId).contains(accountId);
+        return selection
+                .getObject()
+                .eligibleAccountIds(workspaceId, Set.of(accountId))
+                .contains(accountId);
     }
 
     private Workspace lockForMembershipChange(Long workspaceId) {

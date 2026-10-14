@@ -274,6 +274,7 @@ void test("a composition continuation derives no change, runs no program and wri
 				JSON.stringify({
 					contractVersion: 3,
 					admissionDigest: "digest",
+					publicReviewed: false,
 					admitted: [],
 					withheld: [],
 				}),

@@ -176,10 +176,7 @@ function stringOpeningAt(source: string, i: number, all: StringSyntax[]): String
 	return undefined;
 }
 
-/**
- * What opens an interpolation inside this string, or nothing when the syntax has none. A raw Swift
- * string interpolates with `\#(`, the hashes between the backslash and the paren.
- */
+// Raw Swift strings place delimiter hashes between the interpolation backslash and parenthesis.
 function interpolationOpener(spec: StringSyntax, hashes: number, raw: string): string | undefined {
 	if (spec.interpolation === undefined) {
 		return undefined;

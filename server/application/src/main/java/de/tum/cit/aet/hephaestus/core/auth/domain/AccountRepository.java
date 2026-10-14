@@ -124,13 +124,7 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
         return lockStatusForShare(id).map(Account.Status.ACTIVE.name()::equals).orElse(false);
     }
 
-    /**
-     * Usable (ACTIVE) accounts in the given role, write-locked for the surrounding transaction.
-     * Backs the last-admin guard. Selects the entity (not a scalar) so Hibernate emits {@code FOR
-     * UPDATE} — as {@code findActiveByAccountIdForUpdate} does — letting concurrent demotions
-     * serialize rather than both passing a stale count. ACTIVE-only: a suspended/deleting admin
-     * can't sign in, so it must not count as the last admin.
-     */
+    /** Locks active administrators so concurrent demotions cannot both pass the last-admin guard. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Account a WHERE a.appRole = :role AND a.status = :status")
     List<Account> findByAppRoleAndStatusForUpdate(

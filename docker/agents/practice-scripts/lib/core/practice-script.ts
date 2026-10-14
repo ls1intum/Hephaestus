@@ -204,7 +204,7 @@ export interface Rating {
 
 const PACK_SIZE = 30;
 
-/** Short aliases for the items of a pack: real ids cost tokens and can break an answer format. */
+// Real IDs cost tokens and can violate the requested answer format.
 function alias(k: number): string {
 	return `i${k + 1}`;
 }

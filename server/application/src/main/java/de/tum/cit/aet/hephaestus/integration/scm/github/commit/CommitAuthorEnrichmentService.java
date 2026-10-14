@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSync
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -106,6 +107,7 @@ public class CommitAuthorEnrichmentService {
     private final GitHubExceptionClassifier exceptionClassifier;
     private final GitHubUserProcessor userProcessor;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     /**
      * Enriches unresolved commit authors/committers for a repository.
@@ -199,7 +201,8 @@ public class CommitAuthorEnrichmentService {
                     EventContext.forSync(
                             scopeId,
                             Objects.requireNonNull(RepositoryRef.from(repository)),
-                            IdentityProviderType.GITHUB)));
+                            IdentityProviderType.GITHUB,
+                            clock.instant())));
         }
 
         log.info(

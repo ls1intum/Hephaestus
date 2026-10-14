@@ -6,8 +6,13 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * @param standingWork reviewed work in the current standing
+ * @param reviewedWork distinct reviewed work across both comparison bundles
+ */
 public record TrendSupport(
         int currentOpportunities,
         int previousOpportunities,
@@ -32,7 +37,7 @@ public record TrendSupport(
             Map<Long, ItemKind> reviewedWork,
             List<EvidenceOpportunity> trail) {
         // One practice's bundles are disjoint, so no piece of reviewed work is in both.
-        return build(
+        return forGroup(
                 properties,
                 currentOpportunities,
                 previousOpportunities,
@@ -53,30 +58,6 @@ public record TrendSupport(
             int opportunitiesUntilComparable,
             int standingWork,
             Map<Long, ItemKind> reviewedWork,
-            int comparablePractices,
-            int eligiblePractices,
-            List<EvidenceOpportunity> trail) {
-        return build(
-                properties,
-                currentOpportunities,
-                previousOpportunities,
-                opportunities,
-                opportunitiesUntilComparable,
-                standingWork,
-                reviewedWork,
-                comparablePractices,
-                eligiblePractices,
-                trail);
-    }
-
-    private static TrendSupport build(
-            TrendProperties properties,
-            int currentOpportunities,
-            int previousOpportunities,
-            int opportunities,
-            int opportunitiesUntilComparable,
-            int standingWork,
-            Map<Long, ItemKind> reviewedWork,
             @Nullable Integer comparablePractices,
             @Nullable Integer eligiblePractices,
             List<EvidenceOpportunity> trail) {
@@ -87,7 +68,7 @@ public record TrendSupport(
                 .toList();
         Instant first = dated.stream().min(Instant::compareTo).orElse(null);
         Instant last = dated.stream().max(Instant::compareTo).orElse(null);
-        Integer span = first == null || last == null ? null : inclusiveUtcDaySpan(first, last);
+        Integer span = first == null ? null : inclusiveUtcDaySpan(first, Objects.requireNonNull(last));
         return new TrendSupport(
                 currentOpportunities,
                 previousOpportunities,
@@ -112,11 +93,9 @@ public record TrendSupport(
     }
 
     public static int inclusiveUtcDaySpan(Instant first, Instant last) {
-        return (int) Math.max(
-                1,
-                ChronoUnit.DAYS.between(
-                                first.atZone(ZoneOffset.UTC).toLocalDate(),
-                                last.atZone(ZoneOffset.UTC).toLocalDate())
-                        + 1);
+        return (int) (ChronoUnit.DAYS.between(
+                        first.atZone(ZoneOffset.UTC).toLocalDate(),
+                        last.atZone(ZoneOffset.UTC).toLocalDate())
+                + 1);
     }
 }

@@ -14,7 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewSummaryQueryService;
 import de.tum.cit.aet.hephaestus.practices.review.dto.OutcomeVectorDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
-import de.tum.cit.aet.hephaestus.practices.trace.ItemTraceQueryService;
+import de.tum.cit.aet.hephaestus.practices.trace.OwnItemTraceQueryService;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -43,7 +43,7 @@ public class PracticeProfileReviewService {
     private final ResultViewQuery views;
     private final ResultPresentation presentation;
     private final ReviewSummaryQueryService reviews;
-    private final ItemTraceQueryService traces;
+    private final OwnItemTraceQueryService traces;
     private final EvidenceAuthorization authorization;
 
     public Page<ProfileReviewDTO> list(

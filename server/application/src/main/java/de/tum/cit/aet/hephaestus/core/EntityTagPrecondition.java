@@ -1,6 +1,9 @@
 package de.tum.cit.aet.hephaestus.core;
 
+import de.tum.cit.aet.hephaestus.core.exception.PreconditionFailedException;
+import de.tum.cit.aet.hephaestus.core.exception.PreconditionRequiredException;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.ETag;
 
 /** Parses and evaluates an HTTP {@code If-Match} precondition using strong entity-tag comparison. */
@@ -22,6 +25,11 @@ public record EntityTagPrecondition(List<ETag> candidates) {
     public boolean matchesExact(String tag) {
         ETag current = new ETag(tag, false);
         return candidates.stream().anyMatch(candidate -> !candidate.isWildcard() && candidate.compare(current, true));
+    }
+
+    public static void requireExact(@Nullable EntityTagPrecondition precondition, String tag) {
+        if (precondition == null) throw new PreconditionRequiredException();
+        if (!precondition.matchesExact(tag)) throw new PreconditionFailedException();
     }
 
     public static String format(String tag) {

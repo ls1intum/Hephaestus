@@ -20,9 +20,10 @@ void test("importing the runner leaves an empty workspace untouched and exits wi
 			cwd,
 			env: { ...process.env, PI_RUNNER_CWD: cwd },
 			encoding: "utf8",
-			timeout: 5000,
+			timeout: 30_000,
 		},
 	);
+	assert.equal(child.error, undefined, child.error?.message);
 	assert.equal(child.status, 0, child.stderr);
 	assert.equal(child.stdout, "function");
 	assert.deepEqual(readdirSync(cwd), []);

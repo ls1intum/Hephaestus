@@ -98,7 +98,6 @@ final class PracticeCriteriaCaseFixtures {
                 Files.delete(repositoryFile(workspace, entry.getKey()));
             }
         }
-        var manifest = MAPPER.createObjectNode();
         boolean issue = scenario.path("workType").asString().equals("issue");
         String coreKind = issue ? "scm.issue.core" : "scm.pull-request.core";
         String commentsKind = issue ? "scm.issue.comments" : "scm.pull-request.comments";
@@ -234,17 +233,12 @@ final class PracticeCriteriaCaseFixtures {
         for (var artifact : artifacts.entrySet()) {
             contents.putIfAbsent(artifact.getValue(), content(workspace.resolve(artifact.getKey())));
         }
-        for (var source : contents.entrySet()) {
-            manifest.withArray("sources")
-                    .addObject()
-                    .put("kind", source.getKey())
-                    .putObject("state")
-                    .put("availability", "AVAILABLE")
-                    .put("content", source.getValue());
+        var manifest = LiveRunnerWorkspace.manifest(workspace, artifacts);
+        manifest.put("itemKind", issue ? "scm.issue" : "scm.pull_request");
+        for (var source : manifest.path("sources")) {
+            ((ObjectNode) source.path("state"))
+                    .put("content", contents.get(source.path("kind").asString()));
         }
-        ArrayNode registered = manifest.putArray("artifacts");
-        artifacts.forEach((path, kind) ->
-                registered.addObject().put("kind", kind).putObject("artifact").put("path", path));
         Files.write(workspace.resolve(SandboxLayout.MANIFEST_PATH), MAPPER.writeValueAsBytes(manifest));
     }
 

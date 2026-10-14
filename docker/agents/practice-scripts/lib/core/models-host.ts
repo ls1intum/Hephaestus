@@ -16,6 +16,7 @@ import {
 	type SlotModels,
 } from "./contract.ts";
 import { answerTokens, logprobDecisionModel } from "./decision-logprobs.ts";
+import { MAX_OUTPUT_TOKENS } from "./model-options.ts";
 import { reasonOf } from "./practice-script.ts";
 
 const rerankResponseSchema = z.object({
@@ -129,41 +130,6 @@ export function hostModels(
 	return models;
 }
 
-export const MAX_OUTPUT_TOKENS = 4096;
-
-/**
- * Keep only the fields that a model call of a practice script may set. Provider options and headers
- * stay with the runner: a script must not reach provider features, upstream headers, another model
- * or another practice's attribution through them.
- */
-export function allowedOptions(slot: ModelSlot, options: unknown): Record<string, unknown> {
-	const kept: Record<string, unknown> = {};
-	if (typeof options !== "object" || options === null) {
-		return kept;
-	}
-	for (const key of MODEL_SLOT_CALLS[slot].options) {
-		const value: unknown = Reflect.get(options, key);
-		if (value !== undefined) {
-			kept[key] = value;
-		}
-	}
-	if (slot === "chat") {
-		const asked = kept.maxOutputTokens;
-		kept.maxOutputTokens =
-			typeof asked === "number" && Number.isInteger(asked) && asked > 0
-				? Math.min(asked, MAX_OUTPUT_TOKENS)
-				: MAX_OUTPUT_TOKENS;
-		kept.temperature ??= 0;
-		if (Array.isArray(kept.tools)) {
-			kept.tools = kept.tools.filter(
-				(t: unknown) =>
-					typeof t === "object" && t !== null && Reflect.get(t, "type") === "function",
-			);
-		}
-	}
-	return kept;
-}
-
 /**
  * The tokens reserved for a call before it is made: four characters per token of input, plus the most
  * output the call can write. It is an estimate; the call settles at the tokens that it reports.
@@ -175,7 +141,10 @@ export function reservationOf(slot: ModelSlot, options: Record<string, unknown>)
 			return input + Number(options.maxOutputTokens ?? MAX_OUTPUT_TOKENS);
 		}
 		case "decision": {
-			return input + answerTokens(MODEL_SLOT_CALLS.decision.items.count(options));
+			return (
+				input +
+				answerTokens(Object.keys(z.record(z.string(), z.unknown()).parse(options.questions)).length)
+			);
 		}
 		case "embedding":
 		case "reranking": {
@@ -199,10 +168,7 @@ export function modelCall<S extends ModelSlot>(
 	| { reserve: number; run: () => Promise<{ value: SlotAnswer; tokens: number | undefined }> } {
 	const calls: { [K in ModelSlot]: SlotCall<K> } = MODEL_SLOT_CALLS;
 	const entry = calls[slot];
-	const kept = allowedOptions(slot, options);
-	if (!entry.accepts(kept)) {
-		throw new Error(`its options are not a ${slot} call`);
-	}
+	const kept = entry.options.parse(options);
 	if (entry.items !== undefined && entry.items.count(kept) > entry.items.max) {
 		return { reason: "too-large" };
 	}

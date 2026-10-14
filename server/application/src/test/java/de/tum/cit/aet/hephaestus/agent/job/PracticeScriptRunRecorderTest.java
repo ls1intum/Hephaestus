@@ -39,7 +39,7 @@ class PracticeScriptRunRecorderTest extends BaseUnitTest {
         var mapper = new JsonMapper();
         var meters = new SimpleMeterRegistry();
         byte[] report = """
-            {"contractVersion":3,"truncated":false,"practices":[
+            {"schemaVersion":2,"truncated":false,"practices":[
              {"practiceSlug":"clear-names","program":{"kind":"builtin","digest":null},"models":[],"status":"ok","stopReason":null,
               "calls":{"review":1,"chat":0,"decision":0,"embedding":0,"reranking":0},"coverageReached":{"reads":0,"truncatedReads":0,"failedReads":0},"durationMs":1}]}
             """.getBytes(StandardCharsets.UTF_8);

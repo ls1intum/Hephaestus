@@ -45,7 +45,8 @@ class SlackMentorIdentityResolverTest extends BaseUnitTest {
         when(providers.resolveProviderId("SLACK", "https://slack.com")).thenReturn(5L);
         when(identities.resolveActiveAccountId(5L, "U1", "T1")).thenReturn(Optional.of(7L));
         when(memberships.membershipsForAccount(7L))
-                .thenReturn(List.of(new MembershipView(42L, "workspace", "Workspace", "MEMBER")));
+                .thenReturn(
+                        List.of(new MembershipView(42L, "workspace", "Workspace", AccountMembershipQuery.Role.MEMBER)));
         var actor = new AccountSummaryQuery.AccountSummary(7L, "Renamed account", null);
         when(users.findAllByIds(List.of(7L))).thenReturn(Map.of(7L, actor));
 
@@ -106,6 +107,7 @@ class SlackMentorIdentityResolverTest extends BaseUnitTest {
         when(providers.resolveProviderId("SLACK", "https://slack.com")).thenReturn(5L);
         when(identities.resolveAccountId(5L, "U1", "T1")).thenReturn(Optional.of(7L));
         when(memberships.membershipsForAccount(7L))
-                .thenReturn(List.of(new MembershipView(workspaceId, "workspace", "Workspace", "MEMBER")));
+                .thenReturn(List.of(
+                        new MembershipView(workspaceId, "workspace", "Workspace", AccountMembershipQuery.Role.MEMBER)));
     }
 }

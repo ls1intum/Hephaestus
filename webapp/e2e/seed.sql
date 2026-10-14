@@ -2,9 +2,9 @@ BEGIN;
 
 INSERT INTO workspace (id, account_login, account_type, created_at, display_name, public_activity_enabled, slug, status,
   practices_enabled, practice_review_auto_trigger_enabled, practice_review_manual_trigger_enabled)
-VALUES (1, 'hephaestustest', 'ORG', now(), 'E2E Practice Review', false, 'e2e', 'ACTIVE',
-  true, true, true)
-ON CONFLICT (id) DO NOTHING;
+SELECT 1, 'hephaestustest', 'ORG', now(), 'E2E Practice Review', false, 'e2e', 'ACTIVE',
+  true, true, true
+WHERE NOT EXISTS (SELECT 1 FROM workspace WHERE id = 1);
 
 INSERT INTO llm_connection (id, slug, display_name, base_url, api_protocol, auth_mode, enabled, created_at)
 VALUES (1, 'e2e-gateway', 'E2E LLM Gateway', 'https://llm-gateway.example/api', 'openai-completions', 'BEARER', true, now())
@@ -32,22 +32,20 @@ FROM identity_provider
 WHERE type = 'GITHUB' AND server_url = 'https://github.com'
 ON CONFLICT (id) DO NOTHING;
 -- Resolve the account created by dev-login without assuming its generated ID.
-INSERT INTO identity_link (id, account_id, provider_id, subject, linked_at, linked_via, external_actor_id, username_at_signup)
-SELECT 1, a.id, p.id, '900001', now(), 'OAUTH_LOGIN', 900001, 'e2e'
+INSERT INTO identity (account_id, provider_id, provider_user_key, linked_at, linked_via)
+SELECT a.id, p.id, '900001', now(), 'SIGN_IN'
 FROM account a
 JOIN identity_provider p ON p.type = 'GITHUB' AND p.server_url = 'https://github.com'
 WHERE a.primary_email = 'e2e@dev.invalid'
-ON CONFLICT (id) DO NOTHING;
-INSERT INTO workspace_membership (workspace_id, user_id, role, hidden, created_at)
-VALUES (1, 900001, 'ADMIN', false, now())
+ON CONFLICT DO NOTHING;
+INSERT INTO membership (workspace_id, account_id, role)
+SELECT 1, id, 'ADMIN' FROM account WHERE primary_email = 'e2e@dev.invalid'
 ON CONFLICT DO NOTHING;
 
 SELECT setval(pg_get_serial_sequence('llm_connection', 'id'), 10, true);
 SELECT setval(pg_get_serial_sequence('llm_model', 'id'), 10, true);
 SELECT setval(pg_get_serial_sequence('workspace_agent_binding', 'id'), 10, true);
 SELECT setval(pg_get_serial_sequence('workspace', 'id'), 10, true);
-
-SELECT setval(pg_get_serial_sequence('identity_link', 'id'), (SELECT max(id) FROM identity_link), true);
 
 -- Isolated public activity: two published repositories, one private repository and one hidden person.
 -- The source has no credentials or enabled streams. Use the playwright profile for this fixture.
@@ -57,9 +55,9 @@ ON CONFLICT (id) DO UPDATE SET public_activity_allowed = true;
 
 INSERT INTO workspace (id, account_login, account_type, created_at, display_name, public_activity_enabled, slug, status,
   practices_enabled, practice_review_auto_trigger_enabled, practice_review_manual_trigger_enabled)
-VALUES (9, 'e2e-public', 'ORG', now(), 'E2E Public Workspace', true, 'e2e-public', 'ACTIVE',
-  false, false, false)
-ON CONFLICT (id) DO NOTHING;
+SELECT 9, 'e2e-public', 'ORG', now(), 'E2E Public Workspace', true, 'e2e-public', 'ACTIVE',
+  false, false, false
+WHERE NOT EXISTS (SELECT 1 FROM workspace WHERE id = 9);
 
 INSERT INTO connection (workspace_id, kind, instance_key, state, config, created_at, updated_at, version)
 VALUES (9, 'GITHUB', 'e2e-public', 'ACTIVE',
@@ -78,8 +76,20 @@ CROSS JOIN (VALUES
 WHERE p.type = 'GITHUB' AND p.server_url = 'https://github.com'
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO workspace_membership (workspace_id, user_id, role, hidden, created_at)
-VALUES (9, 930002, 'MEMBER', true, now())
+INSERT INTO account (id, display_name, status, created_at, updated_at)
+VALUES (940001, 'E2E River', 'UNCLAIMED', now(), now()),
+  (940002, 'E2E Hidden', 'UNCLAIMED', now(), now())
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO identity (account_id, provider_id, provider_user_key, linked_via, linked_at)
+SELECT fixture.account_id, p.id, fixture.provider_user_key, 'ROSTER', now()
+FROM identity_provider p
+CROSS JOIN (VALUES (940001, '930001'), (940002, '930002')) AS fixture(account_id, provider_user_key)
+WHERE p.type = 'GITHUB' AND p.server_url = 'https://github.com'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO membership (workspace_id, account_id, role, hidden)
+VALUES (9, 940001, 'MEMBER', false), (9, 940002, 'MEMBER', true)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO repository (id, native_id, provider_id, created_at, updated_at, html_url, is_archived, is_disabled,
@@ -139,5 +149,7 @@ VALUES
   ('93000000-0000-4000-8000-000000000005', 'e2e-public:hidden:opened', 'PULL_REQUEST_OPENED',
     '2026-01-10T12:00:00Z', 930002, 9, 930001, 'pull_request', 930014, now())
 ON CONFLICT (id) DO NOTHING;
+
+SELECT setval(pg_get_serial_sequence('account', 'id'), (SELECT max(id) FROM account), true);
 
 COMMIT;

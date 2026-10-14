@@ -25,7 +25,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
-import de.tum.cit.aet.hephaestus.practices.trace.ItemTraceQueryService;
+import de.tum.cit.aet.hephaestus.practices.trace.OwnItemTraceQueryService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -54,7 +54,7 @@ class ProfileReviewPaginationTest extends BaseUnitTest {
             views,
             presentation,
             reviews,
-            mock(ItemTraceQueryService.class),
+            mock(OwnItemTraceQueryService.class),
             authorization);
 
     @Test

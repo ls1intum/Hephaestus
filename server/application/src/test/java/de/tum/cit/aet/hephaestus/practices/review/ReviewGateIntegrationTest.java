@@ -4,15 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,19 +75,24 @@ class ReviewGateIntegrationTest extends BaseIntegrationTest {
     }
 
     ItemSnapshot snapshot() {
-        return new ItemSnapshot(
-                new ItemRef(
-                        scenario.workspace().getId(),
-                        scenario.item().getId(),
-                        scenario.item().getKind(),
-                        scenario.item().getSourceId(),
-                        null,
-                        null),
-                new ItemVersion("v1", null),
-                new IntegrationRef(IntegrationKind.GITHUB, 1, "Test", null),
-                Map.of(),
-                List.of(),
-                new ItemLabel(
-                        scenario.item().getId(), "Item", "Pull request", 1, "Container", null, IntegrationKind.GITHUB));
+        return ItemFixtures.snapshot(
+                        new ItemRef(
+                                scenario.workspace().getId(),
+                                scenario.item().getId(),
+                                scenario.item().getKind(),
+                                scenario.item().getSourceId(),
+                                null,
+                                null),
+                        Map.of())
+                .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, "Test", null))
+                .label(ItemFixtures.label()
+                        .itemId(scenario.item().getId())
+                        .title("Item")
+                        .noun("Pull request")
+                        .number(1)
+                        .container("Container")
+                        .integration(IntegrationKind.GITHUB)
+                        .build())
+                .build();
     }
 }

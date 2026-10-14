@@ -675,11 +675,7 @@ function locateAsWritten(content: string, quote: string): LocatedQuote[] {
 	return hits;
 }
 
-/**
- * The text as the sourceFile writes it, when the quote is a reading of it: verbatim, or with the
- * escapes a JSON string uses, or with a non-breaking space where the quote has a space. Null when
- * the text holds no such reading.
- */
+// JSON escaping and non-breaking spaces can preserve a quotation without matching its literal text.
 function findAsWritten(text: string, quote: string): string | null {
 	for (const candidate of [quote, JSON.stringify(quote).slice(1, -1)]) {
 		if (text.includes(candidate)) {

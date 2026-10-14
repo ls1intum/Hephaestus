@@ -36,6 +36,7 @@ class ReviewRuntimeRoleContextTest extends BaseUnitTest {
             .withBean(EvidenceAuthorization.class, () -> mock(EvidenceAuthorization.class))
             .withBean(AccountIdentityQuery.class, () -> mock(AccountIdentityQuery.class))
             .withBean(GitProviderRegistry.class, () -> mock(GitProviderRegistry.class))
+            .withBean(ProductItemRepository.class, () -> mock(ProductItemRepository.class))
             .withBean(ItemLabels.class, () -> mock(ItemLabels.class))
             .withBean(ItemCatalog.class, () -> mock(ItemCatalog.class))
             .withBean(JdbcClient.class, () -> mock(JdbcClient.class))

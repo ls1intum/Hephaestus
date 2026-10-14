@@ -8,8 +8,8 @@ export interface TraceDisplay {
 	/** Each step’s time and the gap since the step before. */
 	times: boolean;
 	/**
-	 * What the system recorded about each step: the review's queue wait, run time and model, every
-	 * fact of a piece of feedback, and the facts under the record the reader started from.
+	 * The review's queue wait, run time and model, each piece of feedback's delivery details, and
+	 * the facts under the record the reader started from.
 	 */
 	system: boolean;
 	/**

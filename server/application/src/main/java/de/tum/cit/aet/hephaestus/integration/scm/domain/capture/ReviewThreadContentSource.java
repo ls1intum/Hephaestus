@@ -267,9 +267,7 @@ public class ReviewThreadContentSource {
         if (review.getUpdatedAt() != null) {
             node.put("updatedAt", review.getUpdatedAt().toString());
         }
-        // Raw timestamp so the agent can compute supersession (a later APPROVE by the same reviewer
-        // overriding an earlier CHANGES_REQUESTED) downstream — this connector loads facts, it does
-        // not judge.
+        // Keep raw dates so the review can order each reviewer's decisions.
         if (review.getSubmittedAt() != null) {
             node.put("submittedAt", review.getSubmittedAt().toString());
         }

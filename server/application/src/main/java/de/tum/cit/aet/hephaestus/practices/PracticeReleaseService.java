@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
-import de.tum.cit.aet.hephaestus.practices.catalog.CatalogCustomizationService;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogLock;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
 import de.tum.cit.aet.hephaestus.practices.catalog.EffectiveCatalog;
@@ -97,7 +96,7 @@ public class PracticeReleaseService {
         lock(ctx);
         Practice practice = practice(ctx, slug);
         var proposal = proposal(practice);
-        PracticeReleasePrecondition.requireCurrent(precondition, proposal);
+        EntityTagPrecondition.requireExact(precondition, proposal.etag());
         var before = PracticeDefinitionSnapshot.of(practice);
         var merged = PracticeDefinitionMerge.apply(proposal.base(), proposal.current(), proposal.offered(), choices);
         versions.append(practice, merged, SecurityUtils.getCurrentAccountId().orElseThrow());
@@ -112,7 +111,7 @@ public class PracticeReleaseService {
     public void decline(WorkspaceContext ctx, String slug, @Nullable EntityTagPrecondition precondition) {
         lock(ctx);
         Practice practice = practice(ctx, slug);
-        PracticeReleasePrecondition.requireCurrent(precondition, proposal(practice));
+        EntityTagPrecondition.requireExact(precondition, proposal(practice).etag());
         var before = PracticeDefinitionSnapshot.of(practice);
         practice.setCatalogBase(mapper.valueToTree(catalog.practice(Objects.requireNonNull(practice.getCatalogSlug()))
                 .effective()));
@@ -125,7 +124,7 @@ public class PracticeReleaseService {
         lock(ctx);
         Practice practice = practice(ctx, slug);
         var proposal = proposal(practice);
-        PracticeReleasePrecondition.requireCurrent(precondition, proposal);
+        EntityTagPrecondition.requireExact(precondition, proposal.etag());
         var before = PracticeDefinitionSnapshot.of(practice);
         var document = catalog.practice(Objects.requireNonNull(practice.getCatalogSlug()))
                 .effective();
@@ -150,7 +149,7 @@ public class PracticeReleaseService {
                 .orElseThrow(() -> new EntityNotFoundException("Practice group", slug));
         if (group.getCatalogSlug() == null) throw new EntityNotFoundException("Catalog group", slug);
         var offer = catalog.group(group.getCatalogSlug());
-        CatalogCustomizationService.require(precondition, groupResetTag(ctx, slug));
+        EntityTagPrecondition.requireExact(precondition, groupResetTag(ctx, slug));
         var before = PracticeGroupSnapshot.of(group);
         var definition = offer.effective();
         group.setName(definition.name());

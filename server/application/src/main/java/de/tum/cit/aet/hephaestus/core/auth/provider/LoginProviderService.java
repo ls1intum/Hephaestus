@@ -220,16 +220,7 @@ public class LoginProviderService {
                 .record();
     }
 
-    /**
-     * A seed slot is <em>silence</em> (both credential halves blank — "this deployment has no
-     * wiki") or a <em>promise</em> (credentials present). A promise that cannot be kept — a
-     * half-filled credential, an unusable base URL — is an operator mistake, reported at ERROR with
-     * the exact knob to fix.
-     *
-     * <p>Deliberately non-fatal: this listener runs on {@link ApplicationReadyEvent}, and an
-     * exception here aborts startup. One misconfigured optional integration must not take the whole
-     * app down — so we shout, we don't die.
-     */
+    // Invalid optional providers must not abort startup; ApplicationReadyEvent listener errors propagate.
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void seedFromEnvOnStartup() {

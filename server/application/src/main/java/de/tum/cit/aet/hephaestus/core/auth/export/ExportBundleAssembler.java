@@ -83,7 +83,8 @@ public class ExportBundleAssembler {
                 identities.stream().map(this::toIdentity).toList();
 
         List<ExportBundle.Membership> memberships = workspaceMembershipQuery.membershipsForAccount(accountId).stream()
-                .map(m -> new ExportBundle.Membership(m.workspaceSlug(), m.workspaceName(), m.role()))
+                .map(m -> new ExportBundle.Membership(
+                        m.workspaceSlug(), m.workspaceName(), m.role().name()))
                 .toList();
 
         List<String> featureFlags = accountFeatureRepository.findFlagsByAccountId(accountId);

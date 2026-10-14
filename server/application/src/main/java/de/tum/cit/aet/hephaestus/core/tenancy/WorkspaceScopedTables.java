@@ -101,13 +101,8 @@ public class WorkspaceScopedTables {
     private volatile Map<String, Set<String>> primaryKeyColumns = Map.of();
     private final ObjectProvider<EntityManagerFactory> entityManagerFactoryProvider;
 
-    /**
-     * Takes an {@link ObjectProvider} rather than {@link EntityManagerFactory} directly to break a
-     * startup cycle: this bean is consumed (transitively) by Spring Boot's {@code
-     * HibernatePropertiesCustomizer}, which itself is needed to BUILD the {@code
-     * EntityManagerFactory}. Lazy resolution via {@code ObjectProvider} means the EMF lookup only
-     * happens at {@link ApplicationReadyEvent}, after the EMF is fully built.
-     */
+    // Hibernate customizers consume this bean while the factory is being built.
+    // Resolve the factory after ApplicationReadyEvent to avoid that startup cycle.
     public WorkspaceScopedTables(ObjectProvider<EntityManagerFactory> entityManagerFactoryProvider) {
         this.entityManagerFactoryProvider = entityManagerFactoryProvider;
     }

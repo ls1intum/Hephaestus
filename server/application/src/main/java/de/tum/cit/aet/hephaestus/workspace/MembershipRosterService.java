@@ -39,13 +39,13 @@ public class MembershipRosterService implements MembershipRoster, MembershipPage
                 .findByIdForUpdate(workspaceId)
                 .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) return false;
-        var existing = memberships.findByWorkspace_IdAndAccount_Id(workspaceId, accountId);
+        var existing = memberships.findByWorkspace_IdAndId_AccountId(workspaceId, accountId);
         if (existing.isPresent()) return existing.get().getLeftAt() == null;
         var account = accounts.find(accountId).orElseThrow(() -> new EntityNotFoundException("Account", accountId));
         if (account.status() != Account.Status.UNCLAIMED && account.status() != Account.Status.ACTIVE) return false;
         memberships.insertIfAbsent(workspaceId, accountId, Membership.WorkspaceRole.MEMBER.name(), false);
         return memberships
-                .findByWorkspace_IdAndAccount_Id(workspaceId, accountId)
+                .findByWorkspace_IdAndId_AccountId(workspaceId, accountId)
                 .map(member -> member.getLeftAt() == null)
                 .orElse(false);
     }

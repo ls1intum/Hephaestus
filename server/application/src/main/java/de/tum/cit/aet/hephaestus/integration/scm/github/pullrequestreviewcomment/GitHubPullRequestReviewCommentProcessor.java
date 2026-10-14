@@ -291,8 +291,7 @@ public class GitHubPullRequestReviewCommentProcessor {
         // Outdated flag (whether the comment's code context has changed)
         comment.setOutdated(dto.outdated());
 
-        // Which side of the diff the comment sits on: the webhook's own `side`, the sync's thread
-        // side.
+        // The webhook supplies the diff side; sync uses the containing thread's side.
         if (dto.side() != null) {
             comment.setSide(mapSide(dto.side()));
         }

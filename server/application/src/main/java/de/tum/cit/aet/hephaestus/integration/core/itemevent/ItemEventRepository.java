@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.itemevent;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -42,17 +43,18 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
     @WorkspaceAgnostic("Background reaper claims due events across workspaces and preserves each event workspace")
     List<ItemEvent> claimDue(@Param("now") Instant now, @Param("limit") int limit);
 
+    record Decision(
+            ItemEventState from,
+            ItemEventState to,
+            @Nullable ReviewRequestReason reason,
+            Instant at,
+            @Nullable Instant retryAt) {}
+
     @Modifying
-    @Query(
-            "UPDATE ItemEvent e SET e.state = :to, e.reason = :reason, e.decidedAt = :now, e.retryAt = :retryAt WHERE e.workspaceId = :workspaceId AND e.id = :id AND e.state = :from")
-    int decide(
-            @Param("workspaceId") long workspaceId,
-            @Param("id") UUID id,
-            @Param("from") ItemEventState from,
-            @Param("to") ItemEventState to,
-            @Param("reason") @Nullable String reason,
-            @Param("now") Instant now,
-            @Param("retryAt") @Nullable Instant retryAt);
+    @Query("UPDATE ItemEvent e SET e.state = :#{#decision.to()}, e.reason = :#{#decision.reason()}, "
+            + "e.decidedAt = :#{#decision.at()}, e.retryAt = :#{#decision.retryAt()} "
+            + "WHERE e.workspaceId = :workspaceId AND e.id = :id AND e.state = :#{#decision.from()}")
+    int decide(@Param("workspaceId") long workspaceId, @Param("id") UUID id, @Param("decision") Decision decision);
 
     @Modifying
     @Query(
@@ -65,9 +67,9 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
 
     @Modifying
     @Query(
-            "UPDATE ItemEvent e SET e.state = de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.EXPIRED, e.reason = 'PENDING_DEADLINE_EXCEEDED', e.decidedAt = :now, e.retryAt = NULL WHERE e.state IN (de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.RECORDED, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.WAITING, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.BLOCKED) AND e.occurredAt < :before")
+            "UPDATE ItemEvent e SET e.state = de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.EXPIRED, e.reason = :reason, e.decidedAt = :now, e.retryAt = NULL WHERE e.state IN (de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.RECORDED, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.WAITING, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.BLOCKED) AND e.occurredAt < :before")
     @WorkspaceAgnostic("Background reaper expires pending events across workspaces at the configured deadline")
-    int expire(@Param("before") Instant before, @Param("now") Instant now);
+    int expire(@Param("before") Instant before, @Param("now") Instant now, @Param("reason") ReviewRequestReason reason);
 
     @Modifying
     @Query(

@@ -224,7 +224,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(tombstone.isFeedbackDeliveryEnabled()).isFalse();
         assertThat(practiceResultRepository.findById(result.getId())).isEmpty();
         assertThat(feedbackRepository.findById(feedback.getId())).isEmpty();
-        assertThat(memberships.findByAccount_Id(accountId)).isEmpty();
+        assertThat(memberships.findById_AccountId(accountId)).isEmpty();
         assertThat(links.findByAccount_Id(accountId)).isEmpty();
         assertThat(suppression.isAccountSuppressed(accountId)).isTrue();
         assertThat(suppression.isSuppressed(Objects.requireNonNull(provider.getId()), "42", null))
@@ -486,9 +486,13 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
 
         assertThat(counts.get("person_evidence_copy")).isEqualTo(2L);
         assertThat(export.path("stores").path("review_job")).hasSize(2);
+        assertThat(export.path("stores").path("review_job"))
+                .extracting(row -> row.path("id").asString())
+                .containsExactlyInAnyOrderElementsOf(targetDerived.stream()
+                        .map(derived -> derived.jobId().toString())
+                        .toList());
         for (var row : export.path("stores").path("review_job")) {
-            assertThat(row.path("capture").path("manifest").path("sources")).hasSize(1);
-            assertThat(row.path("capture").path("manifest").path("artifacts")).hasSize(1);
+            assertThat(row.has("capture")).isFalse();
         }
         assertThat(export.toString())
                 .doesNotContain("MOUNTED-PROFILE-CANARY", "credential-canary", "unrelated-profile-canary");

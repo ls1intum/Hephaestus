@@ -310,7 +310,6 @@ export default defineConfig({
 			"build:extension": run("vp run --filter extension zip"),
 			"dev:extension": run("vp run --filter extension dev"),
 
-			// Agent runtime, practice scripts, repository scripts and tooling config
 			"gate:agents-format": cached(`vp fmt --check ${agentSources}`),
 			"gate:config-format": cached(configFormatCommand("--check")),
 			"gate:agents-lint": run(`vp exec oxlint ${oxlintFormat}${oxlintTargets}`),

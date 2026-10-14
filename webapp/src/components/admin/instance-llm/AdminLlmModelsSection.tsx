@@ -37,10 +37,7 @@ export interface AdminLlmModelsSectionProps {
 	onDelete: (model: LlmModel) => void;
 }
 
-/**
- * What keeps a model from workspaces, worst first; null for a model they can use. An undeclared data
- * handling is the registry badge's warning, not a block.
- */
+// Undeclared data handling warns but does not block availability.
 function readiness(model: LlmModel, connectionEnabled: boolean): ModelReadiness | null {
 	if (!model.currentPrice || model.currentPrice.pricingMode === "UNPRICED") {
 		return "PRICE_MISSING";

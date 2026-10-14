@@ -1969,7 +1969,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                             .containsExactly(new ActivityActionDTO(ActivityKind.PULL_REQUEST_OPENED, 1));
                 });
                 assertThat(page.nextCursor()).isNull();
-                assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+                assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
                                 workspace.getId(), workspaceMembershipService.accountIdForUser(contributor.getId())))
                         .isEmpty();
             }
@@ -1985,7 +1985,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             }
             record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -904L, DAY, monitored);
             var membership = workspaceMembershipRepository
-                    .findByWorkspace_IdAndAccount_Id(
+                    .findByWorkspace_IdAndId_AccountId(
                             workspace.getId(), workspaceMembershipService.accountIdForUser(ada.getId()))
                     .orElseThrow();
             membership.setHidden(true);

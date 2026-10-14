@@ -66,10 +66,7 @@ export function unfinishedReview(context: Pick<ReadyContext, "trace">): string |
 		: undefined;
 }
 
-/**
- * How many provider comments Hephaestus recorded posting for the reader. None says only that none is
- * recorded, not that the provider shows none.
- */
+// No recorded receipt does not prove that the provider has no comment.
 function feedbackText(feedback: WorkFeedback): string {
 	const comments = feedback.comments.length;
 	if (comments === 0) {

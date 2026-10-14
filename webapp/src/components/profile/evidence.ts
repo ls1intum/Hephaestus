@@ -69,11 +69,7 @@ function foldDiffSides(citations: EvidenceCitation[]): EvidenceLocation[] {
 	return blocks.map(toLocation);
 }
 
-/**
- * One citation as the profile reads it. A folded block keeps neither the side, the commit nor the
- * quote of the citation it grew from, and is captioned with no line range: each side was read at
- * its own commit, so any one of them would be true of one side only, and the block shows both.
- */
+// A folded diff combines sides from separate commits; no single side, commit or quote describes it.
 function toLocation({ citation, change }: DiffBlock): EvidenceLocation {
 	if (change !== undefined) {
 		return {

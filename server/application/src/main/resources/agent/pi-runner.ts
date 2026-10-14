@@ -463,7 +463,7 @@ function candidateReadTheChange(candidate: Candidate): boolean {
 	const { evidence } = candidate;
 	const consulted = [
 		...("search" in evidence && evidence.search !== undefined ? evidence.search.consulted : []),
-		...("inapplicability" in evidence ? evidence.inapplicability.consulted : []),
+		...(candidate.outcome === "DOES_NOT_APPLY" ? candidate.evidence.inapplicability.consulted : []),
 	];
 	return (
 		cited.some((citation) => citation.sourceKind === DIFF_SOURCE) || consulted.includes(DIFF_SOURCE)
@@ -781,7 +781,6 @@ function coordinatesOf(citation: unknown): unknown {
 	return coordinates;
 }
 
-/** A staged file as a titled block of the composition turn, or a pointer to it when it is too large. */
 const COMPOSITION_BLOCK_LIMIT = 32_000;
 
 function stagedBlock(label: string, file: string, limit = COMPOSITION_BLOCK_LIMIT): string {
@@ -794,7 +793,6 @@ function stagedBlock(label: string, file: string, limit = COMPOSITION_BLOCK_LIMI
 		: `### ${label}\n\`\`\`json\n${text}\n\`\`\`\n`;
 }
 
-/** The cause behind a wrapped error, in parentheses, or nothing when the error carries none. */
 function causeText(error: unknown): string {
 	return error instanceof Error && error.cause !== undefined ? ` (${errorText(error.cause)})` : "";
 }
@@ -842,7 +840,7 @@ function scheduleDeadline(timeoutMs: number, onTimeout: () => void) {
 	return { elapsed, timer, expired: () => expired };
 }
 
-/** A mid-turn nudge; the turn goes on either way, so a steer that fails is only logged. */
+// A failed steer must not interrupt the active turn.
 async function steer(session: AgentSession, message: string): Promise<void> {
 	try {
 		await session.steer(message);
@@ -851,7 +849,7 @@ async function steer(session: AgentSession, message: string): Promise<void> {
 	}
 }
 
-/** Abort and wait for idle; Pi refuses a new prompt while the previous run is still active. */
+// Pi rejects prompts while the previous run is active.
 async function abortSession(session: AgentSession): Promise<void> {
 	session.clearQueue();
 	// A compaction in flight is a model call of its own that `abort()` leaves running, and the
@@ -864,7 +862,6 @@ async function abortSession(session: AgentSession): Promise<void> {
 	}
 }
 
-/** Return false if the previous operation does not become idle within maxMs. */
 async function settleSession(
 	session: AgentSession,
 	label: string,
@@ -925,7 +922,6 @@ function incompleteCompositionReason(
 }
 
 export async function runReviewJob(): Promise<void> {
-	/** Accept array, single-item and serialized-list forms; validate each parsed item separately. */
 	function submittedList(value: unknown): { items: unknown[] } | { error: string } {
 		if (typeof value !== "string") {
 			return { items: listOrItem(value) };
@@ -1013,10 +1009,7 @@ export async function runReviewJob(): Promise<void> {
 
 	const taskEnvelope = readTaskEnvelope();
 	const INPUT_PATHS = resolveTaskPaths(CWD, taskEnvelope.paths);
-	/**
-	 * Staged beside the composition request only when this attempt continues a review an earlier attempt admitted and lost
-	 * the writer of: what the server admitted then. Such an attempt assesses nothing; it composes the review on the work.
-	 */
+	// Recovery composes from the admitted attempt's staged inputs without reassessing practices.
 	const CONTINUATION_PATH = nodePath.join(
 		nodePath.dirname(INPUT_PATHS.compositionRequest),
 		"composition-continuation.json",
@@ -1030,9 +1023,8 @@ export async function runReviewJob(): Promise<void> {
 	const PRACTICE_COVERAGE_PATH = outputPath(OUTPUT, "practice-coverage.json");
 	const PRACTICE_SCRIPT_REPORT_PATH = outputPath(OUTPUT, "practice-scripts.json");
 	const PRACTICE_SCRIPT_MODELS_PATH = `${CWD}/practice-script-models.json`;
-	/** Each review's whole input, for the session to read beyond its bounded section; never composition's. */
 	const REVIEW_INPUT_ROOT = "work/review-input";
-	/** The runner's own record of what this review has recorded so far; read back after a compaction. */
+	// Compaction can remove prior recordings from the model context; retain them on disk.
 	const NOTES_PATH = `${CWD}/work/notes/review.md`;
 
 	function positiveIntegerEnv(name: string): number {
@@ -1048,32 +1040,22 @@ export async function runReviewJob(): Promise<void> {
 	const LLM_PROXY_URL = requiredEnv("LLM_PROXY_URL");
 	const LLM_PROXY_TOKEN = requiredEnv("LLM_PROXY_TOKEN");
 	const DIRECT_MODEL_TOKENS = positiveIntegerEnv("PI_DIRECT_MODEL_TOKENS");
-	/** Practices a turn carries at once; a catalog group larger than this is split. */
 	const PRACTICES_PER_TURN = hasText(process.env.PI_PRACTICE_BATCH_SIZE)
 		? Number(process.env.PI_PRACTICE_BATCH_SIZE)
 		: 6;
-	/** Per-practice refusal cap; an exhausted practice remains NOT_REACHED. */
+	// Refusal exhaustion leaves the practice NOT_REACHED.
 	const MAX_REFUSALS_PER_PRACTICE = 8;
-	/** What one practice may spend in a turn; a turn is owed {@link turnBudget} of it. Set by the server. */
+	// The server sets each practice's budget; turnBudget combines it for the assigned practices.
 	const PER_PRACTICE_WORK: Work = {
 		modelCalls: positiveIntegerEnv("PI_PRACTICE_MODEL_CALLS"),
 		outputTokens: positiveIntegerEnv("PI_PRACTICE_OUTPUT_TOKENS"),
 	};
-	/**
-	 * How long a turn may go without a single session event — no streamed token, no tool progress — before
-	 * it counts as stalled and is aborted. Liveness, not a budget: the stream-idle bound Claude Code and
-	 * Codex both default to.
-	 */
+	// Abort a stalled stream independently of the turn's work budget.
 	const STALL_MS = 300_000;
-	/**
-	 * The most output tokens one model call may write, from the model's registration; a call that reaches
-	 * it was cut off, and the tool it called received it incomplete.
-	 */
+	// Reaching the model's output limit can leave its tool arguments incomplete.
 	let outputLimit = Number.POSITIVE_INFINITY;
-	/** A turn whose calls run into the output limit this often is stuck writing one runaway call. */
 	const CUT_OFF_ABORT = 2;
 
-	/** How often the stall watchdog looks: a clock read, so often enough that a stall is caught promptly. */
 	const STALL_CHECK_MS = 1000;
 	const WINDOWS = deriveWindows(AGENT_BUDGET_MS, existsSync(INPUT_PATHS.compositionRequest));
 
@@ -1103,7 +1085,6 @@ export async function runReviewJob(): Promise<void> {
 
 	mkdirSync(OUTPUT, { recursive: true });
 
-	/** Snapshot the eligible practices once for the whole review. */
 	function readPracticeIndex() {
 		return practiceIndexSchema.parse(JSON.parse(readFileSync(INPUT_PATHS.practiceIndex, "utf8")));
 	}
@@ -1148,10 +1129,8 @@ export async function runReviewJob(): Promise<void> {
 		turns: [],
 		usageTotals,
 	};
-	/** The turn the session events are charged to; null between turns. */
 	let currentTurn: TurnTrace | null = null;
 
-	/** How much of a refusal reason the trace keeps: the kind of failure, not the whole excerpt. */
 	const TRACE_REASON_CHARS = 140;
 	const reviewState = new Map<string, Candidate>();
 	const executions = new Map<string, ProgramOutcome>();
@@ -1507,7 +1486,6 @@ export async function runReviewJob(): Promise<void> {
 		return reviewState.size > 0;
 	}
 
-	/** Resolve only the path placeholders owned by the task envelope. */
 	function orchestratorWithPaths(text: string): string {
 		const {
 			contextRoot,
@@ -1696,7 +1674,7 @@ export async function runReviewJob(): Promise<void> {
 		return { candidate: parsed.candidate, notes };
 	}
 
-	/** What a repository read returns for a file that is not text: git's own rule, a NUL in the opening bytes. */
+	// Git classifies a file as binary when its first 8000 bytes contain NUL.
 	const BINARY = Symbol("binary");
 
 	function capturedText(citation: Citation): string | null {
@@ -1724,7 +1702,6 @@ export async function runReviewJob(): Promise<void> {
 		return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
 	}
 
-	/** What a citation quotes: the checkout at HEAD or at the named revision, or the derived change view. */
 	function citedContent(citation: Citation): string | typeof BINARY | null {
 		if (citation.sourceKind === TREE_SOURCE) {
 			if (citation.revision === undefined) {
@@ -1744,7 +1721,6 @@ export async function runReviewJob(): Promise<void> {
 		return readFileSync(`${CWD}/${citation.sourcePath}`, "utf8");
 	}
 
-	/** The citation resolved against what it quotes, or the mismatch that says why it cannot be. */
 	function resolveCited(
 		citation: Citation,
 		content: string | typeof BINARY | null,
@@ -1767,7 +1743,7 @@ export async function runReviewJob(): Promise<void> {
 		return resolveOnEitherSide(citation, content);
 	}
 
-	/** The bytes as text, or BINARY: a quote of a binary file cannot be verified, here or at admission. */
+	// Binary files cannot supply verifiable quotation text.
 	function asText(bytes: Buffer): string | typeof BINARY {
 		return bytes.subarray(0, 8000).includes(0) ? BINARY : bytes.toString("utf8");
 	}
@@ -1780,8 +1756,6 @@ export async function runReviewJob(): Promise<void> {
 		return nodePath.resolve(CWD, "repos", match.groups.repository);
 	}
 
-	/** The blob at a repository-relative path in a revision of the checkout's history, or null. */
-	/** The file at a repository-relative path in the checkout, or null when there is none. */
 	function readCheckoutFile(path: string, repository: string): string | typeof BINARY | null {
 		const file = nodePath.resolve(repository, path);
 		if (!file.startsWith(`${repository}/`)) {
@@ -1796,23 +1770,17 @@ export async function runReviewJob(): Promise<void> {
 
 	let measurementClosed = false;
 
-	/** Calls of the recording tools one turn may make before recording anything; past it, the turn ends. */
 	const MAX_RECORDING_ATTEMPTS_PER_TURN = 24;
 
-	/** Per-turn thresholds for nudging and aborting identical tool calls. */
 	const REPEATED_CALL_NUDGE = 3;
 	const REPEATED_CALL_ABORT = 6;
-	/**
-	 * The same thresholds for a recording call: its answer is a function of its arguments, so the second
-	 * identical call already shows a loop, and a nudge has never broken one.
-	 */
+	// Recording answers depend on their arguments; repeating an identical call cannot resolve a refusal.
 	const REPEATED_RECORDING_NUDGE = 2;
 	const REPEATED_RECORDING_ABORT = 3;
 
-	/** Avoid logging SDK error events again when the tool already logged its refusal. */
+	// SDK error events can repeat a refusal already logged by the tool.
 	const answeredRefusals = new Set<string>();
 
-	/** A refusal the tool itself is answering: logged where it was decided, and once. */
 	async function refusal<T>(toolCallId: string, text: string): Promise<AgentToolResult<T>> {
 		answeredRefusals.add(toolCallId);
 		throw new Error(text);
@@ -1826,7 +1794,6 @@ export async function runReviewJob(): Promise<void> {
 
 	let composerTool: "report_review" | "report_feedback" = "report_feedback";
 
-	/** The text of a tool result as the model reads it; empty when the result carries none. */
 	function toolResultText(result: unknown): string {
 		return jsonArray(isRecord(result) ? result.content : null)
 			.map((block) => (isRecord(block) && typeof block.text === "string" ? block.text : ""))
@@ -1834,31 +1801,23 @@ export async function runReviewJob(): Promise<void> {
 			.join("\n");
 	}
 
-	/** How much of a tool error the log and the trace keep: the kind of failure, not the whole excerpt. */
 	const TOOL_ERROR_CHARS = 240;
 
-	/** A reason on one line, bounded: the SDK puts what it refused on the line after its heading. */
+	// SDK error headings can be followed by the refused content; retain only a bounded reason.
 	function firstLine(text: string): string {
 		const line = text.replaceAll(/\s+/gu, " ").trim() || "(no reason given)";
 		return line.length > TOOL_ERROR_CHARS ? `${line.slice(0, TOOL_ERROR_CHARS)}…` : line;
 	}
 
-	/** The session the turn events belong to, once it exists; what the loop bound aborts. */
 	let activeSession: AgentSession | null = null;
 
 	let turnDemand: TurnDemand | null = null;
 
 	let tokensPerProblem = 1500;
-	/** Output tokens of the last assistant message, when that message carries a recording call. */
 	let recordingMessageTokens = 0;
-	/** When the session last showed any sign of life; what the stall watchdog reads. */
 	let lastEventAt = Date.now();
 
-	/**
-	 * Charges each model call to the turn in flight. The turn is told once to record what it owes when its
-	 * remaining work only pays for that, and is ended between model calls — after the tools of the call that
-	 * spent the budget have run, so a recording in that call lands — never within one.
-	 */
+	// End budget-exhausted turns between model calls so recording tools from the last call can finish.
 	function chargeWork(event: AgentSessionEvent): void {
 		lastEventAt = Date.now();
 		const turn = currentTurn;
@@ -1912,10 +1871,7 @@ export async function runReviewJob(): Promise<void> {
 		}
 	}
 
-	/**
-	 * A call cut off at the output limit reaches its tool incomplete, and the tool's error reads like the
-	 * model's mistake: the model is told it was the cut, once; a second cut in the turn ends it.
-	 */
+	// A cutoff can produce invalid tool arguments; identify truncation before retrying.
 	function noteCutOff(turn: TurnTrace, cutOff: boolean): void {
 		if (!cutOff) {
 			return;
@@ -1943,7 +1899,6 @@ export async function runReviewJob(): Promise<void> {
 		}
 	}
 
-	/** End the turn in flight for a reason of the runner's own; the first reason is the one the trace keeps. */
 	function stopTurn(reason: StopReason, why: string): void {
 		const turn = currentTurn;
 		console.error(`[pi-runner] ${turn?.label ?? "review"}: ${why}`);
@@ -1955,15 +1910,10 @@ export async function runReviewJob(): Promise<void> {
 		}
 	}
 
-	/** Refused submissions per practice; a practice past MAX_REFUSALS_PER_PRACTICE accepts no more. */
 	const refusals = new Map<string, number>();
-	/**
-	 * Practices this review asks no more about: past the refusal limit, too large for the context, or ended on their
-	 * own again after the one request to record. Without a draft, each stays not reached.
-	 */
+	// A blocked practice without a draft stays not reached.
 	const blockedPractices = new Map<string, UnratedReason>();
 
-	/** Whether the practice was closed by its refused submissions, not by another reason. */
 	function refusalLimited(slug: string): boolean {
 		return (refusals.get(slug) ?? 0) >= MAX_REFUSALS_PER_PRACTICE;
 	}
@@ -1976,13 +1926,9 @@ export async function runReviewJob(): Promise<void> {
 		}
 	}
 
-	/**
-	 * The items refused in this turn, as sent, with why: an identical resend gets the same answer, so it is
-	 * told so at once rather than checked again; cleared with the turn.
-	 */
+	// Identical refused submissions retain their answer within a turn.
 	const refusedItems = new Map<string, { reason: string; resent: number }>();
 
-	/** An identical refused item sent this many times more ends the turn: the circuit breaker. */
 	const IDENTICAL_REFUSAL_ABORT = 2;
 
 	const READ_TOOLS: ReadonlySet<string> = new Set(["read", "grep", "find", "ls"]);
@@ -2213,7 +2159,6 @@ export async function runReviewJob(): Promise<void> {
 		}
 	}
 
-	/** The practices the current session asked about; a recorded result for one of them is what it owes. */
 	let currentTurnSlugs: readonly string[] = [];
 
 	// Each measuring session may submit only its assigned practice's result.
@@ -2457,21 +2402,18 @@ export async function runReviewJob(): Promise<void> {
 		);
 	}
 
-	/** What a private composer that reads instead of writing is told, at the exploration bound and near the budget's end. */
 	const COMPOSITION_NUDGE =
 		`Stop reading: the admitted results with their problems and the history are in this turn's prompt and in ` +
 		`work/composition/results.json, and nothing else decides a piece. Persist the feedback you have ` +
 		`with report_feedback now — and a WITHHOLD with its reason for each NOT_MET practice you decided ` +
 		`to stay quiet about. Use tools only from this point onward; no planning prose.`;
 
-	/** What the composer of the review on the work is told near its budget's end. */
 	const REVIEW_NUDGE =
 		`Everything this review may rest on is in this session. Store the final review now with one report_review call: ` +
 		`first one decision for each NOT_MET result, RAISE or a withholding reason, then the complete summary and ` +
 		`any line notes, which speak about each raised result, itself or through its problems, and no withheld one. ` +
 		`No prose outside the calls.`;
 
-	/** Calls a composition may make before its first recording call; at this one it is nudged to persist. */
 	const COMPOSITION_EXPLORATION_NUDGE = 12;
 
 	const PERSIST_DISCIPLINE =
@@ -2480,9 +2422,9 @@ export async function runReviewJob(): Promise<void> {
 
 	const RECORD_NUDGE = `This turn has the work left to write its result and no more. Stop exploring. Submit what the inspected evidence supports for this session's practice with submit_result. ${PERSIST_DISCIPLINE}`;
 
-	/** Tells the server to retry a review whose admission endpoint was unreachable. */
+	// The server interprets exit 75 as unreachable admission and retries the review.
 	const SERVER_UNREACHABLE_EXIT = 75;
-	/** Tells the server to retry a review that recorded nothing after provider failures. */
+	// The server interprets exit 76 as provider failure without a recorded result and retries the review.
 	const PROVIDER_UNREACHABLE_EXIT = 76;
 
 	function readTaskEnvelope(): TaskEnvelope {
@@ -2560,7 +2502,6 @@ export async function runReviewJob(): Promise<void> {
 	const FEEDBACK_PATH = outputPath(OUTPUT, "feedback.json");
 	const COMPOSER_PROMPT_PATH = `${CWD}/feedback-composer.md`;
 	const REVIEW_COMPOSER_PROMPT_PATH = `${CWD}/review-composer.md`;
-	/** The writing style both compositions share, ahead of each one's own instructions. */
 	const FEEDBACK_STYLE_PATH = `${CWD}/feedback-style.md`;
 	const PREPARED_FEEDBACK_PATH = INPUT_PATHS.preparedFeedback;
 	const COMPOSITION_RESULTS_PATH = `${CWD}/work/composition/results.json`;
@@ -2621,6 +2562,7 @@ export async function runReviewJob(): Promise<void> {
 	const PUBLIC_FEEDBACK_HISTORY_PATH = `${CWD}/work/composition/public-feedback-history.json`;
 	let compositionAdmitted = false;
 	let admissionDigest: string | null = null;
+	let publicReviewed = false;
 
 	// Echo the exact composition inputs so Java validates references against the same snapshot.
 	const composedFeedback: ComposedFeedback = {
@@ -2665,9 +2607,6 @@ export async function runReviewJob(): Promise<void> {
 		) {
 			return null;
 		}
-		if (destinations.ON_WORK.enabled && request.onWorkCopyForms.length === 0) {
-			throw new Error("composition request opens ON_WORK without a copy form");
-		}
 		return {
 			destinations,
 			onWorkCopyForms: request.onWorkCopyForms,
@@ -2708,12 +2647,7 @@ export async function runReviewJob(): Promise<void> {
 		}
 	}
 
-	/**
-	 * The `destination:practice` pairs the staged delivered feedback can show as already said. The server chose the person
-	 * and the records this review may read; a record counts only when it is current, not withdrawn, carries its staged
-	 * words and a delivery time, and rests on a NOT_MET problem of the practice. Prepared feedback reached no one, and
-	 * a history that cannot be read does not establish prior communication.
-	 */
+	// Prepared or unreadable feedback cannot establish prior communication. Only current delivered words count.
 	function stagedDeliveredPractices(): Set<string> {
 		const file = `${nodePath.dirname(PREPARED_FEEDBACK_PATH)}/feedback.json`;
 		try {
@@ -3412,7 +3346,7 @@ export async function runReviewJob(): Promise<void> {
 			.join("\n");
 	}
 
-	/** The producer owns body eligibility. Keep its facts here and locate only bodies it actually staged. */
+	// The producer owns body eligibility; consume only bodies it staged.
 	function priorFeedbackFacts(label: string, file: string, key: "feedback" | "prepared"): string {
 		if (!existsSync(file)) {
 			return "";
@@ -3453,7 +3387,7 @@ export async function runReviewJob(): Promise<void> {
 			: `### ${label} — bodies remain at their \`bodyAt\` in the unchanged file; read them when earlier wording matters\n\`\`\`json\n${text}\n\`\`\`\n`;
 	}
 
-	/** The composed public decision is not a delivery receipt or prior advice for the private writer. */
+	// A planned public decision proves neither delivery nor prior private advice.
 	function plannedReviewFacts(): string {
 		const { review } = composedFeedback;
 		if (!review) {
@@ -3549,19 +3483,18 @@ A pattern claim needs at least ${request.minDistinctItems} distinct pieces of wo
 ${coverageNote}Persist the feedback with report_feedback — every piece you have in one call. Writing nothing on a destination is a correct and common outcome; say in one line why, and stop.`;
 	}
 
-	/** A transport failure or a server that is not answering yet; a refusal is a decision, not a blip. */
+	// Transport failures permit retry; explicit admission refusals are final decisions.
 	class AdmissionUnreachableError extends Error {
 		name = "AdmissionUnreachableError";
 	}
 
-	/** Retry transport failures, not slow admission or explicit refusals. */
+	// Retry transport failures without retrying slow admission or explicit refusals.
 	const ADMISSION_ATTEMPTS = 4;
 
 	// Admission verifies every cited blob against the Git object, in a container the server starts, so
 	// one attempt may take minutes; the cap only bounds a server that went silent without closing.
 	const ADMISSION_ATTEMPT_TIMEOUT_MS = 10 * 60_000;
 
-	/** One admission attempt: the answer it returns is the parsed body, unvalidated. */
 	async function postAdmission(): Promise<unknown> {
 		let response: Response;
 		try {
@@ -3675,7 +3608,8 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 				withheldReason: piece.action === "WITHHOLD" ? "COMPOSER_WITHHELD" : null,
 			});
 		}
-		if (composition.length === 0) {
+		const publicComposition = review !== null;
+		if (composition.length === 0 && !publicComposition) {
 			return;
 		}
 		const result = await prepareFeedback({
@@ -3687,6 +3621,7 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 				attempt: taskEnvelope.attempt,
 				basisResultIds: [...new Set(composition.flatMap((piece) => piece.resultIds))],
 				composition,
+				publicComposition,
 			},
 			timeoutMs: Math.min(
 				ADMISSION_ATTEMPT_TIMEOUT_MS,
@@ -3713,16 +3648,14 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 		console.error(`[pi-runner] feedback preparation: ${result.state}`);
 	}
 
-	/**
-	 * Holds an admission answer as the composition's ground, whether this attempt's own admission returned it or the
-	 * server staged an earlier attempt's for a continuing writer: both answer the one contract.
-	 */
+	// Fresh and recovery attempts compose against the same admission contract.
 	function acceptAdmission(admitted: unknown): Record<string, unknown> {
 		if (
 			!isRecord(admitted) ||
 			admitted.contractVersion !== 3 ||
 			typeof admitted.admissionDigest !== "string" ||
-			!Array.isArray(admitted.admitted)
+			!Array.isArray(admitted.admitted) ||
+			typeof admitted.publicReviewed !== "boolean"
 		) {
 			throw new Error("result admission returned an invalid contract");
 		}
@@ -3735,6 +3668,7 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 		}
 		admittedResults.splice(0, admittedResults.length, ...admitted.admitted.map(admittedResultOf));
 		admissionDigest = admitted.admissionDigest;
+		publicReviewed = admitted.publicReviewed;
 		compositionAdmitted = true;
 		composedFeedback.admissionDigest = admissionDigest;
 		composedFeedback.results = leanResults(admittedResults);
@@ -3782,7 +3716,7 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 		return routed === null ? notMet : notMet.filter((slug) => (routed.get(slug) ?? []).length > 0);
 	}
 
-	/** One read of the delivered public history; any refusal or bad answer is final, never an older or empty history. */
+	// Refused or malformed history must not become empty history or a fallback to older data.
 	async function postPublicHistoryRead(): Promise<unknown> {
 		let response: Response;
 		try {
@@ -3822,10 +3756,7 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 		return JSON.parse(body);
 	}
 
-	/**
-	 * The delivered feedback on this work as it stands now, which may include feedback delivered after the work was
-	 * captured. Kept beside the staged history rather than over it: the staged file is what the review was prepared from.
-	 */
+	// Keep live delivery history beside the staged history that the review was prepared from.
 	async function readPublicFeedbackHistory(): Promise<{
 		readAt: string;
 		history: { feedback: unknown[] };
@@ -3958,7 +3889,7 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 		}
 	}
 
-	/** Guard memory belongs to one native session; the turn trace still accumulates its shared work. */
+	// Guard state belongs to one native session; the turn trace spans sessions.
 	const repeatedCalls = new Map<string, number>();
 	let sessionGuards = { cutOff: 0, recordingCalls: 0, stored: 0 };
 	function resetSessionGuards(): void {
@@ -4022,10 +3953,8 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 		);
 	}
 
-	/** How long an aborted turn waits for the session to go idle before the next turn is sent. */
 	const ABORT_SETTLE_MS = 30_000;
 
-	/** Where the practice's criteria are staged for this review. */
 	function criteriaPathOf(slug: string): string {
 		return `${nodePath.dirname(INPUT_PATHS.practiceIndex)}/${slug}.md`;
 	}
@@ -4035,7 +3964,6 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 		return existsSync(file) ? readFileSync(file, "utf8") : null;
 	}
 
-	/** The criteria of the turn's practices, inlined exactly as staged: the turn carries what it asks about. */
 	function criteriaOf(slugs: readonly string[]): string {
 		return slugs
 			.map((slug) => {
@@ -4050,14 +3978,9 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 			.join("\n\n");
 	}
 
-	/**
-	 * Whether the task, the brief and the measuring illustrations are still in the current session's context. A fresh
-	 * session holds none of them, so its first turn carries them; a compaction summarizes them away, so the turn after
-	 * it carries them again, and the model quotes the exact text rather than a summary of it.
-	 */
+	// Compaction summarizes the opening away; resend its exact text after compaction.
 	let openingInContext = false;
 
-	/** The shared user context, before any practice-specific criterion, task or recorded draft. */
 	function assessmentOpening(brief: string): string {
 		return `${prompt}\n\n${brief}\n\n`;
 	}
@@ -4202,7 +4125,6 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 		}
 	}
 
-	/** Retry undecided composition once, under its own work budget and the run's safety line. */
 	async function askComposerOnceMore(
 		session: AgentSession,
 		phase: SessionPhase,
@@ -4328,10 +4250,7 @@ ${finishCompositionText(notMet, request)}`,
 			`[pi-runner] reasoning effort: ${providerConfig.reasoningEffort?.toLowerCase() ?? "provider default"}`,
 		);
 
-		/**
-		 * A native session file under .sessions, bound to what it reviewed by one custom entry. The SDK keeps custom
-		 * entries out of the model's context; the worker retains the file for a day as a debug transcript.
-		 */
+		// SDK custom entries bind debug transcripts without entering the model context.
 		function nativeSessionManager(phase: SessionPhase, practiceSlug: string | null) {
 			const manager = SessionManager.create(CWD, `${CWD}/.sessions`);
 			const binding: ReviewSessionBinding = {
@@ -4525,10 +4444,6 @@ ${finishCompositionText(notMet, request)}`,
 		}
 
 		type SessionOptions = NonNullable<Parameters<typeof createAgentSession>[0]>;
-		/**
-		 * A fresh native session in this sandbox, with the orchestrator, the evidence tools and the given recording
-		 * tool. Reported native assistant usage events go to one stream ledger across these sessions.
-		 */
 		async function openSession(
 			phase: SessionPhase,
 			tools: string[],
@@ -4557,7 +4472,7 @@ ${finishCompositionText(notMet, request)}`,
 			return { session: fresh, phase, unsubscribe: subscribeSession(fresh) };
 		}
 
-		/** Keep settlement events subscribed until the native session stops before another scope starts. */
+		// Keep settlement handlers subscribed until the native session stops.
 		async function stopBeforeSwitching(session: AgentSession): Promise<void> {
 			const deadline = scheduleDeadline(ABORT_SETTLE_MS, () => undefined);
 			try {
@@ -4699,11 +4614,6 @@ ${finishCompositionText(notMet, request)}`,
 				}
 				return blockedPractices.get(slug) ?? "off-format";
 			}
-			/**
-			 * One review of `slug`, as its program asks for it: a fresh session over the program's prepared input,
-			 * whose submissions go to this call's draft alone. It returns the draft once the session ends, or says
-			 * why there is none.
-			 */
 			async function reviewPractice(
 				slug: string,
 				practiceHeading: string,
@@ -5051,6 +4961,7 @@ ${finishCompositionText(notMet, request)}`,
 		) {
 			const markRemaining = (reason: CompositionFailureReason) => {
 				if (
+					!publicReviewed &&
 					compositionRequest.destinations.ON_WORK.enabled &&
 					publicResults(admittedResults).length > 0 &&
 					composedFeedback.review === null
@@ -5081,7 +4992,11 @@ ${finishCompositionText(notMet, request)}`,
 				});
 				try {
 					const reviewable = publicResults(admittedResults);
-					if (compositionRequest.destinations.ON_WORK.enabled && reviewable.length > 0) {
+					if (
+						!publicReviewed &&
+						compositionRequest.destinations.ON_WORK.enabled &&
+						reviewable.length > 0
+					) {
 						await composeReview(compositionRequest, reviewable, notReached, safety);
 					}
 					if (privatelyComposable().length > 0 && !safety.expired()) {
@@ -5108,11 +5023,7 @@ ${finishCompositionText(notMet, request)}`,
 		finalizeOutput();
 		process.exit(0);
 
-		/**
-		 * An earlier attempt of this review measured, was admitted, and lost its writer. This one opens no practice session
-		 * and admits nothing: it composes only the review on the work, from the admission the server staged and the inputs
-		 * that attempt had. Private feedback is not composed here, and says so.
-		 */
+		// Recovery composes only public feedback from the admitted attempt; it performs no new admission.
 		async function continueAdmittedReview(): Promise<void> {
 			measuring = false;
 			measurementClosed = true;
@@ -5137,7 +5048,11 @@ ${finishCompositionText(notMet, request)}`,
 			}
 			persistComposedFeedback();
 			const reviewable = publicResults(admittedResults);
-			if (compositionRequest?.destinations.ON_WORK.enabled === true && reviewable.length > 0) {
+			if (
+				!publicReviewed &&
+				compositionRequest?.destinations.ON_WORK.enabled === true &&
+				reviewable.length > 0
+			) {
 				const safetyMs = AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS);
 				if (safetyMs <= 0) {
 					recordCompositionFailure("PUBLIC_REVIEW", "SAFETY");

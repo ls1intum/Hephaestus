@@ -41,7 +41,6 @@ const GIT_ENV = { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: 
 // oxlint-disable-next-line typescript/strict-void-return -- Node types `execFile`'s promise form through `util.promisify.custom`, which tsc resolves to `{ stdout, stderr }` and the rule does not read.
 const git = promisify(execFile);
 
-/** A path inside `root`, symlinks resolved, naming a regular file small enough to quote; otherwise undefined. */
 async function fileInside(root: string, relative: string): Promise<string | undefined> {
 	try {
 		if (!isSafeRelativePath(relative)) {
@@ -182,10 +181,6 @@ function leadRow(lead: QuotedLead, contextReference: string): string {
 
 const charsOf = (lines: readonly string[]) => lines.reduce((n, line) => n + line.length + 1, 0);
 
-/**
- * The lines in their order, as many as fit in `max` characters. When some do not fit, the last line
- * is `rest` of the lines that it leaves out.
- */
 function fit(lines: readonly string[], max: number, rest: (omitted: readonly string[]) => string) {
 	if (charsOf(lines) <= max) {
 		return lines;

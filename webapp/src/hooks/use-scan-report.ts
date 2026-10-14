@@ -80,9 +80,8 @@ export function sarifFilename(disposition: string | null): string | undefined {
 }
 
 /**
- * One scan's report, as `ScanReportPage` takes it. The scan and its report are read again every
- * five seconds while the scan is active, each stopping on its own terminal answer. A refetch keeps
- * what is loaded on screen; only a first read that failed is an error.
+ * Retains loaded data during refetches; errors apply only before the first successful read.
+ * Active scan and report queries poll independently until each reaches a terminal state.
  */
 export function useScanReport(
 	workspaceSlug: string,

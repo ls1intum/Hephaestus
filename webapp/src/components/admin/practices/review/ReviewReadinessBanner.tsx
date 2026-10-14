@@ -10,11 +10,7 @@ import {
 	reviewReadinessTone,
 } from "./review-readiness";
 
-/**
- * The registry speaks in badge tones because that is the shared vocabulary of status across the
- * practice surfaces; the Alert kit names four of its own. Kept as a total map so a tone added to the
- * registry fails `typecheck:webapp` here rather than falling back to a silent neutral banner.
- */
+// Badge and alert primitives use different tone sets.
 const ALERT_VARIANTS: Record<BadgeVariant, "default" | "destructive" | "success" | "warning"> = {
 	default: "default",
 	secondary: "default",
@@ -39,7 +35,11 @@ export function ReviewReadinessBanner({ readiness, children }: ReviewReadinessBa
 	} = REVIEW_READINESS_DEFS[reviewReadinessTone(readiness)];
 
 	return (
-		<Alert variant={ALERT_VARIANTS[badgeVariant]} role="status">
+		<Alert
+			variant={ALERT_VARIANTS[badgeVariant]}
+			role="note"
+			aria-label="Practice review readiness"
+		>
 			<ToneIcon />
 			<AlertTitle>{label}</AlertTitle>
 			<AlertDescription>

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.integration.core.itemevent.PracticeReviewRefusalMetrics;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -35,7 +36,7 @@ public class ScmItemEventRecorder {
     private final ScmRepositoryAccess access;
     private final RepositoryRepository repositories;
     private final ScmItemSourceQuery queries;
-    private final PracticeReviewRefusalMetrics refusals;
+    private final MeterRegistry meters;
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void onPullRequest(ScmDomainEvent.PullRequestEvent event) {
@@ -147,7 +148,13 @@ public class ScmItemEventRecorder {
                 if (unavailable.code() != ItemCaptureCode.VERSION_UNAVAILABLE
                         && unavailable.code() != ItemCaptureCode.SOURCE_NOT_READY) throw unavailable;
                 // A partial provider read can update the mirror without proving an event version.
-                refusals.recordSubmissionRefusal(unavailable.code().name());
+                meters.counter(
+                                IntegrationCoreMetrics.PRACTICE_REVIEW_REFUSED,
+                                "phase",
+                                "submission",
+                                "reason",
+                                unavailable.code().name())
+                        .increment();
                 continue;
             }
             writer.record(new ItemEventInput(

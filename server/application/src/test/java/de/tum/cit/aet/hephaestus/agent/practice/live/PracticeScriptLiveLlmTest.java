@@ -407,6 +407,9 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
             Files.createDirectories(target.getParent());
             Files.write(target, entry.getValue());
         }
+        Files.copy(
+                EVERY_SLOT.resolveSibling("comment-kinds.ts"),
+                workDir.resolve(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "comment-kinds.ts"));
         LiveRunnerWorkspace.stageTask(
                 workDir,
                 "Review merge request #1 in test/fixture against " + SLUG + ".",

@@ -1,6 +1,6 @@
 // Live models may vary; these tests assert host guarantees rather than model verdicts.
 import assert from "node:assert/strict";
-import { cp, readFile, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { after, before, test } from "node:test";
 
@@ -46,7 +46,7 @@ const CHANGE = await readFile(path.join(import.meta.dirname, "fixtures/cart-chan
 const EVERY_SLOT = await readFile(path.join(import.meta.dirname, "fixtures/every-slot.ts"), "utf8");
 
 const DECIDES = `import { expectKind, requireChange, scm } from "../kits/scm/index.ts";
-import { addedComments, commentKinds } from "../kits/scm/comment-kinds.ts";
+import { addedComments, commentKinds } from "./comment-kinds.ts";
 import { classify, definePracticeScript } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
@@ -138,6 +138,7 @@ interface LiveRun {
 }
 
 async function runLive(slug: string, source: string, bound: BoundModels): Promise<LiveRun> {
+	const log: string[] = [];
 	const standIn = await startStandIn(TOKEN, async (request) => {
 		const { url, key } = upstream(request.slot, request.operation);
 		const response = await fetch(url, {
@@ -146,13 +147,40 @@ async function runLive(slug: string, source: string, bound: BoundModels): Promis
 			body: JSON.stringify(request.body),
 		});
 		const body: unknown = await response.json();
+		if (!response.ok) {
+			log.push(JSON.stringify({ slot: request.slot, status: response.status }));
+		}
+		const first: unknown =
+			isJsonObject(body) && Array.isArray(body.choices) ? body.choices[0] : undefined;
+		if (isJsonObject(first)) {
+			const message = isJsonObject(first.message) ? first.message : {};
+			const probabilities = isJsonObject(first.logprobs) ? first.logprobs.content : undefined;
+			log.push(
+				JSON.stringify({
+					slot: request.slot,
+					status: response.status,
+					finishReason: first.finish_reason,
+					contentChars: typeof message.content === "string" ? message.content.length : 0,
+					reasoningChars: Math.max(
+						...[message.reasoning_content, message.reasoning].map((value) =>
+							typeof value === "string" ? value.length : 0,
+						),
+					),
+					logprobTokens: Array.isArray(probabilities) ? probabilities.length : 0,
+				}),
+			);
+		}
 		return response.ok ? body : { status: response.status, body };
 	});
 	try {
 		const { root, practices } = await stagePracticeScripts({ [slug]: source }, {});
 		roots.push(root);
 		const repo = path.join(root, "repo");
-		await cp(path.join(import.meta.dirname, "lib"), path.join(repo, "lib"), { recursive: true });
+		await mkdir(path.join(repo, "lib"), { recursive: true });
+		await cp(
+			path.join(import.meta.dirname, "kits/scm/diff-parser.ts"),
+			path.join(repo, "lib/diff-parser.ts"),
+		);
 		const change = { base: "b".repeat(40), head: COMMIT, files: parseDiff(CHANGE) };
 		const sources: EvidenceSources = {
 			repo,
@@ -173,7 +201,6 @@ async function runLive(slug: string, source: string, bound: BoundModels): Promis
 		const script = path.join(practices, `${slug}.ts`);
 		const receipts = noReceipts();
 		const reviews: ReviewOptions[] = [];
-		const log: string[] = [];
 		const outcome = await runPracticeProgram(
 			{ script: { path: script, source: await readFile(script) } },
 			{
@@ -231,7 +258,15 @@ void test(
 		};
 		const { outcome, reviews, requests, log } = await runLive("every-slot", EVERY_SLOT, bound);
 		assert.equal(outcome.status, "ok", `${outcome.error ?? ""}\n${log}`);
-		assert.deepEqual(outcome.candidate, REVIEWED);
+		assert.ok(outcome.candidate !== undefined, log);
+		const { coverage, ...candidate } = outcome.candidate;
+		const { coverage: expectedCoverage, ...reviewed } = REVIEWED;
+		assert.deepEqual(candidate, reviewed, log);
+		assert.equal(coverage.source, expectedCoverage.source, log);
+		assert.ok(coverage.source === "host", log);
+		assert.equal(coverage.reads, outcome.coverageReached.reads, log);
+		assert.equal(coverage.truncatedReads, outcome.coverageReached.truncatedReads, log);
+		assert.equal(coverage.failedReads, outcome.coverageReached.failedReads, log);
 		assert.equal(outcome.calls.review, 1);
 		for (const slot of Object.keys(bound)) {
 			assert.ok(
@@ -264,9 +299,11 @@ void test(
 		});
 		assert.equal(outcome.status, "ok", `${outcome.error ?? ""}\n${log}`);
 		assert.equal(requests.filter((r) => r.slot === "decision").length, 1, log);
-		assert.deepEqual(outcome.models, [
-			{ slot: "decision", need: "required", bound: true, failures: {} },
-		]);
+		assert.deepEqual(
+			outcome.models,
+			[{ slot: "decision", need: "required", bound: true, failures: {} }],
+			log,
+		);
 		assert.partialDeepStrictEqual(outcome.candidate, {
 			outcome: "COULD_NOT_DETERMINE",
 			citations: [{ sourceKind: "scm.pull-request.diff", path: "src/cart.ts", startLine: 2 }],

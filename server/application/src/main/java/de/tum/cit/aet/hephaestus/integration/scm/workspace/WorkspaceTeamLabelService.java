@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.workspace.settings.WorkspaceTea
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.settings.WorkspaceTeamSettingsService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceService;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
 import java.util.Objects;

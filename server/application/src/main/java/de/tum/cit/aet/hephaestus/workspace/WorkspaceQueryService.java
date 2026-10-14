@@ -160,7 +160,7 @@ public class WorkspaceQueryService {
         Long accountId =
                 viewed == null ? SecurityUtils.getCurrentAccountId().orElse(null) : Long.valueOf(viewed.accountId());
         if (accountId == null) return List.of();
-        var memberships = workspaceMembershipRepository.findByAccount_Id(accountId).stream()
+        var memberships = workspaceMembershipRepository.findById_AccountId(accountId).stream()
                 .filter(member -> member.getLeftAt() == null)
                 .toList();
         var workspaceIds = memberships.stream()

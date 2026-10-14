@@ -10,12 +10,12 @@ import de.tum.cit.aet.hephaestus.practices.dto.AcceptPracticeReleaseRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupInputDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeUpdateDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.MovePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -87,10 +87,10 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .bodyValue(Map.of("excluded", true))
                 .exchange()
                 .expectStatus()
-                .isEqualTo(409)
+                .isEqualTo(412)
                 .expectBody()
                 .jsonPath("$.detail")
-                .isEqualTo("This entry changed after you loaded it. Reload and try again.");
+                .isEqualTo("Reload this page, then review your changes and try again.");
 
         var unchanged = catalog.practice(slug);
         assertThat(unchanged.excluded()).isFalse();
@@ -179,7 +179,7 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     @WithAdminUser
-    void shouldRejectRepeatedReleaseFieldsAndAcceptOneExplicitChoice() {
+    void shouldRejectUnknownReleaseFieldsAndAcceptOneExplicitChoice() {
         persistUser("admin");
         var source = catalog.effectiveCatalog().practices().stream()
                 .filter(entry -> entry.shipped() != null)
@@ -188,20 +188,15 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
         var local = DefinitionTestFixtures.withCriteria(source.effective().definition(), "Locally authored criteria.");
         var current = customization.updatePractice(
                 source.slug(),
-                new CatalogPracticeInputDTO(
-                        source.slug(),
-                        source.effective().kind().value(),
-                        source.effective().groupSlug(),
-                        local,
-                        source.position()),
+                new CatalogPracticeUpdateDTO(
+                        source.effective().kind().value(), source.effective().groupSlug(), local, source.position()),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(source.etag())));
-        var choice = Map.of("field", "CRITERIA", "source", "OFFERED");
         client.put()
                 .uri("/admin/practice-catalog/practices/{slug}/release", source.slug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .header("If-Match", EntityTagPrecondition.format(current.etag()))
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of("choices", List.of(choice, choice)))
+                .bodyValue(Map.of("choices", Map.of("UNKNOWN", "OFFERED")))
                 .exchange()
                 .expectStatus()
                 .isBadRequest()
@@ -212,13 +207,38 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .headers(TestAuthUtils.withCurrentUser())
                 .header("If-Match", EntityTagPrecondition.format(current.etag()))
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new AcceptPracticeReleaseRequestDTO(List.of(new AcceptPracticeReleaseRequestDTO.Choice(
-                        PracticeDefinitionField.CRITERIA, PracticeReleaseChoice.OFFERED))))
+                .bodyValue(new AcceptPracticeReleaseRequestDTO(
+                        Map.of(PracticeDefinitionField.CRITERIA, PracticeReleaseChoice.OFFERED)))
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
                 .jsonPath("$.definition.criteria")
                 .isEqualTo(source.effective().definition().criteria());
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldUpdateCatalogContentUsingOnlyTheRouteSlug() {
+        persistUser("admin");
+        String slug = "update-" + UUID.randomUUID();
+        var created = customization.createPractice(
+                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, DefinitionTestFixtures.definition(), 0));
+        var definition = DefinitionTestFixtures.rename(created.effective().definition(), "Updated through HTTP");
+        client.put()
+                .uri("/admin/practice-catalog/practices/{slug}", slug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .header("If-Match", EntityTagPrecondition.format(created.etag()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new CatalogPracticeUpdateDTO("scm.pull_request", null, definition, 0))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.slug")
+                .isEqualTo(slug)
+                .jsonPath("$.definition.name")
+                .isEqualTo(definition.name());
+        assertThat(catalog.practice(slug).effective().definition()).isEqualTo(definition);
     }
 }

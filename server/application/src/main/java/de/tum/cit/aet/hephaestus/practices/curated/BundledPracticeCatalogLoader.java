@@ -56,6 +56,8 @@ public class BundledPracticeCatalogLoader {
                     if (!script.startsWith("practices/scripts/") || script.contains(".."))
                         throw new IllegalArgumentException("Invalid script resource.");
                     definition.put("script", read(script));
+                } else if (!definition.has("script")) {
+                    definition.putNull("script");
                 }
                 String preamble = optional(practice, "preamble");
                 if (preamble != null)

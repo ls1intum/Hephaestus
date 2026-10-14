@@ -146,8 +146,7 @@ public class OAuthCallbackService {
             if (exclusive == null || !DataIntegrityViolationConstraints.hasName(e, exclusive.index())) {
                 throw e;
             }
-            // A concurrent connect of the same instance committed after this one's ownership check
-            // passed.
+            // A concurrent connect can commit after the ownership check.
             String conflict = connectedElsewhere(
                             pending.getKind(), pending.getWorkspace().getId(), completed.instanceKey(), actorAccountId)
                     .orElseThrow(() -> e);
@@ -294,9 +293,8 @@ public class OAuthCallbackService {
         if (completed.displayName() != null) {
             connection.setDisplayName(completed.displayName());
         }
-        // Strategies that resolve vendor metadata during finalize (Slack team id/name) hand back a
-        // config blob; null leaves the placeholder seeded by findOrCreatePendingConnection in
-        // place.
+        // Slack finalization can return resolved team metadata.
+        // A null config retains the pending connection metadata.
         if (completed.config() != null) {
             connection.setConfig(refreshedConfig(connection, completed.config()));
         }

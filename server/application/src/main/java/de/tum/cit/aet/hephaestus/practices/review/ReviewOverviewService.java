@@ -25,11 +25,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @ConditionalOnServerRole
@@ -39,9 +39,8 @@ public class ReviewOverviewService {
     private final ReviewOverviewRepository counts;
     private final PracticeRepository practices;
     private final Clock clock;
-    private final JsonMapper json;
 
-    public TimeRange allTime(long ws, @Nullable Instant to, Clock clock) {
+    public TimeRange allTime(long ws, @Nullable Instant to) {
         var now = clock.instant();
         var end = to == null || to.isAfter(now) ? now : to;
         return new TimeRange(counts.first(ws).filter(t -> t.isBefore(end)).orElse(end), end);
@@ -56,9 +55,8 @@ public class ReviewOverviewService {
                 .collect(Collectors.toMap(
                         ReviewOverviewRepository.StatusCount::getStatus,
                         ReviewOverviewRepository.StatusCount::getCount));
-        var groupedBuckets =
-                counts.buckets(ws, range.from(), range.to(), json.writeValueAsString(buckets.epochSeconds())).stream()
-                        .collect(Collectors.toMap(ReviewOverviewRepository.BucketCount::getBucket, b -> b));
+        var groupedBuckets = counts.buckets(ws, range.from(), range.to(), buckets.epochSeconds()).stream()
+                .collect(Collectors.toMap(ReviewOverviewRepository.BucketCount::getBucket, b -> b));
         var timeline = IntStream.range(0, buckets.starts().size())
                 .mapToObj(i -> {
                     var b = groupedBuckets.get(i + 1);
@@ -69,7 +67,13 @@ public class ReviewOverviewService {
                             b == null ? 0 : b.getFeedback());
                 })
                 .toList();
+        var activePractices = Stream.concat(
+                        outcomes.stream().map(ReviewOverviewRepository.OutcomeCount::getPracticeId),
+                        feedback.stream().map(ReviewOverviewRepository.FeedbackCount::getPracticeId))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
         var byPractice = practices.findByWorkspaceId(ws).stream()
+                .filter(p -> activePractices.contains(p.getId()))
                 .map(p -> {
                     var g = p.getGroup();
                     return new ReviewPracticeCountsDTO(
@@ -80,19 +84,6 @@ public class ReviewOverviewService {
                             marked(incorrect, p.getId()),
                             feedback(feedback, p.getId()));
                 })
-                .filter(p -> p.results().met()
-                                + p.results().notMet()
-                                + p.results().doesNotApply()
-                                + p.results().couldNotDetermine()
-                                + p.feedback().delivered()
-                                + p.feedback().ready()
-                                + p.feedback().withheld()
-                                + p.feedback().failed()
-                                + p.feedback().awaitingApproval()
-                                + p.feedback().unconfirmed()
-                                + p.feedback().rejected()
-                                + p.feedback().replaced()
-                        > 0)
                 .toList();
         return new ReviewOverviewDTO(
                 range.from(),

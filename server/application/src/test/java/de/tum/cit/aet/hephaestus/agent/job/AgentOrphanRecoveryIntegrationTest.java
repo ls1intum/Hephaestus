@@ -538,10 +538,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         });
     }
 
-    /*
-     * An admission as it is persisted: a result of a practice revision, citing this job's capture,
-     * and the digest on the job's metadata.
-     */
     private Result admitWithResult(UUID jobId) {
         return Objects.requireNonNull(transactionTemplate.execute(status -> {
             ReviewJob job = jobRepository.findById(jobId).orElseThrow();
@@ -574,10 +570,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         }));
     }
 
-    /*
-     * What an admission keeps for a later writer, as persisted: the inputs under its digest and attempt, and the
-     * capture receipt that vouches for whose rows they copied.
-     */
     private void keepOriginalInputs(
             UUID jobId, int attempt, String receiptState, String dependencies, Instant expiresAt) {
         UUID copyId = UUID.randomUUID();
@@ -615,12 +607,10 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 "{\"files\":{}}");
     }
 
-    /* The attempt ran and the proxy counted its calls before its worker was lost. */
     private void spentBeforeItWasLost(UUID jobId, int calls) {
         jdbc.update("UPDATE review_job SET execution_started_at = now(), llm_calls = ? WHERE id = ?", calls, jobId);
     }
 
-    /* The practice's definition moves on after the admission, as a later edit would. */
     private void changePracticeDefinition() {
         var kind = practice.getKind();
         runtimePracticeVersions.append(

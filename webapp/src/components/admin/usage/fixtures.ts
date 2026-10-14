@@ -150,7 +150,7 @@ type MonthTotals = Pick<
 	"instanceTotalCostUsd" | "ownProviderTotalCostUsd" | "unpricedEventCount"
 >;
 
-/** Apply rounding remainder to the largest share so the split still sums to the total. */
+// Assign the rounding remainder to the largest share to preserve the total.
 function splitLike(values: readonly number[], total: number, digits: number): number[] {
 	const sum = values.reduce((acc, value) => acc + value, 0);
 	if (sum === 0) {

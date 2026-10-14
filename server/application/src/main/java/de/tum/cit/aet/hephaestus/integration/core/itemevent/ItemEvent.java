@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.itemevent;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -72,8 +73,9 @@ public class ItemEvent {
     private ItemEventState state;
 
     @Nullable
+    @Enumerated(EnumType.STRING)
     @Column(name = "reason", length = 48)
-    private String reason;
+    private ReviewRequestReason reason;
 
     @Column(name = "decided_at", nullable = false)
     private Instant decidedAt;

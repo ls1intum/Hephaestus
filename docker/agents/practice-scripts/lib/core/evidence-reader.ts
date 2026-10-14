@@ -40,7 +40,6 @@ export const noReceipts = (): Receipts => ({ reads: 0, truncatedReads: 0, failed
 
 /** The pinned captures a host reads for its programs. */
 export interface EvidenceSources {
-	/** The absolute path of the checkout at the pinned head; null without a captured tree. */
 	repo: string | null;
 	headRevision: string | null;
 	/** The workspace path of the captured tree's sourceFile, `<repository>/.git/HEAD`. */

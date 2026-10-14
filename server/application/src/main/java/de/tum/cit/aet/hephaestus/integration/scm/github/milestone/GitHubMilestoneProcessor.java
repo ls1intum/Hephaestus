@@ -193,12 +193,8 @@ public class GitHubMilestoneProcessor {
      * @return a deterministic negative Long ID
      */
     private Long generateDeterministicId(Long repositoryId, int milestoneNumber) {
-        // Use bit shifting to combine repo ID and milestone number without collision.
-        // The formula repositoryId * 31 + milestoneNumber can produce collisions
-        // (e.g., repo=2,milestone=31 and repo=3,milestone=0 both = 62).
-        // Bit shifting separates components: repo ID in upper 32 bits, milestone number in lower 32
-        // bits.
-        // Negative IDs won't collide with GitHub's positive databaseIds.
+        // Keep negative fallback IDs separate from GitHub's positive database IDs.
+        // Multiplication by 31 collides across repositories; packing two 32-bit components avoids it.
         long combined = (repositoryId << 32) | (milestoneNumber & 0xFFFFFFFFL);
         return -combined;
     }

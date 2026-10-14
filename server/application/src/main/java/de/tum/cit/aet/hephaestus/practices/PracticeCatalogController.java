@@ -14,7 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeGuidanceDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeVersionDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReviewedPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.SetFeedbackModeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
@@ -152,7 +152,7 @@ public class PracticeCatalogController {
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "Order changes presentation only")
     @Operation(operationId = "reorderPractices")
-    public List<PracticeDTO> reorder(WorkspaceContext ctx, @RequestBody @Valid ReorderPracticesRequestDTO input) {
+    public List<PracticeDTO> reorder(WorkspaceContext ctx, @RequestBody @Valid ReorderRequestDTO input) {
         practices.reorderPractices(ctx, input.slugs());
         return presenter.presentPractices(ctx.id(), practices.listPractices(ctx, null));
     }

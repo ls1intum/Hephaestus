@@ -19,6 +19,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
@@ -248,6 +250,27 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         var named = sources.labels(holder.workspaceId(), List.of(issueRef, pullRef));
         assertThat(named.get(issueRef.itemId())).isEqualTo(issueSnapshot.label());
         assertThat(named.get(pullRef.itemId())).isEqualTo(pullSnapshot.label());
+        var expectedBodies = Map.of(issueRef.itemId(), "Issue body", pullRef.itemId(), "Description");
+        for (var snapshot : List.of(issueSnapshot, pullSnapshot)) {
+            var core = snapshot.item().kind().equals(ScmItemEvents.ISSUE)
+                    ? IssueContentSource.CORE
+                    : PullRequestContentSource.CORE;
+            var captured = sources.capture(
+                    snapshot, new CaptureRequest(UUID.randomUUID(), UUID.randomUUID(), 1, Set.of(core), "2.0.0", 3));
+            assertThat(captured.files()).containsKey("context/metadata.json");
+            var staged = sources.record(snapshot, captured.files());
+            assertThat(staged.path("title").asString())
+                    .isEqualTo(snapshot.label().title());
+            assertThat(staged.path("body").asString())
+                    .isEqualTo(expectedBodies.get(snapshot.item().itemId()));
+            assertThat(staged.path("repository_id").asLong())
+                    .isEqualTo(fixture.repository().getId());
+            assertThat(captured.citableTexts())
+                    .isNotEmpty()
+                    .allSatisfy(text -> assertThat(text.sha256())
+                            .isEqualTo(ScmVersion.contentHash(
+                                    Objects.requireNonNull(captured.files().get(text.stagedPath())))));
+        }
         var wrongKind = writer.upsert(
                 new ItemRegistration(holder.workspaceId(), ScmItemEvents.ISSUE, pull.getId(), holder.itemId(), null));
         assertThatThrownBy(() -> sources.pin(wrongKind, null))
@@ -423,6 +446,66 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         assertThat(sources.current(issueRef)).isEmpty();
         writer.restore(holder.workspaceId(), issueRef.itemId());
         assertThat(sources.current(issueRef)).isPresent();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldKeepTheItemWithoutAnEventUntilItsProviderVersionCanBeProved(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var pull = new PullRequest();
+        pull.setNativeId(402L);
+        pull.setProvider(fixture.provider());
+        pull.setRepository(fixture.repository());
+        pull.setNumber(7);
+        pull.setTitle("A pull request");
+        pull.setBody("Description");
+        pull.setState(Issue.State.OPEN);
+        pull.setAuthor(fixture.author());
+        pull.setHtmlUrl(fixture.repository().getHtmlUrl() + "/pull/7");
+        pull.setCreatedAt(Instant.now());
+        pull.setUpdatedAt(Instant.now());
+        pull.setBaseRefOid("b".repeat(40));
+        pull.setHeadRefName("topic");
+        pull.setBaseRefName("main");
+        pull = pulls.saveAndFlush(pull);
+        var context = EventContext.forSync(fixture.workspace().getId(), null, type, Instant.now());
+        recorder.onPullRequest(
+                new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pull), context));
+        var holder = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(),
+                ScmItemEvents.REPOSITORY,
+                fixture.repository().getId(),
+                null,
+                null));
+        var item = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(), ScmItemEvents.PULL_REQUEST, pull.getId(), holder.itemId(), null));
+        assertThat(jdbc.queryForList(
+                        "SELECT item_version FROM item_event WHERE workspace_id=? AND item_id=?",
+                        String.class,
+                        item.workspaceId(),
+                        item.itemId()))
+                .isEmpty();
+        assertThat(jdbc.queryForList(
+                        "SELECT (removed_at IS NULL)::text FROM item WHERE workspace_id=? AND id=?",
+                        String.class,
+                        item.workspaceId(),
+                        item.itemId()))
+                .containsExactly("true");
+        pull.setHeadRefOid("a".repeat(40));
+        pull = pulls.saveAndFlush(pull);
+        var captured = sources.pin(item, null).version();
+        var event = new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pull), context);
+        recorder.onPullRequest(event);
+        recorder.onPullRequest(event);
+        assertThat(jdbc.queryForList(
+                        "SELECT name || '|' || item_version || '|' || found_by FROM item_event WHERE workspace_id=?"
+                                + " AND item_id=?",
+                        String.class,
+                        item.workspaceId(),
+                        item.itemId()))
+                .containsExactly("scm.pull_request.opened|" + captured.value() + "|SYNC");
     }
 
     private Fixture fixture(IdentityProviderType type) {
