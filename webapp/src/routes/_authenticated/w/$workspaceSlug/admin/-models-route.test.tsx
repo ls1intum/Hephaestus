@@ -4,8 +4,13 @@ import { HttpResponse, http, type PathParams } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { deferred } from "@/test/async";
 
-import { getMemberOnboardingQueryKey, listAgentsQueryKey } from "@/api/@tanstack/react-query.gen";
-import type { AgentBinding } from "@/api/types.gen";
+import {
+	getMemberOnboardingQueryKey,
+	getMemberOnboardingSettingsQueryKey,
+	listAgentsQueryKey,
+	workspaceListAvailableLlmModelsQueryKey,
+} from "@/api/@tanstack/react-query.gen";
+import type { AgentBinding, AgentBindingRequest } from "@/api/types.gen";
 import { workspaceOnboarding } from "@/mocks/fixtures/onboarding";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -341,6 +346,155 @@ describe("workspace AI models route", () => {
 		expect(pickerOf(inHouse).getAttribute("aria-invalid")).toBe("true");
 		expect(within(row("Practice reviews")).queryByRole("alert")).toBeNull();
 		expect(screen.queryByRole("status")).toBeNull();
+	});
+
+	it("keeps an unsaved assignment through a failed refresh and its retry, and saves it", async () => {
+		const user = userEvent.setup();
+		let agentReads = 0;
+		const saved: AgentBindingRequest[] = [];
+		const queryClient = await renderModelsRoute(() => {
+			agentReads += 1;
+			return [binding("PRACTICE_REVIEW", 20)];
+		});
+		server.use(
+			http.put<PathParams, AgentBindingRequest>(
+				"*/workspaces/acme/agents/PRACTICE_REVIEW",
+				async ({ request }) => {
+					saved.push(await request.json());
+					return HttpResponse.json(binding("PRACTICE_REVIEW", 21));
+				},
+			),
+		);
+		await user.click(pickerOf(row("Practice reviews")));
+		await user.click(await screen.findByRole("option", { name: /GPT Other/u }));
+		fireEvent.click(advancedButton(row("Practice reviews")));
+		fireEvent.change(timeoutInput(row("Practice reviews")), { target: { value: "900" } });
+
+		server.use(
+			http.get(
+				"*/workspaces/acme/llm/available-models",
+				() => HttpResponse.json({ status: 503, title: "Unavailable" }, { status: 503 }),
+				{ once: true },
+			),
+		);
+		await act(async () => {
+			await queryClient.invalidateQueries({
+				queryKey: workspaceListAvailableLlmModelsQueryKey({ path: { workspaceSlug: "acme" } }),
+				exact: true,
+			});
+		});
+		await screen.findByText("We could not refresh AI models");
+		expect(timeoutInput(row("Practice reviews")).value).toBe("900");
+		expect(pickerOf(row("Practice reviews")).textContent).toContain("GPT Other");
+		const agentReadsBeforeRetry = agentReads;
+		await user.click(screen.getByRole("button", { name: "Retry" }));
+		await waitFor(() => expect(screen.queryByRole("button", { name: /^Retry/u })).toBeNull());
+		const agentReadsAfterRetry = agentReads;
+
+		await user.click(saveButton("Practice reviews"));
+		await waitFor(() => expect(saved).toHaveLength(1));
+		expect(saved[0]).toMatchObject({ instanceModelId: 21, timeoutSeconds: 900 });
+		expect(agentReadsAfterRetry).toBe(agentReadsBeforeRetry);
+	});
+
+	it("hides refused assignments through a later failure, then seeds the next authorized read", async () => {
+		const queryClient = await renderModelsRoute(() => [binding("PRACTICE_REVIEW", 20)]);
+		fireEvent.click(advancedButton(row("Practice reviews")));
+		fireEvent.change(timeoutInput(row("Practice reviews")), { target: { value: "900" } });
+		const served: number[] = [];
+		server.use(
+			http.get(
+				"*/workspaces/acme/agents",
+				() => {
+					served.push(403);
+					return HttpResponse.json({ status: 403, title: "Forbidden" }, { status: 403 });
+				},
+				{ once: true },
+			),
+			http.get(
+				"*/workspaces/acme/agents",
+				() => {
+					served.push(503);
+					return HttpResponse.json({ status: 503, title: "Unavailable" }, { status: 503 });
+				},
+				{ once: true },
+			),
+			http.get("*/workspaces/acme/agents", () => {
+				served.push(200);
+				return HttpResponse.json([{ ...binding("PRACTICE_REVIEW", 21), timeoutSeconds: 1200 }]);
+			}),
+		);
+		const refreshAssignments = async () => {
+			await act(async () => {
+				await queryClient.invalidateQueries({ queryKey: AGENTS_QUERY_KEY, exact: true });
+			});
+		};
+		const refusal = /Ask a workspace admin or instance admin for access/u;
+
+		await refreshAssignments();
+		expect(served).toStrictEqual([403]);
+		await screen.findByText(refusal);
+		expect(screen.queryByRole("region", { name: "Practice reviews" })).toBeNull();
+
+		await refreshAssignments();
+		expect(served).toStrictEqual([403, 503]);
+		// The query settles before its observers hear of it; the screen has caught up once the refusal
+		// it was showing is gone.
+		await waitFor(() => expect(screen.queryByText(refusal)).toBeNull());
+		expect(screen.queryByRole("region", { name: "Practice reviews" })).toBeNull();
+
+		await refreshAssignments();
+		expect(served).toStrictEqual([403, 503, 200]);
+		await screen.findByRole("region", { name: "Practice reviews" });
+		expect(pickerOf(row("Practice reviews")).textContent).toContain("GPT Other");
+		fireEvent.click(advancedButton(row("Practice reviews")));
+		expect(timeoutInput(row("Practice reviews")).value).toBe("1200");
+	});
+
+	it("hides the assignments when one read is refused, even while another only failed", async () => {
+		const queryClient = await renderModelsRoute(() => [binding("PRACTICE_REVIEW", 20)]);
+		server.use(
+			http.get(
+				"*/workspaces/acme/agents",
+				() => HttpResponse.json({ status: 503, title: "Unavailable" }, { status: 503 }),
+				{ once: true },
+			),
+			http.get(
+				"*/workspaces/acme/onboarding/settings",
+				() => HttpResponse.json({ status: 403, title: "Forbidden" }, { status: 403 }),
+				{ once: true },
+			),
+		);
+		await act(async () => {
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: AGENTS_QUERY_KEY, exact: true }),
+				queryClient.invalidateQueries({
+					queryKey: getMemberOnboardingSettingsQueryKey({ path: { workspaceSlug: "acme" } }),
+					exact: true,
+				}),
+			]);
+		});
+
+		await screen.findByText(/Ask a workspace admin or instance admin for access/u);
+		expect(screen.queryByRole("region", { name: "Practice reviews" })).toBeNull();
+		expect(screen.queryByText("We could not refresh AI models")).toBeNull();
+	});
+
+	it("offers Retry when a first read fails, and shows the assignments once it succeeds", async () => {
+		mockModelsRoute(() => [binding("PRACTICE_REVIEW", 20)]);
+		server.use(
+			http.get(
+				"*/workspaces/acme/llm/available-models",
+				() => HttpResponse.json({ status: 503, title: "Unavailable" }, { status: 503 }),
+				{ once: true },
+			),
+		);
+		renderRouteAt("/w/acme/admin/models");
+
+		const retry = await screen.findByRole("button", { name: "Retry" }, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("region", { name: "Practice reviews" })).toBeNull();
+		fireEvent.click(retry);
+		await screen.findByRole("region", { name: "Practice reviews" });
 	});
 });
 

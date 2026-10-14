@@ -249,6 +249,33 @@ export const LoadForbidden: Story = {
 	},
 };
 
+/** A read failed to refresh after the page loaded: the assignments stay editable under the warning. */
+export const RefreshFailed: Story = {
+	args: {
+		bindings: partiallyCovered,
+		refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not refresh AI models")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		const inHouse = row(purposeCard(canvas, "Practice reviews"), "In-house");
+		await expect(inHouse.getByRole("combobox", { name: /In-house/u })).toHaveTextContent(
+			"Local Llama",
+		);
+		await expect(inHouse.getByRole("button", { name: /^Save assignment/u })).toBeEnabled();
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: {
+		bindings: partiallyCovered,
+		refreshFailure: { error: { status: 503 }, pending: true, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+	},
+};
+
 /** A switched-off purpose runs for nobody, however its rows are bound: the preview says so, row by row. */
 export const ProjectReviewsDisabled: Story = {
 	args: { bindings: partiallyCovered, practicesEnabled: false },
