@@ -470,7 +470,7 @@ public class GitHubIssueDependencySyncService {
     }
 
     /**
-     * Find an issue by ID, or create it from GraphQL data if it doesn't exist.
+     * Find an issue by repository and number, or create it from GraphQL data if it does not exist.
      * <p>
      * This implements the find-or-create pattern needed for dependency sync
      * to work during incremental sync, before backfill completes.
@@ -486,7 +486,8 @@ public class GitHubIssueDependencySyncService {
         }
 
         long issueId = graphQlIssue.getFullDatabaseId().longValue();
-        Optional<Issue> existingOpt = issueRepository.findById(issueId);
+        Optional<Issue> existingOpt =
+                issueRepository.findByRepositoryIdAndNumber(repo.getId(), graphQlIssue.getNumber());
         if (existingOpt.isPresent()) {
             return existingOpt.get();
         }
@@ -525,32 +526,33 @@ public class GitHubIssueDependencySyncService {
             return 0;
         }
 
-        // Build map of blocker ID -> GraphQL data for find-or-create
+        // Native IDs identify the provider response; resolved rows carry the local relationship IDs.
         Map<Long, GHIssue> blockerGraphQlData = new HashMap<>();
-        Set<Long> expectedBlockerIds = new HashSet<>();
+        Set<Long> expectedBlockerNativeIds = new HashSet<>();
         for (GHIssue blockerNode : blockerNodes) {
             if (blockerNode.getFullDatabaseId() != null) {
                 long blockerId = blockerNode.getFullDatabaseId().longValue();
-                expectedBlockerIds.add(blockerId);
+                expectedBlockerNativeIds.add(blockerId);
                 blockerGraphQlData.put(blockerId, blockerNode);
             }
         }
 
-        if (expectedBlockerIds.isEmpty()) {
+        if (expectedBlockerNativeIds.isEmpty()) {
             return 0;
         }
 
-        // Batch load existing blockers (fixes N+1 problem)
-        List<Issue> existingBlockers = issueRepository.findAllById(expectedBlockerIds);
-        Set<Long> foundBlockerIds = existingBlockers.stream().map(Issue::getId).collect(Collectors.toSet());
+        List<Issue> existingBlockers =
+                issueRepository.findAllIssuesByProviderIdAndNativeIdIn(providerId, expectedBlockerNativeIds);
+        Set<Long> foundBlockerNativeIds =
+                existingBlockers.stream().map(Issue::getNativeId).collect(Collectors.toSet());
 
         // Find blockers that need to be created
-        Set<Long> missingBlockerIds = new HashSet<>(expectedBlockerIds);
-        missingBlockerIds.removeAll(foundBlockerIds);
+        Set<Long> missingBlockerNativeIds = new HashSet<>(expectedBlockerNativeIds);
+        missingBlockerNativeIds.removeAll(foundBlockerNativeIds);
 
         // Create missing blockers from GraphQL data
         List<Issue> createdBlockers = new ArrayList<>();
-        for (Long missingId : missingBlockerIds) {
+        for (Long missingId : missingBlockerNativeIds) {
             GHIssue blockerGraphQl = blockerGraphQlData.get(missingId);
             Issue createdBlocker = createBlockerIssue(blockerGraphQl, scopeId, providerId);
             if (createdBlocker != null) {
@@ -566,7 +568,7 @@ public class GitHubIssueDependencySyncService {
         // Combine existing and created blockers
         List<Issue> allBlockers = new ArrayList<>(existingBlockers);
         allBlockers.addAll(createdBlockers);
-        Set<Long> allBlockerIds = allBlockers.stream().map(Issue::getId).collect(Collectors.toSet());
+        Set<Long> allBlockerRowIds = allBlockers.stream().map(Issue::getId).collect(Collectors.toSet());
 
         int changes = 0;
 
@@ -580,7 +582,7 @@ public class GitHubIssueDependencySyncService {
 
         // Remove stale relationships (blockers that should no longer exist)
         int initialSize = issue.getBlockedBy().size();
-        issue.getBlockedBy().removeIf(blocker -> !allBlockerIds.contains(blocker.getId()));
+        issue.getBlockedBy().removeIf(blocker -> !allBlockerRowIds.contains(blocker.getId()));
         int removedCount = initialSize - issue.getBlockedBy().size();
         changes += removedCount;
 
