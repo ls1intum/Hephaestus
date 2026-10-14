@@ -10,11 +10,11 @@ import { GlobalScopeSlot } from "./GlobalScopeRow";
 import { carriedScope, type ReviewScopeSearch } from "./review-scope";
 
 const SECTIONS = [
-	{ to: "/w/$workspaceSlug/admin/practices/reviews", label: "Overview", tab: "overview" },
-	{ to: "/w/$workspaceSlug/admin/practices/reviews/runs", label: "Reviews", tab: "reviews" },
+	{ to: "/w/$workspaceSlug/admin/practices/reviews/overview", label: "Overview", tab: "overview" },
+	{ to: "/w/$workspaceSlug/admin/practices/reviews", label: "Reviews", tab: "reviews" },
 	{ to: "/w/$workspaceSlug/admin/practices/reviews/results", label: "Results", tab: "results" },
 	{
-		to: "/w/$workspaceSlug/admin/practices/reviews/observations",
+		to: "/w/$workspaceSlug/admin/practices/reviews/problems",
 		label: "Problems",
 		tab: "problems",
 	},

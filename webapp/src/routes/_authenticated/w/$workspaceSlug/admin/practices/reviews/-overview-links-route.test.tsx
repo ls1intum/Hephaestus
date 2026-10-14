@@ -48,7 +48,7 @@ describe("the overview's figures open the lists filtered to them", () => {
 			await screen.findByRole("link", { name: "See all 14" }, ROUTE_RENDER_WAIT),
 		);
 		await waitFor(() =>
-			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews/runs"),
+			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews"),
 		);
 		expect(router.state.location.search).toMatchObject({ status: ["RUNNING", "QUEUED"] });
 	});
@@ -94,7 +94,7 @@ describe("the overview's range across the tabs", () => {
 		const tabs = screen.getByRole("navigation", { name: "Practice review sections" });
 		await userEvent.click(within(tabs).getByRole("link", { name: /^Reviews/u }));
 		await waitFor(() =>
-			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews/runs"),
+			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews"),
 		);
 		expect(router.state.location.search).not.toHaveProperty("range");
 
@@ -116,9 +116,9 @@ describe("the overview's range across the tabs", () => {
 				),
 			ROUTE_RENDER_WAIT,
 		);
-		router.history.push("/w/acme/admin/practices/reviews/runs");
+		router.history.push("/w/acme/admin/practices/reviews");
 		await waitFor(() =>
-			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews/runs"),
+			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews"),
 		);
 		router.history.push(OVERVIEW);
 		await waitFor(

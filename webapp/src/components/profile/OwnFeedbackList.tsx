@@ -165,7 +165,7 @@ function FeedbackResponse({ feedback, responses }: FeedbackResponseProps) {
 				</p>
 			)}
 			{pendingResolution === "DISAGREE" && (
-	// Disagreement requires a reason; Skip closes the draft without recording it.
+				// Disagreement requires a reason; Skip closes the draft without recording it.
 				<ResponseCommentBand
 					key={pendingResolution}
 					name="Why you disagree"

@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -31,7 +30,7 @@ class IdentityKeyLock {
                 identities.stream().map(PersonIdentity::providerId).toArray(Long[]::new),
                 identities.stream().map(PersonIdentity::subject).toArray(String[]::new),
                 identities.stream()
-                        .map(identity -> Objects.requireNonNullElse(identity.teamId(), ""))
+                        .map(PersonIdentity::teamKey)
                         .toArray(String[]::new));
     }
 }

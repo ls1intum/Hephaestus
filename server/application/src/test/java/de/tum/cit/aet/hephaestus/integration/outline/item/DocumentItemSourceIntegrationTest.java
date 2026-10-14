@@ -48,10 +48,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * A document sits in its collection, and a reader is told which one by the name Outline shows — never by the
- * collection's url id, a random slug that means nothing to anybody.
- */
 @Transactional
 @TestPropertySource(
         properties = {

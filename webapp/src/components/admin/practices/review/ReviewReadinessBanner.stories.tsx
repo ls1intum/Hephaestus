@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 
 import type { AgentBinding } from "@/api/types.gen";
-import { ReviewRunningBanner } from "./ReviewRunningBanner";
+import { ReviewReadinessBanner } from "./ReviewReadinessBanner";
 
 const readyModel = {
 	binding: {
@@ -15,13 +15,13 @@ const readyModel = {
 };
 
 const meta = {
-	component: ReviewRunningBanner,
+	component: ReviewReadinessBanner,
 	parameters: { layout: "padded", chromatic: { viewports: [320, 1440] } },
 	tags: ["autodocs"],
 	args: {
 		running: { enabled: true, model: { status: "ready", ...readyModel } },
 	},
-} satisfies Meta<typeof ReviewRunningBanner>;
+} satisfies Meta<typeof ReviewReadinessBanner>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

@@ -84,10 +84,6 @@ export const ExactSummaryAndInlinePackage: Story = {
 	},
 };
 
-/**
- * A card on the developer's own practice pages is theirs alone: handed copies anyway, the
- * package says the text is withheld and shows none of it, not even the file it is about.
- */
 export const PrivatePlaceNeverShown: Story = {
 	args: {
 		feedback: {

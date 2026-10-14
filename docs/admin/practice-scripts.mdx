@@ -124,15 +124,8 @@ Execution details can expire while durable review history remains available.
 
 ## Upgrade a script from an earlier release
 
-The current script contract is version 3 and uses core plus domain-kit imports.
-Use definePracticeScript with meta and run(ctx), returning one candidate.
-Remove positional arguments, leads-only output and preview metadata versions.
-Replace old context fields with item, scope, about, practice.versionId and review.origin.
-Set severity on problems. Use the current four outcome values and evidence.openQuestions.
-
-The [operator migration entry](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) contains the exact retired-name map.
-Unchanged bundled copies receive appended audited versions.
-Changed copies retain their text until an admin rewrites them or accepts the catalog update.
+A retained job with an incompatible runtime contract stops with `CONTRACT_CHANGED`.
+Use the [operator migration entry](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) and the [runner contract](/contributor/practice-script-runner) to upgrade custom scripts.
 
 ## Limits
 

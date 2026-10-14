@@ -171,7 +171,6 @@ export const WithoutAsking: Story = {
 	},
 };
 
-/** A finished review that recorded nothing about the reader says so, and lists nothing. */
 export const NothingRecorded: Story = {
 	args: { state: readyWith({ results: [], feedback: [] }) },
 	play: async () => {
@@ -185,10 +184,6 @@ export const NothingRecorded: Story = {
 	},
 };
 
-/**
- * A review still going that has recorded nothing yet: the table says results are on their way,
- * not that the review recorded none.
- */
 export const RunningWithNothingRecorded: Story = {
 	args: {
 		state: readyWith({

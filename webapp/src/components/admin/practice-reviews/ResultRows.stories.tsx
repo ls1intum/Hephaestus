@@ -95,7 +95,6 @@ export const ManyDays: Story = {
 	},
 };
 
-/** Captured evidence can remain ambiguous without implying a met or not met result. */
 export const CouldNotDetermine: Story = {
 	args: {
 		state: {
@@ -246,7 +245,6 @@ export const Tracked: Story = {
 	},
 };
 
-/** Denied source prose keeps the result’s facts and a usable, truthfully named link. */
 export const TextUnavailable: Story = {
 	args: { state: { status: "ready", results: [{ ...firstResult, summary: null }] } },
 	play: async ({ canvas }) => {

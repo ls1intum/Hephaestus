@@ -151,10 +151,6 @@ export const Mobile: Story = {
 	},
 };
 
-/**
- * A piece of feedback belongs to every practice one of its results was about, so filtering by a
- * practice finds the feedback a practice's count on the overview was counting.
- */
 export const ReportsAChosenPractice: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Practice" }));
@@ -205,11 +201,6 @@ export const NothingMatches: Story = {
 	},
 };
 
-/**
- * Sorting does not narrow anything, which is why Reset leaves it alone — as on the results
- * list. It sits in the row with the facets. Picking the default again clears it from the search
- * rather than writing the server's own default into the URL.
- */
 export const SortIsNotAFilter: Story = {
 	args: {
 		search: { ...UNFILTERED, state: ["AWAITING_APPROVAL"] },

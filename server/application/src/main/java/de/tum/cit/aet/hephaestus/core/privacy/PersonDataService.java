@@ -22,6 +22,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,7 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 @WorkspaceAgnostic("Verified instance-admin rights requests span all of a person's workspaces")
 public class PersonDataService {
+    private static final Logger log = LoggerFactory.getLogger(PersonDataService.class);
     private final PersonIdentityResolver resolver;
     private final PersonDataRegistry registry;
     private final List<PersonEvidenceErasure> evidenceStores;
@@ -221,6 +224,7 @@ public class PersonDataService {
     public void run(UUID id) {
         TransactionTemplate tx = new TransactionTemplate(transactions);
         var admission = copyFence.erase();
+        String activeStore = "inventory";
         try (admission) {
             Map<String, PersonDataSelection> frozen = tx.execute(status -> {
                 PersonDataRequest r = lockAdmittedErasure(id);
@@ -232,8 +236,12 @@ public class PersonDataService {
                     .collect(Collectors.toUnmodifiableSet());
             if (!frozen.keySet().equals(inventory))
                 throw new IllegalStateException("Erasure contributor inventory changed");
-            for (var store : registry.stores()) store.prepareErasure(Objects.requireNonNull(frozen.get(store.store())));
             for (var store : registry.stores()) {
+                activeStore = store.store();
+                store.prepareErasure(Objects.requireNonNull(frozen.get(store.store())));
+            }
+            for (var store : registry.stores()) {
+                activeStore = store.store();
                 Boolean proceed = tx.execute(status -> {
                     PersonDataRequest r = lockAdmittedErasure(id);
                     if (r == null) return false;
@@ -264,6 +272,10 @@ public class PersonDataService {
                 requests.saveAndFlush(r);
             });
         } catch (RuntimeException exception) {
+            log.atError().addKeyValue("event.name", "person_data.erasure.failed")
+                    .addKeyValue("person_data.store", activeStore)
+                    .addKeyValue("error.type", exception.getClass().getName())
+                    .log("Person data erasure failed");
             tx.executeWithoutResult(status -> {
                 var r = requests.lock(id).orElseThrow(() -> notFound());
                 if (r.getState() == PersonDataRequest.State.ERASING) {

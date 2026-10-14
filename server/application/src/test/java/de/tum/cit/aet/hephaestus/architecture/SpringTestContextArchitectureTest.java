@@ -63,6 +63,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("practices.adapter.ConversationFeedbackErasureIntegrationTest", "review-fixture"),
             assignment("practices.adapter.PracticesWorkspacePurgeAdapterTest", "review-fixture"),
             assignment("practices.feedback.AbstractFeedbackDeliveryIntegrationTest", "review-feedbackdelivery"),
+            assignment("practices.feedback.FeedbackGateIntegrationTest", "review-feedbackgate"),
             assignment("practices.feedback.FeedbackHistoryQueryIntegrationTest", "review-feedbackhistoryquery"),
             assignment("practices.feedback.FeedbackReviewControllerIntegrationTest", "review-feedbackreviewcontroller"),
             assignment("practices.groupdetail.PracticeGroupReviewHistoryIntegrationTest", "review-evidence"),
@@ -135,6 +136,10 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "review-evidence",
                     "shared review fixture with the neutral evidence authorization boundary controlled for exact"
                             + " visibility assertions"),
+            Map.entry(
+                    "review-feedbackgate",
+                    "real feedback eligibility with only source capture and evidence authorization boundaries"
+                            + " controlled"),
             Map.entry(
                     "review-feedbackdelivery",
                     "real feedback receipts and recovery with irreversible delivery and readiness boundaries"

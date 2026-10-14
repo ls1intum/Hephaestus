@@ -32,9 +32,7 @@ const recorded = (response: Partial<FeedbackResponse>): FeedbackResponse => ({
 	...response,
 });
 
-function renderWrite(
-	held?: Promise<void>,
-) {
+function renderWrite(held?: Promise<void>) {
 	const written: { method: string; feedbackId: string; body: unknown }[] = [];
 	server.use(
 		http.put(RESPONSE_PATH, async ({ request, params }) => {

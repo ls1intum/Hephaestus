@@ -1,7 +1,6 @@
 import { HttpResponse, http } from "msw";
 
 import type {
-	AccountRef,
 	CatalogOrigin,
 	FeedbackModeAssignment,
 	Practice,
@@ -9,25 +8,12 @@ import type {
 	PracticeGroup,
 	PracticeGuidanceDto,
 } from "@/api/types.gen";
+import { mockPracticeOf, practiceGroup, OWN_ORIGIN } from "@/components/admin/practices/fixtures";
+import { ADA } from "@/components/admin/practice-scans/fixtures";
+import { toWire } from "@/test/to-wire";
 import { mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
 import type { Wire } from "@/lib/dates";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
-
-
-const ADMIN: Wire<AccountRef> = {
-	id: "7",
-	displayName: "Ada Lovelace",
-	avatarUrl: null,
-	status: "ACTIVE",
-	identities: [{ provider: "GITHUB", login: "ada", displayName: "Ada Lovelace", avatarUrl: null }],
-};
-
-const WRITTEN_HERE: CatalogOrigin = {
-	catalogSlug: null,
-	state: "YOURS",
-	localEdits: [],
-	offeredDigest: null,
-};
 
 const FOLLOWS_WORKSPACE: FeedbackModeAssignment = {
 	effective: "APPROVE_FIRST",
@@ -54,32 +40,13 @@ export function wirePractice({
 	position = 0,
 	versionId = "501",
 	versionNumber = 1,
-	catalogOrigin = WRITTEN_HERE,
+	catalogOrigin = OWN_ORIGIN,
 }: WirePracticeInput): Wire<Practice> {
-	return {
-		id: "50",
-		slug,
-		kind,
-		groupSlug,
-		position,
-		currentVersion: {
-			id: versionId,
-			number: versionNumber,
-			name: definition.name,
-			definition,
-			definitionAvailable: true,
-			historicalDefinition: null,
-			reviewDigest: `sha256:${versionId}`,
-			createdAt: "2026-10-01T09:00:00Z",
-			createdBy: ADMIN,
-			changed: [],
-			reviewChanged: false,
-		},
-		feedbackMode: FOLLOWS_WORKSPACE,
-		catalogOrigin,
-		createdAt: "2026-09-01T09:00:00Z",
-		updatedAt: "2026-10-01T09:00:00Z",
-	};
+ return toWire({
+  ...mockPracticeOf({ id: "50", slug, kind, groupSlug, position, definition, feedbackMode: FOLLOWS_WORKSPACE, catalogOrigin,
+   version: { id: versionId, number: versionNumber, reviewDigest: `sha256:${versionId}`, createdAt: new Date("2026-10-01T09:00:00Z"), createdBy: ADA } }),
+  createdAt: new Date("2026-09-01T09:00:00Z"), updatedAt: new Date("2026-10-01T09:00:00Z"),
+ });
 }
 
 export function wireGroup(
@@ -87,21 +54,7 @@ export function wireGroup(
 	name: string,
 	overrides: Partial<Wire<PracticeGroup>> = {},
 ): Wire<PracticeGroup> {
-	return {
-		id: "60",
-		slug,
-		name,
-		description: null,
-		icon: null,
-		color: null,
-		position: 0,
-		shownToDevelopers: true,
-		feedbackMode: FOLLOWS_WORKSPACE,
-		catalogOrigin: WRITTEN_HERE,
-		createdAt: "2026-09-01T09:00:00Z",
-		updatedAt: null,
-		...overrides,
-	};
+ return { ...toWire(practiceGroup({ id: "60", slug, name, feedbackMode: FOLLOWS_WORKSPACE, createdAt: new Date("2026-09-01T09:00:00Z") })), ...overrides };
 }
 
 /** Install defaults first; tests prepend their specific overrides through server.use. */

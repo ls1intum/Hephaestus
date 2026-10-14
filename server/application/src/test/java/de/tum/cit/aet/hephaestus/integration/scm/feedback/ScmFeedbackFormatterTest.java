@@ -77,10 +77,6 @@ class ScmFeedbackFormatterTest extends BaseUnitTest {
                         + " [Hephaestus](https://hephaestus.example/w/team/feedback/42).</sub>\n");
     }
 
-    /**
-     * An issue comment links to the reader's reviews of the issue, the same place for every review
-     * of it.
-     */
     @Test
     void linksAnIssueCommentToTheIssue() {
         ItemRef item = new ItemRef(1L, 7L, new ItemKind("scm.issue"), 99L, null, null);

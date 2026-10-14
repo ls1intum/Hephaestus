@@ -95,9 +95,9 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     Optional<String> lockStatusForShare(@Param("id") Long id);
 
     /**
-     * The account's status, with the row write-locked; the first step of account-wide revocation.
+     * Status changes conflict with issuance share locks but allow audit foreign-key key-share locks.
      */
-    @Query(value = "SELECT status FROM account WHERE id = :id FOR UPDATE", nativeQuery = true)
+    @Query(value = "SELECT status FROM account WHERE id = :id FOR NO KEY UPDATE", nativeQuery = true)
     Optional<String> lockStatusForUpdate(@Param("id") Long id);
 
     /**

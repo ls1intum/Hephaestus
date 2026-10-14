@@ -8,14 +8,17 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataStores;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonEvidenceErasure;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.support.SqlArrayValue;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
@@ -75,7 +78,7 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
                                 + ")) OR (t.source_type='MENTOR_TURN' AND t.source_id IN (SELECT m.id FROM"
                                 + " chat_message m JOIN chat_thread c ON c.id=m.thread_id WHERE"
                                 + " c.account_id=:account))",
-                        "id,workspace_id,job_type,source_type,source_id,source_attempt,review_id,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,reasoning_tokens,total_calls,cost_usd,pricing_state,funding_source,applied_price_id,applied_workspace_model_id,applied_per_1m_input_usd,applied_per_1m_output_usd,applied_per_1m_cache_read_usd,applied_per_1m_cache_write_usd,occurred_at,usage_provenance",
+                        "id,workspace_id,job_type,source_type,source_id,source_attempt,review_id,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,reasoning_tokens,search_units,total_calls,unreported_calls,cost_usd,pricing_state,funding_source,applied_price_id,applied_workspace_model_id,applied_per_1m_input_usd,applied_per_1m_output_usd,applied_per_1m_cache_read_usd,applied_per_1m_cache_write_usd,occurred_at,usage_provenance",
                         "id,workspace_id",
                         "source_id=gen_random_uuid(),review_id=NULL",
                         -85),
@@ -91,6 +94,8 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
                         400));
     }
 
+    private record JobRow(UUID id, long workspaceId, ReviewJobStatus status, boolean evidence) {}
+
     private final class AgentJobStore extends JdbcPersonDataStore {
         AgentJobStore() {
             super(
@@ -105,21 +110,26 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
                     -80);
         }
 
-        private List<JsonNode> jobs(PersonDataSelection selection) {
-            return querySelected(
-                    "jsonb_build_object('id',t.id,'workspaceId',t.workspace_id,'status',t.status,"
-                            + "'evidence',t.capture IS NOT NULL)::text",
-                    "review_job t",
-                    selection);
+        private List<JobRow> jobs(PersonDataSelection selection) {
+            if (selection.rows().isEmpty()) return List.of();
+            var ids = selection.rows().stream()
+                    .map(row -> UUID.fromString(row.columns().get("id")))
+                    .toArray();
+            return jdbc.query(
+                    "SELECT id,workspace_id,status,capture IS NOT NULL AS evidence FROM review_job WHERE id=ANY(:ids)",
+                    Map.of("ids", new SqlArrayValue("uuid", ids)),
+                    (row, number) -> new JobRow(
+                            Objects.requireNonNull(row.getObject("id", UUID.class)),
+                            row.getLong("workspace_id"),
+                            ReviewJobStatus.valueOf(Objects.requireNonNull(row.getString("status"))),
+                            row.getBoolean("evidence")));
         }
 
         @Override
         public void prepareErasure(PersonDataSelection selection) {
             for (var row : jobs(selection)) {
-                if (Set.of("QUEUED", "RUNNING").contains(row.path("status").asString()))
-                    lifecycle.cancel(
-                            row.path("workspaceId").asLong(),
-                            UUID.fromString(row.path("id").asString()));
+                if (row.status() == ReviewJobStatus.QUEUED || row.status() == ReviewJobStatus.RUNNING)
+                    lifecycle.cancel(row.workspaceId(), row.id());
             }
             eraseEvidence(selection);
         }
@@ -129,9 +139,7 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
             Set<UUID> ids = selection.rows().stream()
                     .map(row -> UUID.fromString(row.columns().get("id")))
                     .collect(Collectors.toUnmodifiableSet());
-            if (evidenceCopies.isEmpty()
-                    && jobs(selection).stream()
-                            .anyMatch(row -> row.path("evidence").asBoolean()))
+            if (evidenceCopies.isEmpty() && jobs(selection).stream().anyMatch(JobRow::evidence))
                 throw new IllegalStateException("Evidence-copy erasure acknowledgement is unavailable");
             evidenceCopies.forEach(copy -> copy.eraseJobEvidence(ids));
         }
@@ -139,7 +147,6 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
         @Override
         public long erase(PersonDataSelection selection) {
             if (selection.rows().isEmpty()) return 0;
-            eraseEvidence(selection);
             return super.erase(selection);
         }
     }

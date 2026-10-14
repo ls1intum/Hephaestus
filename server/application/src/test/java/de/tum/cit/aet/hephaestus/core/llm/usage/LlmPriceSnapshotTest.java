@@ -46,13 +46,6 @@ class LlmPriceSnapshotTest extends BaseUnitTest {
             assertThat(unpriced.calculateCost(1_000_000, 1_000_000, 0, 0).usd()).isNull();
         }
 
-        /**
-         * NO_CHARGE is a declaration by the operator, not an absence of rates: admission passes a
-         * declared-free model's real rates through untouched. The rates below are therefore the
-         * case that matters — with the short-circuit removed they produce $7.50 and bill a
-         * workspace for a model its administrator declared free. An all-null-rate fixture would
-         * reach zero either way and assert nothing.
-         */
         @Test
         @DisplayName(
                 "a declared-free model is exactly zero even when it carries real rates, and that is" + " not a clamp")

@@ -11,8 +11,8 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { ResultMark, ReviewResultDetail } from "@/api/types.gen";
 import { reviewResultDetail } from "@/components/admin/practice-reviews/fixtures";
-import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { server } from "@/mocks/server";
+import { reviewHandlers } from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
 import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter, testQueryClient } from "@/test/router-harness";
 

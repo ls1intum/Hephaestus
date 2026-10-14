@@ -344,12 +344,10 @@ public final class TranslatorState {
         return problemResults.get(problemId);
     }
 
-    /** Spends one admission of a link to the result {@code resultId}; false when none is left. */
     public synchronized boolean consumeLinkAdmission(UUID resultId) {
         return consume(admittedLinks, resultId);
     }
 
-    /** Spends one admission of a link to the problem {@code problemId}; false when none is left. */
     public synchronized boolean consumeProblemLinkAdmission(UUID problemId) {
         return consume(admittedProblemLinks, problemId);
     }

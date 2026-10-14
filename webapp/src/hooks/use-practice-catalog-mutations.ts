@@ -174,7 +174,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			await Promise.all(
 				affected.map(async (practice) => {
 					const filters = { queryKey: practiceQueryKey(practice.slug), exact: true };
-	// Cancel the in-flight read before refetching the reset basis; cache reuse can otherwise return the old basis.
+					// Cancel the in-flight read before refetching the reset basis; cache reuse can otherwise return the old basis.
 					await queryClient.cancelQueries(filters);
 					await queryClient.invalidateQueries(filters);
 				}),

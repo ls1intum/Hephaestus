@@ -171,6 +171,7 @@ class NativeHibernateJsonPersistenceIntegrationTest extends BaseIntegrationTest 
         group.setWorkspace(workspace);
         group.setSlug("native-json-typed");
         group.setName(definition.name());
+        group.setCatalogSlug("native-json-typed");
         group.setCatalogBase(definition);
         currentEntityManager.persist(group);
         currentEntityManager.flush();

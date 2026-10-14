@@ -176,10 +176,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * On the results, this practice's result from each review that reached it, newest first. A review
- * also recorded a result on another practice of the group; the level leaves that one out.
- */
 export const ResultsTab: Story = {
 	args: { tab: "results" },
 	play: async () => {
@@ -204,11 +200,6 @@ export const ResultsTab: Story = {
 	},
 };
 
-/**
- * Live reviews found problems, so the standing says "Needs attention", and the newest review is one
- * the reader requested that found none. The Results tab says the requested review is evidence
- * only, where the reader sees both.
- */
 export const RequestedReviewClean: Story = {
 	args: {
 		tab: "results",
@@ -339,7 +330,7 @@ export const WithoutWhereYouStand: Story = {
 	},
 };
 
-/** Paged results cannot supply an exact tab count until every page is known. */
+// Loaded pages cannot establish an exact count until every page is known.
 export const MoreToLoad: Story = {
 	args: { tab: "results", feed: { ...readyFeed, hasMore: true } },
 	play: async () => {

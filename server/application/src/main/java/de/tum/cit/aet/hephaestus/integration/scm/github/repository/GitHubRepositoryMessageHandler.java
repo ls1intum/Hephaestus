@@ -67,10 +67,9 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
                 IntegrationKind.GITHUB,
                 // Org tier, not repository tier — see the class javadoc. Must stay in lockstep with
                 // GitHubSubjectKeyDeriver's org-scoping of the `repository` event: registering this
-                // on
-                // `repository.` again makes every repository lifecycle event resolve no handler and
-                // be
-                // ACK-dropped silently (WebhookFixtureHandlerResolutionTest guards exactly that).
+                // on `repository.` again makes every repository lifecycle event resolve no handler
+                // and be ACK-dropped silently (WebhookFixtureHandlerResolutionTest guards exactly
+                // that).
                 "organization." + GitHubEventType.REPOSITORY.getValue(),
                 GitHubRepositoryEventDTO.class,
                 deserializer,
@@ -275,8 +274,7 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
                                 nativeId));
 
         // Always attempt the monitor re-key, even when no domain row is mirrored yet: the monitor
-        // is
-        // what the NATS filter is built from, so leaving it stale is the actual data-loss path.
+        // is what the NATS filter is built from, so leaving it stale is the actual data-loss path.
         syncTargetProvider.reconcileSyncTargetsForRepository(providerId, nativeId, newFullName);
     }
 

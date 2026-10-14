@@ -5,7 +5,7 @@ import type { AgentBinding } from "@/api/types.gen";
 import {
 	availableReviewBinding,
 	reviewModelRunnable,
-	reviewRunningDescription,
+	reviewReadinessDescription,
 } from "./review-readiness";
 
 const undeclared: AgentBinding = {
@@ -57,17 +57,17 @@ describe("workspace review model readiness", () => {
 
 	it("says which declared tier is in force while reviews run", () => {
 		expect(
-			reviewRunningDescription({ enabled: true, model: { status: "ready", binding: inHouse } }),
+			reviewReadinessDescription({ enabled: true, model: { status: "ready", binding: inHouse } }),
 		).toBe(
 			"Practice reviews are on and a review model declared as In-house is ready. Each developer’s AI choice still decides whether it runs for them. Feedback mode decides separately where results become feedback.",
 		);
 		expect(
-			reviewRunningDescription({
+			reviewReadinessDescription({
 				enabled: true,
 				model: { status: "ready", binding: { ...undeclared, ready: true } },
 			}),
 		).toMatch(/ready for members who have not chosen/u);
-		expect(reviewRunningDescription({ enabled: true, model: { status: "ready" } })).toMatch(
+		expect(reviewReadinessDescription({ enabled: true, model: { status: "ready" } })).toMatch(
 			/no review model is ready/u,
 		);
 	});

@@ -84,7 +84,9 @@ export const Open: Story = {
 		await expect(legend.getByText("You started here")).toBeVisible();
 		await expect(legend.getByText("Merged early")).toBeVisible();
 		for (const end of ["Delivered", "Did not arrive", "Open", "No feedback"]) {
-			await expect(within(legend.getByRole("region", { name: "Where a path ends" })).getByText(end)).toBeVisible();
+			await expect(
+				within(legend.getByRole("region", { name: "Where a path ends" })).getByText(end),
+			).toBeVisible();
 		}
 		// Where a piece went, in the tags its row carries.
 		await expect(legend.getByText("On the work")).toBeVisible();

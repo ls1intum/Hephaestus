@@ -78,10 +78,6 @@ export const MultiProviderAccount: Story = {
 	},
 };
 
-/**
- * Roster sync created this account before the person signed in. It is named by its workspace
- * identity and marked Unclaimed; nothing claims a sign-in or a choice the person did not make.
- */
 export const UnclaimedAccount: Story = {
 	args: { members: workspaceMemberRows([unclaimedMember], mockTeams) },
 	play: async ({ canvas }) => {
@@ -91,7 +87,6 @@ export const UnclaimedAccount: Story = {
 	},
 };
 
-/** A member who left keeps their row with the day they left, so results stay attributed. */
 export const MemberWhoLeft: Story = {
 	args: {
 		members: workspaceMemberRows(

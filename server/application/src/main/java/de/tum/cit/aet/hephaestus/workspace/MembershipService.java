@@ -16,8 +16,9 @@ import de.tum.cit.aet.hephaestus.workspace.exception.LastOwnerRemovalException;
 import java.time.Clock;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
+import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -36,7 +37,7 @@ public class MembershipService {
     private final ConfigAuditPort configAudit;
     private final WorkspaceAccessService access;
     private final ObjectProvider<PeopleRegistry> people;
-    private final WorkspaceActorSelector actorSelector;
+    private final MembershipReviewSelection selection;
     private final Clock clock;
     private final AccountDirectory accounts;
     private final GitProviderRegistry providers;
@@ -72,7 +73,7 @@ public class MembershipService {
             var actor = providers.actor(entry.getKey()).filter(GitProviderRegistry.ActorProfile::human);
             if (actor.isEmpty()) continue;
             desired.merge(
-                    accountIdFor(actor.get()), entry.getValue(), (first, next) -> first.isAtLeast(next) ? first : next);
+                    accountIdFor(actor.get()), entry.getValue(), Membership.WorkspaceRole::highest);
         }
         for (var entry : desired.entrySet()) {
             var existing = memberships.findByWorkspace_IdAndAccount_Id(workspace.getId(), entry.getKey());
@@ -172,31 +173,20 @@ public class MembershipService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<Membership> findMembership(Long workspaceId, Long accountId) {
-        return memberships.findByWorkspace_IdAndAccount_Id(workspaceId, accountId);
-    }
-
-    @Transactional(readOnly = true)
     public Page<Membership> listMembers(Long workspaceId, Pageable pageable) {
         return memberships.findAllByWorkspace_Id(workspaceId, pageable);
     }
 
     @Transactional(readOnly = true)
     public Set<Long> eligibleAccountIds(Long workspaceId, Collection<Long> accountIds) {
-        return eligibleIds(workspaceId, accountIds);
+        var eligible = new HashSet<>(selection.eligibleAccountIds(workspaceId));
+        eligible.retainAll(accountIds);
+        return Set.copyOf(eligible);
     }
 
     @Transactional(readOnly = true)
     public boolean isPracticeReviewEligible(Long workspaceId, Long accountId) {
-        return eligibleIds(workspaceId, Set.of(accountId)).contains(accountId);
-    }
-
-    private Set<Long> eligibleIds(Long workspaceId, Collection<Long> accountIds) {
-        if (accountIds.isEmpty()) return Set.of();
-        return memberships.findEligibleAccountIds(
-                workspaceId,
-                accountIds,
-                actorSelector.connectedProviderId(workspaceId).orElse(null));
+        return selection.eligibleAccountIds(workspaceId).contains(accountId);
     }
 
     private Workspace lockForMembershipChange(Long workspaceId) {

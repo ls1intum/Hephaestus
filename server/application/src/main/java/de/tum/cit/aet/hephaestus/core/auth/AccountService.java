@@ -237,10 +237,6 @@ public class AccountService {
         return account;
     }
 
-    /**
-     * Instance-admin force sign-out: revoke all of {@code accountId}'s active sessions. Audited as
-     * {@code JWT_REVOKED}.
-     */
     @Transactional
     public int adminRevokeAllSessions(Long accountId, Long actingAccountId) {
         requireById(accountId); // 404 if the account does not exist

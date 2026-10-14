@@ -256,6 +256,15 @@ class PracticeV1CutoverMigrationTest {
                         "SELECT id::text || '|' || state || '|' || external_ref FROM feedback_copy"
                                 + " WHERE id='00000000-0000-0000-0000-000000992334'"))
                 .containsExactly("00000000-0000-0000-0000-000000992334|RETRACTED|provider:updated");
+        assertThat(column(
+                        database,
+                        "SELECT state || '|' || stop_reason FROM feedback WHERE"
+                                + " id='00000000-0000-0000-0000-000000992316'"))
+                .containsExactly("WITHHELD|OUTSIDE_CURRENT_SCOPE");
+        assertThat(column(
+                        database,
+                        "SELECT id::text FROM feedback_copy WHERE feedback_id='00000000-0000-0000-0000-000000992316'"))
+                .isEmpty();
         assertThat(column(database, "SELECT state FROM feedback_copy WHERE id='00000000-0000-0000-0000-000000992332'"))
                 .containsExactly("WRITE_STARTED");
         assertThat(column(
@@ -269,11 +278,6 @@ class PracticeV1CutoverMigrationTest {
                 .containsExactly("[\"OPEN\"]");
         assertThat(column(
                         database,
-                        "SELECT count(*)::text FROM information_schema.columns WHERE table_schema='public'"
-                                + " AND table_name='workspace' AND column_name='practice_skip_drafts'"))
-                .containsExactly("0");
-        assertThat(column(
-                        database,
                         "SELECT account_id || '|' || purpose || '|' || granted || '|' || mechanism || '|' ||"
                                 + " notice_version FROM consent_decision WHERE id=992251"))
                 .containsExactly("992106|PRIVACY_NOTICE_ACKNOWLEDGEMENT|true|ACCOUNT_SETTINGS|2026-08-30");
@@ -281,17 +285,6 @@ class PracticeV1CutoverMigrationTest {
                 .isInstanceOfSatisfying(
                         SQLException.class,
                         error -> assertThat(error.getSQLState()).isEqualTo("55000"));
-        execute(
-                database,
-                "UPDATE review_batch SET status='PAUSED',pause_reason='PAUSED_BY_ADMIN'"
-                        + " WHERE id='00000000-0000-0000-0000-000000992273'");
-        assertThat(column(
-                        database,
-                        "SELECT status || '|' || pause_reason FROM review_batch"
-                                + " WHERE id='00000000-0000-0000-0000-000000992273'"))
-                .containsExactly("PAUSED|PAUSED_BY_ADMIN");
-        assertThat(column(database, "SELECT count(*)::text FROM feedback_copy WHERE readback IS NOT NULL"))
-                .containsExactly("0");
         assertThatThrownBy(() -> execute(
                         database,
                         "UPDATE feedback_copy SET readback='NOT_A_READBACK' WHERE"

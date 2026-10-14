@@ -133,10 +133,6 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
                 .containsEntry(GeneralReviewCommentContentSource.KIND, SourceContentState.EMPTY);
     }
 
-    /**
-     * A pull request nobody commented on still stages the file, holding an empty list — omitting it
-     * would leave the model unable to tell "no comments" from "comments never staged".
-     */
     @Test
     void contribute_noComments_stagesAnEmptyCommentList() throws Exception {
         var captured = provider.capture(request(metadataWithPr()), provider.sourceKinds());

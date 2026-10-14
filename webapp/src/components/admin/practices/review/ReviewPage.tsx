@@ -5,9 +5,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import type { ReviewRunningState } from "./review-readiness";
+import type { ReviewReadinessState } from "./review-readiness";
 import { REVIEW_SECTIONS, type ReviewSectionId } from "./review-sections";
-import { ReviewRunningBanner } from "./ReviewRunningBanner";
+import { ReviewReadinessBanner } from "./ReviewReadinessBanner";
 
 export interface ReviewPageProps {
 	section: ReviewSectionId;
@@ -16,7 +16,7 @@ export interface ReviewPageProps {
 	 * Absent until the workspace is known. The tabs render meanwhile rather than a spinner: a banner
 	 * that guessed at the answer would be reassuring on exactly the evidence it does not have.
 	 */
-	running: ReviewRunningState | undefined;
+	running: ReviewReadinessState | undefined;
 	/**
 	 * The three tab bodies, as elements. Passing an element does not run it — Base UI mounts only the
 	 * open panel — so the sections a reader has not opened cost nothing, which is the whole reason
@@ -31,7 +31,7 @@ export function ReviewPage({ section, onSectionChange, running, sections }: Revi
 	return (
 		<PageLayout>
 			<PageHeader icon={<ScanEye />} title="Review settings" description={active?.description} />
-			{running && <ReviewRunningBanner running={running} />}
+			{running && <ReviewReadinessBanner running={running} />}
 			<Tabs
 				value={section}
 				onValueChange={(next) => {

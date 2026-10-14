@@ -384,12 +384,6 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         assertThat(coverage.summary(workspace, 0).eligiblePeople()).isEqualTo(2);
     }
 
-    /**
-     * The reported bug: a student who reaches the course subgroup only through its parent group
-     * opens a merge request in a selected repository, against a selected base branch, and marks it
-     * ready. Until the roster lists them the gate waits on them rather than on the repository; once
-     * it does, the same check admits them.
-     */
     @Test
     void shouldAdmitAnInheritedAuthorAtTheReadyOccasionOnASelectedRepositoryAndBaseBranch() {
         String project = COURSE + "/team-1/project";

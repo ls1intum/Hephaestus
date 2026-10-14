@@ -15,29 +15,46 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.BasisToCheck;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CitationCheck;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CitationToCheck;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CitationVerifier;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
+import de.tum.cit.aet.hephaestus.practices.spi.CitationProof;
+import de.tum.cit.aet.hephaestus.practices.spi.CitationVerificationStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.DutyBasis;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
+import de.tum.cit.aet.hephaestus.practices.spi.IntroducedBasis;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.StateBasis;
+import de.tum.cit.aet.hephaestus.practices.spi.WorsenedBasis;
 import java.io.Serial;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.node.ObjectNode;
 
 @Component
 class CandidateEvidenceVerifier {
     private final JobEvidenceFiles files;
     private final ClasspathSourceCatalogRegistry catalogs;
-    private final List<CitationVerifier> verifiers;
+    private final Map<ItemKind, CitationVerifier> verifiers;
 
     CandidateEvidenceVerifier(
             JobEvidenceFiles files, ClasspathSourceCatalogRegistry catalogs, List<CitationVerifier> verifiers) {
         this.files = files;
         this.catalogs = catalogs;
-        this.verifiers = List.copyOf(verifiers);
+        var byKind = new HashMap<ItemKind, CitationVerifier>();
+        for (var verifier : verifiers) {
+            for (var kind : verifier.kinds()) {
+                if (byKind.putIfAbsent(kind, verifier) != null)
+                    throw new IllegalStateException("Multiple citation verifiers handle " + kind.value());
+            }
+        }
+        this.verifiers = Map.copyOf(byKind);
     }
 
     static final class Unverified extends RuntimeException {
@@ -45,13 +62,17 @@ class CandidateEvidenceVerifier {
         private static final long serialVersionUID = 1L;
 
         private final CandidateRefusal refusal;
-        private final transient @Nullable ObjectNode failure;
+        private final transient @Nullable EvidenceCitation failure;
 
-        Unverified(CandidateRefusal refusal, String reason, @Nullable ObjectNode failure) {
+        Unverified(CandidateRefusal refusal, String reason, @Nullable EvidenceCitation failure) {
             this(refusal, reason, failure, null);
         }
 
-        Unverified(CandidateRefusal refusal, String reason, @Nullable ObjectNode failure, @Nullable Throwable cause) {
+        Unverified(
+                CandidateRefusal refusal,
+                String reason,
+                @Nullable EvidenceCitation failure,
+                @Nullable Throwable cause) {
             super(reason, cause, false, false);
             this.refusal = refusal;
             this.failure = failure;
@@ -62,36 +83,30 @@ class CandidateEvidenceVerifier {
         }
 
         @Nullable
-        ObjectNode failure() {
+        EvidenceCitation failure() {
             return failure;
         }
     }
 
-    void verifyCandidate(
+    Candidate verifyCandidate(
             ReviewJob job,
             ReviewAssignmentSnapshot assignment,
             ReviewKind scope,
             Candidate candidate,
             CapturedEvidence captured) {
-        var matching = verifiers.stream()
-                .filter(verifier -> verifier.kinds().contains(assignment.item().kind()))
-                .toList();
-        if (matching.size() > 1) throw new JobDeliveryException("Multiple citation verifiers handle this item kind");
-        List<ObjectNode> located = citations(candidate);
+        var verifier = verifiers.get(assignment.item().kind());
+        List<EvidenceCitation> located = citations(candidate);
+        Map<EvidenceCitation, EvidenceCitation> verified = new HashMap<>();
         List<CitationToCheck> checks = new ArrayList<>();
         for (int i = 0; i < located.size(); i++) {
-            ObjectNode citation = located.get(i);
-            SourceKind source = new SourceKind(citation.path("sourceKind").asString());
-            SourceContract contract;
-            try {
-                contract = catalogs.requireSource(source);
-            } catch (IllegalArgumentException unknownSource) {
-                throw new Unverified(
-                        CandidateRefusal.MALFORMED_CANDIDATE,
-                        "The cited source is not in the source catalog",
-                        citation,
-                        unknownSource);
-            }
+            EvidenceCitation citation = located.get(i);
+            SourceKind source = citation.sourceKind();
+            SourceContract contract = catalogs.current()
+                    .source(source)
+                    .orElseThrow(() -> new Unverified(
+                            CandidateRefusal.MALFORMED_CANDIDATE,
+                            "The cited source is not in the source catalog",
+                            citation));
             if (!contract.appliesTo(assignment.item().kind().value())
                     || !catalogs.isSourceUsePermitted(source, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)) {
                 throw new Unverified(
@@ -99,15 +114,15 @@ class CandidateEvidenceVerifier {
                         "This source cannot support the assigned review",
                         citation);
             }
-            capability(contract.citation().side(), citation.has("side"), "side");
-            capability(contract.citation().revision(), citation.has("revision"), "revision");
-            if (matching.isEmpty() && (citation.has("side") || citation.has("revision"))) {
+            capability(contract.citation().side(), citation.side() != null, "side");
+            capability(contract.citation().revision(), citation.revision() != null, "revision");
+            if (verifier == null && (citation.side() != null || citation.revision() != null)) {
                 throw new Unverified(
                         CandidateRefusal.BASIS_REVISION_UNSUPPORTED,
                         "No item verifier supports this citation reference",
                         citation);
             }
-            String sourcePath = citation.path("sourcePath").asString();
+            String sourcePath = citation.sourcePath();
             try {
                 captured.requireFile(source, sourcePath);
             } catch (JobDeliveryException unavailable) {
@@ -117,14 +132,11 @@ class CandidateEvidenceVerifier {
                         citation,
                         unavailable);
             }
-            String path = citation.path("path").asString();
-            CitationSide side = citation.has("side")
-                    ? CitationSide.valueOf(citation.path("side").asString())
-                    : CitationSide.NEW;
-            String revision =
-                    citation.has("revision") ? citation.path("revision").asString() : null;
+            String path = citation.path();
+            CitationSide side = citation.side() != null ? citation.side() : CitationSide.NEW;
+            String revision = citation.revision() != null ? citation.revision() : null;
             var proof = captured.resolve(source, path, side, revision);
-            String quote = citation.path("quote").asString();
+            String quote = citation.quote();
             var text = files.readText(job, proof.stagedPath(), proof.sha256())
                     .orElseThrow(() -> new Unverified(
                             CandidateRefusal.SOURCE_UNAVAILABLE, "Captured source text is unavailable", citation));
@@ -139,24 +151,33 @@ class CandidateEvidenceVerifier {
             for (int offset = 0; offset < start; offset++) if (text.charAt(offset) == '\n') firstLine++;
             int lastLine = firstLine;
             for (int offset = 0; offset < quote.length() - 1; offset++) if (quote.charAt(offset) == '\n') lastLine++;
-            citation.put("startLine", firstLine);
-            citation.put("endLine", lastLine);
-            var verification = citation.putObject("verification");
-            verification.put("status", "VERIFIED");
-            verification.put("itemSha256", proof.sha256());
-            verification.put("quoteSha256", ProvenanceDigest.sha256Hex(quote.getBytes(StandardCharsets.UTF_8)));
-            checks.add(new CitationToCheck(
-                    i, source.value(), citation.path("path").asString(), side, revision, firstLine, lastLine, quote));
+            var annotated = new EvidenceCitation(
+                    source,
+                    sourcePath,
+                    path,
+                    citation.side(),
+                    revision,
+                    firstLine,
+                    lastLine,
+                    quote,
+                    new CitationProof(
+                            CitationVerificationStatus.VERIFIED,
+                            proof.sha256(),
+                            ProvenanceDigest.sha256Hex(quote.getBytes(StandardCharsets.UTF_8))));
+            verified.put(citation, annotated);
+            checks.add(new CitationToCheck(i, source.value(), path, side, revision, firstLine, lastLine, quote));
         }
-        requireConsulted(candidate.search(), captured);
-        requireConsulted(candidate.inapplicability(), captured);
+        var search = candidate.search();
+        if (search != null) requireConsulted(search.consulted(), captured);
+        var inapplicability = candidate.inapplicability();
+        if (inapplicability != null) requireConsulted(inapplicability.consulted(), captured);
         List<BasisToCheck> bases = new ArrayList<>();
         int citationOffset = candidate.citations().size();
         for (int i = 0; i < candidate.problems().size(); i++) {
             var problem = candidate.problems().get(i);
 
-            switch (problem.basisType()) {
-                case "state" -> {
+            switch (problem.basis()) {
+                case StateBasis state -> {
                     if (scope != ReviewKind.SCAN)
                         throw new Unverified(
                                 CandidateRefusal.BASIS_STATE_UNSUPPORTED,
@@ -164,17 +185,15 @@ class CandidateEvidenceVerifier {
                                 null);
                     String itemPath = assignment.item().path();
                     if (itemPath == null
-                            || problem.citations().stream()
-                                    .noneMatch(citation -> itemPath.equals(
-                                            citation.path("path").asString()))) {
+                            || problem.citations().stream().noneMatch(citation -> itemPath.equals(citation.path()))) {
                         throw new Unverified(
                                 CandidateRefusal.BASIS_WITNESS_MISSING,
                                 "A state claim needs a witness from its assigned file",
                                 null);
                     }
                 }
-                case "duty" -> {
-                    String quote = problem.basis().path("criterionQuote").asString();
+                case DutyBasis duty -> {
+                    String quote = duty.criterionQuote();
                     if (quote.isBlank()
                             || !assignment.practice().definition().criteria().contains(quote)) {
                         throw new Unverified(
@@ -183,44 +202,46 @@ class CandidateEvidenceVerifier {
                                 null);
                     }
                 }
-                case "introduced", "worsened" -> {
-                    if (scope == ReviewKind.SCAN)
-                        throw new Unverified(
-                                CandidateRefusal.BASIS_STATE_UNSUPPORTED, "A scan requires a state basis", null);
-                    if (matching.isEmpty())
-                        throw new Unverified(
-                                CandidateRefusal.BASIS_REVISION_UNSUPPORTED,
-                                "No item verifier supports change-basis references",
-                                null);
-                    int base = citationOffset;
-                    int headIndex = base + problem.basis().path("head").asInt();
-                    Integer baseIndex = problem.basisType().equals("worsened")
-                            ? base + problem.basis().path("base").asInt()
-                            : null;
-                    bases.add(new BasisToCheck(i, problem.basisType(), headIndex, baseIndex));
+                case IntroducedBasis introduced -> {
+                    requireChangeVerifier(scope, verifier);
+                    bases.add(new BasisToCheck(i, "introduced", citationOffset + introduced.head(), null));
                 }
-                default -> throw new Unverified(CandidateRefusal.MALFORMED_CANDIDATE, "Unknown problem basis", null);
+                case WorsenedBasis worsened -> {
+                    requireChangeVerifier(scope, verifier);
+                    bases.add(new BasisToCheck(
+                            i, "worsened", citationOffset + worsened.head(), citationOffset + worsened.base()));
+                }
             }
             citationOffset += problem.citations().size();
         }
-        if (!matching.isEmpty()) {
+        if (verifier != null) {
             var version = assignment.version();
-            var refusals = matching.getFirst()
-                    .verify(new CitationCheck(
-                            job.getWorkspaceId(),
-                            assignment.item(),
-                            version,
-                            version.baseVersion() == null ? null : new ItemVersion(version.baseVersion(), null),
-                            files.verificationDirectory(job),
-                            checks,
-                            bases));
+            var refusals = verifier.verify(new CitationCheck(
+                    job.getWorkspaceId(),
+                    assignment.item(),
+                    version,
+                    version.baseVersion() == null ? null : new ItemVersion(version.baseVersion(), null),
+                    files.verificationDirectory(job),
+                    checks,
+                    bases));
             if (!refusals.isEmpty()) {
                 var refusal = refusals.getFirst();
-                ObjectNode failure =
+                EvidenceCitation failure =
                         refusal.index() >= 0 && refusal.index() < located.size() ? located.get(refusal.index()) : null;
                 throw new Unverified(refusal.reason(), refusal.message(), failure);
             }
         }
+        return candidate.withCitations(citation -> Objects.requireNonNull(verified.get(citation)));
+    }
+
+    private static void requireChangeVerifier(ReviewKind scope, @Nullable CitationVerifier verifier) {
+        if (scope == ReviewKind.SCAN)
+            throw new Unverified(CandidateRefusal.BASIS_STATE_UNSUPPORTED, "A scan requires a state basis", null);
+        if (verifier == null)
+            throw new Unverified(
+                    CandidateRefusal.BASIS_REVISION_UNSUPPORTED,
+                    "No item verifier supports change-basis references",
+                    null);
     }
 
     private static void capability(CitationRequirement requirement, boolean present, String field) {
@@ -233,23 +254,22 @@ class CandidateEvidenceVerifier {
         }
     }
 
-    private static void requireConsulted(@Nullable ObjectNode warrant, CapturedEvidence captured) {
-        if (warrant == null) return;
-        for (var source : warrant.path("consulted")) {
-            if (!captured.availableSources().contains(new SourceKind(source.asString()))) {
+    private static void requireConsulted(List<SourceKind> consulted, CapturedEvidence captured) {
+        for (var source : consulted) {
+            if (!captured.availableSources().contains(source))
                 throw new Unverified(
                         CandidateRefusal.SOURCE_UNAVAILABLE, "A warrant names a source that was not captured", null);
-            }
         }
     }
 
-    static List<ObjectNode> citations(Candidate candidate) {
+    static List<EvidenceCitation> citations(Candidate candidate) {
         var citations = new ArrayList<>(candidate.citations());
         candidate.problems().forEach(problem -> citations.addAll(problem.citations()));
-        if (candidate.example() != null)
-            citations.add((ObjectNode) candidate.example().get("citation"));
+        var example = candidate.example();
+        if (example != null) citations.add(example.citation());
         candidate.openQuestions().forEach(question -> {
-            if (question.has("citation")) citations.add((ObjectNode) question.get("citation"));
+            var citation = question.citation();
+            if (citation != null) citations.add(citation);
         });
         return List.copyOf(citations);
     }

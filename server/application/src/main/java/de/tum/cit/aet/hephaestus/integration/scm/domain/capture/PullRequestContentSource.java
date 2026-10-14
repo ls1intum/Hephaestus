@@ -55,9 +55,6 @@ public class PullRequestContentSource {
     public static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
     public static final SourceKind COMMENTS = new SourceKind("scm.pull-request.comments");
 
-    /**
-     * Checked by the integration framework against every descriptor that calls itself reviewable.
-     */
     public Set<SourceKind> sourceKinds() {
         return Set.of(CORE, DIFF, COMMENTS);
     }
@@ -150,9 +147,8 @@ public class PullRequestContentSource {
             ObjectNode staged = workRecord(pullRequest, metadata, capture.capturedAt());
             storeMetadata(files, staged);
             // The words the job was admitted with. A body known to be absent stages an empty
-            // description; a body the
-            // job does not carry as text stays unknown, so no description is staged rather than the
-            // current one.
+            // description; a body the job does not carry as text stays unknown, so no description
+            // is staged rather than the current one.
             JsonNode body = staged.get("body");
             if (body != null) {
                 files.put(DESCRIPTION_FILE, (body.isNull() ? "" : body.asString()).getBytes(StandardCharsets.UTF_8));
@@ -163,9 +159,8 @@ public class PullRequestContentSource {
             completeness.put(CORE, unknown.isEmpty() ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL);
             if (!unknown.isEmpty()) limitations.put(CORE, unknown);
             // No observedAt: the record mixes words retained at admission with status as last
-            // synced, and
-            // the sync time would date the words to a moment they were not read. metadata.json
-            // dates each part.
+            // synced, and the sync time would date the words to a moment they were not read.
+            // metadata.json dates each field.
         }
         if (selectedKinds.contains(COMMENTS)) {
             CommentCapture comments = loadComments(capture.workspaceId(), pullRequestId);
@@ -327,10 +322,9 @@ public class PullRequestContentSource {
      */
     public static ObjectNode workRecord(PullRequest pullRequest, ScmCapturedWork work, @Nullable Instant admittedAt) {
         ObjectNode result = JsonNodeFactory.instance.objectNode();
-        // Which time each part describes. Admission is when the job was accepted, not when the
-        // provider event
-        // happened; the mirror sync time dates the status fields only. No status is reconstructed
-        // for admission.
+        // Which time each field describes. Admission is when the job was accepted, not when the
+        // provider event happened; the mirror sync time dates the status fields only. No status is
+        // reconstructed for admission.
         ObjectNode basis = result.putObject("basis");
         ArrayNode admitted = basis.putArray("admission_fields");
         ADMISSION_FIELDS.forEach(admitted::add);
@@ -361,8 +355,7 @@ public class PullRequestContentSource {
         }
         result.put("is_draft", pullRequest.isDraft());
         // Stated on its own because state alone does not carry it: a pull request the webhook
-        // closed
-        // after the merge is stored CLOSED with merged_at set, and is merged.
+        // closed after the merge is stored CLOSED with merged_at set, and is merged.
         result.put("is_merged", pullRequest.isMerged());
         putInstant(result, "created_at", pullRequest.getCreatedAt());
         putInstant(result, "closed_at", pullRequest.getClosedAt());
@@ -388,8 +381,7 @@ public class PullRequestContentSource {
             result.put("milestone", pullRequest.getMilestone().getTitle());
         }
         // Both come from the GraphQL sync only; a webhook-only record has neither, and an absent
-        // key
-        // says so rather than a null a program might read as a value.
+        // key says so rather than a null a program might read as a value.
         if (pullRequest.getMergeStateStatus() != null) {
             result.put("merge_state_status", pullRequest.getMergeStateStatus().name());
         }
@@ -397,10 +389,8 @@ public class PullRequestContentSource {
             result.put("review_decision", pullRequest.getReviewDecision().name());
         }
         // What the checks said about the reviewed head, as last observed. A state observed for any
-        // other commit,
-        // the current mirror head included, is not about the reviewed change and is left out, as is
-        // a head no sync
-        // or event has reported on.
+        // other commit, the current mirror head included, is not about the reviewed change and is
+        // left out, as is a head no sync or event has reported on.
         if (pullRequest.getHeadCheckState() != null && reviewedHead.equals(pullRequest.getHeadCheckSha())) {
             result.put("head_checks", pullRequest.getHeadCheckState().name());
         }
@@ -442,8 +432,7 @@ public class PullRequestContentSource {
             }
             commentNode.put("path", comment.getPath());
             // line is a primitive int; a file-level comment has no anchor and reports 0. Omit the
-            // key then,
-            // so an absent anchor reads as absent rather than as a literal line-0 anchor.
+            // key then, so an absent anchor reads as absent rather than as a literal line-0 anchor.
             if (comment.getLine() > 0) {
                 commentNode.put("line", comment.getLine());
             }

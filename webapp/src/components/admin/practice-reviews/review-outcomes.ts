@@ -21,7 +21,7 @@ import type { FeedbackSearch, ResultsSearch, ReviewsSearch } from "./review-sear
 
 /** A list tab, filtered: where a count opens. */
 export type ReviewListTarget =
-	| { list: "runs"; search: Partial<ReviewsSearch> }
+	| { list: "reviews"; search: Partial<ReviewsSearch> }
 	| { list: "results"; search: Partial<ResultsSearch> }
 	| { list: "feedback"; search: Partial<FeedbackSearch> };
 
@@ -84,7 +84,10 @@ export function reviewSlots(counts: ReviewStatusCounts, scope?: OutcomeScope): O
 		def: REVIEW_STATUS_DEFS[status],
 		label: lower(REVIEW_STATUS_DEFS[status]),
 		count: counts[REVIEW_COUNT[status]],
-		target: scope && { list: "runs", search: { ...scopeSearch(scope, "runs"), status: [status] } },
+		target: scope && {
+			list: "reviews",
+			search: { ...scopeSearch(scope, "reviews"), status: [status] },
+		},
 	}));
 }
 

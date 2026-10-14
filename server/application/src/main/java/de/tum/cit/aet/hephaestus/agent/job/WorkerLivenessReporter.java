@@ -22,17 +22,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Self-reports this worker's liveness into {@code worker_registry} on a timer.
- *
- * <p>The heartbeat must come from the JVM that actually executes jobs, never from the WSS control
- * channel: a worker can lose WSS while still running jobs, and orphaning those would double-execute
- * them. Only "this executor is gone" is a safe trigger for {@link ReviewJobZombieSweeper} to hand a
- * RUNNING job to a sibling.
- *
- * <p>Manually scheduled rather than {@code @Scheduled}, because {@code @EnableScheduling} is server-role
- * only and this bean runs on worker pods.
- */
+// Heartbeats must come from the executing JVM; a lost WSS connection does not mean the worker stopped.
 @Component
 @ConditionalOnWorkerRole
 @ConditionalOnBooleanProperty(RuntimeRole.AGENT_ENABLED_PROPERTY)

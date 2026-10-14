@@ -255,10 +255,6 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
                 .isEqualTo(413);
     }
 
-    /**
-     * The practice programs run in the review's own process, so the job's one credential reaches their direct model
-     * route too. The route exists only on the gateway, under the model-call bound.
-     */
     @Test
     void shouldServeThePracticeScriptRouteOnTheGatewayWhenTheJobTokenCallsIt() throws Exception {
         String path = "/internal/llm/practice-script/chat/chat/completions";

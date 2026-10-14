@@ -9,7 +9,6 @@ import {
 	NOT_A_DEFINITION_ERROR,
 	parseCandidate,
 	REASONS,
-	type ExecutionReport,
 } from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
 import type { ProgramOutcome } from "../../../../../../docker/agents/practice-scripts/lib/core/program-host.ts";
 import {
@@ -19,7 +18,7 @@ import {
 	PRACTICE_SCRIPT_REPORT_MAX_PRACTICES,
 } from "../../../main/resources/agent/pi-practice-scripts-report.ts";
 
-function parsed(text: string): ExecutionReport {
+function parsed(text: string) {
 	assert.ok(
 		Buffer.byteLength(text) <= PRACTICE_SCRIPT_REPORT_MAX_BYTES,
 		`${Buffer.byteLength(text)} bytes`,

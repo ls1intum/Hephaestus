@@ -120,7 +120,6 @@ export const SelectedScope: Story = {
 	},
 };
 
-/** Selected with nothing chosen reviews nobody; it never falls back to everyone. */
 export const SelectedNobody: Story = {
 	args: {
 		policy: {

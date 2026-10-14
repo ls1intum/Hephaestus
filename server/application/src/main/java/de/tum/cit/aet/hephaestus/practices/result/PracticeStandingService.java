@@ -65,7 +65,6 @@ public class PracticeStandingService {
         return getStandingSnapshot(workspaceId).dtos();
     }
 
-    /** The current developer's standings as they stand now; empty for a caller who is not a synced developer. */
     public StandingSnapshot getStandingSnapshot(Long workspaceId) {
         return currentDeveloperLookup
                 .currentDeveloperId()

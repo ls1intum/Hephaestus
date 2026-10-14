@@ -216,10 +216,6 @@ export const NotReached: Story = {
 	},
 };
 
-/**
- * A practice without a script of its own is reviewed by the built-in review. It declares no models
- * and has no script anyone here can edit, so its row offers no fix.
- */
 export const BuiltInReview: Story = {
 	args: { practices: [scripted(reviewPracticeScripts.builtIn)] },
 	play: async ({ canvas }) => {

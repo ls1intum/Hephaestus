@@ -746,10 +746,6 @@ class LlmProxyServiceTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * A practice script call is never streamed, so its span reads the usage off the buffered body. The input count
-     * is the prompt total, cache reads included. A call that billed only search units carries no token count.
-     */
     @ParameterizedTest
     @CsvSource(
             delimiter = '|',

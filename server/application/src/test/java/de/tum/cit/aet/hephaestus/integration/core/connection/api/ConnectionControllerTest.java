@@ -302,10 +302,6 @@ class ConnectionControllerTest extends BaseUnitTest {
         assertThat(req.getValue().eventType()).isEqualTo("DISCONNECT");
     }
 
-    /**
-     * Only the strategy can erase the integration's data, so without one the connection stays as it
-     * is.
-     */
     @Test
     void updateStatus_toUninstalledWithoutStrategy_isRefused() {
         long workspaceId = 42L;

@@ -20,7 +20,7 @@ import {
 	wireReport,
 	wireScan,
 	type WireProblem,
-} from "./-scan-wire";
+} from "./-scan-server";
 
 // Route mounting loads the admin layout and lazy modules; allow time for the first render.
 vi.setConfig({ testTimeout: 20_000 });

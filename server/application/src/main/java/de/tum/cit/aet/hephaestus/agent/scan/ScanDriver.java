@@ -27,7 +27,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Feeds scans through the existing serial queue; product locks and indexes remain the final fence. */
+// Product locks and indexes remain the final fence for serial scan work.
 @Slf4j
 @Component
 @ConditionalOnServerRole

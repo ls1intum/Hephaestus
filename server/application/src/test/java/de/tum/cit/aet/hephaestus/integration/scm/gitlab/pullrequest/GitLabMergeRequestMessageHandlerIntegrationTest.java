@@ -462,10 +462,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(reviewerStates()).containsEntry("user1", RequestedReviewer.ReviewState.UNREVIEWED);
         }
 
-        /**
-         * GitLab before 18.6 lists reviewers without their state, so only the sync states them; who
-         * is listed changes.
-         */
+    // GitLab before 18.6 omits reviewer state from hooks; only sync can supply that state.
         @Test
         void shouldKeepEachStoredStateWhenAHookListsTheReviewersWithoutOne() throws Exception {
             sync(
@@ -484,10 +481,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                             "user2", RequestedReviewer.ReviewState.REVIEWED));
         }
 
-        /**
-         * A state from a GitLab newer than Hephaestus must not leave the verdict it replaced
-         * standing.
-         */
         @Test
         void shouldStoreNoStateWhenTheHookStatesOneHephaestusDoesNotKnow() throws Exception {
             receive(loadPayload("merge_request.update.reviewers.derived"));
@@ -502,9 +495,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(reviewerStates()).containsEntry("user1", null);
         }
 
-        /**
-         * GitLab leaves {@code reviewers} and {@code assignees} out of a hook when there are none.
-         */
+    // GitLab omits empty reviewers and assignees from hooks.
         @Test
         void shouldRemoveTheLastReviewersAndAssigneesWhenTheHookLeavesTheListsOut() throws Exception {
             receive(loadPayload("merge_request.update.reviewers.derived"));
@@ -537,10 +528,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(reviewerStates()).containsExactlyInAnyOrderEntriesOf(expected);
         }
 
-        /**
-         * A sync page applies unless it was asked for before the webhook arrived; applying it twice
-         * changes nothing.
-         */
         @ParameterizedTest
         @EnumSource(Order.class)
         void shouldApplyASyncPageUnlessItWasReadBeforeTheStoredWebhook(Order page) throws Exception {
@@ -552,11 +539,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(reviewerStates()).containsExactlyInAnyOrderEntriesOf(page == Order.OLDER ? REVIEWED : SYNCED);
         }
 
-        /**
-         * A webhook applies unless it arrived before the stored sync page was asked for, even when
-         * it waited in the stream until after; its payload is as new as the merge request the sync
-         * stored, so only its arrival dates it.
-         */
         @ParameterizedTest
         @EnumSource(Order.class)
         void shouldApplyAWebhookUnlessItArrivedBeforeTheStoredSyncPageWasRead(Order arrival) throws Exception {
@@ -569,11 +551,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(reviewerStates()).containsExactlyInAnyOrderEntriesOf(arrival == Order.OLDER ? SYNCED : REVIEWED);
         }
 
-        /**
-         * A sync page read after the webhook arrived is written while the webhook is handled. The
-         * webhook reads the merge request under its row lock, so it waits for the sync to commit
-         * and compares against the sync's list, not against the one stored before.
-         */
         @Test
         void shouldCompareAgainstTheListAConcurrentSyncCommittedWhileTheWebhookWaited() throws Exception {
             Instant syncedAt = STORED_AT.plus(Duration.ofMinutes(2));
@@ -723,10 +700,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     .containsExactly(Map.entry("approver", PullRequestReview.State.APPROVED));
         }
 
-        /**
-         * Without Premium a request for changes blocks nothing, but the reviewer's state still says
-         * it stands.
-         */
         @Test
         void shouldReportAReviewersRequestForChangesWhereItDoesNotBlockMerging() {
             sync(syncedMergeRequest(
@@ -1590,11 +1563,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     .isEqualTo("a".repeat(40));
         }
 
-        /**
-         * Pages and reads at one GitLab version are ordered by when they were asked for, as the
-         * reviews are: an earlier page applied after a later accepted pair leaves it, and a later
-         * page with its own pair replaces it.
-         */
         @Test
         void shouldKeepTheDiffBaseOfALaterAcceptedReadOverAnEarlierPageAtTheSameVersion() {
             String version = "2026-01-31T18:10:00Z";

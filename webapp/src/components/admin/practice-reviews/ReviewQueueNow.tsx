@@ -202,7 +202,7 @@ function QueueFigures({ workspaceSlug, queue }: { workspaceSlug: string; queue: 
 							<ReviewListLink
 								workspaceSlug={workspaceSlug}
 								// The queue's own statuses, so the list holds exactly the reviews the total counts.
-								destination={{ list: "runs", search: { status: ["RUNNING", "QUEUED"] } }}
+								destination={{ list: "reviews", search: { status: ["RUNNING", "QUEUED"] } }}
 							/>
 						}
 					>
@@ -241,7 +241,7 @@ function QueueCount({
 			render={
 				<ReviewListLink
 					workspaceSlug={workspaceSlug}
-					destination={{ list: "runs", search: { status: [status] } }}
+					destination={{ list: "reviews", search: { status: [status] } }}
 				/>
 			}
 		>

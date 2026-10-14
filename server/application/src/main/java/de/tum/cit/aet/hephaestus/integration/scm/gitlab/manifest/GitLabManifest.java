@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.manifest;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -48,12 +47,6 @@ public class GitLabManifest implements IntegrationManifest {
         return "GitLab";
     }
 
-    /** A merge hook often names no merger; the read after it, or a sync, does. */
-    @Override
-    public Set<AboutRole> rolesNamedAfterTheOccasion() {
-        return Set.of(AboutRole.MERGER);
-    }
-
     @Override
     public Set<Capability> declaredCapabilities() {
         EnumSet<Capability> capabilities = EnumSet.of(Capability.WEBHOOK_INGEST);
@@ -65,10 +58,7 @@ public class GitLabManifest implements IntegrationManifest {
         return Set.copyOf(capabilities);
     }
 
-    /**
-     * Delivery lanes track the same enablement flag as the channel beans; claiming a lane whose
-     * {@code SummaryWriter} is not wired fails at boot.
-     */
+    // Delivery declarations must share bean enablement; unavailable declared capabilities fail at boot.
     @Override
     public ReviewContribution reviewContribution() {
         return new ReviewContribution(

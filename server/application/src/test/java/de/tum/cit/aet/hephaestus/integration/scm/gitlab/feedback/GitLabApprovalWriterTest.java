@@ -74,13 +74,7 @@ class GitLabApprovalWriterTest extends BaseUnitTest {
         when(tokenService.getAccessToken(1L)).thenReturn("glpat-secret");
     }
 
-    /**
-     * GitLab addresses a project by its percent-encoded full path, so the request line must carry
-     * {@code %2F} — not a bare slash (a different, non-existent route) and not {@code %252F}
-     * (double encoding, which resolves to no project). A live GitLab 19.1 instance answers 201 to
-     * exactly this request; the previous {@code mergeRequestApprove} GraphQL mutation does not
-     * exist there.
-     */
+    // GitLab project paths need one percent-encoding pass; a bare or double-encoded slash addresses another route.
     @Test
     void approvePostsToThePercentEncodedProjectPath() throws InterruptedException {
         stubScope();
@@ -94,10 +88,7 @@ class GitLabApprovalWriterTest extends BaseUnitTest {
         assertThat(request.getHeaders().get("Authorization")).isEqualTo("Bearer glpat-secret");
     }
 
-    /**
-     * GitLab answers 401 when the token's user may not approve the merge request — most often
-     * because it authored it, which is permanent rather than retryable.
-     */
+    // GitLab uses 401 when a token owner cannot approve, including the author's permanent restriction.
     @Test
     void approveSurfacesTheReasonOnUnauthorized() {
         stubScope();

@@ -250,10 +250,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(authenticate(method, path, token).status()).isEqualTo(401);
     }
 
-    /**
-     * The practice programs run in the review's process, so the job's one token, scoped only to the proxy, reaches
-     * the review's model, every direct slot and admission.
-     */
     @ParameterizedTest
     @ValueSource(
             strings = {
@@ -454,10 +450,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    /**
-     * Cohere bills a rerank in search units and reports no tokens. The row keeps them, and the attempt's search unit
-     * limit refuses the next call once the committed calls reach it, whatever their tokens.
-     */
     @Test
     void shouldCountTheSearchUnitsAndRefuseAtTheirLimitWhenCohereBillsReranksInThem() throws Exception {
         try (MockWebServer upstream = new MockWebServer()) {
@@ -492,10 +484,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    /**
-     * A chat call's cached prompt keeps its own bucket on the practice row and in the job's counters, so the ledger
-     * prices it at the cache rate. The attempt token limit still counts the whole prompt.
-     */
     @Test
     void shouldKeepTheCachedShareApartWhenAPracticeScriptChatCallReadsTheCache() throws Exception {
         try (MockWebServer upstream = new MockWebServer()) {

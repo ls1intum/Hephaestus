@@ -64,10 +64,6 @@ if (!code || codePath === undefined || codePath === null) {
 	throw new Error("The review fixtures must contain a problem cited on the diff");
 }
 
-/**
- * A place is named as the result's sheet names it: a file and its lines for code, and the object's
- * name for anything else. Only a passage from before the change names its side.
- */
 export const Places: Story = {
 	args: {
 		state: {

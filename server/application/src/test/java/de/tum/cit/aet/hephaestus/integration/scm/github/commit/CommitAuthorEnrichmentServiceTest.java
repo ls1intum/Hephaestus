@@ -222,8 +222,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             // alice@example.com can be resolved by email, unknown@personal.com cannot
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
                     .thenReturn(List.of("alice@example.com", "unknown@personal.com"))
-                    .thenReturn(List.of("unknown@personal.com")); // unknown still unresolved after
-            // email
+                    .thenReturn(List.of("unknown@personal.com")); 
             when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L))
                     .thenReturn(List.of())
                     .thenReturn(List.of());

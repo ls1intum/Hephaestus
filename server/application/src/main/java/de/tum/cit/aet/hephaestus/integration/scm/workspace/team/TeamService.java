@@ -42,12 +42,6 @@ public class TeamService {
         this.workspaceMembershipService = workspaceMembershipService;
     }
 
-    /**
-     * Gets all teams in a workspace with workspace-scoped settings applied.
-     *
-     * @param workspace the workspace to get teams for
-     * @return list of teams with their members, permissions, and workspace-scoped settings
-     */
     @Transactional(readOnly = true)
     public List<TeamInfoDTO> getAllTeams(Workspace workspace) {
         WorkspaceTeamScope scope = workspaceTeamScopeResolver.resolve(workspace).orElse(null);
@@ -73,15 +67,6 @@ public class TeamService {
                 .toList();
     }
 
-    /**
-     * Updates the visibility of a team in workspace activity. Uses workspace-scoped settings for
-     * multi-workspace support.
-     *
-     * @param workspace the workspace the team belongs to
-     * @param teamId the ID of the team to update
-     * @param hidden whether to hide the team from workspace activity
-     * @return true if the team was updated, false if not found or not in workspace
-     */
     @Transactional
     public boolean updateTeamVisibility(Workspace workspace, Long teamId, Boolean hidden) {
         return workspaceTeamSettingsService
@@ -89,17 +74,6 @@ public class TeamService {
                 .isPresent();
     }
 
-    /**
-     * Updates the visibility of a repository for a team's contributions. Uses workspace-scoped
-     * settings for multi-workspace support.
-     *
-     * @param workspace the workspace the team belongs to
-     * @param teamId the ID of the team
-     * @param repositoryId the ID of the repository
-     * @param hiddenFromContributions whether to hide the repository from contributions
-     * @return true if the permission was updated, false if not found or not in workspace
-     * @throws IllegalArgumentException if hiddenFromContributions is null
-     */
     @Transactional
     public boolean updateRepositoryVisibility(
             Workspace workspace, Long teamId, Long repositoryId, Boolean hiddenFromContributions) {
@@ -113,14 +87,7 @@ public class TeamService {
                 .isPresent();
     }
 
-    /**
-     * Gets a team by ID, ensuring it belongs to the specified workspace.
-     *
-     * @param workspace the workspace the team must belong to
-     * @param teamId the ID of the team
-     * @return the team entity
-     * @throws EntityNotFoundException if the team is not found or not in workspace
-     */
+    /** Refuses a team that does not belong to the workspace with {@link EntityNotFoundException}. */
     @Transactional(readOnly = true)
     public Team getTeam(Workspace workspace, Long teamId) {
         return teamRepository
@@ -129,15 +96,7 @@ public class TeamService {
                 .orElseThrow(() -> new EntityNotFoundException("Team", teamId));
     }
 
-    /**
-     * Gets a team repository permission, ensuring the team belongs to the specified workspace.
-     *
-     * @param workspace the workspace the team must belong to
-     * @param teamId the ID of the team
-     * @param repositoryId the ID of the repository
-     * @return the permission entity
-     * @throws EntityNotFoundException if the permission is not found or team not in workspace
-     */
+    /** Refuses a missing permission or a team outside the workspace with {@link EntityNotFoundException}. */
     @Transactional(readOnly = true)
     public TeamRepositoryPermission getTeamRepositoryPermission(Workspace workspace, Long teamId, Long repositoryId) {
         return permissionRepository
@@ -169,25 +128,11 @@ public class TeamService {
         return TeamInfoDTO.fromTeamWithScopeSettings(team, isHidden, workspaceLabels, hiddenRepoIds, hiddenMemberIds);
     }
 
-    /**
-     * Checks if a team is hidden in a specific workspace.
-     *
-     * @param workspace the workspace
-     * @param teamId the team ID
-     * @return true if the team is hidden in this workspace
-     */
     @Transactional(readOnly = true)
     public boolean isTeamHidden(Workspace workspace, Long teamId) {
         return workspaceTeamSettingsService.isTeamHidden(workspace.getId(), teamId);
     }
 
-    /**
-     * Gets the label filters for a team in a workspace.
-     *
-     * @param workspace the workspace
-     * @param teamId the team ID
-     * @return set of labels configured as filters for this team in this workspace
-     */
     @Transactional(readOnly = true)
     public Set<Label> getTeamLabelFilters(Workspace workspace, Long teamId) {
         return workspaceTeamSettingsService.getTeamLabelFilters(workspace.getId(), teamId);

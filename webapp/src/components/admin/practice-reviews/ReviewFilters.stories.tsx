@@ -75,10 +75,7 @@ export const OneMatch: Story = {
 	},
 };
 
-/**
- * No total yet. The count renders nothing rather than a zero, because a zero here would announce an
- * empty list a moment before the full one arrives.
- */
+// A pending count must not announce zero before the loaded list arrives.
 export const CountNotInYet: Story = {
 	args: { total: undefined },
 	play: async ({ canvas }) => {

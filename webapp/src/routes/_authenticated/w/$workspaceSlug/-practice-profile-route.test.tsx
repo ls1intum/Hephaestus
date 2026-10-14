@@ -508,11 +508,11 @@ describe("practice profile route", () => {
 		// The filter belonged to the review it replaced; the page's own tab is the reader's still.
 		expect(router.state.location.search.reviewPractice).toBeUndefined();
 		expect(router.state.location.search.feedback).toBe("resolved");
-		const table = await screen.findByRole(
-			"table",
-			{ name: "Every practice in this review" },
-			SETTLE_WAIT,
-		);
+		const table = await waitFor(() => {
+			const loaded = screen.getByRole("table", { name: "Every practice in this review" });
+			expect(loaded.getAttribute("aria-busy")).not.toBe("true");
+			return loaded;
+		}, ROUTE_RENDER_WAIT);
 		await within(table).findByRole("button", { name: "Explain each change" }, SETTLE_WAIT);
 	});
 
@@ -853,13 +853,14 @@ describe("own result", () => {
 				} satisfies ResultDetail),
 			),
 		);
-		renderRouteAtWithRouter(`${OPEN_REVIEW_PAGE}&reviewResult=${reused.id}`);
+		const { router } = renderRouteAtWithRouter(`${OPEN_REVIEW_PAGE}&reviewResult=${reused.id}`);
 
 		await screen.findByText(
 			"The caching change hides inside the package move",
 			undefined,
-			ROUTE_RENDER_WAIT,
+			SETTLE_WAIT,
 		);
+		expect(router.state.location.search.reviewResult).toBe(reused.id);
 		expect(screen.queryByText(/PracticeCatalogLoader/u)).toBeNull();
 		expect(screen.queryByText(/so a reviewer cannot tell which hunk/u)).toBeNull();
 	});

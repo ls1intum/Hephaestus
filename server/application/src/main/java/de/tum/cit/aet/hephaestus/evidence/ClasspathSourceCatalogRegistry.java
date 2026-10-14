@@ -17,16 +17,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.MapperFeature;
-import tools.jackson.databind.cfg.CoercionAction;
-import tools.jackson.databind.cfg.CoercionInputShape;
-import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.type.LogicalType;
 
 @Component
 public final class ClasspathSourceCatalogRegistry {
@@ -35,37 +31,32 @@ public final class ClasspathSourceCatalogRegistry {
     static final String CATALOG_RESOURCE = "contracts/source-use/" + CURRENT_VERSION_VALUE + "/catalog.json";
     static final String USE_DECISIONS_RESOURCE =
             "contracts/source-use/" + CURRENT_VERSION_VALUE + "/source-use-decisions.json";
-    private static final JsonMapper STRICT_MAPPER = strict(JsonMapper.builder().build());
     private final SourceCatalog catalog;
     private final String catalogDigest;
     private final Map<String, SourceUseDecision> useDecisions;
     private final Clock clock;
 
+    @Autowired
     public ClasspathSourceCatalogRegistry(JsonMapper objectMapper, Clock clock) {
-        this.clock = clock;
-        var mapper = strict(objectMapper);
-        byte[] catalogBytes = readBytes(CATALOG_RESOURCE);
-        this.catalog = checkVersion(mapper.readValue(catalogBytes, SourceCatalog.class));
-        this.catalogDigest = sha256(catalogBytes);
-        this.useDecisions = decisions(mapper.readValue(readBytes(USE_DECISIONS_RESOURCE), UseDecisions.class));
-        validateUseDecisions(catalog, useDecisions);
+        this(
+                objectMapper,
+                clock,
+                new ClassPathResource(CATALOG_RESOURCE),
+                new ClassPathResource(USE_DECISIONS_RESOURCE));
     }
 
-    private static JsonMapper strict(JsonMapper mapper) {
-        return mapper.rebuild()
-                .enable(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
-                .enable(
-                        DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
-                        DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES,
-                        DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+    ClasspathSourceCatalogRegistry(
+            JsonMapper objectMapper, Clock clock, Resource catalogResource, Resource decisionsResource) {
+        this.clock = clock;
+        var mapper = StrictJson.configure(objectMapper.rebuild())
+                .enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)
                 .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
-                .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
-                .withCoercionConfig(
-                        LogicalType.Textual,
-                        coercion -> coercion.setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
-                                .setCoercion(CoercionInputShape.Float, CoercionAction.Fail)
-                                .setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail))
                 .build();
+        byte[] catalogBytes = readBytes(catalogResource);
+        this.catalog = checkVersion(mapper.readValue(catalogBytes, SourceCatalog.class));
+        this.catalogDigest = sha256(catalogBytes);
+        this.useDecisions = decisions(mapper.readValue(readBytes(decisionsResource), UseDecisions.class));
+        validateUseDecisions(catalog, useDecisions);
     }
 
     public SourceCatalog current() {
@@ -94,11 +85,6 @@ public final class ClasspathSourceCatalogRegistry {
         return sources;
     }
 
-    public List<SourceKind> requireDefaultSourcesFor(String itemKind) {
-        requireSourcesFor(itemKind);
-        return catalog.defaultSourcesFor(itemKind);
-    }
-
     public SourceUseDecision requireUseDecision(String decisionId) {
         SourceUseDecision decision = useDecisions.get(decisionId);
         if (decision == null) throw new IllegalArgumentException("Unknown source-use decision: " + decisionId);
@@ -113,18 +99,10 @@ public final class ClasspathSourceCatalogRegistry {
                 .min(Instant::compareTo);
     }
 
-    static SourceCatalog parse(JsonNode root) {
-        return checkVersion(STRICT_MAPPER.treeToValue(root, SourceCatalog.class));
-    }
-
     private static SourceCatalog checkVersion(SourceCatalog catalog) {
         if (!CURRENT_VERSION.equals(catalog.version()))
             throw new IllegalStateException("Catalog resource has unexpected version: " + catalog.version());
         return catalog;
-    }
-
-    static Map<String, SourceUseDecision> parseUseDecisions(JsonNode root) {
-        return decisions(STRICT_MAPPER.treeToValue(root, UseDecisions.class));
     }
 
     private static Map<String, SourceUseDecision> decisions(UseDecisions document) {
@@ -177,8 +155,8 @@ public final class ClasspathSourceCatalogRegistry {
         }
     }
 
-    private static byte[] readBytes(String resource) {
-        try (InputStream input = new ClassPathResource(resource).getInputStream()) {
+    private static byte[] readBytes(Resource resource) {
+        try (InputStream input = resource.getInputStream()) {
             return input.readAllBytes();
         } catch (IOException exception) {
             throw new IllegalStateException("Cannot read source contract resource: " + resource, exception);

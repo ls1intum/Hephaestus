@@ -24,7 +24,8 @@ export function useReviewLineage(
 		queryFn: target === undefined ? skipToken : options.queryFn,
 		retry: retryUnlessNotFound,
 		refetchInterval: ({ state }) =>
-			state.status === "success" && state.data?.nodes.some(
+			state.status === "success" &&
+			state.data?.nodes.some(
 				(node) => node.review !== null && isActiveReview(node.review.status),
 			) === true
 				? ACTIVE_REVIEW_POLL_MS

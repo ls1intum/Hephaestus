@@ -161,8 +161,7 @@ public class LinkedWorkItemContentSource {
                         : issueRepository.findByRepositoryIdAndNumber(repositoryId, number);
                 if (resolved.isEmpty()) {
                     // Found, and pointing at an issue this repository does not mirror: another
-                    // repository
-                    // or an external tracker.
+                    // repository or an external tracker.
                     unresolved.add(number);
                     continue;
                 }
@@ -181,9 +180,7 @@ public class LinkedWorkItemContentSource {
             files.put(OUTPUT_FILE, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(root));
             log.info("Linked work items: wrote {} item(s), unresolved={}", items.size(), unresolved.size());
             return new CaptureContribution(
-                    files, // Always partial: a number scan cannot establish there is no link the
-                    // work
-                    // never mentioned.
+                    files, // Number references cannot prove that all linked work was found.
                     Map.of(KIND, SourceCompleteness.PARTIAL),
                     Map.of(),
                     Map.of(),
@@ -221,10 +218,6 @@ public class LinkedWorkItemContentSource {
         return text(issue).getBytes(StandardCharsets.UTF_8);
     }
 
-    /**
-     * The same staged issue-file projection capture wrote, compared only for provider closing
-     * candidates.
-     */
     public static Optional<Boolean> capturedClosingMaterialMatches(
             List<SourceCapture> sources, List<Issue> closingIssues) {
         var capture = sources.stream()
@@ -278,9 +271,9 @@ public class LinkedWorkItemContentSource {
             }
         }
         // The provider's own rollup when it syncs one (GitHub); otherwise counted from the children
-        // this
-        // repository stores, since GitLab's sync links a child to its parent and never totals them.
-        // `subIssuesSource` says which, so a reader knows whether the count is the provider's word.
+        // this repository stores, since GitLab's sync links a child to its parent and never totals
+        // them. `subIssuesSource` says which, so a reader knows whether the count is the provider's
+        // word.
         if (issue.getSubIssuesTotal() != null && issue.getSubIssuesCompleted() != null) {
             node.put("subIssuesTotal", issue.getSubIssuesTotal());
             node.put("subIssuesCompleted", issue.getSubIssuesCompleted());

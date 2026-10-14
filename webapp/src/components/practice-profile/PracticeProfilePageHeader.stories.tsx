@@ -70,11 +70,6 @@ export const SomeStandingsAbsent: Story = {
 	},
 };
 
-/**
- * Nothing reviewed yet: every practice stands at "Not observed", so the ring is one grey arc and
- * the legend one line, and the card still names its destination. With no review there is nothing
- * to open, so the chip is a plain badge rather than a link onto an empty list.
- */
 export const NothingObservedYet: Story = {
 	args: {
 		latestReview: undefined,

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -55,5 +56,23 @@ class ScmFileVersionsTest extends BaseUnitTest {
                 .isEqualTo(first);
         assertThatThrownBy(() -> versions.version(SELF.path(), BLOB, SELF.mode(), List.of("../**"), List.of(), COMMIT))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldParseBothGitObjectFormatsAndRejectMalformedFileVersions() {
+        String hash = "d".repeat(64);
+        for (int length : List.of(40, 64)) {
+            String blob = "c".repeat(length);
+            assertThat(ScmFileVersions.parse(new ItemVersion("scm.file:v1:" + blob + ":" + hash, COMMIT)))
+                    .contains(new ScmFileVersions.Parsed(blob, hash));
+        }
+        for (String value : List.of(
+                "scm.file:v2:" + BLOB + ":" + hash,
+                "scm.issue:v1:" + BLOB + ":" + hash,
+                "scm.file:v1:bad:" + hash,
+                "scm.file:v1:" + BLOB + ":bad",
+                "scm.file:v1:" + BLOB + ":" + hash + ":extra")) {
+            assertThat(ScmFileVersions.parse(new ItemVersion(value, COMMIT))).isEmpty();
+        }
     }
 }

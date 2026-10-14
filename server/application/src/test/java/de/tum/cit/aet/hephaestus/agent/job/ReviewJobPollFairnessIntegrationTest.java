@@ -125,10 +125,6 @@ class ReviewJobPollFairnessIntegrationTest extends BaseIntegrationTest {
         assertThat(jobRepository.findQueuedIdsOldestFirst(10)).contains(jobId);
     }
 
-    /**
-     * A workspace may bind one slot per AI tier for a purpose; a job counts against the slot of the tier its
-     * snapshot froze, the partition the claim enforces. Whether the other slot is enabled does not matter here.
-     */
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void shouldSelectAQueuedReviewWhenItsWorkspaceBindsOneSlotPerTier(boolean otherSlotEnabled) {

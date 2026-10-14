@@ -84,11 +84,6 @@ public record WorkResolution(List<Work> cleanWork, @Nullable Instant resolvedAt,
         }
     }
 
-    /**
-     * One piece of reviewed work as the resolution and profile rules see it: its identity, the run that
-     * reviewed it and when. The job id is what later resolves the label and the link; the rules themselves
-     * never need them.
-     */
     public record Work(ItemKind kind, long itemId, UUID reviewId, Instant at) {
         public static Work of(ResultView view) {
             return new Work(

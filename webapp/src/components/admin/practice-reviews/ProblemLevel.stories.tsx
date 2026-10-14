@@ -10,10 +10,6 @@ import { evidenceHiddenProblemDetail, reviewProblemDetail } from "./fixtures";
 import { ProblemLevel } from "./ProblemLevel";
 import { problemLevel } from "./review-levels";
 
-/**
- * One problem under a Not met result, opened from the Problems list or the trace: its severity, where
- * it is, the passages that show it and the next step. It links to its result, which carries the marks.
- */
 const meta = {
 	component: ProblemLevel,
 	parameters: { layout: "fullscreen" },
@@ -50,7 +46,6 @@ export const Default: Story = {
 	},
 };
 
-/** Hidden evidence says so, and never stands in an invented reason or passage. */
 export const EvidenceHidden: Story = {
 	args: { problem: { status: "ready", problem: evidenceHiddenProblemDetail } },
 	play: async () => {

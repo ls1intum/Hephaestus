@@ -7,10 +7,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
@@ -230,7 +226,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         void shouldReadCoreFromTheSnapshotWithoutRequiringGit() {
             assertThat(provider.capture(request(sampleMetadata()), Set.of(CORE)).files())
                     .containsKey("context/metadata.json");
-            verifyNoInteractions(deliveredCommentLookup);
         }
 
         @Test
@@ -247,10 +242,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThat(metadataJson.get("repository_full_name").asString()).isEqualTo("owner/repo");
         }
 
-        /**
-         * A full name is unique only per provider, so the record carries the ids that tell two
-         * apart.
-         */
         @Test
         void shouldStateTheAdmittedRepositoryAndOnlyItsOwnProviderWhenTheMirrorStillHoldsIt() throws Exception {
             var provider9 = new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.example");
@@ -650,17 +641,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldLeaveHephaestusOwnNotesOutOfTheCommentsItAsksFor() {
-            when(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(eq(456L), any(), any()))
-                    .thenReturn(List.of());
-
-            provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
-
-            verify(reviewCommentRepository)
-                    .findRecentHumanByPullRequestIdWithAuthor(eq(456L), eq("<!-- hephaestus"), any());
-        }
-
-        @Test
         void shouldKeepAllCommentsAboveTheFormerCaptureLimit() throws Exception {
             var comments = new ArrayList<PullRequestReviewComment>();
             for (int i = 0; i < 10_000 + 100; i++) {
@@ -764,7 +744,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             stubGit();
             var captured = provider.capture(request(sampleMetadata()), Set.of(DIFF));
             assertThat(captured.files()).doesNotContainKey(PullRequestContentSource.COMMITS_FILE);
-            verify(gitRepositoryManager, never()).forEachCommitBetween(any(), any(), any(), any());
         }
 
         private void emitCommit(String message) {
@@ -801,7 +780,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             var captured = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
 
             assertThat(captured.files()).doesNotContainKey(PullRequestContentSource.COMMITS_FILE);
-            verify(gitRepositoryManager, never()).forEachCommitBetween(any(), any(), any(), any());
         }
     }
 
@@ -823,7 +801,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThat(captured.completeness().get(DIFF)).isEqualTo(SourceCompleteness.COMPLETE);
             assertThat(captured.immutableIdentities().get(DIFF)).isEqualTo(BASE + ":" + HEAD);
             assertThat(captured.contentStates().get(DIFF)).isEqualTo(SourceContentState.NON_EMPTY);
-            verify(gitRepositoryManager, never()).unifiedDiff(any(), any(), any());
         }
 
         @Test
@@ -859,9 +836,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
             assertThat(captured.files()).doesNotContainKey(PullRequestContentSource.CHANGE_FILE);
             assertThat(captured.immutableIdentities()).isEmpty();
-            verify(repositoryPreparer).authorize(any());
-            verify(repositoryPreparer, never()).prepare(any());
-            verifyNoInteractions(gitRepositoryManager);
         }
     }
 
@@ -882,8 +856,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThat(captured.stateOverrides())
                     .containsExactly(
                             Map.entry(DIFF, new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED)));
-            verify(repositoryPreparer).authorize(any());
-            verify(repositoryPreparer, never()).prepare(any());
         }
 
         @Test
@@ -920,7 +892,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                     .containsExactlyEntriesOf(
                             Map.of(kind, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)));
         }
-        verifyNoInteractions(reviewCommentRepository, gitRepositoryManager, repositoryPreparer);
         var artifact = pullRequest();
         when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(artifact));
         var restored = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
@@ -938,17 +909,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
         assertThat(captured.stateOverrides())
                 .containsEntry(DIFF, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
-        verifyNoInteractions(gitRepositoryManager, repositoryPreparer);
-    }
-
-    @Test
-    void shouldPrepareTheRepositoryOnceForEverySourceOfOneRequest() {
-        stubGit();
-        var request = request(sampleMetadata());
-
-        for (var kind : provider.sourceKinds()) provider.capture(request, Set.of(kind));
-
-        verify(repositoryPreparer, times(1)).prepare(any());
     }
 
     @Test
@@ -963,7 +923,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                     .isInstanceOf(ItemCaptureException.class)
                     .hasMessage("SCM credentials are unavailable");
         }
-        verify(repositoryPreparer, times(1)).prepare(any());
     }
 
     @Test

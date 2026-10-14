@@ -9,9 +9,9 @@ import java.io.InputStream;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.HashMap;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -49,10 +49,12 @@ class ClasspathSourceCatalogRegistryTest extends BaseUnitTest {
     void shouldRejectUnknownFieldsWhenAResourceAddsUnreviewedSemantics() throws IOException {
         var catalog = read(ClasspathSourceCatalogRegistry.CATALOG_RESOURCE);
         catalog.put("futureMeaning", true);
-        assertThatThrownBy(() -> ClasspathSourceCatalogRegistry.parse(catalog)).hasMessageContaining("futureMeaning");
+        assertThatThrownBy(() -> registry(catalog, read(ClasspathSourceCatalogRegistry.USE_DECISIONS_RESOURCE)))
+                .hasMessageContaining("futureMeaning");
         catalog.remove("futureMeaning");
         ((ObjectNode) catalog.path("sources").get(0).path("citation")).put("futureMeaning", true);
-        assertThatThrownBy(() -> ClasspathSourceCatalogRegistry.parse(catalog)).hasMessageContaining("futureMeaning");
+        assertThatThrownBy(() -> registry(catalog, read(ClasspathSourceCatalogRegistry.USE_DECISIONS_RESOURCE)))
+                .hasMessageContaining("futureMeaning");
     }
 
     @Test
@@ -60,21 +62,21 @@ class ClasspathSourceCatalogRegistryTest extends BaseUnitTest {
         var catalog = read(ClasspathSourceCatalogRegistry.CATALOG_RESOURCE);
         var source = (ObjectNode) catalog.path("sources").get(0);
         source.remove("defaultRequirement");
-        assertThatThrownBy(() -> ClasspathSourceCatalogRegistry.parse(catalog))
+        assertThatThrownBy(() -> registry(catalog, read(ClasspathSourceCatalogRegistry.USE_DECISIONS_RESOURCE)))
                 .hasMessageContaining("defaultRequirement");
         source.put("defaultRequirement", "true");
-        assertThatThrownBy(() -> ClasspathSourceCatalogRegistry.parse(catalog))
+        assertThatThrownBy(() -> registry(catalog, read(ClasspathSourceCatalogRegistry.USE_DECISIONS_RESOURCE)))
                 .hasMessageContaining("defaultRequirement");
     }
 
     @Test
     void shouldRejectAnotherVersionWhenResourcesDoNotMatchTheShippedContract() throws IOException {
         var catalog = read(ClasspathSourceCatalogRegistry.CATALOG_RESOURCE).put("version", "1.0.0");
-        assertThatThrownBy(() -> ClasspathSourceCatalogRegistry.parse(catalog))
+        assertThatThrownBy(() -> registry(catalog, read(ClasspathSourceCatalogRegistry.USE_DECISIONS_RESOURCE)))
                 .hasMessageContaining("unexpected version");
         var decisions =
                 read(ClasspathSourceCatalogRegistry.USE_DECISIONS_RESOURCE).put("contractVersion", "1.0.0");
-        assertThatThrownBy(() -> ClasspathSourceCatalogRegistry.parseUseDecisions(decisions))
+        assertThatThrownBy(() -> registry(read(ClasspathSourceCatalogRegistry.CATALOG_RESOURCE), decisions))
                 .hasMessageContaining("unexpected contract version");
     }
 
@@ -83,27 +85,24 @@ class ClasspathSourceCatalogRegistryTest extends BaseUnitTest {
         var catalog = read(ClasspathSourceCatalogRegistry.CATALOG_RESOURCE);
         var sources = (ArrayNode) catalog.path("sources");
         sources.add(sources.get(0).deepCopy());
-        assertThatThrownBy(() -> ClasspathSourceCatalogRegistry.parse(catalog))
+        assertThatThrownBy(() -> registry(catalog, read(ClasspathSourceCatalogRegistry.USE_DECISIONS_RESOURCE)))
                 .hasMessageContaining("Duplicate source kind");
         var document = read(ClasspathSourceCatalogRegistry.USE_DECISIONS_RESOURCE);
         var decisions = (ArrayNode) document.path("decisions");
         decisions.add(decisions.get(0).deepCopy());
-        assertThatThrownBy(() -> ClasspathSourceCatalogRegistry.parseUseDecisions(document))
+        assertThatThrownBy(() -> registry(read(ClasspathSourceCatalogRegistry.CATALOG_RESOURCE), document))
                 .hasMessageContaining("Duplicate source-use decision");
     }
 
     @Test
     void shouldRejectMissingApprovalOrDecisionWhenGovernanceIsIncomplete() throws IOException {
-        var catalog = ClasspathSourceCatalogRegistry.parse(read(ClasspathSourceCatalogRegistry.CATALOG_RESOURCE));
+        var catalog = read(ClasspathSourceCatalogRegistry.CATALOG_RESOURCE);
         var document = read(ClasspathSourceCatalogRegistry.USE_DECISIONS_RESOURCE);
         ((ObjectNode) document.path("decisions").get(0)).putNull("reviewer");
-        assertThatThrownBy(() -> ClasspathSourceCatalogRegistry.parseUseDecisions(document))
-                .hasMessageContaining("requires review metadata");
-        var decisions = new HashMap<>(ClasspathSourceCatalogRegistry.parseUseDecisions(
-                read(ClasspathSourceCatalogRegistry.USE_DECISIONS_RESOURCE)));
-        decisions.remove(decisions.keySet().iterator().next());
-        assertThatThrownBy(() -> ClasspathSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
-                .hasMessageContaining("match the catalog exactly");
+        assertThatThrownBy(() -> registry(catalog, document)).hasMessageContaining("requires review metadata");
+        var incomplete = read(ClasspathSourceCatalogRegistry.USE_DECISIONS_RESOURCE);
+        ((ArrayNode) incomplete.path("decisions")).remove(0);
+        assertThatThrownBy(() -> registry(catalog, incomplete)).hasMessageContaining("match the catalog exactly");
     }
 
     @Test
@@ -117,6 +116,14 @@ class ClasspathSourceCatalogRegistryTest extends BaseUnitTest {
                 .isFalse();
         assertThat(decision.permitsAt(clock.instant(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isFalse();
+    }
+
+    private ClasspathSourceCatalogRegistry registry(ObjectNode catalog, ObjectNode decisions) {
+        return new ClasspathSourceCatalogRegistry(
+                mapper,
+                clock,
+                new ByteArrayResource(mapper.writeValueAsBytes(catalog)),
+                new ByteArrayResource(mapper.writeValueAsBytes(decisions)));
     }
 
     private ObjectNode read(String resource) throws IOException {

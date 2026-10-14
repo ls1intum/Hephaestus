@@ -193,11 +193,7 @@ export const CriteriaIsMarkdown: Story = {
 	},
 };
 
-/**
- * The decision being made is "do we want this practice", so the rationale leads. `criteria` answers a
- * different question — how the model judges — in text addressed to the model, so it sits behind a
- * disclosure rather than above the reason to adopt.
- */
+// Adoption needs the rationale first; model instructions belong behind the criteria disclosure.
 export const RationaleLeadsTheRuleFollows: Story = {
 	play: async ({ canvas }) => {
 		const rationale = canvas.getByText(realPracticeDefinition.guidance.whyItMatters);

@@ -171,10 +171,6 @@ export const AllOff: Story = {
 	},
 };
 
-/**
- * "Expand all" opens every step's facts and
- * the legend. "Collapse all" folds them again.
- */
 export const ExpandAll: Story = {
 	play: async ({ userEvent }) => {
 		const element = await settledDrawerPanel();

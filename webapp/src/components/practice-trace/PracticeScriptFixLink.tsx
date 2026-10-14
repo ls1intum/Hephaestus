@@ -27,7 +27,7 @@ export function PracticeScriptFixLink({
 	practiceName,
 	fix,
 }: PracticeScriptFixLinkProps) {
-		// Place context after the visible label so speech control can match it (WCAG 2.5.3).
+	// Place context after the visible label so speech control can match it (WCAG 2.5.3).
 	const context =
 		practiceName === undefined ? null : (
 			<>

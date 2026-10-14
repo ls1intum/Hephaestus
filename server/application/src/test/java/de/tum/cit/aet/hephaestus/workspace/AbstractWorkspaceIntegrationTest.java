@@ -68,9 +68,6 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
         databaseTestUtils.cleanDatabase();
     }
 
-    /**
-     * Register the source that makes an activity fixture's monitored repositories authoritative.
-     */
     protected void connectActivitySource(Workspace workspace, IdentityProvider provider) {
         ConnectionConfig config =
                 switch (provider.getType()) {

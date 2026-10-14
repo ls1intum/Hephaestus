@@ -185,11 +185,6 @@ const MARKED_PRACTICES: ReviewOverview = {
 	],
 };
 
-/**
- * "Mostly not applicable" from 90 % does not apply, "Often undecided" from 30 % could not determine, each from
- * 20 results: the marked practices lead, the stronger marker first, and "Busiest first" puts
- * the table back in the server's order.
- */
 export const NeedsALookFirst: Story = {
 	args: {
 		state: readyReviewOverview(MARKED_PRACTICES),

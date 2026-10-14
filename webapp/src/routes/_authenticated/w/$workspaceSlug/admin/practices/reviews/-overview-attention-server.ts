@@ -8,10 +8,10 @@ import {
 	practiceReviewTiming,
 } from "@/components/admin/practice-reviews/fixtures";
 import { reviewRangeStart } from "@/components/admin/practice-reviews/review-range";
-import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { server } from "@/mocks/server";
+import { reviewHandlers } from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
 
-export const OVERVIEW = "/w/acme/admin/practices/reviews";
+export const OVERVIEW = "/w/acme/admin/practices/reviews/overview";
 
 /** The range: nothing queued or running, so nothing polls. */
 export const rangeOverview: ReviewOverview = {

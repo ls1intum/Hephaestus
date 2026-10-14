@@ -344,11 +344,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * A writer that continues a review is given the checkout its capture had: the same tree, limits
-     * and exclusions, from the original commits alone, however the branches moved since. Nothing
-     * current comes with it.
-     */
     @Test
     void shouldRestoreTheOriginalCheckoutFromItsOwnCommitsAfterTheBranchesMoved() throws Exception {
         try (Git git = repository()) {

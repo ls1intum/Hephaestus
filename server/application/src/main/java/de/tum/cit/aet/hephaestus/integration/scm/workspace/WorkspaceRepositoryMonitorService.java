@@ -366,11 +366,6 @@ public class WorkspaceRepositoryMonitorService {
         return workspaceOpt;
     }
 
-    /**
-     * Creates a Repository entity and corresponding RepositoryToMonitor from a provisioning
-     * snapshot (webhook metadata). Idempotent: an existing repository is updated with the snapshot
-     * data; an existing monitor is left alone.
-     */
     @Transactional
     public void ensureRepositoryAndMonitorFromSnapshot(
             long installationId, ProvisioningListener.RepositorySnapshot snapshot) {

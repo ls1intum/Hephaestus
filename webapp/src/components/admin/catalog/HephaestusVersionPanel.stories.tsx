@@ -193,7 +193,6 @@ export const NarrowViewport: Story = {
 	},
 };
 
-/** The default's visual shows as its picture, never as markup; its guide as the Markdown it ships. */
 export const DefaultWithVisualAndGuide: Story = {
 	args: {
 		status: status({ state: "EDITED_HERE" }),

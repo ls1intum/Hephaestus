@@ -125,12 +125,7 @@ public class LlmModelResolver {
         return null;
     }
 
-    /**
-     * Identifies WHICH connection row funds a config's binding, without exposing any credential
-     * material. Frozen into {@link ConfigSnapshot} so the proxy
-     * can re-resolve the live credential for an in-flight job without re-reading the config's
-     * (possibly since-changed) current binding.
-     */
+    /** Freeze the connection id without its credential so {@link ConfigSnapshot} can resolve a live credential for the same provider. */
     public record ConnectionRef(
             @Nullable UsageFundingSource scope,
             @Nullable Long connectionId,

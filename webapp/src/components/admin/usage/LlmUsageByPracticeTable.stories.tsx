@@ -42,7 +42,6 @@ async function practiceOrder(canvas: StoryContext["canvas"]): Promise<string[]> 
 		.map((row) => within(row).getAllByRole("cell")[0]?.textContent ?? "");
 }
 
-/** Per-practice spend is already included in review totals; it must not be added again. */
 const meta = {
 	component: LlmUsageByPracticeTable,
 	parameters: { layout: "padded" },
@@ -175,7 +174,6 @@ export const OwnProviderAbsent: Story = {
 	},
 };
 
-/** Missing rerank usage is unknown cost; zero tokens cannot establish a free run. */
 export const UnpricedReviews: Story = {
 	decorators: [
 		(Story) => (
@@ -249,7 +247,6 @@ export const NotACurrentPractice: Story = {
 	},
 };
 
-/** Use server totals: one review can run several scripts and still counts once. */
 export const Totals: Story = {
 	play: async ({ canvas }) => {
 		const footer = await rowNamed(canvas, /^Total/u);
@@ -316,11 +313,7 @@ export const Loading: Story = {
 	},
 };
 
-/**
- * WCAG 2.2 SC 1.4.10: the table takes the data-table exception and scrolls inside its own box; the
- * page itself never scrolls sideways. Token and call counts give way below `lg`, and the practice
- * column stays in view while the money scrolls under it.
- */
+// WCAG 1.4.10 permits table scrolling inside its box; the page must remain within the viewport.
 export const MobileReflow: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },

@@ -149,7 +149,7 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
                 savedWorkspace,
                 IntegrationKind.GITHUB,
                 "pat",
-                new ConnectionConfig.GitHubPatConfig(accountLogin, /* serverUrl */ null, Set.of()),
+                new ConnectionConfig.GitHubPatConfig(accountLogin,  null, Set.of()),
                 token,
                 "bootstrap-pat-workspace-" + savedWorkspace.getId());
 
@@ -503,9 +503,9 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
                 avatar,
                 htmlUrl,
                 User.Type.USER.name(),
-                null, // email
-                null, // createdAt
-                null // updatedAt
+                null, 
+                null, 
+                null 
                 );
         log.info(
                 "Upserted user for PAT workspace bootstrap: userLogin={}, nativeId={}",

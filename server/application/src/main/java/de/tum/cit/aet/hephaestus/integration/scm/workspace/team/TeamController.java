@@ -35,12 +35,6 @@ public class TeamController {
         this.workspaceResolver = workspaceResolver;
     }
 
-    /**
-     * Get all teams in the workspace.
-     *
-     * @param workspaceContext the resolved workspace context
-     * @return list of teams with their members and permissions
-     */
     @GetMapping
     @Operation(summary = "List teams", description = "Returns all teams in the workspace organization")
     public ResponseEntity<List<TeamInfoDTO>> getAllTeams(WorkspaceContext workspaceContext) {
@@ -50,15 +44,7 @@ public class TeamController {
         return ResponseEntity.ok(teams);
     }
 
-    /**
-     * Update team visibility in workspace activity. Hidden teams are not offered as a filter there.
-     *
-     * @param workspaceContext the resolved workspace context
-     * @param id the team ID
-     * @param hidden whether to hide the team (body parameter, preferred)
-     * @param hiddenParam whether to hide the team (query parameter, fallback)
-     * @return 200 OK on success, 404 if team not found
-     */
+    /** Hidden teams are excluded from workspace activity filters. */
     @PostMapping("/{id}/visibility")
     @RequireAtLeastWorkspaceAdmin
     @Operation(summary = "Update team visibility", description = "Show or hide a team in workspace activity")

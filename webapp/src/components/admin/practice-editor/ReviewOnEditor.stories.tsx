@@ -122,10 +122,7 @@ export const EveryItemType: Story = {
 	},
 };
 
-/**
- * An event saved before the item type stopped offering it, drawn from what was saved: the form
- * refuses to save while it is set, so it has to be here to be unticked.
- */
+// Retain unsupported selected events so the author can remove them before saving.
 export const AnEventTheItemTypeNoLongerOffers: Story = {
 	args: {
 		reviewOn: { events: ["scm.pull_request.opened", "scm.pull_request.reviewed"], state: {} },
@@ -165,12 +162,6 @@ export const Disabled: Story = {
 	},
 };
 
-/**
- * Clicking anywhere on a node toggles it, because the node is the label of a real checkbox.
- *
- * What each control reports is asserted as well as what it draws: the strip talks in event names
- * the reader never sees, so a node wired to its neighbour's name would still look right.
- */
 export const TogglingEventsAndStates: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		const strip = within(canvas.getByRole("group", { name: "Review on" }));

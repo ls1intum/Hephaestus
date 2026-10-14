@@ -32,7 +32,7 @@ public class PeopleRegistryService implements PeopleRegistry {
     public long ensureHuman(PersonIdentity identity, String displayName) {
         if (displayName.isBlank()) throw new IllegalArgumentException("A human display name is required");
         lockIdentity(identity);
-        var existing = identities.findByExactKey(identity.providerId(), identity.subject(), teamKey(identity));
+        var existing = identities.findByExactKey(identity.providerId(), identity.subject(), identity.teamKey());
         if (!existing.isEmpty()) {
             var row = existing.getFirst();
             if (row.getDisabledAt() != null) throw conflict("This identity is disabled.");
@@ -48,7 +48,7 @@ public class PeopleRegistryService implements PeopleRegistry {
         row.setAccount(account);
         row.setProviderId(identity.providerId());
         row.setProviderUserKey(identity.subject());
-        row.setTeamKey(teamKey(identity));
+        row.setTeamKey(identity.teamKey());
         row.setLinkedVia(Identity.LinkedVia.ROSTER);
         identities.saveAndFlush(row);
         return Objects.requireNonNull(account.getId());
@@ -58,7 +58,7 @@ public class PeopleRegistryService implements PeopleRegistry {
     @Transactional
     public long claim(PersonIdentity identity) {
         lockIdentity(identity);
-        var row = identities.findByExactKey(identity.providerId(), identity.subject(), teamKey(identity)).stream()
+        var row = identities.findByExactKey(identity.providerId(), identity.subject(), identity.teamKey()).stream()
                 .findFirst()
                 .orElseThrow(() -> conflict("This identity has no account to claim."));
         var account = lockedOwner(row);
@@ -120,10 +120,6 @@ public class PeopleRegistryService implements PeopleRegistry {
 
     private void lockIdentity(PersonIdentity identity) {
         identityKeys.holdAndLock(List.of(identity));
-    }
-
-    private static String teamKey(PersonIdentity identity) {
-        return Objects.requireNonNullElse(identity.teamId(), "");
     }
 
     private static ResponseStatusException conflict(String message) {

@@ -129,7 +129,6 @@ public class MentorProxyCredentialRegistry {
                         entry.workspaceId()));
     }
 
-    /** Verifies the registered credential without reading routing or turn usage. */
     public Optional<AuthenticatedSession> authenticate(String token) {
         String hash = ReviewJob.computeTokenHash(token);
         Entry entry = byTokenHash.getIfPresent(hash);
@@ -139,7 +138,6 @@ public class MentorProxyCredentialRegistry {
     /** Non-secret, revocation-fenced handle for an authenticated mentor sandbox. */
     public record AuthenticatedSession(UUID sessionId, String credentialHash) {}
 
-    /** Resolves the current billed turn only when a model call needs its route. */
     public Optional<ProxyRouting> resolve(AuthenticatedSession session) {
         Entry entry = byTokenHash.getIfPresent(session.credentialHash());
         if (entry == null || !entry.sessionId().equals(session.sessionId())) return Optional.empty();

@@ -103,10 +103,6 @@ export const ConversationHasOneEvent: Story = {
 	},
 };
 
-/**
- * Reading a source whole is what lets the review say that something is missing from it. A practice
- * that wants a cheaper read at a different event is a second practice.
- */
 export const ReadingASourceWhole: Story = {
 	args: {
 		value: {

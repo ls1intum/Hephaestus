@@ -49,8 +49,11 @@ import {
 	reviewUsageTwoAttempts,
 	workspaceMembers,
 	workspacePractices,
-} from "./fixtures";
-import { type LineageKind, reviewLineage } from "./lineage-fixtures";
+} from "@/components/admin/practice-reviews/fixtures";
+import {
+	type LineageKind,
+	reviewLineage,
+} from "@/components/admin/practice-reviews/lineage-fixtures";
 
 const PAGE_SIZE = 25;
 

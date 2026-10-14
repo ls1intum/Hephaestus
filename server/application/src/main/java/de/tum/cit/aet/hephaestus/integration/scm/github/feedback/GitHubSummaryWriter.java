@@ -279,10 +279,6 @@ public class GitHubSummaryWriter implements SummaryWriter {
                         || e.contains("could not resolve"));
     }
 
-    /**
-     * A GitHub issue subject is the distinct {@code owner/repo/issues/N} form (see
-     * formatIssueSubjectId).
-     */
     static boolean isIssueSubject(String subjectExternalId) {
         return subjectExternalId != null && subjectExternalId.matches(".+/issues/\\d+");
     }
@@ -332,10 +328,6 @@ public class GitHubSummaryWriter implements SummaryWriter {
                 commentNodeId, response.field("addComment.commentEdge.node.url").getValue());
     }
 
-    /**
-     * Splits {@code "owner/repo#42"} (GitHub PR external-id convention used by the agent layer)
-     * into the three components needed by the GraphQL query.
-     */
     static PrCoordinates parseSubjectExternalId(String subjectExternalId) {
         if (subjectExternalId == null || subjectExternalId.isBlank()) {
             throw new FeedbackDeliveryException("subjectExternalId is required for GitHub PR feedback");

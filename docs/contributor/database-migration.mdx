@@ -58,15 +58,14 @@ You must start and remove the disposable database yourself.
 
 Use a fresh empty database for each drift check or draft operation.
 For ERD generation, reuse a disposable database only if its applied changelog has not changed.
-Clear `CI` and `GITHUB_ACTIONS` before a local run.
 Only CI mode uses `-PpackagedServer=true`.
 Local external mode compiles the current source.
 
 ```bash
-env -u CI -u GITHUB_ACTIONS node scripts/db-utils.ts check-drift --external-database
-env -u CI -u GITHUB_ACTIONS node scripts/db-utils.ts draft-changelog --external-database
-env -u CI -u GITHUB_ACTIONS node scripts/db-utils.ts generate-erd --external-database
-env -u CI -u GITHUB_ACTIONS node scripts/db-utils.ts draft-changelog --external-database --from-draft .context/<name>.xml
+node scripts/db-utils.ts check-drift --external-database
+node scripts/db-utils.ts draft-changelog --external-database
+node scripts/db-utils.ts generate-erd --external-database
+node scripts/db-utils.ts draft-changelog --external-database --from-draft .context/<name>.xml
 ```
 
 The task aliases also accept `--external-database`: `db:check-drift`, `db:draft-changelog`, and `db:generate-erd-docs`.
@@ -228,7 +227,7 @@ The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/bl
 
 | Released data | Release 1.0 behavior |
 |---|---|
-| `workspace.practice_skip_drafts` | The workspace flag is removed. It does not change a pinned practice version. Each practice's `reviewOn` declaration owns the automatic review filter. A draft can be reviewed when that declaration permits it. |
+| `workspace.practice_skip_drafts` | 1.0 reviews draft work when a practice's `reviewOn` declaration permits it. `practice_skip_drafts` is removed. The migration preserves each pinned practice version. |
 | `consent_decision.notice_sha256` | The duplicate hash is removed. Each decision keeps its immutable `notice_version`. The referenced `consent_notice` keeps the exact notice text and hash. |
 
 ## Prove the released-state upgrade
@@ -270,7 +269,7 @@ The migration does not issue row updates or disable append-only guards.
 Populated PostgreSQL tests cover conversion, guards, retention, future partitions, export shape, and reruns.
 
 Authentication and configuration HTTP and CSV fields remain Strings.
-Direct person-data exports of previously structured values now contain JSON-text Strings.
+The [release migration entry](https://github.com/hephaestus-build/Hephaestus/blob/main/.migration/native-hibernate-json-mapper.md) owns the person-data export change.
 The [operator procedure](../admin/native-hibernate-json-cutover) owns shutdown, backup, upgrade, export checks, and recovery.
 
 ## Resources

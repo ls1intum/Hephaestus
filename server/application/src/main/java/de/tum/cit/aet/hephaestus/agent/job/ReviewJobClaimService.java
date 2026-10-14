@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.PracticeReviewRefusalMetrics;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import io.micrometer.core.instrument.Counter;
@@ -25,6 +26,7 @@ import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -186,29 +188,27 @@ public class ReviewJobClaimService {
         // Live-revalidate the catalog binding immediately before RUNNING. Submit-time behaviour
         // stays frozen; only availability/grants and the price are refreshed, and a changed binding
         // is refused rather than silently switching the queued job to another model.
-        AgentPurpose purpose = AgentPurpose.PRACTICE_REVIEW;
         WorkspaceAgentBinding binding = memberAiPolicy.binding(job).orElse(null);
         if (binding == null) {
             return refuseUnavailableModel(job);
         }
-        ConfigSnapshot snapshot = admitModels(job, binding);
+        var assigned = assignments.load(job);
+        ConfigSnapshot snapshot = admitModels(job, binding, assigned);
         if (snapshot == null) return refuseUnavailableModel(job);
-        String itemKind = assignments.load(job).getFirst().item().kind().value();
+        String itemKind = assigned.getFirst().item().kind().value();
         // Admission holds this slot's binding row lock until the RUNNING transition commits.
-        {
-            long runningCount = jobRepository.countRunningByWorkspaceIdAndDataHandlingTier(
-                    job.getWorkspaceId(), binding.getDataHandlingTier());
-            if (runningCount >= binding.getMaxConcurrentJobs()) {
-                concurrencyRejected.increment();
-                log.info(
-                        "Concurrency limit reached: jobId={}, workspaceId={}, purpose={}, running={}, max={}",
-                        job.getId(),
-                        job.getWorkspaceId(),
-                        purpose,
-                        runningCount,
-                        binding.getMaxConcurrentJobs());
-                return ClaimOutcome.CONCURRENCY_FULL;
-            }
+        long runningCount = jobRepository.countRunningByWorkspaceIdAndDataHandlingTier(
+                job.getWorkspaceId(), binding.getDataHandlingTier());
+        if (runningCount >= binding.getMaxConcurrentJobs()) {
+            concurrencyRejected.increment();
+            log.info(
+                    "Concurrency limit reached: jobId={}, workspaceId={}, purpose={}, running={}, max={}",
+                    job.getId(),
+                    job.getWorkspaceId(),
+                    AgentPurpose.PRACTICE_REVIEW,
+                    runningCount,
+                    binding.getMaxConcurrentJobs());
+            return ClaimOutcome.CONCURRENCY_FULL;
         }
 
         Instant claimedAt = Instant.now();
@@ -220,17 +220,17 @@ public class ReviewJobClaimService {
         job.setExecutionStartedAt(null);
         // Clear the budget hold marker so a crash requeue cannot inherit an expired hold.
         job.setHoldReason(null);
-        job.setWorkerId(workerId); // owner for cancel routing, orphan recovery, terminal-write fencing
+        job.setWorkerId(workerId);
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
         jobRepository.save(job);
 
         return new ClaimResult(job, snapshot, itemKind);
     }
 
-    private @Nullable ConfigSnapshot admitModels(ReviewJob job, WorkspaceAgentBinding binding) {
+    private @Nullable ConfigSnapshot admitModels(
+            ReviewJob job, WorkspaceAgentBinding binding, List<ReviewAssignmentSnapshot> assigned) {
         ConfigSnapshot snapshot;
         try {
-            var assigned = assignments.load(job);
             ConfigSnapshot submitted = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
             methods.require(assigned.getFirst().practice().method(), "review", binding);
             if (Objects.requireNonNullElse(submitted.model().dataHandlingTier(), DataHandlingTier.UNDECLARED)
@@ -246,7 +246,8 @@ public class ReviewJobClaimService {
                                 submitted.model().priceSnapshot() == null
                                         ? admitted.price()
                                         : submitted.model().priceSnapshot())
-                        .withPracticeScript(admitPracticeScript(job, submitted.practiceScript(), llmAdmissionService));
+                        .withPracticeScript(
+                                admitPracticeScript(job, submitted.practiceScript(), llmAdmissionService, assigned));
             } else {
                 snapshot = submitted;
             }
@@ -257,7 +258,10 @@ public class ReviewJobClaimService {
     }
 
     private @Nullable Map<ModelKind, FrozenModel> admitPracticeScript(
-            ReviewJob job, @Nullable Map<ModelKind, FrozenModel> submitted, LlmAdmissionService admission) {
+            ReviewJob job,
+            @Nullable Map<ModelKind, FrozenModel> submitted,
+            LlmAdmissionService admission,
+            List<ReviewAssignmentSnapshot> assigned) {
         if (submitted == null) {
             return null;
         }
@@ -273,7 +277,7 @@ public class ReviewJobClaimService {
                     .filter(binding -> binding.getDataHandlingTier() == tier)
                     .map(binding -> {
                         methods.require(
-                                assignments.load(job).getFirst().practice().method(),
+                                assigned.getFirst().practice().method(),
                                 purpose.kind().name().toLowerCase(Locale.ROOT),
                                 binding);
                         return binding;

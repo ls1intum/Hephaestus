@@ -51,7 +51,7 @@ The aggregate report contains no second copy of quotes or detailed proof.
 
 ## Results and problems
 
-The [outcome contract](./practice-feedback-language.md#result-outcomes) owns the four verdicts and their evidence requirements.
+The [outcome contract](./practice-feedback-language.md#result-outcomes) owns the four outcomes and their evidence requirements.
 Admission persists the result and its problems atomically.
 A refused child or citation withholds the entire candidate.
 The server never deletes a problem to turn a candidate into Met.

@@ -3,7 +3,7 @@ import { expect, fn, within } from "storybook/test";
 
 import type { ReviewOverview } from "@/api/types.gen";
 import type { ReviewRange } from "@/components/admin/practice-reviews/review-range";
-import { ReviewRunningBanner } from "@/components/admin/practices/review/ReviewRunningBanner";
+import { ReviewReadinessBanner } from "@/components/admin/practices/review/ReviewReadinessBanner";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
@@ -299,10 +299,6 @@ const COURSE_DAY: ReviewOverview = {
 	],
 };
 
-/**
- * Every attention marker past its threshold at once, as a course day can have it: the queue backed
- * up past half an hour, and a practice that mostly does not apply leading the table. Each says so in its own tone, and nothing else on the page takes a colour.
- */
 export const NeedsAttention: Story = {
 	args: {
 		queue: {
@@ -331,7 +327,7 @@ export const NeedsAttention: Story = {
  */
 export const ReviewsCannotStart: Story = {
 	args: {
-		banner: <ReviewRunningBanner running={{ enabled: true, model: { status: "ready" } }} />,
+		banner: <ReviewReadinessBanner running={{ enabled: true, model: { status: "ready" } }} />,
 	},
 	play: async ({ canvas }) => {
 		const banner = canvas.getByText("Reviews cannot start");

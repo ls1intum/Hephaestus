@@ -22,7 +22,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-/** Reads the owning product modules' authorized snapshots, never their persistence model. */
 @Component
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor

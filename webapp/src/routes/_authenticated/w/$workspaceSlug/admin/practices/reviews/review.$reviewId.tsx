@@ -19,7 +19,7 @@ export const Route = createFileRoute(
 				? { kind: focus.kind, id: focus.id }
 				: { kind: "review", id: params.reviewId };
 		throw redirect({
-			to: "/w/$workspaceSlug/admin/practices/reviews/runs",
+			to: "/w/$workspaceSlug/admin/practices/reviews",
 			params: { workspaceSlug: params.workspaceSlug },
 			search: {
 				...carriedScope(search),

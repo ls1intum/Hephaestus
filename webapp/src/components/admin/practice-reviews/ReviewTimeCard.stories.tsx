@@ -72,7 +72,7 @@ const meta = {
 		finished: {
 			state: { status: "ready", total: 34, stale: false },
 			list: {
-				list: "runs",
+				list: "reviews",
 				search: {
 					from: "2026-09-10",
 					to: "2026-10-09",
@@ -168,7 +168,7 @@ export const FinishedInTheRange: Story = {
 		const link = new URL(
 			canvas.getByRole<HTMLAnchorElement>("link", { name: "34 reviews finished" }).href,
 		);
-		await expect(link.pathname).toBe("/w/demo/admin/practices/reviews/runs");
+		await expect(link.pathname).toBe("/w/demo/admin/practices/reviews");
 		await expect(link.searchParams.getAll("status")).toStrictEqual([
 			"COMPLETE",
 			"PARTIAL",
@@ -216,10 +216,6 @@ export const SlowQueue: Story = {
 	},
 };
 
-/**
- * Two of the five the merge itself started, so they could only finish after it. The figure counts
- * all five, and the (i) says how many of them the merge started.
- */
 export const FinishedAfterMerge: Story = {
 	args: {
 		state: {
@@ -284,7 +280,7 @@ export const NoData: Story = {
 		},
 		finished: {
 			state: { status: "ready", total: 0, stale: false },
-			list: { list: "runs", search: { status: ["COMPLETE", "PARTIAL", "FAILED"] } },
+			list: { list: "reviews", search: { status: ["COMPLETE", "PARTIAL", "FAILED"] } },
 		},
 	},
 	play: async ({ canvas }) => {

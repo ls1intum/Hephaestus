@@ -127,10 +127,6 @@ class CommitDetailsPersisterTest extends BaseUnitTest {
         assertThat(event.getValue().context().providerType()).isEqualTo(IdentityProviderType.GITHUB);
     }
 
-    /**
-     * A webhook leaves a row without Git details; completing it is a capture, not a second
-     * creation.
-     */
     @Test
     void shouldCompleteAnUncapturedRowWithoutPublishingAnotherCreatedEvent() {
         Commit stub = TestEntities.commit(1L, SHA);

@@ -214,10 +214,14 @@ export default definePracticeScript({
 				generalCommentsFileAbsent: general === null ? 1 : 0,
 				...(inline === null ? {} : { reviewerComments: inlineByPeople }),
 				...(general === null ? {} : { conversationComments: conversationByPeople }),
-				botComments: notes.length - byPeople.length,
-				withAuthorReply: replied,
-				...(committedAfter === null ? {} : { withLaterCommitOnFile: committedAfter }),
-				afterHandOff,
+				...(inline === null && general === null
+					? {}
+					: {
+							botComments: notes.length - byPeople.length,
+							withAuthorReply: replied,
+							...(committedAfter === null ? {} : { withLaterCommitOnFile: committedAfter }),
+							afterHandOff,
+						}),
 				commitsFileAbsent: capturedCommits === null ? 1 : 0,
 			},
 			directions,

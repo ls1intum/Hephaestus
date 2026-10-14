@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { cn } from "cn";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
+import { z } from "zod";
 import type {
 	AgentBinding,
 	PracticeReviewSettings as PracticeReviewSettingsData,
@@ -255,6 +256,8 @@ function ReviewTimingSection({
 	);
 }
 
+const cooldownSchema = z.coerce.number().int().min(0).max(1440);
+
 function CooldownField({
 	value,
 	overridden,
@@ -265,8 +268,8 @@ function CooldownField({
 	policy: PracticeReviewSettingsProps["policy"];
 }) {
 	const [draft, setDraft] = useState(String(value));
-	const parsed = Number(draft);
-	const invalid = draft.trim() === "" || !Number.isInteger(parsed) || parsed < 0 || parsed > 1440;
+	const parsed = cooldownSchema.safeParse(draft.trim() === "" ? undefined : draft);
+	const invalid = !parsed.success;
 
 	return (
 		<Field data-invalid={invalid || undefined}>
@@ -285,8 +288,8 @@ function CooldownField({
 				disabled={policy.isSaving}
 				onChange={(event) => setDraft(event.currentTarget.value)}
 				onBlur={() => {
-					if (!invalid && parsed !== value) {
-						void policy.onUpdate({ cooldownMinutes: parsed });
+					if (parsed.success && parsed.data !== value) {
+						void policy.onUpdate({ cooldownMinutes: parsed.data });
 					}
 				}}
 				className="max-w-32"

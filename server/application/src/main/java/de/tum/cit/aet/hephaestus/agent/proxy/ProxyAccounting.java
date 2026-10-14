@@ -101,10 +101,7 @@ public class ProxyAccounting {
                 .increment();
     }
 
-    /**
-     * A practice script call named no practice, or no valid one, so its spend could not be split by practice.
-     * Any rate is a defect: the practice script runner names the practice on every call.
-     */
+    // Every direct call must name a valid practice so its spend can be attributed.
     public void recordUnattributedPracticeScript() {
         practiceScriptUnattributed.increment();
     }

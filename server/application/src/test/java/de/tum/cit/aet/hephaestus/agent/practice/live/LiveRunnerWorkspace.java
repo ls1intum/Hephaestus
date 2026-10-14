@@ -107,10 +107,6 @@ final class LiveRunnerWorkspace {
                 "Add login service");
     }
 
-    /**
-     * The shared {@link #CART_CHANGE}, beside the toolkit's {@code lib/diff-parser.ts}, which the fixture's agent
-     * searches the checkout for.
-     */
     static ObjectNode stageCartChange(Path workspace) throws IOException, InterruptedException {
         Map<String, String> base = new LinkedHashMap<>();
         Map<String, String> head = new LinkedHashMap<>();

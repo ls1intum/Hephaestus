@@ -31,19 +31,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-/**
- * Controller for managing workspace-scoped team settings.
- *
- * <p>Provides REST API endpoints for:
- *
- * <ul>
- *   <li>Team visibility (hidden) settings
- *   <li>Repository contribution visibility settings
- *   <li>Label filters for teams
- * </ul>
- *
- * <p>All endpoints are scoped to a workspace and require appropriate permissions.
- */
 @WorkspaceScopedController
 @RequestMapping("/teams/{teamId}/settings")
 @Tag(name = "Team Settings", description = "Workspace-scoped team settings management")
@@ -63,13 +50,6 @@ public class WorkspaceTeamSettingsController {
 
     // Team Visibility Settings
 
-    /**
-     * Get the settings for a team in the workspace.
-     *
-     * @param workspaceContext the resolved workspace context
-     * @param teamId the team ID
-     * @return the team settings
-     */
     @GetMapping
     @Operation(
             summary = "Get team settings",
@@ -90,14 +70,6 @@ public class WorkspaceTeamSettingsController {
         return ResponseEntity.ok(dto);
     }
 
-    /**
-     * Update the visibility settings for a team in the workspace.
-     *
-     * @param workspaceContext the resolved workspace context
-     * @param teamId the team ID
-     * @param request the update request containing the hidden flag
-     * @return the updated team settings, or 404 if team not found
-     */
     @PatchMapping
     @RequireAtLeastWorkspaceAdmin
     @Operation(
@@ -130,14 +102,6 @@ public class WorkspaceTeamSettingsController {
 
     // Repository Contribution Visibility Settings
 
-    /**
-     * Get the settings for a repository within a team in the workspace.
-     *
-     * @param workspaceContext the resolved workspace context
-     * @param teamId the team ID
-     * @param repositoryId the repository ID
-     * @return the repository settings
-     */
     @GetMapping("/repositories/{repositoryId}")
     @Operation(
             summary = "Get repository settings",
@@ -163,15 +127,6 @@ public class WorkspaceTeamSettingsController {
         return ResponseEntity.ok(dto);
     }
 
-    /**
-     * Update the contribution visibility settings for a repository in a team.
-     *
-     * @param workspaceContext the resolved workspace context
-     * @param teamId the team ID
-     * @param repositoryId the repository ID
-     * @param request the update request containing the hiddenFromContributions flag
-     * @return the updated repository settings, or 404 if team/repository not found
-     */
     @PatchMapping("/repositories/{repositoryId}")
     @RequireAtLeastWorkspaceAdmin
     @Operation(
@@ -207,13 +162,6 @@ public class WorkspaceTeamSettingsController {
 
     // Label Filter Settings
 
-    /**
-     * Get all label filters configured for a team in the workspace.
-     *
-     * @param workspaceContext the resolved workspace context
-     * @param teamId the team ID
-     * @return list of labels configured as filters
-     */
     @GetMapping("/label-filters")
     @Operation(
             summary = "Get team label filters",
@@ -233,14 +181,6 @@ public class WorkspaceTeamSettingsController {
         return ResponseEntity.ok(labels);
     }
 
-    /**
-     * Add a label as a filter for a team in the workspace.
-     *
-     * @param workspaceContext the resolved workspace context
-     * @param teamId the team ID
-     * @param labelId the label ID to add as filter
-     * @return 201 Created if successful, 404 if team or label not found
-     */
     @PostMapping("/label-filters/{labelId}")
     @RequireAtLeastWorkspaceAdmin
     @Operation(summary = "Add label filter", description = "Adds a label as a filter for a team in the workspace")
@@ -263,14 +203,6 @@ public class WorkspaceTeamSettingsController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /**
-     * Remove a label filter from a team in the workspace.
-     *
-     * @param workspaceContext the resolved workspace context
-     * @param teamId the team ID
-     * @param labelId the label ID to remove as filter
-     * @return 204 No Content if successful, 404 if filter not found
-     */
     @DeleteMapping("/label-filters/{labelId}")
     @RequireAtLeastWorkspaceAdmin
     @Operation(summary = "Remove label filter", description = "Removes a label filter from a team in the workspace")

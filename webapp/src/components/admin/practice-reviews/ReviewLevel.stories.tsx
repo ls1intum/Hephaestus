@@ -109,10 +109,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Every practice with its state and the reason for it. A withheld practice is not a result: it
- * says why it was withheld instead of counting outcomes.
- */
 export const PracticesWithTheirState: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
@@ -172,7 +168,6 @@ export const ScanWithManyRuns: Story = {
 	},
 };
 
-/** Its runtime records expired: the review's facts and practices remain, the execution is gone. */
 export const RuntimeExpired: Story = {
 	args: { review: ready(reviewDetailExpiredRuntime) },
 	play: async () => {
@@ -221,7 +216,7 @@ export const CostPerAttempt: Story = {
 	},
 };
 
-/** A model without a price has no cost: it says so rather than $0. */
+// Unknown price must not be shown as zero cost.
 export const CostNotKnown: Story = {
 	args: { review: ready({ ...reviewDetailCompleted, usage: reviewUsageUnpriced }) },
 	play: async () => {

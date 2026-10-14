@@ -445,7 +445,7 @@ class PracticeRunnerLiveLlmTest {
             Severity worst = null;
             for (JsonNode problem : candidate.path("problems")) {
                 Severity severity = Severity.valueOf(problem.path("severity").asString());
-                if (worst == null || severity.rank() < worst.rank()) worst = severity; // rank 0 is the most severe
+                if (worst == null || severity.rank() < worst.rank()) worst = severity;
             }
             return worst == null ? null : worst.name();
         }

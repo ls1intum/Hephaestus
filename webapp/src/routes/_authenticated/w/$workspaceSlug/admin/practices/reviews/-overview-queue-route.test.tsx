@@ -12,8 +12,8 @@ import {
 	practiceReviewOverview,
 } from "@/components/admin/practice-reviews/fixtures";
 import type * as ReviewQueueModule from "@/components/admin/practice-reviews/review-queue";
-import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { server } from "@/mocks/server";
+import { reviewHandlers } from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
 import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
@@ -31,7 +31,7 @@ beforeEach(() => {
 	vi.stubGlobal("IntersectionObserver", ObserverStub);
 });
 
-const OVERVIEW = "/w/acme/admin/practices/reviews";
+const OVERVIEW = "/w/acme/admin/practices/reviews/overview";
 
 /** The overview with nothing queued or running, so only the queue itself can keep the poll going. */
 const quietOverview = {

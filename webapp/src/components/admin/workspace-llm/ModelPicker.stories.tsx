@@ -145,7 +145,6 @@ export const NoEmbeddingModelOwnProvidersBlocked: Story = {
 	},
 };
 
-/** A decision needs an answer at once with token probabilities, so a reasoning model earns a warning. */
 export const ReasoningDecisionModel: Story = {
 	args: {
 		purpose: "PRACTICE_DECISION",
@@ -170,10 +169,6 @@ export const DecisionModelAnswersAtOnce: Story = {
 	},
 };
 
-/**
- * A reranker that may report no tokens counts as unpriced, which pauses reviews while their spend
- * has a monthly budget. Only an instance admin prices a shared model, so the hint sends the admin to one.
- */
 export const UnpricedReranker: Story = {
 	args: {
 		purpose: "PRACTICE_RERANKING",

@@ -282,11 +282,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         for (var entry : standing.entrySet()) {
             var review = entry.getValue();
             Instant date = dates.get(entry.getKey());
-            if (!Objects.equals(review.getSubmittedAt(), date) || review.getCommitId() != null) {
+            if (!Objects.equals(review.getSubmittedAt(), date)) {
                 review.setSubmittedAt(date);
-                // GitLab never names the approved revision; a head an earlier version stored for it
-                // was a guess.
-                review.setCommitId(null);
                 reviewRepository.save(review);
             }
         }
@@ -569,8 +566,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                         && eventUpdatedAt != null
                         && !eventUpdatedAt.isAfter(existing.getUpdatedAt())) {
                     // The reviewer list still applies unless the payload is older, as
-                    // sync-lifecycle.md § Reviewer
-                    // lists are dated snapshots explains.
+                    // sync-lifecycle.md § Reviewer lists are dated snapshots explains.
                     if (!eventUpdatedAt.isBefore(existing.getUpdatedAt())
                             && updateRequestedReviewers(event.currentReviewers(), existing, context)) {
                         existing = pullRequestRepository.save(existing);
@@ -628,9 +624,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 event.currentAssignees(), pr.getAssignees(), Objects.requireNonNull(context.providerId()));
         changed |= updateRequestedReviewers(event.currentReviewers(), pr, context);
         // GitLab names the previous head only when the update pushed commits, and not always then,
-        // so a
-        // moved head counts too; a sync that stored the new head first still leaves oldrev to say
-        // so.
+        // so a moved head counts too; a sync that stored the new head first still leaves oldrev to
+        // say so.
         boolean pushed = !isNew
                 && headRefOid != null
                 && (attrs.oldrev() != null || (previousHead != null && !previousHead.equals(headRefOid)));
@@ -642,8 +637,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         }
 
         // Detect draft transitions and pushes. A new merge request is Created only, as a GitHub
-        // pull
-        // request opened ready is: raising Ready as well would review the same head twice.
+        // pull request opened ready is: raising Ready as well would review the same head twice.
         var prData = ScmEventPayload.PullRequestData.from(pr);
         var eventCtx = EventContext.from(context);
         if (pushed) {
@@ -698,9 +692,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     public PullRequest processMerged(GitLabMergeRequestEventDTO event, ProcessingContext context) {
         Issue.State before = getExistingState(event, context);
         PullRequest pr = processInternal(event, context);
-        // Only the close is announced here. The merge itself, the occasion a review is judged on,
-        // is offered by
-        // offerMerge once the read after this hook has had its chance to record who merged.
+        // Only the close is announced here. The merge itself, the event a review is judged on, is
+        // offered by offerMerge once the read after this hook has had its chance to record who
+        // merged.
         if (pr != null
                 && pr.getState() == Issue.State.MERGED
                 && before != Issue.State.CLOSED
@@ -906,8 +900,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 pullRequestRepository.findForUpdateByRepositoryIdAndNumber(repository.getId(), mrNumber);
         boolean isNew = existingOpt.isEmpty();
         // A page that describes an older version than the one stored changes nothing: a later
-        // webhook or read stored
-        // it, and the page's head, checks and approvals would take it back.
+        // webhook or read stored it, and the page's head, checks and approvals would take it back.
         Instant fetchedUpdatedAt = parseGitLabTimestamp(data.updatedAt());
         if (existingOpt.isPresent() && fetchedUpdatedAt == null) {
             // A page that did not capture the version cannot be ordered against the stored merge
@@ -921,10 +914,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 && fetchedUpdatedAt.isBefore(existingOpt.get().getUpdatedAt())) {
             PullRequest stored = existingOpt.get();
             // Nothing that can still change, such as the title or description, is taken from an
-            // older page; only the
-            // facts of the completed merge it reports, when it is the stored merge, fill what is
-            // unknown (see
-            // mergeMismatch).
+            // older page; only the facts of the completed merge it reports, when it is the stored
+            // merge, fill what is unknown (see mergeMismatch).
             if (mergeMismatch(stored, nativeId, data.state(), data.diffHeadSha(), data.mergeCommitSha()) == null) {
                 fillUnknownMerge(
                         stored,
@@ -1051,10 +1042,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 data.additions(),
                 data.deletions(),
                 data.fileCount(),
-                null, // reviewDecision: set below, as upsertCore keeps a stored one where it is
-                // given none
-                null, // mergeStateStatus: recorded with the review snapshot below, as upsertCore
-                // keeps a stored one
+                null,
+                null,
                 null, // mergeable: likewise
                 data.sourceBranch(),
                 data.targetBranch(),
@@ -1070,19 +1059,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         pr.setProvider(repository.getProvider());
 
-        // The decision, the approvals and the mergeability and merge status that follow them are
-        // part of what was read
-        // about the reviews at context.observedAt(): what a hook or read received after the page
-        // was asked for stored
-        // stands. Where it does and the page moved the head, what is stored describes the old head
-        // and is unknown now.
-        // What holds for a head — the decision, mergeability, approvals and a missing pipeline —
-        // needs the page to have
-        // captured which head, and which version, it read: the upsert keeps a stored head where the
-        // page gives none, so
-        // they would otherwise land on a head the page did not read. A pipeline the page names with
-        // its SHA stands on
-        // its own.
+        // Head-scoped status is stored only when this read captured the head it describes.
         boolean headCaptured = fetchedUpdatedAt != null
                 && data.diffHeadSha() != null
                 && !data.diffHeadSha().isBlank();
@@ -1092,9 +1069,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         if (reviewsCurrent) {
             changed |= recordReviewSnapshot(pr, reviewDecision, settling ? null : data.mergeable(), mergeStateStatus);
             // Only the accepted read can store its pair (see GitLabMergeRequestFields#diffRefs). An
-            // older page cannot
-            // replace a newer read. The upsert above invalidated any base whose head or target
-            // changed.
+            // older page cannot replace a newer read. The upsert above cleared any base whose head
+            // or target changed.
             String pairedBase = data.baseSha();
             String storedHead = pr.getHeadRefOid();
             if (pairedBase != null
@@ -1151,8 +1127,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             }
             eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(prData, changedFields, eventCtx));
             // A merge the webhook missed is recorded as the sync found it, so a later delivery of
-            // it can still
-            // claim it; a sync records it without starting a review.
+            // it can still claim it; a sync records it without starting a review.
             if (isMerged && previousState != Issue.State.MERGED) {
                 if (previousState != Issue.State.CLOSED) {
                     eventPublisher.publishEvent(new ScmDomainEvent.PullRequestClosed(prData, true, eventCtx));
@@ -1283,8 +1258,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 htmlUrl,
                 null, // isLocked: not in webhook — null lets COALESCE preserve existing or default
                 closedAtTimestamp,
-                null, // commentsCount: not in webhook — null lets COALESCE preserve existing or
-                // default
+                null, // Webhooks omit comment counts; null preserves the stored value through COALESCE.
                 now, // lastSyncAt
                 parseGitLabTimestamp(createdAt),
                 parseGitLabTimestamp(updatedAt),
@@ -1297,8 +1271,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 null,
                 null,
                 null,
-                null, // commits, additions, deletions, changedFiles — not in webhook, null
-                // preserves existing
+                null, // Webhooks omit change counts; null preserves stored values.
                 null,
                 null,
                 null, // reviewDecision, mergeStateStatus, mergeable — not in webhook
@@ -1307,8 +1280,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 headRefOid,
                 null, // A changed head without a provider base invalidates the stored diff pair.
                 mergedBy != null ? mergedBy.getId() : null,
-                mergeCommitSha // the hook's merge_commit_sha; null, as before a merge, keeps the
-                // stored one
+                mergeCommitSha // An absent merge commit must preserve the stored value.
                 );
 
         PullRequest pr = pullRequestRepository
@@ -1512,8 +1484,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             if (existingReview != null) {
                 boolean changed = false;
                 // A renewed standing approval is a new act whose time the approver list does not
-                // name: it does not
-                // inherit the withdrawn one's.
+                // name: it does not inherit the withdrawn one's.
                 if (existingReview.getState() != PullRequestReview.State.APPROVED || existingReview.isDismissed()) {
                     existingReview.setState(PullRequestReview.State.APPROVED);
                     existingReview.setDismissed(false);
@@ -1530,11 +1501,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                         : nativeDates == null ? null : nativeDates.get(user.getNativeId());
                 boolean dateChanged = !Objects.equals(existingReview.getSubmittedAt(), submittedAt);
                 if (dateChanged) existingReview.setSubmittedAt(submittedAt);
-                // GitLab never names the approved revision; a head an earlier version stored for it
-                // was a guess.
-                boolean guessedHead = existingReview.getCommitId() != null;
-                if (guessedHead) existingReview.setCommitId(null);
-                if (changed || dateChanged || guessedHead) {
+                if (changed || dateChanged) {
                     reviewRepository.save(existingReview);
 
                     if (changed && ctx != null) {

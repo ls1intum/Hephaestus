@@ -5,14 +5,14 @@ import type { ListAgentsResponse } from "@/api/types.gen";
 import {
 	availableReviewBinding,
 	type ReviewModelState,
-	type ReviewRunningState,
+	type ReviewReadinessState,
 } from "@/components/admin/practices/review/review-readiness";
 
 /**
  * Whether practice reviews can run in the workspace: switched on, and a review model ready.
  * Undefined until the workspace is in.
  */
-export function useReviewRunning(workspaceSlug: string): ReviewRunningState | undefined {
+export function useReviewReadiness(workspaceSlug: string): ReviewReadinessState | undefined {
 	const workspaceQuery = useQuery({ ...getWorkspaceOptions({ path: { workspaceSlug } }) });
 	const bindingsQuery = useQuery({ ...listAgentsOptions({ path: { workspaceSlug } }) });
 	return (

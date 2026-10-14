@@ -25,10 +25,6 @@ public record UnpricedLedgerRow(
         @Nullable Long appliedWorkspaceModelId,
         MeasurementVerification measurementVerification) {
 
-    /**
-     * Whether the row measured a billable token. {@code LlmUsageEventRepository} fences its
-     * selection and UPDATE on the same condition.
-     */
     public boolean hasTokenEvidence() {
         return inputTokens > 0 || outputTokens > 0 || cacheReadTokens > 0 || cacheWriteTokens > 0;
     }

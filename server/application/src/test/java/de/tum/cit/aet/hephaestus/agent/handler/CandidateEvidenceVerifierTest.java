@@ -133,10 +133,10 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
         when(files.verificationDirectory(job))
                 .thenReturn(new EvidenceDirectory("inputs/", Path.of("/tmp/citation-test")));
         var candidate = candidate();
-        verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate, captured(true));
-        assertThat(candidate.citations().getFirst().path("startLine").asInt()).isEqualTo(2);
-        assertThat(candidate.citations().getFirst().path("verification").propertyNames())
-                .containsExactlyInAnyOrder("status", "itemSha256", "quoteSha256");
+        var verified = verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate, captured(true));
+        assertThat(verified.citations().getFirst().startLine()).isEqualTo(2);
+        assertThat(verified.citations().getFirst().verification()).isNotNull();
+        assertThat(candidate.citations().getFirst().startLine()).isEqualTo(999);
         var check = ArgumentCaptor.forClass(CitationCheck.class);
         verify(domain).verify(check.capture());
         assertThat(check.getValue().citations().getFirst().startLine()).isEqualTo(2);

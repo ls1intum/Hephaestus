@@ -3,7 +3,22 @@ package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.CANDIDATE_BYTES;
 
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
+import de.tum.cit.aet.hephaestus.practices.spi.ClaimBasis;
+import de.tum.cit.aet.hephaestus.practices.spi.ClaimedCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.DutyBasis;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
+import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.InapplicabilityWarrant;
+import de.tum.cit.aet.hephaestus.practices.spi.IntroducedBasis;
+import de.tum.cit.aet.hephaestus.practices.spi.OpenQuestion;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultExample;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.SearchWarrant;
+import de.tum.cit.aet.hephaestus.practices.spi.StateBasis;
+import de.tum.cit.aet.hephaestus.practices.spi.WorsenedBasis;
+import jakarta.validation.Validator;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -14,23 +29,11 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 public final class CandidateParser {
     private static final JsonMapper MAPPER = CandidateWireMapper.create();
     private static final ObjectReader READER = MAPPER.readerFor(CandidateDocument.class);
-
-    public static final List<String> OMISSION_REASONS = List.of(
-            "selection",
-            "truncated",
-            "unavailable",
-            "budget",
-            "deadline",
-            "too-large",
-            "off-format",
-            "refused",
-            "error",
-            "cancelled");
+    private static final Validator VALIDATOR = CandidateValidation.create();
 
     private CandidateParser() {}
 
@@ -59,7 +62,21 @@ public final class CandidateParser {
                     "The candidate does not match the result contract",
                     malformed);
         }
-        return rules(sent);
+        if (!VALIDATOR.validate(sent).isEmpty())
+            throw refuse(CandidateRefusal.MALFORMED_CANDIDATE, "The candidate exceeds its contract bounds");
+        Candidate candidate = rules(sent);
+        for (var citation : allCitations(candidate))
+            if (citation.endLine() < citation.startLine())
+                throw refuse(CandidateRefusal.MALFORMED_CANDIDATE, "Citation lines are reversed");
+        if (candidate.coverage() instanceof HostCoverage host) {
+            for (var receipt : host.receipts()) {
+                var start = receipt.startLine();
+                var end = receipt.endLine();
+                if (start != null && end != null && end < start)
+                    throw refuse(CandidateRefusal.MALFORMED_CANDIDATE, "Receipt lines are reversed");
+            }
+        }
+        return candidate;
     }
 
     /**
@@ -122,6 +139,18 @@ public final class CandidateParser {
         return bytes;
     }
 
+    private static List<EvidenceCitation> allCitations(Candidate candidate) {
+        var citations = new ArrayList<>(candidate.citations());
+        candidate.problems().forEach(problem -> citations.addAll(problem.citations()));
+        var example = candidate.example();
+        if (example != null) citations.add(example.citation());
+        candidate.openQuestions().forEach(question -> {
+            var citation = question.citation();
+            if (citation != null) citations.add(citation);
+        });
+        return citations;
+    }
+
     private static Candidate rules(CandidateDocument sent) {
         ResultOutcome outcome = sent.outcome();
         List<CandidateProblem> problems = sent.problems() == null
@@ -132,26 +161,15 @@ public final class CandidateParser {
                                 problem.severity(),
                                 problem.summary(),
                                 problem.explanation(),
-                                problem.citations().stream()
-                                        .map(CandidateParser::node)
-                                        .toList(),
-                                node(problem.basis()),
+                                problem.citations(),
+                                problem.basis(),
                                 problem.nextStep()))
                         .toList();
-        List<ObjectNode> citations =
-                sent.citations().stream().map(CandidateParser::node).toList();
-        ObjectNode coverage = node(sent.coverage());
-        if (coverage.path("omitted").isEmpty()) coverage.remove("omitted");
-        ObjectNode searchNode =
-                sent.evidence().search() == null ? null : node(sent.evidence().search());
-        ObjectNode inapplicabilityNode = sent.evidence().inapplicability() == null
-                ? null
-                : node(sent.evidence().inapplicability());
-        List<ObjectNode> questions = sent.evidence().openQuestions() == null
-                ? null
-                : sent.evidence().openQuestions().stream()
-                        .map(CandidateParser::node)
-                        .toList();
+        List<EvidenceCitation> citations = sent.citations();
+        ResultCoverage coverage = sent.coverage();
+        SearchWarrant searchNode = sent.evidence().search();
+        InapplicabilityWarrant inapplicabilityNode = sent.evidence().inapplicability();
+        List<OpenQuestion> questions = sent.evidence().openQuestions();
         boolean listsProblems = problems != null && !problems.isEmpty();
         if ((outcome == ResultOutcome.NOT_MET) != listsProblems || (problems != null && problems.isEmpty())) {
             throw refuse(
@@ -178,13 +196,17 @@ public final class CandidateParser {
                         case NOT_MET -> "a NOT_MET result may carry a search warrant and open questions only";
                         case DOES_NOT_APPLY -> "a DOES_NOT_APPLY result carries its inapplicability warrant only";
                         case COULD_NOT_DETERMINE ->
-                            "an COULD_NOT_DETERMINE result carries its open questions, and a search warrant at most";
+                            "a COULD_NOT_DETERMINE result carries its open questions, and a search warrant at most";
                     });
         }
         if (outcome != ResultOutcome.NOT_MET && citations.isEmpty()) {
             throw refuse(CandidateRefusal.RESULT_CITATIONS_REQUIRED, "a " + outcome + " result cites what it rests on");
         }
-        boolean complete = coverage.path("complete").asBoolean();
+        boolean complete =
+                switch (coverage) {
+                    case HostCoverage host -> host.complete();
+                    case ClaimedCoverage claimed -> claimed.complete();
+                };
         if (outcome == ResultOutcome.MET && !complete) {
             throw refuse(CandidateRefusal.MET_COVERAGE_INCOMPLETE, "a MET result needs complete coverage");
         }
@@ -192,14 +214,14 @@ public final class CandidateParser {
         if (coverageProblem != null) {
             throw refuse(CandidateRefusal.COVERAGE_INCONSISTENT, coverageProblem);
         }
-        ObjectNode example = sent.example() == null ? null : node(sent.example());
+        ResultExample example = sent.example();
         if (example != null && outcome != ResultOutcome.MET && outcome != ResultOutcome.NOT_MET) {
             throw refuse(CandidateRefusal.EXAMPLE_OUTCOME_MISMATCH, "a " + outcome + " result has no example");
         }
         if (example != null && problems != null) {
-            JsonNode exampleCitation = example.path("citation");
+            EvidenceCitation exampleCitation = example.citation();
             for (CandidateProblem problem : problems) {
-                for (ObjectNode cited : problem.citations()) {
+                for (EvidenceCitation cited : problem.citations()) {
                     if (overlaps(cited, exampleCitation)) {
                         throw refuse(
                                 CandidateRefusal.EXAMPLE_OVERLAPS_PROBLEM, "the example cites the place of a problem");
@@ -226,7 +248,7 @@ public final class CandidateParser {
                 }
             }
         }
-        List<ObjectNode> openQuestions = questions == null ? List.of() : questions;
+        List<OpenQuestion> openQuestions = questions == null ? List.of() : questions;
         return switch (outcome) {
             case MET -> new MetCandidate(sent.summary(), sent.explanation(), citations, coverage, example, searchNode);
             case NOT_MET ->
@@ -252,65 +274,50 @@ public final class CandidateParser {
         };
     }
 
-    private static @Nullable String coverageProblem(ObjectNode coverage) {
-        boolean complete = coverage.path("complete").asBoolean();
-        boolean omits = coverage.has("omitted") && !coverage.path("omitted").isEmpty();
-        if (complete == omits) {
-            return complete ? "complete coverage lists no omission" : "incomplete coverage lists what it omitted";
+    private static @Nullable String coverageProblem(ResultCoverage coverage) {
+        boolean complete;
+        boolean omits;
+        switch (coverage) {
+            case HostCoverage host -> {
+                complete = host.complete();
+                omits = host.omitted() != null && !host.omitted().isEmpty();
+                if (complete != (host.truncatedReads() == 0 && host.failedReads() == 0))
+                    return "host coverage is complete exactly when no read was truncated or failed";
+            }
+            case ClaimedCoverage claimed -> {
+                complete = claimed.complete();
+                omits = claimed.omitted() != null && !claimed.omitted().isEmpty();
+                if (claimed.checked() > claimed.selected())
+                    return "claimed coverage checked more items than it selected";
+                var total = claimed.total();
+                if (total != null && claimed.selected() > total)
+                    return "claimed coverage selected more items than the total";
+                if (complete
+                        && (claimed.checked() != claimed.selected() || (total != null && claimed.selected() != total)))
+                    return "complete claimed coverage checks every selected item of the total";
+            }
         }
-        if ("host".equals(coverage.path("source").asString())) {
-            boolean clean = coverage.path("truncatedReads").asLong() == 0
-                    && coverage.path("failedReads").asLong() == 0;
-            return complete != clean ? "host coverage is complete exactly when no read was truncated or failed" : null;
-        }
-        long selected = coverage.path("selected").asLong();
-        long checked = coverage.path("checked").asLong();
-        JsonNode total = coverage.path("total");
-        if (checked > selected) return "claimed coverage checked more items than it selected";
-        if (!total.isNull() && selected > total.asLong()) {
-            return "claimed coverage selected more items than the total";
-        }
-        if (complete && (checked != selected || (!total.isNull() && selected != total.asLong()))) {
-            return "complete claimed coverage checks every selected item of the total";
-        }
-        return null;
+        return complete == omits
+                ? (complete ? "complete coverage lists no omission" : "incomplete coverage lists what it omitted")
+                : null;
     }
 
-    /**
-     * {@code isRepositoryPath} in {@code lib/contract.ts}: a file of a repository as a quote of code names it, relative,
-     * with no empty, {@code .} or {@code ..} part, and outside the repository's {@code .git} directory.
-     */
-    public static boolean isRepositoryPath(String path) {
-        if (path.indexOf('\\') >= 0) return false;
-        for (String part : path.split("/", -1)) {
-            if (part.isEmpty() || part.equals(".") || part.equals("..") || part.equals(".git")) return false;
-        }
-        return true;
+    private static boolean overlaps(EvidenceCitation a, EvidenceCitation b) {
+        return a.sourceKind().equals(b.sourceKind())
+                && a.sourcePath().equals(b.sourcePath())
+                && Objects.equals(a.revision(), b.revision())
+                && a.path().equals(b.path())
+                && a.side() == b.side()
+                && a.startLine() <= b.endLine()
+                && b.startLine() <= a.endLine();
     }
 
-    // Coordinate overlap is checked here; admission also resolves source aliases.
-    private static boolean overlaps(JsonNode a, JsonNode b) {
-        return a.path("sourceKind").asString().equals(b.path("sourceKind").asString())
-                && a.path("sourcePath").asString().equals(b.path("sourcePath").asString())
-                && Objects.equals(a.get("revision"), b.get("revision"))
-                && a.path("path").asString().equals(b.path("path").asString())
-                && Objects.equals(sideOf(a), sideOf(b))
-                && a.path("startLine").asInt() <= b.path("endLine").asInt()
-                && b.path("startLine").asInt() <= a.path("endLine").asInt();
-    }
-
-    private static @Nullable String sideOf(JsonNode citation) {
-        JsonNode side = citation.get("side");
-        return side == null ? null : side.asString();
-    }
-
-    public static List<Integer> basisIndices(JsonNode basis) {
-        return switch (basis.path("type").asString()) {
-            case "introduced" -> List.of(basis.path("head").asInt());
-            case "worsened" ->
-                List.of(basis.path("base").asInt(), basis.path("head").asInt());
-            case "duty" -> List.of(basis.path("event").asInt());
-            default -> List.of();
+    private static List<Integer> basisIndices(ClaimBasis basis) {
+        return switch (basis) {
+            case IntroducedBasis introduced -> List.of(introduced.head());
+            case WorsenedBasis worsened -> List.of(worsened.base(), worsened.head());
+            case DutyBasis duty -> List.of(duty.event());
+            case StateBasis state -> List.of();
         };
     }
 
@@ -326,10 +333,6 @@ public final class CandidateParser {
         } else if (value.isArray()) {
             for (JsonNode item : value) rejectExplicitNulls(item);
         }
-    }
-
-    private static ObjectNode node(Object value) {
-        return MAPPER.valueToTree(value);
     }
 
     private static CandidateRefusedException refuse(CandidateRefusal refusal, @Nullable String message) {

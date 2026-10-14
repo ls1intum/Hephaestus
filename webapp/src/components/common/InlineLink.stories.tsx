@@ -84,7 +84,7 @@ export const NoAddress: Story = {
  * shows which ones open; a figure with no list to open stays a plain word.
  */
 export const Count: Story = {
-	args: { tone: "count", href: "/w/demo/admin/practices/reviews/runs", children: "2 failed" },
+	args: { tone: "count", href: "/w/demo/admin/practices/reviews", children: "2 failed" },
 	render: (args) => (
 		<p className="max-w-md text-sm text-muted-foreground">
 			<InlineLink {...args} /> ·{" "}

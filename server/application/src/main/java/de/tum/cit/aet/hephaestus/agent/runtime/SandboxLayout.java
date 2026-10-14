@@ -62,11 +62,6 @@ public final class SandboxLayout {
     /** Workspace-relative filename of the composition stage's output, collected from {@link #OUTPUT_PATH}. */
     public static final String FEEDBACK_FILENAME = "feedback.json";
 
-    /**
-     * Filename of the execution report, collected from {@link #OUTPUT_PATH}: one entry per admitted practice with the
-     * program it ran, its status and stop reason, the direct models it declared, its calls and the reads it reached.
-     * It holds no candidate.
-     */
     public static final String PRACTICE_SCRIPT_REPORT_FILE = "practice-scripts.json";
 
     /** Workspace-relative filename of the composition stage's instructions, staged beside the runner. */
@@ -107,10 +102,6 @@ public final class SandboxLayout {
      */
     public static final String PRACTICE_SCRIPT_PRACTICES_PREFIX = PRACTICE_SCRIPT_PREFIX + "practices/";
 
-    /**
-     * Workspace-relative path of the link to the practice toolkit, which the practice runner profile creates in
-     * trusted setup before the runner starts. The programs import {@code ../lib/…} through it.
-     */
     public static final String PRACTICE_SCRIPT_LIBRARY_LINK = PRACTICE_SCRIPT_PREFIX + "lib";
 
     public static final String PRACTICE_SCRIPT_INPUTS_SUFFIX = ".inputs.json";

@@ -84,15 +84,13 @@ public class IntegrationFrameworkBootstrap {
     public void validate() {
         List<String> violations = new ArrayList<>();
         // Descriptor rules first: they hold regardless of which vendors are enabled, so reporting
-        // them
-        // ahead of the per-vendor ones puts the root cause on top.
+        // them ahead of the per-vendor ones puts the root cause on top.
         violations.addAll(reviewContract.validateDescriptors());
         for (IntegrationKind kind : manifests.registeredKinds()) {
             IntegrationManifest manifest = manifests.manifestFor(kind).orElseThrow();
             if (!manifest.enabled()) {
                 // A disabled integration wires none of the required beans, so running these checks
-                // would
-                // just report the feature flag back as violations; see
+                // would just report the feature flag back as violations; see
                 // IntegrationManifest#enabled().
                 log.info("Integration {} is disabled; skipping its capability and provenance checks", kind);
                 continue;

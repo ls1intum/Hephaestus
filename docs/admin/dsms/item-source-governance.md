@@ -1,5 +1,5 @@
 ---
-id: artifact-source-governance
+id: item-source-governance
 sidebar_position: 4
 title: Source governance
 description: Approval, minimization, retention, and erasure gate for AI-readable sources.
@@ -7,10 +7,10 @@ description: Approval, minimization, retention, and erasure gate for AI-readable
 
 # Source governance
 
-An artifact source is a registered logical input that can supply project or personal data. Files, mounts, caches, database projections, and tool results are materializations or derived copies. Each must map to a registered source and remain in the governance inventory. Code, configuration, documentation, and schema registration do not
+An item source is a registered logical input that can supply project or personal data. Files, mounts, caches, database projections, and tool results are materializations or derived copies. Each must map to a registered source and remain in the governance inventory. Code, configuration, documentation, and schema registration do not
 authorize collection. Approve each source use for its exact purpose before enabling it.
 
-The [source contract](../../contributor/artifact-source-contract) defines evidence semantics. This page
+The [source contract](../../contributor/item-source-contract) defines evidence semantics. This page
 defines the governance decision that permits collection, retention, processing, and disclosure.
 
 ## Rules
@@ -58,7 +58,7 @@ contract version in which that decision no longer permits it. For an immediate l
 Existing registry permission is not an operator instruction to keep processing.
 
 The runtime registry is
-[`source-use-decisions.json`](https://github.com/hephaestus-build/Hephaestus/blob/main/server/application/src/main/resources/contracts/source-use/1.3.0/source-use-decisions.json).
+[`source-use-decisions.json`](https://github.com/hephaestus-build/Hephaestus/blob/main/server/application/src/main/resources/contracts/source-use/2.0.0/source-use-decisions.json).
 It is an engineering gate and contains only releasable decision summaries. Each record governs exactly one source-use purpose. A source references separate records for automated review, feedback delivery, Mentor context, and operator evidence review:
 
 - `ENGINEERING_BASELINE` with `ENGINEERING_APPROVED` records maintainer approval of the shipped, permitted product scope.
@@ -209,8 +209,8 @@ source/workspace/person erasure paths are implemented and tested.
 ## Approval renewal
 
 The shipped decisions expire on the date recorded in
-`server/application/src/main/resources/contracts/source-use/1.3.0/source-use-decisions.json`. Every governed use fails
-closed after expiry. Instance operators should alert when `artifact_source_governance_expiry_seconds` falls below 30 days.
+`server/application/src/main/resources/contracts/source-use/2.0.0/source-use-decisions.json`. Every governed use fails
+closed after expiry. Instance operators should alert when `source_governance_expiry_seconds` falls below 30 days.
 They should assign the alert to the instance privacy/governance owner. The server logs a warning at startup inside the same window.
 
 Before the deadline, that owner must review the source scopes, processors, retention, erasure coverage, and DPIA

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.account.AccountPreferencesQueryAdapter;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
@@ -54,6 +55,9 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private MembershipReviewSelection selections;
+
+    @Autowired
+    private MembershipService service;
 
     @Autowired
     private EntityManager entityManager;
@@ -176,14 +180,30 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
         long humanId = Objects.requireNonNull(human.getId());
         long unclaimedId = Objects.requireNonNull(unclaimed.getId());
         var ids = List.of(humanId, unclaimedId);
-        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), ids, provider.getId()))
+        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), provider.getId()))
                 .containsExactly(human.getId());
-        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), ids, null))
+        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), null))
                 .containsExactlyInAnyOrderElementsOf(ids);
         identity.setDisabledAt(Instant.now());
         identities.saveAndFlush(identity);
-        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), ids, provider.getId()))
+        assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), provider.getId()))
                 .isEmpty();
+    }
+
+    @Test
+    void shouldExcludeHiddenAndNoAiMembersFromBothEligibilityReaders() {
+        var visible = accounts.saveAndFlush(new Account("Visible eligible"));
+        var member = membership(visible, "shared-eligibility");
+        var hidden = accounts.saveAndFlush(new Account("Hidden developer"));
+        addMember(member.getWorkspace(), hidden, Membership.WorkspaceRole.MEMBER, null);
+        memberships.findByWorkspace_IdAndAccount_Id(member.getWorkspace().getId(), hidden.getId()).orElseThrow().setHidden(true);
+        var noAi = new Account("No AI developer");
+        noAi.setAiChoice(AiChoice.NO_AI);
+        accounts.saveAndFlush(noAi);
+        addMember(member.getWorkspace(), noAi, Membership.WorkspaceRole.MEMBER, null);
+        var ids = List.of(Objects.requireNonNull(visible.getId()), Objects.requireNonNull(hidden.getId()), Objects.requireNonNull(noAi.getId()));
+        assertThat(service.eligibleAccountIds(member.getWorkspace().getId(), ids)).containsExactly(visible.getId());
+        assertThat(coverage.eligibleAccountIds(member.getWorkspace().getId())).containsExactly(visible.getId());
     }
 
     @Test

@@ -13,11 +13,11 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequested;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -26,11 +26,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 @ConditionalOnServerRole
 @ConditionalOnBooleanProperty(value = "hephaestus.integration.slack.conversation-ingest.enabled", matchIfMissing = true)
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
+@ConditionalOnBooleanProperty("hephaestus.integration.slack.enabled")
 public class SlackThreadEventScheduler {
     private static final int MIN_TURNS = 4;
     private static final int MIN_GROWTH = 2;
-    private static final int QUIESCENCE_MINUTES = 10;
+    private static final Duration QUIESCENCE = Duration.ofMinutes(10);
     private final SlackConversationCandidateSource candidates;
     private final ThreadItemSource source;
     private final ItemWriter items;
@@ -69,9 +69,7 @@ public class SlackThreadEventScheduler {
         long offered = 0;
         for (var candidate : candidates.settledCandidates(MIN_TURNS)) {
             Long last = SlackTs.toEpochMicros(candidate.lastTs());
-            if (last == null
-                    || Instant.EPOCH.plus(last, ChronoUnit.MICROS).isAfter(now.minusSeconds(QUIESCENCE_MINUTES * 60L)))
-                continue;
+            if (last == null || Instant.EPOCH.plus(last, ChronoUnit.MICROS).isAfter(now.minus(QUIESCENCE))) continue;
             if (candidates.liveTurnCount(candidate.workspaceId(), candidate.channelId(), candidate.threadTs())
                             < MIN_TURNS
                     || candidates.liveTurnCountSince(

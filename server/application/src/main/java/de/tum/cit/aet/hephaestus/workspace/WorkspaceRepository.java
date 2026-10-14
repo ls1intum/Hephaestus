@@ -21,24 +21,14 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
 
     Optional<Workspace> findFirstByOrderByIdAsc();
 
-    /**
-     * Pessimistic lock, for a read whose value is about to be snapshotted and mutated (the audited
-     * AI-settings writes). Without it the before-snapshot and the write are not serialized: two
-     * concurrent admin PATCHes both read the same prior state, Hibernate's full-column UPDATE makes
-     * the later one silently revert the earlier's field, and the audit trail ends up asserting a
-     * transition that never survived — with no row for the write that undid it.
-     */
+    /** Serialize the before-snapshot and update so concurrent admin changes cannot revert fields or misstate the audit trail. */
     @WorkspaceAgnostic("Locking read of the tenant root itself, by its own id")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
     @Query("SELECT w FROM Workspace w WHERE w.id = :id")
     Optional<Workspace> findByIdForUpdate(@Param("id") Long id);
 
-    /**
-     * {@link #findByIdForUpdate} for a caller that only has the slug. One locking query, not a
-     * lookup followed by a locking read: the second call returns the persistence context's existing
-     * instance without refreshing it, leaving the caller holding exactly the pre-lock state.
-     */
+    /** Lock by slug in one query; a separate lookup could return stale managed state on the locking read. */
     @WorkspaceAgnostic("Locking read of the tenant root itself, by its own slug")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))

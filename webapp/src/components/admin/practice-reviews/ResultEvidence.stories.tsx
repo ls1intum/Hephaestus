@@ -7,11 +7,6 @@ import { expectNoPageOverflow } from "@/stories/reflow";
 
 import { ResultEvidence } from "./ResultEvidence";
 
-/**
- * `path` is what each kind actually puts there: a repo-relative file for the code sources, and a
- * human-facing object name for the rest — the server's own instruction is that a non-diff citation
- * "names the issue or comment object, not a fabricated source file".
- */
 const CITATION_BY_KIND: Record<string, { path: string; quote: string }> = {
 	"scm.pull-request.core": {
 		path: "Pull request description",
@@ -164,7 +159,7 @@ export const EverySource: Story = {
 	},
 };
 
-/** Only code locators expose source coordinates; object coordinates refer to serialized context. */
+// Object coordinates identify serialized context; only code locators expose source line numbers.
 export const LineNumbersOnlyWhereTheyAreReal: Story = {
 	args: {
 		citations: [citation("scm.repository.tree"), citation("slack.conversation.thread")],

@@ -57,11 +57,6 @@ public class AuthAuditController {
             @Nullable String displayName,
             @Nullable String email) {}
 
-    /**
-     * Optional query-param filters for the list/export endpoints, bound as a flattened {@link
-     * ParameterObject} so the handler stays under the parameter-count budget. All fields are
-     * optional; an absent field means "no constraint on that dimension".
-     */
     public record AuditFilterParams(
             @RequestParam(required = false) @Nullable Long accountId,
             @RequestParam(required = false) @Nullable Long actingAccountId,
@@ -85,11 +80,11 @@ public class AuthAuditController {
             @NonNull String eventType,
             @NonNull String result,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean elevatedViaInstanceAdmin,
+            // Raw IDs retain attribution after an account is deleted.
             @Nullable Long accountId,
             @Nullable Long actingAccountId,
             @Nullable Long viewedActorId,
             @Nullable Long viewedAccountId,
-            // Raw IDs retain attribution after an account is deleted.
             @Nullable AuthAuditAccountDTO account,
             @Nullable AuthAuditAccountDTO actor,
             @Nullable String failureReason,

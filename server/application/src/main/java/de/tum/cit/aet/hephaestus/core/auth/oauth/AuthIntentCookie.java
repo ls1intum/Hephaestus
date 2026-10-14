@@ -64,7 +64,6 @@ public class AuthIntentCookie {
         public enum Mode {
             /** Fresh login — JIT-create Account on first IdP subject we've never seen. */
             LOGIN,
-            /** Already authenticated; attach a new Identity to the current Account. */
             LINK,
             /**
              * Fresh login for an installed client: ends in a PKCE-bound handoff, never in a cookie.

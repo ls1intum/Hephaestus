@@ -26,7 +26,6 @@ final class ReviewJobBackoff {
         return compute(attemptNumber, ThreadLocalRandom.current());
     }
 
-    /** Seeded-random overload for deterministic unit testing. */
     static Duration compute(int attemptNumber, RandomGenerator random) {
         int n = Math.min(Math.max(0, attemptNumber), MAX_ATTEMPT_FOR_POWER);
         long baseSeconds = ((long) n * n * n * n) + BASE_OFFSET_SECONDS;

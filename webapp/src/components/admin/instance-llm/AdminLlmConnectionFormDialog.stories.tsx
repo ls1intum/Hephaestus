@@ -93,10 +93,7 @@ export const EditEmbeddingsConnection: Story = {
 	},
 };
 
-/**
- * An endpoint for practice scripts may serve no `{baseUrl}/models`. When it answers that the list is not
- * there, the test is no fault, and the result says so in the status region.
- */
+// Direct-model endpoints can omit /models; that absence must not report a failed connection.
 export const EmbeddingsProbeListsNoModels: Story = {
 	args: {
 		editing: embeddingsConnection,

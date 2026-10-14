@@ -87,9 +87,8 @@ public class GitLabSummaryWriter implements SummaryWriter {
         } catch (OutboundEgressSuppressedException e) {
             throw e;
         } catch (RuntimeException e) {
-            // A transport/timeout error must surface as the channel's typed exception (consistent
-            // with
-            // updateSummary) so ScmSummaryPoster's catch(FeedbackDeliveryException) wraps it
+            // A transport/timeout error must surface as the adapter's typed exception (consistent
+            // with updateSummary) so ScmSummaryPoster's catch(FeedbackDeliveryException) wraps it
             // uniformly.
             throw new FeedbackDeliveryException("createNote transport error: " + e.getMessage(), e);
         }
@@ -99,8 +98,7 @@ public class GitLabSummaryWriter implements SummaryWriter {
         }
 
         // Surface TOP-LEVEL GraphQL errors with their real reason — createNote returns no payload
-        // at all when
-        // the instance is read-only, the gid is unresolvable, or permission is denied.
+        // at all when the instance is read-only, the gid is unresolvable, or permission is denied.
         List<String> topLevelErrors = Objects.requireNonNull(response).getErrors().stream()
                 .map(e -> e.getMessage())
                 .filter(Objects::nonNull)
@@ -181,11 +179,9 @@ public class GitLabSummaryWriter implements SummaryWriter {
         }
 
         // A DELETED note surfaces as a TOP-LEVEL GraphQL error (the global id resolves to nothing),
-        // NOT a
-        // mutation-payload error — GitLab returns no `updateNote` object at all. Left unchecked,
-        // that falls
-        // through to the no-id branch below and is mis-read as TRANSIENT, so an orphaned summary
-        // never re-posts.
+        // NOT a mutation-payload error — GitLab returns no `updateNote` object at all. Left
+        // unchecked, that falls through to the no-id branch below and is mis-read as TRANSIENT, so
+        // an orphaned summary never re-posts.
         List<String> topLevelErrors = Objects.requireNonNull(response).getErrors().stream()
                 .map(e -> e.getMessage())
                 .filter(Objects::nonNull)

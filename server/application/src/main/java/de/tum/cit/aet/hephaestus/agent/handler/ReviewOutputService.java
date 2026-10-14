@@ -14,19 +14,13 @@ import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionResponseDTO;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
-import de.tum.cit.aet.hephaestus.practices.spi.ClaimBasis;
-import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
-import de.tum.cit.aet.hephaestus.practices.spi.InapplicabilityWarrant;
-import de.tum.cit.aet.hephaestus.practices.spi.OpenQuestion;
+import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemCandidate;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
-import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEvidence;
-import de.tum.cit.aet.hephaestus.practices.spi.ResultExample;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
-import de.tum.cit.aet.hephaestus.practices.spi.SearchWarrant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -105,8 +99,8 @@ public class ReviewOutputService {
                         assignment, refused.refusal(), Objects.requireNonNull(refused.getMessage())));
                 continue;
             }
-            if (candidate.coverage().path("source").asString().equals("host")
-                    && !candidate.coverage().path("receipts").equals(mapper.valueToTree(entry.readReceipts()))) {
+            if (candidate.coverage() instanceof HostCoverage host
+                    && !host.receipts().equals(entry.readReceipts())) {
                 refusals.add(new WithheldAssignment(
                         assignment,
                         CandidateRefusal.COVERAGE_INCONSISTENT,
@@ -114,8 +108,8 @@ public class ReviewOutputService {
                 continue;
             }
             try {
-                verifier.verifyCandidate(job, assignment, review.kind(), candidate, captured);
-                admitted.add(result(assignment, candidate));
+                var verified = verifier.verifyCandidate(job, assignment, review.kind(), candidate, captured);
+                admitted.add(result(assignment, verified));
             } catch (CandidateEvidenceVerifier.Unverified refusal) {
                 refusals.add(new WithheldAssignment(
                         assignment, refusal.refusal(), Objects.requireNonNull(refusal.getMessage())));
@@ -178,19 +172,12 @@ public class ReviewOutputService {
                     problem.severity(),
                     problem.summary(),
                     problem.explanation(),
-                    problem.citations().stream().map(this::citation).toList(),
-                    mapper.treeToValue(problem.basis(), ClaimBasis.class),
+                    problem.citations(),
+                    problem.basis(),
                     problem.nextStep()));
         }
         var evidence = new ResultEvidence(
-                candidate.citations().stream().map(this::citation).toList(),
-                candidate.search() == null ? null : mapper.treeToValue(candidate.search(), SearchWarrant.class),
-                candidate.inapplicability() == null
-                        ? null
-                        : mapper.treeToValue(candidate.inapplicability(), InapplicabilityWarrant.class),
-                candidate.openQuestions().stream()
-                        .map(question -> mapper.treeToValue(question, OpenQuestion.class))
-                        .toList());
+                candidate.citations(), candidate.search(), candidate.inapplicability(), candidate.openQuestions());
         return new ResultCandidate(
                 assignment.practice().practiceId(),
                 assignment.practice().practiceVersionId(),
@@ -201,12 +188,8 @@ public class ReviewOutputService {
                 candidate.summary(),
                 candidate.explanation(),
                 evidence,
-                candidate.example() == null ? null : mapper.treeToValue(candidate.example(), ResultExample.class),
-                mapper.treeToValue(candidate.coverage(), ResultCoverage.class),
+                candidate.example(),
+                candidate.coverage(),
                 problems);
-    }
-
-    private EvidenceCitation citation(ObjectNode citation) {
-        return mapper.treeToValue(citation, EvidenceCitation.class);
     }
 }

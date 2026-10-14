@@ -20,7 +20,7 @@ import {
 	SCAN_ID,
 	scanPage,
 	wireScan,
-} from "./-scan-wire";
+} from "./-scan-server";
 
 // Route mounting loads the admin layout and lazy modules; allow time for the first render.
 vi.setConfig({ testTimeout: 15_000 });

@@ -21,7 +21,6 @@ import {
 	stagePractices,
 } from "./program-host-runner.ts";
 
-
 const JOB_TOKEN = "job-token";
 const CALL_TOKENS = 2000;
 const ACCOUNT = 5000;

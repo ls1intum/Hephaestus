@@ -45,11 +45,6 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/**
- * Only the outbound Slack token exchange is a double; state signing, the callback and persistence
- * are real. Shares the {@code slack-signed} context with
- * SlackChannelAdminControllerIntegrationTest.
- */
 @TestPropertySource(
         properties = {
             "hephaestus.integration.slack.enabled=true",
@@ -160,11 +155,6 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
                 .isEmpty();
     }
 
-    /**
-     * An install into {@code source} that already passed its ownership check holds the index entry
-     * uncommitted; the install into {@code target} passes its own check, blocks on that entry, and
-     * fails once it commits.
-     */
     @Test
     void shouldReportTheSameConflictWhenAConcurrentInstallCommitsFirst() throws Exception {
         User stranger = accountHolder("target-owner");
@@ -200,11 +190,6 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
                 .isPresent();
     }
 
-    /**
-     * The same team reauthorized in its own workspace replaces the token on the row that holds it —
-     * reached directly while active, and through a fresh pending placeholder and the team's natural
-     * key while suspended.
-     */
     @ParameterizedTest
     @EnumSource(
             value = IntegrationState.class,

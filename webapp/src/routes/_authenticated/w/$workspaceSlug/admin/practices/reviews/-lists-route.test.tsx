@@ -11,7 +11,7 @@ import {
 } from "@/components/admin/practice-reviews/fixtures";
 import { developerLabel } from "@/components/admin/practice-reviews/review-format";
 import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
-import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
+import { reviewHandlers } from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
 
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { ownMembership } from "@/mocks/fixtures/workspaces";
@@ -96,17 +96,14 @@ function recordRequests() {
 	return { reviewUrls, resultUrls, problemUrls, feedbackUrls, locationCountUrls };
 }
 
-function activeReviewsHandler(getReview: () => ReviewSummary, polls: URL[], reads: URL[]) {
-	return http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
-		const url = new URL(request.url);
-		const poll = !url.searchParams.has("page");
-		if (!isTabCount(url)) {
-			(poll ? polls : reads).push(url);
-		}
-		const review = getReview();
-		const rows = poll && !values(url, "status").includes(review.status) ? [] : [review];
-		return HttpResponse.json(pageOf(rows));
-	});
+function activeReviewsHandler(getReview: () => ReviewSummary, reads: URL[]) {
+ return http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
+  const url = new URL(request.url);
+  if (!isTabCount(url)) { reads.push(url); }
+  const review = getReview();
+  const rows = values(url, "status").includes(review.status) ? [review] : [];
+  return HttpResponse.json(pageOf(rows));
+ });
 }
 
 const [FIRST_PAGE, SECOND_PAGE] = twoCompleteReviews();
@@ -238,7 +235,7 @@ describe("practice review list routes", () => {
 		const { problemUrls } = recordRequests();
 
 		renderRouteAtWithRouter(
-			'/w/acme/admin/practices/reviews/observations?severity=["MAJOR"]&developerId=7&practiceSlug=["thin-controllers"]&groupSlug=["design"]&from=2026-09-01&to=2026-09-10&resultId=3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84',
+			'/w/acme/admin/practices/reviews/problems?severity=["MAJOR"]&developerId=7&practiceSlug=["thin-controllers"]&groupSlug=["design"]&from=2026-09-01&to=2026-09-10&resultId=3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84',
 		);
 		await screen.findByText("No problems match these filters", undefined, ROUTE_RENDER_WAIT);
 
@@ -255,7 +252,7 @@ describe("practice review list routes", () => {
 	it("asks for the problems of the severity chosen, and for all of them once it is cleared", async () => {
 		const { problemUrls } = recordRequests();
 
-		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices/reviews/observations");
+		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices/reviews/problems");
 		const severity = await screen.findByRole("combobox", { name: "Severity" }, ROUTE_RENDER_WAIT);
 		await userEvent.click(severity);
 		await userEvent.click(await screen.findByRole("option", { name: /Major/u }));
@@ -331,28 +328,24 @@ describe("practice review list routes", () => {
 	it("follows a running review until it stops, then stops asking", async () => {
 		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
 		try {
-			const { reviewUrls } = recordRequests();
+			recordRequests();
 			const polls: URL[] = [];
 			let review: ReviewSummary = { ...FIRST_PAGE, status: "RUNNING", completedAt: null };
-			server.use(activeReviewsHandler(() => review, polls, reviewUrls));
+			server.use(activeReviewsHandler(() => review, polls));
 
-			renderRouteAtWithRouter('/w/acme/admin/practices/reviews/runs?status=["RUNNING","FAILED"]');
-			const table = await screen.findByRole(
-				"table",
-				{ name: "Practice reviews, newest first" },
-				ROUTE_RENDER_WAIT,
-			);
-			await within(table).findByRole("link", { name: reviewLinkName(FIRST_PAGE) });
+			renderRouteAtWithRouter('/w/acme/admin/practices/reviews?status=["RUNNING","FAILED"]');
+			await screen.findByRole("link", { name: reviewLinkName(FIRST_PAGE) }, ROUTE_RENDER_WAIT);
+   const table = screen.getByRole("table", { name: "Practice reviews, newest first" });
 			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
 			// The interval is faked, so the waits poll on vitest's own timer rather than on setInterval.
 			await vi.waitFor(() => expect(polls.length).toBeGreaterThan(0));
-			expect(values(polls.at(-1), "status")).toStrictEqual(["RUNNING"]);
+			expect(values(polls.at(-1), "status")).toStrictEqual(["RUNNING", "FAILED"]);
 			expect(within(table).queryAllByText("Failed")).toHaveLength(0);
 
 			review = { ...review, status: "FAILED" };
-			const listReads = reviewUrls.length;
+			const listReads = polls.length;
 			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-			await vi.waitFor(() => expect(reviewUrls.length).toBeGreaterThan(listReads));
+			await vi.waitFor(() => expect(polls.length).toBeGreaterThan(listReads));
 			await within(table).findAllByText("Failed", undefined, ROUTE_RENDER_WAIT);
 
 			const settled = polls.length;
@@ -367,7 +360,7 @@ describe("practice review list routes", () => {
 		const { reviewUrls } = recordRequests();
 
 		renderRouteAtWithRouter(
-			'/w/acme/admin/practices/reviews/runs?developerId=7&practiceSlug=["thin-controllers"]&groupSlug=["design"]&from=2026-09-01&to=2026-09-10&reviewId=3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84',
+			'/w/acme/admin/practices/reviews?developerId=7&practiceSlug=["thin-controllers"]&groupSlug=["design"]&from=2026-09-01&to=2026-09-10&reviewId=3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84',
 		);
 		await screen.findByText("No reviews match these filters", undefined, ROUTE_RENDER_WAIT);
 
@@ -399,9 +392,9 @@ describe("practice review list routes", () => {
 	 * filters, its Reset and its count are below them.
 	 */
 	it.each([
-		["runs", "Created", "Status"],
+		["", "Created", "Status"],
 		["results", "Recorded", "Outcome"],
-		["observations", "Recorded", "Severity"],
+		["problems", "Recorded", "Severity"],
 		["feedback", "Composed", "Delivery"],
 	])(
 		"puts the scope above the tabs and the %s tab's own filters below them",
@@ -432,7 +425,7 @@ describe("practice review list routes", () => {
 	/** The overview keeps the scope it does not apply in the same row above the tabs. */
 	it("keeps the scope above the tabs on the overview, marked as not applied", async () => {
 		recordRequests();
-		renderRouteAtWithRouter("/w/acme/admin/practices/reviews?developerId=7");
+		renderRouteAtWithRouter("/w/acme/admin/practices/reviews/overview?developerId=7");
 
 		const scope = await screen.findByRole(
 			"group",
@@ -472,7 +465,7 @@ describe("practice review list routes", () => {
 		const { reviewUrls } = recordRequests();
 		serveReviewPages(reviewUrls);
 
-		renderRouteAtWithRouter('/w/acme/admin/practices/reviews/runs?status=["COMPLETE"]');
+		renderRouteAtWithRouter('/w/acme/admin/practices/reviews?status=["COMPLETE"]');
 		await screen.findByRole("link", { name: reviewLinkName(FIRST_PAGE) }, ROUTE_RENDER_WAIT);
 		await userEvent.click(screen.getByRole("button", { name: "Show more reviews" }));
 		await screen.findByRole("link", { name: reviewLinkName(SECOND_PAGE) }, ROUTE_RENDER_WAIT);
@@ -501,12 +494,9 @@ describe("practice review list routes", () => {
 			),
 		);
 
-		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices/reviews/runs");
-		const table = await screen.findByRole(
-			"table",
-			{ name: "Practice reviews, newest first" },
-			ROUTE_RENDER_WAIT,
-		);
+		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices/reviews");
+		await screen.findByRole("link", { name: reviewLinkName(requestedReview) }, ROUTE_RENDER_WAIT);
+  const table = screen.getByRole("table", { name: "Practice reviews, newest first" });
 		const requester = reviewAccounts.grace.displayName;
 		assert(requester !== null);
 		await within(table).findByText(requester, undefined, ROUTE_RENDER_WAIT);
@@ -521,6 +511,6 @@ describe("practice review list routes", () => {
 				`review:${requestedReview.id}`,
 			]);
 		});
-		expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews/runs");
+		expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews");
 	});
 });

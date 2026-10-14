@@ -74,7 +74,17 @@ function stubWorkspace(extra: Parameters<typeof server.use>) {
 		),
 		http.get("*/workspaces/:workspaceSlug/agents", () => HttpResponse.json([])),
 		http.get("*/workspaces/:workspaceSlug/members", () =>
-			HttpResponse.json([membership({}), unclaimed]),
+			HttpResponse.json({
+				content: [membership({}), unclaimed],
+				number: 0,
+				size: 100,
+				totalElements: 2,
+				totalPages: 1,
+				last: true,
+				first: true,
+				empty: false,
+				numberOfElements: 2,
+			}),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/items", () =>
 			HttpResponse.json({
@@ -174,7 +184,7 @@ describe("review route", () => {
 		expect(screen.queryByText("States the motivation")).toBeNull();
 	});
 
-// Unmounted section elements run no hooks; a closed section must not fetch its data.
+	// Unmounted section elements run no hooks; a closed section must not fetch its data.
 	it("asks for a section's data only once its tab is opened", async () => {
 		const requested: string[] = [];
 		const recorded = (path: string, body: Parameters<typeof HttpResponse.json>[0]) =>
@@ -213,7 +223,7 @@ describe("review route", () => {
 		expect(screen.queryByRole("tabpanel", { name: "Feedback mode" })).toBeNull();
 	});
 
-// Null restores inheritance; Off is an explicit choice and cannot serve as reset.
+	// Null restores inheritance; Off is an explicit choice and cannot serve as reset.
 	it("overrides a practice's feedback mode and makes it inherit again with an explicit null", async () => {
 		const bodies: SetFeedbackModeRequest[] = [];
 		stubWorkspace([

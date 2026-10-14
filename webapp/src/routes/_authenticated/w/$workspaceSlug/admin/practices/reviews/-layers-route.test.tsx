@@ -22,14 +22,14 @@ import {
 	LINEAGE_REVIEW_ID,
 	wholeReview,
 } from "@/components/admin/practice-reviews/lineage-fixtures";
-import {
-	reviewHandlers,
-	feedbackCountHandlers,
-} from "@/components/admin/practice-reviews/story-mock-server";
 import { forgetTraceDisplay } from "@/components/admin/practice-reviews/trace-display";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
+import {
+	reviewHandlers,
+	feedbackCountHandlers,
+} from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
 import { deferred, sleep } from "@/test/async";
 import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -79,7 +79,7 @@ function requestsTo(pathname: string): URL[] {
 }
 
 beforeEach(() => {
-// jsdom needs an IntersectionObserver stub for paged lists.
+	// jsdom needs an IntersectionObserver stub for paged lists.
 	vi.stubGlobal("IntersectionObserver", ObserverStub);
 	forgetTraceDisplay();
 	requested.length = 0;
@@ -166,7 +166,7 @@ function startedAt(sheet: HTMLElement): string | undefined {
 
 describe("layer 0: a row's own record, Track and Trace", () => {
 	it("opens a review's sheet from its row: the review alone, with no story and no record links", async () => {
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs`);
+		const { router } = renderRouteAtWithRouter(REVIEWS);
 		const [open] = await screen.findAllByRole(
 			"link",
 			{ name: /^Open review of #/u },
@@ -234,7 +234,7 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 	});
 
 	it("traces a review from its row: the trace opens and the review is tracked", async () => {
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs`);
+		const { router } = renderRouteAtWithRouter(REVIEWS);
 		const [trace] = await screen.findAllByRole(
 			"link",
 			{ name: /^Trace review of #/u },
@@ -327,7 +327,7 @@ describe("a review's sheet", () => {
 			),
 		);
 
-		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=review:${REVIEW}`);
+		renderRouteAtWithRouter(`${REVIEWS}?detail=review:${REVIEW}`);
 		const sheet = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
 		const execution = await within(sheet).findByRole(
 			"list",
@@ -349,7 +349,7 @@ describe("a review's sheet", () => {
 			),
 		);
 
-		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=review:${REVIEW}`);
+		renderRouteAtWithRouter(`${REVIEWS}?detail=review:${REVIEW}`);
 		const sheet = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
 		await within(sheet).findByRole("region", { name: "Practice scripts" }, ROUTE_RENDER_WAIT);
 	});
@@ -357,7 +357,7 @@ describe("a review's sheet", () => {
 
 describe("the trace and a record over it", () => {
 	it("opens an event's sheet over the trace, with no links on, and Escape closes it, then the trace", async () => {
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs?detail=${TRACE}`);
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}?detail=${TRACE}`);
 		const sheet = await traceSheet();
 		const dot = within(sheet).getByRole("button", {
 			name: /A cache miss and a permission failure come back as the same 404/u,
@@ -399,7 +399,7 @@ describe("the trace and a record over it", () => {
 	 * with, so the browser's Back afterwards does not open them again.
 	 */
 	it("closes a trace and the sheet over it from the path without Back reopening them", async () => {
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs`);
+		const { router } = renderRouteAtWithRouter(REVIEWS);
 		const [trace] = await screen.findAllByRole(
 			"link",
 			{ name: /^Trace review of #/u },
@@ -432,7 +432,7 @@ describe("the trace and a record over it", () => {
 	});
 
 	it("keeps the mark where the reader started while a record opens over the trace", async () => {
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs?detail=${TRACE}`);
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}?detail=${TRACE}`);
 		const sheet = await traceSheet();
 		expect(startedAt(sheet)).toBe("review");
 		within(sheet).getByText("You started here");
@@ -454,7 +454,7 @@ describe("the trace and a record over it", () => {
 	});
 
 	it("keeps the mark where it started", async () => {
-		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=${TRACE}`);
+		renderRouteAtWithRouter(`${REVIEWS}?detail=${TRACE}`);
 		const sheet = await traceSheet();
 		await userEvent.click(within(sheet).getByRole("button", { name: "Expand all" }));
 		expect(startedAt(sheet)).toBe("review");
@@ -462,7 +462,7 @@ describe("the trace and a record over it", () => {
 
 	it("keeps a sheet over the trace as the deepest level: an address with more keeps the front one", async () => {
 		const { router } = renderRouteAtWithRouter(
-			`${REVIEWS}/runs?detail=${encodeURIComponent(
+			`${REVIEWS}?detail=${encodeURIComponent(
 				JSON.stringify([TRACE, `review:${REVIEW}`, `result:${RESULT}`]),
 			)}`,
 		);
@@ -490,12 +490,12 @@ describe("the trace and a record over it", () => {
 			http.get(`*${OTHER}/practices/reviews/lineage`, heldWorkspaceRead(held.promise)),
 		);
 		try {
-			const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs`);
+			const { router } = renderRouteAtWithRouter(REVIEWS);
 			await screen.findByRole("link", { name: "Reviews, 1" }, ROUTE_RENDER_WAIT);
-			await act(async () => router.history.push(`${REVIEWS}/runs?detail=${TRACE}`));
+			await act(async () => router.history.push(`${REVIEWS}?detail=${TRACE}`));
 			within(await traceSheet()).getByText("You started here");
 			await act(async () =>
-				router.history.push(`/w/other/admin/practices/reviews/runs?detail=${TRACE}&developerId=7`),
+				router.history.push(`/w/other/admin/practices/reviews?detail=${TRACE}&developerId=7`),
 			);
 			const otherReads = () => requested.filter((url) => url.pathname.startsWith(`${OTHER}/`));
 			await waitFor(() => {
@@ -523,7 +523,7 @@ function showToggle(sheet: HTMLElement, name: string): HTMLElement {
 
 describe("what the trace shows", () => {
 	it("offers one Show control", async () => {
-		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=${TRACE}`);
+		renderRouteAtWithRouter(`${REVIEWS}?detail=${TRACE}`);
 		const sheet = await traceSheet();
 		const pressed = ["Times", "System info", "Siblings", "Connections"].map((name) =>
 			showToggle(sheet, name).getAttribute("aria-pressed"),
@@ -532,7 +532,7 @@ describe("what the trace shows", () => {
 	});
 
 	it("applies each toggle to the whole trace at once", async () => {
-		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=${TRACE}`);
+		renderRouteAtWithRouter(`${REVIEWS}?detail=${TRACE}`);
 		const sheet = await traceSheet();
 		const steps = within(sheet).getByRole("list", { name: "Steps, oldest first" });
 		expect(steps.querySelectorAll("time").length).toBeGreaterThan(1);
@@ -555,7 +555,7 @@ describe("what the trace shows", () => {
 	});
 
 	it("remembers the reader's choice for the next trace they open", async () => {
-		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=${TRACE}`);
+		renderRouteAtWithRouter(`${REVIEWS}?detail=${TRACE}`);
 		const first = await traceSheet();
 		await userEvent.click(showToggle(first, "Times"));
 		await userEvent.click(showToggle(first, "Connections"));
@@ -575,7 +575,7 @@ describe("what the trace shows", () => {
 			throw new Error("Storage is blocked");
 		});
 		try {
-			renderRouteAtWithRouter(`${REVIEWS}/runs?detail=${TRACE}`);
+			renderRouteAtWithRouter(`${REVIEWS}?detail=${TRACE}`);
 			const sheet = await traceSheet();
 			expect(showToggle(sheet, "Times").getAttribute("aria-pressed")).toBe("true");
 		} finally {
@@ -597,9 +597,7 @@ describe("a record's sheet is the record alone", () => {
 		["practice", `practice:${String(practiceCounts[0]?.practiceSlug)}`],
 	])("renders no story in the %s sheet, alone or over a trace", async (_kind, level) => {
 		for (const detail of [[level], [TRACE, level]]) {
-			renderRouteAtWithRouter(
-				`${REVIEWS}/runs?detail=${encodeURIComponent(JSON.stringify(detail))}`,
-			);
+			renderRouteAtWithRouter(`${REVIEWS}?detail=${encodeURIComponent(JSON.stringify(detail))}`);
 			const sheet = await frontSheet(detail.length);
 			await within(sheet).findByRole("heading", { level: 2 }, ROUTE_RENDER_WAIT);
 			expect(sheet.querySelector("[data-trace-verdict]")).toBeNull();
@@ -629,7 +627,7 @@ function sheetMarkup(sheet: HTMLElement): string {
 
 /** The sheet in front once it has settled: its record read and nothing left loading. */
 async function settledSheet(detail: string[]): Promise<string> {
-	renderRouteAtWithRouter(`${REVIEWS}/runs?detail=${encodeURIComponent(JSON.stringify(detail))}`);
+	renderRouteAtWithRouter(`${REVIEWS}?detail=${encodeURIComponent(JSON.stringify(detail))}`);
 	const sheet = await frontSheet(detail.length);
 	await within(sheet).findByRole("heading", { level: 2 }, ROUTE_RENDER_WAIT);
 	await waitFor(
@@ -689,7 +687,7 @@ describe("the trace of work no review started on", () => {
 			),
 		);
 		renderRouteAtWithRouter(
-			`${REVIEWS}/runs?detail=${encodeURIComponent(JSON.stringify([`trace:${ITEM}`]))}`,
+			`${REVIEWS}?detail=${encodeURIComponent(JSON.stringify([`trace:${ITEM}`]))}`,
 		);
 		const sheet = await traceSheet();
 		await waitFor(() =>
@@ -707,10 +705,7 @@ describe("deep links", () => {
 		const { router } = renderRouteAtWithRouter(
 			`${REVIEWS}/review/${REVIEW}?focus=result:${RESULT}&reviewId=${REVIEW}&selected=true&practiceSlug=thin-controllers&from=2026-08-01&developerId=7`,
 		);
-		await waitFor(
-			() => expect(router.state.location.pathname).toBe(`${REVIEWS}/runs`),
-			ROUTE_RENDER_WAIT,
-		);
+		await waitFor(() => expect(router.state.location.pathname).toBe(REVIEWS), ROUTE_RENDER_WAIT);
 		expect(router.state.location.search).toMatchObject({
 			detail: `trace:result:${RESULT}`,
 			reviewId: REVIEW,
@@ -733,9 +728,7 @@ describe("deep links", () => {
 	});
 
 	it("drops a step an old address still names", async () => {
-		const { router } = renderRouteAtWithRouter(
-			`${REVIEWS}/runs?detail=review:${REVIEW}&focus=results`,
-		);
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}?detail=review:${REVIEW}&focus=results`);
 		await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
 		expect(router.state.location.search).not.toHaveProperty("focus");
 	});

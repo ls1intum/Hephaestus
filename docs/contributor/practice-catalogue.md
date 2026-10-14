@@ -59,7 +59,7 @@ Instance release acceptance uses the instance proposal, without a workspace vers
 
 The review digest includes applicability, About, reads, Reviewed by, criteria, script and scan.
 It excludes name, guidance, reviewOn, lineNotes and group organization.
-Name or group changes do not make an old verdict a different standard.
+Name or group changes do not make an old result a different standard.
 A scheduling change changes the full definition but not what the same evidence establishes.
 
 The database generates the digest from its canonical JSONB projection.

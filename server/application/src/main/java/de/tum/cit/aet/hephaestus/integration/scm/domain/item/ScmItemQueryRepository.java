@@ -9,7 +9,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-/** Scoped native joins return only the source facts needed by the SCM item boundary. */
 public interface ScmItemQueryRepository extends Repository<Item, Long> {
     @Query(value = """
         WITH selected AS (SELECT * FROM item WHERE workspace_id=:workspaceId AND id IN (:ids))

@@ -496,10 +496,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             assertThat(requestedTeamIds()).isEmpty();
         }
 
-        /**
-         * sync-lifecycle.md § Reviewer lists are dated snapshots: review requests can arrive within
-         * one second.
-         */
+    // Reviewer requests can arrive within one second; snapshot ordering needs the read time.
         @Test
         void shouldStoreTheLaterReviewRequestWhenItArrivesWithinTheSameSecond() throws Exception {
             Team team = team(FIXTURE_TEAM_ID, "hephaetus");

@@ -190,10 +190,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
 
         @Test
         void confidentialIssue_purgesSnapshotInsteadOfProcessing() throws IOException {
-            // A public → confidential flip must NOT (re)ingest, but MUST purge any already-mirrored
-            // public
-            // snapshot — so the handler resolves the context (to know the repo) and delegates to
-            // purgeConfidential rather than short-circuiting before context resolution.
             GitLabIssueEventDTO event = createEvent("update", "opened", true);
 
             Message msg = mockMessage(event);

@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -127,19 +127,19 @@ function AdminMembersContainer() {
 
 	const { mutate: changeHidden } = toggleHidden;
 	const { mutate: changeRole } = assignRole;
-	const handleToggleHidden = useCallback((accountId: string, hidden: boolean) => {
+	const handleToggleHidden = (accountId: string, hidden: boolean) => {
 		if (!hasText(workspaceSlug)) {
 			return;
 		}
 		changeHidden({ path: { workspaceSlug, accountId }, body: { hidden } });
-	}, [workspaceSlug, changeHidden]);
+	};
 
-	const handleRoleChange = useCallback((accountId: string, role: WorkspaceMembership["role"]) => {
+	const handleRoleChange = (accountId: string, role: WorkspaceMembership["role"]) => {
 		if (!hasText(workspaceSlug)) {
 			return;
 		}
 		changeRole({ path: { workspaceSlug }, body: { accountId, role } });
-	}, [workspaceSlug, changeRole]);
+	};
 
 	const teams = teamsQuery.isError
 		? []

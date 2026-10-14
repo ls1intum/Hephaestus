@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collections;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class ScmItemChangeListener {
     private final ScmItemSourceQuery items;
     private final ResultStore results;
+    private final Clock clock;
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void onUpdated(ScmDomainEvent.IssueUpdated event) {
@@ -31,7 +33,7 @@ public class ScmItemChangeListener {
     }
 
     private void advance(long sourceId) {
-        Instant at = Instant.now();
+        Instant at = clock.instant();
         for (var item : items.issueItems(ScmItemEvents.ISSUE.value(), sourceId))
             results.endCurrent(item.getWorkspaceId(), item.getItemId(), ResultEndReason.WORK_CHANGED, at);
     }

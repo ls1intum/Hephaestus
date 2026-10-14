@@ -397,7 +397,7 @@ public class OutlineDocumentSyncService {
             Instant now = Instant.now();
             upsert(ctx, collection.get(), null, meta, existing, /* budget: single doc */ null, now);
             // Read the row back rather than recording from `mirrored`: a content version is keyed on
-            // the document's hash, and the whole point of this signal is that the content just changed.
+            // the document's hash, and this event records a content change.
             documentRepository
                     .findSnapshotByDocumentId(workspaceId, ctx.connectionId(), documentId)
                     .ifPresent(refreshed -> recordAndOffer(workspaceId, refreshed, eventName, now, FoundBy.WEBHOOK));
@@ -446,7 +446,7 @@ public class OutlineDocumentSyncService {
 
     /**
      * One {@code collections.list} call: refresh every mirrored row's human-facing catalog fields and
-     * return the live collections by id (the visibility signal for the reconcile).
+     * return the live collections by id (the visibility input for the reconcile).
      */
     private Map<String, OutlineCollectionModel> refreshCatalog(SyncContext ctx) {
         Map<String, OutlineCollectionModel> live = new LinkedHashMap<>();

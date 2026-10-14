@@ -144,10 +144,6 @@ class ReviewedWorkUrlsTest extends BaseUnitTest {
             assertThat(ReviewedWorkUrls.configuredOrigin(serverUrl)).isEmpty();
         }
 
-        /**
-         * A host is compared whole: a lookalike that merely ends in the configured host is another
-         * server.
-         */
         @Test
         void shouldNotMatchAHostThatOnlySharesASuffixWhenComparingOrigins() {
             String page = ReviewedWorkUrls.page("https://evil-github.com/octo/repo/pull/5")
@@ -251,9 +247,6 @@ class ReviewedWorkUrlsTest extends BaseUnitTest {
             assertThat(gitLab(url)).contains(new WorkAddress("group/project", ScmItemEvents.PULL_REQUEST, 5));
         }
 
-        /**
-         * Issues and work items share one project IID namespace; the same number is the same issue.
-         */
         @ParameterizedTest
         @ValueSource(
                 strings = {

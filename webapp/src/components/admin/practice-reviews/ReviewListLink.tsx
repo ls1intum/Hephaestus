@@ -15,11 +15,11 @@ export interface ReviewListLinkProps extends Omit<ComponentProps<"a">, "href"> {
  */
 export function ReviewListLink({ workspaceSlug, destination, ...props }: ReviewListLinkProps) {
 	switch (destination.list) {
-		case "runs": {
+		case "reviews": {
 			return (
 				<Link
 					{...props}
-					to="/w/$workspaceSlug/admin/practices/reviews/runs"
+					to="/w/$workspaceSlug/admin/practices/reviews"
 					params={{ workspaceSlug }}
 					search={destination.search}
 				/>

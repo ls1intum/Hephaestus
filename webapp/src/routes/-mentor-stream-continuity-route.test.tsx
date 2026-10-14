@@ -28,9 +28,7 @@ function mockMentor() {
 			HttpResponse.json([workspaceListItem("acme"), workspaceListItem("other")]),
 		),
 		http.get("*/user/features", () => HttpResponse.json({})),
-		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json(ownMembership()),
-		),
+		http.get("*/workspaces/:workspaceSlug/members/me", () => HttpResponse.json(ownMembership())),
 		http.get("*/workspaces/:workspaceSlug/onboarding/me", () =>
 			HttpResponse.json({
 				...workspaceOnboarding(),

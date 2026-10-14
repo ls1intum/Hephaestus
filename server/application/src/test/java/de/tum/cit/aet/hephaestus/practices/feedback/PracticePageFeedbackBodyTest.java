@@ -43,10 +43,6 @@ class PracticePageFeedbackBodyTest extends BaseUnitTest {
         assertThat(PracticePageFeedbackBody.messageOf(body)).startsWith("The message.");
     }
 
-    /**
-     * Null rather than a guess: an in-context body was written by a different producer with no headline
-     * at all, and inventing one would put words in its mouth.
-     */
     @Test
     void reportsNoHeadlineForABodyItDidNotWrite() {
         assertThat(PracticePageFeedbackBody.headlineOf("A plain in-context comment body."))

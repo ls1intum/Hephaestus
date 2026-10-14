@@ -122,20 +122,9 @@ public class FeedbackPreparationService {
                 support = selection.evidence();
                 var prior = selection.previous();
                 var decision = composition.pageDecision(primary, support, selection, clock.instant());
-                reason = switch (decision.decision()) {
-                    case ADMIT ->
-                        ids.stream().anyMatch(id -> !selectedIds.contains(id))
-                                ? FeedbackStopReason.EVIDENCE_NOT_PERMITTED
-                                : reason;
-                    case FEEDBACK_OFF -> FeedbackStopReason.FEEDBACK_OFF;
-                    case GATE_REFUSED -> Objects.requireNonNull(decision.stopReason());
-                    case NO_EVIDENCE -> FeedbackStopReason.NO_EVIDENCE;
-                    case UNCORROBORATED -> FeedbackStopReason.UNCORROBORATED;
-                    case BACKFILL_HELD -> FeedbackStopReason.BACKFILL_QUIET;
-                    case UNATTRIBUTABLE_SUBJECT -> FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE;
-                    case RECENTLY_SURFACED -> FeedbackStopReason.NOTHING_NEW;
-                    case PRACTICE_REQUIRES_APPROVAL -> FeedbackStopReason.PRACTICE_REQUIRES_APPROVAL;
-                };
+                if (decision.stopReason() != null) reason = decision.stopReason();
+                else if (ids.stream().anyMatch(id -> !selectedIds.contains(id)))
+                    reason = FeedbackStopReason.EVIDENCE_NOT_PERMITTED;
                 if (prior.isPresent() && !prior.get().id().equals(draft.id())) {
                     if (prior.get().isOpen()) replacesId = prior.get().id();
                     else if (reason == null
@@ -152,17 +141,7 @@ public class FeedbackPreparationService {
                     throw conflict("Conversation feedback requires NOT_MET results.");
                 var decision = composition.conversationDecision(snapshot, result);
                 if (decision.decision() != ConversationDecision.ADMIT) {
-                    reason = switch (decision.decision()) {
-                        case FEEDBACK_OFF -> FeedbackStopReason.FEEDBACK_OFF;
-                        case BACKFILL_QUIET -> FeedbackStopReason.BACKFILL_QUIET;
-                        case PRACTICE_REQUIRES_APPROVAL -> FeedbackStopReason.PRACTICE_REQUIRES_APPROVAL;
-                        case HAS_INLINE_ANCHOR, ALREADY_DELIVERED_ON_WORK -> FeedbackStopReason.NOTHING_NEW;
-                        case REVIEWER_DEFERRED -> FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE;
-                        case MENTOR_UNAVAILABLE -> FeedbackStopReason.RECIPIENT_UNAVAILABLE;
-                        case UNATTRIBUTABLE_SUBJECT -> FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE;
-                        case GATE_REFUSED -> Objects.requireNonNull(decision.stopReason());
-                        case ADMIT -> throw new IllegalStateException("An admitted result has no refusal.");
-                    };
+                    reason = Objects.requireNonNull(decision.stopReason());
                     break;
                 }
             }

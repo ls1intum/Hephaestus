@@ -12,13 +12,7 @@ import {
 	type LlmConnectionFieldsValue,
 } from "./LlmConnectionFields";
 
-/**
- * Both connection dialogs render these fields: the instance catalog's and a workspace's own
- * provider. So nothing here may assume one console.
- *
- * The API is chosen once, at create. A connection keeps it for life, so an edit shows it in a field
- * that cannot change.
- */
+// Shared fields serve both admin consoles; a connection's API is immutable after creation.
 const meta = {
 	component: LlmConnectionFields,
 	parameters: { layout: "padded" },
@@ -123,10 +117,7 @@ export const RerankApi: Story = {
 	},
 };
 
-/**
- * Neither OpenAI nor Azure OpenAI serves a rerank API, so choosing it moves the preset to Other and
- * clears the preset's address. An address the admin typed stays.
- */
+// Reranking requires a custom endpoint; switching presets must preserve an administrator's typed URL.
 export const RerankApiLeavesOpenAiPreset: Story = {
 	play: async ({ canvas }) => {
 		await expectClosedSelectShows(canvas, "Endpoint preset", "OpenAI");

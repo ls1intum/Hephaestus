@@ -54,8 +54,8 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
         Workspace workspace = workspace("audit-producer-role");
         User member = persistUser("audit-producer-role-member");
 
-        membershipService.assignRole(workspace.getId(), member.getId(), Membership.WorkspaceRole.MEMBER);
-        membershipService.assignRole(workspace.getId(), member.getId(), Membership.WorkspaceRole.ADMIN);
+        membershipService.assignRole(workspace.getId(), accountId(member), Membership.WorkspaceRole.MEMBER);
+        membershipService.assignRole(workspace.getId(), accountId(member), Membership.WorkspaceRole.ADMIN);
 
         assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE))
                 .containsExactly(ConfigAuditAction.CREATED, ConfigAuditAction.UPDATED);
@@ -66,9 +66,9 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
     void revokingAMembershipIsRecorded() {
         Workspace workspace = workspace("audit-producer-revoke");
         User member = persistUser("audit-producer-revoke-member");
-        membershipService.assignRole(workspace.getId(), member.getId(), Membership.WorkspaceRole.ADMIN);
+        membershipService.assignRole(workspace.getId(), accountId(member), Membership.WorkspaceRole.ADMIN);
 
-        membershipService.removeMembership(workspace.getId(), member.getId());
+        membershipService.removeMembership(workspace.getId(), accountId(member));
 
         assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE))
                 .containsExactly(ConfigAuditAction.CREATED, ConfigAuditAction.DELETED);
@@ -79,9 +79,9 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
     void hidingAMemberIsRecordedBecauseItOutlivesOrgRemoval() {
         Workspace workspace = workspace("audit-producer-hidden");
         User member = persistUser("audit-producer-hidden-member");
-        membershipService.assignRole(workspace.getId(), member.getId(), Membership.WorkspaceRole.MEMBER);
+        membershipService.assignRole(workspace.getId(), accountId(member), Membership.WorkspaceRole.MEMBER);
 
-        membershipService.updateMemberVisibility(workspace.getId(), member.getId(), true);
+        membershipService.updateMemberVisibility(workspace.getId(), accountId(member), true);
 
         assertThat(snapshotsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE))
                 .as("hidden decides whether access survives leaving the org")
@@ -93,7 +93,7 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
     void aRoleChangedByOrgSyncIsRecorded() {
         Workspace workspace = workspace("audit-producer-sync");
         User member = persistUser("audit-producer-sync-member");
-        membershipService.assignRole(workspace.getId(), member.getId(), Membership.WorkspaceRole.MEMBER);
+        membershipService.assignRole(workspace.getId(), accountId(member), Membership.WorkspaceRole.MEMBER);
 
         membershipService.syncWorkspaceMembers(workspace, Map.of(member.getId(), Membership.WorkspaceRole.ADMIN));
 

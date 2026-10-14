@@ -411,12 +411,6 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
                 .containsEntry(AgentPurpose.MENTOR, Map.of(DataHandlingTier.CLOUD, List.of(DataHandlingTier.CLOUD)));
     }
 
-    /**
-     * The binding view, the needs, and the route of a review's model for practice scripts must give the same answers, or
-     * the AI models page shows a model that the review never uses. Each row names, for the members who chose
-     * in-house and for those who chose cloud, the decision binding that serves them and the one that their review
-     * routes to. A member whom no review binding serves still has a serving decision binding, but no route.
-     */
     @ParameterizedTest
     @MethodSource("assignments")
     void shouldAnswerAsTheNeedsAndThePracticeScriptRouteDoWhenTheBindingViewNamesTheMembersServed(

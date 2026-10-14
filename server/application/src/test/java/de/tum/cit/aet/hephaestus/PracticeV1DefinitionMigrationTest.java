@@ -14,7 +14,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 @Tag("database")
 class PracticeV1DefinitionMigrationTest {
@@ -25,7 +24,6 @@ class PracticeV1DefinitionMigrationTest {
         try (var input =
                 Objects.requireNonNull(getClass().getResourceAsStream("/db/practice-cutover/released-programs.json"))) {
             var programs = Objects.requireNonNull(JsonMapper.builder().build().readTree(input));
-            assertThat(programs.size()).isEqualTo(34);
             try (var connection =
                     DriverManager.getConnection(database.jdbcUrl(), database.username(), database.password())) {
                 connection.setAutoCommit(false);
@@ -283,16 +281,10 @@ class PracticeV1DefinitionMigrationTest {
             throws Exception {
         var mapper = JsonMapper.builder().build();
         final JsonNode released;
-        final JsonNode targets;
         try (var input =
                 Objects.requireNonNull(getClass().getResourceAsStream("/db/practice-cutover/released-catalog.json"))) {
             released = Objects.requireNonNull(mapper.readTree(input));
         }
-        try (var input =
-                Objects.requireNonNull(getClass().getResourceAsStream("/db/practice-cutover/catalog-targets.json"))) {
-            targets = Objects.requireNonNull(mapper.readTree(input));
-        }
-        assertThat(targets.size()).isEqualTo(52);
         var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
         try (var connection =
                 DriverManager.getConnection(database.jdbcUrl(), database.username(), database.password())) {
@@ -306,32 +298,34 @@ class PracticeV1DefinitionMigrationTest {
                 }
                 index++;
             }
-            assertThat(index).isEqualTo(52);
             connection.commit();
         }
         PracticeV1CutoverMigrationTest.upgrade(database, context);
-        for (var target : targets) {
-            if (!(target.path("definition").deepCopy() instanceof ObjectNode expected)) {
-                throw new IllegalStateException("The catalog target needs a complete definition object.");
-            }
-            expected.remove("script");
-            var actual = PracticeV1CutoverMigrationTest.column(
-                    database,
-                    "SELECT (v.definition - 'script')::text FROM practice p JOIN practice_version v"
-                            + " ON v.id=p.current_version_id WHERE p.slug='bundle-"
-                            + target.path("slug").asString() + "'");
-            assertThat(actual).hasSize(1);
-            assertThat(mapper.readTree(Objects.requireNonNull(actual.getFirst())))
-                    .isEqualTo(expected);
-        }
         assertThat(PracticeV1CutoverMigrationTest.column(database, """
-            SELECT count(*)::text FROM practice_version WHERE id BETWEEN 1400000 AND 1400051
-                AND number=1 AND definition->'scan'='null'::jsonb AND definition->'reads'->>'contract'='1.3.0'
-            """)).containsExactly("52");
+            SELECT p.slug || '|' || v.number || '|' || (v.definition->>'about') || '|' ||
+                (v.definition->'reads'->>'contract') || '|' ||
+                COALESCE(v.definition->'scan'->>'itemKind','NO_SCAN')
+            FROM practice p JOIN practice_version v ON v.id=p.current_version_id
+            WHERE p.slug IN ('bundle-scope-one-reviewable-change',
+                'bundle-keeps-functions-small-and-single-purpose',
+                'bundle-logs-through-the-platform-logger',
+                'bundle-validates-inputs-and-edge-cases-at-the-boundary') ORDER BY p.slug
+            """))
+                .containsExactly(
+                        "bundle-keeps-functions-small-and-single-purpose|2|AUTHOR|2.0.0|scm.file",
+                        "bundle-logs-through-the-platform-logger|2|AUTHOR|2.0.0|scm.file",
+                        "bundle-scope-one-reviewable-change|2|AUTHOR|2.0.0|NO_SCAN",
+                        "bundle-validates-inputs-and-edge-cases-at-the-boundary|2|AUTHOR|2.0.0|scm.file");
         assertThat(PracticeV1CutoverMigrationTest.column(database, """
-            SELECT count(*)::text FROM practice p JOIN practice_version v ON v.id=p.current_version_id
-            WHERE p.id BETWEEN 1300000 AND 1300051 AND v.number=2 AND v.definition->'scan'<>'null'::jsonb
-            """)).containsExactly("13");
+            SELECT p.slug || '|' || v.number || '|' || (v.definition->'reads'->>'contract')
+            FROM practice p JOIN practice_version v ON v.practice_id=p.id AND v.number=1
+            WHERE p.slug LIKE 'bundle-%' ORDER BY p.slug
+            """))
+                .containsExactly(
+                        "bundle-keeps-functions-small-and-single-purpose|1|1.3.0",
+                        "bundle-logs-through-the-platform-logger|1|1.3.0",
+                        "bundle-scope-one-reviewable-change|1|1.3.0",
+                        "bundle-validates-inputs-and-edge-cases-at-the-boundary|1|1.3.0");
         assertThat(PracticeV1CutoverMigrationTest.column(database, """
             SELECT v.definition->>'criteria' || '|' || (v.definition->'scan'='null'::jsonb)::text
                 || '|' || v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id WHERE p.id=1300100

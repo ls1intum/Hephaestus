@@ -1,4 +1,3 @@
-
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
 /** JSON-RPC 2.0 §4: every frame in both directions carries this literal. */

@@ -78,18 +78,17 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
                 var parent = items.parent(item, ScmItemEvents.PULL_REQUEST);
                 if (!permitsItem(parent)) return false;
                 var review = reviews.findById(source);
-                if (review.isEmpty()
-                        || review.orElseThrow().getPullRequest() == null
-                        || !Objects.equals(review.orElseThrow().getPullRequest().getId(), parent.sourceId()))
-                    return false;
+                if (!review.map(row -> row.getPullRequest() != null
+                                && Objects.equals(row.getPullRequest().getId(), parent.sourceId()))
+                        .orElse(false)) return false;
             } else {
                 var parent = items.parent(item, ScmItemEvents.REPOSITORY);
                 if (!permitsItem(parent)) return false;
                 var work = workLookup.find(item.kind(), source);
-                if (work.isEmpty()
-                        || work.orElseThrow().getDeletedAt() != null
-                        || work.orElseThrow().getRepository() == null
-                        || !Objects.equals(work.orElseThrow().getRepository().getId(), parent.sourceId())) return false;
+                if (!work.map(row -> row.getDeletedAt() == null
+                                && row.getRepository() != null
+                                && Objects.equals(row.getRepository().getId(), parent.sourceId()))
+                        .orElse(false)) return false;
             }
             for (var identity : contributors.identitiesForSource(
                     item.workspaceId(), item.kind().value(), source)) {

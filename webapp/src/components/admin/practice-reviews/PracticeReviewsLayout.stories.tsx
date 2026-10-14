@@ -12,12 +12,6 @@ import { ReviewScopeFilters } from "./ReviewScopeFilters";
 import { ReviewSelectionBar } from "./ReviewSelectionBar";
 import { STORY_GROUPS, STORY_PEOPLE, STORY_PRACTICES } from "./story-scope-sources";
 
-/**
- * The page's header and its five sections, drawn as line tabs but made of links, since each changes
- * the URL. The scope and the tracked record are in one row above the tabs, because they apply to
- * every tab; a tab's own filters stay below the tabs. Which scope a section link carries is read
- * from the URL, so it is proved by the route's tests.
- */
 const meta = {
 	component: PracticeReviewsLayout,
 	parameters: {
@@ -94,16 +88,12 @@ export const Default: Story = {
 		]);
 		await expect(sections.getByRole("link", { name: "Reviews" })).toHaveAttribute(
 			"href",
-			"/w/demo/admin/practices/reviews/runs",
+			"/w/demo/admin/practices/reviews",
 		);
 		canvas.getByText("The section renders here.");
 	},
 };
 
-/**
- * On a list, the scope's facets are above the tabs, labelled as applying to every tab. The tab's own
- * Outcome, Severity and the count stay below the tabs.
- */
 export const ScopeAboveTheTabs: Story = {
 	args: { children: <ResultsTab search={UNFILTERED} /> },
 	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/results" } },

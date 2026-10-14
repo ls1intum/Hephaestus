@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.core.auth.AccountReferenceService;
 import de.tum.cit.aet.hephaestus.core.auth.dto.AccountRefDTO;
 import de.tum.cit.aet.hephaestus.core.auth.validation.AccountId;
 import de.tum.cit.aet.hephaestus.core.auth.web.CurrentAccount;
-import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
 import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
@@ -47,13 +46,11 @@ public class MembershipController {
     @GetMapping("/me")
     @Operation(operationId = "getOwnMembership", summary = "Get your workspace membership")
     public ResponseEntity<WorkspaceMembershipDTO> getCurrentUserMembership(WorkspaceContext context) {
+        var view = UserViewContextHolder.get();
         Membership membership = workspaceMembershipService.getMembership(
-                context.id(),
-                UserViewContextHolder.get() == null
-                        ? CurrentAccount.requireId()
-                        : Objects.requireNonNull(UserViewContextHolder.get()).accountId());
+                context.id(), view == null ? CurrentAccount.requireId() : view.accountId());
         WorkspaceRole effectiveRole = context.roles().stream()
-                .reduce((first, next) -> first.isAtLeast(next) ? first : next)
+                .reduce(WorkspaceRole::highest)
                 .orElse(membership.getRole());
         if (effectiveRole != WorkspaceRole.OWNER
                 && effectiveRole != WorkspaceRole.ADMIN
@@ -85,7 +82,7 @@ public class MembershipController {
     @Operation(operationId = "getMembership", summary = "Get a workspace membership")
     public ResponseEntity<WorkspaceMembershipDTO> getMember(
             WorkspaceContext context, @PathVariable @AccountId String accountId) {
-        Membership membership = requireMembership(context.id(), Long.parseLong(accountId));
+        Membership membership = workspaceMembershipService.getMembership(context.id(), Long.parseLong(accountId));
         return ResponseEntity.ok(toDTO(context.id(), membership, membership.getRole()));
     }
 
@@ -144,9 +141,4 @@ public class MembershipController {
                 eligible);
     }
 
-    private Membership requireMembership(Long workspaceId, Long accountId) {
-        return workspaceMembershipService
-                .findMembership(workspaceId, accountId)
-                .orElseThrow(() -> new EntityNotFoundException("Membership", accountId));
-    }
 }

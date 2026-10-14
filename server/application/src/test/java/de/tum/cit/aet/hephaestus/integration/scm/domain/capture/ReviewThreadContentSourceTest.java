@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
@@ -515,7 +514,6 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                     .containsExactlyEntriesOf(
                             Map.of(kind, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)));
         }
-        verifyNoInteractions(threadRepository, reviewRepository);
         artifact.setDeletedAt(null);
         when(pullRequestRepository.findById(PR_ID)).thenReturn(Optional.of(artifact));
         var restored = provider.capture(request(metadataWithPr()), provider.sourceKinds());

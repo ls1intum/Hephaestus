@@ -26,7 +26,5 @@ public final class IntegrationCoreMetrics {
     public static final String WEBHOOK_STREAM_OLDEST_MESSAGE_AGE = "webhook.stream.oldest.message.age";
     public static final String WEBHOOK_STREAM_POLL_AGE = "webhook.stream.poll.age";
 
-    public static final String REVIEW_OCCASIONS = "practice.review.occasions";
-
     private IntegrationCoreMetrics() {}
 }

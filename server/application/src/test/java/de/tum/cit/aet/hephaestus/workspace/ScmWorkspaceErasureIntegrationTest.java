@@ -249,15 +249,7 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(repositoryRepository.findByNameWithOwner(SHARED_REPO)).isPresent();
     }
 
-    /**
-     * The {@code Workspace.organization} binding is <b>exclusive</b>, not shared: it is a
-     * {@code @OneToOne} on a {@code unique = true} {@code organization_id} column ({@code
-     * workspace_organization_id_key}), so an organization backs at most ONE workspace. If a
-     * disconnect erased the org-tier mirror but kept the FK, the workspace would squat the
-     * organization forever — no other workspace could ever install it without violating the unique
-     * constraint, and a disconnect does not purge the workspace. The erase must therefore release
-     * the link.
-     */
+    // Workspace organization ownership is unique; an organization cannot be shared by two workspaces.
     @Test
     @DisplayName("disconnect erases the org-tier mirror and releases the organization for re-binding")
     void erase_releasesTheOrganizationAndErasesItsOrgTierMirror() {
@@ -321,12 +313,6 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
                 .isEmpty();
     }
 
-    /**
-     * A vendor-side {@code installation.deleted} must run the same purge chain an admin deletion
-     * runs, not just write {@code status=PURGED}: writing the label directly skips every {@code
-     * WorkspacePurgeContributor} bean, leaving Slack/Outline content, org-tier rows and an ACTIVE
-     * Connection alive behind a "purged" label.
-     */
     @Test
     @DisplayName("a vendor-side GitHub uninstall runs the full purge chain, not just a status write")
     void onInstallationDeleted_runsEveryPurgeContributorNotJustAStatusWrite() {

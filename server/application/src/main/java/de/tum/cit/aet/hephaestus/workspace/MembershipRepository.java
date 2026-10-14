@@ -21,6 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 public interface MembershipRepository extends JpaRepository<Membership, Membership.Id> {
     List<Membership> findByWorkspace_Id(Long workspaceId);
 
+    boolean existsByWorkspace_IdAndId_AccountIdAndLeftAtIsNull(long workspaceId, long accountId);
+
+    @Query("SELECT m.id.accountId FROM Membership m WHERE m.workspace.id = :workspaceId AND m.reviewSelected = true ORDER BY m.id.accountId")
+    List<Long> findSelectedAccountIds(@Param("workspaceId") long workspaceId);
+
     @Query("""
         SELECT m FROM Membership m WHERE m.workspace.id = :workspaceId
           AND (m.reviewSelected = true OR m.id.accountId IN :accountIds)
@@ -59,7 +64,8 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
 
     @Query("""
         SELECT m.id.accountId FROM Membership m JOIN Account a ON a.id = m.id.accountId
-        WHERE m.workspace.id = :workspaceId AND m.id.accountId IN :accountIds AND m.leftAt IS NULL
+        WHERE m.workspace.id = :workspaceId AND m.leftAt IS NULL AND m.hidden = false
+          AND (a.aiChoice IS NULL OR a.aiChoice <> de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice.NO_AI)
           AND a.status IN (de.tum.cit.aet.hephaestus.core.auth.domain.Account.Status.ACTIVE,
                            de.tum.cit.aet.hephaestus.core.auth.domain.Account.Status.UNCLAIMED)
           AND (:providerId IS NULL OR EXISTS (SELECT i.id FROM Identity i
@@ -67,7 +73,6 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
         """)
     Set<Long> findEligibleAccountIds(
             @Param("workspaceId") long workspaceId,
-            @Param("accountIds") Collection<Long> accountIds,
             @Param("providerId") @Nullable Long providerId);
 
     @Modifying
@@ -112,7 +117,7 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
         SELECT m FROM Membership m WHERE m.id.accountId IN :accountIds
         ORDER BY m.workspace.id, m.id.accountId
         """)
-    List<Membership> findByAccount_IdIn(@Param("accountIds") Collection<Long> accountIds);
+    List<Membership> lockByAccountIds(@Param("accountIds") Collection<Long> accountIds);
 
     @Query("""
         SELECT count(m) FROM Membership m
@@ -129,11 +134,6 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
         """)
     List<Long> findAccountIdsByWorkspaceIdAndRole(
             @Param("workspaceId") Long workspaceId, @Param("role") WorkspaceRole role);
-
-    @Query("""
-        SELECT wm.id.accountId FROM Membership wm WHERE wm.workspace.id = :workspaceId AND wm.hidden = true
-        """)
-    Set<Long> findHiddenAccountIdsByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
     /** Does not replace an existing membership or its role under concurrent insertion. */
     @Modifying

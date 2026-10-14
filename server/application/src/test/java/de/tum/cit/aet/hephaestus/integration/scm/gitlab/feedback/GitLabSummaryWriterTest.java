@@ -374,11 +374,7 @@ class GitLabSummaryWriterTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.just(response));
     }
 
-    /**
-     * A deleted note has no {@code updateNote} payload — GitLab reports it as a top-level GraphQL
-     * error. This orphaned-summary case must classify as GONE so the caller re-posts rather than
-     * silently dropping it.
-     */
+    // GitLab reports deleted notes as top-level GraphQL errors, without an updateNote payload.
     @Test
     void updateSummaryReturnsGoneOnTopLevelNotFoundError() {
         FeedbackTarget target = gitlabTarget();
@@ -544,11 +540,7 @@ class GitLabSummaryWriterTest extends BaseUnitTest {
                 .isEqualTo("https://gitlab.example.com/group/project/-/merge_requests/42#note_987654");
     }
 
-    /**
-     * The just-posted summary is the newest note, so the newest end is requested first — no {@code
-     * before} cursor, a {@code last} page size. A forward walk would only reach the marker after
-     * the whole thread.
-     */
+    // A posted summary is newest; start at that end so finding it does not require scanning the whole thread.
     @Test
     void findExistingSummary_walksTheNewestEndFirst() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
@@ -570,8 +562,7 @@ class GitLabSummaryWriterTest extends BaseUnitTest {
         GraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse page = mockMrNotesPage(
                 List.of(note("gid://gitlab/Note/1", "unrelated")),
-                false, // hasPreviousPage=false — the walk reached the oldest note, every
-                // note was seen
+                false, 
                 null);
         when(spec.execute()).thenReturn(Mono.just(page));
 
@@ -649,11 +640,6 @@ class GitLabSummaryWriterTest extends BaseUnitTest {
         assertThat(result.presence()).isEqualTo(LookupPresence.UNKNOWN);
     }
 
-    /**
-     * An ISSUE subject ({@code path#iid}) must reach the issue's own notes; a lookup that only knew
-     * the merge-request document would answer a permanent {@code UNKNOWN} and never find a summary
-     * posted on an issue.
-     */
     @Test
     void findExistingSummary_issueSubject_scansIssueNotes_isFound() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);

@@ -391,9 +391,6 @@ class ConnectionServiceTest extends BaseUnitTest {
         verify(teardown).run();
     }
 
-    /**
-     * Suspended, a failing credential read cannot mark the disconnect transaction rollback-only.
-     */
     @Test
     void disconnect_preparesTheTeardownWithTheTransactionSuspended() {
         Connection connection = connectionInState(IntegrationState.ACTIVE);
@@ -693,10 +690,6 @@ class ConnectionServiceTest extends BaseUnitTest {
         ReflectionTestUtils.setField(connection, "id", id);
     }
 
-    /**
-     * A GitHub App connection runs on no stored token: the write refuses one rather than
-     * overwriting its identity.
-     */
     @Test
     void shouldRefuseToReplaceTheTokenOfAnAppInstallation() {
         Connection app = new Connection(

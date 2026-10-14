@@ -98,7 +98,7 @@ export const NarrowedToNothing: Story = {
 	},
 };
 
-/** Empty loaded pages cannot prove a filtered feed empty while earlier pages remain. */
+// Empty loaded pages cannot establish an empty filtered feed while earlier pages remain.
 export const NarrowedToNothingSoFar: Story = {
 	args: {
 		feed: { ...readyFeed, hasMore: true },

@@ -24,17 +24,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Prices one ledger row that could not be priced when it was written.
- *
- * <p>Only a VERIFIED measurement with no unreported calls and positive billable tokens can have its missing price repaired.
- * A rate cannot establish measurement verification. UNKNOWN historical decisions and UNVERIFIABLE
- * vectors remain unpriced; existing priced amounts are never rewritten. Tokens, source, funding and
- * occurrence time stay frozen.
- *
- * <p>Each row is repriced in its own {@code REQUIRES_NEW} transaction so one unpriceable row cannot roll
- * back the ones already recovered in the same pass.
- */
+// Price only verified, complete measurements; rates cannot verify usage or replace a frozen charge.
+// Each row commits independently so one unpriceable row cannot roll back the pass.
 @Component
 public class LlmUsageRepricer {
 

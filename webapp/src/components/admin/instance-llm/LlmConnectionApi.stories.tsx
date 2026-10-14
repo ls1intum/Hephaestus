@@ -5,10 +5,6 @@ import { expectNoPageOverflow } from "@/stories/reflow";
 
 import { LlmConnectionApi } from "./LlmConnectionApi";
 
-/**
- * The API a connection speaks, under its name in both consoles. The marks show each kind of model
- * the API can serve, and a screen reader hears the kinds once, as a phrase.
- */
 const meta = {
 	component: LlmConnectionApi,
 	parameters: { layout: "padded" },

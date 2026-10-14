@@ -213,7 +213,7 @@ describe("workspace members route", () => {
 	});
 
 	it("keeps the list and says so when a role change is refused", async () => {
-		mockMembersRoute();
+		mockMembersRoute([{ ...ADA, role: "ADMIN" }, SAM]);
 		server.use(
 			http.post("*/workspaces/:workspaceSlug/members/assign", () =>
 				HttpResponse.json(

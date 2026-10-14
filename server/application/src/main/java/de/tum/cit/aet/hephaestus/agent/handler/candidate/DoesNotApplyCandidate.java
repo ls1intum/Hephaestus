@@ -1,12 +1,18 @@
 package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
+import de.tum.cit.aet.hephaestus.practices.spi.InapplicabilityWarrant;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import java.util.List;
-import tools.jackson.databind.node.ObjectNode;
 
 /** The practice does not apply here: at least one citation and the inapplicability warrant. */
 public record DoesNotApplyCandidate(
-        String summary, String explanation, List<ObjectNode> citations, ObjectNode coverage, ObjectNode inapplicability)
+        String summary,
+        String explanation,
+        List<EvidenceCitation> citations,
+        ResultCoverage coverage,
+        InapplicabilityWarrant inapplicability)
         implements Candidate {
     public DoesNotApplyCandidate {
         citations = List.copyOf(citations);

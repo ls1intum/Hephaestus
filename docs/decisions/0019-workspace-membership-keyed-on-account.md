@@ -1,6 +1,6 @@
 # ADR 0019: Workspace membership is keyed on `Account`, not the SCM `User`
 
-**Status:** Accepted (amended 2026-10-14 — model details superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md))
+**Status:** Proposed; superseded in part 2026-10-14 by [ADR 0056](0056-one-practice-model-for-items-and-scans.md)
 **Date:** 2026-06-09
 **Authors:** Hephaestus maintainers
 **Finishes:** [ADR 0017](0017-replace-keycloak-with-spring-native-auth.md) (the `workspace_membership.user_id → account_id` rename it specifies but never implemented)
@@ -98,6 +98,3 @@ has the schema, including the name the `ExternalActor` rename § Decision antici
 ## Update — 2026-10-14 (#2656): the 1.0 practice model
 
 [ADR 0056](0056-one-practice-model-for-items-and-scans.md) supersedes the membership model of this record. Membership uses accounts and keeps its history after logical removal.
-The [product vocabulary](../contributor/practice-feedback-language.md) maps the earlier terms:
-an observation is a result, a channel is a destination, and an artifact is an item.
-The sections above stay as the record of the earlier decision.

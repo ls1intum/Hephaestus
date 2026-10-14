@@ -2,9 +2,9 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { parseSearch } from "@/lib/router-search";
 import { server } from "@/mocks/server";
+import { reviewHandlers } from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
 import { deferred } from "@/test/async";
 import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -32,7 +32,7 @@ const SCOPE = {
 const SCOPE_QUERY = new URLSearchParams(SCOPE).toString();
 
 beforeEach(() => {
-// jsdom needs an IntersectionObserver stub for paged lists.
+	// jsdom needs an IntersectionObserver stub for paged lists.
 	vi.stubGlobal("IntersectionObserver", ObserverStub);
 	server.use(...reviewHandlers());
 });
@@ -131,10 +131,10 @@ function heldScopedCount() {
 
 describe("practice review routes", () => {
 	it.each([
-		["Overview", REVIEWS],
-		["Reviews", `${REVIEWS}/runs`],
+		["Overview", `${REVIEWS}/overview`],
+		["Reviews", REVIEWS],
 		["Results", `${REVIEWS}/results`],
-		["Problems", `${REVIEWS}/observations`],
+		["Problems", `${REVIEWS}/problems`],
 		["Feedback", `${REVIEWS}/feedback`],
 		// A level is opened over the tab the reader is on, and never moves them off it.
 		["Results", `${REVIEWS}/results?detail=feedback:${FEEDBACK}`],
@@ -153,10 +153,10 @@ describe("practice review routes", () => {
 
 	it.each([
 		["/results", `developerId=7&severity=${encodeURIComponent('["MAJOR"]')}`],
-		["/observations", `developerId=7&severity=${encodeURIComponent('["MAJOR"]')}`],
+		["/problems", `developerId=7&severity=${encodeURIComponent('["MAJOR"]')}`],
 		["/feedback", `developerId=7&location=GITHUB`],
-		["/runs", `developerId=7&status=${encodeURIComponent('["FAILED"]')}`],
-		["", "developerId=7"],
+		["", `developerId=7&status=${encodeURIComponent('["FAILED"]')}`],
+		["/overview", "developerId=7"],
 	])('carries the scope from "%s" to every tab', async (fromPath, own) => {
 		const scope = `${SCOPE_QUERY}&practiceSlug=${encodeURIComponent('["thin-controllers"]')}&groupSlug=${encodeURIComponent('["design"]')}`;
 		renderRouteAtWithRouter(`${REVIEWS}${fromPath}?${scope}&${own}`);
@@ -187,7 +187,7 @@ describe("practice review routes", () => {
 	 * not follow the reader to a list tab — and neither back to the overview from one.
 	 */
 	it("keeps a chosen range on the overview and off every tab", async () => {
-		renderRouteAtWithRouter(`${REVIEWS}?range=90d`);
+		renderRouteAtWithRouter(`${REVIEWS}/overview?range=90d`);
 		const navigation = await sectionNavigation();
 		for (const tab of ["Overview", "Reviews", "Results", "Problems", "Feedback"]) {
 			expect(carriedSearch(sectionLink(navigation, tab))).toStrictEqual({});
@@ -195,13 +195,13 @@ describe("practice review routes", () => {
 	});
 
 	it("opens a practice's sheet from the overview, over the overview's range", async () => {
-		renderRouteAtWithRouter(`${REVIEWS}?range=90d`);
+		renderRouteAtWithRouter(`${REVIEWS}/overview?range=90d`);
 		const practice = await screen.findByRole<HTMLAnchorElement>(
 			"link",
 			{ name: "Open practice Thin controllers" },
 			ROUTE_RENDER_WAIT,
 		);
-		expect(new URL(practice.href).pathname).toBe(REVIEWS);
+		expect(new URL(practice.href).pathname).toBe(`${REVIEWS}/overview`);
 		expect(carriedSearch(practice)).toMatchObject({
 			detail: "practice:thin-controllers",
 			range: "90d",
@@ -211,7 +211,7 @@ describe("practice review routes", () => {
 
 describe("practice review page titles", () => {
 	it.each([
-		["the tab, with nothing open", REVIEWS, "Practice reviews · Admin · Hephaestus"],
+		["the tab, with nothing open", REVIEWS, "Reviews · Admin · Hephaestus"],
 		[
 			"the record open in front",
 			`${REVIEWS}?detail=feedback:${FEEDBACK}`,
@@ -244,7 +244,7 @@ describe("practice review page titles", () => {
 			countRead("/practices/reviews/feedback", 1951, counted),
 		);
 		renderRouteAtWithRouter(
-			`${REVIEWS}/runs?developerId=7&groupSlug=${encodeURIComponent('["design"]')}&status=${encodeURIComponent('["FAILED"]')}`,
+			`${REVIEWS}?developerId=7&groupSlug=${encodeURIComponent('["design"]')}&status=${encodeURIComponent('["FAILED"]')}`,
 		);
 		const navigation = await sectionNavigation();
 		await within(navigation).findByRole(
@@ -266,11 +266,11 @@ describe("practice review page titles", () => {
 		expect(feedback?.searchParams.get("developerId")).toBe("7");
 	});
 
-// Failed counts need their own retry; reloading the page must not be the only recovery.
+	// Failed counts need their own retry; reloading the page must not be the only recovery.
 	it("asks again for a count that failed, and shows it once it is known", async () => {
 		const reads = failingOnceCount(13_308);
 		server.use(reads.handler);
-		renderRouteAtWithRouter(`${REVIEWS}/runs`);
+		renderRouteAtWithRouter(REVIEWS);
 		const navigation = await sectionNavigation();
 		await within(navigation).findByRole(
 			"link",
@@ -285,7 +285,7 @@ describe("practice review page titles", () => {
 		const scoped = heldScopedCount();
 		server.use(scoped.handler, countRead("/practices/reviews/results", 13_308, []));
 		try {
-			const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs`);
+			const { router } = renderRouteAtWithRouter(REVIEWS);
 			const navigation = await sectionNavigation();
 			await within(navigation).findByRole(
 				"link",
@@ -293,7 +293,7 @@ describe("practice review page titles", () => {
 				ROUTE_RENDER_WAIT,
 			);
 			await router.navigate({
-				to: "/w/$workspaceSlug/admin/practices/reviews/runs",
+				to: "/w/$workspaceSlug/admin/practices/reviews",
 				params: { workspaceSlug: "acme" },
 				search: { developerId: "7" },
 			});

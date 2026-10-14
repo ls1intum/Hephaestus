@@ -280,7 +280,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         seedEvent(workspace, "PRACTICE_REVIEW", "1.25", PREVIOUS, 3);
         seedEvent(workspace, "PRACTICE_REVIEW", "0.75", PREVIOUS, 3);
         seedEvent(workspace, "MENTOR_TURN", "0.50", PREVIOUS, 12);
-        seedEvent(workspace, "PRACTICE_REVIEW", "9.99", CURRENT, 1); // outside requested month
+        seedEvent(workspace, "PRACTICE_REVIEW", "9.99", CURRENT, 1);
 
         WorkspaceLlmUsageReportDTO report = webTestClient
                 .get()
@@ -435,8 +435,8 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace = setupWorkspaceWithAdmin("usage-paused-past-month");
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("1.00"));
         workspaceRepository.save(workspace);
-        seedEvent(workspace, "MENTOR_TURN", "1.00", CURRENT, 1); // exhausts the CURRENT month
-        seedEvent(workspace, "MENTOR_TURN", "0.10", PREVIOUS, 1); // PREVIOUS stays well under cap
+        seedEvent(workspace, "MENTOR_TURN", "1.00", CURRENT, 1);
+        seedEvent(workspace, "MENTOR_TURN", "0.10", PREVIOUS, 1);
 
         webTestClient
                 .get()

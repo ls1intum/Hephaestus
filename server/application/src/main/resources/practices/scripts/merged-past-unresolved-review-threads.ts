@@ -85,7 +85,7 @@ export default definePracticeScript({
 				resolutionTimeUnknown: candidates.filter(
 					(t) => t.state === "RESOLVED" && !dated(t.resolvedAt),
 				).length,
-		// An undated merge cannot prove whether resolution happened before it.
+				// An undated merge cannot prove whether resolution happened before it.
 				...(mergeUndated
 					? {}
 					: {

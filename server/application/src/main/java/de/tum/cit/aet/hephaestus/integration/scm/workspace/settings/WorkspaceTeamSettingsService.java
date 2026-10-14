@@ -56,25 +56,11 @@ public class WorkspaceTeamSettingsService {
 
     // Team Visibility (Hidden) Settings
 
-    /**
-     * Gets the team settings for a workspace and team.
-     *
-     * @param workspaceId the workspace ID
-     * @param teamId the team ID
-     * @return the team settings if they exist
-     */
     @Transactional(readOnly = true)
     public Optional<WorkspaceTeamSettings> getTeamSettings(Long workspaceId, Long teamId) {
         return teamSettingsRepository.findByWorkspaceIdAndTeamId(workspaceId, teamId);
     }
 
-    /**
-     * Checks if a team is hidden in the given workspace.
-     *
-     * @param workspaceId the workspace ID
-     * @param teamId the team ID
-     * @return true if the team is hidden, false otherwise
-     */
     @Transactional(readOnly = true)
     public boolean isTeamHidden(Long workspaceId, Long teamId) {
         return teamSettingsRepository
@@ -83,25 +69,12 @@ public class WorkspaceTeamSettingsService {
                 .orElse(false);
     }
 
-    /**
-     * Gets all hidden team IDs for a workspace.
-     *
-     * @param workspaceId the workspace ID
-     * @return set of team IDs that are hidden in the workspace
-     */
     @Transactional(readOnly = true)
     public Set<Long> getHiddenTeamIds(Long workspaceId) {
         return teamSettingsRepository.findHiddenTeamIdsByWorkspace(workspaceId);
     }
 
-    /**
-     * Updates the visibility of a team in a workspace.
-     *
-     * @param workspace the workspace
-     * @param teamId the team ID
-     * @param hidden whether to hide the team
-     * @return the updated or created settings, or empty if team not found
-     */
+    /** Returns empty when the team does not exist in the workspace. */
     @Transactional
     public Optional<WorkspaceTeamSettings> updateTeamVisibility(Workspace workspace, Long teamId, boolean hidden) {
         Optional<Team> teamOpt = teamRepository.findById(teamId);
@@ -133,14 +106,6 @@ public class WorkspaceTeamSettingsService {
 
     // Repository Contribution Visibility Settings
 
-    /**
-     * Gets the repository settings for a workspace, team, and repository.
-     *
-     * @param workspaceId the workspace ID
-     * @param teamId the team ID
-     * @param repositoryId the repository ID
-     * @return the repository settings if they exist
-     */
     @Transactional(readOnly = true)
     public Optional<WorkspaceTeamRepositorySettings> getRepositorySettings(
             Long workspaceId, Long teamId, Long repositoryId) {
@@ -148,14 +113,6 @@ public class WorkspaceTeamSettingsService {
                 workspaceId, teamId, repositoryId);
     }
 
-    /**
-     * Checks if a repository is hidden from contributions for a team in a workspace.
-     *
-     * @param workspaceId the workspace ID
-     * @param teamId the team ID
-     * @param repositoryId the repository ID
-     * @return true if the repository is hidden from contributions, false otherwise
-     */
     @Transactional(readOnly = true)
     public boolean isRepositoryHiddenFromContributions(Long workspaceId, Long teamId, Long repositoryId) {
         return repositorySettingsRepository
@@ -164,24 +121,11 @@ public class WorkspaceTeamSettingsService {
                 .orElse(false);
     }
 
-    /**
-     * Gets all repository IDs hidden from contributions in a workspace.
-     *
-     * @param workspaceId the workspace ID
-     * @return set of repository IDs hidden from contributions
-     */
     @Transactional(readOnly = true)
     public Set<Long> getHiddenRepositoryIds(Long workspaceId) {
         return repositorySettingsRepository.findHiddenRepositoryIdsByWorkspace(workspaceId);
     }
 
-    /**
-     * Gets repository IDs hidden from contributions for specific teams in a workspace.
-     *
-     * @param workspaceId the workspace ID
-     * @param teamIds the team IDs to check
-     * @return set of repository IDs hidden from contributions
-     */
     @Transactional(readOnly = true)
     public Set<Long> getHiddenRepositoryIdsByTeams(Long workspaceId, Set<Long> teamIds) {
         if (teamIds == null || teamIds.isEmpty()) {
@@ -190,15 +134,7 @@ public class WorkspaceTeamSettingsService {
         return repositorySettingsRepository.findHiddenRepositoryIdsByWorkspaceAndTeams(workspaceId, teamIds);
     }
 
-    /**
-     * Updates the contribution visibility of a repository for a team in a workspace.
-     *
-     * @param workspace the workspace
-     * @param teamId the team ID
-     * @param repositoryId the repository ID
-     * @param hiddenFromContributions whether to hide contributions from this repository
-     * @return the updated or created settings, or empty if team/repository not found
-     */
+    /** Returns empty when the team or repository does not exist in the workspace. */
     @Transactional
     public Optional<WorkspaceTeamRepositorySettings> updateRepositoryVisibility(
             Workspace workspace, Long teamId, Long repositoryId, boolean hiddenFromContributions) {
@@ -243,28 +179,11 @@ public class WorkspaceTeamSettingsService {
 
     // Label Filter Settings
 
-    /**
-     * Gets all labels configured as filters for a team in a workspace.
-     *
-     * @param workspaceId the workspace ID
-     * @param teamId the team ID
-     * @return set of labels configured as filters
-     */
     @Transactional(readOnly = true)
     public Set<Label> getTeamLabelFilters(Long workspaceId, Long teamId) {
         return labelFilterRepository.findLabelsByWorkspaceAndTeam(workspaceId, teamId);
     }
 
-    /**
-     * Gets label filters grouped by team for multiple teams in a workspace.
-     *
-     * <p>This batch method fetches all label filter associations for the specified teams in a
-     * single database query, avoiding N+1 query patterns when processing multiple teams.
-     *
-     * @param workspaceId the workspace ID
-     * @param teamIds the set of team IDs to fetch label filters for
-     * @return map of team ID to set of labels configured as filters for that team
-     */
     @Transactional(readOnly = true)
     public Map<Long, Set<Label>> getTeamLabelFiltersForTeams(Long workspaceId, Set<Long> teamIds) {
         if (teamIds == null || teamIds.isEmpty()) {
@@ -280,25 +199,12 @@ public class WorkspaceTeamSettingsService {
                         Collectors.mapping(WorkspaceTeamLabelFilter::getLabel, Collectors.toSet())));
     }
 
-    /**
-     * Gets all team IDs that have label filters in a workspace.
-     *
-     * @param workspaceId the workspace ID
-     * @return set of team IDs with label filters
-     */
     @Transactional(readOnly = true)
     public Set<Long> getTeamIdsWithLabelFilters(Long workspaceId) {
         return labelFilterRepository.findTeamIdsWithLabelFilters(workspaceId);
     }
 
-    /**
-     * Adds a label as a filter for a team in a workspace.
-     *
-     * @param workspace the workspace
-     * @param teamId the team ID
-     * @param labelId the label ID
-     * @return the created label filter, or empty if team/label not found
-     */
+    /** Returns empty when the team or label does not exist in the workspace. */
     @Transactional
     public Optional<WorkspaceTeamLabelFilter> addLabelFilter(Workspace workspace, Long teamId, Long labelId) {
         return addLabelFilterInTransaction(workspace, teamId, labelId);
@@ -348,15 +254,7 @@ public class WorkspaceTeamSettingsService {
         return Optional.of(saved);
     }
 
-    /**
-     * Adds a label as a filter for a team in a workspace, looking up by repository and label name.
-     *
-     * @param workspace the workspace
-     * @param teamId the team ID
-     * @param repositoryId the repository ID the label belongs to
-     * @param labelName the label name
-     * @return the created label filter, or empty if team/label not found
-     */
+    /** Returns empty when the team or label does not exist in the workspace. */
     @Transactional
     public Optional<WorkspaceTeamLabelFilter> addLabelFilterByName(
             Workspace workspace, Long teamId, Long repositoryId, String labelName) {
@@ -373,14 +271,6 @@ public class WorkspaceTeamSettingsService {
         return addLabelFilterInTransaction(workspace, teamId, labelOpt.get().getId());
     }
 
-    /**
-     * Removes a label filter for a team in a workspace.
-     *
-     * @param workspace the workspace
-     * @param teamId the team ID
-     * @param labelId the label ID
-     * @return true if the filter was removed, false if it didn't exist
-     */
     @Transactional
     public boolean removeLabelFilter(Workspace workspace, Long teamId, Long labelId) {
         WorkspaceTeamLabelFilter.Id filterId = new WorkspaceTeamLabelFilter.Id(workspace.getId(), teamId, labelId);
@@ -406,12 +296,6 @@ public class WorkspaceTeamSettingsService {
         return true;
     }
 
-    /**
-     * Removes all label filters for a team in a workspace.
-     *
-     * @param workspace the workspace
-     * @param teamId the team ID
-     */
     @Transactional
     public void removeAllLabelFilters(Workspace workspace, Long teamId) {
         labelFilterRepository.deleteAllByWorkspaceIdAndTeamId(workspace.getId(), teamId);
@@ -430,14 +314,6 @@ public class WorkspaceTeamSettingsService {
                 .orElse(false);
     }
 
-    /**
-     * Gets or creates team settings for a workspace and team. This is useful for ensuring settings
-     * exist before querying.
-     *
-     * @param workspace the workspace
-     * @param team the team
-     * @return the existing or new settings
-     */
     @Transactional
     public WorkspaceTeamSettings getOrCreateTeamSettings(Workspace workspace, Team team) {
         return teamSettingsRepository
@@ -448,13 +324,6 @@ public class WorkspaceTeamSettingsService {
                 });
     }
 
-    /**
-     * Gets the workspace entity by ID.
-     *
-     * @param workspaceId the workspace ID
-     * @return the workspace
-     * @throws EntityNotFoundException if workspace not found
-     */
     @Transactional(readOnly = true)
     public Workspace requireWorkspace(Long workspaceId) {
         return workspaceRepository

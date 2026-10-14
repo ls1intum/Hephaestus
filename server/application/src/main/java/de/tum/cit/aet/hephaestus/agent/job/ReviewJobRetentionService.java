@@ -18,13 +18,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Bounds {@code review_job} growth in two passes: TERMINAL rows older than
- * {@link AgentProperties#payloadRetention} keep everything but their bulky {@code capture} and {@code output}, and unreferenced rows older than {@link AgentProperties#rowRetention} go entirely.
- *
- * <p>Both run as {@link BoundedBatchPass} batches, so the queue sharing this table is never held up
- * by one unbounded statement.
- */
+/** Retention removes bulky terminal payloads before unreferenced rows; {@link AgentProperties#payloadRetention} bounds payload lifetime. */
 @ConditionalOnServerRole
 @Component
 @ConditionalOnBooleanProperty(RuntimeRole.AGENT_ENABLED_PROPERTY)

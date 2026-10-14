@@ -166,8 +166,8 @@ public class GitLabTeamSyncService {
                 teamFullPathsByNativeId,
                 syncedNativeIds);
         // Only a whole graph proves a team or a parent link is gone: an unreadable root or a
-        // partial
-        // descendant listing must not delete teams, clear parents, or reconcile memberships.
+        // partial descendant listing must not delete teams, clear parents, or reconcile
+        // memberships.
         boolean graphComplete = rootTeam != null && descendantsComplete;
 
         int totalSynced = syncedTeamsByNativeId.size();
@@ -233,10 +233,9 @@ public class GitLabTeamSyncService {
         }
 
         // Phase G: Tell downstream consumers (e.g. workspace memberships) about the team graph.
-        // Only fired when the
-        // whole graph was listed, and it says whether every team's members are current: a team
-        // whose listing was
-        // incomplete kept old rows, which justify keeping someone but not removing anyone else.
+        // Only fired when the whole graph was listed, and it says whether every team's members are
+        // current: a team whose listing was incomplete kept old rows, which justify keeping someone
+        // but not removing anyone else.
         boolean complete = graphComplete && membersComplete;
         if (graphComplete && teamMembershipListener != null) {
             try {
@@ -404,8 +403,7 @@ public class GitLabTeamSyncService {
                     response.field("group.descendantGroups.nodes").toEntityList(GitLabDescendantGroupResponse.class);
             for (GitLabDescendantGroupResponse group : groups) {
                 // A listed subgroup this sync cannot read, or whose parent it cannot identify, is
-                // still on
-                // GitLab: dropping it would read as a deleted team or a top-level one.
+                // still on GitLab: dropping it would read as a deleted team or a top-level one.
                 Long parentNativeId = parentNativeId(group);
                 Team team = parentNativeId == null ? null : teamProcessor.process(group, groupFullPath, provider);
                 if (team == null) {
@@ -518,8 +516,8 @@ public class GitLabTeamSyncService {
         boolean memberSyncComplete = fetchAllGroupMembers(client, scopeId, groupFullPath, allMembers);
 
         // Phase C.2: Read the whole listing before writing anything. A failed page, or an entry
-        // without a readable
-        // user or access level, leaves every stored membership and role of this team as it was.
+        // without a readable user or access level, leaves every stored membership and role of this
+        // team as it was.
         if (!memberSyncComplete) {
             log.warn("Skipped team membership changes: reason=incompleteListing, groupPath={}", groupFullPath);
             return new MemberSync(0, false);
@@ -540,8 +538,7 @@ public class GitLabTeamSyncService {
         }
 
         // Phase C.3: Apply the membership diff in a short transaction, only while this scope still
-        // owns the group
-        // on the instance it was read from.
+        // owns the group on the instance it was read from.
         MemberSync result = transactionTemplate.execute(status -> {
             if (workspaceLinkService
                     .groupWriteProvider(scopeId, rootGroupFullPath)
@@ -577,13 +574,11 @@ public class GitLabTeamSyncService {
                 syncedMemberIds.add(user.getId());
                 applyMembership(team, user, Objects.requireNonNull(listed.role()), existingMemberships);
             }
-            // A project collaborator the subgroup does not list directly, such as a
-            // student, is a member too. Read in
-            // this transaction, so a failed read changes nothing rather than
-            // dropping them as stale. Collaborator rows
-            // change only from the owning scope's complete project listing, so a
-            // failed collaborator sync leaves its
-            // last complete answer in place rather than an empty one.
+            // A project collaborator the subgroup does not list directly, such as a student, is a
+            // member too. Read in this transaction, so a failed read changes nothing rather than
+            // dropping them as stale. Collaborator rows change only from the owning scope's
+            // complete project listing, so a failed collaborator sync leaves its last complete
+            // answer in place rather than an empty one.
             for (RepositoryCollaborator collaborator : collaboratorRepository.findByOrgLoginAndPermissions(
                     groupFullPath, providerId, TEAM_COLLABORATOR_PERMISSIONS)) {
                 if (syncedMemberIds.add(collaborator.getUser().getId())) {
@@ -645,8 +640,7 @@ public class GitLabTeamSyncService {
             }
             graphQlClientProvider.recordSuccess();
             // A page with field errors, such as a member whose access level is missing, does not
-            // say who holds
-            // which role; none of it is applied.
+            // say who holds which role; none of it is applied.
             if (!Objects.requireNonNull(response).getErrors().isEmpty()) {
                 log.warn("Stopped team member sync: reason=fieldErrors, groupPath={}", groupFullPath);
                 return false;

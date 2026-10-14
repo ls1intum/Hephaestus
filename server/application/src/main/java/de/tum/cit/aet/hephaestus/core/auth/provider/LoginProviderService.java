@@ -256,8 +256,7 @@ public class LoginProviderService {
                 return;
             }
             if (!seed.configured()) {
-                return; // blank credentials → provider omitted (credential-less
-                // pods still boot)
+                return; 
             }
             if (!id.matches("^[a-z][a-z0-9-]{1,62}$")) {
                 log.error(

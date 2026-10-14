@@ -12,7 +12,7 @@ Unexpected source types or partition/template states stop the migration.
 
 Apply the migration once while all writers remain stopped.
 Confirm migration completion and future partition creation before restarting all runtime roles on the same new release.
-Direct person-data exports of previously structured objects and arrays now return Strings that contain JSON text.
+Direct person-data exports of previously structured objects and arrays return Strings that contain JSON text.
 Check consumers that require nested export values.
 
 Downgrade requires restoration of the verified backup from before this cutover.

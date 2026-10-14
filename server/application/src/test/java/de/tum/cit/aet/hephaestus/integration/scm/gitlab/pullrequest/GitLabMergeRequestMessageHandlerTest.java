@@ -308,11 +308,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
                     null);
         }
 
-        /**
-         * GitLab sends {@code approval} for an approval that leaves approvals missing and {@code
-         * unapproval} for a withdrawal that leaves the approval rules met: the same acts as {@code
-         * approved} and {@code unapproved}.
-         */
         static Stream<Arguments> lifecycleActions() {
             BiConsumer<GitLabMergeRequestProcessor, GitLabMergeRequestEventDTO> closed =
                     (processor, event) -> processor.processClosed(eq(event), any(ProcessingContext.class));

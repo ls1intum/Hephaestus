@@ -133,6 +133,8 @@ class ReviewOutputServiceTest extends BaseUnitTest {
 
     @Test
     void shouldKeepTheWorkerAttemptFenceAroundTheProductWrite() {
+        when(verifier.verifyCandidate(eq(job), any(), eq(ReviewKind.ITEM), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(3));
         var prepared = service.prepare(job, submission("clear-names", "docs:one"));
         job.setAttempt(1);
         assertThatThrownBy(() -> prepared.record(job)).isInstanceOf(ResultAdmissionService.StaleAttemptException.class);
@@ -141,6 +143,8 @@ class ReviewOutputServiceTest extends BaseUnitTest {
 
     @Test
     void shouldKeepAnAdmissiblePracticeWhenAnotherCandidateBreaksItsContract() {
+        when(verifier.verifyCandidate(eq(job), any(), eq(ReviewKind.ITEM), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(3));
         var first = RuntimeReviewTestData.assignment(5L, null);
         var second = new ReviewAssignmentSnapshot(
                 new ReviewAssignmentId(job.getReviewId(), 41, 2),

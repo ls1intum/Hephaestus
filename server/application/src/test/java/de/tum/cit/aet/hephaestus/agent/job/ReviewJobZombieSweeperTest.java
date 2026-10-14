@@ -260,7 +260,7 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
                                     snapshot.model().connectionScope(),
                                     snapshot.model().connectionId(),
                                     snapshot.model().modelId(),
-                                    snapshot.model().workspaceId(), // The snapshot has no admission price.
+                                    snapshot.model().workspaceId(),
                                     null,
                                     snapshot.model().reasoningEffort(),
                                     null),
@@ -288,7 +288,7 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
             UUID jobId = UUID.randomUUID();
             when(jobRepository.findOrphanedRunningJobs(any(), anyLong())).thenReturn(List.of(orphan(jobId, 7L, 0)));
             when(jobRepository.requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any()))
-                    .thenReturn(0); // another replica won
+                    .thenReturn(0);
             when(jobRepository.lockById(jobId)).thenReturn(Optional.of(orphanedJob(jobId, 7L, 0)));
 
             sweeper.recoverOrphanedJobs();
@@ -308,8 +308,7 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
         @DisplayName("fails (not requeues) an orphan that hit the retry cap")
         void failsOrphanPastRetryCap() {
             UUID jobId = UUID.randomUUID();
-            when(jobRepository.findOrphanedRunningJobs(any(), anyLong()))
-                    .thenReturn(List.of(orphan(jobId, 7L, 5))); // attempt == maxRetries
+            when(jobRepository.findOrphanedRunningJobs(any(), anyLong())).thenReturn(List.of(orphan(jobId, 7L, 5)));
             ReviewJob persistedJob = orphanedJob(jobId, 7L, 5);
             when(jobRepository.lockById(jobId)).thenReturn(Optional.of(persistedJob));
             when(jobRepository.transitionStatusOwnedBy(
@@ -441,12 +440,6 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
             verify(jobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
         }
 
-        /**
-         * The wedge this guards: a snapshot written by a NEWER schema version — the reverted-canary
-         * case {@link ConfigSnapshot#fromJson} rejects by design. Accounting runs inside the same
-         * transaction as the TIMED_OUT write, so a throw here rolls that write back, the job returns to
-         * RUNNING, and the next sweep fails identically — forever, holding a concurrency slot.
-         */
         @Test
         @DisplayName("a snapshot this server cannot read still terminalises the job, billed UNPRICED")
         void unreadableSnapshotStillTerminalisesTheJob() {

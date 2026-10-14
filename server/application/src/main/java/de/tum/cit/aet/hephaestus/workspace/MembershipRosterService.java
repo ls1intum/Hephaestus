@@ -29,10 +29,7 @@ public class MembershipRosterService implements MembershipRoster, MembershipPage
     @Override
     @Transactional(readOnly = true)
     public boolean isCurrentMember(long workspaceId, long accountId) {
-        return memberships
-                .findByWorkspace_IdAndAccount_Id(workspaceId, accountId)
-                .filter(member -> member.getLeftAt() == null)
-                .isPresent();
+        return memberships.existsByWorkspace_IdAndId_AccountIdAndLeftAtIsNull(workspaceId, accountId);
     }
 
     @Override

@@ -449,11 +449,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Nested
     class SensitiveFieldClearing {
 
-        /**
-         * Per-workspace credentials live on the {@code Connection} aggregate. On workspace purge,
-         * {@code ConnectionPurgeContributor} transitions every still-ACTIVE Connection to {@code
-         * UNINSTALLED}, which clears the encrypted credential blob inside the same transaction.
-         */
         @Test
         void purgeClearsCredentialBlobsOnConnections() {
             Workspace workspace = createGitLabWorkspaceWithData("sensitive");

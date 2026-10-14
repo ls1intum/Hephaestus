@@ -21,14 +21,14 @@ export function reviewModelRunnable(model: ReviewModelState): boolean {
 	return model.status === "ready" && model.binding?.ready === true && model.binding.enabled;
 }
 
-export interface ReviewRunningState {
+export interface ReviewReadinessState {
 	enabled: boolean;
 	model: ReviewModelState;
 }
 
-export type ReviewRunningTone = "running" | "checking" | "unconfirmed" | "blocked" | "off";
+export type ReviewReadinessTone = "running" | "checking" | "unconfirmed" | "blocked" | "off";
 
-export const REVIEW_RUNNING_DEFS: StatusDefs<ReviewRunningTone> = {
+export const REVIEW_READINESS_DEFS: StatusDefs<ReviewReadinessTone> = {
 	running: {
 		label: "Reviews are running",
 		icon: CircleCheckIcon,
@@ -62,7 +62,7 @@ export const REVIEW_RUNNING_DEFS: StatusDefs<ReviewRunningTone> = {
 	},
 };
 
-export function reviewRunningTone({ enabled, model }: ReviewRunningState): ReviewRunningTone {
+export function reviewReadinessTone({ enabled, model }: ReviewReadinessState): ReviewReadinessTone {
 	if (!enabled) {
 		return "off";
 	}
@@ -83,10 +83,10 @@ export function reviewRunningTone({ enabled, model }: ReviewRunningState): Revie
  * which members it serves is decided by that tier against each developer's AI choice, so the banner
  * says which tier is in force rather than only that one is.
  */
-export function reviewRunningDescription(running: ReviewRunningState): string {
-	const tone = reviewRunningTone(running);
+export function reviewReadinessDescription(running: ReviewReadinessState): string {
+	const tone = reviewReadinessTone(running);
 	if (tone !== "running" || running.model.status !== "ready" || !running.model.binding) {
-		return REVIEW_RUNNING_DEFS[tone].description;
+		return REVIEW_READINESS_DEFS[tone].description;
 	}
 	const tier = running.model.binding.dataHandlingTier;
 	const model =

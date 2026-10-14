@@ -210,7 +210,7 @@ export const ClearedResponse: Story = {
 	},
 };
 
-/** A write started and the provider never confirmed it: the sheet says it is checked, not resent. */
+// An uncertain provider write must be checked before another send.
 export const UncertainWrite: Story = {
 	args: { feedback: ready(uncertainWriteFeedbackDetail) },
 	play: async () => {
@@ -399,10 +399,7 @@ export const WithdrawFeedbackFails: Story = {
 	},
 };
 
-/**
- * A conversation linked it, and no appearance is recorded, so whether the developer saw it is
- * unknown: never counted as delivered, and never as withheld.
- */
+// Without an appearance receipt, a conversation link cannot establish delivery.
 export const DeliveryUnconfirmed: Story = {
 	args: { feedback: ready(unconfirmedFeedbackDetail) },
 	play: async () => {
@@ -437,10 +434,6 @@ export const ReadyForPracticePages: Story = {
 	},
 };
 
-/**
- * The longest realistic record, at the narrowest width: a rendered body with code, and every copy's
- * receipt.
- */
 export const Reflow: Story = {
 	args: { feedback: ready({ ...longFeedbackDetail, destination: "ON_WORK" }) },
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
@@ -589,7 +582,6 @@ export const InApprovalQueueReflow: Story = {
 	},
 };
 
-/** A proposal with no copies has nothing to authorize, so only rejection is offered. */
 export const PackageUnavailable: Story = {
 	args: { feedback: ready({ ...awaitingApprovalFeedbackDetail, copies: [] }) },
 	play: async () => {

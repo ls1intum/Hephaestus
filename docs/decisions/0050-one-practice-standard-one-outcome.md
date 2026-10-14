@@ -1,6 +1,6 @@
 # ADR 0050: One practice standard, one outcome
 
-**Status:** Accepted (amended 2026-10-14 — model details superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md))
+**Status:** Accepted; superseded in part 2026-10-14 by [ADR 0056](0056-one-practice-model-for-items-and-scans.md)
 **Date:** 2026-10-02
 **Supersedes:** The observation axes in [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md).
 
@@ -92,6 +92,3 @@ contracts for signals within one practice. Do not add states only to encode feed
 ## Update — 2026-10-14 (#2656): the 1.0 practice model
 
 [ADR 0056](0056-one-practice-model-for-items-and-scans.md) supersedes the result and outcome model of this record.
-The [product vocabulary](../contributor/practice-feedback-language.md) maps the earlier terms:
-an observation is a result, a channel is a destination, and an artifact is an item.
-The sections above stay as the record of the earlier decision.

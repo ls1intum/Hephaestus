@@ -307,7 +307,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         assertThat(currentChannel(C1).getConsentState()).isEqualTo(ConsentState.REVOKED);
         assertThat(threadCount(C1)).isZero();
         assertThat(messageCount(C1)).isZero();
-        assertThat(practiceResultRepository.findById(u2Obs)).isEmpty(); // remaining C1 derived rows erased too
+        assertThat(practiceResultRepository.findById(u2Obs)).isEmpty(); 
         assertThat(auditToStates(C1)).containsExactly(ConsentState.ACTIVE, ConsentState.REVOKED);
         assertThat(currentChannel(C2).getConsentState()).isEqualTo(ConsentState.ACTIVE);
         assertThat(messageCount(C2)).isEqualTo(1);

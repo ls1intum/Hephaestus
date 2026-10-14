@@ -138,10 +138,6 @@ export const ListedResult: Story = {
 	},
 };
 
-/**
- * The practice or the work has changed since this was reviewed, and the review cited nothing: the
- * row says so in one line over its body, and draws no label over evidence it does not have.
- */
 export const StaleWithoutEvidence: Story = {
 	args: {
 		result: { ...strength, currentness: "STALE", explanation: null, evidence: null },
@@ -156,7 +152,6 @@ export const StaleWithoutEvidence: Story = {
 	},
 };
 
-/** An admin found the result wrong. The row stays in the developer's history, marked. */
 export const MarkedIncorrect: Story = {
 	args: { result: { ...strength, markedIncorrectAt: daysBefore(1) } },
 	play: async ({ canvas }) => {
@@ -167,10 +162,6 @@ export const MarkedIncorrect: Story = {
 	},
 };
 
-/**
- * A met result the review wrote no summary for is named by its practice, once: the pill would
- * only repeat it.
- */
 export const MetWithoutSummary: Story = {
 	args: { result: metWithoutSummary },
 	play: async ({ canvas }) => {
@@ -223,11 +214,6 @@ export const MobileReflow: Story = {
 	},
 };
 
-/**
- * Nothing found where the review looked. "What was checked" says what it looked for, the sources
- * it read in the registry's words, and how far it reached — so an expected practice reported
- * missing can be judged against the search that reported it.
- */
 export const SearchedAndFoundNothing: Story = {
 	args: { result: searchedAndFoundNothing },
 	play: async ({ canvas }) => {
@@ -276,10 +262,6 @@ export const NotMetWithProblems: Story = {
 	},
 };
 
-/**
- * The review could not settle the practice. Each open question says what would settle it and,
- * where the review asked about one place, quotes it. A question is not feedback and no problem.
- */
 export const CouldNotDetermine: Story = {
 	args: { result: undeterminedResult },
 	play: async ({ canvas }) => {
@@ -299,10 +281,6 @@ export const CouldNotDetermine: Story = {
 	},
 };
 
-/**
- * Met, with one place in the work the review points at. It reads as evidence about the work, on
- * the neutral ground every other block has: no praise and no status colour.
- */
 export const ExampleFromThisWork: Story = {
 	args: { result: metWithExample },
 	play: async ({ canvas }) => {

@@ -24,7 +24,6 @@ import {
 	INVALID_META_PROGRAM,
 } from "./program-host-runner.ts";
 
-
 const roots: string[] = [];
 after(() => {
 	for (const root of roots) {

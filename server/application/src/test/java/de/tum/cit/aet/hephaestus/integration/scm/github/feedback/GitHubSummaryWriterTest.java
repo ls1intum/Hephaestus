@@ -511,8 +511,7 @@ class GitHubSummaryWriterTest extends BaseUnitTest {
         ClientGraphQlResponse oldestPage = mockCommentsPageResponse(
                 "repository.pullRequest.comments",
                 List.of(comment("IC_1", "also unrelated")),
-                false, // hasPreviousPage=false — the oldest comment was reached, every
-                // comment was scanned
+                false, 
                 null);
         when(spec.execute()).thenReturn(Mono.just(newestPage)).thenReturn(Mono.just(oldestPage));
 
@@ -536,7 +535,7 @@ class GitHubSummaryWriterTest extends BaseUnitTest {
         ClientGraphQlResponse page3 = mockCommentsPageResponse(
                 "repository.pullRequest.comments",
                 List.of(comment("IC_1", "unrelated")),
-                true, // still older comments left when the budget runs out
+                true, 
                 "start-cursor-3");
         when(spec.execute())
                 .thenReturn(Mono.just(page1))

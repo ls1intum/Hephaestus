@@ -3,13 +3,11 @@ import { DIFF_SOURCE, TREE_SOURCE } from "./work/practice-scripts/kits/scm/sourc
 // Repair transport and coordinates before admission; emit a result only when its full contract holds.
 import {
 	CANDIDATE_LIMITS,
+	sessionCandidateSchema,
+	type ParsedSessionCandidate,
 	type Citation,
-	type ClaimBasis,
 	type Outcome,
-	OUTCOMES,
-	PRACTICE_SLUG,
 	type Severity,
-	SEVERITIES,
 } from "./work/practice-scripts/lib/core/contract.ts";
 
 /**
@@ -27,51 +25,7 @@ const CAPTURED_REFS = ".git/hephaestus-captured-refs";
 /** Which side of a diff hunk a citation quotes. It is absent on every source that is not a diff. */
 export type DiffSide = "OLD" | "NEW";
 
-export interface RecordedSearch {
-	consulted: string[];
-	lookedFor: string;
-	boundary: string;
-}
-
-export interface RecordedInapplicability {
-	consulted: string[];
-	prerequisite: string;
-	ruledOutBy: string;
-}
-
-export interface RecordedOpenQuestion {
-	openQuestion: string;
-	wouldSettleIt: string;
-	citation?: Citation;
-}
-
-export interface NormalizedProblem {
-	key?: string;
-	severity: Severity;
-	summary: string;
-	explanation: string;
-	citations: Citation[];
-	basis: ClaimBasis;
-	nextStep?: string;
-}
-
-/**
- * One result, checked: a session candidate without coverage. Which optional parts are present depends
- * on the outcome. {@link normalizeSubmission} enforces that rule; the optionality here is only the shape.
- */
-export interface NormalizedSubmission {
-	outcome: Outcome;
-	summary: string;
-	explanation: string;
-	citations: Citation[];
-	problems?: NormalizedProblem[];
-	example?: { citation: Citation; note: string };
-	evidence: {
-		search?: RecordedSearch;
-		inapplicability?: RecordedInapplicability;
-		openQuestions?: RecordedOpenQuestion[];
-	};
-}
+export type NormalizedSubmission = ParsedSessionCandidate;
 
 export const OUTCOME_DESCRIPTIONS: Record<Outcome, string> = {
 	MET:
@@ -126,118 +80,8 @@ export function trimmedText(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";
 }
 
-function trimmedStrings(value: unknown): string[] {
-	return Array.isArray(value)
-		? value.map((entry: unknown) => trimmedText(entry)).filter(Boolean)
-		: [];
-}
-
 function nullish(value: unknown): boolean {
 	return value == null;
-}
-
-function withinBound(text: string, name: string, max: number): string {
-	if (text.length > max) {
-		throw new Error(`${name} must be at most ${max} characters; this one is ${text.length}`);
-	}
-	return text;
-}
-
-function consultedSources(value: unknown, name: string, missing: string): string[] {
-	const consulted = [...new Set(trimmedStrings(value))].toSorted();
-	if (consulted.length === 0) {
-		throw new Error(`${name} must ${missing}`);
-	}
-	if (consulted.length > CANDIDATE_LIMITS.consultedSources) {
-		throw new Error(
-			`${name} names ${consulted.length} sources; at most ${CANDIDATE_LIMITS.consultedSources}`,
-		);
-	}
-	for (const source of consulted) {
-		withinBound(source, `each source of ${name}`, CANDIDATE_LIMITS.warrantFieldChars);
-	}
-	return consulted;
-}
-
-export function normalizeSearch(search: unknown): RecordedSearch {
-	if (!isRecord(search)) {
-		throw new Error("search is required");
-	}
-	const consulted = consultedSources(
-		search.consulted,
-		"search.consulted",
-		"name at least one source you searched",
-	);
-	const lookedFor = trimmedText(search.lookedFor);
-	const boundary = trimmedText(search.boundary);
-	if (!lookedFor) {
-		throw new Error("search.lookedFor is required");
-	}
-	if (!boundary) {
-		throw new Error("search.boundary is required");
-	}
-	const max = CANDIDATE_LIMITS.warrantFieldChars;
-	return {
-		consulted,
-		lookedFor: withinBound(lookedFor, "search.lookedFor", max),
-		boundary: withinBound(boundary, "search.boundary", max),
-	};
-}
-
-/** A citation alone cannot show inapplicability: require the prerequisite and its exclusion. */
-export function normalizeInapplicability(inapplicability: unknown): RecordedInapplicability {
-	if (!isRecord(inapplicability)) {
-		throw new Error("inapplicability is required");
-	}
-	const consulted = consultedSources(
-		inapplicability.consulted,
-		"inapplicability.consulted",
-		"name at least one source you read to conclude this",
-	);
-	const prerequisite = trimmedText(inapplicability.prerequisite);
-	const ruledOutBy = trimmedText(inapplicability.ruledOutBy);
-	if (!prerequisite) {
-		throw new Error("inapplicability.prerequisite is required: name what this practice looks for");
-	}
-	if (!ruledOutBy) {
-		throw new Error(
-			"inapplicability.ruledOutBy is required: state the fact about THIS work that means the prerequisite " +
-				"cannot occur in it. If you are merely unsure, the answer is COULD_NOT_DETERMINE, not DOES_NOT_APPLY",
-		);
-	}
-	const max = CANDIDATE_LIMITS.warrantFieldChars;
-	return {
-		consulted,
-		prerequisite: withinBound(prerequisite, "inapplicability.prerequisite", max),
-		ruledOutBy: withinBound(ruledOutBy, "inapplicability.ruledOutBy", max),
-	};
-}
-
-export function normalizeOpenQuestion(
-	raw: unknown,
-	which: string,
-	repairs: CitationRepairs = {},
-): RecordedOpenQuestion {
-	if (!isRecord(raw)) {
-		throw new Error(`${which} must be an object with openQuestion and wouldSettleIt`);
-	}
-	const openQuestion = trimmedText(raw.openQuestion);
-	const wouldSettleIt = trimmedText(raw.wouldSettleIt);
-	if (!openQuestion) {
-		throw new Error(`${which}: openQuestion is required`);
-	}
-	if (!wouldSettleIt) {
-		throw new Error(`${which}: wouldSettleIt is required`);
-	}
-	const max = CANDIDATE_LIMITS.openQuestionChars;
-	const citation = nullish(raw.citation)
-		? undefined
-		: normalizeCitation(raw.citation, `${which} citation: `, repairs);
-	return {
-		openQuestion: withinBound(openQuestion, `${which}: openQuestion`, max),
-		wouldSettleIt: withinBound(wouldSettleIt, `${which}: wouldSettleIt`, max),
-		...(citation === undefined ? {} : { citation }),
-	};
 }
 
 export interface CitationRepairs {
@@ -388,537 +232,80 @@ export function normalizeCitation(
 	};
 }
 
-function parseVocabulary<T extends string>(
-	values: readonly T[],
-	value: unknown,
-	field: string,
-	prefix = "",
-): T {
-	const admitted = values.find((candidate) => candidate === value);
-	if (admitted === undefined) {
-		const missing = nullish(value) ? " (missing)" : "";
-		throw new Error(
-			`${prefix}invalid ${field} '${String(value)}'${missing}: one of ${values.join(", ")}`,
-		);
-	}
-	return admitted;
-}
-
-
-const RESULT_FIELDS = [
-	"outcome",
-	"summary",
+const TRIMMED_FIELDS = new Set([
 	"explanation",
-	"citations",
-	"problems",
-	"example",
-	"evidence",
-] as const;
-const EVIDENCE_FIELDS = ["search", "inapplicability", "openQuestions"] as const;
-const PROBLEM_FIELDS = [
-	"key",
-	"severity",
-	"summary",
-	"explanation",
-	"citations",
-	"basis",
 	"nextStep",
-] as const;
-const BASIS_TYPES = ["introduced", "worsened", "duty", "state"] as const;
-const BASIS_FIELDS = {
-	introduced: ["type", "head", "explanation"],
-	worsened: ["type", "base", "head", "explanation"],
-	duty: ["type", "criterionQuote", "event", "explanation"],
-	state: ["type", "explanation"],
-} as const satisfies Record<ClaimBasis["type"], readonly string[]>;
+	"note",
+	"openQuestion",
+	"wouldSettleIt",
+	"lookedFor",
+	"boundary",
+	"prerequisite",
+	"ruledOutBy",
+	"criterionQuote",
+	"key",
+]);
 
-function collect<T>(problems: string[], check: () => T): T | undefined {
-	try {
-		return check();
-	} catch (error) {
-		problems.push(error instanceof Error ? error.message : String(error));
-		return undefined;
-	}
-}
-
-function checkedSummary(value: unknown, prefix: string, problems: string[]): string | undefined {
-	const summary = trimmedText(value).replaceAll(/\s+/gu, " ");
-	if (!summary) {
-		problems.push(`${prefix}summary is required`);
-	} else if (!/\S\s+\S/u.test(summary)) {
-		problems.push(
-			`${prefix}summary must say what was observed as a short phrase, not one word — e.g. ` +
-				"'Debug print left in the request handler'",
-		);
-	} else if (summary.length > MAX_SUMMARY_CHARS) {
-		// Reject overlong result text; truncation would change the submitted claim.
-		problems.push(
-			`${prefix}summary must be at most ${MAX_SUMMARY_CHARS} characters; this one is ${summary.length}. ` +
-				"Resend the result with a shorter summary that reads as a complete phrase on its own — name " +
-				"the behavior, and move titles, quotes and reasons into the explanation",
-		);
-	} else {
-		return summary;
-	}
-	return undefined;
-}
-
-function checkedText(
-	value: unknown,
-	name: string,
-	max: number,
-	problems: string[],
-	missing = `${name} is required`,
-): string | undefined {
-	const text = trimmedText(value);
-	if (!text) {
-		problems.push(missing);
-		return undefined;
-	}
-	return collect(problems, () => withinBound(text, name, max));
-}
-
-function checkedKeys(
-	value: Record<string, unknown>,
-	allowed: readonly string[],
-	what: string,
-	problems: string[],
-): void {
-	const unknown = Object.keys(value).filter((key) => !allowed.includes(key));
-	if (unknown.length > 0) {
-		problems.push(
-			`${what} has unknown field(s): ${unknown.join(", ")}; it has only ${allowed.join(", ")}`,
-		);
-	}
-}
-
-function citationList(
-	value: unknown,
-	name: string,
-	which: (position: number) => string,
-	max: number,
-	repairs: CitationRepairs,
-	problems: string[],
-): Citation[] | undefined {
-	if (!Array.isArray(value)) {
-		problems.push(`${name} must be a list of citations`);
-		return undefined;
-	}
-	if (value.length > max) {
-		problems.push(`${name} lists ${value.length} citations; at most ${max}`);
-		return undefined;
-	}
-	const before = problems.length;
-	const citations = value.flatMap((raw: unknown, index) => {
-		const citation = collect(problems, () => normalizeCitation(raw, which(index + 1), repairs));
-		return citation === undefined ? [] : [citation];
-	});
-	return problems.length > before ? undefined : citations;
-}
-
-function checkedBasis(
-	value: unknown,
-	at: string,
-	citationCount: number | undefined,
-	problems: string[],
-): ClaimBasis | undefined {
-	if (!isRecord(value)) {
-		problems.push(
-			`${at}: basis is required: an object whose type is ${BASIS_TYPES.join(", ")}, saying why the problem belongs to this work`,
-		);
-		return undefined;
-	}
-	const type = BASIS_TYPES.find((known) => known === value.type);
-	if (type === undefined) {
-		problems.push(
-			`${at}: invalid basis type '${String(value.type)}': one of ${BASIS_TYPES.join(", ")}`,
-		);
-		return undefined;
-	}
-	const before = problems.length;
-	checkedKeys(value, BASIS_FIELDS[type], `${at} basis of type ${type}`, problems);
-	const explanation = checkedText(
-		value.explanation,
-		`${at}: basis.explanation`,
-		CANDIDATE_LIMITS.problemExplanationChars,
-		problems,
-	);
-	const index = (name: "head" | "base" | "event"): number => {
-		const sent = value[name];
-		if (typeof sent !== "number" || !Number.isSafeInteger(sent) || sent < 0) {
-			problems.push(
-				`${at}: basis.${name} must be the 0-based index of one of the problem's citations, received ${JSON.stringify(sent)}`,
-			);
-			return -1;
-		}
-		if (citationCount !== undefined && sent >= citationCount) {
-			problems.push(
-				`${at}: basis.${name} names citation ${sent}, and the problem has ${citationCount} citation(s); the index is 0-based`,
-			);
-		}
-		return sent;
-	};
-	let basis: ClaimBasis | undefined;
-	switch (type) {
-		case "introduced": {
-			const head = index("head");
-			basis = explanation === undefined ? undefined : { type, head, explanation };
-			break;
-		}
-		case "worsened": {
-			const base = index("base");
-			const head = index("head");
-			basis = explanation === undefined ? undefined : { type, base, head, explanation };
-			break;
-		}
-		case "duty": {
-			const criterionQuote = checkedText(
-				value.criterionQuote,
-				`${at}: basis.criterionQuote`,
-				CANDIDATE_LIMITS.quoteChars,
-				problems,
-				`${at}: basis.criterionQuote is required: quote the words of the criteria that set the duty`,
-			);
-			const event = index("event");
-			basis =
-				explanation === undefined || criterionQuote === undefined
-					? undefined
-					: { type, criterionQuote, event, explanation };
-			break;
-		}
-		case "state": {
-			basis = explanation === undefined ? undefined : { type, explanation };
-			break;
-		}
-	}
-	return problems.length > before ? undefined : basis;
-}
-
-function normalizeProblem(
-	value: unknown,
-	position: number,
-	repairs: CitationRepairs,
-	problems: string[],
-): NormalizedProblem | undefined {
-	const at = `problem ${position}`;
-	if (!isRecord(value)) {
-		problems.push(
-			`${at} must be an object with severity, summary, explanation, citations and basis`,
-		);
-		return undefined;
-	}
-	const before = problems.length;
-	checkedKeys(value, PROBLEM_FIELDS, at, problems);
-	let key: string | undefined;
-	if (!nullish(value.key) && value.key !== "") {
-		key = trimmedText(value.key);
-		if (!PRACTICE_SLUG.test(key)) {
-			problems.push(
-				`${at}: key must be a short slug of lowercase letters, digits and hyphens, received ${JSON.stringify(value.key)}`,
-			);
-		}
-	}
-	const severity = collect(problems, () =>
-		parseVocabulary(SEVERITIES, value.severity, "severity", `${at}: `),
-	);
-	const summary = checkedSummary(value.summary, `${at}: `, problems);
-	const explanation = checkedText(
-		value.explanation,
-		`${at}: explanation`,
-		CANDIDATE_LIMITS.problemExplanationChars,
-		problems,
-	);
-	const sentCitations = value.citations;
-	let citations: Citation[] | undefined;
-	if (!Array.isArray(sentCitations) || sentCitations.length === 0) {
-		problems.push(`${at}: citations are required: a problem cites at least one place of the work`);
-	} else {
-		citations = citationList(
-			sentCitations,
-			`${at}: citations`,
-			(index) => `${at} citation ${index}: `,
-			CANDIDATE_LIMITS.citationsPerProblem,
-			repairs,
-			problems,
-		);
-	}
-	const basis = checkedBasis(
-		value.basis,
-		at,
-		Array.isArray(sentCitations) ? sentCitations.length : undefined,
-		problems,
-	);
-	const nextStep =
-		nullish(value.nextStep) || value.nextStep === ""
-			? undefined
-			: checkedText(value.nextStep, `${at}: nextStep`, CANDIDATE_LIMITS.nextStepChars, problems);
-	if (
-		problems.length > before ||
-		severity === undefined ||
-		summary === undefined ||
-		explanation === undefined ||
-		citations === undefined ||
-		basis === undefined
-	) {
-		return undefined;
-	}
-	return {
-		...(key === undefined ? {} : { key }),
-		severity,
-		summary,
-		explanation,
-		citations,
-		basis,
-		...(nextStep === undefined ? {} : { nextStep }),
-	};
-}
-
-function checkedProblems(
-	value: unknown,
-	outcome: Outcome | undefined,
-	repairs: CitationRepairs,
-	problems: string[],
-): NormalizedProblem[] | undefined {
-	const listed = nullish(value) ? [] : value;
-	if (!Array.isArray(listed)) {
-		problems.push("problems must be a list of problem objects");
-		return undefined;
-	}
-	if (outcome !== undefined && outcome !== "NOT_MET") {
-		if (!nullish(value)) {
-			problems.push(`a ${outcome} result has no problems: a problem makes it NOT_MET`);
-		}
-		return undefined;
-	}
-	if (outcome === "NOT_MET" && listed.length === 0) {
-		problems.push(
-			"a NOT_MET result lists its problems: one per distinct gap, each with severity, summary, explanation, citations and basis",
-		);
-		return undefined;
-	}
-	if (listed.length > CANDIDATE_LIMITS.problems) {
-		problems.push(`problems lists ${listed.length}; at most ${CANDIDATE_LIMITS.problems}`);
-		return undefined;
-	}
-	const before = problems.length;
-	const normalized = listed.flatMap((raw: unknown, index) => {
-		const problem = normalizeProblem(raw, index + 1, repairs, problems);
-		return problem === undefined ? [] : [problem];
-	});
-	const firstWithKey = new Map<string, number>();
-	for (const [index, problem] of normalized.entries()) {
-		if (problem.key === undefined) {
-			continue;
-		}
-		const first = firstWithKey.get(problem.key);
-		if (first === undefined) {
-			firstWithKey.set(problem.key, index + 1);
-		} else {
-			problems.push(
-				`problems ${first} and ${index + 1} share the key '${problem.key}': each key names one problem`,
-			);
-		}
-	}
-	return problems.length > before ? undefined : normalized;
-}
-
-function checkedExample(
-	value: unknown,
-	outcome: Outcome | undefined,
-	repairs: CitationRepairs,
-	problems: string[],
-): NormalizedSubmission["example"] {
-	if (nullish(value)) {
-		return undefined;
-	}
-	if (outcome !== undefined && outcome !== "MET" && outcome !== "NOT_MET") {
-		problems.push(`example is permitted only for MET or NOT_MET; a ${outcome} result has none`);
-		return undefined;
-	}
-	if (!isRecord(value)) {
-		problems.push("example must be an object with citation and note");
-		return undefined;
-	}
-	checkedKeys(value, ["citation", "note"], "example", problems);
-	const note = checkedText(
-		value.note,
-		"example.note",
-		CANDIDATE_LIMITS.exampleNoteChars,
-		problems,
-		"example.note is required: say in one sentence what the cited place does well",
-	);
-	let citation: Citation | undefined;
-	if (nullish(value.citation)) {
-		problems.push("example.citation is required: the one place that shows the practice done well");
-	} else {
-		citation = collect(problems, () =>
-			normalizeCitation(value.citation, "example citation: ", repairs),
-		);
-	}
-	return note === undefined || citation === undefined ? undefined : { citation, note };
-}
-
-function checkedEvidence(
-	value: unknown,
-	outcome: Outcome | undefined,
-	repairs: CitationRepairs,
-	problems: string[],
-): NormalizedSubmission["evidence"] | undefined {
-	const sent = nullish(value) ? {} : value;
-	if (!isRecord(sent)) {
-		problems.push("evidence must be an object with search, inapplicability or openQuestions");
-		return undefined;
-	}
-	const before = problems.length;
-	const unknown = Object.keys(sent).filter(
-		(key) => !EVIDENCE_FIELDS.some((field) => field === key),
-	);
-	if (unknown.length > 0) {
-		problems.push(
-			`unknown evidence field(s): ${unknown.join(", ")}; evidence has only ${EVIDENCE_FIELDS.join(", ")}`,
-		);
-	}
-	let search: RecordedSearch | undefined;
-	if (!nullish(sent.search)) {
-		if (outcome === "DOES_NOT_APPLY") {
-			problems.push(
-				"evidence.search is not permitted for DOES_NOT_APPLY: a DOES_NOT_APPLY result carries " +
-					"evidence.inapplicability only. If you searched and could not tell, say COULD_NOT_DETERMINE instead",
-			);
-		} else {
-			search = collect(problems, () => normalizeSearch(sent.search));
-		}
-	}
-	let inapplicability: RecordedInapplicability | undefined;
-	if (nullish(sent.inapplicability)) {
-		// Inapplicability is a positive claim about scope, not an uncertain assessment.
-		if (outcome === "DOES_NOT_APPLY") {
-			problems.push(
-				"a DOES_NOT_APPLY result must say why the practice does not apply: " +
-					"evidence.inapplicability with consulted, prerequisite and ruledOutBy. If you looked and could " +
-					"not tell, say COULD_NOT_DETERMINE instead",
-			);
-		}
-	} else if (outcome !== undefined && outcome !== "DOES_NOT_APPLY") {
-		problems.push("evidence.inapplicability is permitted only for DOES_NOT_APPLY");
-	} else {
-		inapplicability = collect(problems, () => normalizeInapplicability(sent.inapplicability));
-	}
-	const openQuestions = checkedOpenQuestions(sent.openQuestions, outcome, repairs, problems);
-	if (problems.length > before) {
-		return undefined;
-	}
-	return {
-		...(search === undefined ? {} : { search }),
-		...(inapplicability === undefined ? {} : { inapplicability }),
-		...(openQuestions === undefined ? {} : { openQuestions }),
-	};
-}
-
-/** The open questions of a NOT_MET or COULD_NOT_DETERMINE result. Uncertainty never silently becomes a verdict. */
-function checkedOpenQuestions(
-	value: unknown,
-	outcome: Outcome | undefined,
-	repairs: CitationRepairs,
-	problems: string[],
-): RecordedOpenQuestion[] | undefined {
-	const listed = nullish(value) ? [] : value;
-	if (!Array.isArray(listed)) {
-		problems.push("evidence.openQuestions must be a list of open questions");
-		return undefined;
-	}
-	if (listed.length === 0) {
-		if (outcome === "COULD_NOT_DETERMINE") {
-			problems.push(
-				"a COULD_NOT_DETERMINE result must say what it could not settle: evidence.openQuestions lists each " +
-					"open question with openQuestion and wouldSettleIt, and a citation where it is located",
-			);
-		}
-		return undefined;
-	}
-	if (outcome === "MET" || outcome === "DOES_NOT_APPLY") {
-		problems.push("evidence.openQuestions is permitted only for NOT_MET or COULD_NOT_DETERMINE");
-		return undefined;
-	}
-	if (listed.length > CANDIDATE_LIMITS.openQuestions) {
-		problems.push(
-			`evidence.openQuestions lists ${listed.length} open questions; at most ${CANDIDATE_LIMITS.openQuestions}`,
-		);
-		return undefined;
-	}
-	const before = problems.length;
-	const questions = listed.flatMap((raw: unknown, index) => {
-		const question = collect(problems, () =>
-			normalizeOpenQuestion(raw, `open question ${index + 1}`, repairs),
-		);
-		return question === undefined ? [] : [question];
-	});
-	return problems.length > before ? undefined : questions;
-}
-
-/** Report all submission errors together so each correction does not require another model call. */
+/** Repair transport coordinates and whitespace, then validate the one shared session contract. */
 export function normalizeSubmission(
 	raw: unknown,
 	notes: string[] = [],
 	sourceOf?: (sourcePath: string) => string | undefined,
 ): NormalizedSubmission {
-	if (!isRecord(raw)) {
-		throw new Error("the arguments must be one result object");
-	}
-	const problems: string[] = [];
+	const errors: string[] = [];
 	const repairs: CitationRepairs = { sourceOf, notes };
-	const sent = raw;
-	checkedKeys(sent, RESULT_FIELDS, "result", problems);
-	const outcome = collect(problems, () => parseVocabulary(OUTCOMES, sent.outcome, "outcome"));
-	const summary = checkedSummary(sent.summary, "", problems);
-	const explanation = checkedText(
-		sent.explanation,
-		"explanation",
-		CANDIDATE_LIMITS.explanationChars,
-		problems,
-		"explanation is required: say why the evidence supports this outcome",
-	);
-	let citations: Citation[] | undefined;
-	const sentCitations = nullish(sent.citations) ? [] : sent.citations;
-	if (
-		outcome !== undefined &&
-		outcome !== "NOT_MET" &&
-		Array.isArray(sentCitations) &&
-		sentCitations.length === 0
-	) {
-		problems.push(`citations are required: a ${outcome} result cites the evidence it rests on`);
-	} else {
-		citations = citationList(
-			sentCitations,
-			"citations",
-			(index) => `citation ${index}: `,
-			CANDIDATE_LIMITS.resultCitations,
-			repairs,
-			problems,
+	const citation = (value: unknown): unknown => {
+		try {
+			return normalizeCitation(value, "", repairs);
+		} catch (error) {
+			errors.push(error instanceof Error ? error.message : String(error));
+			return value;
+		}
+	};
+	const repair = (value: unknown, field = ""): unknown => {
+		if (field === "citation") return citation(value);
+		if (Array.isArray(value)) {
+			return value.map((entry: unknown) =>
+				field === "citations" ? citation(entry) : repair(entry),
+			);
+		}
+		if (isRecord(value))
+			return Object.fromEntries(
+				Object.entries(value)
+					.filter(
+						([key, entry]) =>
+							entry !== undefined &&
+							!(
+								entry === null &&
+								[
+									"example",
+									"search",
+									"inapplicability",
+									"openQuestions",
+									"nextStep",
+									"key",
+								].includes(key)
+							),
+					)
+					.map(([key, entry]) => [key, repair(entry, key)]),
+			);
+		if (typeof value !== "string") return value;
+		if (field === "summary") return value.trim().replaceAll(/\s+/gu, " ");
+		return TRIMMED_FIELDS.has(field) ? value.trim() : value;
+	};
+	const input = isRecord(raw)
+		? { ...raw, citations: raw.citations ?? [], evidence: raw.evidence ?? {} }
+		: raw;
+	const parsed = sessionCandidateSchema.safeParse(repair(input));
+	if (!parsed.success) {
+		errors.push(
+			...parsed.error.issues.map(
+				(issue) => `${issue.path.map(String).join(".") || "result"}: ${issue.message}`,
+			),
 		);
 	}
-	const listed = checkedProblems(sent.problems, outcome, repairs, problems);
-	const example = checkedExample(sent.example, outcome, repairs, problems);
-	const evidence = checkedEvidence(sent.evidence, outcome, repairs, problems);
-	if (
-		problems.length > 0 ||
-		outcome === undefined ||
-		summary === undefined ||
-		explanation === undefined ||
-		citations === undefined ||
-		evidence === undefined
-	) {
-		throw new Error(problems.join("; also: "));
-	}
-	return {
-		outcome,
-		summary,
-		explanation,
-		citations,
-		...(listed === undefined ? {} : { problems: listed }),
-		...(example === undefined ? {} : { example }),
-		evidence,
-	};
+	if (!parsed.success || errors.length > 0) throw new Error(errors.join("; also: "));
+	return parsed.data;
 }
 
 export function submissionCitations(submission: NormalizedSubmission): Citation[] {

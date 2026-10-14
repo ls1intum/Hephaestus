@@ -19,7 +19,6 @@ final class LiveWorkRecords {
 
     static final String REPOSITORY = "test/fixture";
     static final long REPOSITORY_ID = 1L;
-    /** A fixed instant, so that a record does not change between two runs. */
     static final Instant AT = Instant.parse("2026-10-01T09:00:00Z");
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();

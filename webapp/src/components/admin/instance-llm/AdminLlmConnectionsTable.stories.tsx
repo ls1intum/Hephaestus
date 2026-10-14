@@ -55,10 +55,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The server keeps a connection that still has models, so its Delete is off, and one line under the
- * table says why.
- */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		const reason = "To delete a connection, delete its models first.";

@@ -423,5 +423,6 @@ if (scenario !== undefined && scenario !== "") {
 			},
 		},
 	});
-	await import("../../../main/resources/agent/pi-runner.ts");
+	const { runReviewJob } = await import("../../../main/resources/agent/pi-runner.ts");
+	await runReviewJob();
 }

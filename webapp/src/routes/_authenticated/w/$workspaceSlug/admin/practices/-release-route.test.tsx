@@ -10,7 +10,7 @@ import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt, testQueryClient } from "@/test/router-harness";
 
-import { practiceSetupHandlers, wireGuidance, wirePractice } from "./-practice-wire";
+import { practiceSetupHandlers, wireGuidance, wirePractice } from "./-practice-server";
 
 const base = definitionOf({ name: "Explain the change", criteria: "Earlier criteria" });
 

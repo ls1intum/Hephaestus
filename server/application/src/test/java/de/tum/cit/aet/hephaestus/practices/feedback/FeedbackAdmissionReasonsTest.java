@@ -28,7 +28,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationDecision;
-import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheck;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckFacts;
@@ -105,13 +104,13 @@ class FeedbackAdmissionReasonsTest {
     private final ResultRepository results = mock(ResultRepository.class);
     private final PracticeRepository practices = mock(PracticeRepository.class);
     private final PracticeVersionRepository versions = mock(PracticeVersionRepository.class);
-    private final EvidenceAuthorization evidence = mock(EvidenceAuthorization.class);
+    private final FeedbackQueryRepository queries = mock(FeedbackQueryRepository.class);
     private final FeedbackGate gate = mock(FeedbackGate.class);
     private final ItemCatalog catalog = mock(ItemCatalog.class);
     private final FeedbackBasisRepository basis = mock(FeedbackBasisRepository.class);
     private final PreviousPracticePageFeedback previous = mock(PreviousPracticePageFeedback.class);
     private final PracticePageSupportReader support =
-            new PracticePageSupportReader(results, evidence, clock, previous, practices);
+            new PracticePageSupportReader(results, clock, previous, practices, queries);
     private final FeedbackCompositionContextService composition = new FeedbackCompositionContextService(
             reviews,
             results,
@@ -121,7 +120,7 @@ class FeedbackAdmissionReasonsTest {
             new PracticePageFeedbackRouter(),
             gate,
             basis,
-            new FeedbackAnchorEligibility(mock(ProblemRepository.class), catalog),
+            new FeedbackAnchorEligibility(mock(ProblemRepository.class), catalog, new JsonMapper()),
             mock(ResultHistoryQuery.class),
             mock(MentorReadinessQuery.class),
             clock);
@@ -143,6 +142,7 @@ class FeedbackAdmissionReasonsTest {
     @BeforeEach
     void setup() {
         when(reviews.find(1, reviewId)).thenReturn(Optional.of(snapshot));
+        when(queries.reviewOrigins(1, List.of(reviewId))).thenReturn(List.of(ReviewOrigin.EVENT));
         when(gate.mode(current)).thenReturn(FeedbackMode.AUTOMATIC);
         when(versions.findByIdAndWorkspaceId(8L, 1L))
                 .thenReturn(Optional.of(TestEntities.practiceVersion(
@@ -226,7 +226,6 @@ class FeedbackAdmissionReasonsTest {
         when(previous.find(1, 7, "focused-tests", now)).thenReturn(Optional.empty());
         when(results.findCurrentForDeveloper(anyLong(), anyLong(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(about, historical)));
-        when(evidence.permitsForNewDelivery(anyLong(), anyList(), any())).thenReturn(Set.of());
         when(gate.evaluateComposition(any(), anyLong(), anyList(), any())).thenAnswer(call -> {
             List<Result> rows = call.getArgument(2);
             boolean allowed = rows.equals(List.of(about));
@@ -242,7 +241,6 @@ class FeedbackAdmissionReasonsTest {
         var admission = composition.pageDecision(about, selected.evidence(), selected, now);
         assertThat(admission.decision()).isEqualTo(PracticePageDecision.GATE_REFUSED);
         assertThat(admission.stopReason()).isEqualTo(FeedbackStopReason.EVIDENCE_NOT_PERMITTED);
-        assertThat(support.read(1, 7)).isEmpty();
     }
 
     @Test

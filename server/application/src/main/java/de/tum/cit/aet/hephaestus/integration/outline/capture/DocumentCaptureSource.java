@@ -153,10 +153,10 @@ public class DocumentCaptureSource implements ContentSource {
     }
 
     /**
-     * Distinct keywords from the artifact title + body, {@code OR}-joined for {@code websearch_to_tsquery}:
+     * Distinct keywords from the document title + body, {@code OR}-joined for {@code websearch_to_tsquery}:
      * unquoted websearch terms are ANDed, which over-constrains any real item text to zero matches, so
      * relevance has to come from {@code ts_rank} over OR'd terms instead. URLs and sub-3-char tokens carry
-     * no signal and are dropped; empty when nothing survives.
+     * no search terms and are dropped; empty when nothing survives.
      */
     static String deriveQueryText(@Nullable String title, @Nullable String body) {
         String raw = (title == null ? "" : title) + " " + (body == null ? "" : body);

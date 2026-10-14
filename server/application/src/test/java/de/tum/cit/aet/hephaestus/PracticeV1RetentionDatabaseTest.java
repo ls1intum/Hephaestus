@@ -49,7 +49,9 @@ class PracticeV1RetentionDatabaseTest {
                 .containsExactly("provider:123|POSTED");
         assertThatThrownBy(() -> PracticeV1CutoverMigrationTest.execute(
                         database, "DELETE FROM review WHERE id='00000000-0000-0000-0000-000000992111'"))
-                .isInstanceOf(SQLException.class);
+                .isInstanceOfSatisfying(
+                        SQLException.class,
+                        error -> assertThat(error.getSQLState()).isEqualTo("23001"));
         assertThat(PracticeV1CutoverMigrationTest.column(
                         database,
                         "SELECT (nextval(pg_get_serial_sequence('account','id'))>2000000 AND"
@@ -64,7 +66,9 @@ class PracticeV1RetentionDatabaseTest {
         var database = PracticeV1CutoverMigrationTest.migratedDatabase(context);
         assertThatThrownBy(() -> PracticeV1CutoverMigrationTest.execute(
                         database, "DELETE FROM membership WHERE workspace_id=992101 AND account_id=992106"))
-                .isInstanceOf(SQLException.class);
+                .isInstanceOfSatisfying(
+                        SQLException.class,
+                        error -> assertThat(error.getSQLState()).isEqualTo("23001"));
         PracticeV1CutoverMigrationTest.execute(database, """
             DELETE FROM feedback WHERE workspace_id=992101 AND developer_id=992106;
             DELETE FROM review_item WHERE workspace_id=992101 AND result_id IN

@@ -34,16 +34,7 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Parse Pi-runner output into an {@link AgentResult}.
- *
- * <p>Falls back to persisted review state when the primary result is absent and surfaces auxiliary
- * runner artifacts. A malformed result is not a successful run and carries no {@code rawOutput}.
- *
- * <p>Parse failures are counted by the {@code agent.pi.result.parse.failure{stage}} counter; a malformed auxiliary
- * artifact costs only that artifact. The practice script report is read apart from the result, by
- * {@link #parsePracticeScriptReport}, because only the job knows which scripts it staged.
- */
+/** Malformed primary output cannot establish success; malformed auxiliary output drops only that auxiliary data. */
 @Service
 public class PiResultParser {
 

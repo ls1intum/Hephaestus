@@ -22,10 +22,6 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             @Param("sourceType") UsageSourceType sourceType,
             @Param("sourceId") UUID sourceId);
 
-    /**
-     * Every row one source recorded in a workspace under any of {@code sourceTypes}, first attempt
-     * first.
-     */
     @Query("SELECT e FROM LlmUsageEvent e WHERE e.workspace.id = :workspaceId AND e.sourceType IN"
             + " :sourceTypes AND e.sourceId = :sourceId ORDER BY e.sourceAttempt, e.occurredAt")
     List<LlmUsageEvent> findByWorkspaceIdAndSourceTypeInAndSourceIdOrderBySourceAttemptAsc(
@@ -59,10 +55,6 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
                     + " m.connection_id AND c.workspace_id = m.workspace_id WHERE m.workspace_id = w.id"
                     + " AND m.enabled AND c.enabled)";
 
-    /**
-     * One retention batch. {@code occurred_at} is indexed on its own so this never scans the
-     * ledger.
-     */
     @WorkspaceAgnostic("Retention removes expired usage rows across all workspaces")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(

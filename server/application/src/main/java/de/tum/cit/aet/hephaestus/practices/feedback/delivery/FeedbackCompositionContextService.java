@@ -162,11 +162,7 @@ public class FeedbackCompositionContextService {
                     PracticePageDecision.UNATTRIBUTABLE_SUBJECT, FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE);
         if (gate.mode(about) == FeedbackMode.OFF)
             return new PageAdmission(PracticePageDecision.FEEDBACK_OFF, FeedbackStopReason.FEEDBACK_OFF);
-        if (!support.isEmpty()
-                && support.stream()
-                        .allMatch(row -> reviews.find(row.getWorkspaceId(), row.getReviewId())
-                                .map(r -> r.origin() == ReviewOrigin.BACKFILL)
-                                .orElseThrow()))
+        if (pageSupport.isBackfillOnly(about.getWorkspaceId(), support))
             return new PageAdmission(PracticePageDecision.BACKFILL_HELD, FeedbackStopReason.BACKFILL_QUIET);
         var review = reviews.find(about.getWorkspaceId(), about.getReviewId()).orElseThrow();
         var check = gate.evaluateComposition(

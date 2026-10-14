@@ -9,6 +9,7 @@ import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.io.Serial;
 import java.io.Serializable;
@@ -25,7 +26,9 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 @Entity
-@Table(name = "review_job_script_run")
+@Table(
+        name = "review_job_script_run",
+        indexes = @Index(name = "idx_review_job_script_run_job_attempt", columnList = "job_id,attempt,practice_id"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ScriptRun {

@@ -49,10 +49,6 @@ public enum AgentPurpose {
                 .toList();
     }
 
-    /**
-     * The purposes that give a practice review its optional models for practice scripts, one per non-chat kind.
-     * The chat model of practice scripts is the review's own model.
-     */
     public static List<AgentPurpose> practiceScript() {
         return PRACTICE_SCRIPT;
     }

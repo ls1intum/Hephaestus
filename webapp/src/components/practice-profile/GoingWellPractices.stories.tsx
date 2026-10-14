@@ -59,7 +59,6 @@ export const TwoLinkedPractices: Story = {
 	},
 };
 
-/** No sentence from the workspace: the name and the proof, and no praise put in its place. */
 export const NoSentence: Story = {
 	args: { practices: [unworded] },
 	play: async ({ canvas }) => {
@@ -76,10 +75,6 @@ export const NoSentence: Story = {
 	},
 };
 
-/**
- * Support the reader may not see, such as evidence withheld by consent: the practice and its
- * sentence stand, and no link points at a result that is not there.
- */
 export const NoSupport: Story = {
 	args: { practices: [{ ...linked, evidence: [] }] },
 	play: async ({ canvas }) => {
@@ -158,7 +153,6 @@ export const LongProviderLabels: Story = {
 	},
 };
 
-/** Nothing going well to name yet: a sentence says what appears here, never "Going well" praise. */
 export const Empty: Story = {
 	args: { practices: [] },
 	play: async ({ canvas }) => {
@@ -171,7 +165,6 @@ export const Empty: Story = {
 	},
 };
 
-/** A positive claim waits for its data: skeletons, not an empty "Going well". */
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async ({ canvas }) => {

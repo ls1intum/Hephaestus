@@ -4,9 +4,7 @@ package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 public enum CatalogAdoptionAvailability {
     /** Offered by the instance catalog and not yet copied here. */
     AVAILABLE,
-    /**
-     * Already copied here. The copy is independent from now on; adopting again would duplicate it.
-     */
+    /** An adopted copy is independent; adopting it again would duplicate the workspace practice. */
     ADOPTED,
     /**
      * A different workspace practice already holds this slug. Slug identity is what prevents

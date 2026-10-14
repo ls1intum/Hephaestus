@@ -250,9 +250,6 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
         assertThat(failures()).isZero();
     }
 
-    /**
-     * The report writer reads the same cases, so the writer and this parser keep one rule for the error line.
-     */
     @Test
     void shouldKeepTheErrorLineThatTheReportWriterKeepsWhenBothReadTheSameError() throws IOException {
         JsonNode cases;
@@ -285,10 +282,6 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
         assertThat(failures()).isZero();
     }
 
-    /**
-     * The run is written in the attempt's terminal transaction, so a value that PostgreSQL refuses would fail the
-     * whole review. A control character becomes a space; a line with an unpaired surrogate is left out.
-     */
     @Test
     void shouldKeepOnlyTextPostgresqlCanStoreWhenTheErrorHoldsANulOrAnUnpairedSurrogate() {
         List<PracticeScriptRunReport> runs = parse(report(
@@ -393,10 +386,6 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
                 .containsExactly(tuple(ModelSlot.EMBEDDING, false), tuple(ModelSlot.RERANKING, false));
     }
 
-    /**
-     * The practices module cannot name {@link AgentPurpose}, so it mirrors the purposes of the practice script slots. A
-     * purpose without its mirror leaves its slot unknown to the parser, which then drops every entry that uses it.
-     */
     @Test
     void shouldMirrorEveryAgentPurposeOfAPracticeScriptSlotWhenAPurposeIsAdded() {
         assertThat(Arrays.stream(ModelSlot.values()).map(Enum::name))

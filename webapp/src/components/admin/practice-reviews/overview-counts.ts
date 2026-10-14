@@ -46,8 +46,8 @@ export function finishedInRange(
 	scope: OutcomeScope,
 ): { state: ReviewCountState; list: ReviewListTarget } {
 	const list: ReviewListTarget = {
-		list: "runs",
-		search: { ...scopeSearch(scope, "runs"), status: [...FINISHED_REVIEW_STATUSES] },
+		list: "reviews",
+		search: { ...scopeSearch(scope, "reviews"), status: [...FINISHED_REVIEW_STATUSES] },
 	};
 	if (overview.status !== "ready") {
 		return { state: overview, list };

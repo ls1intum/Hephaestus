@@ -80,10 +80,6 @@ public class AccountProvisioningService {
      */
     public record ProvisionResult(Account account, boolean identityLinked) {}
 
-    /**
-     * Resolve the account for a completed OAuth login: returning login (link exists), link-mode
-     * (attach to current account), or fresh JIT creation.
-     */
     @Transactional
     public ProvisionResult resolveOrProvision(
             String registrationId, String subject, OAuth2User principal, AuthIntentCookie.@Nullable Intent intent) {
@@ -115,7 +111,7 @@ public class AccountProvisioningService {
                 .findActiveByProviderSubject(providerId, subject, teamId)
                 .orElseGet(() ->
                         identityRepository
-                                .findByExactKey(providerId, subject, Objects.requireNonNullElse(teamId, ""))
+                                .findByExactKey(providerId, subject, PersonIdentity.teamKey(teamId))
                                 .stream()
                                 .findFirst()
                                 .orElse(null));
@@ -222,7 +218,7 @@ public class AccountProvisioningService {
                     subject,
                     login);
         }
-        return new ProvisionResult(result, false); // fresh JIT login, not a link onto an existing account
+        return new ProvisionResult(result, false); 
     }
 
     private void publishIdentityLinked(long accountId) {
@@ -277,7 +273,7 @@ public class AccountProvisioningService {
         link.setAccount(account);
         link.setProviderId(providerId);
         link.setProviderUserKey(subject);
-        link.setTeamKey(Objects.requireNonNullElse(teamId, ""));
+        link.setTeamKey(PersonIdentity.teamKey(teamId));
         return link;
     }
 

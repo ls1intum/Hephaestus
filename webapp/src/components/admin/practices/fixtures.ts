@@ -268,6 +268,10 @@ export const mockScriptedPractice = mockPracticeOf({
 	}),
 });
 
+export function practiceGroup(overrides: Partial<PracticeGroup> = {}): PracticeGroup {
+ return { id: "1", slug: "review-ready-work", name: "Submitting review-ready work", description: null, icon: null, color: null, position: 0, shownToDevelopers: true, feedbackMode: inheritedFeedbackMode(), catalogOrigin: OWN_ORIGIN, createdAt: new Date("2025-06-01"), updatedAt: null, ...overrides };
+}
+
 export const mockGroups: PracticeGroup[] = [
 	{
 		id: "1",

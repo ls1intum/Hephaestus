@@ -35,7 +35,7 @@ public class FeedbackDeliveryPolicy {
         FeedbackCheck check = gate.evaluate(row, stage, approval);
         Map<FeedbackCheckStage, FeedbackChecks> checks = new EnumMap<>(FeedbackCheckStage.class);
         checks.putAll(feedback.findByIdAndWorkspaceId(row.getId(), row.getWorkspaceId())
-                .orElse(row)
+                .orElseThrow()
                 .getChecks());
         checks.put(check.stage(), new FeedbackChecks(List.of(check), check.checkedAt()));
         feedback.updateChecks(row.getWorkspaceId(), row.getId(), checks);

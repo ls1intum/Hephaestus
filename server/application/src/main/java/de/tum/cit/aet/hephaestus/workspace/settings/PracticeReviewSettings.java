@@ -10,13 +10,7 @@ import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Per-workspace overrides for practice-review trigger/delivery policy. Embedded on {@link
- * de.tum.cit.aet.hephaestus.workspace.Workspace}.
- *
- * <p>PATCH {@code null} means "no change"; to reset a field back to inherit, name it in the PATCH
- * {@code reset} set (see {@link #reset(java.util.Set)}).
- */
+/** PATCH null preserves an override; name the field in {@link #reset(java.util.Set)} to restore inheritance. */
 @Embeddable
 @Getter
 @Setter

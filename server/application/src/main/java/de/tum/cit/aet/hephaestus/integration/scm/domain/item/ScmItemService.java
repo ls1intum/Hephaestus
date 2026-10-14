@@ -241,12 +241,8 @@ public class ScmItemService implements ItemSource {
                 List.of(),
                 holder.version().value());
         if (requested != null) {
-            String[] fields = requested.value().split(":", -1);
-            if (fields.length != 4
-                    || !fields[0].equals("scm.file")
-                    || !fields[1].equals("v1")
-                    || !fields[2].equals(file.objectId())
-                    || !fields[3].matches("[0-9a-f]{64}")) throw versionUnavailable();
+            var parsed = ScmFileVersions.parse(requested).orElseThrow(ScmItemService::versionUnavailable);
+            if (!parsed.blobId().equals(file.objectId())) throw versionUnavailable();
             version = requested;
         }
         return new ItemSnapshot(
@@ -331,13 +327,9 @@ public class ScmItemService implements ItemSource {
                 throw new ItemCaptureException(
                         ItemCaptureCode.CAPTURE_FAILED, "Captured SCM item record is not an object");
             if (kind.equals(ScmItemEvents.FILE)) {
-                String[] version = pinned.version().value().split(":", -1);
-                if (version.length != 4
-                        || !version[0].equals("scm.file")
-                        || !version[1].equals("v1")
-                        || !Objects.equals(
-                                pinned.item().path(), record.path("path").asString())
-                        || !version[2].equals(record.path("blobId").asString())
+                var version = ScmFileVersions.parse(pinned.version()).orElseThrow(ScmItemService::versionUnavailable);
+                if (!Objects.equals(pinned.item().path(), record.path("path").asString())
+                        || !version.blobId().equals(record.path("blobId").asString())
                         || !Objects.equals(
                                 pinned.version().baseVersion(),
                                 record.path("commitId").asString())) throw versionUnavailable();

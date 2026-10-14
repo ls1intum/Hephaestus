@@ -248,12 +248,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             @Param("since") Instant since,
             Pageable page);
 
-    /**
-     * The developer's own authored PULL REQUESTS in the workspace, newest first — the work itself (not
-     * results about it), so the mentor has a concrete, linkable inventory of what they shipped. Same
-     * author + RepositoryToMonitor scoping as {@link #findReviewsReceivedSince}. {@code FROM PullRequest}
-     * narrows to the PR discriminator (single-table inheritance), so issues never leak in.
-     */
+    /** Uses the same author and monitored-repository scope as practice reviews; excludes tombstones. */
     @Query("""
         SELECT p
         FROM PullRequest p

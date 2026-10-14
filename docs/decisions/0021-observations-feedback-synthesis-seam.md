@@ -1,6 +1,6 @@
 # ADR 0021: Separate observations from feedback
 
-**Status:** Superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md)
+**Status:** Accepted (amended 2026-07-31 #1423, 2026-08-18 #1444 — rewritten in place; refined by [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md) and [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md)); superseded 2026-10-14 by [ADR 0056](0056-one-practice-model-for-items-and-scans.md)
 **Date:** 2026-06-14  
 **Authors:** Felix T.J. Dietrich
 
@@ -111,6 +111,3 @@ This ADR owns the separation and its invariants, not field inventories. Current 
 ## Update — 2026-10-14 (#2656): the 1.0 practice model
 
 [ADR 0056](0056-one-practice-model-for-items-and-scans.md) supersedes this record. Results and feedback stay separate records, and delivery cannot change a measured outcome.
-The [product vocabulary](../contributor/practice-feedback-language.md) maps the earlier terms:
-an observation is a result, a channel is a destination, and an artifact is an item.
-The sections above stay as the record of the earlier decision.

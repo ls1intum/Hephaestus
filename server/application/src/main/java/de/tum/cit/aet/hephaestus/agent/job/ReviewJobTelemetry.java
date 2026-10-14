@@ -126,10 +126,6 @@ final class ReviewJobTelemetry {
         Objects.requireNonNull(terminalCounters.get(outcome)).increment();
     }
 
-    /**
-     * A failure before the sandbox started, with what the executor made of it: {@code REQUEUED}, {@code FAILED} or
-     * {@code OWNERSHIP_LOST}. Only the closed stage and kind are recorded, never the failure's own message.
-     */
     void preparationFailed(ReviewJob job, PreparationFailure failure, String result) {
         log.atWarn()
                 .addKeyValue("event.name", "agent.job.preparation_failed")

@@ -16,13 +16,13 @@ import {
 	feedbackDetail,
 	reviewAccounts,
 } from "@/components/admin/practice-reviews/fixtures";
-import {
-	reviewHandlers,
-	feedbackCountHandlers,
-} from "@/components/admin/practice-reviews/story-mock-server";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { hasText } from "@/lib/text";
 import { server } from "@/mocks/server";
+import {
+	reviewHandlers,
+	feedbackCountHandlers,
+} from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
 import { deferred, sleep } from "@/test/async";
 import { levelsOpenedBy } from "@/test/detail-stack";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter, testQueryClient } from "@/test/router-harness";
@@ -45,7 +45,10 @@ function proposalWire(state: ProposalState, id = FEEDBACK_ID) {
 		destination: "ON_WORK" as const,
 		stopReason: state === "AWAITING_APPROVAL" ? "PRACTICE_REQUIRES_APPROVAL" : null,
 		body: "Please keep the cache scoped to one workspace so membership changes cannot leak.",
-		copies: awaitingApprovalFeedbackDetail.copies.map((copy) => ({ ...copy, body: "Please keep the cache scoped to one workspace so membership changes cannot leak." })),
+		copies: awaitingApprovalFeedbackDetail.copies.map((copy) => ({
+			...copy,
+			body: "Please keep the cache scoped to one workspace so membership changes cannot leak.",
+		})),
 	};
 }
 

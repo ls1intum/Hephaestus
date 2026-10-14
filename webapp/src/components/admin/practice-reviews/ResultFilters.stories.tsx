@@ -86,10 +86,7 @@ export const ReportsAChosenSeverity: Story = {
 	},
 };
 
-/**
- * Sorting does not narrow anything, which is why it sits with the count rather than among the facets
- * and why Reset leaves it alone. The choice still travels as a patch like any other.
- */
+// Sorting does not narrow the list, so Reset must preserve it.
 export const SortIsNotAFilter: Story = {
 	args: {
 		search: { ...UNFILTERED, severity: ["MAJOR"] },
@@ -181,10 +178,6 @@ export const AnOutcomeFromTheOverview: Story = {
 	},
 };
 
-/**
- * "Marked incorrect" has no facet of its own: it only arrives from the overview's count, so it is a
- * pill the reader can see and drop rather than a control they would never reach for.
- */
 export const OnlyResultsMarkedIncorrect: Story = {
 	args: {
 		search: {
@@ -234,10 +227,6 @@ export const SetFacetShowsItsValue: Story = {
 	},
 };
 
-/**
- * The scope came along from another tab: a developer, a practice and a range. Reset clears this
- * list's own facets and leaves the scope. "Clear scope" clears the scope.
- */
 export const ScopeCarriedFromAnotherTab: Story = {
 	args: {
 		search: {
@@ -299,16 +288,13 @@ export const TurnedOffPracticesHidden: Story = {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Practice" }));
 		const options = await screen.findByRole("listbox", { name: "Practice options" });
 		await expect(within(options).queryByRole("option", { name: /Thin controllers/u })).toBeNull();
-		await userEvent.keyboard("{Escape}");
-		const show = await screen.findByRole("switch", { name: "Show turned-off practices (1 hidden)" });
+		const show = await screen.findByRole("switch", { name: /^Show turned-off practices/u });
 		await userEvent.click(show);
-		await userEvent.click(canvas.getByRole("combobox", { name: "Practice" }));
-		const updated = await screen.findByRole("listbox", { name: "Practice options" });
-		await within(updated).findByRole("option", { name: /Thin controllers/u });
+		await within(options).findByRole("option", { name: /Thin controllers/u });
 	},
 };
 
-/** A turned-off practice already chosen stays offered, so the choice can be seen and cleared. */
+// An unavailable selected practice must remain visible so the reader can clear it.
 export const ChosenTurnedOffPracticeStays: Story = {
 	args: {
 		search: { ...UNFILTERED, practiceSlug: ["thin-controllers"] },

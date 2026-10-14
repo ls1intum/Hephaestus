@@ -1,12 +1,12 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { parseSearch } from "@/lib/router-search";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { parseSearch } from "@/lib/router-search";
 
 import { resultDetail, reviewDetail, reviews } from "@/components/admin/practice-reviews/fixtures";
-import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { server } from "@/mocks/server";
+import { reviewHandlers } from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
@@ -14,7 +14,7 @@ import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harnes
 vi.setConfig({ testTimeout: 15_000 });
 
 const REVIEWS = "/w/acme/admin/practices/reviews";
-const REVIEWS_TAB = `${REVIEWS}/runs`;
+const REVIEWS_TAB = REVIEWS;
 
 const REVIEW = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
 const RESULT = "9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c";

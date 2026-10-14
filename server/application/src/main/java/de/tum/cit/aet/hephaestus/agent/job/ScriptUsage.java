@@ -88,7 +88,6 @@ public class ScriptUsage {
         return id.getModelKind();
     }
 
-    /** The ledger source that bills calls of this kind; the review's own row bills the chat model. */
     public static UsageSourceType ledgerSourceType(ModelKind kind) {
         return switch (kind) {
             case CHAT -> UsageSourceType.REVIEW_JOB;

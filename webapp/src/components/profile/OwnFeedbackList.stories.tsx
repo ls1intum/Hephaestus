@@ -83,7 +83,6 @@ export const RecordsAResponse: Story = {
 	},
 };
 
-/** A disagreement needs its reason, says who reads it, and Skip only closes the band. */
 export const DisagreementNeedsAReason: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Disagree" }));
@@ -136,10 +135,6 @@ export const ClearResponse: Story = {
 	},
 };
 
-/**
- * A response on its way: every control waits, and the pressed answer is the one being written,
- * not the one it replaces.
- */
 export const ResponsePending: Story = {
 	render: (args) => <Answerable {...args} pending />,
 	play: async ({ canvas, userEvent }) => {
@@ -173,7 +168,6 @@ export const SeveralPieces: Story = {
 	},
 };
 
-/** A user view reads the feedback and answers nothing: no response controls at all. */
 export const ReadOnly: Story = {
 	render: (args) => <OwnFeedbackList {...args} />,
 	play: async ({ canvas }) => {

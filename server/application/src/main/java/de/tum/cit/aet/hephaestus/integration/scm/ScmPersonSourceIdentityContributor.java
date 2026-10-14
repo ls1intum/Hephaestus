@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceIdentityContributor;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
 import de.tum.cit.aet.hephaestus.core.security.ScmOrigin;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -37,7 +38,12 @@ public class ScmPersonSourceIdentityContributor implements PersonSourceIdentityC
 
     @Override
     public Set<String> itemKinds() {
-        return Set.of("scm.issue", "scm.pull_request", "scm.pull_request_review", "scm.repository", "scm.file");
+        return Set.of(
+                ScmItemEvents.ISSUE.value(),
+                ScmItemEvents.PULL_REQUEST.value(),
+                ScmItemEvents.PULL_REQUEST_REVIEW.value(),
+                ScmItemEvents.REPOSITORY.value(),
+                ScmItemEvents.FILE.value());
     }
 
     @Override
@@ -51,17 +57,20 @@ public class ScmPersonSourceIdentityContributor implements PersonSourceIdentityC
     @Override
     public List<PersonIdentity> identitiesForSource(long workspaceId, String itemKind, long sourceId) {
         // Tree captures omit Git authorship; person attribution stays with the source work.
-        if (itemKind.equals("scm.repository") || itemKind.equals("scm.file")) return List.of();
+        if (itemKind.equals(ScmItemEvents.REPOSITORY.value()) || itemKind.equals(ScmItemEvents.FILE.value()))
+            return List.of();
         if (!itemKinds().contains(itemKind)) throw new IllegalArgumentException("Unsupported SCM item kind");
-        if (itemKind.equals("scm.pull_request_review")) {
+        if (itemKind.equals(ScmItemEvents.PULL_REQUEST_REVIEW.value())) {
             var parents = jdbc.query(
-                    "SELECT parent.source_id FROM item child JOIN item parent ON parent.workspace_id=child.workspace_id AND parent.id=child.parent_id JOIN pull_request_review review ON review.id=child.source_id AND review.pull_request_id=parent.source_id WHERE child.workspace_id=? AND child.kind='scm.pull_request_review' AND child.source_id=? AND parent.kind='scm.pull_request'",
+                    "SELECT parent.source_id FROM item child JOIN item parent ON parent.workspace_id=child.workspace_id AND parent.id=child.parent_id JOIN pull_request_review review ON review.id=child.source_id AND review.pull_request_id=parent.source_id WHERE child.workspace_id=? AND child.kind=? AND child.source_id=? AND parent.kind=?",
                     (rs, row) -> rs.getLong("source_id"),
                     workspaceId,
-                    sourceId);
+                    ScmItemEvents.PULL_REQUEST_REVIEW.value(),
+                    sourceId,
+                    ScmItemEvents.PULL_REQUEST.value());
             return parents.isEmpty()
                     ? List.of()
-                    : identitiesForSource(workspaceId, "scm.pull_request", parents.getFirst());
+                    : identitiesForSource(workspaceId, ScmItemEvents.PULL_REQUEST.value(), parents.getFirst());
         }
         boolean connected = connectedToWorkspace(workspaceId, sourceId);
         return jdbc.query(
@@ -73,16 +82,14 @@ public class ScmPersonSourceIdentityContributor implements PersonSourceIdentityC
                     WHERE i.id=? AND (
                         ?
                         OR EXISTS (SELECT 1 FROM item a WHERE a.workspace_id=?
-                            AND a.kind=? AND a.source_id=i.id)) AND ((?='scm.pull_request' AND i.issue_type='PULL_REQUEST')
-                        OR (?='scm.issue' AND i.issue_type='ISSUE'))
+                            AND a.kind=? AND a.source_id=i.id)) AND i.issue_type=?
                     """,
                 (rs, row) -> new PersonIdentity(rs.getLong(1), Objects.requireNonNull(rs.getString(2)), null),
                 sourceId,
                 connected,
                 workspaceId,
                 itemKind,
-                itemKind,
-                itemKind);
+                itemKind.equals(ScmItemEvents.PULL_REQUEST.value()) ? "PULL_REQUEST" : "ISSUE");
     }
 
     private boolean connectedToWorkspace(long workspaceId, long sourceId) {

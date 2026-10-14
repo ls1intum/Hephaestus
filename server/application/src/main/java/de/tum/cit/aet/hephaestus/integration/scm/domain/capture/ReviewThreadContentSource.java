@@ -132,10 +132,9 @@ public class ReviewThreadContentSource {
                     continue;
                 }
                 // A COMMENTED review with no body is the container of inline comments — GitHub's
-                // batch, or
-                // the row GitLab's sync makes per discussion and author — and its substance is
-                // already in
-                // comments.json. Listing it here would be a decision that decided nothing.
+                // batch, or the row GitLab's sync makes per discussion and author — and its
+                // substance is already in comments.json. Listing it here would be a decision that
+                // decided nothing.
                 if (review.getState() == PullRequestReview.State.COMMENTED && isBlank(review.getBody())) {
                     continue;
                 }

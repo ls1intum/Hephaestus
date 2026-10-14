@@ -286,7 +286,7 @@ A component, its file, its props type, and its story title all name the same con
 Use the name in `docs/contributor/practice-feedback-language.md`.
 It is the product's word, not the server's or the screen's previous word.
 
-The verdict of one practice about one piece of work is a **result**.
+The outcome of one practice for one item is a **result**.
 One located problem under a Not met result is a **problem** in code and on screen.
 What a developer receives is **feedback**.
 Use only these three words for them.

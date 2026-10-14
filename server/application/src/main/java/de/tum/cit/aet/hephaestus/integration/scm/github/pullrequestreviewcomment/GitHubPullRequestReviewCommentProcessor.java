@@ -200,11 +200,6 @@ public class GitHubPullRequestReviewCommentProcessor {
                 .map(comment -> {
                     comment.setBody(dto.body());
                     comment.setUpdatedAt(dto.updatedAt());
-                    // Rows stored before the side was kept get it on their next edit or
-                    // sync.
-                    if (dto.side() != null && comment.getSide() == null) {
-                        comment.setSide(mapSide(dto.side()));
-                    }
                     PullRequestReviewComment saved = commentRepository.save(comment);
                     eventPublisher.publishEvent(new ScmDomainEvent.ReviewCommentEdited(
                             ScmEventPayload.ReviewCommentData.from(saved),

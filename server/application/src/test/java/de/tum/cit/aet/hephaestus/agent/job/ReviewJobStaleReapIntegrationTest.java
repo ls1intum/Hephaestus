@@ -158,10 +158,6 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
         assertThat(jobRepository.findById(jobId).orElseThrow().getStatus()).isEqualTo(ReviewJobStatus.TIMED_OUT);
     }
 
-    /**
-     * The reaper appends one row per non-chat model for practice scripts next to the review's row, at the price
-     * and from the purse that the slot froze. The chat row only bounds spend: the review's row bills it.
-     */
     @Test
     @DisplayName("a reaped attempt bills each model for practice scripts at its slot's frozen price and purse")
     void shouldAppendAPracticeScriptLedgerRowPerKindWhenAStaleJobIsReaped() {

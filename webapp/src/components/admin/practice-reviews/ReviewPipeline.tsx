@@ -249,8 +249,8 @@ function openReviewsSlot(overview: ReviewOverview, scope: OutcomeScope): Outcome
 		label: "not finished yet",
 		count: overview.reviews.queued + overview.reviews.running,
 		target: {
-			list: "runs",
-			search: { ...scopeSearch(scope, "runs"), status: ["QUEUED", "RUNNING"] },
+			list: "reviews",
+			search: { ...scopeSearch(scope, "reviews"), status: ["QUEUED", "RUNNING"] },
 		},
 	};
 }
@@ -292,8 +292,8 @@ function FailedShare({
 						<ReviewListLink
 							workspaceSlug={workspaceSlug}
 							destination={{
-								list: "runs",
-								search: { ...scopeSearch(scope, "runs"), status: ["FAILED"] },
+								list: "reviews",
+								search: { ...scopeSearch(scope, "reviews"), status: ["FAILED"] },
 							}}
 						/>
 					}

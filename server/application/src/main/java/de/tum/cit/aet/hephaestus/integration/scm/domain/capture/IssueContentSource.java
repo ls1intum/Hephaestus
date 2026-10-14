@@ -44,9 +44,6 @@ public class IssueContentSource {
     public static final SourceKind CORE = new SourceKind("scm.issue.core");
     public static final SourceKind COMMENTS = new SourceKind("scm.issue.comments");
 
-    /**
-     * Checked by the integration framework against every descriptor that calls itself reviewable.
-     */
     public Set<SourceKind> sourceKinds() {
         return Set.of(CORE, COMMENTS);
     }

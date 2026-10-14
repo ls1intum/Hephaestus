@@ -1,15 +1,17 @@
 package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
+import de.tum.cit.aet.hephaestus.practices.spi.InapplicabilityWarrant;
+import de.tum.cit.aet.hephaestus.practices.spi.OpenQuestion;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultExample;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.SearchWarrant;
 import java.util.List;
+import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.databind.node.ObjectNode;
 
-/**
- * One practice's candidate result, as {@link CandidateParser} admitted its shape: one outcome and only the parts that
- * outcome may carry. Citations, warrants, open questions, the example and the coverage stay JSON objects, each a
- * private copy, because admission verifies and annotates the citations in place before it stores them.
- */
+/** One outcome and its admitted evidence, before citation verification. */
 public sealed interface Candidate
         permits MetCandidate, NotMetCandidate, DoesNotApplyCandidate, CouldNotDetermineCandidate {
 
@@ -21,27 +23,70 @@ public sealed interface Candidate
     String explanation();
 
     /** The result's own citations; empty only on {@link NotMetCandidate}, whose problems carry theirs. */
-    List<ObjectNode> citations();
+    List<EvidenceCitation> citations();
 
-    ObjectNode coverage();
+    ResultCoverage coverage();
 
     default List<CandidateProblem> problems() {
         return List.of();
     }
 
-    default @Nullable ObjectNode example() {
+    default @Nullable ResultExample example() {
         return null;
     }
 
-    default @Nullable ObjectNode search() {
+    default @Nullable SearchWarrant search() {
         return null;
     }
 
-    default @Nullable ObjectNode inapplicability() {
+    default @Nullable InapplicabilityWarrant inapplicability() {
         return null;
     }
 
-    default List<ObjectNode> openQuestions() {
+    default List<OpenQuestion> openQuestions() {
         return List.of();
+    }
+
+    default Candidate withCitations(UnaryOperator<EvidenceCitation> verified) {
+        var citations = citations().stream().map(verified).toList();
+        var example = example();
+        var verifiedExample =
+                example == null ? null : new ResultExample(verified.apply(example.citation()), example.note());
+        var questions = openQuestions().stream()
+                .map(question -> new OpenQuestion(
+                        question.openQuestion(),
+                        question.wouldSettleIt(),
+                        question.citation() == null ? null : verified.apply(question.citation())))
+                .toList();
+        return switch (this) {
+            case MetCandidate met ->
+                new MetCandidate(summary(), explanation(), citations, coverage(), verifiedExample, search());
+            case NotMetCandidate notMet ->
+                new NotMetCandidate(
+                        summary(),
+                        explanation(),
+                        citations,
+                        coverage(),
+                        problems().stream()
+                                .map(problem -> new CandidateProblem(
+                                        problem.key(),
+                                        problem.severity(),
+                                        problem.summary(),
+                                        problem.explanation(),
+                                        problem.citations().stream()
+                                                .map(verified)
+                                                .toList(),
+                                        problem.basis(),
+                                        problem.nextStep()))
+                                .toList(),
+                        verifiedExample,
+                        search(),
+                        questions);
+            case DoesNotApplyCandidate doesNotApply ->
+                new DoesNotApplyCandidate(
+                        summary(), explanation(), citations, coverage(), doesNotApply.inapplicability());
+            case CouldNotDetermineCandidate undetermined ->
+                new CouldNotDetermineCandidate(summary(), explanation(), citations, coverage(), search(), questions);
+        };
     }
 }

@@ -70,12 +70,6 @@ public class WorkspaceQueryService {
         this.providerAvailability = map;
     }
 
-    /**
-     * Maps a {@link Workspace} entity to a {@link WorkspaceDTO}, hydrating the integration-mode
-     * metadata from the active Connection(s). Exposed here so controllers don't have to inject
-     * {@link ConnectionService} just to call the DTO factory (keeps controllers under the
-     * 5-constructor-param arch rule).
-     */
     public WorkspaceDTO toWorkspaceDTO(Workspace workspace) {
         return WorkspaceDTO.from(workspace, connectionService, workspaceAddress(workspace));
     }
@@ -102,10 +96,6 @@ public class WorkspaceQueryService {
                 .toList();
     }
 
-    /**
-     * The source-control provider of the workspace's active connection; none when no connection is
-     * bound.
-     */
     public @Nullable IdentityProviderType scmProviderType(Workspace workspace) {
         return connectionService
                 .findActiveProviderKind(workspace.getId())

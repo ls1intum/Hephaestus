@@ -65,11 +65,6 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
         return Map.of();
     }
 
-    /**
-     * The practice programs import the toolkit as {@code ../lib/…} beside their staged sources, and the runner as
-     * {@code ./work/practice-scripts/lib/…}. The toolkit ships in the image; the link that names it is made here,
-     * before Node starts, because the runner's first import resolves through it.
-     */
     @Override
     public List<String> setupCommands() {
         return List.of(

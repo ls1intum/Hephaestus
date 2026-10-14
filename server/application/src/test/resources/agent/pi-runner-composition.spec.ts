@@ -1622,7 +1622,6 @@ void test("summary-only support refuses a whole inline body while allowing its s
 	);
 });
 
-
 const wholeReview = (summaryBasedOn: string[]) => ({
 	summary: { body: "Say why.", basedOn: summaryBasedOn },
 	inline: [

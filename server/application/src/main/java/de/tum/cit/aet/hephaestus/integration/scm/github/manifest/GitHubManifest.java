@@ -55,7 +55,6 @@ public class GitHubManifest implements IntegrationManifest {
                 Capability.APPROVAL_WORKFLOW);
     }
 
-    /** GitHub declares the item events its webhooks produce. Manual requests create no item event. */
     @Override
     public ReviewContribution reviewContribution() {
         return new ReviewContribution(

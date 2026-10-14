@@ -242,11 +242,6 @@ export const Reflow: Story = {
 	},
 };
 
-/**
- * The developer disagrees with feedback written from the result. The disagreement answers this
- * result, so it is in its history in full, in their words, naming the feedback by where it
- * went without linking it. Their ratings and private notes are theirs and are not shown.
- */
 export const Disagreed: Story = {
 	args: {
 		result: ready({
@@ -305,7 +300,6 @@ export const EvidenceHidden: Story = {
 	},
 };
 
-/** The reason is required: a mark without one is not something the developer could read. */
 export const MarkIncorrect: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, userEvent }) => {
@@ -352,10 +346,6 @@ export const MarkIncorrectFails: Story = {
 	},
 };
 
-/**
- * Marked incorrect, the level says what the mark stopped. The footer offers the reverse instead —
- * remove the mark — and nothing else: an incorrect result cannot be accepted.
- */
 export const MarkedIncorrect: Story = {
 	args: { result: ready(markedIncorrect) },
 	play: async () => {
@@ -433,10 +423,6 @@ export const Marking: Story = {
 	},
 };
 
-/**
- * The drawer is named by its title, so the heading stands while the record loads; the path stays
- * usable, and there is no decision to offer about a record not yet read.
- */
 export const Loading: Story = {
 	args: { result: { status: "loading" } },
 	play: async () => {
@@ -465,7 +451,7 @@ export const LoadFailed: Story = {
 	},
 };
 
-/** Source denial withholds words without claiming no passage was ever captured. */
+// Source denial must not imply that no evidence was captured.
 export const TextUnavailable: Story = {
 	args: {
 		result: ready({

@@ -1,6 +1,6 @@
 # ADR 0017: Replace Keycloak with Spring-native auth (BFF cookie-JWT + `Connection`-backed workspace IdPs)
 
-**Status:** Accepted (amended — Stage B-2 login model; read-only user views; data model corrected against the schema; installed clients by [ADR 0048](0048-installed-clients-sign-in-with-a-pkce-handoff.md); 2026-10-14 — person model superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md))
+**Status:** Accepted (amended — Stage B-2 login model; read-only user views; data model corrected against the schema; installed clients by [ADR 0048](0048-installed-clients-sign-in-with-a-pkce-handoff.md)); superseded in part 2026-10-14 by [ADR 0056](0056-one-practice-model-for-items-and-scans.md)
 **Date:** 2026-05-28
 **Authors:** Felix T.J. Dietrich
 **Supersedes (Stage A):** [ADR 0016](0016-unified-identity-keycloak-as-truth.md)
@@ -186,6 +186,3 @@ Decision and rejected alternatives:
 ## Update — 2026-10-14 (#2656): the 1.0 practice model
 
 [ADR 0056](0056-one-practice-model-for-items-and-scans.md) supersedes the person and membership model of this record. Accounts identify people across provider identities and workspaces, and roster sync can create unclaimed accounts that sign-in claims.
-The [product vocabulary](../contributor/practice-feedback-language.md) maps the earlier terms:
-an observation is a result, a channel is a destination, and an artifact is an item.
-The sections above stay as the record of the earlier decision.

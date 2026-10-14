@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.StrictJson;
 import de.tum.cit.aet.hephaestus.practices.spi.CitationProof;
 import de.tum.cit.aet.hephaestus.practices.spi.ClaimedCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.CoverageOmission;
@@ -22,14 +23,9 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JsonParser;
 import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.ValueDeserializer;
-import tools.jackson.databind.cfg.CoercionAction;
-import tools.jackson.databind.cfg.CoercionInputShape;
-import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.module.SimpleModule;
-import tools.jackson.databind.type.LogicalType;
 
 /** Wire-only creator requirements; stored proof fields are not accepted from an agent. */
 final class CandidateWireMapper {
@@ -39,19 +35,9 @@ final class CandidateWireMapper {
         var integers = new SimpleModule("candidate-integers");
         integers.addDeserializer(Integer.class, new ContractInteger());
         integers.addDeserializer(int.class, new ContractInteger());
-        return JsonMapper.builder()
+        return StrictJson.configure(JsonMapper.builder())
                 .addModule(integers)
-                .enable(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
-                .enable(
-                        DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
-                        DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES,
-                        DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-                .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
-                .withCoercionConfig(
-                        LogicalType.Textual,
-                        coercion -> coercion.setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
-                                .setCoercion(CoercionInputShape.Float, CoercionAction.Fail)
-                                .setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail))
+                .enable(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES)
                 .addMixIn(EvidenceCitation.class, CitationFields.class)
                 .addMixIn(ReadReceipt.class, ReceiptFields.class)
                 .addMixIn(OpenQuestion.class, QuestionFields.class)

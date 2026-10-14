@@ -42,13 +42,11 @@ public class ScmWorkCapture {
             }
             return ScmCaptureContributions.combine(contributions);
         } catch (RuntimeException failure) {
-            for (var contribution : contributions)
-                if (contribution.cleanup() != null)
-                    try {
-                        contribution.cleanup().close();
-                    } catch (Exception e) {
-                        failure.addSuppressed(e);
-                    }
+            try {
+                ScmCaptureContributions.closeAll(contributions);
+            } catch (Exception cleanupFailure) {
+                if (cleanupFailure != failure) failure.addSuppressed(cleanupFailure);
+            }
             throw failure;
         }
     }

@@ -222,10 +222,6 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     int accumulatePracticeScriptUsage(
             @Param("jobId") UUID jobId, @Param("attempt") int attempt, @Param("call") PracticeScriptCallUsage call);
 
-    /**
-     * Each kind of model for practice scripts that one attempt called, summed over its practices and read from the
-     * committed rows.
-     */
     @Query("SELECT new de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal("
             + "u.id.modelKind, SUM(u.calls), SUM(u.inputTokens), SUM(u.outputTokens), SUM(u.cacheReadTokens), "
             + "SUM(u.cacheWriteTokens), SUM(u.searchUnits), SUM(u.reportedCalls)) "
@@ -266,7 +262,6 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             @Param("fromStatuses") Collection<ReviewJobStatus> fromStatuses,
             @Param("workerId") String workerId);
 
-    /** Persists the accounting boundary immediately before sandbox/provider execution. */
     @WorkspaceAgnostic("ID-based execution-start fence; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ReviewJob j SET j.executionStartedAt = :now "
@@ -300,14 +295,14 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @WorkspaceAgnostic("Cross-workspace poll candidates; caller is the @WorkspaceAgnostic job poller")
     @Query(
             value = "SELECT j.id FROM review_job j JOIN workspace w ON w.id = j.workspace_id WHERE j.status = 'QUEUED'"
-                    + " AND w.status = 'ACTIVE' AND j.available_at <= now() AND (  (SELECT count(*) FROM review_job r     "
-                    + " WHERE r.workspace_id = j.workspace_id AND r.status = 'RUNNING'        AND"
-                    + " COALESCE(r.config_snapshot -> 'model' ->> 'dataHandlingTier', 'UNDECLARED')          ="
-                    + " COALESCE(j.config_snapshot -> 'model' ->> 'dataHandlingTier', 'UNDECLARED'))   < COALESCE((SELECT"
-                    + " b.max_concurrent_jobs FROM workspace_agent_binding b      WHERE b.workspace_id = j.workspace_id"
-                    + " AND b.purpose = 'PRACTICE_REVIEW'        AND b.data_handling_tier = COALESCE(j.config_snapshot ->"
-                    + " 'model' ->> 'dataHandlingTier', 'UNDECLARED')),      2147483647)) ORDER BY j.available_at ASC,"
-                    + " j.id ASC LIMIT :limit",
+                + " AND w.status = 'ACTIVE' AND j.available_at <= now() AND (  (SELECT count(*) FROM review_job r     "
+                + " WHERE r.workspace_id = j.workspace_id AND r.status = 'RUNNING'        AND"
+                + " COALESCE(r.config_snapshot -> 'model' ->> 'dataHandlingTier', 'UNDECLARED')          ="
+                + " COALESCE(j.config_snapshot -> 'model' ->> 'dataHandlingTier', 'UNDECLARED'))   < COALESCE((SELECT"
+                + " b.max_concurrent_jobs FROM workspace_agent_binding b      WHERE b.workspace_id = j.workspace_id"
+                + " AND b.purpose = 'PRACTICE_REVIEW'        AND b.data_handling_tier = COALESCE(j.config_snapshot ->"
+                + " 'model' ->> 'dataHandlingTier', 'UNDECLARED')),      2147483647)) ORDER BY j.available_at ASC,"
+                + " j.id ASC LIMIT :limit",
             nativeQuery = true)
     List<UUID> findQueuedIdsOldestFirst(@Param("limit") int limit);
 
@@ -315,11 +310,7 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @Query("SELECT j FROM ReviewJob j WHERE j.status = 'RUNNING' AND j.startedAt < :cutoff")
     List<ReviewJob> findStaleRunningJobs(@Param("cutoff") Instant cutoff);
 
-    /**
-     * RUNNING jobs whose owning worker has no fresh heartbeat. Native so the liveness comparison stays
-     * on the DB clock on both sides ({@code last_heartbeat} is written with the DB {@code now()}), and
-     * no app/DB skew can produce a false orphan.
-     */
+    /** Compare heartbeat times on the database clock so application clock skew cannot create false orphans. */
     @WorkspaceAgnostic("Cross-workspace orphan recovery; caller is @WorkspaceAgnostic sweeper")
     @Query(
             value = "SELECT j.id AS jobId, j.workspace_id AS workspaceId, j.attempt AS attempt, "
@@ -360,7 +351,6 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             @Param("version") int version,
             @Param("now") Instant now);
 
-    /** The transition of {@link #lockContinuableAttempt}, once its attempt is locked and found continuable. */
     @WorkspaceAgnostic("ID-based fenced requeue; caller is @WorkspaceAgnostic sweeper or worker-local drain")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ReviewJob j SET j.status = 'QUEUED', j.workerId = null, j.startedAt = null, j.executionStartedAt ="
@@ -399,13 +389,7 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             + "WHERE j.id = :id AND j.status = 'RUNNING' AND (:workerId IS NULL OR j.workerId = :workerId)")
     int requeueRejectedClaim(@Param("id") UUID id, @Param("workerId") @Nullable String workerId);
 
-    /**
-     * Strips the heavy payload columns from terminal rows, batched so a large backlog is worked off in
-     * many short transactions. Idempotent.
-     *
-     * <p>Excludes {@code processing_status = 'PENDING'}: the delivery-recovery retry reads
-     * {@code output}, so stripping it first would make a stuck delivery permanently undeliverable.
-     */
+    /** Pending delivery recovery still reads output; stripping it would make delivery permanently unrecoverable. */
     @WorkspaceAgnostic("Cross-workspace retention batch; caller is @WorkspaceAgnostic retention service")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
@@ -446,9 +430,9 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @WorkspaceAgnostic("Fleet-wide queue-health snapshot; caller is @WorkspaceAgnostic health sampler")
     @Query(
             value = "SELECT   COUNT(*) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS depth,  "
-                    + " MIN(available_at) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS oldestAvailableAt, "
-                    + "  COUNT(*) FILTER (WHERE status = 'QUEUED' AND hold_reason IS NOT NULL) AS held,   COUNT(*) FILTER"
-                    + " (WHERE status = 'RUNNING') AS running FROM review_job WHERE status IN ('QUEUED', 'RUNNING')",
+                + " MIN(available_at) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS oldestAvailableAt, "
+                + "  COUNT(*) FILTER (WHERE status = 'QUEUED' AND hold_reason IS NOT NULL) AS held,   COUNT(*) FILTER"
+                + " (WHERE status = 'RUNNING') AS running FROM review_job WHERE status IN ('QUEUED', 'RUNNING')",
             nativeQuery = true)
     QueueHealthSnapshot queueHealthSnapshot(@Param("now") Instant now);
 
@@ -500,8 +484,8 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @Modifying(flushAutomatically = true)
     @Query(
             value = "UPDATE review_job SET capture = capture #- '{manifest,files}' #- '{manifest,citableTexts}' WHERE"
-                    + " id = :jobId AND workspace_id = :workspaceId AND attempt = :attempt AND worker_id = :workerId AND"
-                    + " admission_digest IS NOT NULL",
+                + " id = :jobId AND workspace_id = :workspaceId AND attempt = :attempt AND worker_id = :workerId AND"
+                + " admission_digest IS NOT NULL",
             nativeQuery = true)
     int expireCaptureInventory(
             @Param("jobId") UUID jobId,

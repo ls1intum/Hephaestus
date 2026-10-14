@@ -16,7 +16,7 @@ public class MembershipAbsorptionContributor implements AccountAbsorptionContrib
 
     @Override
     public void absorb(long claimedAccountId, long unclaimedAccountId) {
-        memberships.findByAccount_IdIn(List.of(claimedAccountId, unclaimedAccountId));
+        memberships.lockByAccountIds(List.of(claimedAccountId, unclaimedAccountId));
         memberships.absorbAccount(claimedAccountId, unclaimedAccountId);
     }
 

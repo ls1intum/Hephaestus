@@ -189,7 +189,7 @@ export const ColumnCountMatchesHeader: Story = {
 	},
 };
 
-/** A user view names the viewed account by its id, even when nobody has claimed it yet. */
+// Unclaimed accounts still require their account id for a user view.
 export const UnclaimedAccountView: Story = {
 	args: {
 		events: [

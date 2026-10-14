@@ -63,10 +63,6 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
                 .check(classes);
     }
 
-    /**
-     * Not even its own connection: a jnats import anywhere under {@code agent/} would mean a NATS-based
-     * feature crept back in without going through the {@code review_job} queue.
-     */
     @Test
     void agentDoesNotLinkAgainstJnatsAtAll() {
         noClasses()

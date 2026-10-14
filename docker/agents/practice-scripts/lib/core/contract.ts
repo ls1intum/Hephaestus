@@ -20,6 +20,30 @@ import { isJsonObject } from "./json.ts";
 export const NOT_A_DEFINITION_ERROR =
 	"The script's default export is not a practice script. Write it with definePracticeScript.";
 
+/** The bounds of a candidate. Counts are integers from 0 to {@link CANDIDATE_LIMITS.maxCount}. */
+export const CANDIDATE_LIMITS = {
+	summaryChars: 160,
+	pathChars: 4096,
+	versionChars: 1024,
+	explanationChars: 10_000,
+	problemExplanationChars: 4000,
+	nextStepChars: 1000,
+	exampleNoteChars: 280,
+	quoteChars: 4000,
+	openQuestionChars: 500,
+	warrantFieldChars: 500,
+	resultCitations: 50,
+	citationsPerProblem: 20,
+	problems: 50,
+	openQuestions: 20,
+	omissions: 20,
+	omissionItems: 50,
+	receipts: 200,
+	consultedSources: 20,
+	candidateBytes: 131_072,
+	maxCount: 1_000_000,
+} as const;
+
 export const PRACTICE_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
 /**
@@ -316,7 +340,7 @@ export const ABOUT_ROLES = ["AUTHOR", "REVIEWER", "ASSIGNEE", "MERGER"] as const
 export type Origin = (typeof ORIGINS)[number];
 export type AboutRole = (typeof ABOUT_ROLES)[number];
 export const decimalIdSchema = z.string().regex(/^[1-9][0-9]*$/u);
-const version = z.string().min(1).max(1024);
+const version = z.string().min(1).max(CANDIDATE_LIMITS.versionChars);
 /** A full commit id: the only revision a file location names, so it can never read as a git option. */
 export const commitIdSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u);
 export const kindSchema = z
@@ -327,7 +351,7 @@ export const itemRefSchema = z.strictObject({
 	id: decimalIdSchema,
 	kind: kindSchema,
 	parentId: decimalIdSchema.optional(),
-	path: z.string().min(1).max(4096).optional(),
+	path: z.string().min(1).max(CANDIDATE_LIMITS.pathChars).optional(),
 });
 export type ItemRef = z.infer<typeof itemRefSchema>;
 export const reviewScopeSchema = z.discriminatedUnion("kind", [
@@ -341,9 +365,9 @@ export const reviewScopeSchema = z.discriminatedUnion("kind", [
 ]);
 export type ReviewScope = z.infer<typeof reviewScopeSchema>;
 const previousCitationSchema = z.strictObject({
-	sourceKind: z.string().min(1).max(4096),
-	sourcePath: z.string().min(1).max(4096),
-	path: z.string().min(1).max(4096),
+	sourceKind: z.string().min(1).max(CANDIDATE_LIMITS.pathChars),
+	sourcePath: z.string().min(1).max(CANDIDATE_LIMITS.pathChars),
+	path: z.string().min(1).max(CANDIDATE_LIMITS.pathChars),
 	startLine: z.int().min(1).max(2_147_483_647),
 	endLine: z.int().min(1).max(2_147_483_647),
 	side: z.enum(["OLD", "NEW"]).optional(),
@@ -427,28 +451,6 @@ export interface CitationCapabilities {
  * against the captured sources; `CandidateContractSyncTest` keeps the bounds equal.
  */
 
-/** The bounds of a candidate. Counts are integers from 0 to {@link CANDIDATE_LIMITS.maxCount}. */
-export const CANDIDATE_LIMITS = {
-	summaryChars: 160,
-	explanationChars: 10_000,
-	problemExplanationChars: 4000,
-	nextStepChars: 1000,
-	exampleNoteChars: 280,
-	quoteChars: 4000,
-	openQuestionChars: 500,
-	warrantFieldChars: 500,
-	resultCitations: 50,
-	citationsPerProblem: 20,
-	problems: 50,
-	openQuestions: 20,
-	omissions: 20,
-	omissionItems: 50,
-	receipts: 200,
-	consultedSources: 20,
-	candidateBytes: 131_072,
-	maxCount: 1_000_000,
-} as const;
-
 export const CANDIDATE_REFUSALS = [
 	"malformed_candidate",
 	"outcome_problem_mismatch",
@@ -499,10 +501,10 @@ export type Completeness =
  */
 export const readReceiptSchema = z
 	.strictObject({
-		sourceKind: z.string().min(1).max(4096),
-		sourcePath: z.string().min(1).max(4096),
-		path: z.string().min(1).max(4096),
-		version: z.string().min(1).max(1024),
+		sourceKind: z.string().min(1).max(CANDIDATE_LIMITS.pathChars),
+		sourcePath: z.string().min(1).max(CANDIDATE_LIMITS.pathChars),
+		path: z.string().min(1).max(CANDIDATE_LIMITS.pathChars),
+		version: z.string().min(1).max(CANDIDATE_LIMITS.versionChars),
 		status: z.enum(["COMPLETE", "TRUNCATED", "FAILED", "BINARY", "ABSENT"]),
 		contentDigest: z
 			.string()
@@ -595,15 +597,15 @@ export function isSafeRelativePath(path: string): boolean {
 const citationShape = z
 	.strictObject({
 		/** Integration-neutral, e.g. "scm.pull-request.diff", "scm.repository.tree", "scm.pull-request.core". */
-		sourceKind: z.string().min(1).max(4096),
+		sourceKind: z.string().min(1).max(CANDIDATE_LIMITS.pathChars),
 		/** The staged sourceFile, e.g. "context/change.json", "repos/reviewed/.git/HEAD", "context/metadata.json". */
-		sourcePath: z.string().min(1).max(4096),
+		sourcePath: z.string().min(1).max(CANDIDATE_LIMITS.pathChars),
 		/** The repository path for code sources; the record path otherwise. */
-		path: z.string().min(1).max(4096),
+		path: z.string().min(1).max(CANDIDATE_LIMITS.pathChars),
 		/** Source-catalog flags declare whether a side is required or permitted. */
 		side: z.enum(["OLD", "NEW"]).optional(),
 		/** An opaque version whose syntax and permission the domain source owns. */
-		revision: z.string().min(1).max(1024).optional(),
+		revision: z.string().min(1).max(CANDIDATE_LIMITS.versionChars).optional(),
 		startLine: lineNumber,
 		endLine: lineNumber,
 		quote: bounded(CANDIDATE_LIMITS.quoteChars),
@@ -868,7 +870,7 @@ const WARRANT_RULES: Readonly<
 };
 
 function outcomeRefusal(
-	sent: Superset,
+	sent: Omit<Superset, "coverage">,
 	problems: NonEmpty<NonNullable<Superset["problems"]>[number]> | undefined,
 ): Refusal | undefined {
 	const { outcome } = sent;
@@ -889,13 +891,13 @@ function outcomeRefusal(
 	if (outcome !== "NOT_MET" && sent.citations.length === 0) {
 		return refuse("result_citations_required", `a ${outcome} result cites what it rests on`);
 	}
-	if (outcome === "MET" && !sent.coverage.complete) {
-		return refuse("met_coverage_incomplete", "a MET result needs complete coverage");
-	}
 	return undefined;
 }
 
-function problemRefusal(sent: Superset, resolve?: ResolveCitationIdentity): Refusal | undefined {
+function problemRefusal(
+	sent: Omit<Superset, "coverage">,
+	resolve?: ResolveCitationIdentity,
+): Refusal | undefined {
 	const { example, outcome } = sent;
 	const problems = sent.problems ?? [];
 	if (example !== undefined && outcome !== "MET" && outcome !== "NOT_MET") {
@@ -923,6 +925,17 @@ function problemRefusal(sent: Superset, resolve?: ResolveCitationIdentity): Refu
 		? undefined
 		: refuse("duplicate_problem_key", "two problems share a key");
 }
+
+/** Session structure and outcome rules share the program candidate's authoritative schemas. */
+export const sessionCandidateSchema = supersetShape
+	.omit({ coverage: true })
+	.superRefine((sent, ctx) => {
+		const problems = sent.problems === undefined ? undefined : nonEmpty(sent.problems);
+		for (const refusal of [outcomeRefusal(sent, problems), problemRefusal(sent)]) {
+			if (refusal !== undefined) ctx.addIssue({ code: "custom", message: refusal.message });
+		}
+	});
+export type ParsedSessionCandidate = z.infer<typeof sessionCandidateSchema>;
 
 function candidateOf(sent: Superset, coverage: Coverage): Candidate | undefined {
 	const { outcome, summary, explanation, example } = sent;
@@ -985,6 +998,9 @@ export function parseCandidate(
 	const before = outcomeRefusal(sent, problems);
 	if (before !== undefined) {
 		return before;
+	}
+	if (sent.outcome === "MET" && !sent.coverage.complete) {
+		return refuse("met_coverage_incomplete", "a MET result needs complete coverage");
 	}
 	const coverage = readCoverage(sent.coverage);
 	if (typeof coverage === "string") {
@@ -1157,7 +1173,6 @@ export const executionReportSchema = z.strictObject({
 	truncated: z.boolean(),
 	practices: z.array(executionEntrySchema),
 });
-export type ExecutionReport = z.infer<typeof executionReportSchema>;
 
 export function validateCitationCapabilities(
 	citation: Citation,

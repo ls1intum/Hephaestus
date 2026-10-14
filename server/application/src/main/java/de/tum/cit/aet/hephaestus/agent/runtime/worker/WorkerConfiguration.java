@@ -22,13 +22,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Wires the worker-runtime substrate beans. Gated by {@link RuntimeRole#WORKER_PROPERTY}
- * (matchIfMissing=true) AND by a non-empty {@code hephaestus.worker.control.endpoint}: the
- * substrate has exactly one runtime path — a WSS-connected worker pod. Monolith dev mode
- * leaves the gate set but never points at an endpoint, so no substrate beans wire; the in-process
- * executor claims jobs from the {@code review_job} table regardless.
- */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnWorkerRole
 @ConditionalOnExpression("'${hephaestus.worker.control.endpoint:}'.length() > 0")

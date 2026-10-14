@@ -248,8 +248,7 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
                     .exchange()
                     .expectStatus()
                     .isNoContent();
-            assertThat(workspaceMembershipService.findMembership(workspace.getId(), accountId(owner)))
-                    .get()
+            assertThat(workspaceMembershipService.getMembership(workspace.getId(), accountId(owner)))
                     .extracting(Membership::getLeftAt)
                     .isNotNull();
         } else {

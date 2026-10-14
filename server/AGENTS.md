@@ -62,14 +62,8 @@ controller.
 
 ## Practice model boundaries
 
-Core owns neutral item, review, result, feedback and person contracts.
-Domain modules own kinds, versions, role meaning and citation-basis checks.
-Provider adapters own APIs, capture and delivery. Core imports neither provider persistence nor a diff type.
 A practice Problem is distinct from HTTP ProblemDetail.
-
-Accounts own developer identity and choices. SCM users remain source mirrors.
-Erasure removes dependent proof and feedback before membership. It never makes personal proof anonymous.
-The [product vocabulary](../docs/contributor/practice-feedback-language.md) and the [review glossary](../docs/contributor/practice-review-glossary.mdx) define all practice vocabulary.
+[ADR 0056 § Decision](../docs/decisions/0056-one-practice-model-for-items-and-scans.md#decision) owns the module boundaries, person model and erasure order.
 
 ## Null-safety
 

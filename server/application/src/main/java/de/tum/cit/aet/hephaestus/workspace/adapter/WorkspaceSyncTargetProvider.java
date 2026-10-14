@@ -83,12 +83,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     .map(k -> k == kind)
                     .orElse(false);
         } catch (IllegalStateException e) {
-            // A single corrupt workspace with ACTIVE Connections for BOTH GitHub and GitLab makes
-            // findActiveProviderKind fail loud. This filter runs while streaming EVERY workspace at
-            // the top of the daily sync cron (getSyncSessions/getSyncStatistics);
-            // letting the throw escape would abort the whole enumeration and silently skip the sync
-            // for every other tenant until the bad row is fixed out-of-band. Drop just this
-            // workspace.
+            // Ambiguous provider configuration must exclude only its own tenant from fleet enumeration.
             log.error(
                     "Skipping workspace from sync enumeration: reason=dualActiveProvider,"
                             + " workspaceId={}, error={}",
@@ -515,10 +510,6 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         }
     }
 
-    /**
-     * Persists the pagination cursor for the given kind onto the RepositoryToMonitor ({@code
-     * syncTargetId}-keyed) row.
-     */
     @Override
     @Transactional
     public void updateSyncCursor(Long syncTargetId, SyncCursorKind kind, @Nullable String cursor) {

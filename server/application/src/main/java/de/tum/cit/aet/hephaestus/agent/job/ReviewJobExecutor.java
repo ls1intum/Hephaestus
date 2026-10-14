@@ -223,7 +223,7 @@ public class ReviewJobExecutor {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    @Order(2) // After WorkerLivenessReporter.start() (@Order(1)), so the registry row exists pre-first-claim
+    @Order(2) // WorkerLivenessReporter must register this worker before the first claim.
     public void start() {
         if (!running.compareAndSet(false, true)) {
             return;
@@ -240,14 +240,7 @@ public class ReviewJobExecutor {
 
     private static final Duration POLL_THREAD_JOIN_TIMEOUT = Duration.ofSeconds(10);
 
-    /**
-     * Stops the poll loop so no new jobs are claimed. Idempotent.
-     *
-     * <p>Joining the poll thread is what closes the drain admission race: an in-flight claim could
-     * otherwise register with {@link #inFlight} after {@link #awaitInFlight(Duration)} was called, and
-     * the Phaser would put that registration in the NEXT phase — so the coordinator's await returns at
-     * once believing drain was clean, and the late-claimed job is neither awaited nor cancelled.
-     */
+    /** Join the poll thread before drain so an in-flight claim cannot register after the worker appears idle. */
     public void stopAcceptingNewJobs() {
         running.set(false);
         Thread thread = pollThread;
@@ -276,7 +269,7 @@ public class ReviewJobExecutor {
      */
     public boolean awaitInFlight(Duration timeout) {
         if (timeout == null || timeout.isZero() || timeout.isNegative()) {
-            return inFlight.getUnarrivedParties() <= 1; // only the executor party left
+            return inFlight.getUnarrivedParties() <= 1;
         }
         try {
             int phase = inFlight.arriveAndDeregister();
@@ -306,11 +299,7 @@ public class ReviewJobExecutor {
         return cancelInFlight(reason, DRAIN_CLEANUP_TIMEOUT);
     }
 
-    /**
-     * Settles every job first, one short transaction each, so no container stop delays custody. Only a
-     * job whose settlement transition won here is stopped: a job another worker or a cancellation now
-     * owns keeps running there.
-     */
+    // Settle custody before stopping containers; stop only attempts whose settlement transition this worker won.
     boolean cancelInFlight(ReviewJobCancellationReason reason, Duration cleanupTimeout) {
         Set<UUID> snapshot = Set.copyOf(localRunningJobs);
         if (snapshot.isEmpty()) return true;
@@ -443,13 +432,7 @@ public class ReviewJobExecutor {
         log.info("Agent job executor poll loop stopped");
     }
 
-    /**
-     * The sandbox pool's size is the hard bound: worker capacity and pool size are separate knobs, so a
-     * capacity larger than the pool must not claim jobs the pool would then reject. What occupies a slot
-     * is a job this worker holds, not a thread the pool reports busy: the pool hands a task straight to
-     * a thread, so between submit and that thread entering the task it reports the slot idle, and a
-     * claim made on that reading is rejected on submit and requeued for nothing.
-     */
+    // Pool size bounds claims independently of configured worker capacity.
     int computeCapacity() {
         int concurrency = Math.min(
                 capacityState.map(WorkerCapacityState::reviewMax).orElse(Integer.MAX_VALUE),
@@ -475,9 +458,6 @@ public class ReviewJobExecutor {
         }
     }
 
-    /**
-     * Starts one admitted attempt, or reports why this poll did not start it.
-     */
     enum StartOutcome {
         SKIPPED,
         STARTED,
@@ -756,7 +736,6 @@ public class ReviewJobExecutor {
         return terminalStatus;
     }
 
-    /** Package-private: the zombie sweeper reuses it when it restores a reaped job's trace context. */
     static String randomSpanId() {
         long value;
         do {
@@ -1185,7 +1164,6 @@ public class ReviewJobExecutor {
                     switch (terminalStatus) {
                         case TIMED_OUT -> "The container timed out.";
                         case FAILED -> storable ? failureMessage : UNSTORABLE_RESULT_MESSAGE;
-                        case COMPLETED -> null;
                         default -> null;
                     };
             Instant finishedAt = Instant.now();

@@ -42,7 +42,7 @@ export function TraceEventTimeline({
 			) : (
 				<ol className="min-w-0 space-y-0 border-l pl-4">
 					{events.map((event, index) => (
-				// Events have no id, and name/timestamp pairs can repeat.
+						// Events have no id, and name/timestamp pairs can repeat.
 						<li
 							key={`${index}-${event.name}-${event.occurredAt.toISOString()}`}
 							className="relative min-w-0 py-2.5"

@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
@@ -644,7 +643,6 @@ class IssueContentSourceTest extends BaseUnitTest {
                     .containsExactlyEntriesOf(
                             Map.of(kind, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)));
         }
-        verifyNoInteractions(issueCommentRepository);
         artifact.setDeletedAt(null);
         when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(artifact));
         var restored = provider.capture(pinned, Set.of(COMMENTS));

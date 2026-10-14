@@ -12,11 +12,6 @@ import {
 } from "./fixtures";
 import { ReviewItemLabel, ReviewItemLink } from "./ReviewItem";
 
-/**
- * The glyph is the forge when the caller knows it, not the kind: the words already say `#1423` or
- * `#engineering`, so a second pull-request icon would repeat them and leave a GitHub request
- * indistinguishable from a GitLab one.
- */
 const meta = {
 	component: ReviewItemLabel,
 	parameters: { layout: "padded", chromatic: { viewports: [1440] } },
@@ -54,10 +49,6 @@ export const SlackConversation: Story = { args: { item: slackConversation } };
 
 export const OutlineDocument: Story = { args: { item: outlineDocument } };
 
-/**
- * The hover affordance is on the label alone. A title beside it is rendered by the caller, outside
- * the anchor, so the underline can never reach text that is not the link's name.
- */
 const TITLE = "Cache the workspace member lookup on the review path";
 
 export const ExternalLink: Story = {

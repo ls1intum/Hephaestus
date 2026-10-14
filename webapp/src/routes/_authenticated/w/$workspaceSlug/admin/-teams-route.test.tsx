@@ -1,4 +1,3 @@
-import { ownMembership } from "@/mocks/fixtures/workspaces";
 import { QueryClient } from "@tanstack/react-query";
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -8,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { getAllTeamsQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { QUERY_STALE_TIME_MS } from "@/runtime/tanstack-query/query-defaults";
 import { type Deferred, deferred, pending } from "@/test/async";

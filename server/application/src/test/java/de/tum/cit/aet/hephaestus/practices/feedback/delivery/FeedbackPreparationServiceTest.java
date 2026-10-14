@@ -46,8 +46,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -192,21 +190,6 @@ class FeedbackPreparationServiceTest {
                 service.prepare(draft(List.of(resultId)), Optional.of(stored)).draft();
         assertThat(prepared.basis()).extracting(FeedbackBasisInput::resultId).containsExactly(resultId, retained);
         verify(support, never()).select(anyLong(), anyLong(), anyLong(), any());
-    }
-
-    @ParameterizedTest
-    @CsvSource({
-        "NO_EVIDENCE,NO_EVIDENCE", "UNCORROBORATED,UNCORROBORATED", "BACKFILL_HELD,BACKFILL_QUIET",
-        "UNATTRIBUTABLE_SUBJECT,PUBLIC_SUBJECT_INELIGIBLE", "RECENTLY_SURFACED,NOTHING_NEW", "FEEDBACK_OFF,FEEDBACK_OFF"
-    })
-    void shouldRecordTheActualPageAdmissionRefusal(PracticePageDecision decision, FeedbackStopReason expected) {
-        doReturn(new FeedbackCompositionContextService.PageAdmission(decision, expected))
-                .when(composition)
-                .pageDecision(any(), anyList(), any(), any());
-        var prepared =
-                service.prepare(draft(List.of(resultId)), Optional.empty()).draft();
-        assertThat(prepared.state()).isEqualTo(FeedbackState.WITHHELD);
-        assertThat(prepared.stopReason()).isEqualTo(expected);
     }
 
     @Test

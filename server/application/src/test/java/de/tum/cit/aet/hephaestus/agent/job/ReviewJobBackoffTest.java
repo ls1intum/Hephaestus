@@ -78,11 +78,7 @@ class ReviewJobBackoffTest extends BaseUnitTest {
         assertThat(maxDown.toSeconds()).isCloseTo((long) (base.toSeconds() * 0.90), Offset.offset(1L));
     }
 
-    /**
-     * {@code nextDouble()} is bounded to {@code [0, 1)}, so the jitter multiplier never falls below 0.9 —
-     * the {@code Math.max(1, …)} floor in {@code compute} sits below every reachable value and no legal
-     * input exercises it; this pins the reachable minimum instead.
-     */
+    // nextDouble is in [0,1), so legal jitter cannot exercise the unreachable minimum-delay floor.
     @Test
     @DisplayName("never returns zero or negative, even at the smallest attempt with max negative jitter")
     void neverReturnsZeroOrNegative() {

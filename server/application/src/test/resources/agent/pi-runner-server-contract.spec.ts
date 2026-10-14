@@ -18,7 +18,6 @@ import {
 	INVALID_META_PROGRAM,
 } from "./program-host-runner.ts";
 
-
 const OUTPUT = nodePath.join(import.meta.dirname, "../practice-results/runner-output");
 const UPDATE = process.env.UPDATE_RUNNER_OUTPUT === "1";
 
@@ -157,7 +156,6 @@ void test("the server's runner output fixtures are what this run wrote", () => {
 	}
 });
 
-	// FeedbackCompositionInputsTest pins these staged bytes on the server side.
 void test("the runner reads the composition request the server stages", () => {
 	const request: unknown = JSON.parse(
 		readFileSync(nodePath.join(import.meta.dirname, "feedback-composition-request.json"), "utf8"),

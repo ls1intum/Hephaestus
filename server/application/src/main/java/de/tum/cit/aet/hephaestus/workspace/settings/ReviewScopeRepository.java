@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.io.Serial;
 import java.io.Serializable;
@@ -18,7 +19,12 @@ import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 @Entity
-@Table(name = "review_scope_repository")
+@Table(
+        name = "review_scope_repository",
+        indexes =
+                @Index(
+                        name = "idx_review_scope_repository_workspace",
+                        columnList = "workspace_id,repository_monitor_id"))
 @IdClass(ReviewScopeRepository.Key.class)
 @Getter
 @Setter

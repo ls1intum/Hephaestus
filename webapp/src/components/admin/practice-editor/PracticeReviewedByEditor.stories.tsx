@@ -73,7 +73,6 @@ export const Nobody: Story = {
 	},
 };
 
-/** Switching away from Hephaestus names what the save will clear before the author saves. */
 export const SwitchingSaysWhatIsCleared: Story = {
 	args: {
 		value: { ...hephaestus, by: "NOBODY" },

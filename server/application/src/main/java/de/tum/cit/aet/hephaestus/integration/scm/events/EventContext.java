@@ -11,10 +11,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Immutable context for domain events - safe for async handling. The actor is the initiating user,
- * not necessarily the developer whose work is reviewed.
- */
+/** The event actor initiated the action and need not be the developer whose work is reviewed. */
 public record EventContext(
         @NonNull UUID eventId,
         @NonNull Instant occurredAt,

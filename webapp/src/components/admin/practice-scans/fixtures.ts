@@ -430,7 +430,7 @@ export const ITEM_ENTRIES: ScanReportItem[] = [
 	REMOVED_ENTRY,
 ];
 
-function problemEntry(
+export function problemEntry(
 	id: string,
 	summary: string,
 	baselineState: ScanReportProblem["baselineState"],

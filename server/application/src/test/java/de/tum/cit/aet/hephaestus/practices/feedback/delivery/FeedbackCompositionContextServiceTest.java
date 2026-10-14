@@ -9,12 +9,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
@@ -57,6 +60,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @Tag("unit")
 class FeedbackCompositionContextServiceTest {
@@ -78,10 +82,7 @@ class FeedbackCompositionContextServiceTest {
     final PinnedPractice pin = mock(PinnedPractice.class);
     final PracticeDefinition definition = mock(PracticeDefinition.class);
     final PracticeVersion version = TestEntities.practiceVersion(
-            8,
-            1,
-            new JsonMapper().readTree("{\"criteria\":\"Use clear names.\",\"about\":\"AUTHOR\"}"),
-            "v6:" + "a".repeat(64));
+            8, 1, new JsonMapper().valueToTree(DefinitionTestFixtures.definition()), "v6:" + "a".repeat(64));
     final FeedbackCompositionContextService service = new FeedbackCompositionContextService(
             reviews,
             results,
@@ -91,7 +92,7 @@ class FeedbackCompositionContextServiceTest {
             new PracticePageFeedbackRouter(),
             gate,
             basis,
-            new FeedbackAnchorEligibility(mock(ProblemRepository.class), catalog),
+            new FeedbackAnchorEligibility(mock(ProblemRepository.class), catalog, new JsonMapper()),
             history,
             mentor,
             Clock.fixed(now, ZoneOffset.UTC));
@@ -249,9 +250,14 @@ class FeedbackCompositionContextServiceTest {
                 .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
                         ConversationDecision.FEEDBACK_OFF, FeedbackStopReason.FEEDBACK_OFF));
         when(gate.mode(current)).thenReturn(FeedbackMode.AUTOMATIC);
-        when(versions.findByIdAndWorkspaceId(8L, 1L))
-                .thenReturn(Optional.of(TestEntities.practiceVersion(
-                        8, 1, new JsonMapper().readTree("{\"about\":\"REVIEWER\"}"), "v6:" + "a".repeat(64))));
+        var reviewerVersion = TestEntities.practiceVersion(
+                8,
+                1,
+                new JsonMapper()
+                        .valueToTree(DefinitionTestFixtures.withAbout(
+                                DefinitionTestFixtures.definition(), AboutRole.REVIEWER)),
+                "v6:" + "a".repeat(64));
+        when(versions.findByIdAndWorkspaceId(8L, 1L)).thenReturn(Optional.of(reviewerVersion));
         assertThat(service.conversationDecision(snapshot, current))
                 .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
                         ConversationDecision.REVIEWER_DEFERRED, FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE));
@@ -260,14 +266,24 @@ class FeedbackCompositionContextServiceTest {
         var descriptor = mock(ItemDescriptor.class);
         when(descriptor.copyCapabilities()).thenReturn(Set.of(CopyCapability.LINE_NOTE));
         when(catalog.descriptorFor(item.kind())).thenReturn(Optional.of(descriptor));
-        var anchored =
-                current.toBuilder().evidence(new JsonMapper().readTree("""
-                    {"citations":[{"path":"src/Work.java","startLine":3,"side":"NEW",
-                      "verification":{"status":"VERIFIED"}}]}
-                    """)).build();
+        var evidence = AdmittedResultFixtures.evidence(
+                "scm.pull-request.diff", "context/diff.txt", "src/Work.java", "changed line");
+        ((ObjectNode) evidence.path("citations").required(0)).put("side", "NEW");
+        var anchored = current.toBuilder().evidence(evidence).build();
         assertThat(service.conversationDecision(snapshot, anchored))
                 .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
                         ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW));
+        var example = new JsonMapper()
+                .createObjectNode()
+                .set("citation", evidence.path("citations").required(0));
+        assertThat(service.conversationDecision(
+                        snapshot, current.toBuilder().example(example).build()))
+                .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
+                        ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW));
+        ((ObjectNode) evidence.path("citations").required(0)).remove("verification");
+        assertThat(service.conversationDecision(snapshot, anchored))
+                .isEqualTo(
+                        new FeedbackCompositionContextService.ConversationAdmission(ConversationDecision.ADMIT, null));
     }
 
     @Test

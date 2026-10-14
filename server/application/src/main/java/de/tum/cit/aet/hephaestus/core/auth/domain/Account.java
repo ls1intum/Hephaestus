@@ -108,11 +108,7 @@ public class Account {
         UNCLAIMED,
         ACTIVE,
         SUSPENDED,
-        /**
-         * Soft-deleted: sessions revoked and login blocked immediately; the row is purged after the
-         * 48h cooldown ({@code AccountHardDeleteSweeper}). There is no self-service recovery path
-         * today.
-         */
+        /** Sessions are revoked and login blocked immediately; erasure follows the configured cooldown. */
         DELETING,
         DELETED,
     }

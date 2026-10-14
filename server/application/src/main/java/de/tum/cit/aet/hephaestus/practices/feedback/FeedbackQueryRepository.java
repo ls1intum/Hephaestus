@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackLocation;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -207,6 +208,10 @@ public interface FeedbackQueryRepository extends Repository<Feedback, UUID> {
 
     @Query(value = LOCATED + "SELECT id,location FROM located WHERE id IN (:ids)", nativeQuery = true)
     List<LocationRow> locations(@Param("workspaceId") long workspaceId, @Param("ids") Collection<UUID> ids);
+
+    @Query("SELECT r.origin FROM Review r WHERE r.workspaceId=:workspaceId AND r.id IN :reviewIds")
+    List<ReviewOrigin> reviewOrigins(
+            @Param("workspaceId") long workspaceId, @Param("reviewIds") Collection<UUID> reviewIds);
 
     interface LocationRow {
         UUID getId();

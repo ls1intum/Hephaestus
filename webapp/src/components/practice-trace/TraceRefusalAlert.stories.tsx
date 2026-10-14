@@ -4,7 +4,7 @@ import { expect, within } from "storybook/test";
 import { RefusalFixLink } from "./RefusalFixLink";
 import { TraceRefusalAlert } from "./TraceRefusalAlert";
 
-/** A refused request is a successful HTTP read of a domain decision; keep its reason on the page. */
+// A refused domain request can be a successful HTTP read; retain its reason on the page.
 const meta = {
 	component: TraceRefusalAlert,
 	parameters: { layout: "padded" },
@@ -37,7 +37,7 @@ export const OffersTheFixToAnAdmin: Story = {
 	},
 };
 
-/** Members cannot follow admin fix links; keep their current page usable without a dead-end link. */
+// Members cannot use admin fix links; an alert must not send them to an inaccessible page.
 export const WithoutAFix: Story = {
 	args: { fix: undefined },
 	play: async ({ canvas }) => {

@@ -1,5 +1,5 @@
 ---
-id: artifact-source-contract
+id: item-source-contract
 sidebar_position: 6
 title: Source contract
 description: Versioned evidence sources, explicit absence states, practice evidence requirements, and conservative skipping.
@@ -8,7 +8,7 @@ description: Versioned evidence sources, explicit absence states, practice evide
 # Source contract
 
 Hephaestus may review work against a practice only from evidence with explicit semantics.
-Contract `1.3.0` defines the logical source catalog, its capture states, and how well each source must be captured.
+Contract `2.0.0` defines the logical source catalog, its capture states, and how well each source must be captured.
 A folder index records what was supplied to one run.
 It does not prove that a practice is empirically observable.
 
@@ -18,13 +18,10 @@ It does not prove that a practice is empirically observable.
 ## One frozen job folder
 
 The worker renders permitted database records in one read-only repeatable-read transaction.
-Integration-owned projections and history visibility checks remain the authorization boundary. `INDEX.md` describes the folder. `INDEX.json` holds primary reviewed-work readiness facts separately from all rendered source digests and typed area, repository and record refusals.
+Integration-owned projections and history visibility checks remain the authorization boundary. The folder index records capture facts separately from practice readiness and typed source refusals.
 Another repository's records cannot make a missing primary source ready.
 The [workspace ABI](./agent/workspace-abi.mdx) owns paths, quote coordinates, transfer budget and retention.
 
-The capped review capture path is removed.
-The evaluation benchmark [#1436](https://github.com/hephaestus-build/Hephaestus/issues/1436) explicitly does not gate 1.0. This change makes no before-and-after quality claim.
-Heph 1.x remains a separate, purpose-bound runtime.
 
 ## Contract boundary
 
@@ -35,15 +32,15 @@ The contract separates three identities:
 2. **Practice definition:** the events a review selects and the evidence that review *requires* before it may
    run at all. A source declares the item kinds it applies to, so the catalog constrains which sources a
    practice may name.
-3. **Folder index:** the state, provenance facts, and materialized artifacts for one invocation.
+3. **Folder index:** the state, provenance facts, and captured files for one invocation.
 
 A practice's `reads.sources` decide **readiness**, not staging.
 Every source permitted for the workspace and purpose is rendered for every review, whether or not a practice named it.
 Practice criteria and the reviewing model decide relevance.
 Relevance is not a reason to withhold data from the model.
-A practice with a refusing stance still refuses the review if its named source did not arrive.
+A required source that did not arrive withholds the selected practice.
 
-An `EXHAUSTIVE` stance still bounds what the review can assert an absence over.
+A COMPLETE need bounds what a result can assert is absent.
 Neither cuts the sandbox down.
 
 Paths are materializations, not source identities.
@@ -115,7 +112,7 @@ A source allowed in an internal mirror is not thereby allowed in an external mod
 
 ## Source catalog
 
-The machine-readable [catalog](https://github.com/hephaestus-build/Hephaestus/blob/main/server/application/src/main/resources/contracts/source-use/1.3.0/catalog.json), its adjacent JSON Schemas, and the checks in [`gate:contracts`](https://github.com/hephaestus-build/Hephaestus/blob/main/scripts/validate-source-use-contracts.ts) jointly define conformance.
+The machine-readable [catalog](https://github.com/hephaestus-build/Hephaestus/blob/main/server/application/src/main/resources/contracts/source-use/2.0.0/catalog.json), its adjacent JSON Schemas, and the checks in [`gate:contracts`](https://github.com/hephaestus-build/Hephaestus/blob/main/scripts/validate-source-use-contracts.ts) jointly define conformance.
 Schema validation alone is insufficient.
 Standard JSON Schema `uniqueItems` compares whole values, not a selected identity property.
 The [validation checks](#validation) separate resource validation and digest checks from the server's catalog and governance checks.
@@ -179,7 +176,7 @@ Source absence is separate from quality so the folder index does not collapse un
 - `REDACTED`: the entire source was withheld for privacy or security.
 - `COLLECTION_ERROR`: an attempted collection failed.
 
-A non-available source contains no artifacts or source identifiers, and carries a typed `SourceAbsenceReason` saying *why* — `GOVERNANCE_NOT_EFFECTIVE`, `NO_PROVIDER`, `NO_WORKING_COPY`, `CONSENT_NOT_ACTIVE`, and the rest.
+A non-available source contains no captured files or source identifiers, and carries a typed `SourceAbsenceReason` saying *why* — `GOVERNANCE_NOT_EFFECTIVE`, `NO_PROVIDER`, `NO_WORKING_COPY`, `CONSENT_NOT_ACTIVE`, and the rest.
 Safe, typed reason codes may be role-filtered.
 Free-form exception text must not enter the folder index.
 
@@ -191,7 +188,7 @@ Only `AVAILABLE` has:
 - completeness: `COMPLETE`, `PARTIAL`, or `UNKNOWN`.
 - capture facts: `capturedAt` — the only required one — plus an optional `observedAt`, an optional
   `sourceEffectiveAt` watermark, and an optional pinned identity.
-- artifacts.
+- captured files.
 
 Capture facts hold only what could not be known before the capture ran.
 The folder index pins the catalog by digest.
@@ -202,7 +199,7 @@ Logical content is independent of serialized bytes: a JSON file containing `[]` 
 Field-level redaction remains an available, usually partial source.
 Whole-source redaction uses `REDACTED`.
 
-There is no staleness verdict, and there is deliberately no age-based mode.
+Source age alone cannot prove currentness.
 An age threshold needs a watermark recording when a copy was last *verified* against upstream.
 The mirror records only when a row was last *written*.
 An age derived from it measures time since the last upstream change.
@@ -242,19 +239,19 @@ The [pipeline](./practice-review-pipeline.mdx) owns those boundaries.
 
 ### Required evidence is insufficient
 
-`scope-one-reviewable-change` is bound to `scm.pull_request.opened` and `scm.pull_request.ready`, and requires `scm.pull-request.core` and `scm.pull-request.diff` and reads `scm.repository.tree` contextually.
+`scope-one-reviewable-change` is bound to `scm.pull_request.opened` and `scm.pull_request.ready`, and requires `scm.pull-request.core` and `scm.pull-request.diff`, with `scm.repository.tree` as an optional source.
 The diff's contract demands a complete capture, including a verified empty range.
 If the diff cannot be read, or the pinned commit is gone from the mirror, readiness refuses the practice and no result is created.
 The runtime makes no claim that the change is focused, sprawling, or `DOES_NOT_APPLY`.
 
-No stance can demand a currentness the pull-request record cannot show.
+No source need can demand currentness that the pull-request record cannot show.
 Nothing available could substantiate one.
 
 ### Empty evidence is valid
 
 A complete pull-request comment query may materialize as `[]`.
 Its state is `AVAILABLE + EMPTY + COMPLETE`, and `scm.pull-request.comments` sits at `ANY_CAPTURE`, so that is valid evidence rather than `UNAVAILABLE`.
-A redacted or failed query cannot support the same practice claim, and a practice taking an `EXHAUSTIVE` stance is refused by a partial one.
+A redacted or failed query cannot support the same practice claim, and a practice with a COMPLETE need is withheld on a partial capture.
 
 ## Runtime behavior
 
@@ -265,58 +262,29 @@ Practice review configuration decides which practices can run, never which sourc
 A source listed as anything other than `AVAILABLE` always gives a typed reason code.
 That reason is never that no practice asked for it.
 
-Bindings enter afterwards, in the readiness check.
-Readiness is evaluated per practice.
-
-A `CONTEXTUAL` failure does not skip an otherwise eligible practice.
-A `REQUIRED` or `EXHAUSTIVE` failure does.
+Readiness is checked for each selected practice.
+An OPTIONAL source failure does not withhold an otherwise eligible practice.
+A REQUIRED or COMPLETE source failure does.
 If no practice is eligible, no model request is made.
 
-One invocation may contain the governed union needed by several practices.
-The model can technically read that union.
-This runtime uses an attribution boundary rather than process isolation.
-The practice index lists each practice's admissible logical source kinds.
+One invocation can contain the governed union needed by several practices.
+A script can use only its declared sources to support a result.
+A scan also restricts reads and searches to its assigned file and declared context.
+Evaluations that require process isolation must use separate evidence views.
 
-Every citation of a model-authored result, problem, example, or open question must name an exact quote and captured source path.
-The sandbox and server independently verify these facts:
-
-- The source is declared and available.
-- The path belongs to that source in the pinned folder index.
-- The quote occurs in the digest-addressed source.
-
-Delivery fails atomically on any mismatch.
+Citations must name a declared, available source and an exact quote from captured text.
+Core checks the captured bytes and their digest.
+Domain verifiers check source-specific side, version and claim-basis meaning.
+A failed check withholds the candidate at admission. Feedback composition cannot admit it as a result.
 This proves traceable grounding, not model causality.
 
-Evaluations requiring non-interference must still run practices in isolated evidence views.
+The [workspace ABI](./agent/workspace-abi.mdx#evidence-and-read-receipts) owns manifest fields, read receipts and coordinate verification.
+The [script runner](./practice-script-runner.mdx) owns the candidate citation shape.
+Shell output alone is not an authorized source.
 
-A quote of code is verified against the captured repository, whichever of its two sources it names.
-A repository citation names `scm.repository.tree` and the captured `repos/reviewed/.git/HEAD` witness as its `artifactPath`.
-It names a repository-relative `path`, the exact quote, and the line range.
-It can also name a `revision`: a full commit id from the captured history.
-Omitted, it means the reviewed commit.
-A change citation names `scm.pull-request.diff`, the pinned `context/change.json` as its `artifactPath`, the `OLD` or `NEW` side, and the same path, quote and lines.
-
-Its revision is the side's commit of the pinned range, and a path the change does not touch withholds the result of that practice.
-The server never stages a diff.
-The container derives `work/change/diff.patch` from the checkout with `git`.
-Its line annotations are the coordinates a change citation names.
-
-The server answers every code citation by opening the snapshot with JGit.
-It pins the snapshot by the `repos/reviewed/.git/HEAD` and captured-refs digests.
-An uncaptured object, a nonexistent path at that revision, or a quote mismatch withholds the result of that practice.
-The server records `QUOTE_LOCATION_MISMATCH` against the citation.
-Shell output is not an authorized source.
-A quote is verified against the Git object, never against what a command printed.
-
-Only `scm.repository.tree` citations can select a revision.
-Only `scm.pull-request.diff` citations can select a side.
-
-The internal readiness report records whether each practice is ready or skipped.
-It is the one document that stays server-side.
-It is persisted to `review_job.capture` and never staged.
-The **folder index is not internal** — the same bytes persisted to `review_job.capture` are staged into the sandbox at `INDEX.json`, carrying every absence reason code including `GOVERNANCE_NOT_EFFECTIVE`, `CONSENT_NOT_ACTIVE`, and `CONTENT_EVICTED`.
-There is no redacted model-facing variant.
-Treat a reason code you add to a capture state as model-visible, and put anything that must not be as a readiness decision instead.
+Readiness decisions remain server-side.
+The folder index carries safe capture reason codes to the sandbox.
+Do not put raw exceptions or private policy detail in a model-visible reason.
 
 ## Change and staleness
 
@@ -358,7 +326,7 @@ They never establish that a title is unchanged.
 
 ## Adding or changing a source
 
-Complete the [source governance decision](../admin/dsms/artifact-source-governance) before enabling a new or expanded source use.
+Complete the [source governance decision](../admin/dsms/item-source-governance) before enabling a new or expanded source use.
 Accuracy or product benefit alone does not authorize collection.
 
 ### Cut a contract version
@@ -372,7 +340,7 @@ Run commands from the repository root.
    Leave every published version unchanged.
 2. Set the new `catalog.json` version and `source-use-decisions.json` contract version.
    Update every schema version constant and each schema's `$id` to the new version.
-   Use the identifier prefix `https://hephaestus.aet.cit.tum.de/contracts/item-source/`.
+   Use the schema identifier format of the current contract resources.
    Update version-specific references to other schemas if the change introduces them.
 3. Apply the intended source and governance changes only in the new directory.
    Finalize `catalog.json`, including formatting, before calculating its SHA-256 digest.
@@ -400,7 +368,7 @@ Run commands from the repository root.
    Check both the resource-validation results and the runtime validation below.
    Follow the [local verification procedure](./local-verification.mdx) for the remaining checks.
 
-A practice definition pins its source contract in `reads.version`.
+A practice definition pins its source contract in `reads.contract`.
 A version cut does not change existing practice versions.
 An explicit definition update creates a practice version with a new review digest.
 The [currentness rules](#change-and-staleness) apply after the update.

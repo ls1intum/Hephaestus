@@ -50,19 +50,11 @@ final class FixtureIntegration {
 
     private FixtureIntegration() {}
 
-    /**
-     * The evidence a binding on a widget reads — a source kind no contract in {@code src/main}
-     * declares.
-     */
     static PracticeReadSource need() {
         return new PracticeReadSource(new SourceKind("fixture.widget.parts"), ReadNeed.REQUIRED);
     }
 
-    /**
-     * Two events with different version schemes on purpose: one keyed on what a person wrote, one
-     * terminal. A fixture where both behaved alike would not exercise the event version rule the
-     * ledger turns on.
-     */
+    // Different event version schemes exercise the ledger's distinction between content changes and terminal events.
     static ItemDescriptor descriptor() {
         return descriptor(true, Set.of(AboutRole.AUTHOR), Set.of(CopyCapability.SUMMARY));
     }
@@ -159,10 +151,6 @@ final class FixtureIntegration {
         return manifest(KIND, capabilities, contribution);
     }
 
-    /**
-     * The same fixture integration under a second kind, for the case where two integrations raise
-     * different events about one item and only one of them is connected.
-     */
     static IntegrationManifest manifest(
             IntegrationKind integrationKind,
             Set<Capability> capabilities,
@@ -202,9 +190,6 @@ final class FixtureIntegration {
         };
     }
 
-    /**
-     * The catalog a practices-module surface sees when this fixture is the only registered domain.
-     */
     static ItemCatalog itemCatalog() {
         ItemDescriptor descriptor = descriptor();
         return new ItemCatalog() {
@@ -238,9 +223,6 @@ final class FixtureIntegration {
         return () -> KIND;
     }
 
-    /**
-     * The bean {@code FEEDBACK_DELIVERY} promises; removing it from a bootstrap must fail the boot.
-     */
     static SummaryWriter summaryWriter() {
         return new SummaryWriter() {
             @Override

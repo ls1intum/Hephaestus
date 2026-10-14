@@ -31,10 +31,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Real provisioning and persistence, with the installation-status API controlled at its provider
- * boundary.
- */
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTest {
 

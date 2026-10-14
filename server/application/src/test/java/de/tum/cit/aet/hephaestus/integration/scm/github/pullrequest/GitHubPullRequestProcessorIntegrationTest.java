@@ -809,9 +809,6 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             });
         }
 
-        /**
-         * When a sync page was asked for, against the stored review requests' {@code STORED_AT}.
-         */
         enum Page {
             OLDER(Duration.ofMinutes(-1)),
             EQUAL(Duration.ZERO),
@@ -824,11 +821,6 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             }
         }
 
-        /**
-         * A webhook stored the review requests, people and teams; a sync page carrying the same
-         * {@code updated_at} applies unless it was asked for before the webhook arrived, and
-         * applying it twice changes nothing.
-         */
         @ParameterizedTest
         @EnumSource(Page.class)
         void shouldApplyASyncPagesReviewRequestsUnlessItWasReadBeforeTheStoredWebhook(Page page) {

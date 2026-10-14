@@ -107,7 +107,7 @@ export function usePracticeProfileReviews({
 
 	return {
 		list,
-	// Exact positions require every review; filters or partial pages would undercount.
+		// Exact positions require every review; filters or partial pages would undercount.
 		positions:
 			list.status === "ready" && !list.hasMore && !hasText(itemKind) && since === undefined
 				? reviewPositionsOnItem(list.reviews.map(({ review }) => review))

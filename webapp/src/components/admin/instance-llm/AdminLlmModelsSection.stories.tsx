@@ -134,10 +134,6 @@ export const Empty: Story = {
 	},
 };
 
-/**
- * The API sits on a muted line under the heading, with the mark of each kind of model it serves,
- * because it decides which purposes the connection's models serve.
- */
 export const PracticeScriptConnection: Story = {
 	args: {
 		connection: {

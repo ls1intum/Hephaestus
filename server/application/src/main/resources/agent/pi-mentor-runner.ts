@@ -327,7 +327,7 @@ let systemPrompt: string | null = null;
 let runtimeInitFailure: { err: unknown; at: number } | null = null;
 const RUNTIME_INIT_COOLDOWN_MS = 30_000;
 
-	// Serialize stdin delivery and watchdog rebinding so switchSession calls cannot race.
+// Serialize stdin delivery and watchdog rebinding so switchSession calls cannot race.
 let sendQueue = Promise.resolve();
 
 // The tail of the chain is not a useful handle for any caller here —

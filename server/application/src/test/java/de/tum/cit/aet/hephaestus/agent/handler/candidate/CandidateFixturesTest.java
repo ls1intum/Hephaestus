@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
+import de.tum.cit.aet.hephaestus.practices.spi.ClaimedCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
@@ -52,7 +53,8 @@ class CandidateFixturesTest extends BaseUnitTest {
                 .containsExactly(Severity.MAJOR, Severity.MINOR);
         assertThat(candidate.example()).isNotNull();
         assertThat(candidate.openQuestions()).hasSize(1);
-        assertThat(candidate.coverage().path("complete").asBoolean()).isFalse();
+        assertThat(candidate.coverage()).isInstanceOf(ClaimedCoverage.class);
+        assertThat(((ClaimedCoverage) candidate.coverage()).complete()).isFalse();
     }
 
     @Test
@@ -130,6 +132,25 @@ class CandidateFixturesTest extends BaseUnitTest {
         ObjectNode emptyArtifact = fixture("candidate-met-with-example.json");
         firstCitation(emptyArtifact).put("sourcePath", "");
         assertRefused(emptyArtifact, CandidateRefusal.MALFORMED_CANDIDATE);
+    }
+
+    @Test
+    void shouldAcceptBoundedCitationCoordinatesAndRefuseOversizedValues() throws IOException {
+        var bounded = fixture("candidate-met-with-example.json");
+        firstCitation(bounded)
+                .put("sourcePath", "x".repeat(4096))
+                .put("path", "y".repeat(4096))
+                .put("revision", "r".repeat(1024));
+        assertThat(CandidateParser.parse(bounded)).isInstanceOf(MetCandidate.class);
+        var longSourcePath = bounded.deepCopy();
+        firstCitation(longSourcePath).put("sourcePath", "x".repeat(4097));
+        assertRefused(longSourcePath, CandidateRefusal.MALFORMED_CANDIDATE);
+        var longPath = bounded.deepCopy();
+        firstCitation(longPath).put("path", "y".repeat(4097));
+        assertRefused(longPath, CandidateRefusal.MALFORMED_CANDIDATE);
+        var longRevision = bounded.deepCopy();
+        firstCitation(longRevision).put("revision", "r".repeat(1025));
+        assertRefused(longRevision, CandidateRefusal.MALFORMED_CANDIDATE);
     }
 
     @Test
@@ -268,8 +289,8 @@ class CandidateFixturesTest extends BaseUnitTest {
                 .putNull("total")
                 .put("complete", true);
 
-        assertThat(CandidateParser.parse(candidate).coverage().path("total").isNull())
-                .isTrue();
+        assertThat(((ClaimedCoverage) CandidateParser.parse(candidate).coverage()).total())
+                .isNull();
 
         ((ObjectNode) candidate.get("coverage")).remove("total");
         assertRefused(candidate, CandidateRefusal.MALFORMED_CANDIDATE);

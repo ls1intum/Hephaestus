@@ -20,10 +20,10 @@ Provider-specific records and duplicated definitions cannot express those facts 
 
 ## Considered options
 
-1. **Keep provider-specific verdict and execution records.** Rejected. Job retention then deletes product history, and core repeats the meaning of each provider in its own enum.
+1. **Keep provider-specific result and execution records.** Rejected. Job retention then deletes product history, and core repeats the meaning of each provider in its own enum.
 2. **Add a parallel scan model.** Rejected. It costs two definition stores, two outcome enums and two report readers that must agree.
-3. **Build a generic graph for future domains.** Rejected. It costs a node and edge schema that every query must join, and no shipped domain needs an edge that an item, review and result cannot hold.
-4. Use one item, review and result model with domain meaning at the boundary.
+3. **Build a generic graph for future domains.** Rejected. Every query must join a node and edge schema. No shipped domain needs an edge beyond the relationships between items, reviews and results.
+4. **One item, review and result model with domain meaning at the boundary.** Chosen.
 
 ## Decision
 
@@ -82,7 +82,7 @@ A digest does not reassess historical work.
 The [migration procedure](../contributor/database-migration.mdx#prove-the-released-state-upgrade) owns upgrade verification.
 Rollback restores a verified backup with the previous release.
 
-This ADR supersedes model details in ADRs 0019, 0020, 0021, 0022, 0029 and 0050.
+This ADR supersedes model details in ADRs 0017, 0019, 0020, 0021, 0022, 0029 and 0050.
 [ADR 0055](0055-practice-scripts-use-one-result-contract.md) owns the script contract.
 Their surviving identity, evidence and runtime constraints remain in their owning records.
 

@@ -64,12 +64,6 @@ function endOf(root: HTMLElement): HTMLElement | null {
 	return root.querySelector<HTMLElement>('[data-step="end"]');
 }
 
-/**
- * A result's story as it opens: a sentence on top says what became of it; the rail reads
- * Started by, Review, Feedback, Effect, and tells only the result's path, from the review through
- * the result ("You started here") to the feedback written from it and how it ended. The review's
- * other records are one line.
- */
 export const ResultStory: Story = {
 	play: async ({ canvas, canvasElement }) => {
 		await expect(verdictOf(canvasElement)).toHaveTextContent(
@@ -87,7 +81,9 @@ export const ResultStory: Story = {
 			"Feedback",
 			"Effect",
 		]);
-		await expect(stepsOf(canvasElement).querySelector('[data-step="start"]')).toHaveTextContent("Event");
+		await expect(stepsOf(canvasElement).querySelector('[data-step="start"]')).toHaveTextContent(
+			"Event",
+		);
 		await expect(stepsOf(canvasElement).querySelectorAll('[data-step="feedback"]')).toHaveLength(3);
 		await expect(
 			canvas.getByRole("button", { name: "3 other results, 5 other pieces of feedback" }),
@@ -198,7 +194,6 @@ export const AllShown: Story = {
 	},
 };
 
-/** A delivered piece names its destination without exposing the developer’s response. */
 export const DeliveredFeedback: Story = {
 	args: { lineage: ready(wholeReview), here: { kind: "feedback", id: LINEAGE_FEEDBACK.onGitHub } },
 	play: async ({ canvasElement }) => {

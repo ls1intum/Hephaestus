@@ -17,14 +17,7 @@ const feedbackNoun = (total: number): string =>
 const RESULTS = resultSlots(practiceReviewOverview.results, reviewOverviewScope);
 const FEEDBACK = feedbackSlots(practiceReviewOverview.feedback, reviewOverviewScope);
 
-/**
- * A total, how it changed, then what it splits into — as counts in words, never as a bar: each
- * count wears the words, icon and tone of the registry that owns its value. The counts are text: the
- * card has one link, to the list it counts, passed as `link`.
- *
- * A flag such as "marked incorrect" overlaps the parts — a met result marked incorrect is
- * still a met result — so it is listed apart, under its own name, and never added.
- */
+// Incorrect marks overlap outcomes; they cannot form another mutually exclusive outcome slice.
 const meta = {
 	component: OutcomeMix,
 	parameters: { layout: "padded" },

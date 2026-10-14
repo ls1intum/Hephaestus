@@ -24,7 +24,7 @@ public interface IntegrationManifest {
     /**
      * Must never be gated with {@code @ConditionalOnProperty}: a manifest is registered whether or
      * not its vendor is enabled, so removing the bean would make that vendor's item events read as
-     * signals nothing in the build can raise. The flag instead governs only the wiring — credential
+     * events nothing in the build can raise. The flag instead governs only the wiring — credential
      * provider, subject parser, message handlers.
      */
     default boolean enabled() {
@@ -37,15 +37,6 @@ public interface IntegrationManifest {
      * is how an integration ends up ingesting events that never trigger anything.
      */
     ReviewContribution reviewContribution();
-
-    /**
-     * The roles this integration may name only in a later capture from the provider, after the
-     * item event that concerns them is raised. Merge admission consults {@link AboutRole#MERGER} for
-     * merged work, holding its review until the merger is named; no other role is consulted.
-     */
-    default Set<AboutRole> rolesNamedAfterTheOccasion() {
-        return Set.of();
-    }
 
     /** Whether a stored native review commit identifies the current work head; unknown without that authority. */
     default String reviewCommitFor(@Nullable String recordedCommit, @Nullable String currentHead) {

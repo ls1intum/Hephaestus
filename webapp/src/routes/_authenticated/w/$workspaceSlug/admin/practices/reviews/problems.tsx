@@ -18,7 +18,7 @@ import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
 import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/observations",
+	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/problems",
 )({
 	validateSearch: problemsSearchSchema,
 	head: practiceReviewsHead("Problems"),

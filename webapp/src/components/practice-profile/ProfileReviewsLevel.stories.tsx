@@ -194,7 +194,6 @@ export const AskingForAReview: Story = {
 	},
 };
 
-/** A finished review that could not determine a practice does not claim there is nothing to improve. */
 export const CouldNotDetermineResults: Story = {
 	args: {
 		feed: feedOf([

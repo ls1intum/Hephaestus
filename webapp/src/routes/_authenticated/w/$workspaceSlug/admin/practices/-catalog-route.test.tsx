@@ -7,7 +7,7 @@ import type { Wire } from "@/lib/dates";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
-import { practiceSetupHandlers, wireGroup } from "./-practice-wire";
+import { practiceSetupHandlers, wireGroup } from "./-practice-server";
 
 vi.setConfig({ testTimeout: 15_000 });
 

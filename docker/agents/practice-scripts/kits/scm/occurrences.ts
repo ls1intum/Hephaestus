@@ -21,22 +21,19 @@ export interface Occurrence {
 	endLine: number;
 	label: string;
 	facts: Readonly<Record<string, string | number | boolean>>;
+	match?: { start: number; end: number; pattern: number };
 }
 export interface OccurrencePattern {
 	label: string;
 	test: RegExp;
 }
 
-const positions = new WeakMap<Occurrence, { start: number; end: number; pattern: number }>();
-
 export function distinctOccurrences(found: readonly Occurrence[]): readonly Occurrence[] {
 	const kept: Occurrence[] = [];
 	const byLine = new Map<string, Occurrence[]>();
-	const ranked = found.toSorted(
-		(a, b) => (positions.get(a)?.pattern ?? 0) - (positions.get(b)?.pattern ?? 0),
-	);
+	const ranked = found.toSorted((a, b) => (a.match?.pattern ?? 0) - (b.match?.pattern ?? 0));
 	for (const row of ranked) {
-		const at = positions.get(row);
+		const at = row.match;
 		if (at === undefined) {
 			kept.push(row);
 			continue;
@@ -45,7 +42,7 @@ export function distinctOccurrences(found: readonly Occurrence[]): readonly Occu
 		const peers = byLine.get(key) ?? [];
 		if (
 			peers.some((other) => {
-				const previous = positions.get(other);
+				const previous = other.match;
 				return (
 					previous !== undefined &&
 					other.path === row.path &&
@@ -64,7 +61,7 @@ export function distinctOccurrences(found: readonly Occurrence[]): readonly Occu
 		(a, b) =>
 			a.path.localeCompare(b.path) ||
 			a.startLine - b.startLine ||
-			(positions.get(a)?.start ?? 0) - (positions.get(b)?.start ?? 0),
+			(a.match?.start ?? 0) - (b.match?.start ?? 0),
 	);
 }
 
@@ -126,11 +123,11 @@ export function occurrences(
 				label,
 				facts: { language: file.language ?? "unknown" },
 			};
-			positions.set(row, {
+			row.match = {
 				start: match.index + Math.max(0, first),
 				end: match.index + match[0].trimEnd().length,
 				pattern,
-			});
+			};
 			found.push(row);
 		}
 	}

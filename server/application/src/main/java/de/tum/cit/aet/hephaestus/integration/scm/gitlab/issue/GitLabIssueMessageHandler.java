@@ -85,11 +85,9 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
         }
 
         // Confidential issues are never (re)ingested. But an issue that flips public → confidential
-        // must
-        // also have any snapshot we mirrored while it was public purged — otherwise a stale public
-        // copy of
-        // now-restricted data lingers. Resolve the context first so we know the repository, then
-        // tombstone.
+        // must also have any snapshot we mirrored while it was public purged — otherwise a stale
+        // public copy of now-restricted data lingers. Resolve the context first so we know the
+        // repository, then tombstone.
         if (event.isConfidential()) {
             log.debug(
                     "Confidential issue event: purging any public snapshot, iid={}",

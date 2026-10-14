@@ -142,7 +142,6 @@ public class ScanBudget {
         return rate;
     }
 
-    /** Includes all completed calls of every model in the active attempt; settled attempts are already in the ledger. */
     public BigDecimal inFlight(ReviewJob job, ConfigSnapshot snapshot) {
         var price = snapshot.model().priceSnapshot();
         if (price == null || price.pricingState() == UsagePricingState.UNPRICED)

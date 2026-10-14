@@ -6,11 +6,7 @@ import java.util.Arrays;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The wire shapes a connection can speak. {@link #wire()} is the stored and the API form. A wire name
- * names the request shape, not a vendor: vLLM, Azure and other gateways serve the {@code openai-*}
- * shapes too.
- */
+/** Protocol names identify wire shapes, not vendors; {@link #wire()} is the persisted and API form. */
 public enum LlmApiProtocol {
     OPENAI_COMPLETIONS("openai-completions", ModelKind.CHAT, "/chat/completions"),
     OPENAI_RESPONSES("openai-responses", ModelKind.CHAT, "/responses"),
@@ -28,7 +24,6 @@ public enum LlmApiProtocol {
         this.upstreamPath = upstreamPath;
     }
 
-    /** The value stored in {@code api_protocol} and sent on the API, in both directions. */
     @JsonValue
     public String wire() {
         return wire;
@@ -38,10 +33,7 @@ public enum LlmApiProtocol {
         return kind;
     }
 
-    /**
-     * Whether a model on this protocol can fill a slot of {@code slot} kind. A chat completions model
-     * also answers decisions: the practice script runner reads them from its token log probabilities.
-     */
+    /** Chat completions can also serve decisions through token log probabilities. */
     public boolean serves(ModelKind slot) {
         return kind == slot || (this == OPENAI_COMPLETIONS && slot == ModelKind.DECISION);
     }
@@ -51,7 +43,6 @@ public enum LlmApiProtocol {
         return upstreamPath;
     }
 
-    /** Empty for a protocol no connection supports. */
     public static Optional<LlmApiProtocol> parse(@Nullable String wire) {
         return Arrays.stream(values())
                 .filter(protocol -> protocol.wire.equals(wire))

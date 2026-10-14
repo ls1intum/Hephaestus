@@ -13,18 +13,6 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * AI SDK UIMessage shape served to the webapp. Parts are the JSONB array; metadata is the per-turn {status, model, costUsd, …} object.
- *
- * <p>Springdoc 2.x quirk: a {@code @Schema(type = "object")} override on a {@code Map} or
- * {@code List<Object>} field replaces the inferred type with the literal {@code type: string}
- * (verified against the generated openapi.yaml). The webapp's generated client then types
- * {@code metadata} as {@code string} and any consumer that reads {@code metadata.costUsd}
- * silently returns {@code undefined}. To keep the generator's natural inference (Map →
- * {@code type: object, additionalProperties: true}; {@code List<Object>} → {@code type: array})
- * we leave the field types alone and OMIT the redundant {@code type=…} override. The AI SDK
- * {@code UIMessageChunk} schema remains the source of truth for chunk validation client-side.
- */
 @Schema(description = "Mentor chat message in AI SDK UIMessage shape.")
 public record ChatMessageDTO(
         UUID id,

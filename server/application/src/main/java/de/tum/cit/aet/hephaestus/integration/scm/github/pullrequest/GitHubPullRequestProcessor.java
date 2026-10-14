@@ -240,8 +240,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 headRefOid,
                 baseRefOid,
                 mergedBy != null ? mergedBy.getId() : null,
-                null // mergeCommitSha: not written by this path; upsertMergeCommit upserts and
-                // links the merge commit
+                null 
                 );
 
         // Fetch the PR to get a managed entity and handle relationships

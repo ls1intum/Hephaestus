@@ -13,7 +13,6 @@ public interface AccountFeatureRepository extends JpaRepository<AccountFeature, 
     @Query("SELECT f.id.flag FROM AccountFeature f WHERE f.id.accountId = :accountId")
     List<String> findFlagsByAccountId(@Param("accountId") Long accountId);
 
-    /** Resolves an enabled SCM identity to an active account's feature choice. */
     @Query("""
         SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END
           FROM AccountFeature f, Identity il

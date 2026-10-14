@@ -17,7 +17,6 @@ public interface ScriptRunRepository extends JpaRepository<ScriptRun, ScriptRun.
             + " AND j.reviewId = :reviewId AND r.workspaceId = :workspaceId AND r.id.jobId = j.id")
     List<ScriptRun> findForReview(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
 
-    /** Every attempt's runs of these jobs; a job of another workspace has none. */
     @Query("SELECT r FROM ScriptRun r WHERE r.workspaceId = :workspaceId AND r.id.jobId IN :jobIds")
     List<ScriptRun> findByWorkspaceIdAndJobIdIn(
             @Param("workspaceId") long workspaceId, @Param("jobIds") Collection<UUID> jobIds);
@@ -67,7 +66,7 @@ public interface ScriptRunRepository extends JpaRepository<ScriptRun, ScriptRun.
     /**
      * One row per practice of the workspace that has a practice script, with its newest run that reported
      * the script's models. A run whose script did not finish, or ended before it declared its models, holds no
-     * models, so it is passed over: it can say nothing about them. The run is current when its admitted revision
+     * models, so it is passed over: it can say nothing about them. The run is current when its admitted practice version
      * held the script the practice holds now.
      *
      * <p>A lateral probe per practice uses the {@code (workspace_id, practice_slug, finished_at)} index;

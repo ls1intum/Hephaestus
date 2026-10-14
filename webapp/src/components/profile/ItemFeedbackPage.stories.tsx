@@ -45,7 +45,6 @@ export const Default: Story = {
 	},
 };
 
-/** Somebody the comment was not about follows its link: nothing of anybody else's is shown. */
 export const NotAboutTheReader: Story = {
 	args: { feed: { ...readyFeed, reviews: [] } },
 	play: async ({ canvas }) => {
@@ -80,7 +79,6 @@ export const LoadFailed: Story = {
 	},
 };
 
-/** A user view reads the page and answers nothing: the feedback keeps its links, not its controls. */
 export const ReadOnly: Story = {
 	render: (args) => <ItemFeedbackPage {...args} />,
 	play: async ({ canvas }) => {

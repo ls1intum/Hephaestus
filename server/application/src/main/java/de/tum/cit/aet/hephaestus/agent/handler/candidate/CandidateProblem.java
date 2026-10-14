@@ -1,9 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
+import de.tum.cit.aet.hephaestus.practices.spi.ClaimBasis;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.databind.node.ObjectNode;
 
 /**
  * One located problem of a {@link NotMetCandidate}.
@@ -18,14 +19,10 @@ public record CandidateProblem(
         Severity severity,
         String summary,
         String explanation,
-        List<ObjectNode> citations,
-        ObjectNode basis,
+        List<EvidenceCitation> citations,
+        ClaimBasis basis,
         @Nullable String nextStep) {
     public CandidateProblem {
         citations = List.copyOf(citations);
-    }
-
-    public String basisType() {
-        return basis.path("type").asString();
     }
 }

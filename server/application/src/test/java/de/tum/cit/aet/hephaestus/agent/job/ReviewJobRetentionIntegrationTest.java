@@ -45,9 +45,6 @@ class ReviewJobRetentionIntegrationTest extends BaseIntegrationTest {
     @PersistenceContext
     private @Nullable EntityManager entityManager;
 
-    /**
-     * Original writer inputs live only while a writer could still use them, and only their own workspace reads them.
-     */
     @Test
     @Transactional
     void removesOriginalCompositionInputsOnceNoWriterCanUseThem() {

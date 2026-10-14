@@ -237,9 +237,7 @@ public class GitLabPullRequestReviewCommentProcessor {
         String sanitizedBody = PostgresStringUtils.sanitize(data.body());
         comment.setBody(sanitizedBody != null ? sanitizedBody : "");
 
-        // Path from position data: prefer new_path, fall back to old_path on deletion.
-        // filePath is GitLab's resolved path (equals new_path for additions/modifications, old_path
-        // for deletions).
+        // GitLab uses old_path for deleted files.
         String path = resolvePath(data);
         comment.setPath(path);
 

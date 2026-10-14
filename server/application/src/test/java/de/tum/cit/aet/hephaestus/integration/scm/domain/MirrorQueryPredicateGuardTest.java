@@ -93,15 +93,6 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
     @DisplayName("project inventory")
     class ProjectInventory {
 
-        /**
-         * The project inventory is staged into a practice review's evidence, so it honours the tombstone
-         * for a neighbouring reason: an index of work that is gone invites a result about nothing.
-         * Named rather than scanned per class: most queries on these two repositories must <em>not</em>
-         * filter — the gate loaders, the upsert lookups and the sweep's own listings all need to see a
-         * tombstoned row — so a whole-class scan would be mostly allow-list. Both kinds are checked
-         * together because {@code Issue} and {@code PullRequest} share a table, and one guarded side
-         * reads like coverage of the other.
-         */
         @Test
         void bothProjectInventoryQueriesExcludeTombstones() {
             Map<String, String> offenders = new LinkedHashMap<>();

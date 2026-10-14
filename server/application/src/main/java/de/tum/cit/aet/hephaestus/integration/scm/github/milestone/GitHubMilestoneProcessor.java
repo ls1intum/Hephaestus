@@ -224,10 +224,7 @@ public class GitHubMilestoneProcessor {
                 .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(context.providerId()))
                 .ifPresent(milestone -> {
                     Long milestoneId = milestone.getId();
-                    // Clean up issue references via direct database UPDATE before deletion.
-                    // Using issueRepository.clearMilestoneReferences() instead of
-                    // milestone.removeAllIssues()
-                    // because the in-memory collection may be stale or not fully loaded.
+                    // The in-memory collection can omit issue references that the database still holds.
                     int clearedCount = issueRepository.clearMilestoneReferences(milestoneId);
                     if (clearedCount > 0) {
                         log.debug("Cleared milestone references from {} issues before deletion", clearedCount);

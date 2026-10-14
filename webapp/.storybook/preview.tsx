@@ -9,8 +9,9 @@ import {
 } from "@tanstack/react-router";
 import { isCommonAssetRequest } from "msw";
 import { initialize, mswLoader } from "msw-storybook-addon";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext, useState } from "react";
 
+import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { Toaster } from "@/components/ui/sonner";
 import { ROUTER_SEARCH } from "@/lib/router-search";
 import { handlers } from "@/mocks/handlers";
@@ -57,15 +58,38 @@ const withQueryClient: Decorator = (Story) => {
  * A story that renders what the app reads from the address — a level open in the detail stack, say —
  * starts the router there with `parameters: { router: { initialUrl: "/?detail=…" } }`.
  */
-const withRouter: Decorator = (Story, { parameters }) => {
-	const url = initialUrl(parameters.router);
-	const router = createRouter({
-		...ROUTER_SEARCH,
-		routeTree: createRootRoute({ validateSearch: (search) => search, component: () => <Story /> }),
-		history: createMemoryHistory({ initialEntries: [url ?? "/"] }),
-	});
-	return <RouterProvider router={router} />;
-};
+const StoryContentContext = createContext<ReactNode>(null);
+
+function StoryContent(): ReactNode {
+	return useContext(StoryContentContext);
+}
+
+function StoryRouter({ children, url }: { children: ReactNode; url?: string }) {
+	const [router] = useState(() =>
+		createRouter({
+			...ROUTER_SEARCH,
+			routeTree: createRootRoute({
+				validateSearch: (search) => ({
+					...search,
+					detail: search.detail === undefined ? undefined : stackInSearch(search.detail),
+				}),
+				component: StoryContent,
+			}),
+			history: createMemoryHistory({ initialEntries: [url ?? "/"] }),
+		}),
+	);
+	return (
+		<StoryContentContext value={children}>
+			<RouterProvider router={router} />
+		</StoryContentContext>
+	);
+}
+
+const withRouter: Decorator = (Story, { parameters }) => (
+	<StoryRouter url={initialUrl(parameters.router)}>
+		<Story />
+	</StoryRouter>
+);
 
 function initialUrl(router: unknown): string | undefined {
 	if (typeof router === "object" && router !== null && "initialUrl" in router) {

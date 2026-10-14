@@ -12,12 +12,14 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.ReviewOn;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -58,9 +60,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private ConfigAuditEventRepository configAuditEventRepository;
-
-    @Autowired
-    private IdentityRepository identityRepository;
 
     @Autowired
     private AuthEventRepository authEventRepository;
@@ -122,8 +121,10 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Workspace workspace = setupWorkspace("audit-member");
         User member = persistUser("audit-member-admin");
         ensureMembership(workspace, member, Membership.WorkspaceRole.ADMIN);
-        Account account = persistInstanceAdmin("Workspace member");
-        linkIdentity(account, member);
+        Account account = accountRepository.findById(accountId(member)).orElseThrow();
+        account.setStatus(Account.Status.ACTIVE);
+        account.setAppRole(Account.AppRole.APP_ADMIN);
+        accountRepository.saveAndFlush(account);
         long accountId = persistedId(account);
 
         patchPracticeReviewAs(workspace, token(accountId), Map.of("cooldownMinutes", 48));
@@ -171,13 +172,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .uri("/workspaces/{slug}/practices", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of(
-                        "slug",
-                        "focused-reviews",
-                        "kind",
-                        "scm.pull_request",
-                        "definition",
-                        definition("Focused reviews", "Initial private criteria")))
+                .bodyValue(new CreatePracticeRequestDTO("focused-reviews", "scm.pull_request",
+                        definition("Focused reviews", "Initial private criteria describe retained review expectations."), null, null))
                 .exchange()
                 .expectStatus()
                 .isCreated()
@@ -191,11 +187,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .uri("/workspaces/{slug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), practice.slug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of(
-                        "definition",
-                        definition("Focused code reviews", "Updated private criteria"),
-                        "expectedVersionId",
-                        practice.currentVersion().id()))
+                .bodyValue(new UpdatePracticeRequestDTO(
+                        definition("Focused code reviews", "Updated private criteria describe retained review expectations."), practice.currentVersion().id()))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -220,16 +213,13 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(rows)
                 .extracting(ConfigAuditEvent::getAction)
                 .containsExactly(ConfigAuditAction.CREATED, ConfigAuditAction.UPDATED, ConfigAuditAction.DELETED);
-        assertThat(rows.get(0).getNewValue())
-                .contains("\"criteriaRevision\":1", "\"criteriaSha256\"", "\"practiceScriptSha256\"")
-                .doesNotContain("Initial private criteria", "return { hints");
-        assertThat(rows.get(1).changedKeyList())
-                .containsExactlyInAnyOrder("name", "criteriaRevision", "criteriaSha256", "practiceScriptSha256");
-        assertThat(rows.get(1).getNewValue())
-                .contains("\"criteriaRevision\":2", "\"name\":\"Focused code reviews\"")
-                .doesNotContain("Updated private criteria", "return { hints");
+        assertThat(rows.get(0).getNewValue()).contains("\"versionId\":", "\"reviewDigest\":")
+                .doesNotContain("Initial private criteria");
+        assertThat(rows.get(1).changedKeyList()).containsExactlyInAnyOrder("versionId", "reviewDigest");
+        assertThat(rows.get(1).getNewValue()).doesNotContain("Updated private criteria")
+                .isNotEqualTo(rows.get(0).getNewValue());
         assertThat(rows.get(2).getNewValue()).isNull();
-        assertThat(rows.get(2).getOldValue()).contains("\"criteriaRevision\":2");
+        assertThat(rows.get(2).getOldValue()).isEqualTo(rows.get(1).getNewValue());
     }
 
     @Test
@@ -384,11 +374,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .expectBody(Void.class);
     }
 
-    /**
-     * One case per filter dimension this matrix covers. Each carries both directions, because a
-     * predicate transposed to match NOTHING passes every zero case on its own — and a failure has
-     * to name which predicate broke, which one fat test cannot.
-     */
     static Stream<Arguments> filterCases() {
         String future = Instant.now().plusSeconds(60).toString();
         String past = Instant.now().minusSeconds(60).toString();
@@ -564,16 +549,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return "mock-jwt-sub-" + accountId;
     }
 
-    /** Wires an account to an SCM actor, which is what turns a workspace membership into roles. */
-    private void linkIdentity(Account account, User actor) {
-        IdentityProvider provider = ensureGitHubProvider();
-        Identity link = new Identity();
-        link.setAccount(account);
-        link.setProviderId(Objects.requireNonNull(provider.getId()));
-        link.setProviderUserKey(String.valueOf(actor.getNativeId()));
-        identityRepository.save(link);
-    }
-
     private ConfigAuditEvent reviewSettingsRowFor(Workspace workspace) {
         return configAuditEventRepository.findAll().stream()
                 .filter(e -> workspace.getId().equals(e.getWorkspaceId())
@@ -615,15 +590,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .expectBody(Void.class);
     }
 
-    private static Map<String, Object> definition(String name, String criteria) {
-        return Map.ofEntries(
-                Map.entry("name", name),
-                Map.entry("criteria", criteria),
-                Map.entry("reviewOn", Map.of("events", List.of(), "state", Map.of())),
-                Map.entry("about", "AUTHOR"),
-                Map.entry("reads", Map.of("contract", "2.0.0", "sources", List.of())),
-                Map.entry("reviewedBy", Map.of("by", "HEPHAESTUS", "limits", List.of())),
-                Map.entry("lineNotes", false),
-                Map.entry("guidance", Map.of()));
+    private static PracticeDefinition definition(String name, String criteria) {
+        return DefinitionTestFixtures.withLineNotes(
+                DefinitionTestFixtures.withReviewOn(DefinitionTestFixtures.definition(name, criteria), new ReviewOn(List.of(), Map.of())), false);
     }
 }

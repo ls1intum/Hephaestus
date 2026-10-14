@@ -300,7 +300,7 @@ unavailable source cannot be read as an empty one. Outline document capture alre
 Clearing the tombstone permits a later capture; it does not rewrite evidence already recorded.
 [The pipeline](../contributor/practice-review-pipeline.mdx#where-a-review-can-stop) owns each stage's
 refusal vocabulary and the
-[artifact-source contract](../contributor/artifact-source-contract.mdx#capture-state) owns capture
+[artifact-source contract](../contributor/item-source-contract.mdx#capture-state) owns capture
 states.
 
 **New feedback.** `PracticeFeedbackDeliveryPolicy` checks the current target on the artifact, in-app and

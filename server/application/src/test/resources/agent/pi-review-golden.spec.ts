@@ -454,7 +454,8 @@ if (scenario !== undefined && scenario !== "") {
 			},
 		},
 	});
-	await import("../../../main/resources/agent/pi-runner.ts");
+	const { runReviewJob } = await import("../../../main/resources/agent/pi-runner.ts");
+	await runReviewJob();
 } else {
 	const SCENARIOS = ["first-turn", "nudge", "compaction", "leads", "leads-truncated"];
 	const captures = new Map(SCENARIOS.map((name) => [name, runScenario(name)]));

@@ -7,10 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-/**
- * The statements an account purge erases the account's auth-owned rows with. {@link AccountPurger}
- * owns their order; each statement here is one step of it.
- */
 @WorkspaceAgnostic("Account erasure is account-scoped; the rows it removes span every workspace")
 interface AccountErasureRepository extends Repository<Account, Long> {
 

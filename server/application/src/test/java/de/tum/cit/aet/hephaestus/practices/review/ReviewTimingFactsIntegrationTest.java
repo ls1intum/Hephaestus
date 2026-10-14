@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewTimingFactsQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -75,13 +76,13 @@ class ReviewTimingFactsIntegrationTest extends BaseIntegrationTest {
                 .param("id", event)
                 .param("ws", scenario.workspace().getId())
                 .param("item", scenario.item().getId())
-                .param("at", at.minusSeconds(30))
+                .param("at", Timestamp.from(at.minusSeconds(30)))
                 .param("version", Objects.requireNonNull(result.getItemVersion()))
                 .update();
-        jdbc.sql("UPDATE review SET origin='EVENT',event_id=:event,ordered_at=:ordered WHERE workspace_id=:ws"
-                        + " AND id=:id")
+        jdbc.sql("UPDATE review SET origin='EVENT',requested_by_id=NULL,event_id=:event,ordered_at=:ordered"
+                        + " WHERE workspace_id=:ws AND id=:id")
                 .param("event", event)
-                .param("ordered", at.minusSeconds(30))
+                .param("ordered", Timestamp.from(at.minusSeconds(30)))
                 .param("ws", result.getWorkspaceId())
                 .param("id", result.getReviewId())
                 .update();
@@ -113,7 +114,8 @@ class ReviewTimingFactsIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldKeepUnknownEventTimeNullableAndRejectForeignTimelineRows() {
         var result = data.result(scenario, ResultOutcome.MET, Instant.now());
-        jdbc.sql("UPDATE review SET origin='EVENT',event_id=NULL WHERE workspace_id=:ws AND id=:id")
+        jdbc.sql("UPDATE review SET origin='EVENT',requested_by_id=NULL,event_id=NULL WHERE workspace_id=:ws"
+                        + " AND id=:id")
                 .param("ws", result.getWorkspaceId())
                 .param("id", result.getReviewId())
                 .update();
@@ -140,14 +142,14 @@ class ReviewTimingFactsIntegrationTest extends BaseIntegrationTest {
 
     private void withheld(UUID reviewId, Instant at) {
         jdbc.sql("INSERT INTO"
-                        + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,stop_reason,created_at)"
-                        + " VALUES(:id,:ws,:review,:item,:developer,'ON_WORK','WITHHELD','ITEM_MERGED',:at)")
+            + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,stop_reason,created_at)"
+            + " VALUES(:id,:ws,:review,:item,:developer,'ON_WORK','WITHHELD','ITEM_MERGED',:at)")
                 .param("id", UUID.randomUUID())
                 .param("ws", scenario.workspace().getId())
                 .param("review", reviewId)
                 .param("item", scenario.item().getId())
                 .param("developer", scenario.account().getId())
-                .param("at", at)
+                .param("at", Timestamp.from(at))
                 .update();
     }
 }

@@ -81,7 +81,6 @@ export const EveryChoiceIsVisible: Story = {
 	},
 };
 
-/** Complete is Required plus a claim, so it disappears with the Required choice it extends. */
 export const CompleteNeedsARequiredSource: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
@@ -100,7 +99,6 @@ export const CompleteNeedsARequiredSource: Story = {
 	},
 };
 
-/** The cost of Complete arrives with the tick, not with the review that was withheld. */
 export const CompleteStatesItsCost: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
@@ -184,10 +182,7 @@ function SubmittedIntoInvalid(args: React.ComponentProps<typeof PracticeReadsEdi
 	);
 }
 
-/**
- * `invalid` stays true while the author fixes it, so an editor keyed on the flag rather than on the
- * transition into it would re-open under the caret on every keystroke.
- */
+// Open on the transition to invalid; the flag remains true while typing, which must not reopen the editor.
 export const SubmittingRevealsTheSources: Story = {
 	args: { sources: [] },
 	render: (args) => <SubmittedIntoInvalid {...args} />,

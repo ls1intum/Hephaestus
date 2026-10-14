@@ -183,10 +183,6 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
                 .containsExactly("issues/1/record.json", "issues/1/description.md", "issues/1/comments.jsonl");
     }
 
-    /**
-     * A full name is unique only per provider, so each inventory row carries the ids that tell two
-     * apart.
-     */
     @Test
     void shouldStreamEachInventoryRowWithItsOwnRepositoryAndProviderWhenTwoProvidersShareAFullName() {
         Repository onGitHub = repository("labels-org/twins", workspace);

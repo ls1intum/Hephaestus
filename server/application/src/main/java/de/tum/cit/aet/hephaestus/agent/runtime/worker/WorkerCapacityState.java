@@ -3,11 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Per-worker in-flight counts for review jobs and mentor sessions. Read by the capacity
- * reporter, drain coordinator, and {@code ReviewJobExecutor}; resolved maxes come from
- * {@link WorkerProperties}.
- */
 public final class WorkerCapacityState {
 
     private final AtomicInteger inFlightReview = new AtomicInteger();

@@ -32,7 +32,7 @@ function partsOf(canvas: Canvas) {
 }
 
 const FINISHED_LIST: ReviewListTarget = {
-	list: "runs",
+	list: "reviews",
 	search: { from: "2026-09-10", to: "2026-10-09", status: ["COMPLETE", "PARTIAL", "FAILED"] },
 };
 

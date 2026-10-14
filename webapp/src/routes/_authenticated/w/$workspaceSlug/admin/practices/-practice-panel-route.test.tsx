@@ -17,7 +17,7 @@ import {
 	practicesHandlers,
 	wireGroup,
 	wirePractice,
-} from "./-practice-wire";
+} from "./-practice-server";
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -61,7 +61,7 @@ describe("a practice's script needs on practice setup", () => {
 
 	beforeEach(() => {
 		needsRequested.mockReset();
-	// Register this handler before practices/:practiceSlug, which also matches this path.
+		// Register this handler before practices/:practiceSlug, which also matches this path.
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices/practice-script-needs", ({ params }) => {
 				needsRequested(String(params.workspaceSlug));

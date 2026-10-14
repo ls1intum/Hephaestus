@@ -536,11 +536,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             assertThat(captor.getValue().changedFields()).containsExactly("title");
         }
 
-        /**
-         * GitLab has one update action for every field it tracks, most of which the review evidence
-         * never reads. Publishing regardless would mint a fresh occasion for a due-date edit — a
-         * review nobody asked for, on evidence that did not move.
-         */
         @Test
         void publishesNothingWhenTheUpdateMovedNoFieldTheDomainNames() {
             Issue issue = createIssueEntity();

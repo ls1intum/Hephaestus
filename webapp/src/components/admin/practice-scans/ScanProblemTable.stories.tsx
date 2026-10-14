@@ -71,7 +71,7 @@ export const NoMatches: Story = {
 	},
 };
 
-/** No problems, but pairs were withheld: no problems is not the same as every practice met. */
+// Withheld pairs prevent a scan with no problems from claiming that all practices were met.
 export const NoProblemsWithWithholding: Story = {
 	args: {
 		state: ready([]),

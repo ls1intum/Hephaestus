@@ -1,18 +1,19 @@
 package de.tum.cit.aet.hephaestus.practices.feedback.delivery;
 
-import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackQueryRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousPracticePageFeedback;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
-import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -25,10 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class PracticePageSupportReader {
     private static final Duration LOOKBACK = Duration.ofDays(90);
     private final ResultRepository results;
-    private final EvidenceAuthorization evidence;
     private final Clock clock;
     private final PreviousPracticePageFeedback previous;
     private final PracticeRepository practices;
+    private final FeedbackQueryRepository queries;
 
     public record Selection(Optional<PreviousPracticePageFeedback.Previous> previous, List<Result> evidence) {
         public Selection {
@@ -51,10 +52,15 @@ public class PracticePageSupportReader {
     }
 
     @Transactional(readOnly = true)
-    public List<Result> read(long workspaceId, long developerId) {
-        var rows = candidateResults(workspaceId, developerId);
-        var permitted = evidence.permitsForNewDelivery(workspaceId, rows, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-        return rows.stream().filter(row -> permitted.contains(row.getId())).toList();
+    public boolean isBackfillOnly(long workspaceId, List<Result> support) {
+        if (support.isEmpty()) return false;
+        if (support.stream().anyMatch(row -> row.getWorkspaceId() != workspaceId))
+            throw new IllegalArgumentException("Support must belong to this workspace.");
+        var reviewIds = support.stream().map(Result::getReviewId).distinct().toList();
+        var origins = queries.reviewOrigins(workspaceId, reviewIds);
+        if (origins.size() != reviewIds.size())
+            throw new NoSuchElementException("Selected support has missing review authority.");
+        return origins.stream().allMatch(origin -> origin == ReviewOrigin.BACKFILL);
     }
 
     private List<Result> candidateResults(long workspaceId, long developerId) {

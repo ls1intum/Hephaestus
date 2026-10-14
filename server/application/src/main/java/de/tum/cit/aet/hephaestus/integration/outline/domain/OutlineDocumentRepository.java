@@ -268,8 +268,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
                     SELECT d.created_by_subject AS subject UNION SELECT d.updated_by_subject
                     UNION SELECT jsonb_array_elements_text(COALESCE(d.collaborator_subjects,'[]'::jsonb))
                 ) authors
-                 WHERE d.workspace_id=:workspaceId AND d.id=:artifactId AND authors.subject IS NOT NULL AND authors.subject<>''
+                 WHERE d.workspace_id=:workspaceId AND d.id=:documentId AND authors.subject IS NOT NULL AND authors.subject<>''
         """, nativeQuery = true)
     List<PersonSourceIdentityRow> findPersonSourceIdentities(
-            @Param("workspaceId") long workspaceId, @Param("artifactId") long artifactId);
+            @Param("workspaceId") long workspaceId, @Param("documentId") long documentId);
 }

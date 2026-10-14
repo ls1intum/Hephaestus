@@ -95,12 +95,6 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
     @Autowired
     private ObjectMapper objectMapper;
 
-    /**
-     * Two practices share a review with a retry, a no-charge embedding, an unpriced reranker, and chat calls;
-     * a retired practice and a deleted review have their own rows; another workspace and another month
-     * have the same practice, and another workspace has a usage row on this review. The practices and the
-     * not-attributed entry add up to the ledger.
-     */
     @Test
     @WithAdminUser
     void shouldSplitThePracticeScriptLedgerByPracticeAndAddUpToItWhenTheMonthMixesEveryCase() {
@@ -250,10 +244,6 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .isEqualTo(2L);
     }
 
-    /**
-     * Three practices weigh the same in a $0.00001 row. Each share truncates to $0.000003, and the first by slug
-     * takes the whole remainder, so the shares add up to the row exactly.
-     */
     @Test
     @WithAdminUser
     void shouldGiveTheWholeRemainderToOnePracticeWhenThreeShareARowEvenly() {
@@ -344,10 +334,6 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(mean.getTotalCostUsd()).isEqualByComparingTo("2");
     }
 
-    /**
-     * No price set counts runs in the run-type and day tables and in the month, and reviews per practice. A run
-     * is one job attempt with all its rows; a review counts once however many attempts and rows it has.
-     */
     @Test
     @WithAdminUser
     void shouldCountRunsAndReviewsWithNoPriceRatherThanLedgerRowsWhenOneRunHasSeveralUnpricedRows() {
@@ -404,10 +390,6 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(report.practiceScriptTotal().unpricedEventCount()).isEqualTo(2);
     }
 
-    /**
-     * A practice whose calls read the cache weighs its cache reads at the cache rate, as the ledger row priced them,
-     * and its input tokens are the whole prompt.
-     */
     @Test
     @WithAdminUser
     void shouldWeighEachPracticesCacheReadsAtTheCacheRateWhenItSplitsADecisionRow() {

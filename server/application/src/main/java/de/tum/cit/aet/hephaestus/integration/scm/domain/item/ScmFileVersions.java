@@ -4,12 +4,25 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class ScmFileVersions {
+    public record Parsed(String blobId, String hash) {}
+
+    public static Optional<Parsed> parse(ItemVersion version) {
+        String[] fields = version.value().split(":", -1);
+        if (fields.length != 4
+                || !fields[0].equals("scm.file")
+                || !fields[1].equals("v1")
+                || !fields[2].matches("[0-9a-f]{40}|[0-9a-f]{64}")
+                || !fields[3].matches("[0-9a-f]{64}")) return Optional.empty();
+        return Optional.of(new Parsed(fields[2], fields[3]));
+    }
+
     public record Entry(String path, String mode, String objectId) {}
 
     private final ObjectMapper mapper;

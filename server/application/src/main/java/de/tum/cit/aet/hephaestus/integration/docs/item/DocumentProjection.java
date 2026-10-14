@@ -17,12 +17,7 @@ public interface DocumentProjection {
     /** Each reference may be a document id or URL. */
     List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> documentRefs);
 
-    /**
-     * Keyed on the local id because that is the provider source id recorded on the item — a review is
-     * occasioned by {@code docs.document.published} against a row in this workspace's mirror. Empty when
-     * the row is gone, which the caller must report as an unavailable subject, not a document that said
-     * nothing.
-     */
+    /** Resolve the workspace mirror's local source id; absent rows return empty. */
     Optional<ProjectedDocument> documentById(long workspaceId, long documentId);
 
     /**

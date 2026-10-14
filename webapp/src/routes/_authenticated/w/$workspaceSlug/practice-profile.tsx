@@ -284,5 +284,12 @@ function OwnResultDetail({
 	if (result.isPending) {
 		return <Skeleton className="h-24 w-full" />;
 	}
-	return <ReviewResultRow result={result.data} showPracticeName={false} responses={responses} />;
+	return (
+		<ReviewResultRow
+			result={result.data}
+			defaultOpen
+			showPracticeName={false}
+			responses={responses}
+		/>
+	);
 }

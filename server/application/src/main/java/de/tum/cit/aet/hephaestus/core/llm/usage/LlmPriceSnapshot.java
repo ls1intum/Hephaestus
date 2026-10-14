@@ -48,15 +48,9 @@ public record LlmPriceSnapshot(
      * computed.
      */
     public enum CostClamp {
-        /**
-         * A positive cost below one micro-dollar, rounded up rather than to zero, so "we made a
-         * paid call" stays distinguishable from "this was free". Over-bills by less than $0.000001.
-         */
+        /** Round a positive sub-micro-dollar cost upward so paid usage remains distinct from free usage. */
         ROUNDED_UP_TO_MINIMUM,
-        /**
-         * Under-bills, so every budget computed from it reads low. Means a price or token count is
-         * wrong.
-         */
+        /** Clamping high costs underbills and lowers every budget computed from them. */
         CAPPED_AT_MAXIMUM,
     }
 

@@ -21,7 +21,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.stereotype.Service;
 
-/** Captures inputs through domain item sources; mentor sources have a separate request. */
 @Service
 public class WorkspaceContextBuilder {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceContextBuilder.class);

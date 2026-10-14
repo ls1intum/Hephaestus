@@ -682,7 +682,7 @@ CREATE TABLE membership (
   public_activity_seen boolean NOT NULL DEFAULT false,
   joined_at timestamptz NOT NULL DEFAULT now(),
   left_at timestamptz,
-  PRIMARY KEY(workspace_id, account_id),
+  PRIMARY KEY(account_id, workspace_id),
   CONSTRAINT sfk_membership_account FOREIGN KEY(account_id) REFERENCES account(id) ON DELETE RESTRICT,
   CONSTRAINT sfk_membership_workspace FOREIGN KEY(workspace_id) REFERENCES workspace(id) ON DELETE RESTRICT,
   CONSTRAINT ck_membership_role CHECK(role IN ('OWNER','ADMIN','MEMBER')),
@@ -755,7 +755,7 @@ CREATE TABLE practice_group (
   updated_at timestamptz,
   CONSTRAINT uk_practice_group_workspace_id UNIQUE (id, workspace_id),
   CONSTRAINT uk_practice_group_workspace_slug UNIQUE (workspace_id, slug),
-  CONSTRAINT sfk_practice_group_workspace FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_practice_group_workspace FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE RESTRICT,
   CONSTRAINT ck_practice_group_position CHECK (position >= 0),
   CONSTRAINT ck_practice_group_feedback_mode CHECK (feedback_mode IS NULL OR feedback_mode IN ('OFF','APPROVE_FIRST','AUTOMATIC')),
   CONSTRAINT ck_practice_group_catalog CHECK ((catalog_slug IS NULL) = (catalog_base IS NULL)),
@@ -776,7 +776,7 @@ CREATE TABLE practice (
   updated_at timestamptz,
   CONSTRAINT uk_practice_workspace_id UNIQUE (id, workspace_id),
   CONSTRAINT uk_practice_workspace_slug UNIQUE (workspace_id, slug),
-  CONSTRAINT sfk_practice_workspace FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_practice_workspace FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE RESTRICT,
   CONSTRAINT sfk_practice_group FOREIGN KEY (group_id, workspace_id)
     REFERENCES practice_group(id, workspace_id) ON DELETE SET NULL (group_id),
   CONSTRAINT ck_practice_kind CHECK (kind ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$'),
@@ -836,7 +836,7 @@ CREATE TABLE review_scope_repository (
   workspace_id bigint NOT NULL,
   repository_monitor_id bigint NOT NULL,
   base_branches jsonb NOT NULL DEFAULT '[]'::jsonb,
-  PRIMARY KEY (workspace_id, repository_monitor_id),
+  PRIMARY KEY (repository_monitor_id, workspace_id),
   CONSTRAINT sfk_review_scope_repository_workspace FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE RESTRICT,
   CONSTRAINT sfk_review_scope_repository_monitor FOREIGN KEY (repository_monitor_id, workspace_id)
     REFERENCES repository_to_monitor(id, workspace_id) ON DELETE CASCADE,
@@ -1073,7 +1073,7 @@ CREATE TABLE review_job_script_run (
   finished_at timestamptz NOT NULL,
   error varchar(500),
   duration_ms integer,
-  PRIMARY KEY(job_id, attempt, practice_id),
+  PRIMARY KEY(attempt, job_id, practice_id),
   CONSTRAINT sfk_review_job_script_run_job FOREIGN KEY(job_id, workspace_id) REFERENCES review_job(id, workspace_id) ON DELETE CASCADE,
   CONSTRAINT sfk_review_job_script_run_workspace FOREIGN KEY(workspace_id) REFERENCES workspace(id) ON DELETE RESTRICT,
   CONSTRAINT sfk_review_job_script_run_version FOREIGN KEY(practice_version_id, practice_id, workspace_id)
@@ -1102,7 +1102,7 @@ CREATE TABLE review_job_script_usage (
   cache_read_tokens bigint NOT NULL DEFAULT 0,
   cache_write_tokens bigint NOT NULL DEFAULT 0,
   search_units bigint NOT NULL DEFAULT 0,
-  PRIMARY KEY(job_id, attempt, model_kind, practice_id),
+  PRIMARY KEY(attempt, job_id, model_kind, practice_id),
   CONSTRAINT sfk_review_job_script_usage_job FOREIGN KEY(job_id, workspace_id) REFERENCES review_job(id, workspace_id) ON DELETE CASCADE,
   CONSTRAINT sfk_review_job_script_usage_workspace FOREIGN KEY(workspace_id) REFERENCES workspace(id) ON DELETE RESTRICT,
   CONSTRAINT sfk_review_job_script_usage_practice FOREIGN KEY(practice_id, workspace_id) REFERENCES practice(id, workspace_id) ON DELETE RESTRICT,
@@ -1289,7 +1289,7 @@ CREATE TABLE feedback (
   CONSTRAINT ck_feedback_delivered CHECK (state <> 'DELIVERED' OR delivered_at IS NOT NULL),
   CONSTRAINT ck_feedback_checks CHECK (jsonb_typeof(checks) = 'object'),
   CONSTRAINT ck_feedback_replaces_self CHECK (replaces_id IS NULL OR replaces_id <> id),
- CONSTRAINT ck_feedback_stop_reason CHECK(stop_reason IS NULL OR stop_reason IN ('VOLUME_CAPPED','COMPOSER_WITHHELD','NOTHING_NEW','REPEATS_DELIVERED_NOTE','REACTED_DISAGREE','REACTED_NOT_APPLICABLE','CONVERSATION_EXPIRED','DELIVERY_UNCONFIRMED','ITEM_GONE','ITEM_CLOSED','ITEM_MERGED','ITEM_STATE_INELIGIBLE','ISSUE_SNAPSHOT_CHANGED','PUBLIC_SUBJECT_INELIGIBLE','NO_AI','DELIVERY_OFF','PERSON_SUPPRESSED','RECIPIENT_UNAVAILABLE','EMPTY_AFTER_SANITIZE','INSTANCE_SILENCED','FEEDBACK_OFF','WORKSPACE_DISABLED','WORKSPACE_DELIVERY_PAUSED','STALE_ROLLOUT_REVISION','OUTSIDE_CURRENT_SCOPE','APPROVAL_STALE','APPROVAL_NO_LONGER_ELIGIBLE','PRACTICE_REQUIRES_APPROVAL','BACKFILL_QUIET','RESULT_MARKED_INCORRECT','REVIEWED_VERSION_CHANGED','REVIEW_CANCELLED'))
+ CONSTRAINT ck_feedback_stop_reason CHECK(stop_reason IS NULL OR stop_reason IN ('VOLUME_CAPPED','COMPOSER_WITHHELD','NOTHING_NEW','REPEATS_DELIVERED_NOTE','REACTED_DISAGREE','REACTED_NOT_APPLICABLE','CONVERSATION_EXPIRED','DELIVERY_UNCONFIRMED','ITEM_GONE','ITEM_CLOSED','ITEM_MERGED','ITEM_STATE_INELIGIBLE','ISSUE_SNAPSHOT_CHANGED','PUBLIC_SUBJECT_INELIGIBLE','NO_AI','DELIVERY_OFF','PERSON_SUPPRESSED','RECIPIENT_UNAVAILABLE','EMPTY_AFTER_SANITIZE','INSTANCE_SILENCED','FEEDBACK_OFF','WORKSPACE_DISABLED','WORKSPACE_DELIVERY_PAUSED','STALE_ROLLOUT_REVISION','OUTSIDE_CURRENT_SCOPE','APPROVAL_STALE','APPROVAL_NO_LONGER_ELIGIBLE','PRACTICE_REQUIRES_APPROVAL','BACKFILL_QUIET','RESULT_MARKED_INCORRECT','REVIEWED_VERSION_CHANGED','REVIEW_CANCELLED','EVIDENCE_NOT_PERMITTED','NO_EVIDENCE','UNCORROBORATED'))
 );
 
 
@@ -1357,7 +1357,7 @@ CREATE TABLE feedback_copy (
   CONSTRAINT ck_feedback_copy_summary_body CHECK (kind <> 'SUMMARY' OR body IS NULL),
   CONSTRAINT ck_feedback_copy_fence CHECK (state <> 'WRITE_STARTED' OR write_started_at IS NOT NULL),
   CONSTRAINT ck_feedback_copy_posted CHECK (state NOT IN ('POSTED','RETRACTED') OR posted_at IS NOT NULL),
- CONSTRAINT ck_feedback_copy_stop_reason CHECK(stop_reason IS NULL OR stop_reason IN ('VOLUME_CAPPED','COMPOSER_WITHHELD','NOTHING_NEW','REPEATS_DELIVERED_NOTE','REACTED_DISAGREE','REACTED_NOT_APPLICABLE','CONVERSATION_EXPIRED','DELIVERY_UNCONFIRMED','ITEM_GONE','ITEM_CLOSED','ITEM_MERGED','ITEM_STATE_INELIGIBLE','ISSUE_SNAPSHOT_CHANGED','PUBLIC_SUBJECT_INELIGIBLE','NO_AI','DELIVERY_OFF','PERSON_SUPPRESSED','RECIPIENT_UNAVAILABLE','EMPTY_AFTER_SANITIZE','INSTANCE_SILENCED','FEEDBACK_OFF','WORKSPACE_DISABLED','WORKSPACE_DELIVERY_PAUSED','STALE_ROLLOUT_REVISION','OUTSIDE_CURRENT_SCOPE','APPROVAL_STALE','APPROVAL_NO_LONGER_ELIGIBLE','PRACTICE_REQUIRES_APPROVAL','BACKFILL_QUIET','RESULT_MARKED_INCORRECT','REVIEWED_VERSION_CHANGED','REVIEW_CANCELLED'))
+ CONSTRAINT ck_feedback_copy_stop_reason CHECK(stop_reason IS NULL OR stop_reason IN ('VOLUME_CAPPED','COMPOSER_WITHHELD','NOTHING_NEW','REPEATS_DELIVERED_NOTE','REACTED_DISAGREE','REACTED_NOT_APPLICABLE','CONVERSATION_EXPIRED','DELIVERY_UNCONFIRMED','ITEM_GONE','ITEM_CLOSED','ITEM_MERGED','ITEM_STATE_INELIGIBLE','ISSUE_SNAPSHOT_CHANGED','PUBLIC_SUBJECT_INELIGIBLE','NO_AI','DELIVERY_OFF','PERSON_SUPPRESSED','RECIPIENT_UNAVAILABLE','EMPTY_AFTER_SANITIZE','INSTANCE_SILENCED','FEEDBACK_OFF','WORKSPACE_DISABLED','WORKSPACE_DELIVERY_PAUSED','STALE_ROLLOUT_REVISION','OUTSIDE_CURRENT_SCOPE','APPROVAL_STALE','APPROVAL_NO_LONGER_ELIGIBLE','PRACTICE_REQUIRES_APPROVAL','BACKFILL_QUIET','RESULT_MARKED_INCORRECT','REVIEWED_VERSION_CHANGED','REVIEW_CANCELLED','EVIDENCE_NOT_PERMITTED','NO_EVIDENCE','UNCORROBORATED'))
 );
 
 
@@ -2406,7 +2406,9 @@ INSERT INTO _cutover_copy_candidate(feedback_id,source,source_order,kind,write_k
  CASE WHEN d.delivered_external_ref IS NOT NULL THEN 'POSTED' WHEN d.write_started THEN 'WRITE_STARTED' ELSE 'PLANNED' END,
  CASE WHEN d.write_started THEN coalesce(d.write_started_at,d.created_at) END,d.delivered_external_ref,d.delivered_external_url,d.created_at,CASE WHEN d.delivered_external_ref IS NOT NULL THEN d.updated_at END
  FROM _cutover_old_feedback_dispatch d JOIN _cutover_send_parent sp ON sp.dispatch_id=d.id
- WHERE nullif(btrim(d.package_content->>'mrNote'),'') IS NOT NULL OR d.delivered_external_ref IS NOT NULL OR d.write_started;
+ WHERE (nullif(btrim(d.package_content->>'mrNote'),'') IS NOT NULL AND NOT EXISTS
+  (SELECT 1 FROM feedback f WHERE f.id=sp.feedback_id AND f.state='WITHHELD'))
+ OR d.delivered_external_ref IS NOT NULL OR d.write_started;
 CREATE TEMP TABLE _cutover_copy_receipt ON COMMIT DROP AS
  SELECT sp.feedback_id,d.id AS dispatch_id,n AS receipt_order,coalesce(receipt->>'deliveryKey',receipt->>'recurrenceKey') AS write_key,
  receipt->>'path' AS path,(receipt->>'startLine')::integer AS start_line,coalesce((receipt->>'endLine')::integer,(receipt->>'startLine')::integer) AS end_line,
@@ -3054,6 +3056,15 @@ CREATE INDEX idx_review_job_retention ON review_job(completed_at, id)
  WHERE status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED') AND processing_status IN ('NONE','DONE','FAILED');
 
 
+CREATE INDEX idx_membership_workspace_account ON membership(workspace_id,account_id);
+CREATE INDEX idx_review_scope_repository_workspace ON review_scope_repository(workspace_id,repository_monitor_id);
+CREATE INDEX idx_review_job_script_run_job_attempt ON review_job_script_run(job_id,attempt,practice_id);
+CREATE INDEX idx_review_job_script_usage_job ON review_job_script_usage(job_id);
+CREATE INDEX idx_review_job_script_usage_workspace ON review_job_script_usage(workspace_id);
+ALTER TABLE slack_channel_consent_event ADD CONSTRAINT uk_slack_channel_consent_event_tenant UNIQUE(id,workspace_id);
+ALTER TABLE slack_message ADD CONSTRAINT uk_slack_message_tenant UNIQUE(id,workspace_id);
+ALTER TABLE slack_thread ADD CONSTRAINT uk_slack_thread_tenant UNIQUE(id,workspace_id);
+ALTER TABLE workspace RENAME CONSTRAINT fk_workspace_organization TO sfk_workspace_organization;
 CREATE INDEX idx_review_job_script_run_practice ON review_job_script_run(workspace_id, practice_id, finished_at DESC);
 
 

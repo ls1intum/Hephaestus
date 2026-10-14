@@ -80,7 +80,6 @@ function report(overrides: Partial<WorkspaceLlmUsageReport> = {}): WorkspaceLlmU
 	};
 }
 
-/** Keep spend separate by funding source; each source has its own cap. */
 const meta = {
 	component: LlmUsageByJobTypeTable,
 	parameters: { layout: "padded" },

@@ -45,7 +45,7 @@ A workspace administrator connects one or more Git repositories from github.com 
 
 Hephaestus then syncs authored pull/merge requests, issues, code reviews, review comments, and commit metadata from those repositories. The platform processes activity authored in the connected repositories, whether or not the author has signed in to Hephaestus.
 
-Hephaestus analyzes the synced activity against practices that the workspace administrator configures. It produces practice results about each contributor's activity. A result is one practice's verdict on one piece of work. Hephaestus stores each result with its problems (problems at places in the work), an optional example and any open questions. Some judgments require the analysis to read and understand natural-language text. Examples include the meaning of a code comment or the substance of a review reply. For those judgments, the analysis uses an eligible model configured for the workspace, selected by the reviewed developer's AI choice (see the recipient details below).
+Hephaestus analyzes the synced activity against practices that the workspace administrator configures. It produces practice results about each contributor's activity. A result records the outcome of one practice for one piece of work. Hephaestus stores each result with its problems (problems at places in the work), an optional example and any open questions. Some judgments require the analysis to read and understand natural-language text. Examples include the meaning of a code comment or the substance of a review reply. For those judgments, the analysis uses an eligible model configured for the workspace, selected by the reviewed developer's AI choice (see the recipient details below).
 
 Automated practice review forwards the relevant pull/merge-request diff or issue content and the surrounding discussion to the provider. For a pull/merge request, it also forwards whatever the review reads from the captured repository and its history. It can post the resulting AI-generated feedback as comments on the reviewed artifact. Where explicitly connected and permitted, selected Outline documents may supply project context.
 
@@ -335,7 +335,7 @@ Pending delivery blocks both passes. Practice results or feedback that reference
 
 Source evidence retention
 
-Retention separates durable verification results from temporary worker inputs. The [source governance decision](./artifact-source-governance.md) owns the retention and erasure boundaries. A digest is an integrity identifier, not authorization. Extended evaluation retention requires a separate approved purpose and tenant-safe authorization.
+Retention separates durable verification results from temporary worker inputs. The [source governance decision](./item-source-governance.md) owns the retention and erasure boundaries. A digest is an integrity identifier, not authorization. Extended evaluation retention requires a separate approved purpose and tenant-safe authorization.
 
 Webhook and integration-sync event transport buffer (NATS JetStream)
 
@@ -453,7 +453,7 @@ The same transition clears connection credentials atomically. Disconnection does
 
 Artifact-source copies
 
-Source, workspace, and person erasure must traverse source manifests, repository snapshots, citation verdicts, derived assessments, exports, and governed evaluation cases. Expiry/erasure may leave only a non-content typed tombstone and makes replay unavailable. Audit reproducibility never overrides erasure.
+Source, workspace, and person erasure must traverse source manifests, repository snapshots, citation checks, derived assessments, exports, and governed evaluation cases. Expiry/erasure may leave only a non-content typed tombstone and makes replay unavailable. Audit reproducibility never overrides erasure.
 
 Source-side content
 
@@ -693,7 +693,7 @@ person's commits, selected through exact native identity references, never names
 ## Current source scope and controls
 
 Automated practice review can read all permitted workspace areas and repositories in its job folder. This includes Slack threads and person-scoped practice result and feedback history. There are no record-count or history-window caps. The source-use registry version 1.3.0 records maintainer engineering approval,
-not controller/DPO approval. The [source-governance record](./artifact-source-governance.md) owns the
+not controller/DPO approval. The [source-governance record](./item-source-governance.md) owns the
 scope and approval boundary. These categories belong in the full DPIA and the pending notice review.
 
 An account's **No AI**, **In-house** or **Cloud** choice applies across the instance's workspaces to

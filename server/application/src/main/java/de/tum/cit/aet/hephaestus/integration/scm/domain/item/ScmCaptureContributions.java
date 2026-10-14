@@ -56,21 +56,24 @@ final class ScmCaptureContributions {
                 content,
                 states,
                 disk,
-                () -> {
-                    Exception failure = null;
-                    for (var value : values)
-                        if (value.cleanup() != null)
-                            try {
-                                value.cleanup().close();
-                            } catch (Exception e) {
-                                if (failure == null) failure = e;
-                                else failure.addSuppressed(e);
-                            }
-                    if (failure != null) throw failure;
-                },
+                () -> closeAll(values),
                 limitations,
                 directories,
                 refusals,
                 citable);
+    }
+
+    static void closeAll(List<CaptureContribution> values) throws Exception {
+        Exception failure = null;
+        for (var value : values) {
+            if (value.cleanup() == null) continue;
+            try {
+                value.cleanup().close();
+            } catch (Exception error) {
+                if (failure == null) failure = error;
+                else if (failure != error) failure.addSuppressed(error);
+            }
+        }
+        if (failure != null) throw failure;
     }
 }

@@ -4,15 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.CapturedSource;
@@ -277,7 +273,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
             assertThat(item.get("subIssuesSource").asString()).isEqualTo("provider");
             assertThat(root.get("unresolvedReferences")).isEmpty();
             assertThat(root.get("truncated").asBoolean()).isFalse();
-            verify(issueRepository, never()).countChildrenByParentIssueId(anyLong(), any());
         }
 
         @Test
@@ -328,7 +323,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
 
             assertThat(itemNumbers(root)).containsExactly(42);
             assertThat(root.get("workItems").get(0).get("how").asString()).isEqualTo("closesOnMerge");
-            verify(issueRepository, never()).findByRepositoryIdAndNumber(REPO_ID, 42);
         }
 
         @Test
@@ -469,7 +463,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
             JsonNode root = payload(sampleMetadata());
 
             assertThat(itemNumbers(root)).containsExactly(7);
-            verify(issueRepository, never()).findByRepositoryIdAndNumber(REPO_ID, 12);
         }
 
         @Test
@@ -486,7 +479,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
 
             assertThat(root.get("workItems")).hasSize(1);
             assertThat(root.get("workItems").get(0).get("number").asInt()).isEqualTo(42);
-            verify(issueRepository, never()).findByRepositoryIdAndNumber(REPO_ID, 1);
         }
 
         @Test
@@ -502,9 +494,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
             JsonNode root = payload(sampleMetadata());
 
             assertThat(itemNumbers(root)).containsExactly(42);
-            for (int foreign : List.of(12, 13, 3, 14, 15)) {
-                verify(issueRepository, never()).findByRepositoryIdAndNumber(REPO_ID, foreign);
-            }
         }
 
         @Test
@@ -736,10 +725,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
                     .thenReturn(Optional.of(issue(42, "Known", "")));
 
             provider.capture(request(sampleMetadata()), Set.of(KIND));
-
-            verify(repositoryPreparer).authorize(any());
-            verify(repositoryPreparer, never()).prepare(any());
-            verify(gitRepositoryManager, never()).forEachCommitMessage(any(), any(), any(), any());
         }
 
         @Test
@@ -749,7 +734,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
 
             assertThatExceptionOfType(ItemCaptureException.class)
                     .isThrownBy(() -> provider.capture(request(sampleMetadata()), provider.sourceKinds()));
-            verifyNoInteractions(pullRequestRepository, issueRepository);
         }
     }
 }

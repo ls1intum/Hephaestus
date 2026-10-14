@@ -46,7 +46,7 @@ export async function loginAsDevAdmin(page: Page, username = "e2e"): Promise<voi
 	await page.goto("/login");
 	const consent = page.getByRole("region", { name: "Your privacy" });
 	if (await consent.isVisible()) {
-		await consent.getByRole("button", { name: /^(?:Decline|Reject all)$/u }).click();
+		await consent.getByRole("button", { name: "Decline error reports" }).click();
 	}
 	await page.getByPlaceholder("username").fill(username);
 	await page.getByRole("button", { name: /continue as dev admin/iu }).click();

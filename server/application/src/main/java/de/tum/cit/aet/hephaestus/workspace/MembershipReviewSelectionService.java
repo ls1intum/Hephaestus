@@ -3,16 +3,32 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** Capture workers read review eligibility and selection without the server-only roster bean. */
 @Service
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class MembershipReviewSelectionService implements MembershipReviewSelection {
     private final MembershipRepository memberships;
+    private final WorkspaceActorSelector actors;
+
+    @Override
+    @Transactional(readOnly = true)
+    public Set<Long> eligibleAccountIds(long workspaceId) {
+        return memberships.findEligibleAccountIds(workspaceId, actors.connectedProviderId(workspaceId).orElse(null));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> selectedAccountIds(long workspaceId) {
+        return memberships.findSelectedAccountIds(workspaceId);
+    }
+
 
     @Override
     @Transactional

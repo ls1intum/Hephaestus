@@ -492,10 +492,6 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(commentThreadId()).isEqualTo(stored.getId());
         }
 
-        /**
-         * Reopened and resolved again by someone else between two reads: the second names who
-         * resolved it now.
-         */
         @Test
         void shouldNameWhoResolvedTheDiscussionLastAndKeepThemWhenAReadNamesNobody() throws Exception {
             receiveDiffNote();
@@ -538,10 +534,6 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(commentThreadId()).isEqualTo(read.getId());
         }
 
-        /**
-         * Delayed read A saw the thread resolved; read B, begun later, saw it reopened and so
-         * changed nothing.
-         */
         @Test
         void shouldNotLetAnOlderReadUndoANewerSyncThatChangedNothing() throws Exception {
             receiveDiffNote();
@@ -573,11 +565,6 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(discussionsObservedAt()).isEqualTo(newer.requestedAt());
         }
 
-        /**
-         * A sync begins reading a discussion no thread holds yet; a webhook read begun later
-         * records the opposite resolution before the sync stores the discussion's comments. The
-         * sync's older read changes nothing.
-         */
         @ParameterizedTest
         @ValueSource(booleans = {true, false})
         void shouldKeepTheNewerReadOfADiscussionAnOlderSyncStoresLater(boolean newer) {

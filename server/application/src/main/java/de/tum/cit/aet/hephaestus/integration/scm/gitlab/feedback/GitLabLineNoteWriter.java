@@ -124,7 +124,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
             LineNote item = feedbackItems.get(index);
             String key = item.writeKey();
             if (key != null && !processedKeys.add(key)) {
-                continue; // one copy per delivery key
+                continue; 
             }
             FeedbackAnchor diff = item.anchor();
             if (item.body().isBlank() || (diff.endLine() != null && diff.side() == null)) {

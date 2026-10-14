@@ -161,10 +161,7 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
         assertThat(res.getCookie(AuthIntentCookie.COOKIE_NAME)).isNull();
     }
 
-    /**
-     * Link-only is classified by the login_provider row's TYPE: a self-hosted Outline's
-     * authorization URL is indistinguishable from a GitLab's by shape.
-     */
+    // Provider URL shape cannot identify link-only providers; a self-hosted Outline URL can resemble GitLab.
     @ParameterizedTest
     @EnumSource(
             value = LoginProvider.ProviderType.class,

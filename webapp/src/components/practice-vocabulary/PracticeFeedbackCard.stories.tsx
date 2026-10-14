@@ -586,7 +586,6 @@ export const Ratings: Story = {
 	},
 };
 
-/** A disagreement must carry a sentence, which workspace admins read instead of the card. */
 export const DisagreeOpen: Story = {
 	args: { card: { ...card, state: "open" }, openBand: "disagreement" },
 	play: async ({ args, canvas }) => {

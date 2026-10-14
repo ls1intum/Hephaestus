@@ -56,7 +56,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import environment from "@/environment";
 import { usePracticeFeedbackModeMutations } from "@/hooks/use-practice-feedback-mode-mutations";
 import { usePracticeReviewSettingsMutation } from "@/hooks/use-practice-review-settings";
-import { reviewModelOf, useReviewRunning } from "@/hooks/use-review-running";
+import { reviewModelOf, useReviewReadiness } from "@/hooks/use-review-readiness";
 import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
 import { ITEM_KIND } from "@/lib/item-kinds";
 import { workspaceAdminHead } from "@/lib/page-title";
@@ -78,7 +78,7 @@ function ReviewRoute() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const setSearch = useSearchState();
 
-	const running = useReviewRunning(workspaceSlug);
+	const running = useReviewReadiness(workspaceSlug);
 
 	return (
 		<ReviewPage

@@ -150,10 +150,7 @@ export const CustomScript: Story = {
 	},
 };
 
-/**
- * Complete is Required plus a claim the review may make: that something is missing from the source.
- * Optional may be unavailable without the review saying anything about the work.
- */
+// Complete permits absence claims; an unavailable optional source permits no claim about the work.
 export const ReadsCompleteVersusRequired: Story = {
 	args: editing(
 		practiceValueOf({

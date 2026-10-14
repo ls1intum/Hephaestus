@@ -132,12 +132,6 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(usageOf(job).totalCalls()).isZero();
     }
 
-    /**
-     * Attempt 0 dispatches a provider call. While it waits, its worker's heartbeat goes stale and orphan
-     * recovery requeues the job — bumping {@code attempt} and zeroing these counters — after which a
-     * sibling claims it as attempt 1. The original worker was never dead: its response arrives and it
-     * accumulates, onto counters that now belong to attempt 1 and its price and funding source.
-     */
     @Test
     @DisplayName("a late call from a superseded attempt is dropped, not billed to the attempt that now owns the row")
     void lateWriteFromASupersededAttemptDoesNotLandOnTheNewAttempt() {

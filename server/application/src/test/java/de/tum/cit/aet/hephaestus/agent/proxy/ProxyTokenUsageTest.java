@@ -147,7 +147,7 @@ class ProxyTokenUsageTest extends BaseUnitTest {
                 .isNull();
     }
 
-    /** Cohere v2 bills a rerank in search units under {@code meta.billed_units} and reports no tokens. */
+    // Cohere v2 reranking bills search units under meta.billed_units, without token counts.
     @ParameterizedTest
     @ValueSource(strings = {"3", "3.0"})
     void shouldReadTheSearchUnitsWhenCohereBillsARerankInThem(String units) throws Exception {
@@ -176,10 +176,7 @@ class ProxyTokenUsageTest extends BaseUnitTest {
         assertThatIllegalArgumentException().isThrownBy(() -> ProxyTokenUsage.from(body, LlmApiProtocol.COHERE_RERANK));
     }
 
-    /**
-     * The AI SDK reads a Decisions response in the Responses usage shape with every count optional. A decision
-     * writes no text, so a response without an output count bills its input alone.
-     */
+    // Decision responses may omit output usage because they produce no text; reported input still bills.
     @ParameterizedTest
     @CsvSource(
             delimiter = '|',

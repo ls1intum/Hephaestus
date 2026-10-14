@@ -1,6 +1,6 @@
 # ADR 0029: Separate measurement from intervention and derive level from channel
 
-**Status:** Superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md)
+**Status:** Accepted (amended 2026-09-17 — `basedOn` names this run's observations only); superseded 2026-10-14 by [ADR 0056](0056-one-practice-model-for-items-and-scans.md)
 **Date:** 2026-08-16
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0021](0021-observations-feedback-synthesis-seam.md), [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md), [ADR 0007](0007-sandbox-spi-shape.md)
@@ -180,6 +180,3 @@ Everything else in this ADR stands. The contract lives in `agent/review-composer
 ## Update — 2026-10-14 (#2656): the 1.0 practice model
 
 [ADR 0056](0056-one-practice-model-for-items-and-scans.md) supersedes this record. Feedback is composed after result admission and keeps its exact result and problem support at each destination.
-The [product vocabulary](../contributor/practice-feedback-language.md) maps the earlier terms:
-an observation is a result, a channel is a destination, and an artifact is an item.
-The sections above stay as the record of the earlier decision.

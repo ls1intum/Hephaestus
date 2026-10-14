@@ -161,7 +161,7 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
                 .thenReturn(List.of(
                         docWithCollectionName(
                                 "engineering", "Engineering Docs", "onboarding-guide", "Onboarding Guide", "Welcome."),
-                        doc("product", "roadmap", "Roadmap", "Q3 plans.") // no captured collection name
+                        doc("product", "roadmap", "Roadmap", "Q3 plans.") 
                         ));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
@@ -185,7 +185,7 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
                                 "Welcome.",
                                 "Ada Lovelace",
                                 555L),
-                        authoredDoc("Product", "roadmap", "Roadmap", "Q3 plans.", "Grace Hopper", null) // unlinked
+                        authoredDoc("Product", "roadmap", "Roadmap", "Q3 plans.", "Grace Hopper", null) 
                         ));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
@@ -217,7 +217,7 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
                                 List.of(
                                         new ProjectedDocument.Collaborator("0aa1bb2c-user", "Ada Lovelace", 555L),
                                         new ProjectedDocument.Collaborator("7cc9dd0e-user", null, null))),
-                        doc("Product", "roadmap", "Roadmap", "Q3 plans.") // no substrate captured
+                        doc("Product", "roadmap", "Roadmap", "Q3 plans.") 
                         ));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
@@ -255,11 +255,6 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
         assertThat(files).isEmpty();
     }
 
-    /**
-     * No linked or retrieved documentation still stages the index, holding an empty list: "no
-     * documentation directory" and "searched, nothing bore on this change" license opposite conclusions,
-     * and only the index makes them distinguishable.
-     */
     @Test
     void deriveQueryTextStripsUrlsAndOrJoinsDistinctLowercasedTerms() {
         String query = DocumentCaptureSource.deriveQueryText(

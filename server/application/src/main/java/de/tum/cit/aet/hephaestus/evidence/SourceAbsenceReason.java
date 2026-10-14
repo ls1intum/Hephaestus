@@ -20,13 +20,7 @@ public enum SourceAbsenceReason {
     NO_WORKING_COPY,
     /** {@code UNAVAILABLE}: the requested conversation or item does not exist upstream. */
     NOT_FOUND,
-    /**
-     * {@code UNAVAILABLE}: the mirror holds the row but not its content, dropped under a size cap.
-     *
-     * <p>Distinct from {@link #NOT_FOUND}: the item exists and the fix is to raise the cap, not go
-     * looking for something deleted — this is not a privacy reason, since no consent or retention decision
-     * was taken.
-     */
+    /** The item exists but its content was evicted; increasing the cap can restore it. */
     CONTENT_EVICTED,
     /** {@code REDACTED}: the people in it have not granted, or have withdrawn, consent to read it. */
     CONSENT_NOT_ACTIVE,

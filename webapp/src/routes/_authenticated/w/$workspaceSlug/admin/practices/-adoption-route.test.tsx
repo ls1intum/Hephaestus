@@ -29,7 +29,7 @@ import {
 	practicesHandlers,
 	wireGuidance,
 	wirePractice,
-} from "./-practice-wire";
+} from "./-practice-server";
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -562,7 +562,17 @@ describe("catalog adoption over practice setup", () => {
 				),
 				http.get(PRACTICE_PATH, () => {
 					served.push(200);
-					return HttpResponse.json({ ...workspacePractice, name: "Renamed elsewhere" });
+					return HttpResponse.json({
+						...workspacePractice,
+						name: "Renamed elsewhere",
+						currentVersion: {
+							...workspacePractice.currentVersion,
+							definition: {
+								...workspacePractice.currentVersion.definition,
+								name: "Renamed elsewhere",
+							},
+						},
+					});
 				}),
 			);
 			const refreshPractice = async () => {

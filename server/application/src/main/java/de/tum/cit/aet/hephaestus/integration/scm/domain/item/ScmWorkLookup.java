@@ -18,7 +18,7 @@ public class ScmWorkLookup {
 
     Optional<Issue> find(ItemKind kind, long sourceId) {
         if (kind.equals(ScmItemEvents.PULL_REQUEST))
-            return Optional.<Issue>empty().or(() -> pullRequests.findByIdWithAuthorAndRepository(sourceId));
+            return pullRequests.findByIdWithAuthorAndRepository(sourceId).map(Issue.class::cast);
         if (kind.equals(ScmItemEvents.ISSUE)) return issues.findByIdWithAuthorAndRepository(sourceId);
         return Optional.empty();
     }

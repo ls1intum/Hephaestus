@@ -6,20 +6,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Immutable reference to a repository for use in domain events.
- *
- * <p>Domain events must NOT contain JPA entities because:
- *
- * <ul>
- *   <li>Async event handlers run outside the original transaction/session
- *   <li>Lazy-loaded relationships will throw LazyInitializationException
- *   <li>Entity state may change between event publication and handling
- * </ul>
- *
- * <p>This value object captures the essential repository information needed by event consumers
- * without carrying the JPA entity.
- */
+/** Async domain events must contain immutable references rather than lazy JPA entities. */
 public record RepositoryRef(
         @NonNull Long id,
         @NonNull String nameWithOwner,

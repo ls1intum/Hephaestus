@@ -15,6 +15,8 @@ import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { mock, test } from "node:test";
 
+import { compositionRequestSchema } from "../../../main/resources/agent/work/practice-scripts/lib/core/contract.ts";
+
 import type {
 	AgentSession,
 	AgentToolResult,
@@ -36,6 +38,10 @@ import { codingAgentExports } from "./program-host-runner.ts";
 const LIB = nodePath.resolve(
 	import.meta.dirname,
 	"../../../../../../docker/agents/practice-scripts/lib",
+);
+
+const SERVER_COMPOSITION_REQUEST = compositionRequestSchema.parse(
+	JSON.parse(readFileSync(new URL("feedback-composition-request.json", import.meta.url), "utf8")),
 );
 
 const supportOccurrence = (itemKind: string, itemId: number) => ({
@@ -2906,7 +2912,8 @@ if (scenario !== undefined && scenario !== "") {
 			},
 		},
 	});
-	await import("../../../main/resources/agent/pi-runner.ts");
+	const { runReviewJob } = await import("../../../main/resources/agent/pi-runner.ts");
+	await runReviewJob();
 } else {
 	for (const fixture of [
 		"scope-native-completion",
@@ -3272,27 +3279,29 @@ if (scenario !== undefined && scenario !== "") {
 					if (stage.startsWith("compose") || stage === "draft-revision") {
 						writeFileSync(
 							nodePath.join(cwd, "evidence/composition.json"),
-							JSON.stringify({
-								contractVersion: 3,
-								enabled: true,
-								minDistinctItems: 2,
-								destinations: {
-									PRACTICE_PAGE: { enabled: true, maxPieces: 1 },
-									ON_WORK: { enabled: true, maxPieces: 1 },
-									...(stage === "compose-support" || stage === "compose-already-said"
-										? {
-												CONVERSATION: {
-													enabled: fixture !== "compose-support-refused-only",
-													maxPieces: 1,
-												},
-											}
-										: {}),
-								},
-								onWorkCopyForms:
-									stage === "compose" || stage === "compose-foreign-provider"
-										? ["FILE_NOTE", "LINE_NOTE"]
-										: ["FILE_NOTE"],
-							}),
+							JSON.stringify(
+								stage === "compose"
+									? SERVER_COMPOSITION_REQUEST
+									: {
+											...SERVER_COMPOSITION_REQUEST,
+											destinations: {
+												PRACTICE_PAGE: { enabled: true, maxPieces: 1 },
+												ON_WORK: { enabled: true, maxPieces: 1 },
+												...(stage === "compose-support" || stage === "compose-already-said"
+													? {
+															CONVERSATION: {
+																enabled: fixture !== "compose-support-refused-only",
+																maxPieces: 1,
+															},
+														}
+													: {}),
+											},
+											onWorkCopyForms:
+												stage === "compose" || stage === "compose-foreign-provider"
+													? ["FILE_NOTE", "LINE_NOTE"]
+													: ["FILE_NOTE"],
+										},
+							),
 						);
 					}
 					if (stage === "compose-continuation") {

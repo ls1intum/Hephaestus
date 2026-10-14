@@ -80,16 +80,6 @@ public class WorkspaceTeamLabelService {
 
     // Label Management
 
-    /**
-     * Adds a label as a filter for a team in a workspace. Uses workspace-scoped settings for
-     * multi-workspace support.
-     *
-     * @param slug the workspace slug
-     * @param teamId the team ID
-     * @param repositoryId the repository ID the label belongs to
-     * @param label the label name
-     * @return the updated team info, or empty if team/label not found
-     */
     public Optional<TeamInfoDTO> addLabelToTeam(String slug, Long teamId, Long repositoryId, String label) {
         Workspace workspace = requireWorkspace(slug);
         log.debug(
@@ -123,15 +113,6 @@ public class WorkspaceTeamLabelService {
         return addLabelToTeam(requireSlug(workspaceContext), teamId, repositoryId, label);
     }
 
-    /**
-     * Removes a label filter for a team in a workspace. Uses workspace-scoped settings for
-     * multi-workspace support.
-     *
-     * @param slug the workspace slug
-     * @param teamId the team ID
-     * @param labelId the label ID
-     * @return the updated team info, or empty if team not found
-     */
     public Optional<TeamInfoDTO> removeLabelFromTeam(String slug, Long teamId, Long labelId) {
         Workspace workspace = requireWorkspace(slug);
         log.debug(

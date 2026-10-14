@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -11,6 +10,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +29,8 @@ class ScmItemChangeListenerTest extends BaseUnitTest {
         when(issue.id()).thenReturn(33L);
         var event = mock(ScmDomainEvent.IssueClosed.class);
         when(event.issue()).thenReturn(issue);
-        new ScmItemChangeListener(query, results).onClosed(event);
-        verify(results).endCurrent(eq(11L), eq(22L), eq(ResultEndReason.WORK_CHANGED), any());
+        var at = Instant.parse("2026-10-14T12:00:00Z");
+        new ScmItemChangeListener(query, results, Clock.fixed(at, ZoneOffset.UTC)).onClosed(event);
+        verify(results).endCurrent(eq(11L), eq(22L), eq(ResultEndReason.WORK_CHANGED), eq(at));
     }
 }

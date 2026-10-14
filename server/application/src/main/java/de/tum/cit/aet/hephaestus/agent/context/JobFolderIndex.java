@@ -26,9 +26,8 @@ public record JobFolderIndex(
         refusals = List.copyOf(refusals);
         files = List.copyOf(files);
         var paths = new HashSet<String>();
-        for (FolderSource artifact : files) {
-            if (!paths.add(artifact.file().path()))
-                throw new IllegalArgumentException("Duplicate folder artifact path");
+        for (FolderSource file : files) {
+            if (!paths.add(file.file().path())) throw new IllegalArgumentException("Duplicate folder file path");
         }
         sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
         requireCapture(
@@ -54,7 +53,7 @@ public record JobFolderIndex(
     /**
      * A manifest as it stays on its job once admission retires the staged files: the capture's contract, kind,
      * time and each source's state and facts, read with the same checks as the whole manifest. The folder's and
-     * each source's artifact and refusal inventories are not part of it, so their retirement leaves it intact; a
+     * each source's file and refusal inventories are not part of it, so their retirement leaves it intact; a
      * reader that needs a file's digest reads the whole manifest instead.
      */
     @JsonIgnoreProperties({"refusals", "files", "citableTexts"})

@@ -70,10 +70,7 @@ export const SwitchToSource: Story = {
 	},
 };
 
-/**
- * Feedback for the developer's next conversation is private: absent text is explained as withheld,
- * never as missing, and a body a caller passes anyway is not shown.
- */
+// Source denial withholds private prose even when the caller supplies it.
 export const ForConversation: Story = {
 	args: { feedback: { body, destination: "CONVERSATION" } },
 	play: async ({ canvas }) => {

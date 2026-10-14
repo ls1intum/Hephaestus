@@ -693,7 +693,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                             p -> p.getSimpleName().contains("WorkspaceContext")
                                                     || p.getSimpleName().contains("Workspace")
                                                     || p.isEquivalentTo(Long.class)
-                                                    || p.isEquivalentTo(long.class) // workspace ids
+                                                    || p.isEquivalentTo(long.class) 
                                             );
 
                             if (!isWorkspaceAware && !hasWorkspaceParam) {

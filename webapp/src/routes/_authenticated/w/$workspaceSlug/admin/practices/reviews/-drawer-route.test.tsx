@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { getReviewLineageQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { ReviewDetail, ReviewLineage, ReviewResult } from "@/api/types.gen";
 import {
 	feedbackDetail,
@@ -24,11 +25,11 @@ import {
 } from "@/components/admin/practice-reviews/lineage-fixtures";
 import { RESULT_WORDS_UNAVAILABLE } from "@/components/admin/practice-reviews/result-words";
 import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
-import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { browserTimeZone } from "@/lib/dates";
 import { itemName } from "@/lib/item-kinds";
 import { server } from "@/mocks/server";
+import { reviewHandlers } from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
 import { deferred } from "@/test/async";
 import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -65,7 +66,7 @@ function instant(url: URL | undefined, name: string): number | undefined {
 }
 
 beforeEach(() => {
-// jsdom needs an IntersectionObserver stub for paged lists.
+	// jsdom needs an IntersectionObserver stub for paged lists.
 	vi.stubGlobal("IntersectionObserver", ObserverStub);
 	requested.length = 0;
 	server.events.on("request:start", record);
@@ -122,7 +123,7 @@ describe("practice review levels", () => {
 	it("opens the result of a problem over the problems list", async () => {
 		const [problem] = reviewProblems;
 		assert(problem);
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/observations`);
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}/problems`);
 
 		await userEvent.click(
 			await screen.findByRole("link", openRow("result", problem.summary), ROUTE_RENDER_WAIT),
@@ -137,7 +138,7 @@ describe("practice review levels", () => {
 			() => expect(router.state.location.search).not.toHaveProperty("detail"),
 			ROUTE_RENDER_WAIT,
 		);
-		expect(router.state.location.pathname).toBe(`${REVIEWS}/observations`);
+		expect(router.state.location.pathname).toBe(`${REVIEWS}/problems`);
 	});
 
 	/** Closing the level gives focus back to the row it was opened from, so the reader goes on there. */
@@ -173,7 +174,7 @@ describe("practice review levels", () => {
 		const [source] = feedbackDetail(feedback.id).basis;
 		assert(source?.result.summary != null);
 		const { router } = renderRouteAtWithRouter(
-			`${REVIEWS}/runs?detail=${encodeURIComponent(
+			`${REVIEWS}?detail=${encodeURIComponent(
 				JSON.stringify([`feedback:${feedback.id}`, `result:${source.resultId}`]),
 			)}`,
 		);
@@ -297,10 +298,10 @@ describe("practice review levels", () => {
 		const [practice] = practiceCounts;
 		assert(practice);
 		const { router } = renderRouteAtWithRouter(
-			`${REVIEWS}/runs?detail=practice:${practice.practiceSlug}`,
+			`${REVIEWS}?detail=practice:${practice.practiceSlug}`,
 		);
 		await screen.findByRole("dialog", { name: practice.practiceName }, ROUTE_RENDER_WAIT);
-		expect(router.state.location.pathname).toBe(`${REVIEWS}/runs`);
+		expect(router.state.location.pathname).toBe(REVIEWS);
 	});
 });
 
@@ -313,7 +314,7 @@ describe("the facts a sheet reads beyond its record", () => {
 				HttpResponse.json({ ...reviewDetail(review.id), usage: reviewUsageTwoAttempts }),
 			),
 		);
-		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=review:${review.id}`);
+		renderRouteAtWithRouter(`${REVIEWS}?detail=review:${review.id}`);
 
 		const sheet = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
 		// Technical is open by default.
@@ -342,13 +343,24 @@ describe("a new review from a row of the Reviews table", () => {
 
 	it("asks for a review of the row's item after the confirmation, and reads the reviews again", async () => {
 		const bodies: unknown[] = [];
-		const completed = reviews.find((review) => review.item.id === reviewItem.id && review.status === "COMPLETE");
+		const completed = reviews.find(
+			(review) => review.id === "11111111-1111-1111-1111-111111111111",
+		);
 		assert(completed);
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices/reviews", () => HttpResponse.json({
-				content: [completed], number: 0, size: 25, totalElements: 1, totalPages: 1,
-				numberOfElements: 1, first: true, last: true, empty: false,
-			})),
+			http.get("*/workspaces/:workspaceSlug/practices/reviews", () =>
+				HttpResponse.json({
+					content: [completed],
+					number: 0,
+					size: 25,
+					totalElements: 1,
+					totalPages: 1,
+					numberOfElements: 1,
+					first: true,
+					last: true,
+					empty: false,
+				}),
+			),
 			http.post(REQUESTS, async ({ request }) => {
 				bodies.push(await request.json());
 				return HttpResponse.json({
@@ -359,8 +371,9 @@ describe("a new review from a row of the Reviews table", () => {
 				});
 			}),
 		);
-		renderRouteAtWithRouter(`${REVIEWS}/runs`);
-		const name = itemName(reviewItem);
+		renderRouteAtWithRouter(REVIEWS);
+		const itemLabel = itemName(reviewItem);
+		const name = `${itemLabel.charAt(0).toLowerCase()}${itemLabel.slice(1)}`;
 		const listReads = () =>
 			requestsTo("/practices/reviews").filter((url) => url.searchParams.get("size") !== "1");
 		// The table first stands as its skeleton, so the rows are found once they are drawn.
@@ -464,14 +477,11 @@ describe("practices turned off today", () => {
 		const options = await screen.findByRole("listbox", { name: "Practice options" });
 		await within(options).findByRole("option", { name: /Errors carry their context/u });
 		expect(within(options).queryByRole("option", { name: /Thin controllers/u })).toBeNull();
-		await userEvent.keyboard("{Escape}");
 
 		await userEvent.click(
-			await screen.findByRole("switch", { name: "Show turned-off practices (1 hidden)" }),
+			await screen.findByRole("switch", { name: /^Show turned-off practices/u }),
 		);
-		await userEvent.click(screen.getByRole("combobox", { name: "Practice" }));
-		const updated = await screen.findByRole("listbox", { name: "Practice options" });
-		await within(updated).findByRole("option", { name: /Thin controllers/u });
+		await within(options).findByRole("option", { name: /Thin controllers/u });
 	});
 });
 
@@ -550,7 +560,7 @@ describe("a review's trace while the review runs", () => {
 				() => reply(),
 				() => HttpResponse.json(review),
 			);
-			renderRouteAtWithRouter(`${REVIEWS}/runs?detail=trace:review:${RUNNING_ID}`);
+			renderRouteAtWithRouter(`${REVIEWS}?detail=trace:review:${RUNNING_ID}`);
 			await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
 			reply = () => unavailable("Trace temporarily unavailable");
 			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
@@ -598,9 +608,7 @@ describe("a review's trace while the review runs", () => {
 					),
 				),
 			);
-			const { router } = renderRouteAtWithRouter(
-				`${REVIEWS}/runs?detail=trace:review:${RUNNING_ID}`,
-			);
+			const { router } = renderRouteAtWithRouter(`${REVIEWS}?detail=trace:review:${RUNNING_ID}`);
 			await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
 			lineages.set(RUNNING_ID, async () => {
 				await release.promise;
@@ -611,7 +619,7 @@ describe("a review's trace while the review runs", () => {
 			await vi.waitFor(() =>
 				expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(firstReads),
 			);
-			router.history.push(`${REVIEWS}/runs?detail=trace:review:${secondId}`);
+			router.history.push(`${REVIEWS}?detail=trace:review:${secondId}`);
 			await screen.findByRole("dialog", { name: /Second selected work/u }, ROUTE_RENDER_WAIT);
 			const secondReads = () =>
 				requestsTo("/practices/reviews/lineage").filter(
@@ -637,8 +645,8 @@ describe("a review's trace while the review runs", () => {
 				() => HttpResponse.json(lineageOf(review)),
 				() => HttpResponse.json(review),
 			);
-			const { router } = renderRouteAtWithRouter(
-				`${REVIEWS}/runs?detail=trace:review:${RUNNING_ID}`,
+			const { router, queryClient } = renderRouteAtWithRouter(
+				`${REVIEWS}?detail=trace:review:${RUNNING_ID}`,
 			);
 			await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
 			await vi.waitFor(() =>
@@ -646,7 +654,7 @@ describe("a review's trace while the review runs", () => {
 			);
 			const reviewReads = requestsTo(`/practices/reviews/${RUNNING_ID}`).length;
 			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-		// Waits must use Vitest's polling timer while the interval is faked.
+			// Waits must use Vitest's polling timer while the interval is faked.
 			await vi.waitFor(() =>
 				expect(requestsTo(`/practices/reviews/${RUNNING_ID}`).length).toBeGreaterThan(reviewReads),
 			);
@@ -658,6 +666,14 @@ describe("a review's trace while the review runs", () => {
 				expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(before),
 			);
 
+			await screen.findByText("Review complete", undefined, ROUTE_RENDER_WAIT);
+			const lineageKey = getReviewLineageQueryKey({
+				path: { workspaceSlug: "acme" },
+				query: { kind: "REVIEW", reviewId: RUNNING_ID },
+			});
+			await vi.waitFor(() =>
+				expect(queryClient.getQueryState(lineageKey)?.fetchStatus).toBe("idle"),
+			);
 			const settledLineage = requestsTo("/practices/reviews/lineage").length;
 			const settledReview = requestsTo(`/practices/reviews/${RUNNING_ID}`).length;
 			await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
@@ -683,7 +699,7 @@ describe("a review's trace while the review runs", () => {
 				() => HttpResponse.json(lineageOf(review)),
 				() => reply(),
 			);
-			renderRouteAtWithRouter(`${REVIEWS}/runs?detail=trace:review:${RUNNING_ID}`);
+			renderRouteAtWithRouter(`${REVIEWS}?detail=trace:review:${RUNNING_ID}`);
 			await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
 			await vi.waitFor(() =>
 				expect(requestsTo(`/practices/reviews/${RUNNING_ID}`).length).toBeGreaterThan(0),

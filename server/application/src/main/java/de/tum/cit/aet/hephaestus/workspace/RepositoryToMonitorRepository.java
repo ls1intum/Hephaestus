@@ -13,10 +13,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Tracks which repositories each workspace monitors. Queries filter by workspace id or {@code
- * nameWithOwner}, which resolves workspace context during sync.
- */
 @Repository
 @WorkspaceAgnostic("Configuration table mapping repositories to workspaces")
 public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryToMonitor, Long> {
@@ -147,10 +143,6 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
     /** One workspace's monitors of the repository with the given provider-stable id. */
     List<RepositoryToMonitor> findByWorkspaceIdAndNativeId(Long workspaceId, Long nativeId);
 
-    /**
-     * How many workspaces monitor a repository — the orphan check before deleting a shared
-     * repository row.
-     */
     long countByNameWithOwner(String nameWithOwner);
 
     /** Deletes all repository monitors for a workspace (workspace purge). */

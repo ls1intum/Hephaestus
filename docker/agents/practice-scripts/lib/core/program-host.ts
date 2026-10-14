@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 
 import {
 	parseCandidate,
+	CANDIDATE_LIMITS,
 	parseMeta,
 	parseReviewOptions,
 	type Candidate,
@@ -235,7 +236,7 @@ export async function runPracticeProgram(
 			]),
 		).values(),
 	];
-	if (readReceipts.length > 200) {
+	if (readReceipts.length > CANDIDATE_LIMITS.receipts) {
 		return finished("failed", "too-large", { error: "read receipts exceed the proof bound" });
 	}
 	if (candidate.coverage.source === "host") {

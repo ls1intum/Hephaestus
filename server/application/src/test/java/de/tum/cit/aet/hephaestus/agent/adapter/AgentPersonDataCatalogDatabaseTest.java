@@ -57,7 +57,7 @@ class AgentPersonDataCatalogDatabaseTest {
                 .doesNotContain("00000000-0000-0000-0000-000000992112");
         assertThat(unacknowledgedStore.export(selected))
                 .anySatisfy(row -> assertThat(row.path("id").asString()).isEqualTo(job.toString()));
-        assertThatThrownBy(() -> unacknowledgedStore.erase(selected))
+        assertThatThrownBy(() -> unacknowledgedStore.prepareErasure(selected))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Evidence-copy erasure acknowledgement is unavailable");
         assertThat(plain.queryForObject("SELECT id FROM review_job WHERE id=?", UUID.class, job))

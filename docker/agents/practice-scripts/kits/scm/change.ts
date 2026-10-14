@@ -1,31 +1,7 @@
 import { z } from "zod";
+import { commitIdSchema } from "../../lib/core/contract.ts";
 
 import type { Evidence } from "../../lib/core/practice-script.ts";
-
-export interface ChangeCommit {
-	sha: string;
-	/** The full commit message: subject, blank line, body. */
-	message: string;
-	author: string;
-	authoredAt: string;
-	committer: string;
-	committedAt: string;
-	parents: string[];
-	/** What the commit touched, against its first parent. */
-	files: ChangedFile[];
-	/** The line of commits.json that carries this commit's `sha`, 1-based; 0 when unknown. */
-	line: number;
-}
-
-export interface ChangedFile {
-	/** git's status letter: A, M, D, R (renamed), C (copied), T (type changed). */
-	status: string;
-	path: string;
-	oldPath?: string;
-	/** Changed-line counts, when the record carries them. */
-	additions?: number;
-	deletions?: number;
-}
 
 const changedFileSchema = z.object({
 	status: z.string().min(1),
@@ -36,22 +12,26 @@ const changedFileSchema = z.object({
 });
 
 const optionalText = z.string().default("");
-const commitId = z.string().trim().min(1);
 
 const commitsRecordSchema = z.object({
 	commits: z.array(
 		z.object({
-			sha: commitId,
+			sha: commitIdSchema,
 			message: z.string(),
 			author: optionalText,
 			authoredAt: optionalText,
 			committer: optionalText,
 			committedAt: optionalText,
-			parents: z.array(commitId),
+			parents: z.array(commitIdSchema),
 			files: z.array(changedFileSchema),
 		}),
 	),
 });
+
+export type ChangedFile = z.infer<typeof changedFileSchema>;
+export type ChangeCommit = z.infer<typeof commitsRecordSchema>["commits"][number] & {
+	line: number;
+};
 
 function parseJson(source: string): unknown {
 	try {
@@ -79,21 +59,7 @@ export async function readCapturedCommits(
 	}
 	const lines = record.text.split("\n");
 	return parsed.data.commits.map((commit) => ({
-		sha: commit.sha,
-		message: commit.message,
-		author: commit.author,
-		authoredAt: commit.authoredAt,
-		committer: commit.committer,
-		committedAt: commit.committedAt,
-		parents: commit.parents,
-		files: commit.files.map((file) => ({
-			status: file.status,
-			path: file.path,
-			...(file.oldPath === undefined ? {} : { oldPath: file.oldPath }),
-			...(file.additions !== undefined && file.deletions !== undefined
-				? { additions: file.additions, deletions: file.deletions }
-				: {}),
-		})),
+		...commit,
 		line: lines.findIndex((line) => line.includes(commit.sha)) + 1,
 	}));
 }

@@ -218,12 +218,7 @@ export const FilteredToNothing: Story = {
 	},
 };
 
-/**
- * `ACTIONABILITY` is the server's ordering, not one the browser applies: not met results
- * worst-first, then met results, then the results that judged nothing. The control's only
- * job is to put the choice in the search the route turns into a request — that the endpoint spells it
- * `sort` is pinned by `-lists-route.test.tsx`, which is the only place the wire name can be checked.
- */
+// The server owns actionability order; this control only changes the requested sort.
 export const SortByActionability: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ args, canvas, userEvent }) => {
@@ -254,10 +249,7 @@ export const SortByActionability: Story = {
 	},
 };
 
-/**
- * `FacetMultiSelect` collapses its value chips below `sm` into a bare count, so at this width the
- * applied values only reach the reader through a separate pill row.
- */
+// Narrow facet controls collapse labels to counts; applied-value pills must retain the selected names.
 export const MobileAppliedFilters: Story = {
 	parameters: {
 		chromatic: { viewports: [320] },
@@ -346,7 +338,7 @@ export const Loading: Story = {
 	},
 };
 
-/** Nothing has been reviewed yet, which is not the same as a filter that matched nothing. */
+// An empty review history needs different wording from filters that matched no results.
 export const NoResultsYet: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	args: { results: pool([]) },

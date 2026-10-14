@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 
-/** Resolves routing and in-flight spend only for an authenticated model call. */
 @Service
 @ConditionalOnWorkerRole
 class ProxyRoutingService {
@@ -152,7 +151,6 @@ class ProxyRoutingService {
         return spent;
     }
 
-    /** The slot named by {@code /internal/llm/practice-script/{slot}/...}, or {@code null} for no known slot. */
     static @Nullable ModelKind practiceScriptSlot(String path) {
         String rest = path.substring(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PATH.length());
         int end = rest.indexOf('/');

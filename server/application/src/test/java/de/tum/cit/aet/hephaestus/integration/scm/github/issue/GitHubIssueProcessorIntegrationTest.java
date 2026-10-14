@@ -819,11 +819,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(issueRepository.count()).isEqualTo(countAfterFirst);
         }
 
-        /**
-         * Assignees live in a join table the atomic upsert cannot touch, so a change to them is
-         * reported under one name for labels and assignees alike — which is what the review
-         * pipeline reads to decide that a triage action moved evidence a practice can see.
-         */
         @Test
         void shouldReportRelationshipsWhenAnIssueIsAssigned() {
             Long issueId = 888999111L;
@@ -849,12 +844,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                     .satisfies(event -> assertThat(event.changedFields()).contains("relationships"));
         }
 
-        /**
-         * Locking an issue and commenting on it move no field the issue evidence is built from. The
-         * mirror still reports them, and reporting them under their own names is what lets the
-         * review pipeline decline the occasion instead of spending a review on evidence that did
-         * not move.
-         */
         @Test
         void shouldNameOnlyTheFieldsThatMovedWhenAnIssueIsLockedAndCommentedOn() {
             Long issueId = 888999222L;
@@ -1289,11 +1278,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                     });
         }
 
-        /**
-         * A native type is one of the fields the issue evidence is built from, so typing an issue
-         * that already exists has to be reported as a moved field — that, not the IssueTyped event,
-         * is what occasions the review of the retyped issue.
-         */
         @Test
         void shouldReportIssueTypeWhenAnExistingIssueIsTyped() {
             Long issueId = 888999333L;

@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
@@ -27,7 +28,12 @@ import org.hibernate.annotations.DynamicUpdate;
 import org.jspecify.annotations.Nullable;
 
 @Entity
-@Table(name = "membership")
+@Table(
+        name = "membership",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_membership_workspace_account",
+                        columnNames = {"workspace_id", "account_id"}))
 @DynamicUpdate
 @Getter
 @Setter
@@ -106,6 +112,10 @@ public class Membership {
         /** Declaration order is descending privilege: OWNER, ADMIN, MEMBER. */
         public boolean isAtLeast(WorkspaceRole requiredRole) {
             return compareTo(requiredRole) <= 0;
+        }
+
+        public static WorkspaceRole highest(WorkspaceRole first, WorkspaceRole second) {
+            return first.compareTo(second) <= 0 ? first : second;
         }
 
         /** Unknown organization roles receive MEMBER access. */
