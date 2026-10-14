@@ -578,6 +578,31 @@ const TIMELINES = [
 	],
 ] as const;
 
+/** Confirms Hide on the person level in front, and waits for the confirmation to close. */
+async function confirmHide(user: ReturnType<typeof userEvent.setup>) {
+	await user.click(
+		await screen.findByRole("button", { name: "Hide from activity" }, ROUTE_RENDER_WAIT),
+	);
+	await user.click(
+		within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Hide" }),
+	);
+	await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+}
+
+/** Closes the person level in front and opens Ada from the people table, as an admin would. */
+async function openAdaInstead(
+	user: ReturnType<typeof userEvent.setup>,
+	router: ReturnType<typeof renderRouteAtWithRouter>["router"],
+) {
+	await user.keyboard("{Escape}");
+	await waitFor(() => expect(router.state.location.search.detail).toBeUndefined());
+	await user.click(
+		within(screen.getByRole("table", { name: "People" })).getByRole("link", { name: "Ada" }),
+	);
+	await screen.findByRole("dialog", { name: "Ada" }, ROUTE_RENDER_WAIT);
+	expect(router.state.location.search.detail).toBe("person:ada-lrz");
+}
+
 describe("Workspace activity", () => {
 	let reads: URL[] = [];
 	let automation: URL[] = [];
@@ -1144,10 +1169,290 @@ describe("Workspace activity", () => {
 		);
 		// The person has left the list, so the level over it closes.
 		await waitFor(() => expect(router.state.location.search.detail).toBeUndefined());
+		await screen.findByText("Bob is hidden from activity");
+		screen.getByText("In workspace acme.");
 		await user.click(await screen.findByRole("button", { name: "Undo" }));
 		await waitFor(() =>
 			expect(visibility.map((url) => url.search)).toStrictEqual(["?hidden=true", "?hidden=false"]),
 		);
+		await screen.findByText("Bob is shown in activity again");
+	});
+
+	it("keeps another person's drawer open when an earlier hide finishes", async () => {
+		role = "ADMIN";
+		const user = userEvent.setup();
+		const response = deferred<Response>();
+		let visiblePeople = people;
+		server.use(
+			http.get("*/workspaces/acme/activity/people", () => HttpResponse.json(visiblePeople)),
+			// The hide is held; its Undo shows Bob on the server again.
+			http.patch(
+				"*/workspaces/acme/activity/people/8/public-visibility",
+				async ({ request }) => {
+					visibility.push(new URL(request.url));
+					return response.promise;
+				},
+				{ once: true },
+			),
+			http.patch("*/workspaces/acme/activity/people/8/public-visibility", ({ request }) => {
+				visibility.push(new URL(request.url));
+				visiblePeople = people;
+				return new HttpResponse(null, { status: 204 });
+			}),
+		);
+		const { router, queryClient } = renderRouteAtWithRouter(
+			"/w/acme/workspace-activity?detail=person:bob",
+		);
+		try {
+			await user.click(
+				await screen.findByRole("button", { name: "Hide from activity" }, ROUTE_RENDER_WAIT),
+			);
+			await user.click(
+				within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Hide" }),
+			);
+			await waitFor(() =>
+				expect(visibility.map((url) => url.search)).toStrictEqual(["?hidden=true"]),
+			);
+			await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+			await user.keyboard("{Escape}");
+			await waitFor(() => expect(router.state.location.search.detail).toBeUndefined());
+			await user.click(
+				within(screen.getByRole("table", { name: "People" })).getByRole("link", { name: "Ada" }),
+			);
+			await screen.findByRole("dialog", { name: "Ada" }, ROUTE_RENDER_WAIT);
+			expect(router.state.location.search.detail).toBe("person:ada-lrz");
+			visiblePeople = { ...people, people: people.people.filter(({ person }) => person.id !== 8) };
+			await act(async () => {
+				response.resolve(new HttpResponse(null, { status: 204 }));
+			});
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			expect(router.state.location.search.detail).toBe("person:ada-lrz");
+			screen.getByRole("dialog", { name: "Ada" });
+			await screen.findByText("Bob is hidden from activity");
+			await user.click(screen.getByRole("button", { name: "Undo" }));
+			await waitFor(() =>
+				expect(visibility.map((url) => `${url.pathname}${url.search}`)).toStrictEqual([
+					"/workspaces/acme/activity/people/8/public-visibility?hidden=true",
+					"/workspaces/acme/activity/people/8/public-visibility?hidden=false",
+				]),
+			);
+			expect(router.state.location.search.detail).toBe("person:ada-lrz");
+			await screen.findByText("Bob is shown in activity again");
+			// Bob is listed again once Ada's level is closed.
+			await user.keyboard("{Escape}");
+			await waitFor(() => expect(router.state.location.search.detail).toBeUndefined());
+			await within(screen.getByRole("table", { name: "People" })).findByRole("link", {
+				name: "Bob",
+			});
+		} finally {
+			response.resolve(new HttpResponse(null, { status: 204 }));
+		}
+	});
+
+	it("says a failed hide was for its own person, and leaves the one opened since alone", async () => {
+		role = "ADMIN";
+		const user = userEvent.setup();
+		const response = deferred<Response>();
+		server.use(
+			http.patch("*/workspaces/acme/activity/people/8/public-visibility", async ({ request }) => {
+				visibility.push(new URL(request.url));
+				return response.promise;
+			}),
+		);
+		const { router, queryClient } = renderRouteAtWithRouter(
+			"/w/acme/workspace-activity?detail=person:bob",
+		);
+		try {
+			await confirmHide(user);
+			await openAdaInstead(user, router);
+			await act(async () => {
+				response.resolve(HttpResponse.json({ status: 500 }, { status: 500 }));
+			});
+			await screen.findByText("We could not hide Bob from activity");
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			expect(screen.queryByText("Bob is hidden from activity")).toBeNull();
+			expect(router.state.location.search.detail).toBe("person:ada-lrz");
+			screen.getByRole("dialog", { name: "Ada" });
+			expect(visibility.map((url) => url.search)).toStrictEqual(["?hidden=true"]);
+		} finally {
+			response.resolve(HttpResponse.json({ status: 500 }, { status: 500 }));
+		}
+	});
+
+	it("leaves the same person open in another workspace when a hide in the first finishes", async () => {
+		role = "ADMIN";
+		const user = userEvent.setup();
+		const response = deferred<Response>();
+		server.use(
+			http.get("*/workspaces", () =>
+				HttpResponse.json([workspaceListItem("acme"), workspaceListItem("beta", { id: 2 })]),
+			),
+			http.get("*/workspaces/beta", () => HttpResponse.json(workspaceListItem("beta", { id: 2 }))),
+			http.patch(
+				"*/workspaces/acme/activity/people/8/public-visibility",
+				async ({ request }) => {
+					visibility.push(new URL(request.url));
+					return response.promise;
+				},
+				{ once: true },
+			),
+		);
+		const { router, queryClient } = renderRouteAtWithRouter(
+			"/w/acme/workspace-activity?detail=person:bob",
+		);
+		try {
+			await confirmHide(user);
+			await act(async () => {
+				await router.navigate({
+					to: "/w/$workspaceSlug/workspace-activity",
+					params: { workspaceSlug: "beta" },
+					search: { detail: ["person:bob"] },
+				});
+			});
+			const level = await screen.findByRole("dialog", { name: "Bob" }, ROUTE_RENDER_WAIT);
+			// Beta's own Bob can be hidden while acme's request is out.
+			const betaHide = await within(level).findByRole("button", { name: "Hide from activity" });
+			expect(betaHide.getAttribute("aria-disabled")).not.toBe("true");
+
+			await act(async () => {
+				response.resolve(new HttpResponse(null, { status: 204 }));
+			});
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			await screen.findByText("Bob is hidden from activity");
+			screen.getByText("In workspace acme.");
+			expect(router.state.location.pathname).toBe("/w/beta/workspace-activity");
+			expect(router.state.location.search.detail).toBe("person:bob");
+			await user.click(screen.getByRole("button", { name: "Undo" }));
+			await waitFor(() =>
+				expect(visibility.map((url) => `${url.pathname}${url.search}`)).toStrictEqual([
+					"/workspaces/acme/activity/people/8/public-visibility?hidden=true",
+					"/workspaces/acme/activity/people/8/public-visibility?hidden=false",
+				]),
+			);
+			expect(router.state.location.search.detail).toBe("person:bob");
+		} finally {
+			response.resolve(new HttpResponse(null, { status: 204 }));
+		}
+	});
+
+	it("preserves the destination person while a workspace navigation is waiting for membership", async () => {
+		role = "ADMIN";
+		const user = userEvent.setup();
+		const response = deferred<Response>();
+		const membership = deferred<Response>();
+		let membershipRequested = false;
+		server.use(
+			http.get("*/workspaces", () =>
+				HttpResponse.json([workspaceListItem("acme"), workspaceListItem("beta", { id: 2 })]),
+			),
+			http.get("*/workspaces/beta", () => HttpResponse.json(workspaceListItem("beta", { id: 2 }))),
+			http.get("*/workspaces/beta/members/me", async () => {
+				membershipRequested = true;
+				return membership.promise;
+			}),
+			http.patch("*/workspaces/acme/activity/people/8/public-visibility", async ({ request }) => {
+				visibility.push(new URL(request.url));
+				return response.promise;
+			}),
+		);
+		const { router, queryClient } = renderRouteAtWithRouter(
+			"/w/acme/workspace-activity?detail=person:bob",
+		);
+		let navigation: ReturnType<typeof router.navigate> | undefined;
+		try {
+			await confirmHide(user);
+			await act(async () => {
+				navigation = router.navigate({
+					to: "/w/$workspaceSlug/workspace-activity",
+					params: { workspaceSlug: "beta" },
+					search: { detail: ["person:bob"] },
+				});
+			});
+			await waitFor(() => expect(membershipRequested).toBe(true));
+			expect(router.state.location.pathname).toBe("/w/beta/workspace-activity");
+			expect(router.state.location.search.detail).toBe("person:bob");
+			await act(async () => {
+				response.resolve(new HttpResponse(null, { status: 204 }));
+			});
+			await screen.findByText("Bob is hidden from activity");
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			expect(router.state.location.pathname).toBe("/w/beta/workspace-activity");
+			expect(router.state.location.search.detail).toBe("person:bob");
+			await act(async () => {
+				membership.resolve(
+					HttpResponse.json({ role: "ADMIN", userId: 7, userLogin: "ada-lrz", userName: "Ada" }),
+				);
+				await navigation;
+			});
+			await screen.findByRole("dialog", { name: "Bob" }, ROUTE_RENDER_WAIT);
+			expect(router.state.location.search.detail).toBe("person:bob");
+		} finally {
+			await act(async () => {
+				response.resolve(new HttpResponse(null, { status: 204 }));
+				membership.resolve(
+					HttpResponse.json({ role: "ADMIN", userId: 7, userLogin: "ada-lrz", userName: "Ada" }),
+				);
+				await navigation;
+			});
+		}
+	});
+
+	it("decides whom a hide closes only once the people are read again", async () => {
+		role = "ADMIN";
+		const user = userEvent.setup();
+		const reread = deferred<Response>();
+		const { router, queryClient } = renderRouteAtWithRouter(
+			"/w/acme/workspace-activity?detail=person:bob",
+		);
+		await screen.findByRole("button", { name: "Hide from activity" }, ROUTE_RENDER_WAIT);
+		// The hide answers at once; the reads after it are held while the admin moves to Ada.
+		server.use(http.get("*/workspaces/acme/activity/people", async () => reread.promise));
+		try {
+			await confirmHide(user);
+			await waitFor(() =>
+				expect(visibility.map((url) => url.search)).toStrictEqual(["?hidden=true"]),
+			);
+			await openAdaInstead(user, router);
+			await act(async () => {
+				reread.resolve(HttpResponse.json(people));
+			});
+			await screen.findByText("Bob is hidden from activity");
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			expect(router.state.location.search.detail).toBe("person:ada-lrz");
+			screen.getByRole("dialog", { name: "Ada" });
+		} finally {
+			reread.resolve(HttpResponse.json(people));
+		}
+	});
+
+	it("closes a category opened over the hidden person together with the person", async () => {
+		role = "ADMIN";
+		const user = userEvent.setup();
+		const response = deferred<Response>();
+		server.use(
+			http.patch("*/workspaces/acme/activity/people/8/public-visibility", async ({ request }) => {
+				visibility.push(new URL(request.url));
+				return response.promise;
+			}),
+		);
+		const { router } = renderRouteAtWithRouter("/w/acme/workspace-activity?detail=person:bob");
+		try {
+			await confirmHide(user);
+			await act(async () => {
+				await router.navigate({
+					to: "/w/$workspaceSlug/workspace-activity",
+					params: { workspaceSlug: "acme" },
+					search: { detail: ["person:bob", "activity:reviews"] },
+				});
+			});
+			await screen.findByRole("dialog", { name: "Reviews" }, ROUTE_RENDER_WAIT);
+			await act(async () => {
+				response.resolve(new HttpResponse(null, { status: 204 }));
+			});
+			await waitFor(() => expect(router.state.location.search.detail).toBeUndefined());
+		} finally {
+			response.resolve(new HttpResponse(null, { status: 204 }));
+		}
 	});
 
 	it("leaves a member to be hidden under Members, not from their activity page", async () => {
