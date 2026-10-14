@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { WorkspaceLlmModel } from "@/api/types.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DATA_HANDLING_DEFS } from "@/components/practice-vocabulary/data-handling-defs";
 import { expectSettledVisible } from "@/stories/overlay";
 import { expectDialogFitsViewport } from "@/stories/reflow";
@@ -123,6 +124,48 @@ export const EditLegacyUndeclared: Story = {
 		await expectSettledVisible(within(dialog).getByText("Not declared"));
 		await userEvent.click(within(dialog).getByRole("button", { name: /save changes/iu }));
 		await expect(args.onUpdate).toHaveBeenCalledOnce();
+	},
+};
+
+/** The models failed to refresh while the form was open: the warning is in the form, and the draft stays editable. */
+export const RefreshFailed: Story = {
+	args: {
+		editing: mockModel,
+		notice: (
+			<QueryErrorAlert
+				error={{ status: 503 }}
+				title="We could not refresh your AI providers"
+				onRetry={fn()}
+			/>
+		),
+	},
+	play: async () => {
+		const dialog = await screen.findByRole("dialog");
+		await expectSettledVisible(within(dialog).getByText("We could not refresh your AI providers"));
+		await expect(within(dialog).getByRole("button", { name: "Retry" })).toBeEnabled();
+		const name = within(dialog).getByLabelText("Display name");
+		await userEvent.clear(name);
+		await userEvent.type(name, "GPT-5 mini draft");
+		await expect(name).toHaveValue("GPT-5 mini draft");
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: {
+		editing: mockModel,
+		notice: (
+			<QueryErrorAlert
+				error={{ status: 503 }}
+				title="We could not refresh your AI providers"
+				pending
+				onRetry={fn()}
+			/>
+		),
+	},
+	play: async () => {
+		const dialog = await screen.findByRole("dialog");
+		await expect(within(dialog).getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		await expect(within(dialog).getByLabelText("Display name")).toBeEnabled();
 	},
 };
 

@@ -25,7 +25,7 @@ import type {
 	WorkspaceLlmModel,
 } from "@/api/types.gen";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { QueryErrorAlert, queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,9 +37,10 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { filedUnder, pathNumber, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 import { WorkspaceLlmConnectionFormDialog } from "./WorkspaceLlmConnectionFormDialog";
 import { WorkspaceLlmModelFormDialog } from "./WorkspaceLlmModelFormDialog";
@@ -86,15 +87,50 @@ export function WorkspaceLlmProviderPanel({
 	const [deletingConnection, setDeletingConnection] = useState<WorkspaceLlmConnection | null>(null);
 	const registrationBlocked = !ownProviderAllowed || registrationDisabled;
 
-	const connectionsQuery = useQuery(
-		workspaceListLlmConnectionsOptions({ path: { workspaceSlug } }),
+	const connectionsOptions = workspaceListLlmConnectionsOptions({ path: { workspaceSlug } });
+	const connectionsQuery = useQuery(connectionsOptions);
+	useQueryReadRefusal(
+		connectionsOptions.queryKey,
+		connectionsQuery.isError,
+		connectionsQuery.error,
 	);
 	const connections = connectionsQuery.data ?? [];
-	const modelsQuery = useQuery({
-		...workspaceListLlmModelsOptions({ path: { workspaceSlug } }),
-		enabled: connections.length > 0,
-	});
+	const modelsOptions = workspaceListLlmModelsOptions({ path: { workspaceSlug } });
+	const modelsQuery = useQuery({ ...modelsOptions, enabled: connections.length > 0 });
+	useQueryReadRefusal(modelsOptions.queryKey, modelsQuery.isError, modelsQuery.error);
 	const models = modelsQuery.data ?? [];
+
+	// The models are read only once there is a provider to own them.
+	const requiredReads =
+		connections.length > 0 ? [connectionsQuery, modelsQuery] : [connectionsQuery];
+	const failedReads = requiredReads.filter((read) => read.isError);
+	const loaded =
+		connectionsQuery.data !== undefined &&
+		(connections.length === 0 || modelsQuery.data !== undefined);
+	// A refusal hides the panel even over cached data, and wins over a failure a retry could clear.
+	// Any other failure leaves loaded providers, and an open form's draft, on screen.
+	const blockingFailure =
+		failedReads.find((read) => !queryErrorIsRetryable(read.error)) ??
+		(loaded ? undefined : failedReads[0]);
+	const retryPending = failedReads.some((read) => read.isFetching);
+	const retryFailedReads = () => {
+		for (const read of failedReads) {
+			void read.refetch();
+		}
+	};
+
+	// A refused read closes what was opened on what it refused, so a later read cannot reopen it.
+	const refusal = blockingFailure !== undefined && !queryErrorIsRetryable(blockingFailure.error);
+	const [closedForRefusal, setClosedForRefusal] = useState<unknown>(undefined);
+	if (refusal && closedForRefusal !== blockingFailure.error) {
+		setClosedForRefusal(blockingFailure.error);
+		setConnectionDialogOpen(false);
+		setEditingConnection(null);
+		setModelDialogOpen(false);
+		setEditingModel(null);
+		setModelConnectionId(null);
+		setDeletingConnection(null);
+	}
 
 	const invalidateConnections = async () =>
 		queryClient.invalidateQueries({
@@ -207,41 +243,22 @@ export function WorkspaceLlmProviderPanel({
 		pathNumber(variables, "id"),
 	);
 
-	if (connectionsQuery.isError) {
+	if (blockingFailure !== undefined) {
 		return (
 			<QueryErrorAlert
-				error={connectionsQuery.error}
-				title="We could not load your AI providers"
-				onRetry={() => {
-					void connectionsQuery.refetch();
-				}}
+				error={blockingFailure.error}
+				title={
+					blockingFailure === connectionsQuery
+						? "We could not load your AI providers"
+						: "We could not load your provider models"
+				}
+				pending={retryPending}
+				onRetry={retryFailedReads}
 			/>
 		);
 	}
-	if (connectionsQuery.isLoading) {
-		return (
-			<div className="flex h-32 items-center justify-center">
-				<Spinner className="size-6" />
-			</div>
-		);
-	}
-	if (connections.length > 0 && modelsQuery.isError) {
-		return (
-			<QueryErrorAlert
-				error={modelsQuery.error}
-				title="We could not load your provider models"
-				onRetry={() => {
-					void modelsQuery.refetch();
-				}}
-			/>
-		);
-	}
-	if (connections.length > 0 && modelsQuery.isLoading) {
-		return (
-			<div className="flex h-32 items-center justify-center">
-				<Spinner className="size-6" />
-			</div>
-		);
+	if (!loaded) {
+		return <ProviderPanelSkeleton />;
 	}
 
 	const openCreateConnection = () => {
@@ -249,8 +266,21 @@ export function WorkspaceLlmProviderPanel({
 		setConnectionDialogOpen(true);
 	};
 
+	const refreshAlert =
+		failedReads.length > 0 ? (
+			<QueryErrorAlert
+				error={failedReads[0]?.error}
+				title="We could not refresh your AI providers"
+				pending={retryPending}
+				onRetry={retryFailedReads}
+			/>
+		) : undefined;
+	// An open form is modal, so the warning goes inside it rather than on the page behind.
+	const formOpen = connectionDialogOpen || modelDialogOpen;
+
 	return (
 		<div className="space-y-4">
+			{!formOpen && refreshAlert}
 			{registrationBlocked && (
 				<Alert>
 					<CircleAlert aria-hidden />
@@ -423,6 +453,7 @@ export function WorkspaceLlmProviderPanel({
 				open={connectionDialogOpen}
 				onOpenChange={setConnectionDialogOpen}
 				editing={editingConnection}
+				notice={refreshAlert}
 				isSubmitting={createConnection.isPending || updateConnection.isPending}
 				onCreate={(body: CreateWorkspaceLlmConnectionRequest) =>
 					createConnection.mutate({ path: { workspaceSlug }, body })
@@ -435,6 +466,7 @@ export function WorkspaceLlmProviderPanel({
 				open={modelDialogOpen}
 				onOpenChange={setModelDialogOpen}
 				editing={editingModel}
+				notice={refreshAlert}
 				isSubmitting={createModel.isPending || updateModel.isPending}
 				onCreate={(body: CreateWorkspaceLlmModelRequest) => {
 					if (modelConnectionId == null) {
@@ -457,6 +489,22 @@ export function WorkspaceLlmProviderPanel({
 					deleteConnection.mutate({ path: { workspaceSlug, id: connection.id } })
 				}
 			/>
+		</div>
+	);
+}
+
+/** The heading and one provider card with its models, in the shape they will land in. */
+function ProviderPanelSkeleton() {
+	return (
+		<div className="space-y-4" aria-busy="true">
+			<span className="sr-only">Loading your AI providers…</span>
+			<Skeleton className="h-7 w-48 max-w-full" />
+			<div className="space-y-3 rounded-xl border p-4">
+				<Skeleton className="h-5 w-40 max-w-full" />
+				<Skeleton className="h-4 w-56 max-w-full" />
+				<Skeleton className="h-8 w-64 max-w-full" />
+				<Skeleton className="h-24 w-full" />
+			</div>
 		</div>
 	);
 }

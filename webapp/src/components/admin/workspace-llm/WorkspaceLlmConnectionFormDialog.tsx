@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 
 import type {
 	CreateWorkspaceLlmConnectionRequest,
@@ -34,6 +34,8 @@ export interface WorkspaceLlmConnectionFormDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	editing: WorkspaceLlmConnection | null;
+	/** Shown above the fields, such as a failed refresh of the providers the form edits. */
+	notice?: ReactNode;
 	isSubmitting: boolean;
 	onCreate: (body: CreateWorkspaceLlmConnectionRequest) => void;
 	onUpdate: (id: number, body: UpdateWorkspaceLlmConnectionRequest) => void;
@@ -65,6 +67,7 @@ type WorkspaceLlmConnectionFormDialogContentProps = Omit<
 
 function WorkspaceLlmConnectionFormDialogContent({
 	editing,
+	notice,
 	isSubmitting,
 	onCreate,
 	onUpdate,
@@ -128,6 +131,7 @@ function WorkspaceLlmConnectionFormDialogContent({
 
 				{/* This form outgrows a 320 px viewport, so the body scrolls and the submit stays on screen. */}
 				<DialogBody className="space-y-4 py-1">
+					{notice}
 					<LlmConnectionFields
 						value={fields}
 						onChange={setFields}

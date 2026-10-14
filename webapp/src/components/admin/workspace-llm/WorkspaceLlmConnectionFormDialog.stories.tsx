@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn, screen, userEvent } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { WorkspaceLlmConnection } from "@/api/types.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { expectSettledVisible } from "@/stories/overlay";
 import { expectDialogFitsViewport } from "@/stories/reflow";
 
@@ -45,6 +46,48 @@ export const Edit: Story = {
 
 export const Submitting: Story = {
 	args: { isSubmitting: true },
+};
+
+/** The providers failed to refresh while the form was open: the warning is in the form, and the draft stays editable. */
+export const RefreshFailed: Story = {
+	args: {
+		editing: mockConnection,
+		notice: (
+			<QueryErrorAlert
+				error={{ status: 503 }}
+				title="We could not refresh your AI providers"
+				onRetry={fn()}
+			/>
+		),
+	},
+	play: async () => {
+		const dialog = await screen.findByRole("dialog");
+		await expectSettledVisible(within(dialog).getByText("We could not refresh your AI providers"));
+		await expect(within(dialog).getByRole("button", { name: "Retry" })).toBeEnabled();
+		const name = within(dialog).getByLabelText("Display name");
+		await userEvent.clear(name);
+		await userEvent.type(name, "My OpenAI draft");
+		await expect(name).toHaveValue("My OpenAI draft");
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: {
+		editing: mockConnection,
+		notice: (
+			<QueryErrorAlert
+				error={{ status: 503 }}
+				title="We could not refresh your AI providers"
+				pending
+				onRetry={fn()}
+			/>
+		),
+	},
+	play: async () => {
+		const dialog = await screen.findByRole("dialog");
+		await expect(within(dialog).getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		await expect(within(dialog).getByLabelText("Display name")).toBeEnabled();
+	},
 };
 
 /** WCAG 2.2 SC 1.4.10 at 320 px: a `fixed` popup that outgrows the viewport hangs off both ends. */
