@@ -137,8 +137,9 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a turn that reported its own usage is billed from that report, not from the proxy meter")
-    void theRunnerReportWinsWhenThereIsOne() {
+    @DisplayName("a turn with no billable proxy usage is billed from its runner report")
+    void shouldBillTheRunnerReportWhenTheProxyHasNoBillableUsage() {
+        proxyRecorded(MentorTurnLlmUsage.NONE);
         TranslatorState state = startedTurnWithNoRunnerReport();
         ObjectNode reported = NODES.objectNode();
         reported.put("input", 11).put("output", 22);
@@ -149,10 +150,10 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                 ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
         verify(usageRecorder).record(eq(WORKSPACE_ID), sample.capture());
+        verify(usageRecorder, never()).recordUnverifiable(any(), any());
         assertThat(sample.getValue().inputTokens()).isEqualTo(11);
         assertThat(sample.getValue().outputTokens()).isEqualTo(22);
-        // Not even consulted: summing the two views of the same calls would double-bill them.
-        verify(chatMessageRepository, never()).findLlmUsageById(any());
+        assertThat(sample.getValue().totalCalls()).isEqualTo(1);
     }
 
     static Stream<Arguments> nothingToBillFrom() {
