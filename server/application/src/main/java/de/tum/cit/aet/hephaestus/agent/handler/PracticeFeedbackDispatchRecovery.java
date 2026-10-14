@@ -41,6 +41,27 @@ class PracticeFeedbackDispatchRecovery {
     @Scheduled(fixedDelayString = "PT30S", initialDelayString = "PT30S")
     @SchedulerLock(name = "practice-feedback-dispatch-recovery", lockAtMostFor = "PT15M", lockAtLeastFor = "PT5S")
     void recover() {
+        for (var receipt :
+                dispatchRepository.findProjectedAutomaticPackagesNeedingReconciliation(PageRequest.of(0, BATCH_SIZE))) {
+            try {
+                var job = agentJobRepository
+                        .findByIdAndWorkspaceId(receipt.getAgentJobId(), receipt.getWorkspaceId())
+                        .orElse(null);
+                if (job == null || !FeedbackDeliveryService.canReconcileProjectedReceipt(job)) continue;
+                int retryCount = job.getRetryCount();
+                short deliveryAttempts = job.getDeliveryAttempts();
+                // Commit the lane request before taking the repair's job lock; listeners update that same row.
+                feedbackLedgerRecorder.requestPreparation(job);
+                feedbackDeliveryService.reconcileProjectedAutomaticPackage(
+                        receipt.getAgentJobId(),
+                        receipt.getWorkspaceId(),
+                        receipt.getId(),
+                        retryCount,
+                        deliveryAttempts);
+            } catch (RuntimeException exception) {
+                log.warn("Projected public receipt reconciliation deferred: dispatchId={}", receipt.getId(), exception);
+            }
+        }
         for (var terminal : dispatchRepository.findUnprojectedTerminal(Instant.now(), PageRequest.of(0, BATCH_SIZE))) {
             try {
                 var job = agentJobRepository

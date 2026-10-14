@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -14,6 +15,8 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.job.DeliveryStatus;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -24,6 +27,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -76,6 +80,36 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
             projection.run();
             return true;
         });
+    }
+
+    @Test
+    void shouldLeaveProjectedReceiptUnsettledWhenItsPreparationRequestFails() {
+        var current = new AgentJob();
+        current.setId(UUID.randomUUID());
+        var workspace = new Workspace();
+        workspace.setId(1L);
+        current.setWorkspace(workspace);
+        current.setStatus(AgentJobStatus.COMPLETED);
+        current.setDeliveryStatus(DeliveryStatus.PENDING);
+        var mapper = new JsonMapper();
+        current.setMetadata(mapper.createObjectNode().put(ObservationAdmissionService.DIGEST_METADATA_KEY, "digest"));
+        var output = mapper.createObjectNode();
+        output.putObject("feedback").put("admissionDigest", "digest").putArray("compositionFailures");
+        current.setOutput(output);
+        FeedbackDispatch receipt = mock(FeedbackDispatch.class);
+        when(receipt.getAgentJobId()).thenReturn(current.getId());
+        when(receipt.getWorkspaceId()).thenReturn(1L);
+        when(dispatches.findProjectedAutomaticPackagesNeedingReconciliation(any()))
+                .thenReturn(List.of(receipt));
+        when(jobs.findByIdAndWorkspaceId(current.getId(), 1L)).thenReturn(Optional.of(current));
+        doThrow(new IllegalStateException("preparation request unavailable"))
+                .when(ledgerRecorder)
+                .requestPreparation(current);
+
+        recovery.recover();
+
+        verify(ledgerRecorder).requestPreparation(current);
+        verifyNoMoreInteractions(feedbackDeliveryService);
     }
 
     @Test

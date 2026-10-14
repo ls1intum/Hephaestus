@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
@@ -10,6 +11,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -100,6 +102,23 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
                 eventPublisher,
                 egressGuard,
                 commentFormatter);
+    }
+
+    @Test
+    void shouldPropagateARequestedPreparationPublicationFailure() {
+        var failure = new IllegalStateException("executor unavailable");
+        doThrow(failure).when(eventPublisher).publishEvent(any(PracticeFeedbackPreparationRequestedEvent.class));
+
+        assertThatThrownBy(() -> recorder().requestPreparation(job())).isSameAs(failure);
+    }
+
+    @Test
+    void shouldKeepExistingLedgerPreparationBestEffortWhenPublicationFails() {
+        doThrow(new IllegalStateException("executor unavailable"))
+                .when(eventPublisher)
+                .publishEvent(any(PracticeFeedbackPreparationRequestedEvent.class));
+
+        assertThatCode(() -> recorder().recordNothingToPost(job(), null)).doesNotThrowAnyException();
     }
 
     @Test
