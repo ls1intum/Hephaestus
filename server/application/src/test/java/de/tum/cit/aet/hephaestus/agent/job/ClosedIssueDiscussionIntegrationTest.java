@@ -239,7 +239,7 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
         issue.setUpdatedAt(closedAt);
         issueId = issues.save(issue).getId();
 
-        when(fixture.resolver().resolveAllForRepository("org/project")).thenReturn(List.of(workspace));
+        when(fixture.resolver().resolveAllForRepositoryId(repository.getId())).thenReturn(List.of(workspace));
         when(fixture.gate().evaluateIssue(any(Issue.class), any(Workspace.class), any(SignalName.class), any()))
                 .thenReturn(new GateDecision.Skip("not under test"));
         transactions.executeWithoutResult(status -> events.publishEvent(new ScmDomainEvent.IssueClosed(
