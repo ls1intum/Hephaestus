@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceDataSyncTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
@@ -41,11 +42,9 @@ import org.springframework.stereotype.Component;
  * to ACTIVE). A {@link SyncJobConflictException} (already an active job on this connection) skips
  * the run rather than racing it.
  *
- * <p>The cancellable two-arg overload is reused as-is by {@code GitLabIntegrationSyncRunner} — it
- * deliberately does NOT wrap itself in another {@code SyncJobService} job: the runner is invoked
- * from inside a job the caller (the manual-trigger endpoint) already created, and a second nested
- * {@code beginJob} for the same connection would immediately collide with the one-active-job
- * guard the outer call holds.
+ * <p>The tracked lifecycle body reports returned incomplete outcomes as warnings. The cancellable
+ * two-argument entry point returns the same outcome without creating a job. Manual synchronization
+ * uses the warning-aware scheduler through {@code GitLabIntegrationSyncRunner}.
  */
 @Component
 @ConditionalOnBean(GitLabWorkspaceInitializationService.class)
@@ -93,13 +92,18 @@ public class GitLabWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
                             SyncJobType.INITIAL,
                             SyncJobTrigger.LIFECYCLE,
                             null),
-                    handle -> syncAllRepositoriesBody(workspaceId, () -> {
-                        if (handle.isCancellationRequested()) {
-                            handle.reportCancelled();
-                            return true;
+                    handle -> {
+                        SyncResult result = syncAllRepositoriesBody(workspaceId, () -> {
+                            if (handle.isCancellationRequested()) {
+                                handle.reportCancelled();
+                                return true;
+                            }
+                            return false;
+                        });
+                        if (result.status() != SyncResult.Status.COMPLETED) {
+                            handle.reportWarnings();
                         }
-                        return false;
-                    }));
+                    });
         } catch (SyncJobConflictException e) {
             log.info(
                     "Skipped GitLab lifecycle sync, already an active sync job: workspaceId={}, connectionId={}",
@@ -109,22 +113,22 @@ public class GitLabWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
     }
 
     /**
-     * Cooperatively cancellable variant used by {@code GitLabIntegrationSyncRunner} so a
-     * {@code SyncJob} cancel request can stop the pass between repositories. Does NOT record its own
-     * job — see class doc.
+     * Runs initialization and full data sync with the supplied cancellation checkpoint, without recording a job.
+     *
+     * @return combined outcome; counts are internal accounting across phases
      */
-    public void syncAllRepositories(long workspaceId, BooleanSupplier cancelled) {
-        syncAllRepositoriesBody(workspaceId, cancelled);
+    public SyncResult syncAllRepositories(long workspaceId, BooleanSupplier cancelled) {
+        return syncAllRepositoriesBody(workspaceId, cancelled);
     }
 
-    private void syncAllRepositoriesBody(long workspaceId, BooleanSupplier cancelled) {
+    private SyncResult syncAllRepositoriesBody(long workspaceId, BooleanSupplier cancelled) {
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
         if (workspace == null) {
             log.warn("Skipped GitLab data sync: reason=workspaceNotFound, workspaceId={}", workspaceId);
-            return;
+            return SyncResult.abortedError(0);
         }
-        gitLabInitService.initialize(workspace);
-        gitLabInitService.syncFullData(workspace, cancelled);
+        return SyncResult.merge(
+                gitLabInitService.initialize(workspace), gitLabInitService.syncFullData(workspace, cancelled));
     }
 
     @Override
