@@ -1,15 +1,21 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnumerator;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
@@ -21,14 +27,23 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.StubInstallationRepositoryEnumerator;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.adapter.WorkspaceSyncTargetProvider;
+import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
+import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
+import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryProviderNotConnectedException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
 
@@ -60,6 +75,15 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private WorkspaceSyncTargetProvider workspaceSyncTargetProvider;
+
+    @Autowired
+    private ConnectionService connectionService;
+
+    @Autowired
+    private ScmWorkspaceContentEraser scmWorkspaceContentEraser;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private static final String SHARED_NAME = "shared-org/shared-repo";
     private static final String GITLAB_SERVER_URL = "https://gitlab.example.com";
@@ -179,6 +203,197 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
                 .get()
                 .extracting(RepositoryToMonitor::getNativeId)
                 .isEqualTo(9001L);
+    }
+
+    @Test
+    void shouldRefusePatMonitorCreationWhenDisconnectCommitsWhileItWaits() throws Exception {
+        Workspace workspace = persistGitHubTokenWorkspace();
+        persistRepository(IdentityProviderType.GITHUB, "https://github.com", 9001L);
+        Workspace other = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("ws-other-pat"));
+        repositoryToMonitorRepository.saveAndFlush(buildMonitor(other, SHARED_NAME));
+        Connection connection = connectionRepository
+                .findActive(workspace.getId(), IntegrationKind.GITHUB)
+                .orElseThrow();
+        CountDownLatch erased = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var threads = Executors.newFixedThreadPool(2)) {
+            var disconnect = threads.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+                disconnect(connection);
+                erased.countDown();
+                awaitRelease(release);
+            }));
+            try {
+                assertThat(erased.await(20, SECONDS)).isTrue();
+                var creator = threads.submit(() -> workspaceRepositoryMonitorService.addRepositoryToMonitor(
+                        workspace.getWorkspaceSlug(), SHARED_NAME));
+                assertThatThrownBy(() -> creator.get(1, SECONDS)).isInstanceOf(TimeoutException.class);
+                release.countDown();
+                disconnect.get(20, SECONDS);
+                assertThatThrownBy(() -> creator.get(20, SECONDS))
+                        .isInstanceOf(ExecutionException.class)
+                        .hasCauseInstanceOf(RepositoryProviderNotConnectedException.class);
+            } finally {
+                release.countDown();
+            }
+        }
+        assertThat(connectionRepository
+                        .findById(connection.getId())
+                        .orElseThrow()
+                        .getState())
+                .isEqualTo(IntegrationState.UNINSTALLED);
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(other.getId(), SHARED_NAME))
+                .isPresent();
+        assertThat(repositoryRepository.findByNameWithOwner(SHARED_NAME)).isPresent();
+    }
+
+    @Test
+    void shouldErasePatMonitorWhenCreationCommitsBeforeDisconnect() throws Exception {
+        Workspace workspace = persistGitHubTokenWorkspace();
+        persistRepository(IdentityProviderType.GITHUB, "https://github.com", 9001L);
+        Connection connection = connectionRepository
+                .findActive(workspace.getId(), IntegrationKind.GITHUB)
+                .orElseThrow();
+        CountDownLatch created = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var threads = Executors.newFixedThreadPool(2)) {
+            var creator = threads.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+                workspaceRepositoryMonitorService.addRepositoryToMonitor(workspace.getWorkspaceSlug(), SHARED_NAME);
+                created.countDown();
+                awaitRelease(release);
+            }));
+            try {
+                assertThat(created.await(20, SECONDS)).isTrue();
+                var disconnect = threads.submit(() -> disconnect(connection));
+                assertThatThrownBy(() -> disconnect.get(1, SECONDS)).isInstanceOf(TimeoutException.class);
+                release.countDown();
+                creator.get(20, SECONDS);
+                disconnect.get(20, SECONDS);
+            } finally {
+                release.countDown();
+            }
+        }
+        assertThat(connectionRepository
+                        .findById(connection.getId())
+                        .orElseThrow()
+                        .getState())
+                .isEqualTo(IntegrationState.UNINSTALLED);
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .isEmpty();
+        assertThat(repositoryRepository.findByNameWithOwner(SHARED_NAME)).isEmpty();
+    }
+
+    @Test
+    void shouldRefuseManualCreationWhenPatConnectionBecomesAnAppWhileItWaits() throws Exception {
+        Workspace workspace = persistGitHubTokenWorkspace();
+        persistRepository(IdentityProviderType.GITHUB, "https://github.com", 9001L);
+        Connection connection = connectionRepository
+                .findActive(workspace.getId(), IntegrationKind.GITHUB)
+                .orElseThrow();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var threads = Executors.newFixedThreadPool(2)) {
+            var update = threads.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+                connectionRepository.acquireLifecycleLock(connection.getId(), workspace.getId());
+                Connection current =
+                        connectionRepository.findById(connection.getId()).orElseThrow();
+                current.setConfig(new ConnectionConfig.GitHubAppConfig(
+                        INSTALLATION_ID, workspace.getAccountLogin(), null, Set.of()));
+                connectionRepository.saveAndFlush(current);
+                locked.countDown();
+                awaitRelease(release);
+            }));
+            try {
+                assertThat(locked.await(20, SECONDS)).isTrue();
+                var creator = threads.submit(() -> workspaceRepositoryMonitorService.addRepositoryToMonitor(
+                        workspace.getWorkspaceSlug(), SHARED_NAME));
+                assertThatThrownBy(() -> creator.get(1, SECONDS)).isInstanceOf(TimeoutException.class);
+                release.countDown();
+                update.get(20, SECONDS);
+                assertThatThrownBy(() -> creator.get(20, SECONDS))
+                        .isInstanceOf(ExecutionException.class)
+                        .hasCauseInstanceOf(RepositoryManagementNotAllowedException.class);
+            } finally {
+                release.countDown();
+            }
+        }
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldCreateOnePatMonitorWhenConcurrentCreatorsWaitOnTheLifecycleLock() throws Exception {
+        Workspace workspace = persistGitHubTokenWorkspace();
+        persistRepository(IdentityProviderType.GITHUB, "https://github.com", 9001L);
+        Connection connection = connectionRepository
+                .findActive(workspace.getId(), IntegrationKind.GITHUB)
+                .orElseThrow();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var threads = Executors.newFixedThreadPool(3)) {
+            var holder = threads.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+                connectionRepository.acquireLifecycleLock(connection.getId(), workspace.getId());
+                locked.countDown();
+                awaitRelease(release);
+            }));
+            try {
+                assertThat(locked.await(20, SECONDS)).isTrue();
+                var first = threads.submit(() -> addPatMonitor(workspace));
+                var second = threads.submit(() -> addPatMonitor(workspace));
+                assertThatThrownBy(() -> first.get(1, SECONDS)).isInstanceOf(TimeoutException.class);
+                release.countDown();
+                holder.get(20, SECONDS);
+                assertThat(List.of(first.get(20, SECONDS), second.get(20, SECONDS)))
+                        .containsExactlyInAnyOrder(true, false);
+            } finally {
+                release.countDown();
+            }
+        }
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .singleElement()
+                .satisfies(monitor -> assertThat(monitor.getNativeId()).isEqualTo(9001L));
+    }
+
+    private boolean addPatMonitor(Workspace workspace) {
+        try {
+            workspaceRepositoryMonitorService.addRepositoryToMonitor(workspace.getWorkspaceSlug(), SHARED_NAME);
+            return true;
+        } catch (RepositoryAlreadyMonitoredException e) {
+            return false;
+        }
+    }
+
+    private void disconnect(Connection connection) {
+        ConnectionStrategy strategy = mock(ConnectionStrategy.class);
+        doAnswer(invocation -> {
+                    scmWorkspaceContentEraser.eraseWorkspaceScmMirror(
+                            connection.getWorkspace().getId());
+                    return null;
+                })
+                .when(strategy)
+                .eraseLocalData(any());
+        connectionService.disconnect(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.UNINSTALLED,
+                        "DISCONNECT",
+                        "SYSTEM",
+                        "test",
+                        UUID.randomUUID().toString(),
+                        null),
+                strategy);
+    }
+
+    private static void awaitRelease(CountDownLatch release) {
+        try {
+            if (!release.await(20, SECONDS)) {
+                throw new IllegalStateException("Lifecycle transaction was not released");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Lifecycle transaction interrupted", e);
+        }
     }
 
     private Workspace persistGitHubTokenWorkspace() {
