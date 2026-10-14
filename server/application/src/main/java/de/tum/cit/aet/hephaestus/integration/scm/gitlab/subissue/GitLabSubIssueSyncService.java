@@ -99,6 +99,7 @@ public class GitLabSubIssueSyncService {
 
         // Track which issues have a parent according to GitLab
         Set<Long> issuesWithParentInGitLab = new HashSet<>();
+        Set<Long> unknownHierarchyIssueIds = new HashSet<>();
         int totalLinked = 0;
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
@@ -141,7 +142,8 @@ public class GitLabSubIssueSyncService {
                         (List<?>) response.field("project.workItems.nodes").toEntityList(Map.class);
 
                 for (Map<String, Object> node : nodes) {
-                    int linked = processWorkItemNode(node, issueByIid, issuesWithParentInGitLab, repository);
+                    int linked = processWorkItemNode(
+                            node, issueByIid, issuesWithParentInGitLab, unknownHierarchyIssueIds, repository);
                     totalLinked += linked;
                 }
 
@@ -161,15 +163,15 @@ public class GitLabSubIssueSyncService {
                 }
                 previousCursor = cursor;
                 page++;
-            } while (cursor != null);
+            } while (true);
 
-            // Unfetched issues and unreadable hierarchy facts may hide real parents. Cleanup requires
-            // readable hierarchy facts for mirrored nodes and a whole, error-free final page.
+            // Unfetched issues may hide real parents. Cleanup requires a whole, error-free final page;
+            // identified issues with unreadable hierarchy remain protected individually.
             if (!complete) {
                 log.warn("Skipping stale-parent cleanup after an incomplete walk: project={}", safeProjectPath);
                 return SyncResult.abortedError(totalLinked);
             }
-            int staleCleared = clearStaleParents(issues, issuesWithParentInGitLab);
+            int staleCleared = clearStaleParents(issues, issuesWithParentInGitLab, unknownHierarchyIssueIds);
 
             if (totalLinked > 0 || staleCleared > 0) {
                 log.info(
@@ -179,10 +181,19 @@ public class GitLabSubIssueSyncService {
                         staleCleared);
             }
 
-            return SyncResult.completed(totalLinked);
+            return unknownHierarchyIssueIds.isEmpty()
+                    ? SyncResult.completed(totalLinked)
+                    : SyncResult.abortedError(totalLinked);
         } catch (Exception e) {
             log.warn("Failed sub-issue sync: project={}", safeProjectPath, e);
             return SyncResult.abortedError(totalLinked);
+        } finally {
+            if (!unknownHierarchyIssueIds.isEmpty()) {
+                log.warn(
+                        "Incomplete sub-issue sync: project={}, unknownHierarchyItems={}, reason=unreadableHierarchy",
+                        safeProjectPath,
+                        unknownHierarchyIssueIds.size());
+            }
         }
     }
 
@@ -191,6 +202,7 @@ public class GitLabSubIssueSyncService {
             Map<String, Object> node,
             Map<Integer, Issue> issueByIid,
             Set<Long> issuesWithParentInGitLab,
+            Set<Long> unknownHierarchyIssueIds,
             Repository repository) {
         String iidStr = node.get("iid") != null ? node.get("iid").toString() : null;
         if (iidStr == null) return 0;
@@ -208,7 +220,8 @@ public class GitLabSubIssueSyncService {
         // Extract hierarchy widget
         List<Map<String, Object>> widgets = (List<Map<String, Object>>) node.get("widgets");
         if (widgets == null) {
-            throw new GitLabSyncException("Unreadable work item widgets");
+            unknownHierarchyIssueIds.add(issue.getId());
+            return 0;
         }
 
         Integer parentIid = null;
@@ -217,7 +230,8 @@ public class GitLabSubIssueSyncService {
             String widgetType = (String) widget.get("type");
             if ("HIERARCHY".equals(widgetType)) {
                 if (!widget.containsKey("parent")) {
-                    throw new GitLabSyncException("Missing work item hierarchy parent");
+                    unknownHierarchyIssueIds.add(issue.getId());
+                    return 0;
                 }
                 Map<String, Object> parent = (Map<String, Object>) widget.get("parent");
                 Object hasParent = widget.get("hasParent");
@@ -225,7 +239,8 @@ public class GitLabSubIssueSyncService {
                     return 0;
                 }
                 if (!Boolean.TRUE.equals(hasParent) || parent == null) {
-                    throw new GitLabSyncException("Unreadable work item hierarchy parent");
+                    unknownHierarchyIssueIds.add(issue.getId());
+                    return 0;
                 }
                 parentIid = extractIid(parent);
                 parentNamespacePath = extractNamespacePath(parent);
@@ -234,7 +249,8 @@ public class GitLabSubIssueSyncService {
         }
 
         if (parentIid == null || parentIid <= 0) {
-            throw new GitLabSyncException("Missing readable work item hierarchy parent IID");
+            unknownHierarchyIssueIds.add(issue.getId());
+            return 0;
         }
         issuesWithParentInGitLab.add(issue.getId());
         Issue parentIssue = issueByIid.get(parentIid);
@@ -262,12 +278,15 @@ public class GitLabSubIssueSyncService {
     }
 
     /**
-     * Clears parentIssue for issues that had a parent locally but no longer have one in GitLab.
+     * Clears stored parents absent from a complete inventory, except issues with unreadable hierarchy.
      */
-    private int clearStaleParents(List<Issue> issues, Set<Long> issuesWithParentInGitLab) {
+    private int clearStaleParents(
+            List<Issue> issues, Set<Long> issuesWithParentInGitLab, Set<Long> unknownHierarchyIssueIds) {
         int cleared = 0;
         for (Issue issue : issues) {
-            if (issue.getParentIssue() != null && !issuesWithParentInGitLab.contains(issue.getId())) {
+            if (issue.getParentIssue() != null
+                    && !issuesWithParentInGitLab.contains(issue.getId())
+                    && !unknownHierarchyIssueIds.contains(issue.getId())) {
                 issue.setParentIssue(null);
                 issueRepository.save(issue);
                 cleared++;

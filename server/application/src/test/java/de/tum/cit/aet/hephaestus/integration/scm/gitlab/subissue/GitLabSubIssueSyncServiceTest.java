@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.subissue;
 import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.Vendor.GITLAB;
 import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.assertVendorCouldReturn;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.SoftAssertions.assertSoftly;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -74,6 +75,7 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
     private GitLabGraphQlResponseHandler responseHandler;
 
     private GitLabSubIssueSyncService service;
+    private final List<@Nullable String> requestedCursors = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -101,7 +103,8 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
 
         SyncResult result = service.syncSubIssuesForRepository(SCOPE_ID, repository);
 
-        assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+        assertThat(result).isEqualTo(SyncResult.completed(0));
+        assertThat(requestedCursors).singleElement().isNull();
         // The parent lands (stays) on the ISSUE row...
         assertThat(childIssue.getParentIssue()).isSameAs(parentIssue);
         // ...and the merge request that happens to share IID 5 is never given a parent.
@@ -110,6 +113,78 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
         verify(issueRepository, never()).save(any());
         // The colliding merge request is never even looked up as a parent-lookup fallback.
         verify(issueRepository, never()).findByRepositoryIdAndNumber(anyLong(), any(Integer.class));
+    }
+
+    @Test
+    void shouldRepeatInitialNullCursorAndParentIssueWhenHandlerReturnsRetryThenContinue() {
+        var repository = TestEntities.repository(REPO_ID, "acme/widgets");
+        var parentIssue = issue(PARENT_IID * 100L, PARENT_IID);
+        var childIssue = issue(CHILD_IID * 100L, CHILD_IID);
+        when(issueRepository.findAllIssuesByRepositoryId(REPO_ID)).thenReturn(List.of(childIssue, parentIssue));
+
+        mockSequentialResponses(
+                mock(ClientGraphQlResponse.class),
+                mockWorkItemPage(new GitLabPageInfo(false, null), workItemNode(CHILD_IID, PARENT_IID, "acme/widgets")));
+        // This exercises the consumer action contract, without provider classification or the handler's wait.
+        when(responseHandler.handle(any(), anyString(), any()))
+                .thenReturn(
+                        new HandleResult(HandleResult.Action.RETRY, null),
+                        new HandleResult(HandleResult.Action.CONTINUE, null));
+
+        var result = service.syncSubIssuesForRepository(SCOPE_ID, repository);
+
+        assertSoftly(softly -> {
+            softly.assertThat(childIssue.getParentIssue()).isSameAs(parentIssue);
+            softly.assertThat(result).isEqualTo(SyncResult.completed(1));
+            softly.assertThat(requestedCursors).containsExactly(null, null);
+        });
+    }
+
+    @Test
+    void shouldPreserveStoredParentWithoutCleanupWhenHandlerAbortsFirstPage() {
+        var repository = TestEntities.repository(REPO_ID, "acme/widgets");
+        var parentIssue = issue(PARENT_IID * 100L, PARENT_IID);
+        var childIssue = issue(CHILD_IID * 100L, CHILD_IID);
+        childIssue.setParentIssue(parentIssue);
+        when(issueRepository.findAllIssuesByRepositoryId(REPO_ID)).thenReturn(List.of(childIssue, parentIssue));
+
+        mockSequentialResponses(mock(ClientGraphQlResponse.class));
+        when(responseHandler.handle(any(), anyString(), any()))
+                .thenReturn(new HandleResult(HandleResult.Action.ABORT, null));
+
+        var result = service.syncSubIssuesForRepository(SCOPE_ID, repository);
+
+        assertThat(childIssue.getParentIssue()).isSameAs(parentIssue);
+        assertThat(result).isEqualTo(SyncResult.abortedError(0));
+        assertThat(requestedCursors).singleElement().isNull();
+    }
+
+    @Test
+    void shouldRepeatLaterCursorAndParentBothIssuesWhenHandlerRetriesLaterPage() {
+        var repository = TestEntities.repository(REPO_ID, "acme/widgets");
+        var parentIssue = issue(PARENT_IID * 100L, PARENT_IID);
+        var childIssue = issue(CHILD_IID * 100L, CHILD_IID);
+        var laterChild = issue((CHILD_IID + 1) * 100L, CHILD_IID + 1);
+        when(issueRepository.findAllIssuesByRepositoryId(REPO_ID))
+                .thenReturn(List.of(childIssue, parentIssue, laterChild));
+
+        mockSequentialResponses(
+                mockWorkItemPage(new GitLabPageInfo(true, "next"), workItemNode(CHILD_IID, PARENT_IID, "acme/widgets")),
+                mock(ClientGraphQlResponse.class),
+                mockWorkItemPage(
+                        new GitLabPageInfo(false, null), workItemNode(CHILD_IID + 1, PARENT_IID, "acme/widgets")));
+        when(responseHandler.handle(any(), anyString(), any()))
+                .thenReturn(
+                        new HandleResult(HandleResult.Action.CONTINUE, null),
+                        new HandleResult(HandleResult.Action.RETRY, null),
+                        new HandleResult(HandleResult.Action.CONTINUE, null));
+
+        var result = service.syncSubIssuesForRepository(SCOPE_ID, repository);
+
+        assertThat(childIssue.getParentIssue()).isSameAs(parentIssue);
+        assertThat(laterChild.getParentIssue()).isSameAs(parentIssue);
+        assertThat(result).isEqualTo(SyncResult.completed(2));
+        assertThat(requestedCursors).containsExactly(null, "next", "next");
     }
 
     private static Issue issue(long id, int number) {
@@ -135,29 +210,50 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
 
     @SafeVarargs
     private void mockWorkItemResponse(Map<String, Object>... nodes) {
-        List<Map<String, Object>> nodeList = new ArrayList<>(nodes.length);
-        for (Map<String, Object> node : nodes) {
-            nodeList.add(node);
-        }
-        assertVendorCouldReturn(GITLAB, "GetProjectWorkItemHierarchy", "project.workItems.nodes", nodeList);
+        mockSequentialResponses(mockWorkItemPage(new GitLabPageInfo(false, null), nodes));
+    }
+
+    private void mockSequentialResponses(ClientGraphQlResponse first, ClientGraphQlResponse... rest) {
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         when(graphQlClientProvider.forScope(anyLong())).thenReturn(client);
 
         GraphQlClient.RequestSpec requestSpec = mock(GraphQlClient.RequestSpec.class);
         when(client.documentName(anyString())).thenReturn(requestSpec);
-        when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
+        when(requestSpec.variable(anyString(), any())).thenAnswer(invocation -> {
+            if ("after".equals(invocation.getArgument(0))) {
+                requestedCursors.add(invocation.getArgument(1));
+            }
+            return requestSpec;
+        });
+
+        var stubbing = when(requestSpec.execute()).thenReturn(Mono.just(first));
+        for (ClientGraphQlResponse response : rest) {
+            stubbing = stubbing.thenReturn(Mono.just(response));
+        }
+    }
+
+    @SafeVarargs
+    private ClientGraphQlResponse mockWorkItemPage(GitLabPageInfo pageInfo, Map<String, Object>... nodes) {
+        List<Map<String, Object>> nodeList = new ArrayList<>(nodes.length);
+        for (Map<String, Object> node : nodes) {
+            nodeList.add(node);
+        }
+        assertVendorCouldReturn(GITLAB, "GetProjectWorkItemHierarchy", "project.workItems.nodes", nodeList);
 
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
-        when(response.getErrors()).thenReturn(List.of());
-        when(responseHandler.isWholePage(response, "project.workItems")).thenReturn(true);
-        when(requestSpec.execute()).thenReturn(Mono.just(response));
+        // A RETRY can leave a later page unread; unused page fields must not mask behavior assertions.
+        lenient().when(response.getErrors()).thenReturn(List.of());
+        lenient()
+                .when(responseHandler.isWholePage(response, "project.workItems"))
+                .thenReturn(true);
 
         ClientResponseField nodesField = mock(ClientResponseField.class);
-        doReturn(nodeList).when(nodesField).toEntityList(Map.class);
-        when(response.field("project.workItems.nodes")).thenReturn(nodesField);
+        lenient().doReturn(nodeList).when(nodesField).toEntityList(Map.class);
+        lenient().when(response.field("project.workItems.nodes")).thenReturn(nodesField);
 
         ClientResponseField pageInfoField = mock(ClientResponseField.class);
-        doReturn(new GitLabPageInfo(false, null)).when(pageInfoField).toEntity(GitLabPageInfo.class);
-        when(response.field("project.workItems.pageInfo")).thenReturn(pageInfoField);
+        lenient().doReturn(pageInfo).when(pageInfoField).toEntity(GitLabPageInfo.class);
+        lenient().when(response.field("project.workItems.pageInfo")).thenReturn(pageInfoField);
+        return response;
     }
 }

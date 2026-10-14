@@ -2,4 +2,4 @@
 "hephaestus": patch
 ---
 
-GitLab issue parent links remain intact when a hierarchy read is unavailable or incomplete. Scheduled and manual syncs report these incomplete reads as warnings.
+GitLab hierarchy syncs continue through readable items and later pages while preserving stored parent links for items whose hierarchy is unreadable. Stale parent links clear only after the full listing succeeds. Hierarchy syncs also retry the first page after a rate-limit wait. Scheduled and manual syncs report incomplete hierarchy reads as warnings.

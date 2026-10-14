@@ -157,34 +157,95 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
 
     @ParameterizedTest(name = "{index}: widgets={0}")
     @ValueSource(strings = {"null", "[]", "[{\"type\":\"DESCRIPTION\"}]"})
-    void shouldPreserveStoredParentAndAbortWhenMirroredWorkItemHasNoReadableHierarchy(String widgets) {
-        answers.add(page(3, false, null, node(1, null, true), """
+    void shouldPreserveUnknownParentAndReconcileLaterSiblingsWhenMirroredWorkItemHasNoReadableHierarchy(
+            String widgets) {
+        var removedChild = issue(repository, 6, 4, parent);
+        assertThat(parentId(removedChild)).contains(parent.getId());
+        answers.add(page(4, false, null, """
                 {"iid":"2","widgets":%s}
-                """.formatted(widgets), node(3, null)));
-
-        var result = sync();
-
-        assertSoftly(softly -> {
-            softly.assertThat(parentId(existingChild)).contains(parent.getId());
-            softly.assertThat(parentId(newChild)).isEmpty();
-            softly.assertThat(result).isEqualTo(SyncResult.abortedError(0));
-            softly.assertThat(parentId(unrelatedChild)).contains(unrelatedParent.getId());
-        });
-    }
-
-    @Test
-    void shouldPreserveUnknownParentAndProcessedCountWhenHierarchySaysParentExistsButIsUnavailable() {
-        answers.add(page(3, false, null, node(3, 1), """
-                {"iid":"2","widgets":[{"type":"HIERARCHY","hasParent":true,
-                 "parent":null,"hasChildren":false}]}
-                """, node(1, null, true)));
+                """.formatted(widgets), node(3, 1), node(4, null), node(1, null, true)));
 
         var result = sync();
 
         assertSoftly(softly -> {
             softly.assertThat(parentId(existingChild)).contains(parent.getId());
             softly.assertThat(parentId(newChild)).contains(parent.getId());
+            softly.assertThat(parentId(removedChild)).isEmpty();
             softly.assertThat(result).isEqualTo(SyncResult.abortedError(1));
+            softly.assertThat(parentId(unrelatedChild)).contains(unrelatedParent.getId());
+        });
+    }
+
+    @Test
+    void shouldReconcileLaterSiblingsAndRecoverWhenUnavailableDeclaredParentBecomesReadable() {
+        var removedChild = issue(repository, 6, 4, parent);
+        assertThat(parentId(removedChild)).contains(parent.getId());
+        answers.add(page(4, false, null, """
+                {"iid":"2","widgets":[{"type":"HIERARCHY","hasParent":true,
+                 "parent":null,"hasChildren":false}]}
+                """, node(3, 1), node(4, null), node(1, null, true)));
+
+        var result = sync();
+
+        assertSoftly(softly -> {
+            softly.assertThat(parentId(existingChild)).contains(parent.getId());
+            softly.assertThat(parentId(newChild)).contains(parent.getId());
+            softly.assertThat(parentId(removedChild)).isEmpty();
+            softly.assertThat(result).isEqualTo(SyncResult.abortedError(1));
+            softly.assertThat(parentId(unrelatedChild)).contains(unrelatedParent.getId());
+        });
+
+        answers.add(page(4, false, null, node(2, null), node(3, 1), node(4, null), node(1, null, true)));
+
+        var recovered = sync();
+
+        assertThat(parentId(existingChild)).isEmpty();
+        assertThat(parentId(newChild)).contains(parent.getId());
+        assertThat(parentId(removedChild)).isEmpty();
+        assertThat(recovered).isEqualTo(SyncResult.completed(0));
+        assertUnrelatedLink();
+    }
+
+    @Test
+    void shouldReconcileLaterPageWhenFirstPageContainsUnknownHierarchy() {
+        var removedChild = issue(repository, 6, 4, parent);
+        assertThat(parentId(removedChild)).contains(parent.getId());
+        answers.add(page(4, true, "after-unknown", """
+                {"iid":"2","widgets":null}
+                """));
+        answers.add(page(4, false, null, node(3, 1), node(4, null), node(1, null, true)));
+
+        var result = sync();
+
+        assertSoftly(softly -> {
+            softly.assertThat(parentId(existingChild)).contains(parent.getId());
+            softly.assertThat(parentId(newChild)).contains(parent.getId());
+            softly.assertThat(parentId(removedChild)).isEmpty();
+            softly.assertThat(result).isEqualTo(SyncResult.abortedError(1));
+            softly.assertThat(requestedCursors).containsExactly("<start>", "after-unknown");
+            softly.assertThat(parentId(unrelatedChild)).contains(unrelatedParent.getId());
+        });
+    }
+
+    @Test
+    void shouldPreserveStoredParentsWhenPageFailsAfterUnknownHierarchyAndReadableSiblings() {
+        var removedChild = issue(repository, 6, 4, parent);
+        assertThat(parentId(removedChild)).contains(parent.getId());
+        answers.add(page(4, true, "after-unknown", """
+                {"iid":"2","widgets":null}
+                """, node(3, 1), node(4, null), node(1, null, true)));
+        answers.add("""
+                {"data":null,"errors":[{"message":"Internal server error"}]}
+                """);
+
+        var result = sync();
+
+        assertSoftly(softly -> {
+            softly.assertThat(parentId(existingChild)).contains(parent.getId());
+            softly.assertThat(parentId(newChild)).contains(parent.getId());
+            softly.assertThat(parentId(removedChild)).contains(parent.getId());
+            softly.assertThat(result).isEqualTo(SyncResult.abortedError(1));
+            softly.assertThat(requestedCursors).containsExactly("<start>", "after-unknown");
             softly.assertThat(parentId(unrelatedChild)).contains(unrelatedParent.getId());
         });
     }
