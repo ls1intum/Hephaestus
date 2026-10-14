@@ -16,7 +16,7 @@ Semantic versioning applies to the surfaces an operator or API consumer depends 
 
 | Surface                      | What is covered                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Database migration chain** | Startup applies pending Liquibase changesets in changelog order. Thus, a newer release builds on the previous release's schema. Migrations run automatically when the application server starts.                                                                                                                                                                                |
+| **Database migration chain** | Liquibase applies changesets in changelog order. A newer release builds on the previous schema. Follow the [database migration instructions](#database-migrations) before an upgrade.                                                                                                                                                                                |
 | **Runtime prerequisites**    | The minimum PostgreSQL major version, the required outbound network destinations, and any required external services. Adding one is a breaking change.                                                                                                                                                                                                                          |
 | **Configuration keys**       | Environment variables and `hephaestus.*` properties documented in the [Install](./install.mdx) guide (base install) and [Integrations & Reference Deployment](./production-setup.mdx) (per-integration bundles). Renames and removals are breaking changes.                                                                                                                     |
 | **Docker Compose interface** | Service names, image names, the signed release-lock contract, and required environment variables of the published Compose files. This includes the self-hosted stack (`docker/self-host/compose.yaml`, see the [Install guide](./install.mdx)). It also includes the reference deployment (`docker/compose.app.yaml`, `docker/compose.core.yaml`, `docker/compose.proxy.yaml`). |
@@ -37,9 +37,6 @@ Other surfaces can change in any release without notice:
 | **Minor** (x.`Y`.z) | New functionality. The upgrade needs no action. It can include new *optional* configuration keys.                                                                                                                                                                                                              |
 | **Patch** (x.y.`Z`) | Bug and security fixes. The upgrade needs no action.                                                                                                                                                                                                                                                           |
 
-Any release may include database migrations that run automatically on startup — the release notes flag
-them with a "back up before upgrading" banner.
-
 :::caution CAUTION: Pre-1.0
 Below 1.0.0, the **Minor** row above does not apply.
 There are no major releases yet.
@@ -53,11 +50,20 @@ This exception ends with the 1.0.0 release.
 2. Test the upgrade in staging first.
    :::
 
+## Database migrations
+
+Liquibase normally applies pending changesets, in order, when the application server starts.
+The release notes flag schema migrations and direct you to the required backup and upgrade instructions.
+Read those instructions before starting any target runtime role.
+
+A release-specific migration procedure takes precedence over normal startup.
+For the [native Hibernate JSON cutover](./native-hibernate-json-cutover), follow its procedure before starting the new runtime roles.
+That procedure owns the requirements to stop writers, verify the backup, apply the migration, and restart the roles.
+
 ## Upgrade guarantee
 
 **From 1.0 onward, any 1.x can be upgraded to any later 1.y without intermediate releases.** Use the
-target release's Compose files and images. Startup applies the pending migrations for its supported
-database baseline.
+target release's Compose files and images. Follow the [database migration instructions](#database-migrations) for its supported database baseline.
 
 **Before 1.0, do not assume an arbitrary older release can upgrade directly.** Read the target release's
 migration instructions first: they may require an intermediate release or manual preparation. Existing

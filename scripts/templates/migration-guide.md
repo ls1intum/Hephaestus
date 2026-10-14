@@ -53,7 +53,7 @@ Before upgrading to any new `0.x.0` version:
 
 1. ✅ Read the [release notes](https://github.com/hephaestus-build/Hephaestus/releases)
 2. ✅ Check this migration guide for breaking changes
-3. ✅ Verify in staging first (auto-deployed on every release)
+3. ✅ Verify the upgrade in staging first
 4. ✅ Approve production deployment after staging verification
 
 ---
@@ -67,16 +67,17 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ## Automatic vs Manual Migrations
 
-### Automatic (No Action Needed)
+### Normal Startup Migrations
 
 | Component | Tool | Notes |
 |-----------|------|-------|
-| Database schema | Liquibase | Changesets apply automatically, in order, on server startup |
+| Database schema | Liquibase | Follow the [database migration instructions](https://docs.hephaestus.build/admin/compatibility-policy#database-migrations) |
 
 ### Manual (Action Required)
 
 | Component | How | Notes |
 |-----------|-----|-------|
+| Database cutover | Follow the target release's migration entry | Complete any required procedure before starting the new runtime roles |
 | Environment variables | Check release notes | New config may be required |
 | Docker compose | Check `docker/` files | Image versions may change |
 
@@ -108,10 +109,10 @@ and review the release notes for endpoint changes.
 
 ### Database Schema Changed
 
-Liquibase applies changelogs automatically, in order, on server startup. A failure is not silent: the
-application context fails to start, so the container exits and your orchestrator restarts it — a
-crash-loop whose first useful line is in the *first* startup attempt's log, not the latest. Capture
-that before doing anything else:
+First follow the [database migration instructions](https://docs.hephaestus.build/admin/compatibility-policy#database-migrations).
+For a migration run at startup, a failure prevents the application context from starting.
+The container exits, and the orchestrator may restart it.
+Capture the first failed startup log before retrying:
 
 ```bash
 docker compose logs application-server | grep -i -m5 liquibase

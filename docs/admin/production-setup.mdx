@@ -746,6 +746,8 @@ Each resolves images from the verified release lock.
 `docker/.env` defines no `HEPHAESTUS_IMAGE_*` variable.
 A project without the lock refuses startup.
 
+For an upgrade, follow the [database migration instructions](./compatibility-policy#database-migrations) before starting any target runtime role.
+
 1. Make sure PostgreSQL, NATS, and storage volumes are ready.
    The self-host stack supplies its own.
    This stack does not.
@@ -769,8 +771,8 @@ A project without the lock refuses startup.
 `depends_on` cannot cross project boundaries.
 You must maintain the order.
 The broker starts first to preserve existing application-server JetStream connections during redeployment.
-The application stack owns PostgreSQL and runs Liquibase migrations at startup.
-The core stack's webhook runtime reads migration results.
+The application stack owns PostgreSQL.
+Start the core stack's webhook runtime only after the required database migrations complete.
 The proxy starts last, never routing to a stack that is still starting.
 
 Kubernetes manifests need the same order.
