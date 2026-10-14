@@ -65,7 +65,7 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
                 new CatalogPracticeUpdateDTO(
                         source.effective().kind().value(),
                         source.effective().groupSlug(),
-                        offeredDefinition,
+                        DefinitionTestFixtures.authoring(offeredDefinition),
                         source.position()),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(source.etag())));
         var proposal = releases.get(ctx, source.slug());
@@ -115,7 +115,10 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
         customization.updatePractice(
                 source.slug(),
                 new CatalogPracticeUpdateDTO(
-                        source.effective().kind().value(), source.effective().groupSlug(), changed, source.position()),
+                        source.effective().kind().value(),
+                        source.effective().groupSlug(),
+                        DefinitionTestFixtures.authoring(changed),
+                        source.position()),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(source.etag())));
         var ctx = WorkspaceContext.fromWorkspace(workspace, Set.of(), null);
         service.setFeedbackMode(ctx, source.slug(), FeedbackMode.OFF);

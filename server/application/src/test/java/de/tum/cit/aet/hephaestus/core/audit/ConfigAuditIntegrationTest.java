@@ -175,8 +175,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .bodyValue(new CreatePracticeRequestDTO(
                         "focused-reviews",
                         "scm.pull_request",
-                        definition(
-                                "Focused reviews", "Initial private criteria describe retained review expectations."),
+                        DefinitionTestFixtures.authoring(definition(
+                                "Focused reviews", "Initial private criteria describe retained review expectations.")),
                         null,
                         null))
                 .exchange()
@@ -193,9 +193,9 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new UpdatePracticeRequestDTO(
-                        definition(
+                        DefinitionTestFixtures.authoring(definition(
                                 "Focused code reviews",
-                                "Updated private criteria describe retained review expectations."),
+                                "Updated private criteria describe retained review expectations.")),
                         practice.currentVersion().id()))
                 .exchange()
                 .expectStatus()

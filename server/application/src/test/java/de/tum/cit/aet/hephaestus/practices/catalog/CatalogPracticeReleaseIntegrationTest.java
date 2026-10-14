@@ -33,7 +33,7 @@ class CatalogPracticeReleaseIntegrationTest extends AbstractWorkspaceIntegration
                 new CatalogPracticeUpdateDTO(
                         original.effective().kind().value(),
                         original.effective().groupSlug(),
-                        local,
+                        DefinitionTestFixtures.authoring(local),
                         original.position()),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(original.etag())));
         var proposal = catalog.proposal(original.slug());

@@ -259,7 +259,7 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
                         "eligibility",
                         UUID.randomUUID().toString(),
                         "Source connected"));
-        var ids = List.of(Objects.requireNonNull(linked.getId()), Objects.requireNonNull(unlinked.getId()));
+        List<Long> ids = List.of(Objects.requireNonNull(linked.getId()), Objects.requireNonNull(unlinked.getId()));
         assertThat(service.eligibleAccountIds(workspace.getId(), ids)).containsExactly(linked.getId());
         assertThat(coverage.eligibleAccountIds(workspace.getId())).containsExactly(linked.getId());
     }

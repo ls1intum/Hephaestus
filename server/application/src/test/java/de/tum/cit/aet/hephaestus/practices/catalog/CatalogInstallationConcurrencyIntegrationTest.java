@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeCatalogInstallationManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -102,7 +103,7 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
                     new CatalogPracticeUpdateDTO(
                             current.effective().kind().value(),
                             current.effective().groupSlug(),
-                            updated,
+                            DefinitionTestFixtures.authoring(updated),
                             current.position()),
                     EntityTagPrecondition.parse(EntityTagPrecondition.format(current.etag())));
             writerPid.set(Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));

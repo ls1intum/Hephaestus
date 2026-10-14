@@ -50,7 +50,10 @@ public class CatalogCustomizationService {
         return writePractice(
                 catalog,
                 input.slug(),
-                new CatalogPracticeDocument(new ItemKind(input.kind()), input.groupSlug(), input.definition().toDefinition()),
+                new CatalogPracticeDocument(
+                        new ItemKind(input.kind()),
+                        input.groupSlug(),
+                        input.definition().toDefinition()),
                 input.position());
     }
 
@@ -63,7 +66,10 @@ public class CatalogCustomizationService {
         return writePractice(
                 catalog,
                 slug,
-                new CatalogPracticeDocument(new ItemKind(input.kind()), input.groupSlug(), input.definition().toDefinition()),
+                new CatalogPracticeDocument(
+                        new ItemKind(input.kind()),
+                        input.groupSlug(),
+                        input.definition().toDefinition()),
                 input.position());
     }
 

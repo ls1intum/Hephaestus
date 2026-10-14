@@ -28,10 +28,24 @@ public record PracticeDefinitionInputDTO(
         @JsonProperty(required = true) @NotBlank String criteria,
         @JsonProperty(required = true) @Nullable String script,
         @JsonProperty(required = true) @Valid @Nullable ScanDefinition scan,
-        @JsonProperty(required = true) @JsonSetter(nulls = Nulls.FAIL) boolean lineNotes,
-        @JsonProperty(required = true) @NotNull @Valid PracticeGuidance guidance) implements ClosedPracticeInput {
+
+        @JsonProperty(required = true) @JsonSetter(nulls = Nulls.FAIL)
+        boolean lineNotes,
+
+        @JsonProperty(required = true) @NotNull @Valid PracticeGuidance guidance)
+        implements ClosedPracticeInput {
     public PracticeDefinition toDefinition() {
-        return new PracticeDefinition(name, reviewOn, appliesWhen, about, reads, reviewedBy.toReviewedBy(),
-                criteria, script, scan, lineNotes, guidance);
+        return new PracticeDefinition(
+                name,
+                reviewOn,
+                appliesWhen,
+                about,
+                reads,
+                reviewedBy.toReviewedBy(),
+                criteria,
+                script,
+                scan,
+                lineNotes,
+                guidance);
     }
 }

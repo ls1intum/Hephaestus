@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.practices.ClosedPracticeInput;
-import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;

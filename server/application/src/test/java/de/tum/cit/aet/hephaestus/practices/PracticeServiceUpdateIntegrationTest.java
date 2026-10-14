@@ -41,7 +41,8 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
                         ctx,
                         practice.getSlug(),
                         new UpdatePracticeRequestDTO(
-                                DefinitionTestFixtures.rename(DefinitionTestFixtures.definition(), "New display name"),
+                                DefinitionTestFixtures.authoring(DefinitionTestFixtures.rename(
+                                        DefinitionTestFixtures.definition(), "New display name")),
                                 "9223372036854775807")))
                 .isInstanceOf(StalePracticeVersionException.class);
         assertThat(service.getPractice(ctx, practice.getSlug())

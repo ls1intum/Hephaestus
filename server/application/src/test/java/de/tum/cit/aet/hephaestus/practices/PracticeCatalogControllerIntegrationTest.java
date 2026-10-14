@@ -73,7 +73,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri("/workspaces/{workspace}/practices", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new CreatePracticeRequestDTO("repository-scan", "scm.repository", definition, null, null))
+                .bodyValue(new CreatePracticeRequestDTO(
+                        "repository-scan", "scm.repository", DefinitionTestFixtures.authoring(definition), null, null))
                 .exchange()
                 .expectStatus()
                 .isCreated()
@@ -124,7 +125,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri("/workspaces/{workspace}/practices", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new CreatePracticeRequestDTO("team-decisions", "scm.pull_request", definition, null, null))
+                .bodyValue(new CreatePracticeRequestDTO(
+                        "team-decisions", "scm.pull_request", DefinitionTestFixtures.authoring(definition), null, null))
                 .exchange()
                 .expectStatus()
                 .isCreated()
@@ -258,7 +260,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri("/workspaces/{workspace}/practices/{slug}", workspace.getWorkspaceSlug(), practice.getSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeRequestDTO(DefinitionTestFixtures.definition(), firstId.toString()))
+                .bodyValue(new UpdatePracticeRequestDTO(
+                        DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()), firstId.toString()))
                 .exchange()
                 .expectStatus()
                 .isEqualTo(409)
@@ -376,8 +379,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         var owner = persistUser("admin");
         var workspace = createWorkspace("catalog-comparison", "Comparison", "comparison-org", AccountType.ORG, owner);
         String slug = "comparison-" + UUID.randomUUID();
-        var entry = customization.createPractice(
-                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, DefinitionTestFixtures.definition(), null));
+        var entry = customization.createPractice(new CatalogPracticeInputDTO(
+                slug,
+                "scm.pull_request",
+                null,
+                DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
+                null));
         customization.setExcluded(
                 CatalogEntryType.PRACTICE,
                 slug,
@@ -416,7 +423,11 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new CreatePracticeRequestDTO(
-                        "move-practice", "scm.pull_request", DefinitionTestFixtures.definition(), null, null))
+                        "move-practice",
+                        "scm.pull_request",
+                        DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
+                        null,
+                        null))
                 .exchange()
                 .expectStatus()
                 .isCreated()

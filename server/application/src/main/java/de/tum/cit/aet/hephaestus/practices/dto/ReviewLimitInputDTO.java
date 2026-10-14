@@ -12,6 +12,7 @@ public record ReviewLimitInputDTO(
         @Nullable String code,
         @JsonProperty(required = true) @NotBlank @NonNull String description) implements ClosedPracticeInput {
     public ReviewLimit toLimit() {
-        return new ReviewLimit(code == null ? new CanonicalDigest().add(description).hex() : code, description);
+        return new ReviewLimit(
+                code == null ? new CanonicalDigest().add(description).hex() : code, description);
     }
 }

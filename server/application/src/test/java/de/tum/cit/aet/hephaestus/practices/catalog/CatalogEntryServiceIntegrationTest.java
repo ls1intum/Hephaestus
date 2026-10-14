@@ -43,8 +43,8 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
     void shouldKeepKindInItsColumnWithoutDuplicatingAuthoredContent() {
         String slug = "local-" + UUID.randomUUID();
         var definition = DefinitionTestFixtures.definition();
-        var created = customization.createPractice(
-                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 2));
+        var created = customization.createPractice(new CatalogPracticeInputDTO(
+                slug, "scm.pull_request", null, DefinitionTestFixtures.authoring(definition), 2));
         var row = entries.findById(new CatalogEntry.Id(CatalogEntryType.PRACTICE, slug))
                 .orElseThrow();
         assertThat(row.getKind()).isEqualTo(new ItemKind("scm.pull_request"));
@@ -61,8 +61,8 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
                         new CatalogPracticeUpdateDTO(
                                 "scm.issue",
                                 null,
-                                DefinitionTestFixtures.definition(
-                                        new ItemKind("scm.issue"), "Issue practice", "Issue criteria", null),
+                                DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition(
+                                        new ItemKind("scm.issue"), "Issue practice", "Issue criteria", null)),
                                 2),
                         EntityTagPrecondition.parse(EntityTagPrecondition.format(created.etag()))))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -73,8 +73,8 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
     void shouldRestoreExclusionWithoutLosingTheAuthoredDefinition() {
         String slug = "exclude-" + UUID.randomUUID();
         var definition = DefinitionTestFixtures.definition();
-        var created = customization.createPractice(
-                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 0));
+        var created = customization.createPractice(new CatalogPracticeInputDTO(
+                slug, "scm.pull_request", null, DefinitionTestFixtures.authoring(definition), 0));
         customization.setExcluded(
                 CatalogEntryType.PRACTICE,
                 slug,
@@ -101,7 +101,10 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
         var changed = customization.updatePractice(
                 shipped.slug(),
                 new CatalogPracticeUpdateDTO(
-                        shipped.effective().kind().value(), shipped.effective().groupSlug(), local, 7),
+                        shipped.effective().kind().value(),
+                        shipped.effective().groupSlug(),
+                        DefinitionTestFixtures.authoring(local),
+                        7),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(shipped.etag())));
         customization.setExcluded(
                 CatalogEntryType.PRACTICE,
@@ -140,16 +143,19 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
     void shouldRejectAnOldEtagAfterTheDefinitionChangesAndIsRestored() {
         String slug = "stale-" + UUID.randomUUID();
         var definition = DefinitionTestFixtures.definition();
-        var first = customization.createPractice(
-                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 0));
+        var first = customization.createPractice(new CatalogPracticeInputDTO(
+                slug, "scm.pull_request", null, DefinitionTestFixtures.authoring(definition), 0));
         var edited = customization.updatePractice(
                 slug,
                 new CatalogPracticeUpdateDTO(
-                        "scm.pull_request", null, DefinitionTestFixtures.rename(definition, "Edited name"), 0),
+                        "scm.pull_request",
+                        null,
+                        DefinitionTestFixtures.authoring(DefinitionTestFixtures.rename(definition, "Edited name")),
+                        0),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(first.etag())));
         var restored = customization.updatePractice(
                 slug,
-                new CatalogPracticeUpdateDTO("scm.pull_request", null, definition, 0),
+                new CatalogPracticeUpdateDTO("scm.pull_request", null, DefinitionTestFixtures.authoring(definition), 0),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(edited.etag())));
         assertThat(restored.effective()).isEqualTo(first.effective());
         assertThat(restored.base()).isEqualTo(first.base());
@@ -192,7 +198,8 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
         var group = customization.createGroup(new CatalogGroupInputDTO(groupSlug, "Review", null, null, null, 0));
         String slug = "member-" + UUID.randomUUID();
         var definition = DefinitionTestFixtures.definition();
-        customization.createPractice(new CatalogPracticeInputDTO(slug, "scm.pull_request", groupSlug, definition, 0));
+        customization.createPractice(new CatalogPracticeInputDTO(
+                slug, "scm.pull_request", groupSlug, DefinitionTestFixtures.authoring(definition), 0));
         customization.setExcluded(CatalogEntryType.GROUP, groupSlug, true, tag(group.etag()));
         assertThat(catalog.practice(slug).offered()).isFalse();
         assertThat(catalog.effectiveCatalog().installablePractices())
@@ -217,10 +224,10 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
         String firstSlug = "first-" + UUID.randomUUID();
         String secondSlug = "second-" + UUID.randomUUID();
         var definition = DefinitionTestFixtures.definition();
-        customization.createPractice(
-                new CatalogPracticeInputDTO(firstSlug, "scm.pull_request", groupSlug, definition, 0));
-        customization.createPractice(
-                new CatalogPracticeInputDTO(secondSlug, "scm.pull_request", groupSlug, definition, 1));
+        customization.createPractice(new CatalogPracticeInputDTO(
+                firstSlug, "scm.pull_request", groupSlug, DefinitionTestFixtures.authoring(definition), 0));
+        customization.createPractice(new CatalogPracticeInputDTO(
+                secondSlug, "scm.pull_request", groupSlug, DefinitionTestFixtures.authoring(definition), 1));
         customization.move(
                 secondSlug, groupSlug, 0, tag(catalog.effectiveCatalog().etag()));
         assertThat(catalog.practice(secondSlug).position()).isZero();
@@ -247,8 +254,12 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
     @Test
     void shouldRejectMissingAndStalePreconditionsWithoutWriting() {
         String slug = "guard-" + UUID.randomUUID();
-        var current = customization.createPractice(
-                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, DefinitionTestFixtures.definition(), 0));
+        var current = customization.createPractice(new CatalogPracticeInputDTO(
+                slug,
+                "scm.pull_request",
+                null,
+                DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
+                0));
         var id = new CatalogEntry.Id(CatalogEntryType.PRACTICE, slug);
         long version = entries.findById(id).orElseThrow().getVersion();
         assertThatThrownBy(() -> customization.setExcluded(CatalogEntryType.PRACTICE, slug, true, null))
@@ -320,7 +331,8 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
         var local = DefinitionTestFixtures.rename(shipped.definition(), "Local name");
         var changed = customization.updatePractice(
                 original.slug(),
-                new CatalogPracticeUpdateDTO(shipped.kind().value(), shipped.groupSlug(), local, 4),
+                new CatalogPracticeUpdateDTO(
+                        shipped.kind().value(), shipped.groupSlug(), DefinitionTestFixtures.authoring(local), 4),
                 tag(original.etag()));
         var result = customization.applyRelease(
                 original.slug(),

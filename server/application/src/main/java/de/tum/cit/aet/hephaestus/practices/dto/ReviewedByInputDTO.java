@@ -15,14 +15,18 @@ import org.jspecify.annotations.Nullable;
 public record ReviewedByInputDTO(
         @JsonProperty(required = true) @NotNull ReviewedByKind by,
         @JsonProperty(required = true) @Valid @Nullable ReviewLimitInputDTO humanReason,
-        @JsonProperty(required = true) @NotNull @Size(max = 100) List<@Valid @NotNull ReviewLimitInputDTO> limits)
+
+        @JsonProperty(required = true) @NotNull @Size(max = 100)
+        List<@Valid @NotNull ReviewLimitInputDTO> limits)
         implements ClosedPracticeInput {
     public ReviewedByInputDTO {
         limits = List.copyOf(limits);
     }
 
     public ReviewedBy toReviewedBy() {
-        return new ReviewedBy(by, humanReason == null ? null : humanReason.toLimit(),
+        return new ReviewedBy(
+                by,
+                humanReason == null ? null : humanReason.toLimit(),
                 limits.stream().map(ReviewLimitInputDTO::toLimit).toList());
     }
 }

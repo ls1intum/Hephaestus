@@ -46,7 +46,11 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
         String practiceSlug = "move-practice-" + suffix;
         customization.createGroup(new CatalogGroupInputDTO(groupSlug, "Move group", null, null, null, null));
         customization.createPractice(new CatalogPracticeInputDTO(
-                practiceSlug, "scm.pull_request", null, DefinitionTestFixtures.definition(), null));
+                practiceSlug,
+                "scm.pull_request",
+                null,
+                DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
+                null));
 
         var response = client.patch()
                 .uri("/admin/practice-catalog/practices/{slug}/group", practiceSlug)
@@ -76,8 +80,12 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
     void shouldRejectAStaleWriteWithoutDisclosingTheCurrentETag() {
         persistUser("admin");
         String slug = "stale-" + UUID.randomUUID();
-        var created = customization.createPractice(
-                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, DefinitionTestFixtures.definition(), null));
+        var created = customization.createPractice(new CatalogPracticeInputDTO(
+                slug,
+                "scm.pull_request",
+                null,
+                DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
+                null));
 
         client.patch()
                 .uri("/admin/practice-catalog/practices/{slug}/status", slug)
@@ -107,7 +115,11 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new CatalogPracticeInputDTO(
-                        slug, "scm.pull_request", null, DefinitionTestFixtures.definition(), null))
+                        slug,
+                        "scm.pull_request",
+                        null,
+                        DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
+                        null))
                 .exchange()
                 .expectStatus()
                 .isCreated()
@@ -131,7 +143,11 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new CatalogPracticeInputDTO(
-                        "unauthorized", "scm.pull_request", null, DefinitionTestFixtures.definition(), null))
+                        "unauthorized",
+                        "scm.pull_request",
+                        null,
+                        DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
+                        null))
                 .exchange()
                 .expectStatus()
                 .isForbidden()
@@ -141,9 +157,16 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
     static Stream<CatalogPracticeInputDTO> invalidPracticeInputs() {
         var definition = DefinitionTestFixtures.definition();
         return Stream.of(
-                new CatalogPracticeInputDTO("Uppercase", "scm.pull_request", null, definition, null),
-                new CatalogPracticeInputDTO("bad--slug", "scm.pull_request", null, definition, null),
-                new CatalogPracticeInputDTO("invalid-position", "scm.pull_request", null, definition, -1));
+                new CatalogPracticeInputDTO(
+                        "Uppercase", "scm.pull_request", null, DefinitionTestFixtures.authoring(definition), null),
+                new CatalogPracticeInputDTO(
+                        "bad--slug", "scm.pull_request", null, DefinitionTestFixtures.authoring(definition), null),
+                new CatalogPracticeInputDTO(
+                        "invalid-position",
+                        "scm.pull_request",
+                        null,
+                        DefinitionTestFixtures.authoring(definition),
+                        -1));
     }
 
     @ParameterizedTest
@@ -189,7 +212,10 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
         var current = customization.updatePractice(
                 source.slug(),
                 new CatalogPracticeUpdateDTO(
-                        source.effective().kind().value(), source.effective().groupSlug(), local, source.position()),
+                        source.effective().kind().value(),
+                        source.effective().groupSlug(),
+                        DefinitionTestFixtures.authoring(local),
+                        source.position()),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(source.etag())));
         client.put()
                 .uri("/admin/practice-catalog/practices/{slug}/release", source.slug())
@@ -222,15 +248,20 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
     void shouldUpdateCatalogContentUsingOnlyTheRouteSlug() {
         persistUser("admin");
         String slug = "update-" + UUID.randomUUID();
-        var created = customization.createPractice(
-                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, DefinitionTestFixtures.definition(), 0));
+        var created = customization.createPractice(new CatalogPracticeInputDTO(
+                slug,
+                "scm.pull_request",
+                null,
+                DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
+                0));
         var definition = DefinitionTestFixtures.rename(created.effective().definition(), "Updated through HTTP");
         client.put()
                 .uri("/admin/practice-catalog/practices/{slug}", slug)
                 .headers(TestAuthUtils.withCurrentUser())
                 .header("If-Match", EntityTagPrecondition.format(created.etag()))
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new CatalogPracticeUpdateDTO("scm.pull_request", null, definition, 0))
+                .bodyValue(new CatalogPracticeUpdateDTO(
+                        "scm.pull_request", null, DefinitionTestFixtures.authoring(definition), 0))
                 .exchange()
                 .expectStatus()
                 .isOk()
