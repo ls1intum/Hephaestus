@@ -1,14 +1,11 @@
-import {
-	type InfiniteData,
-	type UseInfiniteQueryResult,
-	useInfiniteQuery,
-} from "@tanstack/react-query";
+import { hashKey, useInfiniteQuery } from "@tanstack/react-query";
 
 import {
 	adminListConfigAuditEventsInfiniteOptions,
 	listWorkspaceConfigAuditEventsInfiniteOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type { ConfigAuditEntryView, PageResponseDtoConfigAuditEntryView } from "@/api/types.gen";
+import type { ConfigAuditEntryView } from "@/api/types.gen";
+import { type AuditListState, auditRows } from "@/components/admin/audit/audit-list";
 import {
 	type ConfigAuditSearch,
 	dayAfterInstant,
@@ -24,9 +21,10 @@ import { FacetMultiSelect, toFacetOptions } from "@/components/common/FacetMulti
 import { FilterToolbar } from "@/components/common/FilterToolbar";
 import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { ResultCount } from "@/components/common/ResultCount";
-import { dedupeById } from "@/lib/dedupe-by-id";
 import { narrowToEnum, nonEmpty } from "@/lib/search-params";
+import { infiniteListState } from "@/runtime/tanstack-query/infinite-list";
 import { springPageParams } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 const PAGE_SIZE = 50;
 
@@ -58,16 +56,17 @@ export function AdminConfigAuditPanel({
 	onSearchChange,
 	resolveWorkspaceName,
 }: ConfigAuditPanelProps) {
-	const listQuery = useInfiniteQuery({
-		...adminListConfigAuditEventsInfiniteOptions({ query: toQuery(search) }),
-		...springPageParams,
-	});
+	const listOptions = adminListConfigAuditEventsInfiniteOptions({ query: toQuery(search) });
+	const listQuery = useInfiniteQuery({ ...listOptions, ...springPageParams });
+	useQueryReadRefusal(listOptions.queryKey, listQuery.isError, listQuery.error);
+	const list = infiniteListState(listQuery, auditRows);
 
 	return (
 		<ConfigAuditView
 			search={search}
 			onSearchChange={onSearchChange}
-			listQuery={listQuery}
+			list={list}
+			read={hashKey(listOptions.queryKey)}
 			showWorkspace
 			resolveWorkspaceName={resolveWorkspaceName}
 		/>
@@ -79,36 +78,41 @@ export function WorkspaceConfigAuditPanel({
 	search,
 	onSearchChange,
 }: Omit<ConfigAuditPanelProps, "resolveWorkspaceName"> & { workspaceSlug: string }) {
-	const listQuery = useInfiniteQuery({
-		...listWorkspaceConfigAuditEventsInfiniteOptions({
-			path: { workspaceSlug },
-			query: toQuery(search),
-		}),
-		...springPageParams,
+	const listOptions = listWorkspaceConfigAuditEventsInfiniteOptions({
+		path: { workspaceSlug },
+		query: toQuery(search),
 	});
+	const listQuery = useInfiniteQuery({ ...listOptions, ...springPageParams });
+	useQueryReadRefusal(listOptions.queryKey, listQuery.isError, listQuery.error);
+	const list = infiniteListState(listQuery, auditRows);
 
-	return <ConfigAuditView search={search} onSearchChange={onSearchChange} listQuery={listQuery} />;
+	return (
+		<ConfigAuditView
+			search={search}
+			onSearchChange={onSearchChange}
+			list={list}
+			read={hashKey(listOptions.queryKey)}
+		/>
+	);
 }
-
-type ConfigAuditListQuery = UseInfiniteQueryResult<
-	InfiniteData<PageResponseDtoConfigAuditEntryView>
->;
 
 function ConfigAuditView({
 	search,
 	onSearchChange,
-	listQuery,
+	list,
+	read,
 	showWorkspace = false,
 	resolveWorkspaceName,
 }: ConfigAuditPanelProps & {
-	listQuery: ConfigAuditListQuery;
+	list: AuditListState<ConfigAuditEntryView>;
+	/** The read's query key, hashed: the workspace and filters the list was read for. */
+	read: string;
 	showWorkspace?: boolean;
 }) {
 	const dateRange = toDateRange(search);
-	const entries: ConfigAuditEntryView[] = dedupeById(
-		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
-	);
-	const total = listQuery.data?.pages[0]?.totalElements;
+	// Names and the count come only from a read that stands, never from one refused.
+	const entries = list.status === "ready" ? list.rows : [];
+	const total = list.status === "ready" ? list.total : undefined;
 	const query = toQuery(search);
 	const hasAppliedFilter =
 		(query.entityType?.length ?? 0) > 0 ||
@@ -158,19 +162,12 @@ function ConfigAuditView({
 			<ResultCount total={total} noun={["change", "changes"]} hasFilter={hasAppliedFilter} />
 
 			<ConfigAuditTable
-				entries={entries}
-				isLoading={listQuery.isLoading}
-				isError={listQuery.isError}
+				// One table per read: another workspace's or filter's read starts with nothing selected,
+				// while the same read failing to refresh keeps what is open.
+				key={read}
+				state={list}
 				hasFilter={hasAppliedFilter}
 				onResetFilters={reset}
-				hasNextPage={listQuery.hasNextPage}
-				isFetchingNextPage={listQuery.isFetchingNextPage}
-				onLoadMore={() => {
-					void listQuery.fetchNextPage();
-				}}
-				onRetry={() => {
-					void listQuery.refetch();
-				}}
 				onFilterActor={(actorId) => onSearchChange({ actorId })}
 				showWorkspace={showWorkspace}
 				resolveWorkspaceName={resolveWorkspaceName}

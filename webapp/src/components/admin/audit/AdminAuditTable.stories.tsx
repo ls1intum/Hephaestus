@@ -4,7 +4,7 @@ import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AuthEventView } from "@/api/types.gen";
 import { expectSettledVisible } from "@/stories/overlay";
 
-import { AdminAuditTable } from "./AdminAuditTable";
+import { AdminAuditTable, type AdminAuditTableProps } from "./AdminAuditTable";
 
 const events: AuthEventView[] = [
 	{
@@ -61,18 +61,25 @@ const elevatedAccess: AuthEventView = {
 	userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/124.0",
 };
 
+/** A read that stands, with no page left to ask for. */
+function loaded(rows: AuthEventView[]) {
+	return {
+		status: "ready",
+		rows,
+		total: rows.length,
+		hasMore: false,
+		isLoadingMore: false,
+		onLoadMore: fn(),
+	} satisfies AdminAuditTableProps["state"];
+}
+
 const meta = {
 	component: AdminAuditTable,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		events,
-		isLoading: false,
-		isError: false,
+		state: loaded(events),
 		hasFilter: false,
-		hasNextPage: false,
-		isFetchingNextPage: false,
-		onLoadMore: fn(),
 		onFilterAccount: fn(),
 		onFilterActor: fn(),
 	},
@@ -90,7 +97,7 @@ export const Default: Story = {
 
 export const DeletedAccountFallback: Story = {
 	args: {
-		events: [
+		state: loaded([
 			{
 				id: 5,
 				elevatedViaInstanceAdmin: false,
@@ -100,7 +107,7 @@ export const DeletedAccountFallback: Story = {
 				accountId: 1234,
 				ipAddress: "203.0.113.9",
 			},
-		],
+		]),
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("#1234");
@@ -120,7 +127,7 @@ export const RowDetail: Story = {
 };
 
 export const ElevatedWorkspaceAccess: Story = {
-	args: { events: [elevatedAccess] },
+	args: { state: loaded([elevatedAccess]) },
 	play: async ({ canvas }) => {
 		canvas.getByText("Workspace reached as instance admin");
 		await expect(canvas.getByText("Elevated")).toBeVisible();
@@ -128,7 +135,7 @@ export const ElevatedWorkspaceAccess: Story = {
 };
 
 export const ElevatedRowDetail: Story = {
-	args: { events: [elevatedAccess] },
+	args: { state: loaded([elevatedAccess]) },
 	play: async ({ canvas }) => {
 		const [details] = canvas.getAllByRole("button", { name: /^View details for/iu });
 		if (!details) {
@@ -141,14 +148,14 @@ export const ElevatedRowDetail: Story = {
 };
 
 export const UnelevatedRowHasNoBadge: Story = {
-	args: { events: [{ ...elevatedAccess, elevatedViaInstanceAdmin: false }] },
+	args: { state: loaded([{ ...elevatedAccess, elevatedViaInstanceAdmin: false }]) },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByText("Elevated")).toBeNull();
 	},
 };
 
 export const EmptyInitial: Story = {
-	args: { events: [], hasFilter: false },
+	args: { state: loaded([]), hasFilter: false },
 	play: async ({ canvas }) => {
 		canvas.getByText("No events yet");
 		canvas.getByText(/Sign-ins, user views, role changes/iu);
@@ -156,23 +163,66 @@ export const EmptyInitial: Story = {
 };
 
 export const EmptyWithFilter: Story = {
-	args: { events: [], hasFilter: true },
+	args: { state: loaded([]), hasFilter: true },
 	play: async ({ canvas }) => {
 		canvas.getByText("No events match your filters");
 	},
 };
 
+/** The first read failed; nothing was read to show, so nothing claims the log is empty. */
 export const ErrorState: Story = {
-	args: { events: [], isError: true },
+	args: { state: { status: "error", error: { status: 503 }, onRetry: fn() } },
 	play: async ({ canvas }) => {
 		canvas.getByText(/We could not load the audit log/iu);
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.queryByText("No events yet")).toBeNull();
+	},
+};
+
+/** A refused read says why and offers no retry that would be refused again. */
+export const Refused: Story = {
+	args: { state: { status: "error", error: { status: 403 }, onRetry: fn() } },
+	play: async ({ canvas }) => {
+		canvas.getByText("You do not have access to the audit log");
+		await expect(canvas.queryByRole("button", { name: "Retry" })).toBeNull();
+		await expect(canvas.queryByRole("table")).toBeNull();
+	},
+};
+
+/** A refresh failed: the events already read stay, marked as possibly out of date. */
+export const RefreshFailed: Story = {
+	args: {
+		state: {
+			...loaded(events),
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("We could not refresh the audit log");
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.getAllByRole("button", { name: /^View details for/iu })).toHaveLength(
+			events.length,
+		);
+	},
+};
+
+/** The next page failed: the first stays readable, and Load more asks again. */
+export const LoadMoreFailed: Story = {
+	args: { state: { ...loaded(events), hasMore: true, loadMoreError: { status: 503 } } },
+	play: async ({ canvas }) => {
+		canvas.getByText("We could not load more events.");
+		await expect(canvas.getByRole("button", { name: "Load more" })).toBeEnabled();
+		await expect(canvas.getAllByRole("button", { name: /^View details for/iu })).toHaveLength(
+			events.length,
+		);
 	},
 };
 
 export const Loading: Story = {
-	args: { events: [], isLoading: true },
+	args: { state: { status: "loading" } },
 	play: async ({ canvas }) => {
 		canvas.getByRole("columnheader", { name: "Event" });
+		await expect(canvas.queryByText("No events yet")).toBeNull();
 	},
 };
 
@@ -192,7 +242,7 @@ export const ColumnCountMatchesHeader: Story = {
 /** An accountless viewed user is attributable without pretending that they were signed in. */
 export const AccountlessUserView: Story = {
 	args: {
-		events: [
+		state: loaded([
 			{
 				id: 20,
 				occurredAt: new Date("2026-09-11T12:00:00Z"),
@@ -206,7 +256,7 @@ export const AccountlessUserView: Story = {
 				details:
 					'{"phase":"AUTHORIZED","reason":"Investigate missing feedback","surface":"practices"}',
 			},
-		],
+		]),
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("High-risk event:");

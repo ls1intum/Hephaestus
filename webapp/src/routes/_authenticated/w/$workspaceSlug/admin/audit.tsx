@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { ScrollTextIcon } from "lucide-react";
 
 import {
@@ -9,6 +9,7 @@ import { WorkspaceConfigAuditPanel } from "@/components/admin/audit/ConfigAuditP
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { useSearchState } from "@/lib/search-params";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/audit")({
 	head: workspaceAdminHead("Audit log"),
@@ -19,10 +20,10 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/aud
 function WorkspaceAuditPage() {
 	const { workspaceSlug } = Route.useParams();
 	const search = Route.useSearch();
-	const navigate = useNavigate({ from: Route.fullPath });
+	const setSearch = useSearchState();
 
 	const patchSearch = (patch: Partial<ConfigAuditSearch>) => {
-		void navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+		void setSearch((prev) => ({ ...prev, ...patch }), { replace: true });
 	};
 
 	return (

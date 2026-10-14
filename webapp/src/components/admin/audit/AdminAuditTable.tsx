@@ -5,6 +5,7 @@ import type { AuthEventView } from "@/api/types.gen";
 import { ElevationBadge } from "@/components/admin/audit/ElevationBadge";
 import { FilterLink } from "@/components/admin/audit/FilterLink";
 import { refLabel } from "@/components/admin/audit/ref-label";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,6 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Spinner } from "@/components/ui/spinner";
 import {
 	Table,
 	TableBody,
@@ -36,195 +36,193 @@ import {
 	severityDotClass,
 	severityScreenReaderPrefix,
 } from "./audit-format";
+import type { AuditListState } from "./audit-list";
 import { AuditEventDetailSheet } from "./AuditEventDetailSheet";
+import { AuditListEnd } from "./AuditListEnd";
 
 export interface AdminAuditTableProps {
-	events: AuthEventView[];
-	isLoading: boolean;
-	isError: boolean;
+	state: AuditListState<AuthEventView>;
 	hasFilter: boolean;
 	onResetFilters?: () => void;
-	hasNextPage: boolean;
-	isFetchingNextPage: boolean;
-	onLoadMore: () => void;
-	onRetry?: () => void;
 	onFilterAccount?: (id: number) => void;
 	onFilterActor?: (id: number) => void;
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
 export function AdminAuditTable({
-	events,
-	isLoading,
-	isError,
+	state,
 	hasFilter,
 	onResetFilters,
-	hasNextPage,
-	isFetchingNextPage,
-	onLoadMore,
-	onRetry,
+	...rowActions
+}: AdminAuditTableProps) {
+	if (state.status === "error") {
+		return (
+			<QueryErrorAlert
+				error={state.error}
+				title="We could not load the audit log"
+				onRetry={state.onRetry}
+			/>
+		);
+	}
+	if (state.status === "loading") {
+		return (
+			<AuthEventsTable>
+				<TableRowsSkeleton columns={["w-24", "w-28", "w-16", "w-24", null]} rows={8} />
+			</AuthEventsTable>
+		);
+	}
+	return (
+		<div className="space-y-4">
+			{state.refreshFailure !== undefined && (
+				<QueryErrorAlert title="We could not refresh the audit log" {...state.refreshFailure} />
+			)}
+			{state.rows.length === 0 ? (
+				<Empty variant="outlined">
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<ScrollText />
+						</EmptyMedia>
+						<EmptyTitle>{hasFilter ? "No events match your filters" : "No events yet"}</EmptyTitle>
+						{!hasFilter && (
+							<EmptyDescription>
+								Sign-ins, user views, role changes, and account deletions will appear here.
+							</EmptyDescription>
+						)}
+					</EmptyHeader>
+					{hasFilter && onResetFilters && (
+						<EmptyContent>
+							<Button variant="outline" onClick={onResetFilters}>
+								Clear filters
+							</Button>
+						</EmptyContent>
+					)}
+				</Empty>
+			) : (
+				<AuthEventRows list={state} {...rowActions} />
+			)}
+		</div>
+	);
+}
+
+function AuthEventsTable({ children }: { children: ReactNode }) {
+	return (
+		<Table bordered>
+			<TableCaption className="sr-only">Sign-in and account events, newest first</TableCaption>
+			<TableHeader>
+				<TableRow>
+					<TableHead scope="col">Time</TableHead>
+					<TableHead scope="col">Event</TableHead>
+					<TableHead scope="col">Result</TableHead>
+					<TableHead scope="col">Account</TableHead>
+					<TableHead scope="col" className="w-0 text-right">
+						<span className="sr-only">Details</span>
+					</TableHead>
+				</TableRow>
+			</TableHeader>
+			{children}
+		</Table>
+	);
+}
+
+/**
+ * The rows of a read that stands, and the event opened from them. Mounted only while that read
+ * stands, so a refused read closes the event. Another filter is another read: the host keys the
+ * table by it.
+ */
+function AuthEventRows({
+	list,
 	onFilterAccount,
 	onFilterActor,
 	resolveWorkspaceName,
-}: AdminAuditTableProps) {
+}: Pick<AdminAuditTableProps, "onFilterAccount" | "onFilterActor" | "resolveWorkspaceName"> & {
+	list: Extract<AuditListState<AuthEventView>, { status: "ready" }>;
+}) {
 	const [detail, setDetail] = useState<AuthEventView | null>(null);
 	const [detailOpen, setDetailOpen] = useState(false);
-
-	if (isError) {
-		return (
-			<Empty variant="outlined">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<ScrollText />
-					</EmptyMedia>
-					<EmptyTitle>We could not load the audit log</EmptyTitle>
-					<EmptyDescription>
-						Try again in a moment. If it keeps failing, reload the page.
-					</EmptyDescription>
-				</EmptyHeader>
-				{onRetry && (
-					<EmptyContent>
-						<Button variant="outline" size="sm" onClick={onRetry}>
-							Retry
-						</Button>
-					</EmptyContent>
-				)}
-			</Empty>
-		);
-	}
-
-	if (events.length === 0 && !isLoading) {
-		return (
-			<Empty variant="outlined">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<ScrollText />
-					</EmptyMedia>
-					<EmptyTitle>{hasFilter ? "No events match your filters" : "No events yet"}</EmptyTitle>
-					{!hasFilter && (
-						<EmptyDescription>
-							Sign-ins, user views, role changes, and account deletions will appear here.
-						</EmptyDescription>
-					)}
-				</EmptyHeader>
-				{hasFilter && onResetFilters && (
-					<EmptyContent>
-						<Button variant="outline" onClick={onResetFilters}>
-							Clear filters
-						</Button>
-					</EmptyContent>
-				)}
-			</Empty>
-		);
-	}
-
 	return (
-		<div className="space-y-4">
-			<Table bordered>
-				<TableCaption className="sr-only">Sign-in and account events, newest first</TableCaption>
-				<TableHeader>
-					<TableRow>
-						<TableHead scope="col">Time</TableHead>
-						<TableHead scope="col">Event</TableHead>
-						<TableHead scope="col">Result</TableHead>
-						<TableHead scope="col">Account</TableHead>
-						<TableHead scope="col" className="w-0 text-right">
-							<span className="sr-only">Details</span>
-						</TableHead>
-					</TableRow>
-				</TableHeader>
-				{isLoading ? (
-					<TableRowsSkeleton columns={["w-24", "w-28", "w-16", "w-24", null]} rows={8} />
-				) : (
-					<TableBody>
-						{events.map((e) => {
-							const severity = eventSeverity(e.eventType, e.result);
-							const screenReaderPrefix = severityScreenReaderPrefix(severity);
-							const { accountId, actingAccountId } = e;
-							const account = refLabel(e.account, accountId);
-							const actor = refLabel(e.actor, actingAccountId);
-							let accountCell: ReactNode = "—";
-							if (hasText(account)) {
-								accountCell =
-									onFilterAccount && accountId != null ? (
-										<FilterLink
-											label={account}
-											title={e.account?.email ?? `Filter by ${account}`}
-											onSelect={() => onFilterAccount(accountId)}
+		<>
+			<AuthEventsTable>
+				<TableBody>
+					{list.rows.map((e) => {
+						const severity = eventSeverity(e.eventType, e.result);
+						const screenReaderPrefix = severityScreenReaderPrefix(severity);
+						const { accountId, actingAccountId } = e;
+						const account = refLabel(e.account, accountId);
+						const actor = refLabel(e.actor, actingAccountId);
+						let accountCell: ReactNode = "—";
+						if (hasText(account)) {
+							accountCell =
+								onFilterAccount && accountId != null ? (
+									<FilterLink
+										label={account}
+										title={e.account?.email ?? `Filter by ${account}`}
+										onSelect={() => onFilterAccount(accountId)}
+									/>
+								) : (
+									<span title={e.account?.email ?? undefined}>{account}</span>
+								);
+						}
+						return (
+							<TableRow key={e.id}>
+								<TableCell className="text-sm whitespace-nowrap text-muted-foreground">
+									<RelativeTime value={e.occurredAt} />
+								</TableCell>
+								<TableCell>
+									<span className="flex items-center gap-2" title={e.eventType}>
+										<span
+											className={`size-1.5 shrink-0 rounded-full ${severityDotClass(severity)}`}
+											aria-hidden
 										/>
-									) : (
-										<span title={e.account?.email ?? undefined}>{account}</span>
-									);
-							}
-							return (
-								<TableRow key={e.id}>
-									<TableCell className="text-sm whitespace-nowrap text-muted-foreground">
-										<RelativeTime value={e.occurredAt} />
-									</TableCell>
-									<TableCell>
-										<span className="flex items-center gap-2" title={e.eventType}>
-											<span
-												className={`size-1.5 shrink-0 rounded-full ${severityDotClass(severity)}`}
-												aria-hidden
-											/>
-											{hasText(screenReaderPrefix) && (
-												<span className="sr-only">{screenReaderPrefix}</span>
-											)}
-											<span className="text-sm">{eventLabel(e.eventType)}</span>
-											<ElevationBadge elevated={e.elevatedViaInstanceAdmin} />
-										</span>
-									</TableCell>
-									<TableCell>
-										<Badge variant={e.result === "FAILURE" ? "destructive" : "outline"}>
-											{resultLabel(e.result)}
-										</Badge>
-									</TableCell>
-									<TableCell className="max-w-[12rem]">
-										<span className="block truncate">{accountCell}</span>
-										{hasText(actor) && (
-											<span className="block truncate text-xs text-muted-foreground">
-												by{" "}
-												{onFilterActor && actingAccountId != null ? (
-													<FilterLink
-														label={actor}
-														title={e.actor?.email ?? `Filter by ${actor}`}
-														onSelect={() => onFilterActor(actingAccountId)}
-													/>
-												) : (
-													actor
-												)}
-											</span>
+										{hasText(screenReaderPrefix) && (
+											<span className="sr-only">{screenReaderPrefix}</span>
 										)}
-									</TableCell>
-									<TableCell className="text-right">
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											aria-label={`View details for ${eventLabel(e.eventType)}${hasText(account) ? `, ${account}` : ""}`}
-											onClick={() => {
-												setDetail(e);
-												setDetailOpen(true);
-											}}
-										>
-											View details
-										</Button>
-									</TableCell>
-								</TableRow>
-							);
-						})}
-					</TableBody>
-				)}
-			</Table>
+										<span className="text-sm">{eventLabel(e.eventType)}</span>
+										<ElevationBadge elevated={e.elevatedViaInstanceAdmin} />
+									</span>
+								</TableCell>
+								<TableCell>
+									<Badge variant={e.result === "FAILURE" ? "destructive" : "outline"}>
+										{resultLabel(e.result)}
+									</Badge>
+								</TableCell>
+								<TableCell className="max-w-[12rem]">
+									<span className="block truncate">{accountCell}</span>
+									{hasText(actor) && (
+										<span className="block truncate text-xs text-muted-foreground">
+											by{" "}
+											{onFilterActor && actingAccountId != null ? (
+												<FilterLink
+													label={actor}
+													title={e.actor?.email ?? `Filter by ${actor}`}
+													onSelect={() => onFilterActor(actingAccountId)}
+												/>
+											) : (
+												actor
+											)}
+										</span>
+									)}
+								</TableCell>
+								<TableCell className="text-right">
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										aria-label={`View details for ${eventLabel(e.eventType)}${hasText(account) ? `, ${account}` : ""}`}
+										onClick={() => {
+											setDetail(e);
+											setDetailOpen(true);
+										}}
+									>
+										View details
+									</Button>
+								</TableCell>
+							</TableRow>
+						);
+					})}
+				</TableBody>
+			</AuthEventsTable>
 
-			{hasNextPage && (
-				<div className="flex justify-center">
-					<Button variant="outline" onClick={onLoadMore} disabled={isFetchingNextPage}>
-						{isFetchingNextPage ? <Spinner className="mr-2 size-3.5" /> : null}
-						Load more
-					</Button>
-				</div>
-			)}
+			<AuditListEnd list={list} noun="events" />
 
 			<AuditEventDetailSheet
 				event={detail}
@@ -232,6 +230,6 @@ export function AdminAuditTable({
 				onOpenChange={setDetailOpen}
 				resolveWorkspaceName={resolveWorkspaceName}
 			/>
-		</div>
+		</>
 	);
 }
