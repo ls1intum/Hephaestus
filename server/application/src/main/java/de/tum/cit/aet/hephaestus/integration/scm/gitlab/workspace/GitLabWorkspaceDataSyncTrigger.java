@@ -93,7 +93,13 @@ public class GitLabWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
                             SyncJobType.INITIAL,
                             SyncJobTrigger.LIFECYCLE,
                             null),
-                    handle -> syncAllRepositoriesBody(workspaceId, handle::isCancellationRequested));
+                    handle -> syncAllRepositoriesBody(workspaceId, () -> {
+                        if (handle.isCancellationRequested()) {
+                            handle.reportCancelled();
+                            return true;
+                        }
+                        return false;
+                    }));
         } catch (SyncJobConflictException e) {
             log.info(
                     "Skipped GitLab lifecycle sync, already an active sync job: workspaceId={}, connectionId={}",
