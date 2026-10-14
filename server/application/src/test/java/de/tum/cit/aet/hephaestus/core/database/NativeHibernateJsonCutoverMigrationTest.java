@@ -75,6 +75,19 @@ class NativeHibernateJsonCutoverMigrationTest {
         assertThat(beforeConfigExport.get(5).path("new_value").isObject()).isTrue();
         assertThat(beforeExport.get(5).path("detail").isObject()).isTrue();
 
+        try (Liquibase liquibase = liquibase(database)) {
+            assertThat(liquibase
+                            .listUnrunChangeSets(new Contexts(context), new LabelExpression())
+                            .getFirst()
+                            .getFilePath())
+                    .endsWith(CUTOVER);
+            liquibase.update(1, new Contexts(context), new LabelExpression());
+            assertThat(query(database, "SELECT filename FROM databasechangelog ORDER BY orderexecuted DESC LIMIT 1")
+                            .getFirst())
+                    .endsWith(CUTOVER);
+            assertThatThrownBy(() -> liquibase.rollback(1, new Contexts(context), new LabelExpression()))
+                    .hasStackTraceContaining("restore the verified database backup");
+        }
         migrate(database, context);
         assertThat(metadata(database)).isEqualTo(metadata);
         assertThat(query(
@@ -133,9 +146,12 @@ class NativeHibernateJsonCutoverMigrationTest {
         assertThat(query(database, "SELECT id || ':' || md5sum FROM databasechangelog ORDER BY orderexecuted"))
                 .isEqualTo(migratedHistory);
         assertThat(metadata(database)).isEqualTo(migratedRows);
+        int appliedSinceBoundary = migratedHistory.size() - history.size();
+        assertThat(appliedSinceBoundary).isPositive();
         try (Liquibase liquibase = liquibase(database)) {
-            assertThatThrownBy(() -> liquibase.rollback(1, new Contexts(context), new LabelExpression()))
-                    .hasStackTraceContaining("restore the verified database backup");
+            assertThatThrownBy(() ->
+                            liquibase.rollback(appliedSinceBoundary, new Contexts(context), new LabelExpression()))
+                    .hasStackTraceContaining("verified database backup");
         }
         assertPartitionTypes(database);
     }
