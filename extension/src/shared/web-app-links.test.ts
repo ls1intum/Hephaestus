@@ -11,10 +11,10 @@ describe("web app links", () => {
 		});
 	});
 
-	it("adds this item's own reviews for a workspace admin, with its detail open", () => {
+	it("adds review details when the server permits inspection", () => {
 		expect(workLinks(APP, "intro", { id: "12" }, true)).toStrictEqual({
 			trace: `${APP}/w/intro/feedback/12`,
-			reviewDetails: `${APP}/w/intro/admin/practices/reviews/reviews?itemId=12&detail=item%3A12`,
+			reviewDetails: `${APP}/w/intro/admin/practices/reviews/?itemId=12&detail=item%3A12`,
 		});
 	});
 });

@@ -153,18 +153,14 @@ export function useScanReport(
 		mutationFn: async () => {
 			const { data, response } = await exportScanSarif({
 				path,
+				// Automatic parsing treats SARIF's +json media type as JSON; downloads require a Blob.
 				parseAs: "blob",
 				throwOnError: true,
 			});
-			// The generated type says `string`; with `parseAs: "blob"` the client hands back a Blob.
-			const body: unknown = data;
-			if (!(body instanceof Blob)) {
-				throw new Error("The export did not return a SARIF file.");
-			}
 			const filename =
 				sarifFilename(response.headers.get("Content-Disposition")) ??
 				`hephaestus-scan-${scanId}.sarif`;
-			const url = URL.createObjectURL(body);
+			const url = URL.createObjectURL(data);
 			const link = document.createElement("a");
 			link.href = url;
 			link.download = filename;

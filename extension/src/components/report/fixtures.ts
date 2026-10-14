@@ -53,7 +53,7 @@ export const READY_ADMIN: ReadyContext = {
 	canInspectReviewDetails: true,
 	links: {
 		...READY.links,
-		reviewDetails: `${WEB_APP}/w/intro-course/admin/practices/reviews/reviews?itemId=4009&detail=item%3A4009`,
+		reviewDetails: `${WEB_APP}/w/intro-course/admin/practices/reviews/?itemId=4009&detail=item%3A4009`,
 	},
 };
 

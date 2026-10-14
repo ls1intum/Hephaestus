@@ -15,7 +15,7 @@ const catalog = z
 				displayName: z.string(),
 				itemKinds: z.array(z.string()),
 				completeness: z.object({ supportsComplete: z.boolean() }),
-				citation: z.object({ side: citationRequirement, revision: citationRequirement }),
+				citation: z.object({ side: citationRequirement, commit: citationRequirement }),
 			}),
 		),
 	})

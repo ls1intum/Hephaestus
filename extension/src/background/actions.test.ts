@@ -5,7 +5,6 @@ import type {
 	OwnItemTrace,
 	ReviewContext as ReviewContextDTO,
 	ReviewRequestOutcome,
-	WorkspaceMembership,
 } from "~/api/types.gen";
 import {
 	type ActionApi,
@@ -38,10 +37,11 @@ const ITEM: ItemRef = {
 };
 const OTHER_ITEM: ItemRef = { ...ITEM, id: "99", label: "#9" };
 const ANSWER: ReviewContextDTO = {
-	workspaceId: "0b7c1a52-0d3e-4c55-8a0b-000000000001",
+	workspaceId: "1001",
 	workspaceSlug: "team",
 	item: ITEM,
 	requestAllowed: true,
+	canInspectReviewDetails: false,
 	reasonDescription: null,
 };
 const TRACE: OwnItemTrace = {
@@ -59,23 +59,6 @@ const TRACE: OwnItemTrace = {
 	events: [{ name: "Review requested", occurredAt: "2026-09-26T11:00:00Z" }],
 	results: [],
 };
-function membership(role: WorkspaceMembership["role"]): WorkspaceMembership {
-	return {
-		account: {
-			id: "0b7c1a52-0d3e-4c55-8a0b-000000000002",
-			displayName: "Reader",
-			avatarUrl: null,
-			identities: [],
-			status: "ACTIVE",
-		},
-		eligibleForPracticeReview: true,
-		hidden: false,
-		joinedAt: "2026-01-01T00:00:00Z",
-		leftAt: null,
-		reviewSelected: true,
-		role,
-	};
-}
 const SUBMITTED: ReviewRequestOutcome = {
 	status: "SUBMITTED",
 	reviewId: TRACE.review.id,
@@ -95,7 +78,7 @@ function harness() {
 		workspaces: async () => [],
 		workspace: async () => undefined,
 		resolve: vi.fn<ActionApi["resolve"]>(async () => answer),
-		membership: vi.fn<ActionApi["membership"]>(async () => membership("MEMBER")),
+
 		trace: vi.fn<ActionApi["trace"]>(async () => TRACE),
 		requestReview: vi.fn<ActionApi["requestReview"]>(async () => SUBMITTED),
 	} satisfies ActionApi;

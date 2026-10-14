@@ -1879,8 +1879,8 @@ erDiagram
     IdentityProvider ||--o{ Label : labeled
     LlmConnection ||--o{ LlmModel : has
     LlmModel ||--o{ LlmModelPrice : has
-    Workspace ||--o{ LlmUsageEvent : has
     Review ||--o{ LlmUsageEvent : has
+    Workspace ||--o{ LlmUsageEvent : has
     Account ||--o{ Membership : belongs_to
     Workspace ||--o{ Membership : belongs_to
     ChatThread ||--o{ MentorSlackThread : has

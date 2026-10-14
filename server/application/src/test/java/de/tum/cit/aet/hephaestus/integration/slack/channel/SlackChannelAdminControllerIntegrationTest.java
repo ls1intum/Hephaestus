@@ -360,6 +360,6 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
                 workspace.getId(),
                 practice,
                 threadId,
-                owner.getId());
+                accountId(owner));
     }
 }

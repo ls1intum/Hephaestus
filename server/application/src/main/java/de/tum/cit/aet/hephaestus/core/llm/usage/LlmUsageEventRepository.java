@@ -179,13 +179,13 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
             value = "UPDATE llm_usage_event SET cost_usd = :costUsd, pricing_state = :#{#price.pricingState().name()},"
-                    + " applied_price_id = :#{#price.appliedPriceId()}, applied_workspace_model_id ="
-                    + " :#{#price.appliedWorkspaceModelId()}, applied_per_1m_input_usd = :#{#price.per1mInputUsd()},"
-                    + " applied_per_1m_output_usd = :#{#price.per1mOutputUsd()}, applied_per_1m_cache_read_usd ="
-                    + " :#{#price.per1mCacheReadUsd()}, applied_per_1m_cache_write_usd = :#{#price.per1mCacheWriteUsd()}"
-                    + " WHERE id = :id AND pricing_state = 'UNPRICED' AND measurement_verification = 'VERIFIED' AND"
-                    + " unreported_calls = 0 AND (input_tokens > 0 OR output_tokens > 0 OR cache_read_tokens > 0 OR"
-                    + " cache_write_tokens > 0)",
+                + " applied_price_id = :#{#price.appliedPriceId()}, applied_workspace_model_id ="
+                + " :#{#price.appliedWorkspaceModelId()}, applied_per_1m_input_usd = :#{#price.per1mInputUsd()},"
+                + " applied_per_1m_output_usd = :#{#price.per1mOutputUsd()}, applied_per_1m_cache_read_usd ="
+                + " :#{#price.per1mCacheReadUsd()}, applied_per_1m_cache_write_usd = :#{#price.per1mCacheWriteUsd()}"
+                + " WHERE id = :id AND pricing_state = 'UNPRICED' AND measurement_verification = 'VERIFIED' AND"
+                + " unreported_calls = 0 AND (input_tokens > 0 OR output_tokens > 0 OR cache_read_tokens > 0 OR"
+                + " cache_write_tokens > 0)",
             nativeQuery = true)
     int applyResolvedPrice(
             @Param("id") UUID id, @Param("costUsd") BigDecimal costUsd, @Param("price") LlmPriceSnapshot price);
@@ -390,7 +390,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
                      ELSE t.floor_cost END AS cost_share
             FROM truncated t
         )
-        SELECT a.practice_slug AS practiceSlug, p.name AS practiceName,
+        SELECT a.practice_slug AS practiceSlug, pv.definition->>'name' AS practiceName,
             STRING_AGG(DISTINCT a.model_kind, ',') AS modelKinds,
             COUNT(DISTINCT a.source_id) AS reviews,
             SUM(a.calls) AS calls, SUM(a.input_tokens) AS inputTokens, SUM(a.output_tokens) AS outputTokens,
@@ -399,7 +399,8 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             COUNT(DISTINCT a.source_id) FILTER (WHERE a.pricing_state = 'UNPRICED') AS unpricedEventCount
         FROM allocated a
         LEFT JOIN practice p ON p.workspace_id = :workspaceId AND p.slug = a.practice_slug
-        GROUP BY a.practice_slug, p.name
+        LEFT JOIN practice_version pv ON pv.id = p.current_version_id AND pv.workspace_id = p.workspace_id
+        GROUP BY a.practice_slug, pv.definition->>'name'
         ORDER BY COALESCE(SUM(a.cost_share), 0) DESC, a.practice_slug NULLS LAST
         """, nativeQuery = true)
     List<PracticeAggregate> aggregatePracticeScriptByPractice(

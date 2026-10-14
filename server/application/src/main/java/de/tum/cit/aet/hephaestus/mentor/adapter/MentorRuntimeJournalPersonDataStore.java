@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.mentor.adapter;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.JdbcPersonDataStore;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
+import de.tum.cit.aet.hephaestus.integration.core.framework.MonitoredRepositoryScope;
 import java.util.List;
 import java.util.Map;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -23,13 +24,13 @@ final class MentorRuntimeJournalPersonDataStore extends JdbcPersonDataStore {
         SELECT workspace_id FROM membership WHERE account_id = :account
         UNION SELECT workspace_id FROM slack_thread WHERE id = ANY(:conversations)
         UNION SELECT workspace_id FROM outline_document WHERE id = ANY(:documents)
-        UNION SELECT rm.workspace_id FROM repository_to_monitor rm
-            JOIN repository r ON r.name_with_owner = rm.name_with_owner
-                AND monitor_covers_repository(rm.workspace_id, rm.native_id, r.native_id, r.provider_id)
+        UNION SELECT rtm.workspace_id FROM repository_to_monitor rtm
+            JOIN repository r ON r.name_with_owner = rtm.name_with_owner
+                AND %s
             JOIN issue i ON i.repository_id = r.id
             WHERE i.id = ANY(:items)
         UNION SELECT workspace_id FROM review_job WHERE id = ANY(:derivedJobs)
-        """;
+        """.formatted(MonitoredRepositoryScope.NATIVE_RTM_R);
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;

@@ -27,7 +27,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -298,7 +297,7 @@ class ProductionSchemaContractIntegrationTest {
 
         assertThatThrownBy(() -> setScopeMode(workspaceId, "practice_default_feedback_mode", "INVALID"))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_workspace_practice_default_feedback_mode");
+                .hasMessageContaining("ck_workspace_feedback_mode");
 
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT review_scope_repositories FROM workspace WHERE id = ?", String.class, workspaceId))
@@ -464,12 +463,9 @@ class ProductionSchemaContractIntegrationTest {
                 .filter(part -> part.matches("[A-Z_]{2,}"))
                 .distinct()
                 .toList();
-        List<String> expected =
-                new ArrayList<>(Arrays.stream(values).map(Enum::name).toList());
-        if (constraintName.equals("ck_config_audit_event_entity_type")) {
-            expected.addAll(List.of("PRACTICE_AREA", "CURATED_PRACTICE_AREA"));
-        }
-        assertThat(accepted).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(accepted)
+                .containsExactlyInAnyOrderElementsOf(
+                        Arrays.stream(values).map(Enum::name).toList());
     }
 
     private long auditWorkspaceId() {

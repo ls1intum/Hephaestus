@@ -86,7 +86,7 @@ function citation(sourceKind: string, overrides: Partial<EvidenceCitation> = {})
 		startLine: 12,
 		endLine: quote.includes("\n") ? 13 : 12,
 		side: isDiff ? "NEW" : null,
-		revision: null,
+		commit: null,
 		verification: null,
 		...overrides,
 	};
@@ -193,7 +193,7 @@ export const UnknownSource: Story = {
 				startLine: 4,
 				endLine: 4,
 				side: null,
-				revision: null,
+				commit: null,
 				verification: null,
 			},
 		],
@@ -237,7 +237,7 @@ export const Mobile: Story = {
 
 export const HistoricalSource: Story = {
 	args: {
-		citations: [citation("scm.repository.tree", { revision: "b".repeat(40) })],
+		citations: [citation("scm.repository.tree", { commit: "b".repeat(40) })],
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("b".repeat(40))).toBeVisible();

@@ -31,7 +31,7 @@ const citation = (path: string): EvidenceCitation => ({
 	sourcePath: "owner/repo#1",
 	path,
 	side: "NEW",
-	revision: null,
+	commit: null,
 	startLine: 1,
 	endLine: 1,
 	quote: "return null;",

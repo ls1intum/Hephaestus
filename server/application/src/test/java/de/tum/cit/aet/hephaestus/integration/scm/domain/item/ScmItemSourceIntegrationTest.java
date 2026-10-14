@@ -57,7 +57,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
     @Autowired
@@ -94,7 +96,10 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
     private UserRepository users;
 
     @Autowired
-    private ScmItemEventRecorder recorder;
+    private ApplicationEventPublisher publisher;
+
+    @Autowired
+    private TransactionTemplate transactions;
 
     @Autowired
     private ItemEventRepository events;
@@ -423,8 +428,8 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                 fixture.author().getId());
         var submitted = new ScmDomainEvent.ReviewSubmitted(
                 ScmEventPayload.ReviewData.from(review).orElseThrow(), context);
-        recorder.onReview(submitted);
-        recorder.onReview(submitted);
+        transactions.executeWithoutResult(status -> publisher.publishEvent(submitted));
+        transactions.executeWithoutResult(status -> publisher.publishEvent(submitted));
         for (long workspaceId : List.of(holder.workspaceId(), second.getId())) {
             var repositoryItem = writer.upsert(new ItemRegistration(
                     workspaceId, ScmItemEvents.REPOSITORY, fixture.repository().getId(), null, null));
@@ -487,8 +492,8 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         pull.setBaseRefName("main");
         pull = pulls.saveAndFlush(pull);
         var context = EventContext.forSync(fixture.workspace().getId(), null, type, Instant.now());
-        recorder.onPullRequest(
-                new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pull), context));
+        var unproved = new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pull), context);
+        transactions.executeWithoutResult(status -> publisher.publishEvent(unproved));
         var holder = writer.upsert(new ItemRegistration(
                 fixture.workspace().getId(),
                 ScmItemEvents.REPOSITORY,
@@ -513,8 +518,8 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         pull = pulls.saveAndFlush(pull);
         var captured = sources.pin(item, null).version();
         var event = new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pull), context);
-        recorder.onPullRequest(event);
-        recorder.onPullRequest(event);
+        transactions.executeWithoutResult(status -> publisher.publishEvent(event));
+        transactions.executeWithoutResult(status -> publisher.publishEvent(event));
         assertThat(jdbc.queryForList(
                         "SELECT name || '|' || item_version || '|' || found_by FROM item_event WHERE workspace_id=?"
                                 + " AND item_id=?",

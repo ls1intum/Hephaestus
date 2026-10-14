@@ -44,7 +44,7 @@ const strength: ResultDetail = {
 				sourcePath: "owner/repo#4821",
 				path: "server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/AgentClient.java",
 				side: "NEW",
-				revision: null,
+				commit: null,
 				startLine: 88,
 				endLine: 90,
 				quote:
@@ -57,7 +57,7 @@ const strength: ResultDetail = {
 				sourcePath: "owner/repo#4821",
 				path: "server/application/src/main/resources/application.yml",
 				side: "NEW",
-				revision: null,
+				commit: null,
 				startLine: 12,
 				endLine: 12,
 				quote: "agent.timeout: 90s",

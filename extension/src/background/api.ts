@@ -5,7 +5,6 @@ import {
 	getCurrentUser,
 	getOwnDeliveredWorkFeedback,
 	getOwnItemTrace,
-	getOwnMembership,
 	getWorkspace,
 	listIdentityProviders,
 	listOwnItemReviews,
@@ -27,7 +26,6 @@ import type {
 	ReviewContext as ReviewContextDTO,
 	Workspace,
 	WorkspaceListItem,
-	WorkspaceMembership,
 } from "~/api/types.gen";
 import {
 	consentRequired,
@@ -224,12 +222,6 @@ export class AuthenticatedApi {
 	async workspace(workspaceSlug: string): Promise<Workspace | undefined> {
 		return bodyOrMissing(
 			await this.#call(async (client) => getWorkspace({ client, path: { workspaceSlug } })),
-		);
-	}
-
-	async membership(workspaceSlug: string): Promise<WorkspaceMembership> {
-		return body(
-			await this.#call(async (client) => getOwnMembership({ client, path: { workspaceSlug } })),
 		);
 	}
 

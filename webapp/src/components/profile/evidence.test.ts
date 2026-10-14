@@ -13,7 +13,7 @@ function citation(overrides: Partial<EvidenceCitation> = {}): EvidenceCitation {
 		sourcePath: "owner/repo#1",
 		path: "src/Main.java",
 		side: "NEW",
-		revision: null,
+		commit: null,
 		startLine: 42,
 		endLine: 44,
 		quote: "a();\nb();",
@@ -71,9 +71,9 @@ describe("toEvidenceLocations", () => {
 	});
 
 	it("preserves the commit that a historical quote was verified against", () => {
-		const revision = "a".repeat(40);
-		const [location] = toEvidenceLocations([citation({ revision })]);
-		expect(location?.commit).toBe(revision);
+		const commit = "a".repeat(40);
+		const [location] = toEvidenceLocations([citation({ commit })]);
+		expect(location?.commit).toBe(commit);
 	});
 
 	it("preserves the order the reviewer recorded", () => {
@@ -129,8 +129,8 @@ describe("toEvidenceLocations", () => {
 
 	it("keeps neither side's commit on a folded block: each side was read at its own", () => {
 		const [location] = toEvidenceLocations([
-			citation({ side: "OLD", revision: "a".repeat(40), quote: "-a();" }),
-			citation({ side: "NEW", revision: "b".repeat(40), quote: "+a();" }),
+			citation({ side: "OLD", commit: "a".repeat(40), quote: "-a();" }),
+			citation({ side: "NEW", commit: "b".repeat(40), quote: "+a();" }),
 		]);
 
 		expect(location?.change).toStrictEqual({ before: "-a();", after: "+a();" });

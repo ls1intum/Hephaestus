@@ -66,11 +66,12 @@ public final class SlackConversationTestSupport {
     }
 
     /** Seed one monitored channel with an explicit consent state. */
-    public void seedChannel(long workspaceId, String channelId, String consentState) {
+    public void seedChannel(long workspaceId, String teamId, String channelId, String consentState) {
         jdbc.update(
                 "INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, channel_name,"
-                        + " consent_state, created_at) VALUES (?, 'T1', ?, 'engineering', ?, now())",
+                        + " consent_state, created_at) VALUES (?, ?, ?, 'engineering', ?, now())",
                 workspaceId,
+                teamId,
                 channelId,
                 consentState);
     }
@@ -101,11 +102,13 @@ public final class SlackConversationTestSupport {
     }
 
     /** Seed one non-tombstoned message (author {@code U1}). */
-    public void seedMessage(long workspaceId, String channelId, String ts, @Nullable String threadTs, String text) {
+    public void seedMessage(
+            long workspaceId, String teamId, String channelId, String ts, @Nullable String threadTs, String text) {
         jdbc.update(
                 "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts,"
-                        + " author_slack_user_id, text, ingested_at) VALUES (?, 'T1', ?, ?, ?, 'U1', ?, now())",
+                        + " author_slack_user_id, text, ingested_at) VALUES (?, ?, ?, ?, ?, 'U1', ?, now())",
                 workspaceId,
+                teamId,
                 channelId,
                 ts,
                 threadTs,

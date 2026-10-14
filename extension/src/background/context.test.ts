@@ -11,7 +11,6 @@ import type {
 	ReviewContext as ReviewContextDTO,
 	Workspace,
 	WorkspaceListItem,
-	WorkspaceMembership,
 } from "~/api/types.gen";
 import {
 	type ContextApi,
@@ -87,6 +86,7 @@ function dto(id: string, kind = "scm.pull_request"): ReviewContextDTO {
 		workspaceSlug: "team",
 		item: itemRef(id, kind),
 		requestAllowed: true,
+		canInspectReviewDetails: false,
 		reasonDescription: null,
 	};
 }
@@ -112,24 +112,6 @@ function ownTrace(itemId: string): OwnItemTrace {
 
 const TRACE = ownTrace("4009");
 
-function membership(role: WorkspaceMembership["role"]): WorkspaceMembership {
-	return {
-		account: {
-			id: "1002",
-			displayName: "Reader",
-			avatarUrl: null,
-			identities: [],
-			status: "ACTIVE",
-		},
-		eligibleForPracticeReview: true,
-		hidden: false,
-		joinedAt: "2026-01-01T00:00:00Z",
-		leftAt: null,
-		reviewSelected: true,
-		role,
-	};
-}
-
 interface Setup {
 	url: string;
 	workspaces?: WorkspaceListItem[];
@@ -140,7 +122,6 @@ interface Setup {
 function environment(setup: Setup) {
 	let { url } = setup;
 	const trace = vi.fn<ContextApi["trace"]>().mockResolvedValue(TRACE);
-	const member = vi.fn<ContextApi["membership"]>().mockResolvedValue(membership("MEMBER"));
 	const resolve = vi
 		.fn<ContextApi["resolve"]>()
 		.mockImplementation(async (slug) => setup.resolved?.[slug]);
@@ -151,7 +132,7 @@ function environment(setup: Setup) {
 		workspace: async (slug) =>
 			workspace(slug, setup.servers?.[slug] ?? "https://gitlab.example.test"),
 		resolve,
-		membership: member,
+
 		trace,
 	};
 	const env: ContextEnvironment = {
@@ -169,7 +150,7 @@ function environment(setup: Setup) {
 		env,
 		trace,
 		resolve,
-		membership: member,
+
 		navigate: (next: string) => {
 			url = next;
 		},
@@ -277,22 +258,20 @@ describe("resolveContext", () => {
 		});
 	});
 
-	it.each(["OWNER", "ADMIN"] as const)(
-		"links a workspace %s to the item's review details too",
-		async (role) => {
-			const { env, membership: member } = environment({ url: MR, resolved: { team: dto("4009") } });
-			member.mockResolvedValue(membership(role));
-			await expect(resolveContext(env, 1)).resolves.toMatchObject({
-				canInspectReviewDetails: true,
-				links: {
-					trace: "https://heph.example.test/w/team/feedback/4009",
-					reviewDetails:
-						"https://heph.example.test/w/team/admin/practices/reviews/reviews?itemId=4009&detail=item%3A4009",
-				},
-			});
-			expect(member).toHaveBeenCalledWith("team");
-		},
-	);
+	it("uses the server's permission to link to review details", async () => {
+		const { env } = environment({
+			url: MR,
+			resolved: { team: { ...dto("4009"), canInspectReviewDetails: true } },
+		});
+		await expect(resolveContext(env, 1)).resolves.toMatchObject({
+			canInspectReviewDetails: true,
+			links: {
+				trace: "https://heph.example.test/w/team/feedback/4009",
+				reviewDetails:
+					"https://heph.example.test/w/team/admin/practices/reviews/?itemId=4009&detail=item%3A4009",
+			},
+		});
+	});
 
 	it("keeps own records readable when their review trace is unavailable", async () => {
 		const { env, trace } = environment({ url: MR, resolved: { team: dto("4009") } });
@@ -310,26 +289,6 @@ describe("resolveContext", () => {
 		});
 		navigate(ISSUE);
 		released.resolve(TRACE);
-		await expect(pending).rejects.toMatchObject({ code: "stale" });
-	});
-
-	it("drops the answer when the tab moved on while the reader's membership loaded", async () => {
-		const {
-			env,
-			membership: member,
-			navigate,
-		} = environment({
-			url: MR,
-			resolved: { team: dto("4009") },
-		});
-		const released = Promise.withResolvers<WorkspaceMembership>();
-		member.mockReturnValue(released.promise);
-		const pending = resolveContext(env, 1);
-		await vi.waitFor(() => {
-			expect(member).toHaveBeenCalledOnce();
-		});
-		navigate(ISSUE);
-		released.resolve(membership("ADMIN"));
 		await expect(pending).rejects.toMatchObject({ code: "stale" });
 	});
 
@@ -417,7 +376,7 @@ function detailsEnvironment() {
 		workspaces: async () => [listItem("team", "GITLAB")],
 		workspace: async (slug: string) => workspace(slug, "https://gitlab.example.test"),
 		resolve: vi.fn<ContextApi["resolve"]>(async (_slug, page) => byPage[page]),
-		membership: vi.fn<ContextApi["membership"]>(async () => membership("MEMBER")),
+
 		trace: vi.fn<ContextApi["trace"]>(async (_slug, itemId) => ownTrace(itemId)),
 		ownResults: vi.fn<DetailsApi["ownResults"]>(async () => resultResponse([ownRow()])),
 		workFeedback: vi.fn<DetailsApi["workFeedback"]>(async () => ({
@@ -446,11 +405,11 @@ function detailsEnvironment() {
 }
 
 describe("the reader's own results on the tab's item", () => {
-	it.each(["MEMBER", "ADMIN"] as const)(
-		"asks for a %s's own results on the exact item",
-		async (role) => {
+	it.each([false, true])(
+		"asks only for own results when review inspection is %s",
+		async (canInspectReviewDetails) => {
 			const { env, api } = detailsEnvironment();
-			api.membership.mockResolvedValue(membership(role));
+			api.resolve.mockResolvedValue({ ...dto("101"), canInspectReviewDetails });
 			const page = await resultPage(env, 10, "team");
 			expect(api.ownResults).toHaveBeenCalledWith("team", "101", 25);
 			expect(page).toMatchObject({ total: 1 });

@@ -128,9 +128,9 @@ function CitationHeader({
 					{side}
 				</Badge>
 			)}
-			{hasText(citation.revision) && (
+			{hasText(citation.commit) && (
 				<p className="min-w-0 basis-full text-xs break-all text-muted-foreground">
-					Commit <code>{citation.revision}</code>
+					Commit <code>{citation.commit}</code>
 				</p>
 			)}
 		</div>
@@ -151,7 +151,7 @@ function citationKey(citation: EvidenceCitation): string {
 		citation.sourceKind,
 		citation.sourcePath,
 		citation.path,
-		citation.revision,
+		citation.commit,
 		citation.side,
 		citation.startLine,
 		citation.endLine,

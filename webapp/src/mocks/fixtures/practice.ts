@@ -70,7 +70,7 @@ function readSource(source: string, label: string): ReadSourceOption {
 		source,
 		label,
 		needs: ["REQUIRED", "COMPLETE", "OPTIONAL"],
-		citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
+		citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 	};
 }
 
@@ -148,20 +148,20 @@ export const mockPracticeDefinitionOptions = {
 					source: "scm.pull-request.diff",
 					label: "Code changes",
 					needs: ["REQUIRED", "COMPLETE", "OPTIONAL"],
-					citation: { side: "REQUIRED", revision: "OPTIONAL" },
+					citation: { side: "REQUIRED", commit: "OPTIONAL" },
 				},
 				readSource("scm.pull-request.comments", "Inline review comments"),
 				{
 					source: "scm.repository.tree",
 					label: "Repository files and history",
 					needs: ["REQUIRED", "COMPLETE", "OPTIONAL"],
-					citation: { side: "FORBIDDEN", revision: "OPTIONAL" },
+					citation: { side: "FORBIDDEN", commit: "OPTIONAL" },
 				},
 				{
 					source: "scm.linked-work-items",
 					label: "Linked work items",
 					needs: ["REQUIRED", "OPTIONAL"],
-					citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
+					citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 				},
 				readSource("scm.review-threads", "Review threads and decisions"),
 				readSource("scm.general-review-comments", "General review comments"),

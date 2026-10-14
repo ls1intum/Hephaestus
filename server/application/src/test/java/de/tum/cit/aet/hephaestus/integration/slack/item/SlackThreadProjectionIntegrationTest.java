@@ -96,7 +96,10 @@ class SlackThreadProjectionIntegrationTest extends BaseIntegrationTest {
 
     private void connect(Workspace workspace) {
         var connection = new Connection(
-                workspace, IntegrationKind.SLACK, "T1", new ConnectionConfig.SlackConfig("T1", null, null, Set.of()));
+                workspace,
+                IntegrationKind.SLACK,
+                "T" + workspace.getId(),
+                new ConnectionConfig.SlackConfig("T" + workspace.getId(), null, null, Set.of()));
         connection.setState(IntegrationState.ACTIVE);
         connections.saveAndFlush(connection);
     }
@@ -109,7 +112,7 @@ class SlackThreadProjectionIntegrationTest extends BaseIntegrationTest {
     }
 
     private void seedChannel(long workspaceId, String channelId, String consentState) {
-        support.seedChannel(workspaceId, channelId, consentState);
+        support.seedChannel(workspaceId, "T" + workspaceId, channelId, consentState);
     }
 
     private void seedThread(
@@ -123,7 +126,7 @@ class SlackThreadProjectionIntegrationTest extends BaseIntegrationTest {
     }
 
     private void seedMessage(long workspaceId, String channelId, String ts, @Nullable String threadTs) {
-        support.seedMessage(workspaceId, channelId, ts, threadTs, "hi");
+        support.seedMessage(workspaceId, "T" + workspaceId, channelId, ts, threadTs, "hi");
     }
 
     @Test

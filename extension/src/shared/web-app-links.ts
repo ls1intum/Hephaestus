@@ -12,14 +12,14 @@ export function workLinks(
 	webAppOrigin: string,
 	workspaceSlug: string,
 	item: { id: string },
-	admin: boolean,
+	canInspectReviewDetails: boolean,
 ): { trace: string; reviewDetails?: string } {
 	const base = workspaceBase(webAppOrigin, workspaceSlug);
 	const trace = `${base}/feedback/${encodeURIComponent(item.id)}`;
-	return admin
+	return canInspectReviewDetails
 		? {
 				trace,
-				reviewDetails: `${base}/admin/practices/reviews/reviews?${new URLSearchParams({
+				reviewDetails: `${base}/admin/practices/reviews/?${new URLSearchParams({
 					itemId: item.id,
 					detail: `item:${item.id}`,
 				})}`,

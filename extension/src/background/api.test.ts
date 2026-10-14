@@ -10,7 +10,6 @@ import type {
 	PageResponseDtoProfileReview,
 	ReviewRef,
 	ReviewRequestOutcome,
-	WorkspaceMembership,
 } from "~/api/types.gen";
 import { AuthenticatedApi, publicApi } from "~/background/api";
 import {
@@ -358,29 +357,6 @@ describe("the report's calls", () => {
 				.filter((request) => new URL(request.url).pathname.endsWith("/own-trace"))
 				.map((request) => new URL(request.url).searchParams.get("reviewId")),
 		).toStrictEqual([REVIEW, LATER_REVIEW]);
-	});
-
-	it("reads the reader's own membership in the workspace", async () => {
-		const membership: WorkspaceMembership = {
-			account: {
-				id: "acc",
-				displayName: "Reader",
-				avatarUrl: null,
-				identities: [],
-				status: "ACTIVE",
-			},
-			eligibleForPracticeReview: true,
-			hidden: false,
-			joinedAt: "2026-01-01T00:00:00Z",
-			leftAt: null,
-			reviewSelected: true,
-			role: "ADMIN",
-		};
-		const { built, requests } = await api(async () => json(membership));
-		await expect(built.membership("team")).resolves.toStrictEqual(membership);
-		expect(requests.map((request) => new URL(request.url).pathname)).toStrictEqual([
-			"/api/workspaces/team/members/me",
-		]);
 	});
 
 	it("posts one review request, and returns a refusal as the server's answer", async () => {

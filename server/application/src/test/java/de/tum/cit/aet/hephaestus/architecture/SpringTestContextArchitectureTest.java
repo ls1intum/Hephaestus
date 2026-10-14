@@ -103,75 +103,78 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("testconfig.RealAuthIntegrationTest", "real-auth"));
 
     private static final Map<String, String> FULL_CONTEXT_JUSTIFICATIONS = Map.ofEntries(
-            Map.entry("base", "shared PostgreSQL, HTTP, security, and application acceptance context"),
+            Map.entry("base", "shared PostgreSQL, HTTP, security, and application acceptance" + " context"),
             Map.entry(
                     "consent-sign-in",
-                    "real cookie and installed-client sign-in with the production consent interceptor enabled"),
+                    "real cookie and installed-client sign-in with the production consent" + " interceptor enabled"),
             Map.entry("dev-login", "dev-login feature-property behavior"),
             Map.entry(
                     "email-capture",
-                    "shared configured sender identity and captured SMTP boundary for durable delivery and HTTP"
-                            + " authorization"),
+                    "shared configured sender identity and captured SMTP boundary for"
+                            + " durable delivery and HTTP authorization"),
             Map.entry("github-live", "explicitly selected live GitHub profile and credentials"),
             Map.entry(
                     "gitlab-event-routing",
-                    "real JetStream scope consumer with GitLab discovery, webhook and sync held at the API boundary"),
+                    "real JetStream scope consumer with GitLab discovery, webhook and sync"
+                            + " held at the API boundary"),
             Map.entry(
                     "gitlab-token-lifecycle",
-                    "real credential storage, lifecycle locks and attention with only irreversible upstream token"
-                            + " rotation mocked"),
+                    "real credential storage, lifecycle locks and attention with only"
+                            + " irreversible upstream token rotation mocked"),
             Map.entry(
                     "mentor-worker-split",
-                    "server-only role with authenticated worker transport and controlled runner, routing and admission"
-                            + " boundaries"),
+                    "server-only role with authenticated worker transport and controlled"
+                            + " runner, routing and admission boundaries"),
             Map.entry(
                     "mentor-http",
-                    "shared mentor HTTP authorization context with only asynchronous turn transport spied"),
+                    "shared mentor HTTP authorization context with only asynchronous turn" + " transport spied"),
             Map.entry("outline-enabled", "enabled Outline integration wiring"),
             Map.entry(
                     "practice-script-live",
-                    "worker role with the real LLM proxy on a free sandbox gateway port, calling live models"),
+                    "worker role with the real LLM proxy on a free sandbox gateway port," + " calling live models"),
             Map.entry("real-auth", "real OAuth and authentication wiring without test security"),
             Map.entry(
                     "review-evidence",
-                    "shared review fixture with the neutral evidence authorization boundary controlled for exact"
-                            + " visibility assertions"),
+                    "shared review fixture with the neutral evidence authorization boundary"
+                            + " controlled for exact visibility assertions"),
             Map.entry(
                     "review-feedbackgate",
-                    "real feedback eligibility with only source capture and evidence authorization boundaries"
-                            + " controlled"),
+                    "real feedback eligibility with only source capture and evidence"
+                            + " authorization boundaries controlled"),
             Map.entry(
                     "review-feedbackdelivery",
-                    "real feedback receipts and recovery with irreversible delivery and readiness boundaries"
-                            + " controlled"),
+                    "real feedback receipts and recovery with irreversible delivery and"
+                            + " readiness boundaries controlled"),
             Map.entry(
                     "review-feedbackhistoryquery",
-                    "real persisted history with exact private/public source permissions controlled"),
+                    "real persisted history with exact private/public source permissions" + " controlled"),
             Map.entry(
                     "review-feedbackmodereview",
-                    "real feedback mode inheritance with runtime attempt authority controlled"),
+                    "real feedback mode inheritance with runtime attempt authority" + " controlled"),
             Map.entry(
                     "review-feedbackreviewcontroller",
-                    "real authenticated feedback routes with item display labels controlled"),
+                    "real authenticated feedback routes with item display labels" + " controlled"),
             Map.entry(
                     "review-fixture",
-                    "shared persisted review/item/account fixture with real product services and schema functions"),
+                    "shared persisted review/item/account fixture with real product"
+                            + " services and schema functions"),
             Map.entry(
                     "review-resultadmission",
-                    "real transactional result admission with controlled runtime attempts, budget and custody"
-                            + " boundaries"),
+                    "real transactional result admission with controlled runtime attempts,"
+                            + " budget and custody boundaries"),
             Map.entry(
                     "review-resulthistory",
-                    "real persisted result history with runtime and source permission boundaries controlled"),
+                    "real persisted result history with runtime and source permission" + " boundaries controlled"),
             Map.entry(
                     "review-reviewoperationalviews",
-                    "real operational HTTP product views with worker runtime facts controlled"),
+                    "real operational HTTP product views with worker runtime facts" + " controlled"),
             Map.entry(
                     "review-reviewtimingfacts",
-                    "real retained product timing and bounded percentile queries with provider merge facts controlled"),
+                    "real retained product timing and bounded percentile queries with"
+                            + " provider merge facts controlled"),
             Map.entry(
                     "review-scanreport",
-                    "real scan report membership, marks and visibility with runtime/person boundaries controlled"),
+                    "real scan report membership, marks and visibility with runtime/person" + " boundaries controlled"),
             Map.entry("slack-enabled", "real Slack item resolution with the configured provider adapter"),
             Map.entry("slack-ingest", "enabled Slack ingest wiring with its review-submission spy"),
             Map.entry("slack-lifecycle", "agent submission boundary override"),
@@ -233,6 +236,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "integration.slack.SlackConsentLifecycleE2EIntegrationTest",
             "practices.acrossworkspace.PracticesAcrossWorkspaceIntegrationTest",
             "practices.feedback.AbstractFeedbackDeliveryIntegrationTest",
+            "practices.feedback.FeedbackGateIntegrationTest",
+            "practices.feedback.FeedbackGateIntegrationTest",
             "practices.feedback.FeedbackHistoryQueryIntegrationTest",
             "practices.feedback.FeedbackReviewControllerIntegrationTest",
             "practices.groupdetail.PracticeGroupReviewHistoryIntegrationTest",
@@ -260,8 +265,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                 .map(JavaClass::getName)
                 .collect(Collectors.toCollection(TreeSet::new));
         assertThat(mockitoBeans)
-                .as("@MockitoBean changes Spring's context-cache key; reuse an existing configuration or review"
-                        + " this inventory")
+                .as("@MockitoBean changes Spring's context-cache key; reuse an existing"
+                        + " configuration or review this inventory")
                 .isEqualTo(MOCKITO_BEAN_TESTS);
 
         Set<String> dynamicProperties = classesWithTests.stream()
@@ -270,7 +275,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                 .map(method -> method.getOwner().getName())
                 .collect(Collectors.toCollection(TreeSet::new));
         assertThat(dynamicProperties)
-                .as("@DynamicPropertySource changes Spring's context-cache key; reuse a reviewed test base")
+                .as("@DynamicPropertySource changes Spring's context-cache key; reuse a" + " reviewed test base")
                 .isEqualTo(DYNAMIC_PROPERTY_TESTS);
     }
 
@@ -285,7 +290,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                 .collect(Collectors.toCollection(TreeSet::new));
 
         assertThat(configurationBearingTests)
-                .as("Every full-context configuration variant must be assigned to a reviewed merged key")
+                .as("Every full-context configuration variant must be assigned to a reviewed" + " merged key")
                 .isEqualTo(FULL_CONTEXT_ASSIGNMENTS.keySet());
 
         Set<String> mergedKeys =
@@ -330,8 +335,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                 .collect(Collectors.toCollection(TreeSet::new));
         assertThat(actual)
                 .as(
-                        "@%s changes Spring's context-cache key; reuse an existing configuration or review this"
-                                + " inventory",
+                        "@%s changes Spring's context-cache key; reuse an existing configuration or"
+                                + " review this inventory",
                         annotation.getSimpleName())
                 .isEqualTo(expected);
     }
@@ -406,14 +411,16 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
 
     private static final class NestedConfigurationFixture {
 
-        @SuppressWarnings("UnusedNestedClass") // ArchUnit reads it as the nested @TestConfiguration under test
+        @SuppressWarnings("UnusedNestedClass") // ArchUnit reads it as the nested @TestConfiguration under
+        // test
         @TestConfiguration
         static class Configuration {}
     }
 
     private static final class TestBeanFixture {
 
-        @SuppressWarnings("UnusedVariable") // ArchUnit reads its @TestBean annotation; Spring never loads the fixture
+        @SuppressWarnings("UnusedVariable") // ArchUnit reads its @TestBean annotation; Spring never loads the
+        // fixture
         @TestBean
         @Nullable
         String dependency;

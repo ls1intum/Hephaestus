@@ -5,7 +5,6 @@ import type {
 	ReviewContext as ReviewContextDTO,
 	Workspace,
 	WorkspaceListItem,
-	WorkspaceMembership,
 } from "~/api/types.gen";
 import { consentRequired, stale, WorkerError } from "~/background/errors";
 import type { InstanceConfig } from "~/background/storage";
@@ -35,7 +34,6 @@ export interface ContextApi {
 	workspaces: () => Promise<WorkspaceListItem[]>;
 	workspace: (slug: string) => Promise<Workspace | undefined>;
 	resolve: (slug: string, url: string) => Promise<ReviewContextDTO | undefined>;
-	membership: (slug: string) => Promise<WorkspaceMembership>;
 	trace: (slug: string, itemId: string) => Promise<OwnItemTrace | null>;
 }
 
@@ -259,12 +257,8 @@ async function resolveLocated(
 		};
 	}
 	const { site, dto, item } = chosen;
-	const [trace, membership] = await Promise.all([
-		env.api.trace(site.slug, item.id),
-		env.api.membership(site.slug),
-	]);
+	const trace = await env.api.trace(site.slug, item.id);
 	await located.stillThere();
-	const admin = membership.role !== "MEMBER";
 	return {
 		located,
 		context: {
@@ -274,9 +268,9 @@ async function resolveLocated(
 			alternatives: choices.filter((choice) => choice.slug !== site.slug),
 			item,
 			requestAllowed: dto.requestAllowed,
-			canInspectReviewDetails: admin,
+			canInspectReviewDetails: dto.canInspectReviewDetails,
 			trace,
-			links: workLinks(env.instance.webAppOrigin, site.slug, item, admin),
+			links: workLinks(env.instance.webAppOrigin, site.slug, item, dto.canInspectReviewDetails),
 			pageUrl: page.canonicalUrl,
 			view: page.view,
 			fetchedAt: env.now().toISOString(),

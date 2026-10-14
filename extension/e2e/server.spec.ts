@@ -135,7 +135,7 @@ test.describe("inline review activity", () => {
 		await providerTab(page, GITLAB_MR);
 		const frame = await openInline(page);
 		await expectWork(frame, TRACE_URL);
-		const details = `${WEB_APP_URL}/w/ext-e2e/admin/practices/reviews/reviews?itemId=${MR4_ITEM_ID}&detail=item%3A${MR4_ITEM_ID}`;
+		const details = `${WEB_APP_URL}/w/ext-e2e/admin/practices/reviews/?itemId=${MR4_ITEM_ID}&detail=item%3A${MR4_ITEM_ID}`;
 		await expectSafeLink(frame.getByRole("link", { name: /^Review details/u }), details);
 		await expect(frame.getByRole("button", { name: /Manage/u })).toHaveCount(0);
 		// Only the line opens; nothing inside it opens further.

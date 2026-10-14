@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.scm.feedback;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
@@ -60,8 +60,10 @@ public final class ScmReviewFixtures {
                     workspaceId,
                     developer,
                     Timestamp.from(at));
+            var repository = items.upsert(new ItemRegistration(
+                    workspaceId, ScmItemEvents.REPOSITORY, issue.getRepository().getId(), null, null));
             var item = items.upsert(
-                    new ItemRegistration(workspaceId, new ItemKind("scm.issue"), issue.getId(), null, null));
+                    new ItemRegistration(workspaceId, ScmItemEvents.ISSUE, issue.getId(), repository.itemId(), null));
             long practiceId = sequence("practice");
             long versionId = sequence("practice_version");
             String slug = "fixture-" + UUID.randomUUID();

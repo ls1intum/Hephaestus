@@ -1,7 +1,5 @@
-package de.tum.cit.aet.hephaestus.config;
+package de.tum.cit.aet.hephaestus.integration.core.consumer;
 
-import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
-import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsOptions;
 import io.nats.client.Connection;
 import io.nats.client.Nats;
 import io.nats.client.Options;

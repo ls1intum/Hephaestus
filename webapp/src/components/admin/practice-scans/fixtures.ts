@@ -456,7 +456,7 @@ export function problemEntry(
 					endLine: 48,
 					side: null,
 					quote: null,
-					revision: null,
+					commit: null,
 					verification: null,
 				},
 			],

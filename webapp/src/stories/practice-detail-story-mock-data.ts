@@ -102,7 +102,7 @@ function cited(
 		sourcePath: null,
 		path: null,
 		side: null,
-		revision: null,
+		commit: null,
 		startLine: null,
 		endLine: null,
 		quote: null,

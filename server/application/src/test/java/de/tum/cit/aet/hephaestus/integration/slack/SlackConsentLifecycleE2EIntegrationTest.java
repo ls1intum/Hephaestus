@@ -261,7 +261,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         String lastTs = (baseSecond + 3) + ".000000";
         support.seedThread(workspaceId, C1, rootTs, lastTs, 4, "{" + u1MemberId + "," + u2MemberId + "}");
         for (long s = baseSecond; s <= baseSecond + 3; s++) {
-            support.seedMessage(workspaceId, C1, s + ".000000", s == baseSecond ? null : rootTs, "turn");
+            support.seedMessage(workspaceId, TEAM, C1, s + ".000000", s == baseSecond ? null : rootTs, "turn");
         }
         long settledThreadId = threadRepository
                 .findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(workspaceId, C1, rootTs)
@@ -298,7 +298,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
 
         consentService.transition(workspaceId, C2, ConsentState.ACTIVE, "sibling active");
         support.seedThread(workspaceId, C2, "700.0", "700.0", 1, "{" + u2MemberId + "}");
-        support.seedMessage(workspaceId, C2, "700.0", null, "sibling msg");
+        support.seedMessage(workspaceId, TEAM, C2, "700.0", null, "sibling msg");
 
         // This manually constructed service needs the transaction normally supplied by its Spring proxy.
         new TransactionTemplate(transactionManager)

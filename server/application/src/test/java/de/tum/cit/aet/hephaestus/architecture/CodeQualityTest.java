@@ -518,8 +518,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
 
         /*
          * The person-data boundary: core.privacy, the adapters each module registers through its SPI
-         * or as an account erasure contributor, and the callers of the copy fence's leased session. They export
-         * and erase across every module's tables, including tables without an entity, and
+         * or as an account lifecycle contributor, and the callers of the copy fence's leased session. They export,
+         * absorb and erase across every module's tables, including tables without an entity, and
          * PersonalDataMapArchTest holds their SQL to the personal-data map.
          */
         private static final DescribedPredicate<JavaClass> PERSON_DATA_BOUNDARY = DescribedPredicate.describe(

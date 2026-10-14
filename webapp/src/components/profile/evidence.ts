@@ -86,7 +86,7 @@ function toLocation({ citation, change }: DiffBlock): EvidenceLocation {
 		endLine: citation.endLine ?? undefined,
 		sourceKind: citation.sourceKind,
 		side: citation.side ?? undefined,
-		commit: citation.revision ?? undefined,
+		commit: citation.commit ?? undefined,
 		snippet: citation.quote ?? undefined,
 	};
 }
