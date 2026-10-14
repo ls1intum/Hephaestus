@@ -56,7 +56,6 @@ describe("user view request context", () => {
 		},
 	);
 
-	// A provider login is not an account id, so a view stored with one is not a view.
 	it.each(["-1", "0", "alex", "11abc"])("ignores the stored account id %s", (accountId) => {
 		storeUserView({ accountId });
 

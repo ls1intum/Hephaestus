@@ -34,6 +34,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +47,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
-/** Persisted fixture rows for account erasure and workspace isolation. */
 @Component
 @ConditionalOnServerRole
 @RequiredArgsConstructor
@@ -184,13 +184,11 @@ public class PracticeModelTestFixtures {
         var manager = Objects.requireNonNull(entities);
         long existing = manager.createQuery(
                         "SELECT count(r) FROM Result r WHERE r.reviewId=:review AND"
-                                + " r.practiceId=:practice AND r.itemId=:item AND"
-                                + " r.developerId=:developer",
+                                + " r.practiceId=:practice AND r.itemId=:item",
                         Long.class)
                 .setParameter("review", work.review().getId())
                 .setParameter("practice", work.practice().getId())
                 .setParameter("item", work.item().getId())
-                .setParameter("developer", developerId)
                 .getSingleResult();
         if (existing != 0) work = forkReview(work);
         jdbc.update(
@@ -200,24 +198,37 @@ public class PracticeModelTestFixtures {
                 work.review().getWorkspaceId(),
                 developerId);
         var at = Instant.now();
-        manager.createQuery("UPDATE Result r SET r.endedAt=:at, r.endReason=:reason WHERE"
-                        + " r.workspaceId=:workspace AND r.practiceId=:practice AND"
-                        + " r.itemId=:item AND r.developerId=:developer AND r.endedAt IS NULL")
-                .setParameter("at", at)
-                .setParameter("reason", ResultEndReason.REPLACED)
-                .setParameter("workspace", work.review().getWorkspaceId())
-                .setParameter("practice", work.practice().getId())
-                .setParameter("item", work.item().getId())
-                .setParameter("developer", developerId)
-                .executeUpdate();
+        var assignment = Objects.requireNonNull(manager.find(
+                ReviewPractice.class,
+                new ReviewPractice.Id(work.review().getId(), work.practice().getId())));
+        var frozen = manager.find(ReviewItem.class, new ReviewItem.Id(
+                work.review().getId(), work.practice().getId(), Objects.requireNonNull(work.item().getId())));
+        if (frozen == null) {
+            frozen = ReviewItem.builder()
+                    .workspaceId(work.review().getWorkspaceId())
+                    .reviewId(work.review().getId())
+                    .practiceId(work.practice().getId())
+                    .itemId(Objects.requireNonNull(work.item().getId()))
+                    .itemVersion(work.review().getItemVersion())
+                    .state(ReviewItemState.LISTED)
+                    .jobId(work.job().getId())
+                    .build();
+            manager.persist(frozen);
+        }
+        manager.flush();
+        jdbc.update("""
+                UPDATE result SET ended_at=?, end_reason=?
+                WHERE workspace_id=? AND practice_id=? AND item_id=? AND developer_id=? AND ended_at IS NULL
+                """, Timestamp.from(at), ResultEndReason.REPLACED.name(), work.review().getWorkspaceId(),
+                work.practice().getId(), work.item().getId(), developerId);
         var result = Result.builder()
                 .id(UUID.randomUUID())
                 .workspaceId(work.review().getWorkspaceId())
                 .reviewId(work.review().getId())
                 .practiceId(work.practice().getId())
-                .practiceVersionId(work.practice().getCurrentVersion().getId())
+                .practiceVersionId(assignment.getPracticeVersionId())
                 .itemId(Objects.requireNonNull(work.item().getId()))
-                .itemVersion(work.review().getItemVersion())
+                .itemVersion(Objects.requireNonNull(frozen.getItemVersion()))
                 .developerId(developerId)
                 .outcome(ResultOutcome.MET)
                 .summary(summary)
@@ -226,20 +237,10 @@ public class PracticeModelTestFixtures {
                 .recordedAt(Instant.now())
                 .build();
         manager.persist(result);
-        manager.merge(ReviewItem.builder()
-                .workspaceId(result.getWorkspaceId())
-                .reviewId(result.getReviewId())
-                .practiceId(result.getPracticeId())
-                .itemId(result.getItemId())
-                .itemVersion(result.getItemVersion())
-                .state(ReviewItemState.JUDGED)
-                .resultId(result.getId())
-                .jobId(work.job().getId())
-                .attemptedAt(Instant.now())
-                .build());
-        var assignment = Objects.requireNonNull(manager.find(
-                ReviewPractice.class,
-                new ReviewPractice.Id(work.review().getId(), work.practice().getId())));
+        manager.flush();
+        frozen.setState(ReviewItemState.JUDGED);
+        frozen.setResultId(result.getId());
+        frozen.setAttemptedAt(Instant.now());
         assignment.setStatus(ReviewPracticeStatus.DONE);
         work.job().setStatus(ReviewJobStatus.COMPLETED);
         work.job().setProcessingStatus(ProcessingStatus.DONE);

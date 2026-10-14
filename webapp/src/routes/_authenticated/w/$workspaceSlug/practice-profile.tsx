@@ -104,7 +104,6 @@ function PracticeProfile() {
 	const openReviewId = openLevelId(detailStack, "review");
 	const reviews = usePracticeProfileReviews({
 		workspaceSlug,
-		// The review level reads its position off the list.
 		listOpen: openLevelId(detailStack, "reviews") !== undefined || openReviewId !== undefined,
 		reviewId: openReviewId,
 		itemKind: search.reviewKind,
@@ -138,7 +137,6 @@ function PracticeProfile() {
 	// A user view reads the developer's page; it never spends their workspace's budget.
 	const onReviewNow = readOnly ? undefined : reviews.onReviewNow;
 	const openGroup = (group: GroupRef) => stackControls.open(practiceGroupLevel(group.slug));
-	// The group a practice is filed under, as the page's standings carry it.
 	const groupOf = (practiceSlug: string) => {
 		const groupSlug = practiceStandings.find((entry) => entry.slug === practiceSlug)?.groupSlug;
 		return groups.find((group) => group.slug === groupSlug);
@@ -262,7 +260,6 @@ function PracticeProfile() {
 	);
 }
 
-/** One of the reader's own results in full, read when its row in a review opens. */
 function OwnResultDetail({
 	workspaceSlug,
 	resultId,

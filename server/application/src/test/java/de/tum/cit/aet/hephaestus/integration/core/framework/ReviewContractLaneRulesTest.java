@@ -9,15 +9,7 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Every {@link CopyCapability} must carry an enforcement rule.
- *
- * <p>A lane added to the enum and to neither of {@link ReviewContractValidator}'s two collections
- * is not rejected — it is simply never checked, so an integration declaring it would pass
- * validation and then deliver nowhere. This is a test rather than a fail-fast in a static
- * initializer because that would only move the discovery to runtime, including the webhook pod,
- * whose missed push events cannot be redelivered.
- */
+// Adding a copy capability requires a validation rule even when no enabled integration declares it.
 class ReviewContractLaneRulesTest extends BaseUnitTest {
 
     @Test

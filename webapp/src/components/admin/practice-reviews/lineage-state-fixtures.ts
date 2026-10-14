@@ -33,20 +33,11 @@ import {
 	storyLineage,
 } from "./lineage-fixtures";
 
-/**
- * Every state the graph can meet, one small graph per state, grouped the way the state matrix
- * stories show them. Each graph is the same pull request, reviewed from 13:35, so only the state in
- * question differs between two of them.
- */
 export interface LineageStateCase {
 	key: string;
 	/** What the case shows, as its heading in the matrix. */
 	title: string;
 	lineage: ReviewLineage;
-	/**
-	 * The review's own detail, where the case needs what only it says: a stop reason, a withheld
-	 * practice, the runtime jobs or their absence.
-	 */
 	review?: ReviewDetail;
 }
 
@@ -67,7 +58,6 @@ const RESULT_B = id(1, 2);
 const RESULT_C = id(1, 3);
 const FEEDBACK_A = id(2, 1);
 
-/** A result of the graph's review, about Ada's pull request unless the case says otherwise. */
 function stateResult(
 	resultId: string,
 	overrides: Partial<ReviewBoundResult> = {},
@@ -99,7 +89,6 @@ const problemOf = (resultId: string, position: number, severity: ProblemSummary[
 	summary: `Problem ${position + 1}`,
 });
 
-/** Three results: one not met behind the feedback, one met, one that does not apply. */
 const threeResults = (overrides: Partial<ReviewBoundResult> = {}): LineageResultSpec[] => [
 	stateResult(RESULT_A, overrides, [
 		problemOf(RESULT_A, 0, "MAJOR"),
@@ -139,7 +128,6 @@ function stateFeedback(
 	};
 }
 
-/** One comment on the pull request from the not met result. */
 const oneComment = (overrides: Partial<ReviewBoundFeedback> = {}) =>
 	stateFeedback(FEEDBACK_A, [RESULT_A], overrides);
 
@@ -156,13 +144,11 @@ const baseReview: ReviewRef = {
 
 interface ChainSpec {
 	item?: ItemRef;
-	/** The review's ref; `null` when its record is gone. */
 	review?: Partial<ReviewRef> | null;
 	results?: LineageResultSpec[];
 	feedback?: LineageFeedbackSpec[];
 }
 
-/** A graph asked for by its review, or by its item once the review's record is gone. */
 function chain({
 	item = reviewItem,
 	review = {},
@@ -186,7 +172,6 @@ function chain({
 	});
 }
 
-/** The review's detail for a case, built on the completed review with what the case needs on top. */
 function detailOf(lineage: ReviewLineage, overrides: Partial<ReviewDetail> = {}): ReviewDetail {
 	const ref = lineage.nodes.find((entry) => entry.review !== null)?.review ?? baseReview;
 	return {
@@ -337,10 +322,6 @@ const originCases: LineageStateCase[] = [
 	),
 ];
 
-// ------------------------------------------------------------------------------------------------
-// The item reviewed
-// ------------------------------------------------------------------------------------------------
-
 const itemCases: LineageStateCase[] = [
 	withCase("item-github", "A pull request on GitHub", chain()),
 	withCase("item-gitlab", "A merge request on GitLab", chain({ item: gitlabMergeRequest })),
@@ -373,10 +354,6 @@ const itemCases: LineageStateCase[] = [
 		}),
 	),
 ];
-
-// ------------------------------------------------------------------------------------------------
-// Results: outcome by severity, currentness, an earlier review's answers, none, many
-// ------------------------------------------------------------------------------------------------
 
 const outcomeGrid: LineageResultSpec[] = [
 	...(["CRITICAL", "MAJOR", "MINOR", "TRIVIAL"] as const).map((severity, index) =>
@@ -498,10 +475,6 @@ const resultCases: LineageStateCase[] = [
 		}),
 	),
 ];
-
-// ------------------------------------------------------------------------------------------------
-// Feedback: where it went, and what became of it
-// ------------------------------------------------------------------------------------------------
 
 const DESTINATIONS = ["ON_WORK", "PRACTICE_PAGE", "CONVERSATION"] as const;
 

@@ -47,7 +47,6 @@ export function membership(
 	};
 }
 
-/** One account with a GitHub and a GitLab identity: one member, not two. */
 export const multiProviderMember = membership(
 	memberAccount("11", {
 		displayName: "Alice Johnson",
@@ -59,7 +58,6 @@ export const multiProviderMember = membership(
 	{ role: "ADMIN" },
 );
 
-/** Roster sync created this account; the person has not signed in, and has no name of their own. */
 export const unclaimedMember = membership(
 	memberAccount("12", {
 		status: "UNCLAIMED",

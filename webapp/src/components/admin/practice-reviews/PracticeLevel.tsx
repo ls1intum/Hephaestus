@@ -37,21 +37,12 @@ export interface PracticeLevelProps {
 	practice: PanelState<{
 		practice: Practice | undefined;
 		definitionOptions: PracticeDefinitionOptions;
-		/** The group's display name, for the feedback mode it inherits. Absent when unassigned. */
 		groupName?: string;
 	}>;
 	/** Every stored version of its definition, newest first, with what changed in each. */
 	versions?: PanelState<{ versions: PracticeVersion[] }>;
 }
 
-/**
- * One practice's sheet: its full definition and nothing else, as Practice setup's panel shows it —
- * one component for both. The status line says its feedback mode, which decides only how its
- * feedback is delivered, where that comes from and when it last changed; who reviews it is its
- * definition's Reviewed by. The history says when it was created and each version of its definition
- * with what changed in it. It counts nothing: the row it was opened from has the counts. Changing it
- * is Practice setup's form, which the header links to.
- */
 export function PracticeLevel({
 	workspaceSlug,
 	nested,

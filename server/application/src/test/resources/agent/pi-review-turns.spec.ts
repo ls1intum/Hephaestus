@@ -61,7 +61,6 @@ void test("a turn is asked to record with two calls left, or when its tokens onl
 	const budget = turnBudget(3, piece);
 	assert.equal(shouldRecordNow({ modelCalls: 10, outputTokens: 1000 }, budget, 3, 1500), false);
 	assert.equal(shouldRecordNow({ modelCalls: 16, outputTokens: 1000 }, budget, 3, 1500), true);
-	// 3 problems at 1500 tokens each need 4500 of the 5000 left.
 	assert.equal(shouldRecordNow({ modelCalls: 4, outputTokens: 19_000 }, budget, 3, 1500), false);
 	assert.equal(shouldRecordNow({ modelCalls: 4, outputTokens: 19_600 }, budget, 3, 1500), true);
 });

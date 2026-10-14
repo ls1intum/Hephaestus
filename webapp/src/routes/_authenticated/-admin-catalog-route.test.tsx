@@ -38,7 +38,6 @@ const release: CatalogPracticeReleaseProposal = {
 	fields: [{ field: "CRITERIA", offeredChanged: true, changedLocally: true, conflict: true }],
 };
 
-/** The catalog as the server sends it. */
 function mockCatalog({
 	groups = [packaging],
 	practices = [{ ...savedPractice, state: "UPDATE_WAITING", changeKind: "REVIEW" }],
@@ -157,7 +156,6 @@ describe("instance catalog routes", () => {
 
 		await waitFor(() => expect(body).toBeDefined());
 		expect(ifMatch).toBe('"tag-1"');
-		// The save replaces the whole definition, so leaving a field out would delete it.
 		expect(body).toStrictEqual({
 			slug: guided.slug,
 			kind: guided.kind,
@@ -649,7 +647,6 @@ describe("instance catalog routes", () => {
 				PRACTICE_PATH,
 				({ request }) => {
 					lastIfMatch = request.headers.get("if-match");
-					// Somebody else's write landed first, and it is their tag the reload has to pick up.
 					currentEtag = "tag-2";
 					return HttpResponse.json({ status: 409, title: "Stale" }, { status: 409 });
 				},

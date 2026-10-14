@@ -8,10 +8,6 @@ import { PRACTICE_REVIEW_READS } from "@/components/admin/practice-reviews/revie
 import { problemDetailOf } from "@/lib/problem-detail";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
 
-/**
- * A started review moves every count, the queue and the timing, the item's trace, and the
- * developer's own reviews and practice profile.
- */
 const READS_OF_STARTED_REVIEW: ReadonlySet<string> = new Set([
 	...PRACTICE_REVIEW_READS,
 	"getOwnItemTrace",
@@ -20,7 +16,6 @@ const READS_OF_STARTED_REVIEW: ReadonlySet<string> = new Set([
 	"getOwnPracticeProfileOverview",
 ]);
 
-/** Why an ask about one item started nothing, for the level that shows that item. */
 export interface ReviewRefusal {
 	itemId: string;
 	outcome: ReviewRequestOutcome;
@@ -34,15 +29,7 @@ interface RequestPracticeReviewOptions {
 	showsInline?: (itemId: string) => boolean;
 }
 
-/**
- * "Request review", and the one home of what its answer shows. A started review refreshes every
- * read the new review moves; a refusal is `refusal` where a level shows the item, and a toast
- * carrying the server's sentence otherwise.
- *
- * Both are handled here rather than in callbacks passed to `mutate`, which TanStack Query calls only
- * for the latest ask and only while the caller is mounted: a refusal of one item answered after a
- * second was asked for would say nothing at all.
- */
+/** Keep a refusal inline only while its item level is visible; navigation can change before the answer arrives. */
 export function useRequestPracticeReview(
 	workspaceSlug: string,
 	{ showsInline }: RequestPracticeReviewOptions = {},
@@ -85,7 +72,6 @@ export function useRequestPracticeReview(
 			const body: CreateReviewRequest = { itemId };
 			mutation.mutate({ path: { workspaceSlug }, body });
 		},
-		/** The item the latest ask is about, while it is in flight. */
 		asking: mutation.isPending ? mutation.variables.body.itemId : undefined,
 		refusal,
 		/** Forgets the refusal, for a surface whose level moved on to something else. */

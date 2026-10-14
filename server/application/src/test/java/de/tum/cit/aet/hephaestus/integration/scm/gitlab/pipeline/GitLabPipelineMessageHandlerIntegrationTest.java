@@ -30,7 +30,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Checks GitLab pipeline payloads through persisted merge-request head-check state. */
 class GitLabPipelineMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     private static final String PIPELINE_SHA = "bcbb5ec396a2c0f828686f14fac9b80b780504f2";

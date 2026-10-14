@@ -10,7 +10,6 @@ const FILES: Record<string, string> = {
 	"src/large.ts": Array.from({ length: 300 }, (_, i) => `line ${String(i + 1)}`).join("\n"),
 };
 
-/** A tree over `FILES` that records what the tools asked it, as the host would answer. */
 function tree() {
 	const asked: unknown[] = [];
 	const files: FileTree = {
@@ -54,7 +53,6 @@ function tree() {
 	return { files, asked };
 }
 
-/** Run the tool `name` over `files` with `input`, as an agent's step calls it. */
 async function run(files: FileTree, name: string, input: unknown): Promise<unknown> {
 	const tool = evidenceTools(files)[name];
 	assert.ok(tool !== undefined && "execute" in tool && tool.execute !== undefined, `${name} runs`);
@@ -93,11 +91,9 @@ void describe("the read tools of an agent", () => {
 			large,
 			/\n249: line 249\n\(more lines follow; read them with a later startLine\)$/u,
 		);
-		// Only the shown lines are read, so the host's receipt claims no more than the agent saw.
 		assert.deepEqual(asked.at(-1), { read: "src/large.ts", offsetLine: 50, maxLines: 200 });
 		assert.equal(await read({ path: "absent.ts" }), "absent.ts is not a file of the repository");
 		assert.equal(await read({ path: "logo.png" }), "logo.png is a binary file");
-		// A read that fails stops the agent: it is never shown as an absent file.
 		await assert.rejects(read({ path: "broken.ts" }), {
 			name: "UnratedError",
 			reason: "unavailable",

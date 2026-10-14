@@ -70,7 +70,6 @@ public record ConfigSnapshot(
         return mapper.valueToTree(this);
     }
 
-    /** Accepts only the current runtime configuration contract. */
     public static ConfigSnapshot fromJson(JsonNode node, ObjectMapper mapper) {
         Objects.requireNonNull(node, "node");
         int version = node.path("schemaVersion").asInt(-1);

@@ -1,6 +1,3 @@
-// Finds each captured linked issue of a merged pull request: its task-list items as captured, ticked
-// and unticked, its sub-issue rollup, its state, and how the change names it. The review decides which
-// of them this change implements. A lead is a candidate, not a claim.
 import { scm, expectKind } from "../kits/scm/index.ts";
 import { subIssueRollup } from "../kits/scm/issue-classification.ts";
 import {
@@ -24,7 +21,6 @@ export const LABELS = {
 };
 type OutcomeKind = keyof typeof LABELS;
 
-/** How the change names a linked issue, strongest form first. */
 function howLinked(
 	number: number,
 	closing: ReadonlySet<number>,
@@ -81,7 +77,6 @@ export default definePracticeScript({
 			if (checkable) {
 				untickedItems += items.length - ticked;
 			}
-			// The provider's own link outranks what the text says: a link made in the UI matches no `#N`.
 			const how =
 				item.how === "closesOnMerge"
 					? "a provider closing candidate"

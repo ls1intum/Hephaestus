@@ -46,7 +46,6 @@ const SCOPED: ResultsSearch = {
 	to: "2026-09-10",
 };
 
-/** The Results tab as the route draws it: its filters, then its list. */
 function ResultsTab({ search }: { search: ResultsSearch }) {
 	return (
 		<section aria-label="Practice results" className="space-y-4">
@@ -189,7 +188,6 @@ export const OverviewKeepsTheScope: Story = {
 	},
 };
 
-/** At 320px the row above the tabs wraps, and five sections share the track, with no sideways scroll. */
 export const Reflow: Story = {
 	args: { children: <ResultsTab search={SCOPED} />, selection: TRACKING },
 	parameters: {

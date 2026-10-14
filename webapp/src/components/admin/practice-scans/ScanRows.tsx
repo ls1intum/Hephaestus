@@ -9,7 +9,6 @@ import { TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table
 
 import { ofTotal, repositoryName, scanStartedBy, shortVersion } from "./scan-display";
 
-/** The list's columns, in order; the skeleton promises the same boxes. */
 export const SCAN_COLUMNS = [
 	"Repository",
 	"Version",
@@ -51,10 +50,7 @@ export interface ScanRowsProps {
 	scans: readonly ScanSummary[];
 }
 
-/**
- * One row per scan. "Reviewed" counts practice and file pairs, out of the listed total once the scan
- * knows it; while it is still listing files there is no total, so none is shown rather than a guess.
- */
+// Reviewed counts practice-file pairs; listing must finish before a total can be shown.
 export function ScanRows({ workspaceSlug, scans }: ScanRowsProps) {
 	return (
 		<TableBody>

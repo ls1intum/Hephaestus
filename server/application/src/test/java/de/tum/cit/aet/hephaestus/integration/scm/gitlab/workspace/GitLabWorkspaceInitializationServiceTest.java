@@ -115,9 +115,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
     private static final long CONNECTED_PROVIDER_ID = 100L;
 
-    /**
-     * The workspace's active connection is on one GitLab instance, whose group row linking picks.
-     */
     private final WorkspaceActorSelector actorSelector = mock(WorkspaceActorSelector.class);
 
     @Mock

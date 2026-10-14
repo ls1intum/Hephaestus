@@ -275,7 +275,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .containsExactly("SCOPE_" + WorkerJwtIssuer.LLM_PROXY_SCOPE);
     }
 
-    /** Each op reaches the upstream path of its protocol, with the catalog model and credential. */
     @ParameterizedTest
     @CsvSource(
             delimiter = '|',
@@ -307,8 +306,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                             .asString())
                     .isEqualTo(slot.name().toLowerCase(Locale.ROOT) + "-upstream");
             assertThat(practiceScriptRows(job, 0)).containsExactly(new UsageRow(slot, PRACTICE, 1, input, output));
-            // The row keeps the tier of the model that served it, so the review can show it for a run that did not
-            // finish.
             assertThat(jdbc.queryForObject(
                             "SELECT data_handling_tier FROM review_job_script_usage WHERE job_id = ?",
                             String.class,
@@ -430,7 +427,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    /** Each practice keeps its own row, and the cap judges the attempt over all of them. */
     @Test
     void shouldCountEachPracticeApartAndCapThemTogetherWhenTwoPracticesCallOneModel() throws Exception {
         try (MockWebServer upstream = new MockWebServer()) {
@@ -530,7 +526,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    /** The attempt in the key is the fence: a late call of an earlier attempt adds to no row. */
     @Test
     void shouldKeepEachAttemptsPracticeScriptRowApartWhenTheJobIsRequeued() {
         ReviewJob job = practiceScriptJob("https://models.example.com/v1");
@@ -569,7 +564,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return callPracticeScript(proxyService(200_000), job, path, PRACTICE, body);
     }
 
-    /** @param practice the practice that the runner names in its header */
     private ProxyResult callPracticeScript(
             LlmProxyService service, ReviewJob job, String path, String practice, String body) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
@@ -594,11 +588,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private record ProxyResult(int status, @Nullable String body) {}
 
-    /**
-     * The worker role is off in this context, so the proxy is assembled here around the real catalog and
-     * repositories. Its accumulator is not a Spring bean here, so {@link #transactionTemplate} supplies
-     * the transaction that its {@code REQUIRES_NEW} boundary gives it in production.
-     */
+    // The worker role is off here; supply the accumulator's production transaction boundary explicitly.
     private LlmProxyService proxyService(long maxTokensPerAttempt) {
         return proxyService(maxTokensPerAttempt, 1000);
     }
@@ -672,7 +662,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .build();
     }
 
-    /** A running review whose four slots each point at their own catalog model behind {@code baseUrl}. */
     private ReviewJob practiceScriptJob(String baseUrl) {
         Map<ModelKind, CatalogModel> catalog = new EnumMap<>(ModelKind.class);
         for (ModelKind kind : ModelKind.values()) {

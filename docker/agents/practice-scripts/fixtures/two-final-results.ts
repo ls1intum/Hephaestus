@@ -1,4 +1,3 @@
-// A program that sends a result of its own before it returns: two final messages from one program.
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({

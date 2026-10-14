@@ -49,14 +49,12 @@ const PROBLEM_WORDS: RecordResultsWords = {
 	emptyDescription: "A problem appears when a review records a not met result.",
 };
 
-/** Stands in for the summary and the place where the result's sheet hides its evidence. */
 const HIDDEN_SUMMARY = "Details hidden";
 
 export interface ProblemRowsProps {
 	state: ProblemRowsState;
 }
 
-/** Problems by day, drawn as the Results table draws results. */
 export function ProblemRows({ state }: ProblemRowsProps) {
 	const rows = state.status === "ready" ? state.problems : [];
 	return (
@@ -81,14 +79,12 @@ export function ProblemRows({ state }: ProblemRowsProps) {
 	);
 }
 
-/** The place of the problem's first passage, as the result's sheet names it; none when hidden. */
 function placeOf(problem: ReviewProblem) {
 	const { sourceKind, path, startLine, endLine, side } = problem;
 	if (sourceKind === null || path === null) {
 		return;
 	}
 	const place = { sourceKind, path, startLine, endLine, side };
-	// After the change is where a problem usually is, so a row names only the side before it.
 	return {
 		location: citationLocation(place),
 		before: side === "OLD" ? citationSide(place) : undefined,
@@ -99,17 +95,11 @@ export interface ProblemRowProps {
 	problem: ReviewProblem;
 }
 
-/**
- * One problem: its severity as the row's icon, what it says with its practice and place, the work
- * and who it is about. Its result's mark, disagreement or lost currentness shows as on the result's
- * row. The row opens the result it belongs to; Track and Trace act on that result.
- */
 export function ProblemRow({ problem }: ProblemRowProps) {
 	const today = new Date(useNow());
 	const tracked = useTracked({ kind: "result", id: problem.resultId });
 	const summary = problem.evidenceHidden ? HIDDEN_SUMMARY : problem.summary;
 	const place = placeOf(problem);
-	// A hidden summary is the same on every hidden row, so the name also says whose result it is.
 	const { container, label } = problem.item;
 	const work = container === null ? label : `${container} ${label}`;
 	const name = `${summary}, ${problem.practiceName}, ${work}, ${formatDayTime(problem.recordedAt, today)}`;

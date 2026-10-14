@@ -15,12 +15,6 @@ import { practiceLevel } from "./review-levels";
 const [practice] = workspacePractices;
 const retryPractice = fn();
 
-/**
- * One practice's sheet, from the overview's Practices table: its full definition, read the same as
- * in Practice setup because it is the same component, with its feedback mode in the status line once.
- * It counts nothing — the row it came from has the counts — and links only to Practice setup's
- * form, where it is changed.
- */
 const meta = {
 	component: PracticeLevel,
 	parameters: { layout: "fullscreen" },
@@ -60,7 +54,6 @@ export const Default: Story = {
 		// No counts: the Practices table's row has them.
 		await expect(panel.queryByText(/^Counts/u)).toBeNull();
 		await expect(panel.queryByText("Feedback delivered")).toBeNull();
-		// The feedback mode once, in the status line.
 		await expect(panelElement.querySelectorAll("[data-sheet-status]")).toHaveLength(1);
 		await expect(panel.getByRole("link", { name: "Edit in Practice setup" })).toHaveAttribute(
 			"href",
@@ -109,7 +102,6 @@ export const NoLongerInTheWorkspace: Story = {
 	},
 };
 
-/** While the practice is read, the definition's shape stands in for it. */
 export const Loading: Story = {
 	args: { practice: { status: "loading" }, versions: { status: "loading" } },
 	play: async () => {
@@ -118,7 +110,6 @@ export const Loading: Story = {
 	},
 };
 
-/** The practice could not be read: the sheet says so and offers to try again. */
 export const LoadFailed: Story = {
 	args: { practice: { status: "error", error: new Error("Network down"), onRetry: retryPractice } },
 	play: async () => {

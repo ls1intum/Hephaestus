@@ -25,22 +25,13 @@ import {
 } from "./evidence-reader.ts";
 import { UnratedError } from "./practice-script.ts";
 
-/**
- * The review input is inlined beside the criteria in the turn that evaluates the practice, so it is
- * bounded: one busy program cannot crowd the criteria and the brief out of the prompt.
- */
+// Bound prepared context so it cannot crowd criteria and the brief out of the prompt.
 const SECTION_CHARS = 3000;
-/**
- * The most of a section that its notices take: what the program did not rate. The rest of the
- * section can never push them out.
- */
+// Reserve notice space so other context cannot hide what was not rated.
 const NOTICE_CHARS = 1500;
-/** The longest notice line. */
 const NOTICE_LINE_CHARS = 300;
-/** The most of one prepared context value that the section shows. */
 const CONTEXT_VALUE_CHARS = 1200;
 
-/** A lead with the first line its source holds at that place. */
 export interface QuotedLead extends ReviewLead {
 	quote: string;
 }
@@ -70,7 +61,6 @@ async function fileInside(root: string, relative: string): Promise<string | unde
 	}
 }
 
-/** The text at a location, or undefined when its source does not hold it. */
 async function quoteOf(
 	at: EvidenceLocation,
 	sources: EvidenceSources,
@@ -186,7 +176,6 @@ function leadRow(lead: QuotedLead, contextReference: string): string {
 	return `  - at ${where(lead.at, contextReference)}${quote ? `: \`${quote}\`` : ""}${facts ? ` [${facts}]` : ""}`;
 }
 
-/** The characters that lines take in a section, each with its line break. */
 const charsOf = (lines: readonly string[]) => lines.reduce((n, line) => n + line.length + 1, 0);
 
 /**
@@ -223,7 +212,6 @@ export function renderReviewInput(
 	const leadRows = new Set<string>();
 	if (leads.length > 0) {
 		body.push("", "**Leads:**");
-		// In the program's order: each run of leads with one label goes under that label once.
 		for (const [index, lead] of leads.entries()) {
 			if (leads[index - 1]?.label !== lead.label) {
 				body.push(`- ${lead.label}`);

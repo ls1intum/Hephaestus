@@ -538,10 +538,7 @@ async function dispatch<K extends keyof RpcResponses>(
 	return handler(request, tabId);
 }
 
-/**
- * The only entry into the worker. Shape first, then who is asking, then the command — and the reply
- * carries the generation it was computed under.
- */
+// Validate the message and sender before dispatch; replies retain the session generation.
 export async function handleMessage(
 	message: unknown,
 	sender: SenderFacts,

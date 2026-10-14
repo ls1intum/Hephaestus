@@ -24,14 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * The recent-sign-in gate over the wire, against the real security chain — a genuine Hephaestus JWT
- * carrying (or missing) {@code auth_time}, decoded by the production decoder, converted into the
- * authorization-code factor authority the authorization rule reads.
- *
- * <p>The bearer path is deliberate: an API client that never loads the SPA must be refused
- * identically, so the gate cannot be a property of the dialog.
- */
+// Bearer clients must pass the same recent-sign-in gate as the SPA.
 class StepUpGateIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired

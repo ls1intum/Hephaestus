@@ -364,13 +364,8 @@ class GitHubSummaryWriterTest extends BaseUnitTest {
 
     private static final SummaryContent EXPECTED = ScmFeedbackFixtures.summary("Summary text", MARKER);
 
-    /** The exact body {@code postSummary} sends for {@link #EXPECTED}. */
     private static final String EXACT = EXPECTED.externalBody();
 
-    /**
-     * One page of a backwards (newest-end) walk; a null {@code hasPreviousPage} leaves the flag
-     * unanswered.
-     */
     private ClientGraphQlResponse mockCommentsPageResponse(
             String commentsPath,
             List<Map<String, Object>> nodes,
@@ -393,7 +388,6 @@ class GitHubSummaryWriterTest extends BaseUnitTest {
         return response;
     }
 
-    /** A comment the authenticated viewer wrote. */
     private static Map<String, Object> comment(String id, String body) {
         return comment(id, body, true);
     }
@@ -455,8 +449,7 @@ class GitHubSummaryWriterTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_pagesFromTheNewestEnd_neverForwards() {
-        // The just-posted marker is newest; a forward walk could run out of budget before reaching
-        // it on a busy PR.
+        // Read newest-first so pagination limits cannot hide a just-posted marker.
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         GraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse response = mockCommentsPageResponse(

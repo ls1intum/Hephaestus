@@ -18,21 +18,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Persists inbound Slack channel messages as workspace-scoped content (the substrate that
- * {@code SlackConversationContentSource} exposes to the mentor). Stores rendered text only (data minimization).
- * Idempotent on {@code (workspace, channel, ts)}.
- *
- * <p>Ingestion is fail-closed behind stacked gates: the fleet-wide capability flag
- * ({@link #conversationIngestEnabled}), the per-channel consent gate ({@code ACTIVE}), the forward-only
- * announcement window, and the per-person opt-out firewall. The DM/mentor path and everything else in the Slack
- * integration are unaffected by the capability flag.
- *
- * <p>On a genuinely new message the author's Slack id is resolved to an account id and
- * stamped onto {@code slack_message.author_account_id} (the participant-firewall stamp), and the thread aggregate
- * is upserted (window advance + participant union). {@code message_changed}/{@code message_deleted} edit and
- * tombstone the stored row (GDPR Art. 17).
- */
+// Ingest only after active source consent and the announcement boundary; person opt-outs still apply.
 @Service
 @ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")

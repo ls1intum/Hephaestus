@@ -34,7 +34,6 @@ import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { useSearchState } from "@/lib/search-params";
 
-/** The workspaces table's view. Each param leaves the address while it holds its default. */
 const instanceUsageSearchSchema = usageSearchSchema.extend({
 	q: z.string().max(INSTANCE_USAGE_SEARCH_MAX_LENGTH).optional().catch(undefined),
 	sort: z.enum(INSTANCE_USAGE_SORTS).optional().catch(undefined),
@@ -45,10 +44,9 @@ const instanceUsageSearchSchema = usageSearchSchema.extend({
 	page: z.coerce.number().int().min(0).optional().catch(undefined),
 });
 
-/** One array while the list loads, so the table's data keeps its identity. */
+// TanStack Table caches data by array identity; share the loading fallback.
 const NO_WORKSPACES: AdminWorkspaceLlmUsage[] = [];
 
-/** Most shared-model spend first: the money an instance admin sets budgets for. */
 const DEFAULT_VIEW: AdminInstanceUsageView = { q: "", sort: "sharedSpend", desc: true, page: 0 };
 
 export const Route = createFileRoute("/_authenticated/admin/usage")({

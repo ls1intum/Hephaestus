@@ -28,11 +28,6 @@ import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Integration tests for GitHubSubIssuesMessageHandler.
- *
- * <p>Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
- */
 class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

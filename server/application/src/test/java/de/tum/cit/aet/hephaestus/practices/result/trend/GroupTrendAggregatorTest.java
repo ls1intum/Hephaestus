@@ -32,8 +32,6 @@ class GroupTrendAggregatorTest {
 
     @Test
     void shouldDateAnGroupSpanFromComparedOpportunitiesOnly() {
-        // The merged trail carries every practice's opportunities by artifact, so a verdictless one from a
-        // sibling practice could otherwise date the whole group.
         PracticeTrend looked = PracticeTrendCalculator.calculatePractice(
                 List.of(noVerdict(7L, "2026-03-01T09:00:00Z")), Instant.parse("2026-01-01T00:00:00Z"), properties);
         PracticeTrend judged = PracticeTrendCalculator.calculatePractice(
@@ -175,7 +173,6 @@ class GroupTrendAggregatorTest {
                 GroupTrendAggregator.aggregate(List.of("naming", "testing"), List.of(full, thin), properties);
 
         assertThat(group.support().comparablePractices()).isEqualTo(1);
-        // The compared practice's newest four, and the thin practice's one: both vote in the standing.
         assertThat(group.support().standingWork()).isEqualTo(5);
         assertThat(group.support().reviewedWork()).isEqualTo(9);
     }

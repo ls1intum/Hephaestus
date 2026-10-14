@@ -1,7 +1,3 @@
-// Finds where the pull request names an issue: the provider's closing links, the title, the body and
-// the source branch. It looks up each reference in the project inventory and the linked items, in the
-// repository that the reference names. When the pull request names no issue, it tells what the
-// inventory holds. The review decides if a reference is a link.
 import {
 	isOpenState,
 	readProjectInventory,
@@ -29,10 +25,7 @@ export const LABELS = {
 };
 type ReferenceKind = keyof typeof LABELS;
 
-/**
- * Qualified references cannot become local `#N` candidates. GitLab's `project#N` shortcut needs
- * provider namespace authority the captured metadata does not carry, so its target remains unknown.
- */
+// Qualified references require provider namespace authority; they cannot become local #N candidates.
 const QUALIFIED_REF =
 	/(?<![\w./-])(?<target>[\w.-]+(?:\/[\w.-]+)*)#(?<number>\d+)(?![\w]|\.[0-9])/gu;
 
@@ -48,9 +41,6 @@ export default definePracticeScript({
 		const focal = metadata.repository_full_name;
 		const linked = await readLinkedWorkItems(ctx.evidence);
 		const inventory = await readProjectInventory(ctx.evidence);
-		// A plain #N is the admitted repository's, by its id; a qualified path names a repository of the
-		// same provider. A full name alone is unique only within one provider, so no id leaves the scope
-		// unknown.
 		const { repository_id: repositoryId, provider_id: providerId } = metadata;
 		const focalIssues = repositoryIssues(
 			inventory,
@@ -118,9 +108,6 @@ export default definePracticeScript({
 			}
 		};
 		const unqualified = (source: string) => source.replaceAll(QUALIFIED_REF, " ");
-		// The provider's closing candidates come first: a link made in the UI or through a cross-project
-		// reference matches nothing in the text. A candidate may belong to another repository, so it is
-		// placed in the inventory only by its address, never by its number.
 		const providerLinks = (linked ?? []).filter((item) => item.how === "closesOnMerge");
 		const providerWhere = "linked_work_items.json (how: closesOnMerge)";
 		for (const item of providerLinks) {
@@ -184,7 +171,6 @@ export default definePracticeScript({
 			linked === null
 				? "linked_work_items.json not captured"
 				: `${String(linked.length)} captured, ${String(providerLinks.length)} of them provider closing candidates${candidates}`;
-		// What the inventory holds for this repository: absent, not attributable to it, or its own counts.
 		const held = (absent: string, counts: string) => {
 			if (inventory === null) {
 				return absent;

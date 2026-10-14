@@ -8,7 +8,6 @@ import { detailReviews } from "@/stories/practice-detail-story-mock-data";
 import { ItemFeedbackPage } from "./ItemFeedbackPage";
 import type { ReviewFeedState } from "./reviews";
 
-/** The page with responses a story holds in place of the server. */
 function Answerable(props: ComponentProps<typeof ItemFeedbackPage>) {
 	const responses = useStoryFeedbackResponses();
 	return <ItemFeedbackPage {...props} responses={responses} />;
@@ -22,10 +21,6 @@ const readyFeed = {
 	onLoadMore: fn(),
 } satisfies ReviewFeedState;
 
-/**
- * The page a comment on a pull request, merge request or issue links to: the reader's own reviews of
- * that work, where each piece of their feedback can be answered or disagreed with.
- */
 const meta = {
 	component: ItemFeedbackPage,
 	tags: ["autodocs"],
@@ -37,7 +32,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The reader's reviews of the work, with what a disagreement does said before they write one. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await expect(

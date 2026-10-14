@@ -46,12 +46,10 @@ public record PracticeScriptCallUsage(
                 true);
     }
 
-    /** The stored form of {@link #modelKind()}, for the native query. */
     public String modelKindName() {
         return modelKind.name();
     }
 
-    /** The stored form of {@link #dataHandlingTier()}, for the native query. */
     public @Nullable String dataHandlingTierName() {
         return dataHandlingTier == null ? null : dataHandlingTier.name();
     }

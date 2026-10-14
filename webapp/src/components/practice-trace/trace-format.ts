@@ -11,12 +11,7 @@ export type RefusalReason = NonNullable<ReviewRequestOutcome["reason"]>;
  */
 export const REVIEW_FILTER_MAX_LENGTH = 120;
 
-/**
- * One vocabulary answers both "why did this event go nowhere" and "why was my request refused", but
- * the server generates the two unions separately. The declarations below assert they stay mutually
- * assignable: `false` does not satisfy `extends true`, so a reason added to only one of them is a
- * compile error here rather than a link silently lost on one of the two surfaces.
- */
+// Event and request refusals share vocabulary but have separately generated wire unions.
 type EventReason = NonNullable<ItemEvent["reason"]>;
 
 type Agree<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;

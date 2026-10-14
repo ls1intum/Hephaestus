@@ -10,12 +10,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Instance-admin cross-tenant workspace listing (metadata only). The whole service is {@link
- * WorkspaceAgnostic} so the listing — including the per-workspace connection / membership lookups —
- * runs under a tenancy bypass and sees every workspace, not just the caller's. Access is gated
- * upstream by {@code hasAuthority('app_admin')} on {@link WorkspaceAdminController}.
- */
+/** Cross-tenant metadata reads require {@link WorkspaceAgnostic}; {@link WorkspaceAdminController} enforces app_admin authority. */
 @Service
 @WorkspaceAgnostic("Instance-admin overview lists every workspace across tenants (metadata only)")
 public class WorkspaceAdminService {

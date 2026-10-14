@@ -8,10 +8,11 @@ import {
 } from "@/components/practice-vocabulary/feedback-location-defs";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
+import { parseSearch } from "@/lib/router-search";
+
 import { FeedbackDeveloperSummary } from "./FeedbackDeveloperSummary";
 import { reviewDevelopers } from "./fixtures";
 
-/** Every location, as `countReviewFeedbackByLocation` returns it for one developer. */
 const LOCATION_COUNTS: [FeedbackLocation, number][] = [
 	["GITHUB", 4],
 	["GITLAB", 2],
@@ -45,10 +46,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Everything for one developer: one row per location, then the total. Every count opens the list
- * filtered to exactly the feedback it counts.
- */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", { name: "Feedback for Grace Hopper" });
@@ -66,14 +63,14 @@ export const Default: Story = {
 		}
 		const github = within(table).getByRole("row", { name: /On GitHub/u });
 		const githubLink = within(github).getByRole("link", { name: "4" });
-		await expect(githubLink).toHaveAttribute("href", expect.stringContaining("developerId=9"));
-		await expect(githubLink).toHaveAttribute("href", expect.stringContaining("GITHUB"));
+		await expect(
+			parseSearch(new URL(String(githubLink.getAttribute("href")), window.location.origin).search),
+		).toMatchObject({ developerId: "9", location: "GITHUB" });
 		const all = within(table).getByRole("row", { name: /All locations/u });
 		await expect(within(all).getByRole("link", { name: "15" })).toBeVisible();
 	},
 };
 
-/** A location with no feedback for this developer has no row. */
 export const OneLocation: Story = {
 	args: {
 		state: {
@@ -89,7 +86,6 @@ export const OneLocation: Story = {
 	},
 };
 
-/** The person's name is not known yet: the summary still reads, without a wrong name. */
 export const WithoutAName: Story = {
 	args: { developerName: undefined },
 	parameters: { chromatic: { viewports: [1440] } },

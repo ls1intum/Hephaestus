@@ -4,7 +4,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import org.junit.jupiter.api.Test;
 
-/** Feedback persistence belongs to practices. Runtime writers call practices.spi. */
 class FeedbackLedgerOwnershipTest extends HephaestusArchitectureTest {
     @Test
     void shouldKeepFeedbackRepositoriesInsideTheirOwningModule() {

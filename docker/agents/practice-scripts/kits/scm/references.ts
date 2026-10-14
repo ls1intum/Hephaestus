@@ -15,23 +15,16 @@ import { gfmStrikethrough } from "micromark-extension-gfm-strikethrough";
  */
 const NUMBER_REF = /#(?<number>\d+)(?![\w]|\.[0-9])/gu;
 
-/** `closes #12`, `Fixes: #7`, `resolved #3`. */
 const CLOSING_REF = new RegExp(
 	String.raw`\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b\s*:?\s*${NUMBER_REF.source}`,
 	"giu",
 );
 
-/** `Related to #12`: GitLab's wording for an issue a change belongs to without closing it. */
 const RELATED_REF = new RegExp(String.raw`\brelated\s+to\s*:?\s*${NUMBER_REF.source}`, "giu");
 
-/** An issue number opening a branch-slug segment: `18-foo`, `feat/18-foo`. */
 const BRANCH_REF = /(?:^|\/)(?<number>\d{1,7})-/gu;
 
-/**
- * An HTML comment is not rendered, and neither provider links an issue from inside one: a template's
- * `<!-- Example: #12 -->` is the template's text, not the author's reference. The server's linked-work-item
- * lookup applies the same rule.
- */
+// Providers do not link issue references inside hidden HTML comments.
 const HTML_COMMENT = /<!--[\s\S]*?-->/gu;
 
 function matched(pattern: RegExp, text: string): number[] {
@@ -50,7 +43,7 @@ function numbers(pattern: RegExp, text: string): number[] {
 	return matched(pattern, withoutHtmlComments(text));
 }
 
-/** Keep a boundary so removing a comment cannot join tokens that the author separated. */
+// Retain a boundary so removed comments cannot join separate tokens.
 export function withoutHtmlComments(text: string): string {
 	let result = text;
 	let previous;
@@ -61,15 +54,11 @@ export function withoutHtmlComments(text: string): string {
 	return result;
 }
 
-/** Every `#N` in the text, in order of first appearance. */
 export function issueNumberReferences(text: string): number[] {
 	return numbers(NUMBER_REF, text);
 }
 
-/**
- * Code, quotations and images show something rather than state the author's own words, and struck-out
- * text is words the author withdrew.
- */
+// Exclude quotations, code, images, and withdrawn text from the author's own prose.
 const SHOWN = new Set([
 	"code",
 	"inlineCode",
@@ -118,7 +107,6 @@ function blocks(node: MarkdownNode): string[] {
 	return (node.children ?? []).flatMap(blocks);
 }
 
-/** The numbers a phrase names in the author's own prose, one paragraph or heading at a time. */
 function stated(pattern: RegExp, text: string): number[] {
 	const tree = fromMarkdown(text, {
 		extensions: [gfmStrikethrough()],
@@ -127,17 +115,14 @@ function stated(pattern: RegExp, text: string): number[] {
 	return [...new Set(blocks(tree).flatMap((block) => matched(pattern, block)))];
 }
 
-/** The `#N` a closing keyword precedes in the author's own prose. */
 export function closingReferences(text: string): number[] {
 	return stated(CLOSING_REF, text);
 }
 
-/** The `#N` a `Related to` precedes in the author's own prose. */
 export function relatedReferences(text: string): number[] {
 	return stated(RELATED_REF, text);
 }
 
-/** The issue numbers a branch name encodes. */
 export function branchIssueReferences(branch: string): number[] {
 	return numbers(BRANCH_REF, branch);
 }
@@ -146,7 +131,6 @@ export function branchIssueReferences(branch: string): number[] {
 export const OUTCOME_HEADING =
 	/^\s*#+\s*(?:acceptance criteria|definition of done|dod\b|done when|expected (?:outcome|result|behaviou?r)|given\b)/imu;
 
-/** The issues that each named way of linking names, with every way that names each one. */
 export function namedIssues(
 	ways: readonly (readonly [how: string, issues: readonly number[]])[],
 ): Map<number, string[]> {

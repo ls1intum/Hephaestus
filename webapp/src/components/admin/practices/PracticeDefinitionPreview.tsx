@@ -29,7 +29,6 @@ export interface PracticeDefinitionPreviewProps {
 	kind: string;
 	definition: PracticeDefinition;
 	options: PracticeDefinitionOptions;
-	/** The version number of a workspace practice. The catalog's entries have none. */
 	version?: number;
 	/**
 	 * What the practice script needs in this workspace, above its source. Only a workspace has
@@ -50,16 +49,6 @@ function Lines({ lines }: { lines: readonly string[] }) {
 	);
 }
 
-/**
- * The practice first, its criteria last. The practice is what developers read: its introduction
- * exactly as their practice level draws it, then the guide in full, since an admin adopting a practice
- * is deciding on that text too. `criteria` addresses the *model* in the second person and runs to
- * thousands of characters once the server composes its kind-of-work preamble in, so leading with it
- * buries `whyItMatters` — the field that answers "do we want this practice". The review's settings
- * follow in a review's order: what it reviews and when, who it is about, who reviews it, what it
- * reads, and how it runs. The criteria stay reachable behind a disclosure, because adopting an
- * automated critic without being able to read its criteria is worse.
- */
 export function PracticeDefinitionPreview({
 	slug,
 	kind,

@@ -52,7 +52,6 @@ import {
 	pursesOf,
 } from "./usage-utils";
 
-/** The columns the workspaces table sorts by, as the address names them. */
 export const INSTANCE_USAGE_SORTS = [
 	"workspace",
 	"sharedSpend",
@@ -61,9 +60,7 @@ export const INSTANCE_USAGE_SORTS = [
 ] as const;
 export type InstanceUsageSort = (typeof INSTANCE_USAGE_SORTS)[number];
 
-/** What the reader chose to see of the workspaces table: the route keeps it in the address. */
 export interface AdminInstanceUsageView {
-	/** Matched against workspace names. */
 	q: string;
 	sort: InstanceUsageSort;
 	desc: boolean;
@@ -73,7 +70,6 @@ export interface AdminInstanceUsageView {
 
 export const INSTANCE_USAGE_PAGE_SIZE = 25;
 
-/** The longest search the address keeps, so the field never takes more than that. */
 export const INSTANCE_USAGE_SEARCH_MAX_LENGTH = 200;
 
 export interface AdminInstanceLlmUsageTableProps {
@@ -113,7 +109,6 @@ interface CapUsage {
 	/** Share of the cap consumed. Can exceed 100. */
 	percent?: number;
 	paused: boolean;
-	/** Worst first; empty for a cap with room left and every run priced. */
 	states: CapState[];
 }
 
@@ -147,7 +142,6 @@ const CAP_HELP: Record<Purse, { header: string; help: string; meter: string }> =
 	},
 };
 
-/** The view's sort, or the default where the column it names is not on screen, such as a stale address. */
 function shownSort(
 	sort: InstanceUsageSort,
 	desc: boolean,
@@ -180,22 +174,18 @@ export function AdminInstanceLlmUsageTable({
 }: AdminInstanceLlmUsageTableProps) {
 	const purses = pursesOf({ ownProviderInUse: rows.some((row) => row.ownProviderInUse) });
 	const showsOwnProvider = purses.includes("OWN_PROVIDER");
-	// Identity matters as much as the value: `useTable` republishes controlled state on every render,
-	// so a fresh array here writes the sorting atom every time the parent re-renders.
+	// TanStack Table republishes controlled state; stable sorting identity avoids rewriting it on every render.
 	const sorting = useMemo(
 		() => shownSort(view.sort, view.desc, showsOwnProvider),
 		[view.sort, view.desc, showsOwnProvider],
 	);
-	// The table's `data`, keyed the same way `columns` is: the core row model is cached against this
-	// array's identity. Name order underneath, so workspaces that tie on the sorted column read
-	// alphabetically.
+	// The row model cache is keyed by data-array identity.
 	const data = useMemo(
 		() => [...rows].sort((a, b) => a.displayName.localeCompare(b.displayName)),
 		[rows],
 	);
 
-	// TanStack Table caches its column model, and every row model derived from it, against this
-	// array's identity.
+	// The column model cache is keyed by array identity.
 	const columns = useMemo(
 		() =>
 			columnHelper.columns([
@@ -279,9 +269,6 @@ export function AdminInstanceLlmUsageTable({
 		[purses, fx, isCurrentMonth, expandedWorkspaceSlug, onToggleDetails, onEditSharedModelBudget],
 	);
 
-	// Pages are cut from the filtered and sorted rows here rather than by the table, so a page past
-	// the last one, typed or left by a narrower filter, reads as the last page without rewriting the
-	// address.
 	const table = useTable({
 		features: dataTableFeatures,
 		data,
@@ -520,11 +507,6 @@ interface WorkspaceUsageDetailsProps {
 	isCurrentMonth: boolean;
 }
 
-/**
- * The same sections as the workspace's own usage page, in the same order, each table stacked at full
- * width: side by side they would each be too narrow to avoid a horizontal scroller of their own,
- * which is two-dimensional scrolling (WCAG 2.2 SC 1.4.10).
- */
 function WorkspaceUsageDetails({
 	workspace,
 	report,
@@ -537,7 +519,6 @@ function WorkspaceUsageDetails({
 	isCurrentMonth,
 }: WorkspaceUsageDetailsProps) {
 	const loaded = isLoading ? undefined : report;
-	// The row's own figures, already on screen, so the skeleton has the columns the report will.
 	const purses = pursesOf(workspace);
 	const paces = pacesWorthWarningAbout(report, isCurrentMonth);
 	return (
@@ -620,10 +601,6 @@ interface CapCellProps {
 	workspace: string;
 }
 
-/**
- * With no cap, a purse can still have calls with no price, and that state is not left out. The cell
- * is at least as wide as a meter needs and grows to its longest badge, so no state is cut short.
- */
 function CapCell({ purse, usage, label, workspace }: CapCellProps) {
 	const percent = usage.percent ?? 0;
 	return (

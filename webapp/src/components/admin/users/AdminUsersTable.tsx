@@ -50,7 +50,6 @@ function roleBadgeVariant(appRole: AppRole) {
 	return appRole === "APP_ADMIN" ? "default" : "secondary";
 }
 
-// Active and unclaimed are normal states and read as neutral; the others read as destructive.
 function statusBadgeVariant(status: AdminAccountView["status"]) {
 	if (status === "ACTIVE") {
 		return "secondary";

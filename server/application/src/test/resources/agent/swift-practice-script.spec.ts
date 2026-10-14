@@ -28,7 +28,6 @@ final class EventStore {
 }
 `;
 
-/** The whole file as added lines, numbered as in the file. */
 function whole(file: string, source: string): [string, DiffFile] {
 	const lines = source.split("\n");
 	return [
@@ -133,7 +132,6 @@ void test("a system picker, an import or an image picker on the library is not p
 	assert.equal(result.facts?.permissionReferenceKinds, 0);
 	assert.deepEqual(result.leads ?? [], []);
 	assert.doesNotMatch((result.directions ?? []).join("\n"), /Permission-related|authorization/u);
-	// Choosing the camera as the picker's source is the access it is.
 	const camera = await runBundled(slug, {
 		change: new Map([whole("App/Picker.swift", `${source}\nlibrary.sourceType = .camera\n`)]),
 	});
@@ -246,7 +244,6 @@ void test("detached item needs no written reason, and default isolation text is 
 	assert.match(said, /leaves the module's default unknown rather than nonisolated/u);
 	assert.match(said, /Check the SDK before relying on inherited SwiftUI View isolation/u);
 	assert.match(said, /Swallowed failures belong to handles-errors-instead-of-swallowing-them/u);
-	// Two targets that disagree, and a SwiftPM setting that is commented out.
 	const withSettings = await runBundled(slug, {
 		repo: {
 			"App/Feed.swift": source,
@@ -329,7 +326,6 @@ void test("each state declaration is a lead with its enclosing type, and a plain
 
 void test("a change with no reference anywhere says what it scanned and what the inventory holds", async () => {
 	const slug = "links-the-change-to-its-issue";
-	// Each row carries the ids of its repository; the reviewed one is the admitted repository id.
 	const context = {
 		"project_inventory.json": {
 			issues: [
@@ -345,7 +341,6 @@ void test("a change with no reference anywhere says what it scanned and what the
 		},
 	};
 	const reviewed = { repository_id: 1, provider_id: 1 };
-	// The server stages the record of the item and its description beside the inventory; the leads cite them.
 	const run = async (item: { title: string; body: string; source_branch: string }) =>
 		runBundled(slug, {
 			item: { ...reviewed, ...item },
@@ -365,7 +360,6 @@ void test("a change with no reference anywhere says what it scanned and what the
 	assert.equal(result.facts.linkedWorkItems, -1);
 	const referenced = await run({
 		title: "Add the map",
-		// The template's commented example is not the author's reference.
 		body: "<!-- Example: Closes #12 -->\nCloses #4",
 		source_branch: "4-add-the-map",
 	});
@@ -456,7 +450,6 @@ void test("a print in another language beyond the shared row cap is counted but 
 		),
 	);
 	assert.equal(result.facts?.printsSelected, 41);
-	// The script's own print is past the 40 leads returned, so no listed lead is under a tool path.
 	assert.equal(result.facts.printsInToolPaths, 0);
 	assert.match(result.directions?.[0] ?? "", /^41 diagnostic line\(s\) selected; 40 are listed\./u);
 	assert.match(result.directions?.[1] ?? "", /\(0 listed under a tool or script path\)/u);
@@ -498,7 +491,6 @@ void test("a literal and a named asset color are told apart, and the asset's dar
 
 void test("a colorset's appearances are read as JSON whatever the key order, and an unreadable one stays unknown", async () => {
 	const colorsets: Record<string, string> = {
-		// The dark appearance with its keys in the other order.
 		Reordered:
 			'{"colors":[{"color":{},"idiom":"universal"},{"color":{},"idiom":"universal","appearances":[{"value":"dark","appearance":"luminosity"}]}]}',
 		Single: '{"colors":[{"color":{},"idiom":"universal"}],"info":{"version":1}}',
@@ -507,7 +499,6 @@ void test("a colorset's appearances are read as JSON whatever the key order, and
 		Empty: '{"colors":[]}',
 		GamutOnly:
 			'{"colors":[{"idiom":"universal","display-gamut":"sRGB","color":{}},{"idiom":"universal","display-gamut":"display-P3","color":{}}]}',
-		// Valid JSON whose inspected entries are not the shape a colorset has.
 		NullEntry: '{"colors":[{"color":{},"idiom":"universal"},null]}',
 		TextAppearances: '{"colors":[{"color":{},"idiom":"universal","appearances":"dark"}]}',
 	};
@@ -570,7 +561,6 @@ void test("a named color resolves only to one colorset, exact name first; two ca
 		[
 			["Brand", true],
 			["brand", "unknown"],
-			// The same exact name in two catalogs: which target's the view uses is not here.
 			["Accent", "unknown"],
 		],
 	);
@@ -609,9 +599,7 @@ void test("a named color given a bundle is a named asset; the main bundle resolv
 		"    var body: some View {",
 		'        Text("a").foregroundStyle(Color("Brand", bundle: .main))',
 		'        Text("b").foregroundStyle(Color("Brand", bundle: nil))',
-		// A package's own catalog: the checkout's Brand.colorset may not be the one it holds.
 		'        Text("c").foregroundStyle(Color("Brand", bundle: .module))',
-		// The same argument shape names an image, not a color.
 		'        Image("Brand", bundle: .module)',
 		"    }",
 		"}",

@@ -32,7 +32,6 @@ import { PracticeProfilePageHeader } from "./PracticeProfilePageHeader";
 export interface PracticeProfilePageProps {
 	/** The review the header's latest-review chip names; absent before the first review. */
 	latestReview?: ProfileReviewRef;
-	/** The practices going well, with the results that show them, between the header and the feedback. */
 	goingWell: GoingWellPractice[];
 	/** Every practice with a standing, for the header's overview ring. */
 	practices: PracticeStanding[];
@@ -94,11 +93,6 @@ function feedbackCardsByTab(
 	};
 }
 
-/**
- * The developer's own practice profile: the overview header, the practices going well, then the
- * feedback cards under a tab row that filters them in place, with the table of every practice one
- * level over the page.
- */
 export function PracticeProfilePage({
 	latestReview,
 	goingWell,

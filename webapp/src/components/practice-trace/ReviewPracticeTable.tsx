@@ -36,24 +36,17 @@ import { hasText } from "@/lib/text";
 import { REVIEW_FILTER_MAX_LENGTH } from "./trace-format";
 
 export interface ReviewPracticeFilters {
-	/** The practice group's name. */
 	group?: string;
-	/** Part of a practice's name, matched case-insensitively. */
 	practice?: string;
 }
 
 export interface ReviewPracticeTableProps {
-	/** The review's results about the reader, in the order the server sent them. */
 	results: ResultList[];
-	/** The review the table lists. A result reused from an earlier review says so. */
 	reviewId: string;
-	/** The group a practice is filed under, for its name, icon and colour. */
 	groupOf: (practiceSlug: string) => GroupRef | undefined;
 	filters: ReviewPracticeFilters;
 	onFiltersChange: (filters: ReviewPracticeFilters) => void;
-	/** Opens a practice's own level from its pill. */
 	onOpenPractice?: (practiceSlug: string) => void;
-	/** Why there is no result at all to list, which only the caller can say. */
 	emptyMessage: string;
 	/** How a result reused from an earlier review links to it; the caller owns where reviews open. */
 	earlierReviewLink?: (reviewId: string) => ReactNode;
@@ -74,7 +67,6 @@ export interface ReviewPracticeTableProps {
 	plainState?: boolean;
 }
 
-/** Practices the workspace files in no group are still listed, under a name of their own. */
 const UNGROUPED = "Other practices";
 
 /**
@@ -88,10 +80,6 @@ export function earlierReviewOf(
 	return result.reviewId === reviewId ? undefined : result.reviewId;
 }
 
-/**
- * The reader's results in one review, a row per result: its outcome, its practice, and its own
- * words, opening in place to its problems and evidence.
- */
 export function ReviewPracticeTable({
 	results,
 	reviewId,
@@ -268,11 +256,6 @@ export function ReviewPracticeTable({
 	);
 }
 
-/**
- * A row's outcome. Plain, an outcome that went wrong is a badge and every other outcome is words
- * beside its icon; otherwise the badge is a button that opens its tooltip, so a keyboard reaches its
- * sentence.
- */
 function ResultOutcome({ outcome, plain }: { outcome: Outcome; plain: boolean }) {
 	const def = OUTCOME_DEFS[outcome];
 	if (plain) {

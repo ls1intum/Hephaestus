@@ -27,10 +27,6 @@ const seconds = new Intl.NumberFormat("en-GB", {
 	maximumFractionDigits: 1,
 });
 
-/**
- * A script's run time as `4.2 s`, or `2 min 5 s` from a minute on. A run under 0.1 s does not read
- * as `0.0 s`, as if it did not run.
- */
 function formatScriptTime(durationMs: number): string {
 	if (durationMs < 100) {
 		return "< 0.1 s";
@@ -45,11 +41,9 @@ function formatScriptTime(durationMs: number): string {
 
 export interface ReviewPracticeScriptTableProps {
 	workspaceSlug: string;
-	/** The review's practices whose program ran, each with its run. */
 	practices: ReviewPractice[];
 }
 
-/** The model a script called, as the workspace binds it. */
 const SCRIPT_MODEL_PURPOSE = {
 	CHAT: "PRACTICE_REVIEW",
 	DECISION: "PRACTICE_DECISION",
@@ -57,17 +51,10 @@ const SCRIPT_MODEL_PURPOSE = {
 	RERANKING: "PRACTICE_RERANKING",
 } satisfies Record<PracticeScriptModel["kind"], AgentPurpose>;
 
-/**
- * How each practice's program ran in one review: how it ended, which models it had, how many calls
- * the proxy counted, and how long it ran. The calls to the review's own model are the review's, and
- * spend is on AI usage, so neither is here.
- */
 export function ReviewPracticeScriptTable({
 	workspaceSlug,
 	practices,
 }: ReviewPracticeScriptTableProps) {
-	// On a narrow screen, the practice and its result fit the screen's width and wrap there. The
-	// figures to their right scroll into view.
 	return (
 		<Table bordered className="sm:min-w-160">
 			<caption className="sr-only">How the program of each practice ran in this review</caption>
@@ -105,10 +92,6 @@ export function ReviewPracticeScriptTable({
 	);
 }
 
-/**
- * One script. The result carries its fix and, for a failed script, its error, so the way out and
- * what went wrong sit together and wrap inside the result's own column.
- */
 function ScriptRow({
 	workspaceSlug,
 	practice,
@@ -162,11 +145,6 @@ function ScriptRow({
 	);
 }
 
-/**
- * Each model with its data-handling tier. The tier's icon is enough beside the kind's name, and a
- * screen reader hears its label. A model with counted calls ran even when its tier is unknown, as
- * for a script that did not finish, so it claims nothing about its assignment.
- */
 function ScriptModels({ models }: { models: PracticeScriptModel[] }) {
 	if (models.length === 0) {
 		return <Nothing />;

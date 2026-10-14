@@ -8,10 +8,6 @@ import java.time.Instant;
 import java.util.Map;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Records a runner's execution report as the worker does at the end of an attempt. The recorder runs in the worker
- * role, which the integration context leaves off, so a test outside this package records through here.
- */
 public final class PracticeScriptRunRecorderFixtures {
 
     private PracticeScriptRunRecorderFixtures() {}

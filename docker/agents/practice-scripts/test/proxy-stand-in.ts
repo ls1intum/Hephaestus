@@ -34,7 +34,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
 
-/** Write the handler's answer, or a 500 with the error when the handler rejects. */
 async function respond(res: ServerResponse, answering: Promise<unknown>): Promise<void> {
 	let answer: unknown;
 	try {
@@ -102,7 +101,6 @@ export async function startStandIn(token: string, handler: StandInHandler): Prom
 	};
 }
 
-/** OpenAI chat-completions JSON with one assistant message. */
 export function chatMessage(content: string, extra: Record<string, unknown> = {}) {
 	return {
 		id: "chatcmpl-stand-in",
@@ -116,7 +114,6 @@ export function chatMessage(content: string, extra: Record<string, unknown> = {}
 	};
 }
 
-/** OpenAI chat-completions JSON whose assistant message calls one tool. */
 export function chatToolCall(name: string, args: object, id = "call-1") {
 	return {
 		id: "chatcmpl-stand-in",

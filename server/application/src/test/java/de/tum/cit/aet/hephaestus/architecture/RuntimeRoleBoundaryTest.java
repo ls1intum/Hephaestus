@@ -147,6 +147,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             Map.entry("de.tum.cit.aet.hephaestus.productfeedback.FeedbackService", RuntimeRole.SERVER_PROPERTY),
             Map.entry("de.tum.cit.aet.hephaestus.productfeedback.SurveyService", RuntimeRole.SERVER_PROPERTY),
             Map.entry("de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorInFlightReaper", RuntimeRole.SERVER_PROPERTY),
+            Map.entry("de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChatController", RuntimeRole.SERVER_PROPERTY),
             // ADR 0006: the LLM proxy runs beside the sandbox on the WORKER, and only there.
             Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxyController", RuntimeRole.WORKER_PROPERTY),
             Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxySecurityConfig", RuntimeRole.WORKER_PROPERTY),
@@ -392,20 +393,21 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    void mentorBeansWireUnconditionally() {
+    void mentorBeansHaveNoCapabilityGate() {
         List<String> stillGated = UNCONDITIONAL_MENTOR_BEANS.stream()
                 .map(fqn -> classes.stream()
                         .filter(c -> c.getFullName().equals(fqn))
                         .findFirst()
                         .orElseThrow(() -> new AssertionError("Expected class not found in ArchUnit scan: " + fqn)))
-                .filter(clazz ->
-                        conditionalOnPropertyAnnotations(clazz).findAny().isPresent())
+                .filter(clazz -> conditionalOnPropertyAnnotations(clazz)
+                        .flatMap(ConditionalRef::propertyNames)
+                        .anyMatch(name -> !isRoleProperty(name)))
                 .map(JavaClass::getFullName)
                 .collect(Collectors.toList());
 
         assertThat(stillGated)
-                .as("Mentor beans must wire unconditionally — Heph is always offered (per-workspace readiness "
-                        + "is the mentor model binding), not behind a capability flag.")
+                .as("Mentor availability uses the workspace model binding. Runtime roles control deployment; "
+                        + "a capability flag must not remove mentor support.")
                 .isEmpty();
     }
 

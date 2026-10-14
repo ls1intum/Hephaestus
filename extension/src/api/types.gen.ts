@@ -1296,9 +1296,6 @@ export type CurrentUserView = {
     username?: string;
 };
 
-/**
- * The practice's authoritative display name and stable workspace slug.
- */
 export type DeliveredFeedbackPractice = {
     name: string;
     slug: string;

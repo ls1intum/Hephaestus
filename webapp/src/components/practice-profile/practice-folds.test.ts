@@ -15,7 +15,6 @@ describe("splitFoldedPractices", () => {
 	it("folds the practices that never applied and the ones not observed yet, apart", () => {
 		const { shown, neverApplied, notObserved } = splitFoldedPractices([
 			standing("a", "NO_OPPORTUNITY", true),
-			// Could not determine somewhere: a silence, not a practice that never applied.
 			standing("b", "NO_OPPORTUNITY", false),
 			standing("c", "NOT_OBSERVED"),
 			standing("d", "DEVELOPING"),
@@ -49,7 +48,6 @@ describe("splitFoldedPractices", () => {
 		expect(groupNeverApplied(mixed)).toBe(false);
 		// A group whose every practice never applied keeps its own fold.
 		expect(groupNotObservedYet([standing("a", "NO_OPPORTUNITY", true)])).toBe(false);
-		// A practice with nothing to report but some results keeps the group in the table.
 		expect(
 			groupNotObservedYet([standing("a", "NO_OPPORTUNITY"), standing("b", "NOT_OBSERVED")]),
 		).toBe(false);

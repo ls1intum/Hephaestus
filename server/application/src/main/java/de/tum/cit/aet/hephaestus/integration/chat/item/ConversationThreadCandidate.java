@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.chat.item;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/** Chat-domain source candidate records. */
 public record ConversationThreadCandidate(
         long workspaceId,
         long threadId,

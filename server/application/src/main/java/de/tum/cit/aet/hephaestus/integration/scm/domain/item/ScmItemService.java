@@ -56,7 +56,6 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Resolves the provider-neutral SCM kinds through exact workspace-owned item references. */
 @Service
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor

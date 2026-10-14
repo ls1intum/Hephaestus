@@ -27,7 +27,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
 
-/** Checks GitHub check-suite and commit-status payloads through persisted head-check state. */
 class GitHubCheckEventsIntegrationTest extends BaseIntegrationTest {
 
     private static final String CHECKED_SHA = "67700adac0c0f02df77fdf1bf037273e7b056aa9";

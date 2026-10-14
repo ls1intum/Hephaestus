@@ -190,7 +190,6 @@ export const WhileThePracticesLoad: Story = {
 	},
 };
 
-/** The practices could not be fetched, and the facet says so instead of offering nothing. */
 export const ThePracticesCouldNotBeLoaded: Story = {
 	args: { practices: { options: [], isLoading: false, isError: true } },
 	play: async ({ canvas, userEvent }) => {
@@ -199,7 +198,6 @@ export const ThePracticesCouldNotBeLoaded: Story = {
 	},
 };
 
-/** No feedback matches, and the count says so in a sentence rather than a bare zero. */
 export const NothingMatches: Story = {
 	args: { search: { ...UNFILTERED, state: ["FAILED"] }, total: 0 },
 	play: async ({ canvas }) => {
@@ -236,10 +234,6 @@ export const SortIsNotAFilter: Story = {
 	},
 };
 
-/**
- * A group is part of the shared scope: it finds the feedback written from results of any
- * practice in it, and it narrows the practices on offer.
- */
 export const ReportsAChosenGroup: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		const group = STORY_GROUPS.options[0];
@@ -252,7 +246,6 @@ export const ReportsAChosenGroup: Story = {
 	},
 };
 
-/** Every facet sits in one row: Delivery, Destination, Why withheld and the sort, with no toggle. */
 export const EveryFacetInOneRow: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		canvas.getByRole("combobox", { name: "Delivery" });

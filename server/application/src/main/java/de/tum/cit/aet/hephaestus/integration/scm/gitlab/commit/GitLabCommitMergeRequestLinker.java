@@ -212,8 +212,7 @@ public class GitLabCommitMergeRequestLinker {
                                     extractNestedEndCursor(mrNode),
                                     safeProjectPath + "!" + iid);
                             if (tail == null) {
-                                // Incomplete follow-up pagination: skip the MR to avoid partial
-                                // links.
+                                // Incomplete pagination cannot establish all commit links.
                                 continue;
                             }
                             commitNodes.addAll(tail);

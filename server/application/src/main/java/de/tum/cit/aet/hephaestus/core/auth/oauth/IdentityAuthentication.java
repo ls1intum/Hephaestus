@@ -17,17 +17,8 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 
 /**
- * Resolves the account that may attach a new identity, for the two points of the linking flow that
- * run outside the resource-server chain.
- *
- * <p>The OAuth chain is stateless and {@code permitAll}, so no {@code SecurityContext} exists on
- * either the kickoff or the callback. The access cookie is validated here with the same primitives
- * the resource-server chain uses ({@link CookieBearerTokenResolver} → {@link
- * RevocationAwareJwtDecoder} → the shared authentication converter), which is also what lets the
- * recent-sign-in decision read the very same factor authority it reads for an ordinary request.
- *
- * <p>Linking is gated because attaching an identity adds a permanent second way into the account: a
- * hijacked session must not be able to install one.
+ * The stateless OAuth chain has no SecurityContext, so linking must validate the access cookie through
+ * {@link CookieBearerTokenResolver} and {@link RevocationAwareJwtDecoder}, including recent sign-in.
  */
 @ConditionalOnServerRole
 @Service

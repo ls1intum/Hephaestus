@@ -29,6 +29,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
     private static final Map<String, String> FULL_CONTEXT_ASSIGNMENTS = Map.ofEntries(
             assignment("StartupBudgetIntegrationTest", "startup"),
             assignment("agent.mentor.chat.MentorWorkerSplitIntegrationTest", "mentor-worker-split"),
+            assignment("agent.mentor.chat.MentorChatControllerAuthIntegrationTest", "mentor-http"),
+            assignment("mentor.MentorAccessIntegrationTest", "mentor-http"),
             assignment("agent.practice.live.PracticeScriptLiveLlmTest", "practice-script-live"),
             assignment("core.auth.clientsession.ClientSessionConcurrencyIntegrationTest", "dev-login"),
             assignment("core.auth.clientsession.ClientSessionIntegrationTest", "dev-login"),
@@ -121,6 +123,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "mentor-worker-split",
                     "server-only role with authenticated worker transport and controlled runner, routing and admission"
                             + " boundaries"),
+            Map.entry(
+                    "mentor-http",
+                    "shared mentor HTTP authorization context with only asynchronous turn transport spied"),
             Map.entry("outline-enabled", "enabled Outline integration wiring"),
             Map.entry(
                     "practice-script-live",

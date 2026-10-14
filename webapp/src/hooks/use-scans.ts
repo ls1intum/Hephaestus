@@ -23,10 +23,8 @@ import { ITEM_KIND } from "@/lib/item-kinds";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
 export const SCANS_PAGE_SIZE = 20;
-/** One page of repositories is the whole offer: a workspace scope holds far fewer. */
 const REPOSITORY_PAGE_SIZE = 200;
 
-/** The workspace's scans, one page at a time, read again while any scan on the page is active. */
 export function useScanList(
 	workspaceSlug: string,
 	page: number,
@@ -61,10 +59,6 @@ export function useScanList(
 	return { status: "loading" };
 }
 
-/**
- * A practice a scan can review: its current definition says how to scan it, and Hephaestus, not
- * people or nobody, reviews it. A version whose definition was not recorded scans nothing.
- */
 function scanPracticeOption(practice: Practice): ScanPracticeOption | undefined {
 	const { definition } = practice.currentVersion;
 	return definition !== null &&
@@ -78,7 +72,6 @@ function scanPracticeOptions(practices: readonly Practice[]): ScanPracticeOption
 	return practices.flatMap((practice) => scanPracticeOption(practice) ?? []);
 }
 
-/** A top-level string property of a refusal body, which the server writes beside RFC 9457's own. */
 function refusalProperty(error: unknown, key: string): string | undefined {
 	if (!isRecord(error)) {
 		return undefined;
@@ -120,12 +113,7 @@ export interface StartScan {
 	start: (draft: StartScanDraft) => Promise<ScanSummary>;
 }
 
-/**
- * Starting one scan. Each attempt carries an Idempotency-Key, kept for an explicit retry of the
- * same draft after no answer or a server failure, so a retry joins the scan the first attempt may
- * have started rather than starting a second. A changed draft, or a definitive refusal, takes a new
- * key. A version conflict is shown and remembered for the next attempt; it is never retried here.
- */
+/** Retain the Idempotency-Key for an explicit retry of the same draft after an uncertain response. */
 export function useStartScan(
 	workspaceSlug: string,
 	onStarted: (scan: ScanSummary) => void,
@@ -152,7 +140,6 @@ export function useStartScan(
 		},
 	});
 
-	// A second press before the first answer joins the first request rather than sending another.
 	const inFlight = useRef<Promise<ScanSummary>>(undefined);
 
 	const send = async (draft: StartScanDraft) => {

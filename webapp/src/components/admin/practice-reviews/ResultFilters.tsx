@@ -23,19 +23,16 @@ import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { type ReviewSortItem, ReviewSortSelect } from "./ReviewSortSelect";
 
-/** Every option wears the badge its rows wear; see the note on `FeedbackFilters`' facets. */
 const OUTCOME_OPTIONS = statusFacetOptions(OUTCOME_DEFS);
 const SEVERITY_OPTIONS = statusFacetOptions(SEVERITY_DEFS);
 const DISAGREEMENT_OPTIONS = statusFacetOptions(DISAGREEMENT_DEFS);
 
-/** The filters that the results and the problems lists share: an admin's marks and a developer's disagreement. */
 export interface AssessmentSearch {
 	markedIncorrect?: boolean;
 	accepted?: boolean;
 	disagreed?: boolean;
 }
 
-/** The one boolean the server filters by, as the facet's selection: both or neither is no filter. */
 function disagreementSelection(disagreed: boolean | undefined): Disagreement[] {
 	if (disagreed === undefined) {
 		return [];
@@ -60,10 +57,6 @@ const MARK_FILTERS: readonly { kind: ResultMarkKind; key: "markedIncorrect" | "a
 	{ kind: "ACCEPTED", key: "accepted" },
 ];
 
-/**
- * The mark filters. No facet offers them: a link from a count sets them, so they show as pills that
- * clear them.
- */
 export function markFilterPills(
 	search: AssessmentSearch,
 	onPatch: (patch: AssessmentSearch) => void,
@@ -111,7 +104,6 @@ export function clearedResultFacets(): Partial<ResultsSearch> {
 	};
 }
 
-/** Every filter on this list, the shared scope included: what the empty list's button clears. */
 export function clearedResultFilters(): Partial<ResultsSearch> {
 	return { ...clearedResultFacets(), ...clearedScope() };
 }
@@ -138,10 +130,6 @@ export function groupFacetOptions(groups: readonly NamedGroup[] | undefined): Fa
 	return (groups ?? []).map((group) => ({ value: group.slug, label: group.name }));
 }
 
-/**
- * A practice as a facet offers it, with its group, so a chosen group can narrow the offer, and
- * whether its feedback is turned off today, so the facet can leave it out.
- */
 export interface PracticeFacetOption extends FacetOption {
 	groupSlug?: string;
 	turnedOff?: boolean;
@@ -164,17 +152,13 @@ export function practiceFacetOptions(
 
 export interface ResultFiltersProps {
 	search: ResultsSearch;
-	/** Reports one changed facet. The caller sends the reader back to page one. */
 	onPatch: (patch: Partial<ResultsSearch>) => void;
-	/** Clears this list's own facets. The shared scope stays. */
 	onReset: () => void;
-	/** Clears the shared scope, on this tab and every tab after it. */
 	onClearScope: () => void;
 	groups: FacetSource;
 	practices: FacetSource<PracticeFacetOption>;
 	people: ReviewPeople;
 	total: number | undefined;
-	/** The one record the scope is filtered to, by name; absent for none, or for a selection. */
 	record?: ScopeRecordFilter;
 	/**
 	 * The name of the developer `developerId` identifies. It must name *that* person: reading it off
@@ -208,8 +192,6 @@ export function ResultFilters({
 			scope={readScope(search)}
 			onChange={onPatch}
 			onClearScope={onClearScope}
-			// "Recorded", not "Date": this range filters when the result was recorded, while the same
-			// control on the feedback list filters when the feedback was composed.
 			dateTitle="Recorded"
 			groups={groups}
 			practices={practices}

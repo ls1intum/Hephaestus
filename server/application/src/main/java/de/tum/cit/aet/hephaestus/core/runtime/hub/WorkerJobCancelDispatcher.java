@@ -6,13 +6,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Routes a job cancellation to the worker that owns the running job, over the WSS control channel.
- * The caller (e.g. {@code ReviewJobService.cancel}) performs the authoritative {@code agent_job}
- * status transition first; this just asks the owning worker to stop its container promptly. If the
- * owning worker is not connected to this hub, the cancel still takes effect via the DB transition +
- * reconciler/zombie-sweeper backstops — the container is simply not stopped early.
- */
+// Commit cancellation before requesting a worker stop; disconnected workers remain subject to reconciliation.
 public class WorkerJobCancelDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(WorkerJobCancelDispatcher.class);

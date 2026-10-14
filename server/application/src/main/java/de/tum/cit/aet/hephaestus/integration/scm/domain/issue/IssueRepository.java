@@ -193,17 +193,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
             @Param("numbers") Collection<Integer> numbers,
             @Param("deletedAt") Instant deletedAt);
 
-    /**
-     * Repository-wide issue inventory (pure issues, PullRequest subclass rows excluded) ordered
-     * newest-first by number, for the cross-item project-context telescope. The author is
-     * fetched up front to avoid a per-row lazy load; labels/comments/bodies are intentionally NOT
-     * fetched — the inventory is a compact "what else exists in this project" index, not a full
-     * body. Tombstones are excluded: something deleted upstream is no longer in the project.
-     *
-     * @param repositoryId the repository ID
-     * @param pageable the cap (newest N) — caller supplies {@code PageRequest.of(0, cap)}
-     * @return newest-first issues for the repository
-     */
+    /** Returns bounded issue metadata, excluding pull requests and tombstones; the author is fetched to avoid per-row loads. */
     @Query(
             "SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.milestone WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL ORDER BY i.number DESC")
     List<Issue> findIssueInventoryByRepositoryId(@Param("repositoryId") long repositoryId, Pageable pageable);

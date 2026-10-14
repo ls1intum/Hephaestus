@@ -5,11 +5,7 @@ import java.util.Set;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-/**
- * A validated proxy-scoped bearer token — either an {@code ReviewJob}'s job token or a mentor session's
- * registry-minted token. The verified execution identity is the principal. Each scope becomes a
- * {@code SCOPE_} authority, the form that {@code OAuth2AuthorizationManagers.hasScope} checks.
- */
+// Token scopes become SCOPE_ authorities, as Spring hasScope requires.
 class JobTokenAuthentication extends AbstractAuthenticationToken {
 
     @Serial

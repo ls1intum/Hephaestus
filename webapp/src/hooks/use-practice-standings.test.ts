@@ -27,7 +27,6 @@ describe("groupsOfReviewedPractices", () => {
 			reviewed("scope", packaging),
 			reviewed("tests", testing),
 			reviewed("describe", packaging),
-			// A practice in no group adds none.
 			reviewed("loose", null),
 		]);
 

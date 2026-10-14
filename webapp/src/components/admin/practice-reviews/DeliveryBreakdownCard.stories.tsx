@@ -36,7 +36,6 @@ function rowsOf(canvas: StoryContext["canvas"], label: string) {
 	);
 }
 
-/** The failure figure's row of the card's foot, which carries its tone. */
 function rateOf(canvas: StoryContext["canvas"], term: RegExp) {
 	return canvas.getByText(term, { selector: "[data-rate]" }).parentElement;
 }
@@ -54,11 +53,6 @@ function linkOf(canvas: StoryContext["canvas"], name: string) {
 	return { path: url.pathname, search };
 }
 
-/**
- * Under Delivery, beside the Feedback tile: where the feedback of the range went. Delivered
- * feedback by location and withheld feedback by reason, two short tables in the Feedback table's
- * filter words, each row opening the table filtered to it; then the failure figure as the foot.
- */
 const meta = {
 	component: DeliveryBreakdownCard,
 	decorators: [
@@ -90,10 +84,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The 14 delivered pieces by location and the 4 withheld by reason, the admin's rejection among
- * them, add up to the Feedback tile's counts. Each count opens exactly its rows over the range.
- */
 export const Default: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await expect(rowsOf(canvas, "Delivered by location")).toEqual([
@@ -131,7 +121,6 @@ export const Default: Story = {
 		await expect(canvas.getByRole("link", { name: "8, On GitHub" }).closest("tr")).toHaveClass(
 			"relative",
 		);
-		// The failure figure is the card's foot, over the range on screen, as its (i) says.
 		await expect(rateOf(canvas, /^Feedback failed to deliver/u)).toHaveAttribute(
 			"data-tone",
 			"destructive",
@@ -176,7 +165,6 @@ export const ReasonNotRecorded: Story = {
 	},
 };
 
-/** Nothing delivered or withheld, and nothing failed: each table says so in a line. */
 export const NothingYet: Story = {
 	args: {
 		overview: readyReviewOverview({
@@ -235,7 +223,6 @@ export const Stale: Story = {
 	},
 };
 
-/** At 320 px long location names truncate before the count, and nothing scrolls sideways. */
 export const Narrow: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {

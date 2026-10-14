@@ -22,10 +22,6 @@ export interface CorrectionReasonCopy {
 	placeholder: string;
 }
 
-/**
- * An admin correction that needs a written reason: marking a result incorrect, withdrawing feedback, and
- * their reversals. The reason stays in the form until `onSubmit` succeeded, so a refused change can be retried.
- */
 export function CorrectionReasonPopover({
 	copy,
 	icon: Icon,

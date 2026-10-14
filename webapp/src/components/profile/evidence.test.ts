@@ -22,7 +22,6 @@ function citation(overrides: Partial<EvidenceCitation> = {}): EvidenceCitation {
 	};
 }
 
-/** A result's evidence with no warrant, no citation and no open question. */
 const NO_EVIDENCE: ResultEvidence = {
 	citations: [],
 	openQuestions: [],

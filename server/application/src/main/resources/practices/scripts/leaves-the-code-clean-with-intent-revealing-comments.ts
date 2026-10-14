@@ -1,7 +1,3 @@
-// Finds residue that the change adds: debug output, TODO markers, notes about the editing session,
-// template placeholders and near-empty new files. A table of debug-output calls for each language,
-// keyed by the file extension, finds the debug output. Each lead is a place to read; the review
-// decides if it is residue or a deliberate line.
 import { scm } from "../kits/scm/index.ts";
 import {
 	occurrences,
@@ -22,7 +18,6 @@ export const LABELS = {
 	"near-empty-new-file": "A new text or Markdown file with one or two lines of content.",
 };
 
-// language key -> [human label, regex] of debug-output / residue constructs that, when selected, are worth a look.
 const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
 	swift: [
 		["print(", /(?:^|[^.\w])print\s*\(/u],
@@ -56,16 +51,12 @@ const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
 	rust: [["println!/dbg!/eprintln!", /\b(?:println|eprintln|dbg|print|eprint)\s*!/u]],
 };
 
-// A TODO/FIXME/XXX/HACK marker selected in the diff — residue in any language.
 const TODO_MARKER = /\b(?:TODO|FIXME|XXX|HACK)\b/u;
 
-// A comment that narrates the editing session rather than the code, on any language's comment line.
 const PROCESS_NOTE =
 	/^\s*(?:\/\/|#|\*)\s*(?:FIX(?:ED)?\s*\d*\s*:|CHANGED?\s*:|selected\s*:|MOVED\s*:|UPDATED?\s*:|REMOVED?\s*:|NEW\s*:)/imu;
-// A template placeholder left in a manifest the change edited.
 const TEMPLATE_PLACEHOLDER = /#\s*TODO:\s*Adjust|<your[- ]|REPLACE[_ ]ME|CHANGE[_ ]ME/iu;
 
-/** The leads that the script lists. */
 const LISTED = 40;
 
 export default definePracticeScript({

@@ -18,7 +18,6 @@ import {
 import { issue, pullRequest } from "./practice-profile-story-mock-data";
 import { daysBefore } from "./story-clock";
 
-/** The review the trace fixtures name. */
 const TRACED_REVIEW = "11111111-1111-1111-1111-111111111111";
 
 /** GitLab, since only a GitLab note can be linked to from a review's row. */
@@ -29,7 +28,6 @@ const tracedMergeRequest: ItemRef = {
 	url: "https://gitlab.example.com/acme/api/-/merge_requests/1423",
 };
 
-/** A fixture result moved onto one review, its item and a practice, under its own id. */
 function onReview(
 	result: ResultDetail,
 	review: ReviewRef,
@@ -61,11 +59,6 @@ const olderReview = reviewRef(
 	daysBefore(40),
 );
 
-/**
- * The newest review, on the traced merge request, asked for by the reader: Thin controllers not
- * met with three problems, Product language met with an example from the work, and Migration
- * safety left open. Its feedback was posted on the merge request as one summary.
- */
 export const openProfileReview: ProfileReview = {
 	review: openReview,
 	results: [
@@ -99,7 +92,6 @@ export const openProfileReview: ProfileReview = {
 	],
 };
 
-/** The open review as its level reads it, with what the reader may see of its trace. */
 export const openProfileReviewDetail: ProfileReviewDetail = {
 	...openProfileReview,
 	practiceOutcomes: { met: 1, notMet: 1, doesNotApply: 0, couldNotDetermine: 1 },
@@ -111,7 +103,6 @@ export const openProfileReviewDetail: ProfileReviewDetail = {
 	},
 };
 
-/** Newest first: a second review of one merge request, a quiet issue, a failure, and an older pass. */
 export const profileReviews: ProfileReview[] = [
 	openProfileReview,
 	{
@@ -172,7 +163,6 @@ export const profileReviews: ProfileReview[] = [
 	},
 ];
 
-/** A review the reader asked for that is still running, with nothing recorded yet. */
 export const runningProfileReview: ProfileReview = {
 	review: reviewRef("00000000-0000-0000-0000-0000000002a6", pullRequest(905), daysBefore(0), {
 		origin: "REQUEST",

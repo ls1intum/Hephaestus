@@ -23,9 +23,7 @@ import {
 import { priceLabel } from "@/lib/llm-pricing";
 
 export interface WorkspaceLlmModelsTableProps {
-	/** Names the table, since each provider has one. */
 	providerName: string;
-	/** False when the provider is turned off, so none of its models can run. */
 	connectionEnabled: boolean;
 	models: WorkspaceLlmModel[];
 	/** Ids of the models with a write in flight. */
@@ -36,7 +34,6 @@ export interface WorkspaceLlmModelsTableProps {
 
 const COLUMNS = 5;
 
-/** What keeps a model from running, provider first; null for a model that can run. */
 function readiness(model: WorkspaceLlmModel, connectionEnabled: boolean): ModelReadiness | null {
 	if (!connectionEnabled) {
 		return "CONNECTION_OFF";
@@ -44,10 +41,6 @@ function readiness(model: WorkspaceLlmModel, connectionEnabled: boolean): ModelR
 	return model.enabled ? null : "OFF";
 }
 
-/**
- * A provider's models, one bordered table per provider. An empty one keeps its header and says so in
- * a row. The columns have fixed widths, so the tables of providers stacked on one page line up.
- */
 export function WorkspaceLlmModelsTable({
 	providerName,
 	connectionEnabled,

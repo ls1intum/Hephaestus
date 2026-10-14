@@ -21,7 +21,6 @@ import type { OverviewRegionState, ReviewCountState } from "./review-states";
 import type { AttentionGroup, AttentionRange } from "./ReviewAttention";
 import { ReviewListLink } from "./ReviewListLink";
 
-/** Delivered feedback of the range by location, as the Feedback table's Location filter counts it. */
 export type DeliveredByLocationState = PanelState<{
 	counts: ReasonCount[];
 	stale: boolean;
@@ -47,13 +46,6 @@ export interface DeliveryBreakdownCardProps {
 	failedDeliveries: AttentionGroup<ReviewCountState>;
 }
 
-/**
- * Beside the Feedback tile, where the feedback of the range went: the delivered feedback split by
- * location, the withheld feedback split by reason, each row in the words of the Feedback table's
- * filter for it and opening the table filtered to exactly the rows it counts. Under them, smaller,
- * the share of the feedback sent that failed to deliver, red above 5 %, by the overview's colour
- * rule (`review-attention-thresholds.ts`). Counts only: no text, rating or comment of any feedback.
- */
 export function DeliveryBreakdownCard({
 	workspaceSlug,
 	scope,
@@ -154,10 +146,6 @@ function withheldState(
 	};
 }
 
-/**
- * One split as a short table: its caption with the split's total as the head, then a row a share,
- * each its filter's icon and words and its count, the whole row a link to the rows it counts.
- */
 function BreakdownTable<T>({
 	caption,
 	what,
@@ -166,9 +154,7 @@ function BreakdownTable<T>({
 	rows,
 	workspaceSlug,
 }: {
-	/** The head and the table's accessible name: "Delivered by location". */
 	caption: string;
-	/** For the error alert: "We could not load delivered feedback by location". */
 	what: string;
 	state: PanelState<{ counts: T; stale: boolean }>;
 	empty: string;
@@ -224,10 +210,6 @@ function BreakdownTable<T>({
 	);
 }
 
-/**
- * A breakdown row: its filter's icon and words, and its count, aligned on the right. The words are the
- * link, stretched over the whole row, so the row opens the rows it counts wherever it is pressed.
- */
 function BreakdownTableRow({ row, workspaceSlug }: { row: BreakdownRow; workspaceSlug: string }) {
 	const Icon = row.def.icon;
 	return (
@@ -254,11 +236,9 @@ function BreakdownTableRow({ row, workspaceSlug }: { row: BreakdownRow; workspac
 }
 
 interface RateDef {
-	/** The figure's label, the term of the card's (i): "Feedback failed to deliver". */
 	term: string;
 	/** For the loading and error states: "feedback that failed to deliver". */
 	what: string;
-	/** The link's words, naming what the count is out of: "1 of 15 sent". */
 	link: (count: number, of: number | undefined) => string;
 	tone: (share: number) => AttentionTone;
 }
@@ -271,11 +251,6 @@ const DELIVERY_FAILURE_RATE: RateDef = {
 		share > PROBLEM_THRESHOLDS.deliveriesDestructiveAbove ? "destructive" : "secondary",
 };
 
-/**
- * The failure figure of the range, the card's foot: its label and the count it comes from, which
- * opens the rows it counts, then the rate, aligned with the counts above: the share of the feedback
- * sent that failed to deliver.
- */
 function RateLine({
 	workspaceSlug,
 	rate,

@@ -114,19 +114,13 @@ export const Default: Story = {
 		);
 		await expect(cells.map((row) => row[1])).toStrictEqual(["In-house", "Cloud", "Not declared"]);
 		await expect(cells.map((row) => row[4])).toStrictEqual(["Ready", "Ready", "Price missing"]);
-		// Only the exception is a badge, and it comes from the readiness registry with its icon.
 		const missing = canvas.getByText("Price missing").closest("[data-slot=badge]");
 		await expect(missing?.querySelector("svg")).not.toBeNull();
 		await expect(canvas.getAllByText("Ready")[0]?.closest("[data-slot=badge]")).toBeNull();
-		// Each name leads with its maker's mark, as everywhere else a model is named.
 		await expect(canvas.getByRole("cell", { name: "GPT-5" }).querySelector("img")).not.toBeNull();
 	},
 };
 
-/**
- * No model yet: the table keeps its header and says so in one row, the same shape as a workspace's
- * provider. The one way to add a model is the button above it.
- */
 export const Empty: Story = {
 	args: { models: [] },
 	play: async ({ canvas }) => {

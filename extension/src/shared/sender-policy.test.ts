@@ -144,8 +144,6 @@ describe("requestSchema", () => {
 		{ type: "sign-in", registrationId: "a b" },
 		{ type: "sign-in-dev", username: "x;drop", admin: false },
 		{ type: "list-results", workspaceSlug: "team", itemId: "9" },
-		// Every developer's records, one result's detail, feedback bodies and review changes are
-		// the web app's: the extension has no command for them.
 		{ type: "list-results", workspaceSlug: "team", scope: "workspace" },
 		{ type: "get-result", workspaceSlug: "team", resultId: JOB },
 		{ type: "get-feedback", workspaceSlug: "team", feedbackId: JOB },

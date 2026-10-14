@@ -1,7 +1,3 @@
-// Finds the selected code that can discard or swallow an error, in all languages. Each lead is a
-// candidate: the review decides if the error is really lost, with no report, log or recovery. An empty
-// catch body often spans lines, so the patterns run over each block of consecutive selected lines of a
-// file, not over one line. To add a language, add a row.
 import { scm } from "../kits/scm/index.ts";
 import {
 	occurrences,
@@ -40,16 +36,13 @@ export const LABELS = {
 };
 type ErrorKind = keyof typeof LABELS;
 
-// language key -> [kind, regex] of constructs in selected code that discard or swallow an error. The `\s`
-// in each regex spans the newlines joined into a window, so multi-line empty bodies match.
 const LANG_PATTERNS: Record<string, [ErrorKind, RegExp][]> = {
 	swift: [
 		["try-discards-error", /\btry\?\s/u],
 		["empty-catch", /\bcatch\s*\{\s*\}/u],
 		["catch-with-only-print", /\bcatch\s*\{\s*print\s*\([^)]*\)\s*\}/u],
 		["error-ignored-if-let-error", /\bif\s+let\s+error\b[^{]*\{\s*\}/u],
-		// Constructs the criteria ask to classify, not swallows in themselves: a fallback on a failable
-		// conversion and a bare early return are where a failure is most often dropped quietly.
+		// Failable conversions and early returns need review; their syntax alone proves no swallowed error.
 		[
 			"fallback-on-a-failable-conversion",
 			/\b(?:Int|Double|Float|Decimal|Bool|URL|UUID)\s*\([^)]*\)\s*\?\?/u,

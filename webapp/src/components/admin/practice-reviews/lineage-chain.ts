@@ -74,23 +74,15 @@ export function toneChip(variant: BadgeVariant): string {
 	return TONE_CHIP[variant];
 }
 
-// ------------------------------------------------------------------------------------------------
-// The graph, read as records
-// ------------------------------------------------------------------------------------------------
-
-/** One result of the graph, with the problems it records. */
 export interface LineageResult extends ReviewBoundResult {
 	problems: ProblemSummary[];
 }
 
-/** One piece of feedback of the graph, with the ids of the results it rests on. */
 export interface LineageFeedback extends ReviewBoundFeedback {
 	basis: string[];
 }
 
-/** The records of a lineage graph, each with what its edges say about it. */
 export interface LineageRecords {
-	/** The record the graph was asked for. */
 	root: ReviewLineageNode | undefined;
 	item: ItemRef | undefined;
 	reviews: ReviewRef[];
@@ -98,10 +90,7 @@ export interface LineageRecords {
 	feedback: LineageFeedback[];
 }
 
-/**
- * The graph as records: every node by its kind, a result with the problems it records, a piece of
- * feedback with the results it rests on. An edge to a node the graph does not hold says nothing.
- */
+// Edges to absent nodes cannot establish relationships.
 export function lineageRecords(lineage: ReviewLineage): LineageRecords {
 	const byKey = new Map(lineage.nodes.map((node) => [node.id, node]));
 	const targets = (from: string, kind: ReviewLineageNode["kind"]) =>
@@ -138,7 +127,6 @@ export function lineageRecords(lineage: ReviewLineage): LineageRecords {
 	return { root: byKey.get(lineage.rootId), item, reviews, results, feedback };
 }
 
-/** The feedback written from one result. */
 export function feedbackOf(
 	feedback: readonly LineageFeedback[],
 	resultId: string,
@@ -146,10 +134,6 @@ export function feedbackOf(
 	return feedback.filter((entry) => entry.basis.includes(resultId));
 }
 
-/**
- * Where one piece of feedback appears: its destination, with the provider read from the work for
- * feedback on the work.
- */
 export function feedbackLocation(
 	feedback: Pick<ReviewBoundFeedback, "destination">,
 	item: ItemRef | undefined,
@@ -178,7 +162,6 @@ export function lowerFirst(value: string): string {
 	return value.charAt(0).toLowerCase() + value.slice(1);
 }
 
-/** The status of one piece of feedback as its row shows it. The graph names no stop reason. */
 export function feedbackStatus(feedback: ReviewBoundFeedback): StatusDef {
 	return deliveryOutcome({ ...feedback, stopReason: null });
 }
@@ -186,9 +169,7 @@ export function feedbackStatus(feedback: ReviewBoundFeedback): StatusDef {
 export interface BranchOutcome {
 	/** Icon and tone. */
 	def: StatusDef;
-	/** "Delivered on GitHub", "Withdrawn by an admin". */
 	text: string;
-	/** More words, where the short text leaves something out. */
 	detail?: string;
 	/** When it happened, where the record says. */
 	at?: Date;
@@ -200,10 +181,7 @@ export interface BranchOutcome {
 	kind: "delivered" | "withheld" | "waiting" | "replaced" | "other";
 }
 
-/**
- * What became of one piece of feedback, in one line: where it landed, or why it did not. An
- * admin's withdrawal wins over the stored state, since that is the last thing that happened to it.
- */
+// An admin withdrawal overrides stored delivery state.
 export function branchOutcome(
 	feedback: ReviewBoundFeedback,
 	item: ItemRef | undefined,
@@ -215,7 +193,6 @@ export function branchOutcome(
 		return {
 			def: FEEDBACK_WITHDRAWN_DEF,
 			text: "Withdrawn by an admin",
-			// A ready piece can be withdrawn too: only a recorded delivery says it was delivered.
 			detail: reachedDeveloper(feedback)
 				? `Delivered ${lowerFirst(location.label)}, then taken off them.`
 				: "Taken back before it reached the developer.",
@@ -277,7 +254,6 @@ const OUTCOME_ORDER: readonly Outcome[] = [
 	"DOES_NOT_APPLY",
 ];
 
-/** The results by verdict, worst first, with the zeroes left out. */
 export function verdictCounts(
 	results: readonly ReviewBoundResult[],
 ): { outcome: Outcome; count: number }[] {
@@ -287,7 +263,6 @@ export function verdictCounts(
 	})).filter((entry) => entry.count > 0);
 }
 
-/** "5 results: 3 not met, 2 met". */
 export function verdictSummary(results: readonly ReviewBoundResult[]): string {
 	const parts = verdictCounts(results).map(
 		({ outcome, count }) => `${count} ${OUTCOME_DEFS[outcome].label.toLowerCase()}`,
@@ -304,15 +279,9 @@ export interface NumberedResult {
 	number: number;
 }
 
-/** The numbered results by id, as `numberedResults` numbers them. */
 export type NumberedById = ReadonlyMap<string, NumberedResult>;
 
-/**
- * The results in the order the chain numbers them: by when they were recorded, then by id,
- * grouped by practice in the order a practice was first recorded. The number is the position, from
- * 1. The order rests on the results alone, never on the record a trace was opened from or the
- * order the graph lists them in, so a result keeps its number in every trace of its review.
- */
+// Number results from their full review so every trace keeps the same identities.
 export function numberedResults(results: readonly LineageResult[]): NumberedResult[] {
 	const byTime = [...results].sort(
 		(a, b) => a.recordedAt.getTime() - b.recordedAt.getTime() || a.id.localeCompare(b.id, "en"),
@@ -326,10 +295,6 @@ export function numberedResults(results: readonly LineageResult[]): NumberedResu
 	return [...groups.values()].flat().map((result, index) => ({ result, number: index + 1 }));
 }
 
-/**
- * Not-met results that led to no feedback. A met result, or one that does not apply or could not
- * be determined, rarely leads to feedback, so it is no loss.
- */
 export function silentNotMet(
 	records: Pick<LineageRecords, "results" | "feedback">,
 ): LineageResult[] {
@@ -339,7 +304,6 @@ export function silentNotMet(
 	);
 }
 
-/** How far the chain got, step by step: recorded, written, reached the developer. */
 export interface StageCounts {
 	results: number;
 	feedback: number;

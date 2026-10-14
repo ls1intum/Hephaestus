@@ -14,7 +14,6 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
-import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecisionRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecisionService;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackCompositionContextService;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackLedgerRecorder;
@@ -66,26 +65,35 @@ class FeedbackStoreServiceTest {
     final PersonDataWriteFence privacy = mock(PersonDataWriteFence.class);
     final FeedbackPreparationService preparation = mock(FeedbackPreparationService.class);
     final FeedbackContentDigest digests = mock(FeedbackContentDigest.class);
-    final FeedbackStoreService store = new FeedbackStoreService(
+    final Clock clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
+    final FeedbackSendQueue sendQueue = new FeedbackSendQueue(sends, clock);
+    final FeedbackDeliveryPolicy policy = new FeedbackDeliveryPolicy(feedback, copies, gate, sendQueue);
+    final FeedbackPreparationStore prepared = new FeedbackPreparationStore(
             feedback,
             basis,
             copies,
-            sends,
             results,
             mock(ProblemRepository.class),
             reviews,
-            mock(FeedbackDecisionService.class),
-            mock(FeedbackDecisionRepository.class),
-            mock(FeedbackResponseService.class),
-            mock(FeedbackVisibilityService.class),
-            gate,
-            Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
+            clock,
             privacy,
             preparation,
             new FeedbackLedgerRecorder(feedback, basis, copies),
             digests,
+            policy);
+    final FeedbackStoreService store = new FeedbackStoreService(
+            feedback,
+            copies,
+            sends,
+            mock(FeedbackDecisionService.class),
+            mock(FeedbackResponseService.class),
+            mock(FeedbackVisibilityService.class),
+            clock,
+            privacy,
             mock(FeedbackCompositionContextService.class),
-            new FeedbackSendQueue(sends, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)));
+            sendQueue,
+            policy,
+            prepared);
     final UUID reviewId = UUID.randomUUID(), resultId = UUID.randomUUID();
     final Review review = Review.builder()
             .id(reviewId)

@@ -151,7 +151,6 @@ function day(costUsd: number, iso: string): LlmUsageByDay {
 }
 
 describe("breakdown totals", () => {
-	// One number per cell: an estimate stacked under a total breaks the money column's right edge.
 	it("stay in USD, with the estimate left to the tiles and the disclosure", () => {
 		const byDay = [0.575, 0.575, 0.575, 0.575].map((value, index) =>
 			day(value, `2026-07-0${index + 1}T00:00:00.000Z`),

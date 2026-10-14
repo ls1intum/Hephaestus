@@ -128,7 +128,6 @@ function ownReviews(...reviews: ReviewRef[]): PageResponseDtoProfileReview {
 	};
 }
 
-/** The reader's own reviews of the item, then the trace of the one named. */
 function ownReviewResponse(latest: () => ReviewRef, trace: unknown, status = 200) {
 	return async (request: Request) =>
 		new URL(request.url).pathname.endsWith("/reviews")
@@ -136,7 +135,6 @@ function ownReviewResponse(latest: () => ReviewRef, trace: unknown, status = 200
 			: json(trace, status);
 }
 
-/** Answers with whichever own review is the latest at the moment of asking, and its trace. */
 function latestOwnReview(latest: () => ReviewRef) {
 	return async (request: Request) =>
 		new URL(request.url).pathname.endsWith("/reviews")

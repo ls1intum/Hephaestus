@@ -12,7 +12,6 @@ import { renderWithRouter } from "@/test/router-harness";
 import { CatalogPracticeForm } from "./CatalogPracticeForm";
 import { catalogPractice, catalogPracticeDefinition } from "./fixtures";
 
-/** A cancel that navigates, which is what `useUnsavedChanges` guards. */
 const cancel = (
 	<Link to="/admin/catalog" className={buttonVariants({ variant: "outline" })}>
 		Cancel

@@ -18,28 +18,20 @@ import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter, testQueryClient } from "@/t
 
 vi.setConfig({ testTimeout: 20_000 });
 
-// jsdom has no IntersectionObserver, and the lists load their next page as their end scrolls into view.
+// jsdom needs an IntersectionObserver stub for paged lists.
 beforeEach(() => {
 	vi.stubGlobal("IntersectionObserver", ObserverStub);
 });
 
-/** The level opened by its URL over the list it belongs to, as a shared link opens it. */
 const RESULT_LEVEL = `/w/acme/admin/practices/reviews/results?detail=result:${reviewResultDetail.id}`;
 
 const REASON = "The 404 comes from the router.";
 
-/**
- * The level's own handlers ahead of the fixture's, which answer the list the level opens over: MSW
- * takes the first handler that matches.
- */
+// MSW selects the first matching handler; register detail overrides before list fixtures.
 function stub(...handlers: Parameters<typeof server.use>) {
 	server.use(...handlers, ...reviewHandlers());
 }
 
-/**
- * The developer's own results and review, and the overview under a range the page under the level
- * has not asked for: reads that count the result without being on screen.
- */
 function countingReads(workspaceSlug: string) {
 	return [
 		listOwnResultsQueryKey({ path: { workspaceSlug } }),
@@ -64,7 +56,6 @@ const incorrectMark: ResultMark = {
 	removalReason: null,
 };
 
-/** The result as the server answers once `marks` stand on it. */
 function withMarks(marks: ResultMark[]): ReviewResultDetail {
 	const active = marks.find((mark) => mark.kind === "INCORRECT" && mark.removedAt === null);
 	return {
@@ -74,7 +65,6 @@ function withMarks(marks: ResultMark[]): ReviewResultDetail {
 	};
 }
 
-/** Opens the popover named `action`, writes the reason and sends it. */
 async function submitReason(action: string) {
 	const user = userEvent.setup();
 	await user.click(await screen.findByRole("button", { name: action }, ROUTE_RENDER_WAIT));
@@ -85,10 +75,6 @@ async function submitReason(action: string) {
 }
 
 describe("result level", () => {
-	/**
-	 * The wire carries each problem under its result, and the example beside them. The level reads
-	 * the problems and leaves the example to the developer's own pages.
-	 */
 	it("shows the result's problems from the wire and not its example", async () => {
 		assert(reviewResultDetail.summary !== null);
 		stub();
@@ -111,7 +97,6 @@ describe("result level", () => {
 		let sent: unknown;
 		let current = withMarks([]);
 		stub(
-			// Re-read after the change like every other read of it, so it answers as the server would.
 			http.get("*/workspaces/:workspaceSlug/practices/reviews/results/:resultId", () =>
 				HttpResponse.json(current),
 			),
@@ -134,7 +119,6 @@ describe("result level", () => {
 		renderRouteAtWithRouter(RESULT_LEVEL, queryClient);
 		await submitReason("Mark incorrect");
 
-		// The toast and the result's own mark both say it.
 		await screen.findAllByText("Marked incorrect");
 		expect(sent).toStrictEqual({ kind: "INCORRECT", reason: REASON });
 		await waitFor(() => expect(screen.queryByRole("textbox", { name: "Reason" })).toBeNull());
@@ -165,7 +149,6 @@ describe("result level", () => {
 		renderRouteAtWithRouter(RESULT_LEVEL);
 		await submitReason("Remove mark");
 
-		// The confirmation and the result's history both say so.
 		await screen.findAllByText("Mark removed");
 		expect(sent).toStrictEqual({ markId: incorrectMark.id, body: { reason: REASON } });
 	});

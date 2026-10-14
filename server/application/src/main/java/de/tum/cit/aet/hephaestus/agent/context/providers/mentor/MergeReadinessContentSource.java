@@ -125,7 +125,6 @@ public class MergeReadinessContentSource implements ContentSource {
         return OUTPUT_PREFIX + "merge_readiness/" + pullRequestId + ".json";
     }
 
-    /** The pull request id an on-demand key names, if {@code key} is one. */
     public static Optional<Long> pullRequestIdOf(String key) {
         Matcher matcher = ITEM_KEY.matcher(key);
         if (!matcher.matches()) return Optional.empty();
@@ -509,12 +508,8 @@ public class MergeReadinessContentSource implements ContentSource {
         return commit.equals(head) ? "CURRENT_HEAD" : "OTHER_COMMIT";
     }
 
-    /**
-     * What the provider was recorded saying about the current head's checks. GitLab reporting no pipeline or a skipped
-     * one is not a failure, and says nothing about whether CI is configured. {@code NONE} is GitHub's empty rollup, and
-     * on GitLab a record stored before the two were told apart. A result of another commit, or none, leaves the
-     * current head's checks not captured.
-     */
+    // Missing or skipped GitLab pipelines establish no failure or CI configuration.
+    // Check results from another head cannot describe the reviewed head.
     private static String checksObserved(PullRequest pr) {
         CheckState state = pr.getHeadCheckState();
         if (state == null || !"CURRENT_HEAD".equals(checksFor(pr))) {

@@ -22,11 +22,6 @@ import { problemDetailOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
 
-/**
- * Every write of a feedback response, whatever surface it was made on, so the response buttons of
- * the piece of feedback being written wait wherever it is on screen — a card on the page and the
- * same feedback in a review's card are one write.
- */
 const FEEDBACK_RESPONSE_WRITE_KEY = ["feedback-response", "write"];
 
 /**
@@ -38,13 +33,6 @@ interface FeedbackResponseWriteVariables {
 	body?: FeedbackResponseRequest;
 }
 
-/**
- * Every read that carries a response or counts one: the practice-page cards, the resolution
- * counts, the overview, and each list or detail of the reader's reviews and results, whose
- * feedback refs carry the response. A reader who is also an admin has the review drawer's
- * disagreements cached, so those refresh too. By operation, so a list is refreshed whatever its
- * filters.
- */
 const READS_OF_FEEDBACK_RESPONSES: ReadonlySet<string> = new Set([
 	"getOwnPracticePageFeedback",
 	"getOwnFeedbackResponse",
@@ -98,7 +86,7 @@ export function useFeedbackResponseWrite(workspaceSlug: string): FeedbackRespons
 		select: ({ state: { variables } }) =>
 			variables && [variables.path.feedbackId, variables.body ?? {}],
 	});
-	// The cache lists mutations oldest first, so a later write to the same feedback wins.
+	// Mutation cache order is oldest-first; the latest write to one feedback record wins.
 	const pendingResponses = new Map(pending.filter((entry) => entry !== undefined));
 	const responseOf = (feedbackId: string, recorded: FeedbackResponse | null) =>
 		pendingResponses.get(feedbackId) ?? responseRequestOf(recorded);

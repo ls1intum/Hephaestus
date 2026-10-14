@@ -61,7 +61,7 @@ describe("a practice's script needs on practice setup", () => {
 
 	beforeEach(() => {
 		needsRequested.mockReset();
-		// Before the practice handlers: their `practices/:practiceSlug` would answer this path too.
+	// Register this handler before practices/:practiceSlug, which also matches this path.
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices/practice-script-needs", ({ params }) => {
 				needsRequested(String(params.workspaceSlug));
@@ -74,7 +74,6 @@ describe("a practice's script needs on practice setup", () => {
 	it("shows the open practice's own needs, read for this workspace", async () => {
 		renderRouteAt(at("practice", "comment-quality"));
 
-		// The unmet required model stops the script, so the panel says so before anything else.
 		const alert = await screen.findByRole("note", {}, ROUTE_RENDER_WAIT);
 		expect(alert.textContent).toBe(
 			"The practice script does not run for In-house members’ work: no decision model is assigned for them. Assign a decision model",
@@ -82,7 +81,6 @@ describe("a practice's script needs on practice setup", () => {
 		expect(
 			within(alert).getByRole("link", { name: "Assign a decision model" }).getAttribute("href"),
 		).toBe("/w/acme/admin/models?purpose=PRACTICE_DECISION");
-		// Another practice's needs are not this one's.
 		expect(screen.queryByText(/embedding model/u)).toBeNull();
 		expect(needsRequested).toHaveBeenCalledWith("acme");
 	});
@@ -98,7 +96,6 @@ describe("a practice's script needs on practice setup", () => {
 describe("resetting a practice to the catalog after declining its update", () => {
 	const ours = definitionOf({ name: "Explain the change", criteria: "Our criteria" });
 	const offered = { ...ours, criteria: "New catalog criteria" };
-	// Declining kept our definition and moved the catalog base: the practice now reads Edited here.
 	const declined = wirePractice({
 		slug: "explain-the-change",
 		definition: ours,
@@ -174,7 +171,6 @@ describe("resetting a practice to the catalog after declining its update", () =>
 	it("keeps the practice and shows the new comparison when the offer changed meanwhile", async () => {
 		server.use(
 			...practicesHandlers([declined]),
-			// The comparison the reader sees, then the one that holds once the catalog moved on.
 			http.get(
 				"*/workspaces/:workspaceSlug/practices/releases/:slug",
 				() => HttpResponse.json(proposal),
@@ -297,7 +293,6 @@ describe("editing a workspace practice", () => {
 
 		const conflict = await screen.findByRole("alert", {}, ROUTE_RENDER_WAIT);
 		expect(conflict.textContent).toContain("Someone saved a newer version");
-		// The draft is untouched until the reader chooses to load the newest version.
 		screen.getByDisplayValue("My name");
 		expect(moved).not.toHaveBeenCalled();
 

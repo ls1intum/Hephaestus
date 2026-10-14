@@ -39,7 +39,6 @@ function processingOf(controller: ReviewController): string | undefined {
 describe("a review whose results are still processed", () => {
 	it("polls until processing ends, then reads its feedback checks and row again", async () => {
 		const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-		// The review's row as the sheet reads it, which the review settling has to renew.
 		const rowKey = listReviewsQueryKey({
 			path: { workspaceSlug: "demo" },
 			query: { reviewId, size: 1 },
@@ -115,7 +114,7 @@ describe("cancelling a review", () => {
 
 describe("an unknown review", () => {
 	it("asks once and reports not found without retrying", async () => {
-		// The client's own default retries: the hook has to opt out of them for a 404 itself.
+		// Disable retry for a 404; repeating a denied or removed review read cannot recover it.
 		const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
 		let reviewReads = 0;
 		server.use(

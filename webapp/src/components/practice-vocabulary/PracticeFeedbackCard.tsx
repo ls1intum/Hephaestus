@@ -30,7 +30,6 @@ import type { Outcome } from "./outcome-defs";
 import { cleanLabel, timelinePieces } from "./practice-feedback-timeline";
 import { PracticePill } from "./PracticePill";
 
-/** The band under a card's footer: the rating's comment, or the reason for a disagreement. */
 export type FeedbackBand = "comment" | "disagreement";
 
 /** The control whose write is in flight, so "Saving…" lands on it and nowhere else. */
@@ -149,7 +148,6 @@ export interface FeedbackRatingProps {
 	 */
 	onRate?: (usefulness: FeedbackUsefulness) => void;
 	onSendComment?: (comment: string) => void;
-	/** Skip in either band: the comment's or the disagreement's. */
 	onSkipComment?: () => void;
 	/** Without it the card has no Disagree button. The caller decides what a press on a standing disagreement does. */
 	onDisagree?: () => void;

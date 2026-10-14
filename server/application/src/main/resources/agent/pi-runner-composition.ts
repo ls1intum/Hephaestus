@@ -102,13 +102,11 @@ export interface ComposedFeedbackEnvelope {
 	review?: ComposedReview | null;
 }
 
-/** The fields of an admitted problem a line note is checked against: the citations it may sit on. */
 export interface ReviewedProblem {
 	problemId: string;
 	citations: readonly Record<string, unknown>[];
 }
 
-/** The fields of an admitted result a review is checked against, with its problems when it is NOT_MET. */
 export interface ReviewedResult {
 	summaryOnly?: boolean;
 	practiceSlug: string;
@@ -116,16 +114,11 @@ export interface ReviewedResult {
 	problems: readonly ReviewedProblem[];
 }
 
-/** The admitted result an id names, either as its own resultId or as one of its problems' problemId. */
 export interface NamedEvidence<R> {
 	result: R;
 	ref: EvidenceRef;
 }
 
-/**
- * Every id composition may name, keyed by itself: each result's resultId and each of its problems'
- * problemId, with the result it belongs to.
- */
 export function namedEvidence<R extends { problems: readonly { problemId: string }[] }>(
 	results: ReadonlyMap<string, R>,
 ): Map<string, NamedEvidence<R>> {
@@ -139,10 +132,6 @@ export function namedEvidence<R extends { problems: readonly { problemId: string
 	return named;
 }
 
-/**
- * The references the ids name, each once, in the order first named. Only checked ids reach this point, so an id that
- * names nothing admitted is a defect here, never something to drop.
- */
 export function evidenceRefs(
 	ids: readonly string[],
 	named: ReadonlyMap<string, { ref: EvidenceRef }>,
@@ -171,10 +160,7 @@ export function notReachedNote(notReached: readonly string[]): string {
 	);
 }
 
-/**
- * Private feedback rests on a problem of its own practice: its NOT_MET result, named directly or through one of its
- * problems. History alone authorizes nothing.
- */
+// Private feedback requires this practice's admitted Not met result; history alone authorizes no claim.
 export function validateFeedbackEvidence(
 	primaryPractice: string,
 	basedOn: readonly string[],
@@ -186,8 +172,6 @@ export function validateFeedbackEvidence(
 	const named = namedEvidence(results);
 	const unknown = basedOn.find((id) => !named.has(id));
 	if (unknown !== undefined) {
-		// The ids of this practice's own result and problems are named, so the correction is one edit away:
-		// a session that wrote a digest or a citation here is looking at the wrong field.
 		const own = [...results]
 			.filter(([, result]) => result.practiceSlug === primaryPractice)
 			.map(
@@ -247,7 +231,6 @@ export interface PracticePageSupportOccurrence {
 	recordedAt: string;
 }
 
-/** PracticePageDecision as the server decides it from the evidence, before any card is written. */
 export const PRACTICE_PAGE_DECISIONS = [
 	"ADMIT",
 	"NO_EVIDENCE",
@@ -258,7 +241,6 @@ export const PRACTICE_PAGE_DECISIONS = [
 	"UNATTRIBUTABLE_SUBJECT",
 ] as const;
 
-/** ConversationRoutingDecision, per admitted NOT_MET result. */
 export const CONVERSATION_DECISIONS = [
 	"ADMIT",
 	"MENTOR_UNAVAILABLE",
@@ -276,12 +258,10 @@ export interface PracticePagePracticeSupport {
 	occurrences: PracticePageSupportOccurrence[];
 }
 
-/** The server's dated PRACTICE_PAGE support read; null until admission, and null when it arrived malformed. */
 export type PracticePageSupport =
 	| { state: "COMPLETE"; readAt: string; practices: PracticePagePracticeSupport[] }
 	| { state: "UNAVAILABLE" | "REFUSED"; readAt: string; refusal: string | null };
 
-/** The server's dated CONVERSATION routing read; null until admission, and null when it arrived malformed. */
 export type ConversationEligibility =
 	| {
 			state: "COMPLETE";
@@ -290,7 +270,6 @@ export type ConversationEligibility =
 	  }
 	| { state: "UNAVAILABLE" | "REFUSED"; readAt: string };
 
-/** The admitted fields the routing reads are checked against. */
 interface RoutedResult {
 	resultId: string;
 	practiceSlug: string;
@@ -336,7 +315,6 @@ function readSupportOccurrence(value: unknown): PracticePageSupportOccurrence | 
 	};
 }
 
-/** Validates the support read beside the admission; anything else is no support context at all. */
 export function readPracticePageSupport(
 	value: unknown,
 	current: readonly RoutedResult[],
@@ -376,7 +354,6 @@ export function readPracticePageSupport(
 			!expected.delete(practice.practiceSlug) ||
 			decision === undefined ||
 			!Array.isArray(practice.occurrences) ||
-			// A practice the page refuses carries no support.
 			(decision !== "ADMIT" && practice.occurrences.length > 0)
 		) {
 			return null;
@@ -394,7 +371,6 @@ export function readPracticePageSupport(
 	return { state: "COMPLETE", readAt: value.readAt, practices };
 }
 
-/** Validates the CONVERSATION routing beside the admission: one decision for each admitted NOT_MET result, or none. */
 export function readConversationEligibility(
 	value: unknown,
 	current: readonly RoutedResult[],
@@ -463,10 +439,6 @@ function listOf(value: unknown): unknown[] | null {
 	return value === undefined || value === null ? [] : null;
 }
 
-/**
- * The ids as sent, or null when basedOn is not an array of non-empty strings. Nothing is dropped from it: a text
- * whose support names something that is not an id says something no result backs, so it is refused whole.
- */
 function idsOf(value: unknown): string[] | null {
 	if (!Array.isArray(value)) {
 		return null;
@@ -493,7 +465,6 @@ function integerOf(value: unknown): number | undefined {
 	return typeof value === "string" && /^\d+$/u.test(value.trim()) ? Number(value) : undefined;
 }
 
-/** The problems with a text that is published as written: missing, too long, or carrying a reserved reference. */
 function textProblem(value: unknown, limit: number): string | null {
 	if (typeof value !== "string" || value.trim() === "") {
 		return "body is required: the complete text, as the developer will read it";
@@ -510,10 +481,6 @@ function textProblem(value: unknown, limit: number): string | null {
 	return null;
 }
 
-/**
- * The problems with what a part rests on: every id an admitted NOT_MET result, or a problem of one. The review on
- * the work never acknowledges a MET result, so a text that rests on one is refused.
- */
 function supportProblem(basedOn: readonly string[] | null, named: Named): string | null {
 	if (basedOn === null) {
 		return NOT_AN_ID_LIST;
@@ -531,10 +498,6 @@ function supportProblem(basedOn: readonly string[] | null, named: Named): string
 		: null;
 }
 
-/**
- * The problem with a note's anchor: it names a problem that the note rests on, itself or through its result, and
- * one of that problem's citations that is a line of this change and carries no other note.
- */
 function anchorProblem(
 	anchor: ReviewAnchor,
 	basedOn: readonly string[],
@@ -565,7 +528,6 @@ function anchorProblem(
 		: null;
 }
 
-/** What the review decides for one NOT_MET result: raise it, or withhold it for one of the reasons. */
 export const DISPOSITIONS = ["RAISE", ...WITHHOLD_REASONS] as const;
 export type Disposition = (typeof DISPOSITIONS)[number];
 
@@ -574,10 +536,6 @@ function dispositionOf(value: unknown): Disposition | undefined {
 	return DISPOSITIONS.find((candidate) => candidate === word);
 }
 
-/**
- * The results a sent text speaks about, itself or through a problem it names in basedOn, read from what was sent
- * so a refused part still counts as spoken.
- */
 function spokenOf(value: Record<string, unknown>, named: Named): Set<string> {
 	const summary = isObject(value.summary) ? (idsOf(value.summary.basedOn) ?? []) : [];
 	const notes = (listOf(value.inline) ?? []).flatMap((note) =>
@@ -586,11 +544,6 @@ function spokenOf(value: Record<string, unknown>, named: Named): Set<string> {
 	return new Set([...summary, ...notes].flatMap((id) => named.get(id)?.ref.resultId ?? []));
 }
 
-/**
- * Every NOT_MET result takes one decision, and the text keeps to it: a raised one is spoken about, itself or through
- * its problems, and a withheld one is not. A result whose decision was sent but refused is answered by that
- * refusal, not as undecided.
- */
 function coverageProblems(
 	decided: ReadonlyMap<string, Disposition>,
 	named: ReadonlySet<string>,
@@ -626,7 +579,6 @@ function inlineSupportProblem(basedOn: string[] | null, named: Named): string | 
 		: null;
 }
 
-/** What a review is read against besides the results it may rest on. */
 export interface ReviewContext {
 	/** The statements a withholding may name as where this work already received the advice. */
 	witnesses: ReadonlyMap<string, PriorAdviceWitness>;
@@ -687,10 +639,6 @@ function readSummary(
 	return { summary: { body: value.body, basedOn: evidenceRefs(basedOn, named) }, errors: [] };
 }
 
-/**
- * The decisions as sent, one per NOT_MET result: each valid one by result, every result a decision names, and every
- * reason one is refused. A prior-advice reason names the statement that gave the advice.
- */
 function readDecisions(
 	value: unknown,
 	results: ReadonlyMap<string, ReviewedResult>,
@@ -777,16 +725,7 @@ export function prepareReviewArguments(value: unknown) {
 	return value;
 }
 
-/**
- * Reads one review as the composer sent it, or every reason it cannot be stored. A review is stored whole or not
- * at all: its decisions and texts were written together, so one wrong part sends the whole review back to be
- * corrected. The decisions are checked here and not stored as sent: each withheld one becomes the stored withholding
- * of its result and reason, and a decision's witnessIds are not kept. Every id a stored text names is stored as the
- * reference it resolves to.
- *
- * @param results the results this review may rest on, by resultId
- * @param lineNotes whether this work has lines a note can be placed on
- */
+/** Store the review whole: a refused part cannot be dropped while retaining decisions written with it. */
 export function readReview(
 	value: unknown,
 	results: ReadonlyMap<string, ReviewedResult>,
@@ -851,7 +790,6 @@ export function readReview(
 				"anchor needs problemId and citationIndex, the line comes from that citation of that problem",
 			);
 		} else if (basedOn !== null) {
-			// A refused support is answered above; the anchor cannot be checked against it.
 			const problem = anchorProblem({ problemId, citationIndex }, basedOn, named, anchors);
 			if (problem !== null) {
 				problems.push(problem);
@@ -867,7 +805,6 @@ export function readReview(
 			anchors.add(`${problemId}#${citationIndex}`);
 			inline.push({
 				body: raw.body,
-				// A note that rests on the anchor's result also rests on the problem it sits on.
 				basedOn: evidenceRefs([...basedOn, problemId], named),
 				anchor: { problemId, citationIndex },
 			});
@@ -883,7 +820,6 @@ export function readReview(
 	return errors.length > 0 ? { errors } : { review: { summary, inline, withheld } };
 }
 
-/** Every result the review decided about, itself or through its problems: what it says and what it withholds. */
 export function decidedByReview(review: ComposedReview | null | undefined): Set<string> {
 	if (!review) {
 		return new Set();
@@ -897,15 +833,6 @@ export function decidedByReview(review: ComposedReview | null | undefined): Set<
 	);
 }
 
-/**
- * The admitted results the review on the work may rest on, whole, with their problems: the NOT_MET results that
- * admission marked publicEligible. A review on the work is owed only when there is at least one. A MET result is never
- * acknowledged on the work, so it is left out here, and a run with only MET results composes no review. The server
- * decides eligibility (PublicReviewEligibility) and admits a composed review by the same rule, so a result it did not
- * mark is left out entirely rather than shown with parts removed — its words may carry what it drew on. Nothing of a
- * shown result is shortened; only the verification digests of its citations, its example's and its problems' are
- * dropped, which say nothing a composer can use.
- */
 export function publicResults(
 	results: readonly Record<string, unknown>[],
 ): Record<string, unknown>[] {
@@ -927,7 +854,6 @@ export function publicResults(
 		}));
 }
 
-/** One citation as a public reference shows it: its quoted lines and coordinates, without its verification digests. */
 function withoutDigest(citation: unknown): unknown {
 	if (!isObject(citation)) {
 		return citation;
@@ -1155,7 +1081,6 @@ export const WRITE_CONTRACT =
 	"nothing: the summary is null and there are no line notes.\n\n" +
 	"One result or problem may support notes at several places, and also the summary's overview of them.";
 
-/** The practices of the public NOT_MET results, each once: every one is decided against its whole standard. */
 function notMetPractices(reviewable: readonly Record<string, unknown>[]): string[] {
 	return [
 		...new Set(
@@ -1166,10 +1091,6 @@ function notMetPractices(reviewable: readonly Record<string, unknown>[]): string
 	];
 }
 
-/**
- * What a staged standard is for in the review, wherever one is shown: the opening or a restored reference. The
- * criteria were written to assess the work; here they only qualify how its recorded results are communicated.
- */
 export const STANDARD_REFERENCE =
 	"Reference, whole as staged: each standard explains what its practice's recorded results were assessed " +
 	"against and the responses it accepts, and qualifies whether and how those results and their problems may " +
@@ -1298,18 +1219,6 @@ function idList(ids: readonly string[], description: string) {
 	};
 }
 
-/**
- * The parameters of report_review for one run, built from the same results readReview checks against: one decision
- * for each NOT_MET result comes first, each text names only NOT_MET results of this run or their problems, and a
- * note sits only on a problem with a line of this change. A list with nothing it could name takes no items. The
- * required fields of each part are required here, so a missing one is answered by the provider's own validation; the
- * texts use null for no summary and an empty array for no notes. readReview stays the final check and answers each
- * part by name.
- *
- * @param results the results this review may rest on, by resultId
- * @param lineNotes whether this work has lines a note can be placed on
- * @param eligibleWitnesses every witnessId a decision may name; readReview checks which reason each one supports
- */
 export function reviewToolParameters(
 	results: ReadonlyMap<string, ReviewedResult>,
 	lineNotes: boolean,
@@ -1424,21 +1333,17 @@ export function reviewToolParameters(
 	};
 }
 
-/** Explanatory context from the staged practice version, not a new assessment. */
 export interface ReviewPractice {
 	slug: string;
 	name: string;
 	whyItMatters?: string;
 	knownLimitations: readonly string[];
-	/** Which practice version was staged: it identifies the standard, not that the standard or the work changed. */
 	versionId?: string;
 }
 
 /** Everything the review on the work is composed from; nothing else reaches its session. */
 export interface ReviewTurnInput {
-	/** The captured record of this same work, from buildSameWorkContext: it orients; results own assessments. */
 	sameWork: string;
-	/** The NOT_MET results of this work the review may rest on, whole with their problems, from publicResults. */
 	results: readonly Record<string, unknown>[];
 	/** The limits recorded by the abstentions of this work, from publicQualifications: context, never support. */
 	qualifications: readonly Record<string, unknown>[];
@@ -1449,7 +1354,6 @@ export interface ReviewTurnInput {
 	ownHistoryReadAt?: string;
 	/** The bounded captured public discussion of this same work, from buildPublicReviewHistory. */
 	captured: PublicReviewHistory;
-	/** Context on the practices of the NOT_MET results. */
 	practices: readonly ReviewPractice[];
 	/** Practices this review did not reach at all. */
 	notReached: readonly string[];
@@ -1459,9 +1363,6 @@ export interface ReviewTurnInput {
 	stagedCriteria: (practiceSlug: string) => string | null;
 }
 
-/**
- * The opening reference: whole work and communication, full concerns, and the limits the abstentions recorded.
- */
 export function buildReviewTurn(input: ReviewTurnInput): string {
 	const own = ownHistoryText(input.alreadySaid, input.ownHistoryOmissions, input.ownHistoryReadAt);
 	const others =

@@ -15,7 +15,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UUID> {
-    /** Every attempt one source recorded in a workspace, first attempt first. */
     @Query("SELECT e FROM LlmUsageEvent e WHERE e.workspace.id = :workspaceId AND e.sourceType ="
             + " :sourceType AND e.sourceId = :sourceId ORDER BY e.sourceAttempt")
     List<LlmUsageEvent> findByWorkspaceIdAndSourceTypeAndSourceIdOrderBySourceAttemptAsc(
@@ -180,35 +179,8 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             @Param("from") Instant from, @Param("to") Instant to, Pageable pageable);
 
     /**
-     * The one sanctioned UPDATE on the ledger: fill in a price that could not be resolved when the
-     * row was written. See the runtime repricer for why this is a repair rather than a rewrite.
-     *
-     * <p>Fenced on {@code pricing_state = 'UNPRICED'}, so it can only ever move a row out of the
-     * unpriced state and never re-price one that already carries a frozen amount somebody was
-     * charged. Two pods repricing the same row concurrently is therefore safe: the loser updates
-     * nothing. Also fenced on no unreported calls and a measured billable token: incomplete usage
-     * stays unknown, whatever the price says, because a free model's zero is a fact only about
-     * spend that was observed.
-     *
-     * <p>Every token column is untouched; this operation resolves a rate without changing the
-     * measurement.
-     *
-     * <p><b>The price travels as one value.</b> The eight columns this writes are the eight
-     * components of the {@link LlmPriceSnapshot} the repricer resolved, so it is passed as the
-     * snapshot rather than unpacked into a list of values: a row is priced by <em>one</em>
-     * catalogue entry, and splitting it into separate arguments only creates the chance of pairing
-     * one entry's rate with another's id. Same shape as {@link #insertIfAbsent}, and for the same
-     * reason.
-     *
-     * <p>{@link LlmPriceSnapshot#fundingSource()} is deliberately not in the SET list. Which purse
-     * paid for an attempt was settled when it was admitted; a reprice recovers an amount, it never
-     * moves a charge between the instance's money and the workspace's.
-     *
-     * @param price the resolved price, whose {@code pricingState} is what the row moves to — always
-     *     the state the caller computed, so a NO_CHARGE model settles as a real zero rather than
-     *     staying a blind spot
-     * @return 1 when this call priced the row, 0 when it was no longer unpriced or lacked complete
-     *     token evidence
+     * Prices only complete UNPRICED measurements, without changing token counts or the funding source.
+     * Frozen charges are immutable; concurrent repricers can price a row only once.
      */
     @WorkspaceAgnostic("ID-based price repair; the event id comes from the cross-tenant repricing enumeration")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -262,7 +234,6 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     boolean existsWorkspaceFunded(
             @Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
 
-    /** {@link #OWN_PROVIDER_CONNECTED} for one workspace. */
     @Query(
             value = "SELECT " + OWN_PROVIDER_CONNECTED + " FROM workspace w WHERE w.id = :workspaceId",
             nativeQuery = true)
@@ -472,7 +443,6 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
         @Nullable
         String getPracticeName();
 
-        /** The model kinds, comma-separated. */
         String getModelKinds();
 
         long getReviews();

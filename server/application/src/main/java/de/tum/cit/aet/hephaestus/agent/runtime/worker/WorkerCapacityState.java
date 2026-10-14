@@ -60,11 +60,7 @@ public final class WorkerCapacityState {
         return mentorMax;
     }
 
-    /**
-     * Idempotent: returns when the counter is already at 0 instead of throwing, because release
-     * paths fire from defensive code (e.g. {@code ReviewJobExecutor.releaseCapacity}) that can't
-     * tolerate an exception, and the early-shutdown / double-release window is real but harmless.
-     */
+    // Capacity release is idempotent and must not throw during shutdown.
     private static void decrementIfPositive(AtomicInteger counter) {
         while (true) {
             int current = counter.get();

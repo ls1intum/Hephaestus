@@ -4,10 +4,8 @@ import type { StatusDefs } from "@/components/common/status-def";
 
 import type { Purse } from "./purse-defs";
 
-/** A spend limit worth naming. A limit with room left and every call priced has no state, so no badge. */
 export type CapState = "PAUSED" | "NEAR" | "UNPRICED";
 
-/** Worst first, so a pause is never listed under a warning. */
 function capStateDefs(limit: "budget" | "cap"): StatusDefs<CapState> {
 	return {
 		PAUSED: {

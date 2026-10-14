@@ -95,12 +95,7 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             + "WHERE j.workspaceId = :workspaceId AND j.status = 'QUEUED' AND j.holdReason = 'BUDGET'")
     int releaseBudgetHolds(@Param("workspaceId") Long workspaceId, @Param("now") Instant now);
 
-    /**
-     * Empty if a concurrent poller holds the row, or it is no longer eligible. Eligibility is
-     * re-checked here and not only in the candidate poll, because a concurrent backoff-requeue can push
-     * {@code available_at} into the future in between. {@code :now} is bound rather than read from the
-     * DB clock so eligibility is judged against the same app clock that computed {@code available_at}.
-     */
+    /** Rechecks eligibility under the row lock, using the same application clock that set available_at. */
     @WorkspaceAgnostic("ID-based claim; job ID from a workspace-scoped candidate poll")
     @Query(
             value = "SELECT j.* FROM review_job j JOIN workspace w ON w.id = j.workspace_id "
@@ -109,11 +104,7 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             nativeQuery = true)
     Optional<ReviewJob> findByIdQueuedForUpdateSkipLocked(@Param("id") UUID id, @Param("now") Instant now);
 
-    /**
-     * The row lock makes this read and the caller's following status transition one decision: a
-     * concurrent execution-start CAS either commits before this read or waits and then loses because
-     * the job is no longer RUNNING.
-     */
+    /** Holds the row through the status transition so a concurrent execution-start CAS cannot win afterward. */
     @WorkspaceAgnostic("ID-based locked recovery read; caller performs a fenced status transition")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT j FROM ReviewJob j WHERE j.id = :id")
@@ -386,14 +377,7 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
 
     record CompositionRequeue(int attempt, int maxRetries, Instant now, Instant availableAt) {}
 
-    /**
-     * Ends a RUNNING attempt whose results were admitted but whose run was lost before it finished:
-     * it fails with what is known, and its results, capture and digest stay as recorded. Fenced on
-     * the owning worker and the attempt, so a stale caller cannot end a run another claim started;
-     * {@link #requeueOrphan} refuses exactly these rows.
-     *
-     * @return 1 if this caller ended the attempt, 0 if the row is not admitted or no longer that attempt
-     */
+    /** Ends an owned admitted attempt without discarding proof; admitted attempts must not be requeued. */
     @WorkspaceAgnostic("ID-based fenced terminal write; caller is @WorkspaceAgnostic sweeper or worker-local drain")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ReviewJob j SET j.status = de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus.FAILED, "
@@ -407,17 +391,7 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             @Param("now") Instant now,
             @Param("error") String error);
 
-    /**
-     * Requeue of a claim this same worker just won but could not dispatch (sandbox executor pool
-     * rejection). The job never started, so {@code attempt} is left untouched — otherwise an
-     * undersized sandbox pool would exhaust {@code max-retries} on jobs that never ran. {@code
-     * available_at} is left untouched too: the row could only have been claimed because it was already
-     * in the past, so it stays immediately reclaimable. No token rotation — no sandbox ever saw it.
-     * {@code :workerId} is null only when the worker role runs with no identity configured.
-     *
-     * @return 1 if requeued, 0 if the row is no longer RUNNING-and-ours; the caller treats both the
-     *     same, since either way the claim is gone
-     */
+    /** Pool rejection leaves attempt, availability, and token unchanged because no sandbox executed. */
     @WorkspaceAgnostic("ID-based self-fenced requeue; caller is the claiming worker itself")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ReviewJob j SET j.status = 'QUEUED', j.workerId = null, j.startedAt = null, "

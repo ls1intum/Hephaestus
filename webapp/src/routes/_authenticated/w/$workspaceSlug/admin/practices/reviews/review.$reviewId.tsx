@@ -7,13 +7,7 @@ import { parseSelectionSearch } from "@/components/admin/practice-reviews/review
 import { parseTraceFocus } from "@/components/admin/practice-reviews/review-trace";
 import { detailStackKey } from "@/components/layout/detail-drawer/detail-stack";
 
-/**
- * A review has no page of its own any more: its trace is a sheet over the Reviews tab. An address of
- * the page — a link from before, or one shared — opens a trace with the record the tables track. A
- * link that focused one result or piece of feedback of the review opens that record's trace, so
- * the trace marks where the reader started; any other link opens the review's. The scope it carried,
- * such as the practice, the dates and the person, is kept.
- */
+// Shared review URLs open the trace over the Reviews tab.
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/review/$reviewId",
 )({

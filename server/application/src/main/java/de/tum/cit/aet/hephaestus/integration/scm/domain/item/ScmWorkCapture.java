@@ -14,7 +14,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Collects the selected SCM work sources and releases partial captures on failure. */
 @Component
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor

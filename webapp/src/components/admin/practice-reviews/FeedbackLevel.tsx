@@ -92,7 +92,6 @@ export interface FeedbackLevelProps {
 	isChangingWithdrawal: boolean;
 }
 
-/** The copies in the order they are written: the summary first, then the notes. */
 function inOrder(copies: readonly FeedbackCopy[]): FeedbackCopy[] {
 	return [...copies].sort((a, b) => a.position - b.position);
 }
@@ -111,18 +110,6 @@ function feedbackTitle(feedback: FeedbackRecord): string {
 	);
 }
 
-/**
- * One piece of feedback's sheet, and only the feedback, in the order every sheet has: the status
- * line (what became of it, withdrawn or disagreed with, which copies landed, when), what it is (who
- * it is for, where it goes, the work), its history — composed, each decision, withheld with the
- * precise reason, each copy posted with its permalink or failed with its error, each send to the
- * provider, the developer's response — what it says and its feedback checks, and the technical
- * facts.
- *
- * Its actions are the footer: approve or reject while it awaits approval, withdraw or restore
- * otherwise. The results it was written from, the review that wrote it and when it was read are its
- * trace.
- */
 export function FeedbackLevel({
 	nested,
 	path,
@@ -277,7 +264,6 @@ function FeedbackWhat({ feedback }: { feedback: FeedbackRecord }) {
 	);
 }
 
-/** Where a note sits: `path:118–120`, or the path alone for a note on the whole file. */
 function copyAnchor(copy: FeedbackCopy): string | undefined {
 	if (!hasText(copy.path)) {
 		return undefined;
@@ -303,18 +289,12 @@ function LastError({ error }: { error: string }) {
 	);
 }
 
-/**
- * Composed, each decision, withheld, each copy's receipt and each send to the provider, the
- * developer's response: one list, oldest first. A copy's permalink is the one link out, to where it
- * was posted.
- */
 function feedbackHistory(feedback: FeedbackRecord): SheetEvent[] {
 	const events: SheetEvent[] = [
 		{ key: "composed", at: feedback.createdAt, title: "Composed" },
 		...feedback.decisions.map(decisionEvent),
 	];
 	const { stopReason } = feedback;
-	// Awaiting approval is a stop the "now" line explains; it is no event of its own yet.
 	if (stopReason !== null && feedback.state !== "AWAITING_APPROVAL") {
 		const stop = feedback.checks.find((check) => !check.allowed && check.reason === stopReason);
 		events.push({
@@ -324,8 +304,6 @@ function feedbackHistory(feedback: FeedbackRecord): SheetEvent[] {
 			detail: WITHHOLDING_REASON_DEFS[stopReason],
 		});
 	}
-	// On the work, each copy's receipt is the delivery. Elsewhere the one copy is the appearance
-	// itself, so the delivery time says it.
 	const onWork = feedback.destination === "ON_WORK";
 	const receipts = onWork
 		? inOrder(feedback.copies).flatMap((copy) => copyEvent(copy, stopReason) ?? [])
@@ -362,11 +340,6 @@ function decisionEvent(decision: FeedbackDecision): SheetEvent {
 	};
 }
 
-/**
- * What became of one copy on the work: posted, with its permalink; failed, with its error; a write
- * the provider never confirmed; or withheld, with its reason where the feedback's own differs. A
- * copy still planned has no receipt yet.
- */
 function copyEvent(
 	copy: FeedbackCopy,
 	feedbackStopReason: FeedbackRecord["stopReason"],
@@ -431,10 +404,6 @@ function copyEvent(
 	}
 }
 
-/**
- * One send to the provider: what it does, how often it was tried, when it is tried next and the
- * last error. A post that finished is said by the copies' own receipts, unless it gave up on some.
- */
 function sendEvent(send: FeedbackSend, copiesFailed: boolean): SheetEvent | undefined {
 	const done = send.state === "DONE";
 	let title: string;
@@ -512,7 +481,6 @@ function responseEvent(feedback: FeedbackRecord): SheetEvent | undefined {
 	};
 }
 
-/** What withdrawn feedback means at each destination. */
 const WITHDRAWN_NOW: Record<FeedbackDestination, string> = {
 	ON_WORK:
 		"It is withdrawn. Copies it posted on the work are retracted there, and their receipts stay in this history. The results behind it are unchanged.",
@@ -550,11 +518,6 @@ function feedbackNow(feedback: FeedbackRecord): ReactNode {
 	}
 }
 
-/**
- * What "ready" means at this destination. Only copies on the work are sent and tried again; a
- * practice pages card is delivered when the developer opens it, and a conversation piece when Heph
- * raises it.
- */
 function readyLine(feedback: FeedbackRecord): string {
 	switch (feedback.destination) {
 		case "PRACTICE_PAGE": {
@@ -607,10 +570,6 @@ function feedbackTechnical(feedback: FeedbackRecord): TechnicalFact[] {
 	return facts;
 }
 
-/**
- * Feedback that was or is about to be shown can be withdrawn; withdrawn feedback can always be
- * restored. Feedback still awaiting approval is rejected instead.
- */
 function canChangeWithdrawal(feedback: FeedbackRecord): boolean {
 	return (
 		feedback.withdrawn ||

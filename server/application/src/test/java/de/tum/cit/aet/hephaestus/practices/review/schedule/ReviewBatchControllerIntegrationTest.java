@@ -124,6 +124,7 @@ class ReviewBatchControllerIntegrationTest extends BaseIntegrationTest {
                 .fromAt(at.minusSeconds(60))
                 .toAt(at)
                 .status(status)
+                .pauseReason(status == ReviewBatchStatus.PAUSED ? ReviewBatchPauseReason.BUDGET_EXHAUSTED : null)
                 .requestedByAccountId(owner.account().getId())
                 .createdAt(at)
                 .updatedAt(at)

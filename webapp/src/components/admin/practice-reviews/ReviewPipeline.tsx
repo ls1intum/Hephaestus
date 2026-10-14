@@ -96,7 +96,6 @@ const STAGES: readonly StageDef[] = [
 		noun: (count) => (count === 1 ? "result" : "results"),
 		perBucket: (bucket) => bucket.results,
 		total: (overview) => slotsTotal(resultSlots(overview.results)),
-		// The outcome's own word, one form for all four: "35 met", "27 not met", "10 does not apply".
 		slots: (overview, scope) =>
 			resultSlots(overview.results, scope).map((slot) => ({
 				...slot,
@@ -125,14 +124,6 @@ const GRID_COLUMNS: Partial<Record<number, string>> = {
 	3: "@3xl:grid-cols-3",
 };
 
-/**
- * The stages work flows through — reviews ran, recorded results, composed feedback — a tile
- * each, in the recipe of Activity's tiles: the total, how it compares with the period before, its
- * volume over the range, then what it split into. Each stage is counted by its own date, so the
- * tiles stand side by side rather than claiming one caused the next. The tile's title has no link,
- * since the tab above opens the same list; given a workspace, each count opens the list filtered to
- * exactly the rows it counts, over the range.
- */
 export function ReviewPipeline({
 	state,
 	previous,
@@ -264,13 +255,6 @@ function openReviewsSlot(overview: ReviewOverview, scope: OutcomeScope): Outcome
 	};
 }
 
-/**
- * The share of the range's finished reviews that failed, as the last item of the Reviews tile's
- * row: "8 % failed". The counts are in the row already; the share is
- * what the row adds. Plain at any share, by the overview's colour rule
- * (`review-attention-thresholds.ts`); none when nothing failed. Given a workspace, it opens the
- * Reviews table filtered to them over the range.
- */
 function FailedShare({
 	overview: { reviews },
 	scope,

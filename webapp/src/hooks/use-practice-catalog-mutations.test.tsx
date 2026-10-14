@@ -41,7 +41,6 @@ const adoptionCatalogQueryKey = listAdoptablePracticesQueryKey({
 	path: { workspaceSlug: WORKSPACE },
 });
 
-/** A second optimistic write landing on one row while a move is still in flight. */
 function switchingOff(slug: string) {
 	return (current: Practice[] = []) =>
 		current.map((item) =>

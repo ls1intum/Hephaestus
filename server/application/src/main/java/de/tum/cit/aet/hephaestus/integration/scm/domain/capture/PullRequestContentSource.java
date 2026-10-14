@@ -308,10 +308,6 @@ public class PullRequestContentSource {
         }
     }
 
-    /**
-     * The fields copied from the job as it was admitted; every other field is the mirror at
-     * capture.
-     */
     private static final List<String> ADMISSION_FIELDS = List.of(
             "pr_number",
             "pr_url",

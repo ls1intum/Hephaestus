@@ -670,15 +670,10 @@ function PracticeFeedbackModeRow({
 	);
 }
 
-/** Direct or inherited, Off reads the same: what it keeps and every place it stops feedback. */
 function OffNote() {
 	return <p className="text-xs text-muted-foreground">{FEEDBACK_MODE_DESCRIPTIONS.OFF}</p>;
 }
 
-/**
- * A practice that Heph does not review produces no result to send, whatever its feedback mode. The
- * note keeps that apart from Off, which stops feedback for results Heph still records.
- */
 function ReviewedByNote({ practice }: { practice: Practice }) {
 	const { reviewedBy } = currentDefinition(practice);
 	return (
@@ -693,7 +688,7 @@ function ReviewedByNote({ practice }: { practice: Practice }) {
 	);
 }
 
-/** `DecisionNote` reads `null` as "chosen here, so offer the reset" — narrowed once, not per site. */
+// DecisionNote treats null as a local choice that can be reset.
 function inheritedSentenceOrNull(
 	assignment: Parameters<typeof feedbackModeSourceOf>[0],
 	level: FeedbackModeLevel,

@@ -23,17 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Unit tests for {@link AbstractIntegrationMessageHandler}. Locks the three contracts that the
- * concrete handlers depend on:
- *
- * <ul>
- *   <li>Subject last-segment validation (with the {@code tag_push} vs {@code push} overlap
- *       regression),
- *   <li>Deserialization-failure to {@link PayloadParsingException} translation,
- *   <li>Tx-template wrapping of {@code handleEvent}.
- * </ul>
- */
 class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
 
     private NatsMessageDeserializer deserializer;

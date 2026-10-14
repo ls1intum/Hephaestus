@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.practice.live;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCapturedWork;
@@ -13,11 +14,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * The work records that the live harnesses stage as {@code context/metadata.json}, built by the content sources'
- * own {@code workRecord}, so that a harness can never stage a shape the server does not write.
- * {@code LiveWorkRecordsTest} pins them to the files that {@code lib/contract.test.ts} parses with the runner's schema.
- */
+// Use the content sources' work records so live fixtures cannot invent an input shape the server never writes.
 final class LiveWorkRecords {
 
     static final String REPOSITORY = "test/fixture";
@@ -29,7 +26,6 @@ final class LiveWorkRecords {
 
     private LiveWorkRecords() {}
 
-    /** The metadata a pull request review is admitted with, as the job carries it. */
     static ScmCapturedWork capturedPullRequest(
             long pullRequestId,
             long repositoryId,
@@ -54,7 +50,6 @@ final class LiveWorkRecords {
                 null);
     }
 
-    /** An open pull request of the fixture repository, by its author, at {@code head}. */
     static ObjectNode pullRequest(String head, String title, @Nullable String body, int additions) {
         PullRequest pullRequest = new PullRequest();
         pullRequest.setNumber(1);
@@ -73,7 +68,6 @@ final class LiveWorkRecords {
                 pullRequest, capturedPullRequest(1L, REPOSITORY_ID, 1, head, title, body, "feat/login"), AT);
     }
 
-    /** An open issue of the fixture repository, by its author. */
     static ObjectNode issue(String title, String body) {
         Issue issue = new Issue();
         issue.setNumber(1);
@@ -103,7 +97,6 @@ final class LiveWorkRecords {
                 null);
     }
 
-    /** The bytes the content source stages: its mapper's default pretty printer. */
     static byte[] staged(JsonNode record) {
         return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(record);
     }
@@ -111,6 +104,9 @@ final class LiveWorkRecords {
     private static Repository repository() {
         Repository repository = new Repository();
         repository.setId(REPOSITORY_ID);
+        var provider = new IdentityProvider();
+        provider.setId(1L);
+        repository.setProvider(provider);
         repository.setName("fixture");
         repository.setNameWithOwner(REPOSITORY);
         repository.setHtmlUrl("https://github.com/" + REPOSITORY);

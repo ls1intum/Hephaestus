@@ -175,8 +175,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     void outlineLink_withFlatTeamId_bindsToCurrentAccountWithTeamKey() {
         useOutlineProvider();
         afterVerifiedClaim("0aa1bb2c-user", "9ff8ee7d-team");
-        // The flat "team_id" attribute OutlineAuthInfoUserService emits (flattened from
-        // data.team.id).
         OAuth2User outlinePrincipal = new DefaultOAuth2User(
                 List.of(new SimpleGrantedAuthority("ROLE_USER")),
                 Map.of("id", "0aa1bb2c-user", "name", "Ada", "team_id", "9ff8ee7d-team"),
@@ -413,8 +411,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
 
     @Test
     void link_rejectsWhenIdentityAlreadyLinkedElsewhere() {
-        // The incoming identity is already an ACTIVE link on account 99; operator is linking into
-        // 42.
         when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
                 .thenReturn(Optional.of(linkOn(accountWithId(99L))));
 

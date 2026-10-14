@@ -10,12 +10,6 @@ export interface RefusalFixLinkProps {
 	className?: string;
 }
 
-/**
- * The way out of a refusal, where one exists. Renders nothing at all rather than a disabled or
- * explanatory stand-in when there is no fix: the sentence beside it already says everything a
- * member can act on. Every link leads into `/admin`, so only a route that knows the reader is an
- * admin renders it.
- */
 export function RefusalFixLink({ workspaceSlug, reason, className }: RefusalFixLinkProps) {
 	const fix = REFUSAL_FIXES[reason];
 	if (!fix) {

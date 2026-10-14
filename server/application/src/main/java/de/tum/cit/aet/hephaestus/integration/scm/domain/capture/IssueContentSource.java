@@ -36,20 +36,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Materialises the issue review context under {@code inputs/context/} — the no-diff counterpart of
- * {@link PullRequestContentSource}:
- *
- * <ul>
- *   <li>{@code metadata.json} — issue metadata (state, labels, assignees, milestone, sub-issue
- *       rollup)
- *   <li>{@code comments.json} — the ordered discussion thread
- * </ul>
- *
- * <p>An issue that is missing, tombstoned, or changed since its review was admitted makes the
- * source unavailable rather than empty (prevents hollow positives). Runs read-only transactionally
- * so the lazy collections (labels, assignees, comments) load within the same tx.
- */
+// Missing, tombstoned, or changed issues make capture unavailable; empty content could create false positives.
 @Component
 @ConditionalOnCaptureRole
 public class IssueContentSource {
@@ -72,7 +59,6 @@ public class IssueContentSource {
 
     private static final Logger log = LoggerFactory.getLogger(IssueContentSource.class);
 
-    /** Cap the thread included in context; most recent kept on truncation. */
     private final ObjectMapper objectMapper;
 
     private final IssueRepository issueRepository;
@@ -180,12 +166,7 @@ public class IssueContentSource {
                 ScmCitableTexts.files(files, this::sourceKindFor, objectMapper));
     }
 
-    /**
-     * The discussion the review reads: the mirrored comments, the same ones its update revision
-     * digests. A provider count above what the mirror holds marks it partial, since comments known
-     * to exist are missing; a count at or below it shows only that none known are missing, not that
-     * the mirror is current with the provider.
-     */
+    // A larger provider count proves missing comments; a smaller count does not prove the mirror is current.
     private CommentCapture reviewedComments(long issueId, Issue issue) {
         long mirrored = issueCommentRepository.countByIssueId(issueId);
         return new CommentCapture(revisions.reviewedComments(issueId), issue.getCommentsCount() <= mirrored);

@@ -24,9 +24,6 @@ import {
 	INVALID_META_PROGRAM,
 } from "./program-host-runner.ts";
 
-// The runner runs each admitted practice's program on the host: a custom program in a child process, the
-// built-in in the runner. These runs assert what reaches out/: the execution report, and the admission request
-// as result.json, review-state.json and the request body.
 
 const roots: string[] = [];
 after(() => {
@@ -35,7 +32,6 @@ after(() => {
 	}
 });
 
-/** A program whose `review()` asks for a review with a prepared direction, and returns its result. */
 const REVIEWING_PROGRAM = `import { definePracticeScript } from "../lib/core/practice-script.ts";
 export default definePracticeScript({
 	meta: {},
@@ -62,7 +58,6 @@ async function run(
 	return { cwd, ...(await runRunner(cwd, sessions, env)) };
 }
 
-/** The execution report, parsed by the contract the server reads it with. */
 function executionReport(cwd: string) {
 	const parsed = executionReportSchema.safeParse(readJsonFile(cwd, "out/practice-scripts.json"));
 	assert.ok(parsed.success, parsed.error?.message);
@@ -75,7 +70,6 @@ function entryOf(entries: readonly ExecutionEntry[], slug: string): ExecutionEnt
 	return entry;
 }
 
-/** The practices whose results `out/result.json` submits for admission, in its order. */
 function admittedSlugs(cwd: string): unknown[] {
 	const results: unknown = field(readJsonFile(cwd, "out/result.json"), "results");
 	assert.ok(Array.isArray(results));
@@ -185,7 +179,6 @@ void test("a review session that ends without a result fails its program with an
 	const prompts = capturedLines(main.cwd, "prompts").filter(
 		(line) => field(line, "slug") === "d-silent",
 	);
-	// One session, asked once more for the result it owes; its prepared input is staged for it to read.
 	assert.equal(prompts.length, 2);
 	assert.equal(new Set(prompts.map((line) => field(line, "session"))).size, 1);
 	assert.ok(prompts.every((line) => field(line, "reviewInput") === true));
@@ -240,7 +233,7 @@ void test("the admission request is result.json and review-state.json, sorted by
 });
 
 void test("a practice that the run's safety line stops before it starts is reported not reached", async () => {
-	// Programs end RETURN_MS (5 s) before the safety line, so the budget leaves the first review room to finish.
+	// Leave the program return buffer outside the safety deadline so the first review can finish.
 	const stopped = await run(
 		[{ slug: "a-first" }, { slug: "b-hangs" }, { slug: "c-never" }],
 		{ "b-hangs": "hang" },

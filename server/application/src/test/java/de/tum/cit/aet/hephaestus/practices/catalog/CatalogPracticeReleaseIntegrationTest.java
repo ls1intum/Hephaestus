@@ -15,10 +15,10 @@ class CatalogPracticeReleaseIntegrationTest extends AbstractWorkspaceIntegration
     CatalogService catalog;
 
     @Autowired
-    PracticeReviewDigest digest;
+    CatalogCustomizationService customization;
 
     @Autowired
-    CatalogReleaseService releases;
+    PracticeReviewDigest digest;
 
     @Test
     void shouldKeepLocalContentWhenDecliningAShippedRelease() {
@@ -28,7 +28,7 @@ class CatalogPracticeReleaseIntegrationTest extends AbstractWorkspaceIntegration
                 .orElseThrow();
         var local =
                 DefinitionTestFixtures.withCriteria(original.effective().definition(), "Locally authored criteria.");
-        var edited = catalog.updatePractice(
+        var edited = customization.updatePractice(
                 original.slug(),
                 new CatalogPracticeInputDTO(
                         original.slug(),
@@ -37,13 +37,16 @@ class CatalogPracticeReleaseIntegrationTest extends AbstractWorkspaceIntegration
                         local,
                         original.position()),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(original.etag())));
-        var proposal = releases.proposal(original.slug());
+        var proposal = catalog.proposal(original.slug());
         assertThat(proposal.offeredDigest())
                 .isEqualTo(digest.of(proposal.offered()))
                 .isNotEqualTo(digest.of(local))
                 .isNotEqualTo(proposal.etag());
-        var declined = releases.decline(
-                original.slug(), EntityTagPrecondition.parse(EntityTagPrecondition.format(edited.etag())));
+        customization.acknowledge(
+                CatalogEntryType.PRACTICE,
+                original.slug(),
+                EntityTagPrecondition.parse(EntityTagPrecondition.format(edited.etag())));
+        var declined = catalog.practice(original.slug());
         assertThat(declined.effective().definition()).isEqualTo(local);
         assertThat(declined.base()).isEqualTo(declined.shipped());
     }

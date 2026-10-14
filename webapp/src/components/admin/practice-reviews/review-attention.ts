@@ -4,14 +4,8 @@ import type { WithholdingReason } from "@/components/practice-vocabulary/withhol
 
 import { PRACTICE_MARKER_THRESHOLDS } from "./review-attention-thresholds";
 
-/**
- * The tones an attention marker on the overview can take: neutral is information, red says
- * something is broken now that an admin can fix (`review-attention-thresholds.ts`). There is no
- * amber. They are the status tones every badge uses.
- */
 export type AttentionTone = Extract<BadgeVariant, "secondary" | "destructive">;
 
-/** The share `count` is of `whole`, from 0 to 1; nothing of nothing is nothing. */
 export function shareOf(count: number, whole: number): number {
 	return whole > 0 ? count / whole : 0;
 }
@@ -77,15 +71,10 @@ export function withheldClass(reason: WithholdingReason): WithheldClass {
 	return REASON_CLASS[reason];
 }
 
-/**
- * What a practice's results suggest an admin look at: a practice that mostly does not apply here
- * costs reviews and tells nobody much, and one that often cannot decide may lack the evidence it needs.
- */
 export type PracticeMarker = "NEVER_APPLIES" | "OFTEN_UNDECIDED";
 
 export interface PracticeMarkerDef {
 	label: string;
-	/** The marker's reason with its numbers: "Does not apply in 179 of 179 results. …" */
 	reason: (count: number, whole: number) => string;
 }
 
@@ -102,7 +91,6 @@ export const PRACTICE_MARKER_DEFS: Record<PracticeMarker, PracticeMarkerDef> = {
 	},
 };
 
-/** The one marker a practice's results earn, the stronger first; none below the minimum. */
 export function practiceMarker(
 	counts: ReviewResultCounts,
 ): { marker: PracticeMarker; count: number; whole: number } | undefined {
@@ -122,12 +110,6 @@ export function practiceMarker(
 const MARKER_RANK: Record<PracticeMarker, number> = { NEVER_APPLIES: 0, OFTEN_UNDECIDED: 1 };
 const UNMARKED_RANK = 2;
 
-/**
- * The practices in the order "Needs a look first": the ones with a marker ahead, the stronger marker
- * first; then the most results an admin marked incorrect, then the most that could not be determined, since
- * both say the review got the practice wrong or could not judge it. Ties keep the order they came
- * in, which is busiest first, so a range with nothing to look at reads as busiest first.
- */
 export function needsALookFirst<
 	T extends { results: ReviewResultCounts; resultsMarkedIncorrect: number },
 >(rows: readonly T[]): T[] {

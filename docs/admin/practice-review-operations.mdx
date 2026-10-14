@@ -335,6 +335,7 @@ A copy write fence can mean the provider accepted the request before the receipt
 FOUND readback records the existing copy. ABSENT records proved failure. UNKNOWN keeps visibility Unconfirmed.
 Automatic recovery never repeats a POST from unknown visibility.
 Only an explicit admin retry after proved absence can reopen the write, subject to current policy and approval.
+
 A confirmed historical copy is never posted again.
 
 When one sibling is posted and another is unknown, the parent remains Unconfirmed.

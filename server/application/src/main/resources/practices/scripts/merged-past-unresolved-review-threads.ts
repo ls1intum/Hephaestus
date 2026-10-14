@@ -1,6 +1,3 @@
-// Finds the merge as the record holds it, and each review thread that the record does not show as
-// resolved by the merge. Each thread lead tells where the thread is anchored, when it was opened and
-// if the provider calls it outdated. The review reads each thread against the merge.
 import { scm, expectKind } from "../kits/scm/index.ts";
 import {
 	candidateThreads,
@@ -88,7 +85,7 @@ export default definePracticeScript({
 				resolutionTimeUnknown: candidates.filter(
 					(t) => t.state === "RESOLVED" && !dated(t.resolvedAt),
 				).length,
-				// Undated, the merge places no resolution before it, so the count is left out rather than zero.
+		// An undated merge cannot prove whether resolution happened before it.
 				...(mergeUndated
 					? {}
 					: {

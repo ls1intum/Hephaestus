@@ -45,7 +45,6 @@ import { ReviewPerson } from "./ReviewPerson";
 
 const HIDDEN_EVIDENCE = "The evidence of this result is hidden.";
 
-/** Why a result stopped being the current one for its practice, work and developer. */
 const RESULT_END_SENTENCES: Record<NonNullable<ReviewResultDetail["endReason"]>, string> = {
 	REPLACED: "A later review of the same work replaced it.",
 	OUTRANKED: "A review ordered later already held the current result, so this one is history.",
@@ -63,20 +62,14 @@ export interface ResultLevelProps {
 	 * the reason until it succeeded.
 	 */
 	onMark: (kind: ResultMarkKind, reason: string) => Promise<unknown>;
-	/** Removes one active mark, with the reason it no longer holds. */
 	onRemoveMark: (markId: string, reason: string) => Promise<unknown>;
 	isMarking: boolean;
 }
 
-/** The active mark of `kind`, if any: one that was not removed. */
 function activeMark(result: ReviewResultDetail, kind: ResultMarkKind): ResultMark | undefined {
 	return result.marks.find((mark) => mark.kind === kind && mark.removedAt === null);
 }
 
-/**
- * The one flag the status line has room for, most consequential first: marked incorrect, then
- * disagreed, then no longer current.
- */
 function resultFlag(result: ReviewResultDetail): ReactNode {
 	if (activeMark(result, "INCORRECT") !== undefined) {
 		return <StatusBadge def={RESULT_MARK_DEFS.INCORRECT} />;
@@ -91,19 +84,7 @@ function resultFlag(result: ReviewResultDetail): ReactNode {
 	return undefined;
 }
 
-/**
- * One result's sheet, and only the result, in the order every sheet has: the status line (its
- * outcome with its number of problems and its severity, the one flag that changes how it reads,
- * when it was recorded), what it is, its history — recorded, disagreed with in the developer's own
- * words, marked and unmarked, no longer current — its explanation, the problems it located, the
- * questions it left open, the passages it cites, and the technical facts. Its decisions, the marks
- * an admin adds or removes, are the footer.
- *
- * A disagreement is shown in full, because it answers this result. The developer's ratings and
- * private notes are not: they stay theirs. The example a review may record is for the developer's
- * own pages, so it is not shown here. The feedback written from it and when it was read are its
- * trace.
- */
+// Developer ratings and private notes stay private; disagreements answer this result and appear in full.
 export function ResultLevel({
 	nested,
 	path,
@@ -290,15 +271,10 @@ export function ResultLevel({
 	);
 }
 
-/** Who did something, or the words for an account that no longer exists. */
 function actorName(account: ResultMark["createdBy"]): string {
 	return account === null ? ERASED_ACCOUNT : accountName(account);
 }
 
-/**
- * Recorded, each disagreement in the developer's own words, each mark and its removal with who and
- * why, and when the result stopped being current: one list, oldest first.
- */
 export function resultHistory(result: ReviewResultDetail): SheetEvent[] {
 	const DisagreedIcon = DISAGREEMENT_DEFS.DISAGREED.icon;
 	const events: SheetEvent[] = [{ key: "recorded", at: result.recordedAt, title: "Recorded" }];
@@ -345,7 +321,6 @@ export function resultHistory(result: ReviewResultDetail): SheetEvent[] {
 	return events;
 }
 
-/** What the current state means, in one or two sentences, in place of an alert. */
 function resultNow(result: ReviewResultDetail): ReactNode {
 	if (activeMark(result, "INCORRECT") !== undefined) {
 		return RESULT_MARK_DEFS.INCORRECT.description;
@@ -359,10 +334,6 @@ function resultNow(result: ReviewResultDetail): ReactNode {
 	return undefined;
 }
 
-/**
- * One located problem: its own severity, what it is, why, the passages that place it and what would
- * fix it. The explanation is the review's text, rendered as the rationale is.
- */
 function ProblemItem({ problem }: { problem: Problem }) {
 	return (
 		<li className="space-y-3">
@@ -388,7 +359,7 @@ function ProblemItem({ problem }: { problem: Problem }) {
 	);
 }
 
-/** What the review could not settle: never a claim about the work, so never feedback. */
+// Open questions identify uncertainty; they cannot become feedback claims.
 function OpenQuestionItem({ question }: { question: OpenQuestion }) {
 	const location = question.citation === null ? undefined : citationLocation(question.citation);
 	return (
@@ -436,7 +407,6 @@ const REMOVE_COPY: Record<ResultMarkKind, CorrectionReasonCopy> = {
 	},
 };
 
-/** Adds a mark of `kind`, or removes the active one: each with the reason the admin writes. */
 function MarkPopover({
 	kind,
 	active,

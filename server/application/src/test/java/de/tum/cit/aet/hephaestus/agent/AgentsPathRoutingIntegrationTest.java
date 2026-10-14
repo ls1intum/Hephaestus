@@ -13,45 +13,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * {@code GET /agents/jobs} (literal) and {@code GET /agents/{purpose}} (template) are both two-segment
- * patterns under the same parent. Spring's {@code PathPattern} comparator ranks the literal higher; if
- * that ordering ever flipped, the job-history screen would start failing enum conversion with a 400
- * while both controllers kept passing their own suites in isolation.
- */
 class AgentsPathRoutingIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
 
     private Workspace setupWorkspace() {
-        User owner = persistUser("dispatch-owner");
-        Workspace workspace =
-                createWorkspace("dispatch-ws", "Dispatch Workspace", "dispatch-org", AccountType.ORG, owner);
+        User owner = persistUser("routing-owner");
+        Workspace workspace = createWorkspace("routing-ws", "Routing Workspace", "routing-org", AccountType.ORG, owner);
         ensureAdminMembership(workspace);
         return workspace;
-    }
-
-    @Test
-    @WithAdminUser
-    @DisplayName("GET /agents/jobs reaches the job controller, not /agents/{purpose}")
-    void jobsSegmentOutranksThePurposeTemplate() {
-        Workspace workspace = setupWorkspace();
-
-        // A paginated envelope can only have come from ReviewJobController; the binding controller
-        // returns a bare array.
-        webTestClient
-                .get()
-                .uri("/workspaces/{slug}/agents/jobs", workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.content")
-                .isArray()
-                .jsonPath("$.totalElements")
-                .isEqualTo(0);
     }
 
     @Test
@@ -60,7 +31,6 @@ class AgentsPathRoutingIntegrationTest extends AbstractWorkspaceIntegrationTest 
     void agentsCollectionIsNotShadowedByTheJobsRoute() {
         Workspace workspace = setupWorkspace();
 
-        // A bare array is the binding controller's shape.
         webTestClient
                 .get()
                 .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())

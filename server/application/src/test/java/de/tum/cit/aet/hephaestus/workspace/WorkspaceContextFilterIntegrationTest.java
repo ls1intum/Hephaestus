@@ -132,10 +132,6 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
     @Test
     @WithAdminUser
     void superAdminElevationDoesNotResurrectSuspendedWorkspace() {
-        // The ACTIVE-status gate runs BEFORE the elevation, so a super-admin (no membership) is
-        // still
-        // 404'd on a suspended workspace's scoped routes — elevation never widens access to
-        // non-active tenants.
         persistUser("admin");
         User owner = persistUser("suspended-elev-owner");
         Workspace workspace = createWorkspace("suspended-elev", "Suspended", "suspendedelev", AccountType.ORG, owner);

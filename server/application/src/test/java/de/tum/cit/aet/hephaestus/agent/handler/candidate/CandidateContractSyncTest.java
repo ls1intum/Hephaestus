@@ -19,11 +19,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
-/**
- * Cross-language sync test. The practice host refuses a candidate with {@code parseCandidate} in {@code lib/contract.ts}
- * before it submits it, and admission refuses it again with {@link CandidateParser}. A bound or a refusal order that
- * differs lets one side accept what the other refuses, or name another reason for the same value.
- */
+// Java and TypeScript must enforce identical bounds and refusal order for candidate values.
 class CandidateContractSyncTest extends BaseUnitTest {
 
     private static final Pattern LIMITS = Pattern.compile("export const CANDIDATE_LIMITS = \\{([^}]*)}");

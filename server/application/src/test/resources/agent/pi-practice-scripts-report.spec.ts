@@ -19,7 +19,6 @@ import {
 	PRACTICE_SCRIPT_REPORT_MAX_PRACTICES,
 } from "../../../main/resources/agent/pi-practice-scripts-report.ts";
 
-/** The report as the server reads it: it must parse by the contract, or it creates no verdict. */
 function parsed(text: string): ExecutionReport {
 	assert.ok(
 		Buffer.byteLength(text) <= PRACTICE_SCRIPT_REPORT_MAX_BYTES,
@@ -32,7 +31,6 @@ function parsed(text: string): ExecutionReport {
 
 const noCalls = { review: 0, chat: 0, decision: 0, embedding: 0, reranking: 0 };
 
-/** A built-in program that ran its one review, with the given changes. */
 function outcome(changes: Partial<ProgramOutcome> = {}): ProgramOutcome {
 	return {
 		program: { kind: "builtin", digest: null },
@@ -51,21 +49,15 @@ const failed = (error: string | undefined) =>
 
 const slugOf = (i: number) => `p-${String(i).padStart(3, "0")}`;
 
-/** A file of the fixtures that the server's tests share: `practice-results/`. */
 const sharedFixture = (name: string): unknown =>
 	JSON.parse(readFileSync(path.join(import.meta.dirname, "../practice-results", name), "utf8"));
 
-/**
- * `PiResultParserPracticeScriptReportTest` and `lib/contract.test.ts` read the same shared fixture, so a field
- * that the writer and the server spell differently fails one of the three.
- */
 void test("the report of the shared fixture's practices is the fixture: every status, program kind and stop", () => {
 	const fixture = executionReportSchema.safeParse(sharedFixture("execution-report.json"));
 	assert.ok(fixture.success, fixture.error?.message);
 	const passed = parseCandidate(sharedFixture("candidate-met-with-example.json"));
 	assert.ok(passed.ok);
 	const outcomes = fixture.data.practices.toReversed().map(({ practiceSlug, ...entry }) => {
-		// A candidate that passed the host's checks never reaches the report.
 		const ran: ProgramOutcome =
 			entry.status === "ok" ? { ...entry, candidate: passed.candidate } : { ...entry };
 		return [practiceSlug, ran] as const;
@@ -189,10 +181,6 @@ function errorLineCases(): ErrorLineCase[] {
 	});
 }
 
-/**
- * `PiResultParserPracticeScriptReportTest` reads the same cases, so the writer and the server keep one rule for
- * the error line.
- */
 void test("a failed program's error is reported as the line that the server keeps", () => {
 	const cases = errorLineCases();
 	const report = parsed(
@@ -231,7 +219,6 @@ void test("a program that is not a practice script is reported with its whole er
 });
 
 void test("the report keeps the first practices by slug within its bounds, and says it left the rest out", () => {
-	// An entry takes more than 256 bytes, so 64 KiB holds fewer entries than the practice bound allows.
 	const slugs = Array.from({ length: PRACTICE_SCRIPT_REPORT_MAX_PRACTICES + 44 }, (_, i) =>
 		slugOf(i),
 	);
@@ -244,7 +231,6 @@ void test("the report keeps the first practices by slug within its bounds, and s
 	assert.equal(report.truncated, true);
 });
 
-/** An entry of many bytes: every slot declared, every reason counted at the most a count may be. */
 const large = outcome({
 	program: { kind: "custom", digest: "f".repeat(64) },
 	models: (["chat", "decision", "embedding", "reranking"] as const).map((slot) => ({
@@ -255,7 +241,6 @@ const large = outcome({
 	})),
 });
 
-/** The bytes of the entry that the report writes for `slug`. */
 function entryBytes(slug: string): number {
 	const text = executionReport([[slug, large]]);
 	return Buffer.byteLength(text) - Buffer.byteLength(executionReport([]));
@@ -264,15 +249,12 @@ function entryBytes(slug: string): number {
 void test("the report keeps whole entries within its byte bound, and says it left the rest out", async (t) => {
 	const entry = entryBytes(slugOf(0));
 	const envelope = Buffer.byteLength(executionReport([]));
-	// Each case fills the bound to `slack` bytes short. The next entry, with its comma, needs `entry + 1`: at slack
-	// 0 the last entry fits exactly, and at slack `entry` the next entry is one byte too large.
+	// Exercise the exact report boundary, including the comma needed by one additional entry.
 	for (const slack of [0, entry]) {
 		await t.test(`${slack} bytes short of the bound`, () => {
 			const room = PRACTICE_SCRIPT_REPORT_MAX_BYTES - slack - envelope + 1;
 			const kept = Math.floor(room / (entry + 1));
 			assert.ok(kept < PRACTICE_SCRIPT_REPORT_MAX_PRACTICES, "the byte bound is reached first");
-			// The first slugs get longer by the bytes that whole entries do not fill, up to the 64 characters
-			// of a slug.
 			let padding = room - kept * (entry + 1);
 			const slugs = Array.from({ length: kept + 10 }, (_, i) => {
 				const extra = Math.min(padding, 64 - slugOf(i).length);
@@ -287,8 +269,6 @@ void test("the report keeps whole entries within its byte bound, and says it lef
 				slugs.slice(0, kept),
 			);
 			assert.equal(report.truncated, true);
-			// The kept entries are the most that fit: the complete report is `slack` bytes short of the bound,
-			// and the next entry does not fit in it.
 			const complete = Buffer.byteLength(text.replace('"truncated":true', '"truncated":false'));
 			assert.equal(complete, PRACTICE_SCRIPT_REPORT_MAX_BYTES - slack);
 			assert.ok(complete + 1 + entryBytes(slugs[kept] ?? "") > PRACTICE_SCRIPT_REPORT_MAX_BYTES);
@@ -298,7 +278,6 @@ void test("the report keeps whole entries within its byte bound, and says it lef
 
 void test("the report keeps every practice within its bounds and leaves out the errors that do not fit", () => {
 	const slugs = Array.from({ length: 200 }, (_, i) => slugOf(i));
-	// Each error is 500 characters of 4 UTF-8 bytes, so the errors of 200 practices cannot all fit.
 	const error = "\u{1F642}".repeat(PRACTICE_SCRIPT_ERROR_MAX_CHARS);
 	const report = parsed(executionReport(slugs.map((slug) => [slug, failed(error)])));
 	assert.equal(report.truncated, false);

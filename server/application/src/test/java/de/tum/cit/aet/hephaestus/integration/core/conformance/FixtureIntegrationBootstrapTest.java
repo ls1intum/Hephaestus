@@ -43,19 +43,10 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * An item kind that exists nowhere in {@code src/main}, driven through the real machinery —
- * proving the integration framework and practices module hold no knowledge of which item kinds
- * exist.
- *
- */
 class FixtureIntegrationBootstrapTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 7L;
 
-    /**
-     * A second borrowed kind, for the one case that needs two integrations to differ in coverage.
-     */
     private static final IntegrationKind UNCONNECTED_KIND = IntegrationKind.SLACK;
 
     @Test

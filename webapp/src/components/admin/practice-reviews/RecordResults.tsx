@@ -30,12 +30,9 @@ export type RecordResultsStatus =
 
 /** What a list says when it has nothing to show, filtered or not. */
 export interface RecordResultsWords {
-	/** "We could not load results". */
 	errorTitle: string;
 	icon: ComponentType;
-	/** "No results yet". */
 	emptyTitle: string;
-	/** "No results match these filters". */
 	filteredTitle: string;
 	/** Where the records come from, said while there are none yet. */
 	emptyDescription: string;
@@ -50,10 +47,6 @@ export interface RecordResultsProps {
 	children: (empty: ReactNode) => ReactElement;
 }
 
-/**
- * The error, the skeleton and the empty state every record list shares, around the table it draws
- * itself: the Results and Feedback lists differ only in their rows and their words.
- */
 export function RecordResults({
 	state,
 	"aria-label": label,

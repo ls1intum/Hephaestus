@@ -28,7 +28,6 @@ const catalog = z
 		),
 	);
 
-/** The needs a source offers: Complete only where the source can be read whole. */
 const needsOf = (supportsComplete: boolean | undefined) =>
 	supportsComplete === true ? ["REQUIRED", "COMPLETE", "OPTIONAL"] : ["REQUIRED", "OPTIONAL"];
 

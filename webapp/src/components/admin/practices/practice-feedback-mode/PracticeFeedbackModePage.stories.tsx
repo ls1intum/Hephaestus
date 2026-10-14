@@ -120,7 +120,6 @@ const offByGroup = buildFeedbackModeFixture({
 
 const noPractices = buildFeedbackModeFixture({ groups: [] });
 
-/** Built once and shared: resolving the whole inheritance chain over this many rows is not free. */
 const atScale = scaleFixture();
 
 const idle = {
@@ -156,12 +155,6 @@ const meta = {
 	},
 	decorators: [withWidePage],
 	tags: ["autodocs"],
-	/**
-	 * Only the scope filter is held in state; the feedback mode setters stay spies. {@link buildFeedbackModeFixture}
-	 * resolves the three-level inheritance chain the way the server does, so applying a feedback mode locally
-	 * would mean resolving it a second time by hand — and the page would show a rollup its own rows
-	 * contradict the first time the two disagreed.
-	 */
 	render: (args) => (
 		<Stateful initial={args.overridesOnly}>
 			{(overridesOnly, setOverridesOnly) => (
@@ -186,7 +179,6 @@ export const WorkspaceDefaultUnset: Story = {
 		await expect(canvas.getByRole("heading", { name: "Workspace default" })).toBeVisible();
 		await expect(canvas.getByText("Not chosen yet, so Approve first applies.")).toBeVisible();
 		await expect(canvas.getByRole("radiogroup", { name: "Workspace feedback mode" })).toBeVisible();
-		// The workspace makes one decision: feedback mode. What Heph reviews is set elsewhere.
 		await expect(canvas.getByText(/It does not decide what Heph reviews\./u)).toBeVisible();
 		await expectNoPageOverflow();
 	},
@@ -270,8 +262,6 @@ export const PracticeOverrideWithReset: Story = {
 			throw new Error("Practice row not rendered");
 		}
 
-		// `getByText` matches an element's own text nodes, so this is the paragraph and not the button
-		// inside it; the button is asserted by role below.
 		await expect(within(row).getByText("Set here.")).toBeVisible();
 		await expect(
 			within(row).getByRole("radiogroup", {
@@ -296,11 +286,6 @@ export const PracticeOverrideWithReset: Story = {
 	},
 };
 
-/**
- * A practice carrying no prose gets no preview card at all, rather than an empty popup appearing
- * under the pointer. Locally written practices usually carry none, so this is a state production
- * reaches routinely.
- */
 export const PracticeContext: Story = {
 	args: from(oneDescribedAndOneBare),
 	play: async ({ canvas, userEvent }) => {
@@ -315,7 +300,6 @@ export const PracticeContext: Story = {
 			within(described).queryByText(/reads as arbitrary six months later/u),
 		).not.toBeInTheDocument();
 
-		// The card is portalled, so it is found on the screen and not in the row.
 		await userEvent.hover(
 			within(described).getByRole("link", { name: "Explains the trade-off it chose" }),
 		);
@@ -326,9 +310,6 @@ export const PracticeContext: Story = {
 			throw new Error("Bare row not rendered");
 		}
 		await expect(within(bare).getByText("Pull or merge request")).toBeVisible();
-		// A practice with neither field renders its link bare rather than wrapped in a card that
-		// would open on hover with nothing in it. Asserted on the element, not by hovering and
-		// waiting for nothing, which passes just as well when the card is merely slow.
 		await expect(
 			within(bare).getByRole("link", { name: "Written by hand, and says nothing more" }),
 		).not.toHaveAttribute("data-slot", "hover-card-trigger");
@@ -336,11 +317,6 @@ export const PracticeContext: Story = {
 	},
 };
 
-/**
- * The card hangs off the practice's own link rather than a help icon, so the tab stop the row already
- * has is the keyboard path and no row grows a second one. This story is what keeps that a fact rather
- * than a claim: Base UI's hover card opens on focus-visible, Radix's does not.
- */
 export const PracticeDetailOnKeyboardFocus: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	args: from(oneDescribedPractice),
@@ -351,8 +327,7 @@ export const PracticeDetailOnKeyboardFocus: Story = {
 		await expect(
 			screen.queryByText(/reads as arbitrary six months later/u),
 		).not.toBeInTheDocument();
-		// `link.focus()` would not do: the card opens on focus-*visible*, so focus has to arrive by
-		// keyboard. Bounded, so a DOM change ahead of the link fails the story instead of hanging it.
+		// The card opens on focus-visible; reach it by keyboard rather than programmatic focus.
 		for (let step = 0; step < 12 && document.activeElement !== link; step += 1) {
 			await userEvent.tab();
 		}
@@ -470,18 +445,12 @@ export const AtScale: Story = {
 	},
 };
 
-/**
- * A geometry assertion, because a ladder laid out after a content-width header takes its left edge
- * from the length of the group's name — and nothing about the DOM, the roles or the text changes when
- * that happens, so no other kind of assertion catches it.
- */
 export const DecisionsShareOneColumn: Story = {
 	args: from(atScale),
 	globals: { viewport: { value: "desktop" } },
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
-		// Below `sm` every ladder is full width and shares a left edge regardless, so a runner that
-		// ignored the viewport would pass this story for the wrong reason.
+		// Assert the desktop breakpoint; a narrow layout would align every ladder regardless of the grid.
 		await expect(window.innerWidth).toBeGreaterThanOrEqual(640);
 
 		await userEvent.click(canvas.getByRole("button", { name: /^Pull request hygiene/u }));
@@ -491,7 +460,6 @@ export const DecisionsShareOneColumn: Story = {
 			.map((group) => Math.round(group.getBoundingClientRect().left));
 
 		await expect(lefts.length).toBeGreaterThan(25);
-		// One column, to within the sub-pixel rounding of a grid track inside a grid track.
 		await expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(2);
 	},
 };
@@ -505,14 +473,10 @@ export const AtScaleOverridesOnly: Story = {
 	},
 };
 
-/**
- * Off reads the same wherever it applies: chosen on the practice or handed down from its group, the
- * row says what Off keeps and every place it stops feedback.
- */
 export const OffDirectAndInherited: Story = {
 	args: from(offByGroup),
 	play: async ({ canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("button", { name: /Testing/u }));
+		await userEvent.click(canvas.getByRole("button", { name: /^Testing\b/u }));
 		const off =
 			"Off keeps results and stops feedback on the work, on practice pages, and in conversation.";
 		const inherited = canvas.getByText("Covers the new branch").closest("li");
@@ -527,7 +491,6 @@ export const OffDirectAndInherited: Story = {
 	},
 };
 
-/** Reviewed by people or nobody is not feedback mode Off, and the row says so beside the ladder. */
 export const NotReviewedByHeph: Story = {
 	args: from(notReviewedByHeph),
 	play: async ({ canvas, userEvent }) => {

@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 class ResultMarkFeedbackIntegrationTest extends AbstractFeedbackIntegrationTest {
+    @Autowired
+    FeedbackMarkListener feedbackMarks;
 
     @Autowired
     FeedbackStoreService store;
@@ -26,7 +28,7 @@ class ResultMarkFeedbackIntegrationTest extends AbstractFeedbackIntegrationTest 
         var parent = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.READY, null);
         var result = result();
         bind(parent, result);
-        store.marked(new ResultMarkChanged(
+        feedbackMarks.marked(new ResultMarkChanged(
                 UUID.randomUUID(), workspace.getId(), result.getId(), ResultMarkKind.INCORRECT, false, AT));
         var row = feedback.findById(parent.getId()).orElseThrow();
         assertThat(row.getState()).isEqualTo(FeedbackState.WITHHELD);
@@ -40,7 +42,7 @@ class ResultMarkFeedbackIntegrationTest extends AbstractFeedbackIntegrationTest 
         var result = result();
         bind(parent, result);
         var copy = summary(parent, FeedbackCopyState.WRITE_STARTED);
-        store.marked(new ResultMarkChanged(
+        feedbackMarks.marked(new ResultMarkChanged(
                 UUID.randomUUID(), workspace.getId(), result.getId(), ResultMarkKind.INCORRECT, false, AT));
         assertThat(feedback.findById(parent.getId()).orElseThrow().getState()).isEqualTo(FeedbackState.UNCONFIRMED);
         assertThat(copies.findById(copy.getId()).orElseThrow().getState()).isEqualTo(FeedbackCopyState.WRITE_STARTED);
@@ -52,7 +54,7 @@ class ResultMarkFeedbackIntegrationTest extends AbstractFeedbackIntegrationTest 
         var parent = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.READY, null);
         var result = result();
         bind(parent, result);
-        store.marked(new ResultMarkChanged(
+        feedbackMarks.marked(new ResultMarkChanged(
                 UUID.randomUUID(), workspace.getId(), result.getId(), ResultMarkKind.ACCEPTED, false, AT));
         assertThat(feedback.findById(parent.getId()).orElseThrow().getState()).isEqualTo(FeedbackState.READY);
     }

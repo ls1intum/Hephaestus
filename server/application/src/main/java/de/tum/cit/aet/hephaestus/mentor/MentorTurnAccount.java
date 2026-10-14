@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.mentor;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import java.util.Optional;
 
-/** Account verified before a mentor turn enters its executor. */
 public final class MentorTurnAccount {
     private static final ThreadLocal<Long> ACCOUNT = new ThreadLocal<>();
 

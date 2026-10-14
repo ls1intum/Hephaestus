@@ -34,12 +34,10 @@ type Scope = StoryContext["canvas"];
 
 const UNCHOSEN_ROW = "Members who have not chosen";
 
-/** A purpose's row is the accordion trigger its title names. */
 function trigger(canvas: Scope, title: string): HTMLElement {
 	return canvas.getByRole("button", { name: title });
 }
 
-/** Opens the purpose's row if it is closed, and returns what it opened. */
 async function openPurpose(canvas: Scope, title: string): Promise<Scope> {
 	const button = trigger(canvas, title);
 	if (button.getAttribute("aria-expanded") !== "true") {
@@ -48,7 +46,6 @@ async function openPurpose(canvas: Scope, title: string): Promise<Scope> {
 	return within(await canvas.findByRole("region", { name: title }));
 }
 
-/** A tier row is the group its heading names: the tier's label, or the unchosen row's own title. */
 function row(purpose: Scope, title: string): Scope {
 	return within(purpose.getByRole("group", { name: title }));
 }
@@ -69,10 +66,6 @@ const inHouseModel = modelDeclaredAs("IN_HOUSE");
 const cloudModel = modelDeclaredAs("CLOUD");
 const undeclaredModel = modelDeclaredAs("UNDECLARED");
 
-/**
- * A binding as the server sends it, `servedTiers` included: the page reads routing from the wire and
- * never derives it, so each fixture states it.
- */
 function binding(
 	tier: AgentBinding["dataHandlingTier"],
 	model: AvailableLlmModel,
@@ -100,13 +93,11 @@ const partiallyCovered: AgentBinding[] = [
 	binding("UNDECLARED", undeclaredModel),
 ];
 
-/** Practice reviews and Heph serve every member on one In-house model; no model for practice scripts is bound. */
 const everyoneCovered: AgentBinding[] = [
 	binding("IN_HOUSE", inHouseModel),
 	binding("IN_HOUSE", inHouseModel, { purpose: "MENTOR" }),
 ];
 
-/** Each tier has its own review model, so a Cloud script model serves Cloud members. */
 const reviewsOnBothTiers: AgentBinding[] = [
 	binding("IN_HOUSE", inHouseModel, { servedTiers: ["IN_HOUSE"] }),
 	binding("IN_HOUSE", inHouseModel, { purpose: "MENTOR" }),
@@ -115,10 +106,8 @@ const reviewsOnBothTiers: AgentBinding[] = [
 
 const decisionForCloud = binding("CLOUD", mockDecisionModel, { purpose: "PRACTICE_DECISION" });
 
-/** The same assignment where Cloud members' reviews run In-house: the server routes no one to it. */
 const decisionForCloudUnserved: AgentBinding = { ...decisionForCloud, servedTiers: [] };
 
-/** A page in use: every kind of cell, a fallback, an unmet need, and a quiet row. */
 const workspaceInUse: AgentBinding[] = [
 	...reviewsOnBothTiers,
 	decisionForCloud,
@@ -132,7 +121,6 @@ const needsIn = (summaries: PracticeScriptSummary[]): PracticeScriptSummariesSta
 
 const statusLabel = (status: PurposeStatus) => PURPOSE_STATUS_DEFS[status].label;
 
-/** No row may draw any status badge; the words stay only in the description a screen reader hears. */
 async function expectNoStatusBadge(canvas: Scope) {
 	for (const status of Object.keys(PURPOSE_STATUS_DEFS).filter(isPurposeStatus)) {
 		await expect(canvas.queryByText(statusLabel(status), { ignore: ".sr-only" })).toBeNull();
@@ -142,15 +130,6 @@ async function expectNoStatusBadge(canvas: Scope) {
 const isPurposeStatus = (value: string): value is PurposeStatus =>
 	Object.hasOwn(PURPOSE_STATUS_DEFS, value);
 
-/**
- * Two groups of purposes, each one row per purpose. Closed, a row is a line of a matrix: the kind,
- * the model each member answer gets, and a status only when something is off. Open, it holds the
- * tier editors, each with its own save. A row that asks something of the admin opens by itself,
- * once, when the page loads.
- *
- * Rejected: a table with a drawer per purpose. A drawer would hold three independent saves, and a
- * purpose-by-tier matrix scrolls sideways at 320 px; below `md` the cells stack instead.
- */
 const meta = {
 	component: AgentBindingsPage,
 	parameters: { layout: "fullscreen" },
@@ -177,7 +156,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** The shape of both groups while the page loads, so nothing moves when the rows arrive. */
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async ({ canvas }) => {
@@ -212,7 +190,6 @@ export const LoadForbidden: Story = {
 
 const retryLoad = fn();
 
-/** A failed read keeps the page header and offers Retry; no row claims a model or a need. */
 export const LoadFailed: Story = {
 	args: {
 		state: {
@@ -229,10 +206,6 @@ export const LoadFailed: Story = {
 	},
 };
 
-/**
- * Nothing asks for the admin: every row stays closed and no row draws a badge. A Cloud member's
- * cell names the In-house model that serves them, with its tier's icon.
- */
 export const Quiet: Story = {
 	args: { bindings: everyoneCovered, aiChoiceRequired: true },
 	play: async ({ canvas }) => {
@@ -255,7 +228,6 @@ export const Quiet: Story = {
 	},
 };
 
-/** Some members get a model and some do not: one badge, and the cells show which. */
 export const PartlySet: Story = {
 	args: { bindings: [binding("CLOUD", cloudModel)], aiChoiceRequired: true },
 	play: async ({ canvas }) => {
@@ -270,10 +242,6 @@ export const PartlySet: Story = {
 	},
 };
 
-/**
- * A practice whose script cannot run without a model opens its row with a count and the members it
- * misses, above the forms. The practice leads *Used by*; an optional need only counts.
- */
 export const RequiredNeedUnmet: Story = {
 	args: {
 		bindings: [...reviewsOnBothTiers, decisionForCloud],
@@ -287,18 +255,15 @@ export const RequiredNeedUnmet: Story = {
 			`Used by 1 practice In-house: none Cloud: ${mockDecisionModel.displayName} ${statusLabel("NEEDS_ATTENTION")}`,
 		);
 		const region = within(canvas.getByRole("region", { name: "Decision model" }));
-		// Static page content: opening the row does not announce it.
 		await expect(region.queryByRole("alert")).toBeNull();
 		const note = region.getByRole("note");
 		await expect(note).toHaveTextContent(
 			"1 practice needs a decision model for In-house members. Until you assign one, reviews of their work record no result for this practice.",
 		);
-		// One state, one tone: the note wears the colour of the row's badge.
 		const badge = within(decision).getByText(statusLabel("NEEDS_ATTENTION"), {
 			ignore: ".sr-only",
 		});
 		await expect(getComputedStyle(note).color).toBe(getComputedStyle(badge).color);
-		// Cloud members' reviews have their own Cloud model, so the Cloud script model serves them.
 		await expect(row(region, "Cloud").queryByText(/reviews run on an In-house model/u)).toBeNull();
 		const usedBy = within(region.getByRole("list", { name: "Used by" }));
 		const practice = within(usedBy.getByRole("listitem"));
@@ -307,13 +272,11 @@ export const RequiredNeedUnmet: Story = {
 		).toStrictEqual(["practice:comment-quality"]);
 		const required = practice.getByText(PRACTICE_SCRIPT_REQUIRED_DEF.label);
 		await expect(required).toBeVisible();
-		// The badge sits beside the name it qualifies, not at the far edge of the row.
 		const name = practice.getByRole("link", { name: "Comment quality" }).getBoundingClientRect();
 		await expect(required.getBoundingClientRect().left - name.right).toBeLessThan(40);
 		await expect(practice.getByText("Not set for In-house members")).toBeVisible();
 		await expect(region.getByText("As of each practice’s newest review.")).toBeVisible();
 
-		// Used, unassigned and only optional: it counts its practices and stays closed.
 		const embedding = trigger(canvas, "Embedding model");
 		await expect(embedding).toHaveAttribute("aria-expanded", "false");
 		await expect(embedding).toHaveAccessibleDescription(
@@ -330,7 +293,6 @@ const commentChecks: PracticeScriptSummary[] = ["Comment quality", "Comments exp
 	}),
 );
 
-/** Several practices short of the same model share one warning that counts them; *Used by* names them. */
 export const SeveralPracticesNeedIt: Story = {
 	args: {
 		bindings: [...reviewsOnBothTiers, decisionForCloud],
@@ -351,12 +313,6 @@ export const SeveralPracticesNeedIt: Story = {
 	},
 };
 
-/**
- * A script model is never looser than its review's. With no ready Cloud review model, Cloud members'
- * reviews run In-house, so the Cloud decision model serves nobody and its editor says why. The
- * overview still shows the assignment, muted as not used, and no practice uses the model, so the
- * row asks for nothing.
- */
 export const CloudModelUnused: Story = {
 	args: { bindings: [...everyoneCovered, decisionForCloudUnserved], aiChoiceRequired: true },
 	play: async ({ canvas }) => {
@@ -368,20 +324,14 @@ export const CloudModelUnused: Story = {
 			"Cloud members’ reviews run on an In-house model, so this model is not used. Assign a Cloud model for practice reviews to use it.";
 		await expect(cloud.getByText(note)).toBeVisible();
 		await expect(cloud.getByRole("combobox", { name: /Cloud/u })).toHaveAccessibleDescription(note);
-		// Only the Cloud editor of a model kind for practice scripts has it.
 		const inHouse = row(within(canvas.getByRole("region", { name: "Decision model" })), "In-house");
 		await expect(inHouse.queryByText(/reviews run on an In-house model/u)).toBeNull();
 	},
 };
 
-/**
- * The needs are read apart from the page: while they load, the rows for practice scripts claim nothing about
- * them, and the rest of the page already works.
- */
 export const PracticeScriptNeedsLoading: Story = {
 	args: { practiceScriptNeeds: { status: "loading" } },
 	play: async ({ canvas }) => {
-		// No count and no status: the description is the cells alone.
 		await expect(trigger(canvas, "Decision model")).toHaveAccessibleDescription(
 			"In-house: none Cloud: none Not chosen: none",
 		);
@@ -392,7 +342,6 @@ export const PracticeScriptNeedsLoading: Story = {
 	},
 };
 
-/** A failed read of the needs says so in the section *Models for practice scripts*, and nothing else stops. */
 export const PracticeScriptNeedsFailed: Story = {
 	args: {
 		practiceScriptNeeds: {
@@ -420,7 +369,6 @@ const manyPractices: PracticeScriptSummary[] = Array.from({ length: 7 }, (_, ind
 	practiceName: `Practice ${index + 1}`,
 }));
 
-/** A long list shows five practices, then the rest on request. An optional need wears no badge. */
 export const ManyPracticesUseIt: Story = {
 	args: { practiceScriptNeeds: needsIn(manyPractices) },
 	play: async ({ canvas }) => {
@@ -435,19 +383,16 @@ export const ManyPracticesUseIt: Story = {
 	},
 };
 
-/** An assignment the server cannot run marks its purpose and opens it. */
 export const TiersPartiallyCovered: Story = {
 	args: { bindings: partiallyCovered },
 	play: async ({ canvas }) => {
 		const reviewsTrigger = trigger(canvas, "Practice reviews");
 		await expect(reviewsTrigger).toHaveAttribute("aria-expanded", "true");
-		// The Cloud model is not ready, so Cloud members fall back to the In-house one.
 		await expect(reviewsTrigger).toHaveAccessibleDescription(
 			`In-house: ${inHouseModel.displayName} Cloud: ${inHouseModel.displayName} In-house Not chosen: ${undeclaredModel.displayName} ${statusLabel("NEEDS_ATTENTION")}`,
 		);
 		const reviews = within(canvas.getByRole("region", { name: "Practice reviews" }));
 
-		// Ready is the normal case and draws nothing; only the exception wears a badge.
 		await expect(row(reviews, "In-house").queryByText(/ready/iu)).toBeNull();
 		await expect(row(reviews, "Cloud").getByText("Not ready")).toBeVisible();
 
@@ -458,10 +403,6 @@ export const TiersPartiallyCovered: Story = {
 	},
 };
 
-/**
- * Only members who have not chosen get a model, so the row is partly set. Their editor names them
- * and wears no tier badge: *Not declared* is a model's tier, not an answer a member gave.
- */
 export const NothingCovered: Story = {
 	args: { bindings: [binding("UNDECLARED", undeclaredModel)] },
 	play: async ({ canvas }) => {
@@ -474,7 +415,6 @@ export const NothingCovered: Story = {
 	},
 };
 
-/** Once the workspace requires the choice, the undeclared row serves nobody and loses its column. */
 export const ChoiceRequired: Story = {
 	args: { bindings: partiallyCovered, aiChoiceRequired: true },
 	play: async ({ canvas }) => {
@@ -483,18 +423,12 @@ export const ChoiceRequired: Story = {
 		);
 		await expect(canvas.queryByText("Not chosen")).toBeNull();
 		const reviews = await openPurpose(canvas, "Practice reviews");
-		// It still holds an assignment, so its editor stays to clear it.
 		await expect(row(reviews, UNCHOSEN_ROW).getByText(/no one uses it now/u)).toBeVisible();
-		// A purpose with nothing assigned there has no editor that would serve no one.
 		const heph = await openPurpose(canvas, "Heph");
 		await expect(heph.queryByRole("group", { name: UNCHOSEN_ROW })).toBeNull();
 	},
 };
 
-/**
- * The route words the refusal from the registry; the row shows it and keeps what the admin chose.
- * The refusal is about that model, so choosing another takes it away.
- */
 export const SlotRejected: Story = {
 	args: {
 		bindings: partiallyCovered,
@@ -566,7 +500,6 @@ export const BoundModelMovedNoAlternative: Story = {
 	},
 };
 
-/** A row offers only the models that the server says can serve its purpose. */
 export const OffersOnlyModelsThatServeThePurpose: Story = {
 	play: async ({ canvas }) => {
 		const embeddings = row(await openPurpose(canvas, "Embedding model"), UNCHOSEN_ROW);
@@ -579,10 +512,6 @@ export const OffersOnlyModelsThatServeThePurpose: Story = {
 	},
 };
 
-/**
- * With no review model, the row opens by itself: nothing reviews until one is assigned. A model kind for
- * practice scripts with no model at all names the API to connect and links to the providers below.
- */
 export const NoModelsAvailable: Story = {
 	args: {
 		bindings: [],
@@ -616,21 +545,18 @@ export const NoModelsAvailable: Story = {
 		await expect(
 			row(reviews, UNCHOSEN_ROW).getByText(/No model for this purpose is available yet/u),
 		).toBeVisible();
-		// A model kind for practice scripts with no model at all says which API to connect, once per row.
 		const embedding = row(await openPurpose(canvas, "Embedding model"), "Cloud");
 		await expect(embedding.getByRole("combobox", { name: /Cloud/u })).toHaveAccessibleDescription(
 			"No embedding model yet. Connect a provider with the Embeddings API under Your providers, then add its model.",
 		);
 		await expect(embedding.queryByText(/No model for this purpose/u)).toBeNull();
 		await userEvent.click(embedding.getByRole("link", { name: "Your providers" }));
-		// Focus lands on the panel's wrapper, which holds the "Your providers" section.
 		await expect(
 			canvas.getByText("Connect your own provider").closest(`#${PROVIDER_PANEL_ID}`),
 		).toHaveFocus();
 	},
 };
 
-/** A workspace that may not add its own provider is sent to an instance admin, never to a dead end. */
 export const NoModelsOwnProvidersBlocked: Story = {
 	args: { bindings: [], availableModels: [], ownProviderAllowed: false },
 	play: async ({ canvas }) => {
@@ -648,10 +574,6 @@ export const NoModelsOwnProvidersBlocked: Story = {
 	},
 };
 
-/**
- * A switched-off purpose runs for nobody, however its rows are bound: each row says Off, the group
- * says why once, and no tier claims to be ready.
- */
 export const ProjectReviewsDisabled: Story = {
 	args: {
 		bindings: [...partiallyCovered, decisionForCloudUnserved],
@@ -664,7 +586,6 @@ export const ProjectReviewsDisabled: Story = {
 				new RegExp(`${statusLabel("OFF")}$`, "u"),
 			);
 		}
-		// Off outranks the unmet need, so nothing opens and nothing asks for a binding.
 		await expect(trigger(canvas, "Decision model")).toHaveAttribute("aria-expanded", "false");
 		await expect(trigger(canvas, "Practice reviews")).toHaveAttribute("aria-expanded", "false");
 		await expect(
@@ -677,7 +598,6 @@ export const ProjectReviewsDisabled: Story = {
 			);
 		}
 
-		// While reviews are off nobody gets the bound models, so every cell is empty.
 		await expect(trigger(canvas, "Practice reviews")).toHaveAccessibleDescription(
 			`In-house: none Cloud: none Not chosen: none ${statusLabel("OFF")}`,
 		);
@@ -687,14 +607,12 @@ export const ProjectReviewsDisabled: Story = {
 		await expect(
 			row(reviews, "In-house").getByRole("button", { name: /^Save assignment/u }),
 		).toBeEnabled();
-		// Heph is on but unassigned here: nothing runs, and no switch is to blame.
 		await expect(trigger(canvas, "Heph")).toHaveAccessibleDescription(
 			`In-house: none Cloud: none Not chosen: none ${statusLabel("NOT_SET")}`,
 		);
 	},
 };
 
-/** The row being saved says so on its own button; every other row stays editable. */
 export const Saving: Story = {
 	args: {
 		bindings: partiallyCovered,
@@ -717,7 +635,6 @@ export const Saving: Story = {
 	},
 };
 
-/** The row being cleared says so on its own button, and its save waits too. */
 export const Clearing: Story = {
 	args: {
 		bindings: partiallyCovered,
@@ -736,7 +653,6 @@ export const Clearing: Story = {
 	},
 };
 
-/** A fix link elsewhere names a purpose: its row opens and comes into view, and closing it says so. */
 export const DeepLinkedPurpose: Story = {
 	args: { bindings: everyoneCovered, focusPurpose: "PRACTICE_RERANKING" },
 	play: async ({ canvas, args }) => {
@@ -763,7 +679,6 @@ export const AdvancedDisclosure: Story = {
 		await openAdvanced(mentor);
 		await expect(mentor.queryByLabelText(/^Max concurrent runs/u)).toBeNull();
 		await expect(mentor.getByLabelText(/^Timeout \(seconds\)/u)).toHaveValue(10_800);
-		// A model for practice scripts runs under its practice review's limits and has none of its own.
 		await expect(
 			row(await openPurpose(canvas, "Embedding model"), "In-house").queryByRole("button", {
 				name: /^Advanced/u,
@@ -816,17 +731,13 @@ export const MobileReflow: Story = {
 	},
 };
 
-/** The page in use, in light: the counterpart of `Dark`. */
 export const InUse: Story = {
 	args: {
 		bindings: workspaceInUse,
 		practiceScriptNeeds: needsIn(mockPracticeScriptNeeds),
 	},
 	play: async ({ canvas }) => {
-		// Heph is a kind like the others here, so its mark takes the review kind's neutral tone, not
-		// the mentor accent.
 		const glyphTone = (title: string) => {
-			// The row's first glyph is its kind mark, which is hidden from the accessibility tree.
 			const glyph = trigger(canvas, title).querySelector("svg");
 			if (glyph === null) {
 				throw new Error(`The ${title} row draws no kind mark`);

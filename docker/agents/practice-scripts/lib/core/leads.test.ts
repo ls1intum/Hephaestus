@@ -40,7 +40,6 @@ const CHANGE = parseDiff(
 	].join("\n"),
 );
 
-/** A git checkout with an earlier commit, a context folder, and the sources over them. */
 async function sources(t: TestContext) {
 	const root = await mkdtemp(path.join(tmpdir(), "leads-"));
 	t.after(async () => rm(root, { recursive: true, force: true }));
@@ -221,7 +220,6 @@ void describe("the leads of a review input", () => {
 	});
 });
 
-/** Ten directions of the longest length that a program may give. */
 const longDirections = Array.from({ length: 10 }, (_, i) => `${String(i)} ${"d".repeat(296)}`);
 
 const manyLeads: QuotedLead[] = Array.from({ length: 200 }, (_, i) => ({
@@ -238,7 +236,6 @@ const limitations = (count: number): NonNullable<ReviewOptions["limitations"]> =
 		reason: "deadline",
 	}));
 
-/** A lead on a line of the change, with that line as its quote. */
 const leadAt = (label: string, line: number): QuotedLead => ({
 	at: { change: "src/cart.ts", line },
 	label,
@@ -276,7 +273,6 @@ void describe("the section of a review input", () => {
 		const shown = section.split("\n").filter((line) => /^- Not rated: \d+ added/u.test(line));
 		assert.equal(shown.length + Number(omitted.groups?.count), 20);
 		assert.ok(shown.length > 0);
-		// Their share is taken before the directions get theirs: some directions are cut instead.
 		assert.match(
 			section,
 			/^- \d+ more lines are not shown\. The full input is in `out\/p\.json`\.$/mu,

@@ -44,7 +44,6 @@ export const Enabled: Story = {
 			"**/*.ts\n**/*.tsx",
 		);
 		await expect(canvas.getByRole("group", { name: "Scan reads" })).toBeVisible();
-		// A scan names no developer, and the switch says so where it is turned on.
 		await expect(
 			canvas.getByRole("switch", { name: "Include in scans" }),
 		).toHaveAccessibleDescription(/not attributed to any developer/u);
@@ -59,7 +58,6 @@ export const Disabled: Story = {
 	},
 };
 
-/** Turning scans off keeps what was written, so turning them on again restores it. */
 export const TurningOffKeepsTheDraft: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		const toggle = canvas.getByRole("switch", { name: "Include in scans" });
@@ -93,7 +91,6 @@ export const Invalid: Story = {
 	},
 };
 
-/** An item type that offers no scans shows nothing, unless a scan was saved before it stopped. */
 export const UnsupportedKind: Story = {
 	args: {
 		itemType: mockIssueItemType,
@@ -104,7 +101,6 @@ export const UnsupportedKind: Story = {
 	},
 };
 
-/** A saved scan the kind no longer offers stays until the author removes it, never silently. */
 export const UnsupportedKindWithASavedScan: Story = {
 	args: { itemType: mockIssueItemType },
 	play: async ({ args, canvas, userEvent }) => {

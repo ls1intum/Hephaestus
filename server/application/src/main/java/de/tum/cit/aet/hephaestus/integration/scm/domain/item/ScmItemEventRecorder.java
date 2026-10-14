@@ -25,7 +25,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-/** Provider mirror events become immutable events for each authorized workspace item. */
 @Component
 @ConditionalOnServerRole
 @WorkspaceAgnostic("Fans out one exact provider mirror event to explicitly monitored workspace items")

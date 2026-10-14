@@ -100,11 +100,6 @@ const loadingRow = (
 
 const NO_SENTENCES: NonNullable<PracticeGroupDetailLevelProps["practiceSentences"]> = {};
 
-/**
- * One practice group as the profile's first detail level, in one column: the practices it
- * reviews. Where the reader stands in it is the header's. What the
- * reviews found stays one level deeper, on the practice.
- */
 export function PracticeGroupDetailLevel({
 	nested,
 	path,

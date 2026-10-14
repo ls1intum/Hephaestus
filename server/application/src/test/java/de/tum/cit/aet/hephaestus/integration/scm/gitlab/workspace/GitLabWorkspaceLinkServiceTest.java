@@ -27,10 +27,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * Who may rewrite a shared project's rows from its own reading of GitLab: the workspace that owns
- * the project's group on its connected instance, and still monitors that very project.
- */
 class GitLabWorkspaceLinkServiceTest extends BaseUnitTest {
 
     private static final String GROUP = "course/intro";

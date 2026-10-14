@@ -34,7 +34,6 @@ import { isJsonObject } from "./json.ts";
 import { modelCall, type ModelBudget } from "./models-host.ts";
 import { reasonOf, UnratedError } from "./practice-script.ts";
 
-/** Heap per program, in MiB. */
 const CHILD_HEAP_MB = 256;
 /** A program's process is killed this long after its deadline, so a program that unwinds still returns. */
 export const RETURN_MS = 5000;
@@ -42,14 +41,10 @@ export const RETURN_MS = 5000;
 export class ProgramSettlementError extends Error {
 	override name = "ProgramSettlementError";
 }
-/** Requests a child may have in flight at once. */
 const MAX_IN_FLIGHT = 32;
-/** The most of a failed program's error that its outcome keeps. */
 export const MAX_ERROR_CHARS = 2000;
-/** The most of a child's own output that the log keeps. */
 const MAX_OUTPUT_CHARS = 64 * 1024;
 
-/** One declared model slot of a program: what it needs, whether a model was bound, and its calls not rated. */
 export interface SlotReport {
 	slot: ModelSlot;
 	need: "required" | "optional";
@@ -59,36 +54,27 @@ export interface SlotReport {
 
 /** What the host gives one practice's program. */
 export interface ProgramServices {
-	/** The practice's reads, with their receipts. */
 	reader: EvidenceReader;
 	/** The practice's direct models, with the credential: every call names the practice to the proxy. */
 	models: Partial<SlotModels>;
-	/** The attempt's direct model account. */
 	budget: ModelBudget;
 	/** Run one review of this practice. It rejects with `UnratedError` when the session gives no result. */
 	review: (options: ReviewOptions, signal: AbortSignal) => Promise<Candidate>;
-	/** The attempt's cancellation: deadline, budget or cancelled. */
 	signal: AbortSignal;
 	log: (line: string) => void;
 }
 
-/** What one execution of a program did, before the host checks its value. */
 export interface ProgramExecution {
-	/** The value `run` returned; absent when it returned nothing. */
 	value?: unknown;
-	/** Why it returned nothing. */
 	failure?: { stopReason: StopReason; error: string; skipped?: true };
 	models: SlotReport[];
 	calls: { review: number } & Record<ModelSlot, number>;
 }
 
-/** A request the host still owes a reply. */
 interface OpenRequest {
 	kind: "model" | "read" | "review";
 	call: AbortController;
-	/** The slot of a model request. */
 	slot?: ModelSlot;
-	/** The host already failed it and counted it when it stopped the program. */
 	refused?: true;
 }
 
@@ -129,7 +115,6 @@ export function readableRoots(inputs: readonly string[]): string[] {
 		.map((dir) => path.resolve(dir));
 }
 
-/** Which declared slots have a model, and the report of each. A required slot without one skips the program. */
 export function acceptModels(
 	meta: ParsedMeta,
 	models: Partial<SlotModels>,
@@ -154,7 +139,6 @@ export function acceptModels(
 	};
 }
 
-/** The reason an aborted signal carries, as a stop reason. */
 export function abortReasonOf(signal: AbortSignal): AbortReason {
 	const reason: unknown = signal.reason;
 	return reason instanceof UnratedError &&
@@ -213,9 +197,7 @@ export async function runCustomProgram(
 	child.stdout?.on("data", prefix);
 	child.stderr?.on("data", prefix);
 
-	// Every call the host makes for this program ends with the program, its deadline, or the attempt.
 	const stopped = new AbortController();
-	/** The process ended on its own account: its calls end with it, and the host did not stop it. */
 	let ended = false;
 	child.on("close", () => {
 		ended = true;
@@ -227,10 +209,8 @@ export async function runCustomProgram(
 		AbortSignal.timeout(Math.max(0, job.deadline - Date.now())),
 	]);
 	let aborted: AbortReason | undefined;
-	/** Requests the host still owes a reply, by id, each with its own cancellation. */
 	const open = new Map<number, OpenRequest>();
 	const outstanding = new Map<OpenRequest, Promise<void>>();
-	/** Count one model call whose failure the program receives. */
 	const countUnrated = (slot: ModelSlot, reason: Reason) => {
 		const slotReport = report.find((r) => r.slot === slot);
 		if (slotReport !== undefined) {
@@ -238,13 +218,11 @@ export async function runCustomProgram(
 		}
 	};
 	const reply = (message: Exclude<HostMessage, { kind: "job" | "abort" | "meta-accepted" }>) => {
-		// A reply to a request already answered, or after the program stopped, is dropped.
 		if (!open.delete(message.id) || !child.connected) {
 			return;
 		}
 		child.send(message);
 	};
-	/** Answer a request that the host will not run, with the failure of its own kind. */
 	const refuseRequest = (kind: "model" | "read" | "review", id: number, reason: AbortReason) => {
 		if (!child.connected) {
 			return;
@@ -268,13 +246,11 @@ export async function runCustomProgram(
 		if (child.connected) {
 			child.send({ kind: "abort", reason } satisfies HostMessage);
 		}
-		// Every request in flight fails now; whatever its call answers later is not sent or counted.
-		// The count is taken here, before the program can read the failure and return.
+		// Count failures before replying; the child can return as soon as it receives a failure.
 		for (const [id, request] of open) {
 			request.refused = true;
 			request.call.abort(new UnratedError(reason, `the host stopped this program: ${reason}`));
 			if (request.slot !== undefined) {
-				// A slot report has no cancelled count: as in the direct model calls, it is the deadline.
 				countUnrated(request.slot, reason === "cancelled" ? "deadline" : reason);
 			}
 			refuseRequest(request.kind, id, reason);
@@ -305,7 +281,6 @@ export async function runCustomProgram(
 	let killLater: ReturnType<typeof setTimeout> | undefined;
 
 	let settled: Omit<ProgramExecution, "models" | "calls"> | undefined;
-	/** Whether the program sent its one final message: a result, or why it has none. */
 	let finished = false;
 	let meta: ParsedMeta | undefined;
 	let accepted: Partial<Record<ModelSlot, string>> = {};
@@ -449,7 +424,6 @@ export async function runCustomProgram(
 		} satisfies HostMessage);
 	};
 
-	/** Answer one request; a request the host cannot answer, such as options without a JSON form, stops the program. */
 	const answerRequest = async (
 		message: Extract<ChildMessage, { kind: "model" | "read" | "review" }>,
 		request: OpenRequest,
@@ -538,7 +512,6 @@ export async function runCustomProgram(
 			}
 			case "failed": {
 				finished = true;
-				// A program that fails before it declares itself is not a program.
 				const reason = message.reason ?? (meta === undefined ? "invalid-program" : "error");
 				settled = {
 					failure: {

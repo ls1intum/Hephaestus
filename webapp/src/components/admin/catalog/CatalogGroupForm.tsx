@@ -92,9 +92,7 @@ export function CatalogGroupForm(props: CatalogGroupFormProps) {
 	const [form, setForm] = useState<FormState>(() => initialState(group));
 	const [refusals, setRefusals] = useState(0);
 	const formDisabled = isPending || isResetPending || isKeepPending;
-	// `deepEqual`, not `JSON.stringify`: the latter reports a difference between two equal objects
-	// whose keys happen to have been inserted in a different order, which armed the guard for edits
-	// the reader never made.
+	// Compare values independent of object key order.
 	const unsavedChanges = useUnsavedChanges({
 		isDirty: !deepEqual(form, initialState(group)),
 		disabled: formDisabled,

@@ -46,7 +46,6 @@ export const Default: Story = {
 				}),
 			),
 		).toEqual([`result:${reviewProblemDetail.resultId}`]);
-		// No mark on a problem: a mark is the result's.
 		await expect(panel.queryByRole("button", { name: /^Mark/u })).not.toBeInTheDocument();
 	},
 };

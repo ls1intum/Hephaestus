@@ -14,7 +14,6 @@ import {
 import type { OverviewRegionState, PreviousReviewPeriodState } from "./review-states";
 import { ReviewPipeline } from "./ReviewPipeline";
 
-/** The thirty days before: fewer reviews, as many results, more feedback. */
 const PREVIOUS: ReviewOverview = {
 	...quietPracticeReviewOverview,
 	reviews: { complete: 30, partial: 0, failed: 0, cancelled: 0, running: 0, queued: 0 },
@@ -28,7 +27,6 @@ const READY: OverviewRegionState = {
 	stale: false,
 };
 
-/** A course day's feedback: 120 pieces, 20 of them replaced; 30 withheld and 3 rejected. */
 const COURSE_DAY: ReviewOverview = {
 	...practiceReviewOverview,
 	feedback: {
@@ -89,9 +87,6 @@ export const Default: Story = {
 		// No tile links to its list: the tab above opens the same one, so a second way there is noise.
 		await expect(within(stages).queryByRole("link")).not.toBeInTheDocument();
 		within(stages).getByText("Reviews");
-		// Reviews still going have no outcome yet: they come last in the row, quiet, with the share
-		// that failed after them. How many run and wait right now is the queue's to say,
-		// so the tile does not split them.
 		await expect(
 			within(canvas.getByRole("list", { name: "Reviews not finished yet" })).getByRole("listitem"),
 		).toHaveTextContent("3 not finished yet");
@@ -123,7 +118,6 @@ export const Default: Story = {
 			"1 failed to deliver",
 			"1 replaced by newer",
 		]);
-		// The marked-incorrect count overlaps the results' outcomes, so it is listed apart.
 		await expect(
 			within(canvas.getByRole("list", { name: "Results checked by an admin" })).getByRole(
 				"listitem",

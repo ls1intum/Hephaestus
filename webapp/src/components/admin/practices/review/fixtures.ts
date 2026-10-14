@@ -45,10 +45,7 @@ export const adaAccount: AccountRef = {
 	identities: [{ provider: "GITHUB", login: "ada", displayName: "Ada Lovelace", avatarUrl: null }],
 };
 
-/**
- * Real `Date`s, not ISO strings: these go straight to a prop rather than through MSW, and a `Date`
- * is what the generated client's response transformer hands a screen at runtime.
- */
+// Prop fixtures bypass response transformation and therefore supply Dates directly.
 export function reviewSchedule(overrides: Partial<ReviewSchedule> = {}): ReviewSchedule {
 	return {
 		id: "22222222-2222-2222-2222-222222222222",

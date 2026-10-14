@@ -121,7 +121,6 @@ function cited(
 	};
 }
 
-/** A public NOT_MET result whose one problem cites these lines: a problem's citations are its problems'. */
 const decided = (citations: unknown[]) => ({
 	resultId: "r",
 	outcome: "NOT_MET",
@@ -180,7 +179,6 @@ void test("cited primary code arrives whole, once per file and revision, with it
 				],
 				problems: [],
 			},
-			// The review on the work never acknowledges a MET result, so the code it cites is not read.
 			{
 				resultId: "strength",
 				outcome: "MET",

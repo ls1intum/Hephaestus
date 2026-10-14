@@ -61,10 +61,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     /** {@code hephaestus.integration.gitlab.default-server-url} in the test profile. */
     private static final String DEFAULT_INSTANCE = "https://gitlab.lrz.de";
 
-    /**
-     * A caller whose {@link Account} has an active GitLab {@link Identity} on the default instance,
-     * authenticated through the {@code mock-jwt-sub-} test token (sub = the account id).
-     */
     private Consumer<HttpHeaders> gitLabCaller(String login) {
         return gitLabCaller(login, gitLabInstance(DEFAULT_INSTANCE));
     }
@@ -87,10 +83,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         return 70_000 + persistedId(account.getId()) * 100 + persistedId(gitlab.getId());
     }
 
-    /**
-     * A seeded GitLab caller plus its resolved SCM {@link User} mirror (for owner/membership
-     * setup).
-     */
     private record GitLabCaller(Consumer<HttpHeaders> headers, User scmUser) {}
 
     /** Adds the SCM mirror belonging to the caller's verified provider subject. */
@@ -115,9 +107,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                         () -> gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, serverUrl)));
     }
 
-    /**
-     * An enabled GitLab login provider: what makes a self-hosted instance eligible for workspaces.
-     */
     private void configureGitLabLogin(String registrationId, String baseUrl) {
         LoginProvider provider = new LoginProvider();
         provider.setRegistrationId(registrationId);

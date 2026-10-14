@@ -8,14 +8,9 @@ import type {
 import { readsProblem } from "./review-settings";
 
 export const MAX_SCAN_PATTERNS = 64;
-/** The longest pattern the server's path matcher accepts. */
 export const MAX_SCAN_PATTERN_LENGTH = 512;
 
-/**
- * Why one path pattern cannot be saved, or undefined when it can. The same rules the server applies
- * to a scan's paths and to a changed-path condition: relative, forward slashes, no empty, `.`, `..`
- * or `.git` component, no NUL and no brace expansion.
- */
+/** Match server path rules: relative paths, forward slashes, and no traversal, .git, NUL, or brace expansion. */
 export function pathPatternProblem(pattern: string): string | undefined {
 	if (pattern.length > MAX_SCAN_PATTERN_LENGTH) {
 		return `Use at most ${MAX_SCAN_PATTERN_LENGTH} characters in a pattern.`;
@@ -56,7 +51,6 @@ export interface ScanDraft {
 	reads: PracticeReadSource[];
 }
 
-/** The patterns in a field: one per line, trimmed, without blank lines or repeats. */
 export function patternsOf(text: string): string[] {
 	return [
 		...new Set(
@@ -78,7 +72,6 @@ export function scanDraftOf(scan: ScanDefinition): ScanDraft {
 	};
 }
 
-/** A new scan of the item type's first scannable kind, with nothing chosen yet. */
 export function emptyScanDraft(itemType: PracticeItemTypeOption): ScanDraft {
 	return {
 		itemKind: itemType.scanItemKinds[0] ?? "",
@@ -114,10 +107,7 @@ const FIELD_NAMES: Record<ScanPatternField, string> = {
 	context: "Context",
 };
 
-/**
- * The first reason a scan cannot be saved. `readSources` are those of the scanned item kind, which
- * is not the practice's own kind: a pull request practice scans files.
- */
+/** Validate reads against the scanned item kind; it can differ from the practice's own kind. */
 export function scanProblem(
 	draft: ScanDraft,
 	itemType: PracticeItemTypeOption,

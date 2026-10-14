@@ -17,7 +17,6 @@ export interface TraceDisplay {
 	 * fold into one line. The review's results table opens and folds on its own.
 	 */
 	siblings: boolean;
-	/** Lines from each result to the feedback written from it. */
 	connections: boolean;
 }
 

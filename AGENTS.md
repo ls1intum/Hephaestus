@@ -65,6 +65,7 @@ Get a decision instead of silently bypassing the rule.
 Use their exact names in prose, code, HTTP and release notes.
 Define each term in one owning page and cite it elsewhere.
 The sandboxed runtime is an agent. Heph and the application are not agents.
+
 In this file, **you** is the agent that reads it and changes Hephaestus.
 **We**, the maintainers, are the people who build Hephaestus and talk to you now.
 

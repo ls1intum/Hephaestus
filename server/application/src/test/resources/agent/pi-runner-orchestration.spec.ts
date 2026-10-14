@@ -48,7 +48,6 @@ const supportOccurrence = (itemKind: string, itemId: number) => ({
 	recordedAt: "2026-10-07T08:00:00Z",
 });
 
-/** One citation as admission projects it: its index, its coordinates, its verification and whether a note may sit on it. */
 const admittedCitation = {
 	index: 0,
 	sourceKind: "scm.pull-request.diff",
@@ -62,7 +61,6 @@ const admittedCitation = {
 	anchorable: true,
 };
 
-/** An admitted problem: one located problem of a NOT_MET result. */
 const admittedChild = (problemId: string, citation: unknown = admittedCitation) => ({
 	problemId,
 	position: 0,
@@ -75,7 +73,6 @@ const admittedChild = (problemId: string, citation: unknown = admittedCitation) 
 	anchorable: true,
 });
 
-/** An admitted NOT_MET result of test-practice, as admission projects it, with its one problem. */
 const admittedResult = {
 	resultId: "result-1",
 	practiceSlug: "test-practice",
@@ -101,7 +98,6 @@ const admittedResult = {
 	problems: [admittedChild("problem-1")],
 };
 
-/** An admitted MET result: its own citations decide it, and it has no problem. */
 const metResult = (resultId: string, practiceSlug: string) => ({
 	...admittedResult,
 	resultId,
@@ -111,7 +107,6 @@ const metResult = (resultId: string, practiceSlug: string) => ({
 	problems: [],
 });
 
-/** The worker wire response carries result citations in evidence and problem ids as id. */
 function admissionDto(value: unknown) {
 	const row = recordOf(value);
 	const { citations, problems, severity: _severity, ...fields } = row;
@@ -320,7 +315,6 @@ const STAGED_FEEDBACK_HISTORY = JSON.stringify({
 	],
 });
 
-/** A delivered record as the server stages it, on one destination, resting on one recorded NOT_MET problem. */
 const deliveredRecord = (
 	id: string,
 	destination: string,
@@ -343,10 +337,6 @@ const deliveredRecord = (
 	...overrides,
 });
 
-/**
- * One delivered PRACTICE_PAGE card about each practice. On CONVERSATION, second-practice has current notes, and test-practice
- * has only records that do not count: malformed, MET-based, stale, withdrawn and undated.
- */
 const ALREADY_SAID_HISTORY = JSON.stringify({
 	coverage: HISTORY_COVERAGE,
 	recordRole: "RECORDED_DELIVERY",
@@ -374,7 +364,6 @@ const ALREADY_SAID_HISTORY = JSON.stringify({
 	],
 });
 
-/** Prepared CONVERSATION notes about test-practice: queued, never delivered. */
 const ALREADY_SAID_PREPARED = JSON.stringify({
 	coverage: HISTORY_COVERAGE,
 	recordRole: "PREPARED_NOT_DELIVERED",
@@ -396,8 +385,6 @@ const REVIEW_SUMMARY =
 	"The login change calls `insecure()` on the path every sign-in takes.\n\n" +
 	"Route it through the checked helper so a bad token cannot reach it.";
 
-/** A NOT_MET result of one problem, as a review session submits it: no practice, no coverage; the host binds both. */
-/** A citation as a session submits it: plain JSON fields. */
 type SubmittedCitation = Record<string, string | number>;
 
 function notMet(summary: string, citation: SubmittedCitation = changeCitation) {
@@ -419,7 +406,6 @@ function notMet(summary: string, citation: SubmittedCitation = changeCitation) {
 	};
 }
 
-/** A MET result, as a review session submits it: its own citations decide it. */
 const met = (summary: string) => ({
 	outcome: "MET",
 	summary,
@@ -428,7 +414,6 @@ const met = (summary: string) => ({
 	evidence: {},
 });
 
-/** The captured record of the work, quoted by a result that rests on it. */
 const recordCitation = {
 	sourceKind: "scm.pull-request.core",
 	sourcePath: "evidence/metadata.json",
@@ -437,7 +422,6 @@ const recordCitation = {
 	quote: '"title": "Add login"',
 };
 
-/** A result that decides nothing; for a practice that reads the change, it must show it read it. */
 const undecided = (consulted: string[]) => ({
 	outcome: "DOES_NOT_APPLY",
 	summary: "Nothing to assess in this change",
@@ -462,7 +446,6 @@ function practice(
 	return { slug, group, readsSources, ...(versionId === undefined ? {} : { versionId }) };
 }
 
-/** The reviewed pull request's record, complete, as the server stages `metadata.json`. */
 const WORK_RECORD = {
 	title: "Add login",
 	basis: { admission_fields: [], other_fields: "CAPTURE" },
@@ -482,7 +465,6 @@ const WORK_RECORD = {
 	assignees: [],
 };
 
-/** A program that prepares one lead on the added call and asks one review with it. */
 const LEADS_PROGRAM = `import { definePracticeScript } from "../lib/core/practice-script.ts";
 export default definePracticeScript({
 	meta: {},
@@ -505,8 +487,6 @@ function listOf(value: unknown): unknown[] {
 	return items;
 }
 
-/** The final results a file holds, each as `{ practiceSlug, candidate }`: the admission request's form. */
-/** The admitted results that out/feedback.json echoes. */
 function readFeedbackResults(path: string) {
 	const payload: unknown = JSON.parse(readFileSync(path, "utf8"));
 	assert.ok(isRecord(payload) && Array.isArray(payload.results));
@@ -520,7 +500,6 @@ function readResults(path: string) {
 	return listOf(payload.results).map(recordOf);
 }
 
-/** The candidate each final result of a file holds, by practice. */
 function candidatesIn(path: string): Map<string, Record<string, unknown>> {
 	return new Map(
 		readResults(path).map((entry) => [String(entry.practiceSlug), recordOf(entry.candidate)]),
@@ -597,21 +576,18 @@ if (scenario !== undefined && scenario !== "") {
 	let now = 1_000_000;
 	mock.method(Date, "now", () => now);
 	const record = (event: string) => appendFileSync(nodePath.join(cwd, "events"), `${event}\n`);
-	// The tests stage the change view the runner would derive from a checkout they do not have.
 	const change = new URL("../../../main/resources/agent/pi-change.ts", import.meta.url).href;
 	const derived: unknown = await import(change);
 	assert.ok(typeof derived === "object" && derived !== null);
 	mock.module(change, {
 		namedExports: { ...derived, writeChangeView: () => record("derive-change") },
 	});
-	/** A second NOT_MET practice's result, with its own problem. */
 	const secondNotMet = {
 		...admittedResult,
 		resultId: "result-2",
 		practiceSlug: "second-practice",
 		problems: [admittedChild("problem-2")],
 	};
-	/** An admitted abstention: its own citations carry the limit it recorded, and it has no problem. */
 	const abstention = (
 		resultId: string,
 		practiceSlug: string,
@@ -630,7 +606,6 @@ if (scenario !== undefined && scenario !== "") {
 	const admitted = (): unknown[] => {
 		switch (scenario) {
 			case "compose-abstention": {
-				// Admission answers with every submitted outcome, abstentions included, as it was measured.
 				const ids = ["test-practice", "second-practice", "third-practice"];
 				return readResults(nodePath.join(cwd, "admission.json")).map((posted) => {
 					const candidate = recordOf(posted.candidate);
@@ -727,7 +702,6 @@ if (scenario !== undefined && scenario !== "") {
 			}
 			case "compose":
 			case "compose-foreign-provider": {
-				// Admission marks a result drawn from the person's history as not for the review on the work.
 				return [
 					{
 						...admittedResult,
@@ -947,7 +921,6 @@ if (scenario !== undefined && scenario !== "") {
 		assert.ok(typeof init?.body === "string");
 		writeFileSync(nodePath.join(cwd, "admission.json"), init.body);
 		if (scenario === "compose-settle-deadline") {
-			// The run is admitted a moment before its safety ceiling: composition gets what is left.
 			now = 1_000_000 + Number(process.env.AGENT_BUDGET_MS) - 200;
 		}
 		const rows = admitted();
@@ -992,7 +965,6 @@ if (scenario !== undefined && scenario !== "") {
 					: { practiceSlug, decision: inAppDecision, occurrences: [] },
 			),
 		};
-		// The conversation lane's routing per admitted NOT_MET result, by its id.
 		const chatRouting =
 			supportMode === "routing-missing"
 				? undefined
@@ -1056,11 +1028,9 @@ if (scenario !== undefined && scenario !== "") {
 	let sessions = 0;
 	let prompts = 0;
 	let measuredTool: CustomTool | undefined;
-	/** The submit_result the first practice's session was given. */
 	let firstTool: CustomTool | undefined;
 	/** What the runner steered the session with, in order. */
 	const steered: string[] = [];
-	/** The final results as the runner keeps them, and the review's notes, which show the open review's draft. */
 	const stateText = () => {
 		const path = nodePath.join(cwd, "out/review-state.json");
 		return existsSync(path) ? readFileSync(path, "utf8") : null;
@@ -1081,7 +1051,6 @@ if (scenario !== undefined && scenario !== "") {
 		}
 		idleWaiters = [];
 	};
-	/** Past the measuring window of any budget these scenarios run with. */
 	const PAST_SAFETY_MS = 120_000;
 	const waitForIdle = async () => {
 		if (scenario === "settle-safety" && compacting) {
@@ -1591,9 +1560,6 @@ if (scenario !== undefined && scenario !== "") {
 								text.includes("The review leaves these NOT_MET results undecided") ||
 								text.includes("The review on this work is not final yet")
 							) {
-								// The review composition, in its own session: choosing and storing the review is all it
-								// can do.
-								// It is composed only with a public NOT_MET result, and its one tool stores the review.
 								assert.ok(
 									admitted().some(
 										(row) =>
@@ -1777,15 +1743,12 @@ if (scenario !== undefined && scenario !== "") {
 										decisions: [{ resultId: "result-1", disposition: "RAISE" }],
 										summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
 									};
-									// The review never acknowledges a MET result: a text that also rests on one is refused.
 									record(
 										`mixed-met:${await attempt("r-met", {
 											...raised,
 											summary: { body: REVIEW_SUMMARY, basedOn: ["result-1", "result-2"] },
 										})}`,
 									);
-									// The session compacts after the review turn: the refusal restores the turn, a review in the
-									// same batch is refused too, and the next turn's is stored.
 									emit({
 										type: "compaction_end",
 										reason: "threshold",
@@ -1861,7 +1824,6 @@ if (scenario !== undefined && scenario !== "") {
 									return;
 								}
 								if (scenario === "compose-complete-error") {
-									// The final review withholds the one problem, and the response then ends in a model error.
 									record(
 										`complete-final:${await attempt("r-e", {
 											decisions: [{ resultId: "result-1", disposition: "BELOW_BAR" }],
@@ -1954,10 +1916,6 @@ if (scenario !== undefined && scenario !== "") {
 								if (scenario === "compose-no-decision") {
 									return;
 								}
-								// The composer's finishing prompt: the runner asks once more for the practices
-								// with a NOT_MET result, and a WITHHOLD is a recorded decision.
-								// A WITHHOLD sent without basedOn is refused with the practice's result ids;
-								// the second piece names one.
 								const withheld = await tool("report_feedback").execute("f-9", {
 									feedback: [
 										{
@@ -2029,7 +1987,6 @@ if (scenario !== undefined && scenario !== "") {
 								if (scenario === "draft-revision") {
 									assert.ok(!options.customTools.some((item) => item.name === "submit_result"));
 									assert.ok(measuredTool);
-									// A submission outside an open review: measurement is closed, and nothing changes.
 									const before = [stateText(), notesText()];
 									const closed = await measuredTool.execute(
 										"after-admission",
@@ -2149,9 +2106,6 @@ if (scenario !== undefined && scenario !== "") {
 									return;
 								}
 								if (scenario === "compose-already-said") {
-									// A withholding that names earlier feedback needs a delivered record on its own destination
-									// for every NOT_MET practice it folds in; a refused one is stored nowhere and the lane
-									// can still be decided.
 									const feedback = tool("report_feedback");
 									const both = ["result-1", "result-2"];
 									const first = await feedback.execute("said", {
@@ -2179,8 +2133,6 @@ if (scenario !== undefined && scenario !== "") {
 									return;
 								}
 								if (scenario === "compose-fold") {
-									// Two practices saw one event: one private piece names the practice that best names it
-									// and folds the other's result into basedOn, which decides both.
 									const folded = await tool("report_feedback").execute("f-fold", {
 										feedback: [
 											{
@@ -2225,8 +2177,6 @@ if (scenario !== undefined && scenario !== "") {
 									nextStep: "Check the call before pushing.",
 								};
 								const feedback = tool("report_feedback");
-								// The schema carries the shape and the vocabulary and no rule: a rule is applied
-								// per piece, by the tool, so one wrong piece never discards the others in the call.
 								const schema = JSON.stringify(feedback.parameters);
 								for (const keyword of ["maxLength", "additionalProperties", "minItems", "oneOf"]) {
 									assert.ok(
@@ -2245,8 +2195,6 @@ if (scenario !== undefined && scenario !== "") {
 										error instanceof Error ? error.message : String(error),
 									);
 								record(`feedback-historical:${historical}`);
-								// Trying to break it: every piece but the first is wrong in its own way, and each
-								// is answered on its own while the first is stored.
 								const reply = await feedback.execute("f-1", {
 									feedback: [
 										{ ...card, destination: "PRACTICE_PAGE", basedOn: "problem-1" },
@@ -2265,7 +2213,6 @@ if (scenario !== undefined && scenario !== "") {
 									],
 								});
 								record(`feedback:${JSON.stringify(reply)}`);
-								// A single piece sent bare where the list was asked for is the list of one.
 								const bare = await feedback
 									.execute("f-2", {
 										feedback: {
@@ -2399,13 +2346,10 @@ if (scenario !== undefined && scenario !== "") {
 								return;
 							}
 							if (scenario === "scope-ownership") {
-								// The first practice's submit_result is kept; the second practice's session submits through it.
 								firstTool ??= report;
 								const sibling =
 									currentSlug === "test-practice" ? "second-practice" : "test-practice";
 								const before = stateText();
-								// Six refused submissions in each session: two sessions refuse more than the limit, and
-								// neither practice is closed, since one practice's refusals spend none of the other's.
 								for (let attempt = 0; attempt < 6; attempt += 1) {
 									await assert.rejects(
 										firstTool.execute(
@@ -2418,7 +2362,6 @@ if (scenario !== undefined && scenario !== "") {
 										/citation does not match/u,
 									);
 								}
-								// A result that names the other practice is this session's: the host binds the practice.
 								await assert.rejects(
 									firstTool.execute("foreign", {
 										...notMet(`Own ${currentSlug}`),
@@ -2513,7 +2456,6 @@ if (scenario !== undefined && scenario !== "") {
 								return;
 							}
 							if (scenario === "met-coverage") {
-								// The session reads the change, and its read is cut short at the tool's limit.
 								emit({
 									type: "tool_execution_start",
 									toolCallId: "r-cut",
@@ -2615,7 +2557,6 @@ if (scenario !== undefined && scenario !== "") {
 								);
 								await assert.rejects(atRevision("b".repeat(40), 2), /no such file at revision/u);
 								record("citation:history-refused");
-								// Coordinates alone verify nothing: the quote is the claim the runner checks.
 								await assert.rejects(cite("src/Auth.java", "", "Cited by line alone"), /quote/u);
 								record("citation:no-quote-refused");
 								writeFileSync(nodePath.join(cwd, "out", "stray.txt"), "left by a session");
@@ -2626,7 +2567,6 @@ if (scenario !== undefined && scenario !== "") {
 									"provisional-diff",
 									notMet("Retained changed authentication evidence"),
 								);
-								// The draft is the session's own: the notes show it, and the review state holds none yet.
 								const beforeReplacement = [stateText(), notesText()];
 								assert.match(notesText(), /Retained changed authentication evidence/u);
 								await assert.rejects(
@@ -2669,7 +2609,6 @@ if (scenario !== undefined && scenario !== "") {
 									report.execute("invalid-range", encoded("insecure();", "[L999]")),
 									/citation does not match/u,
 								);
-								// The declaration names no sourceFile; submitting still refuses one the capture did not stage.
 								await assert.rejects(
 									report.execute(
 										"uncaptured-sourceFile",
@@ -2693,7 +2632,6 @@ if (scenario !== undefined && scenario !== "") {
 									inapplicability: null,
 									openQuestions: null,
 								};
-								// A warrant another outcome owes is refused, never moved or dropped.
 								await assert.rejects(
 									report.execute("incompatible-warrant", {
 										...met("Added call goes through the checked helper"),
@@ -2740,7 +2678,6 @@ if (scenario !== undefined && scenario !== "") {
 								assert.ok(isRecord(first) && isRecord(first.details));
 								assert.equal(first.details.inserted, 1);
 								assert.equal(first.details.revised, 0);
-								// A draft is the session's own: the review state holds no result until the review returns it.
 								assert.equal(stateText(), null);
 								assert.match(notesText(), /test-practice: MET/u);
 								// A resend that changes nothing stores nothing: an error, or it reads as done.
@@ -2751,7 +2688,6 @@ if (scenario !== undefined && scenario !== "") {
 										error instanceof Error ? error.message : String(error),
 									);
 								record(`draft-duplicate:${duplicate}`);
-								// A refused replacement leaves the draft as it was.
 								const drafted = notesText();
 								await assert.rejects(
 									report.execute("invalid", {
@@ -2764,7 +2700,6 @@ if (scenario !== undefined && scenario !== "") {
 									/citation does not match/u,
 								);
 								assert.equal(notesText(), drafted);
-								// A later complete submission replaces the draft.
 								const corrected = await report.execute("correct", negative);
 								assert.ok(isRecord(corrected) && isRecord(corrected.details));
 								assert.equal(corrected.details.revised, 1);
@@ -2840,7 +2775,6 @@ if (scenario !== undefined && scenario !== "") {
 							}
 							if (scenario !== "batch") {
 								if (scenario === "finish" && currentSlug === "second-practice") {
-									// The loop guard, not the model, ends this session: its practice gets no result.
 									for (let call = 1; call <= 6; call += 1) {
 										emit({
 											type: "tool_execution_start",
@@ -2852,7 +2786,6 @@ if (scenario !== undefined && scenario !== "") {
 									return;
 								}
 								if (scenario === "finish") {
-									// The message carrying this submission spent 1200 output tokens; the pace is read from it.
 									emit({
 										type: "message_end",
 										message: {
@@ -2907,7 +2840,6 @@ if (scenario !== undefined && scenario !== "") {
 								revise("Unsafe authentication call", correctedCitation),
 							);
 							record(`batch:${JSON.stringify(reply)}`);
-							// A result that names another practice is still this session's: the host binds the practice.
 							const outside = await report
 								.execute("o-outside", {
 									...revise("A result that names another practice"),
@@ -2961,7 +2893,6 @@ if (scenario !== undefined && scenario !== "") {
 							);
 							record(`corrected-path:${JSON.stringify(path)}`);
 							await report.execute("o-2", revise("The login change calls an insecure helper"));
-							// A resend of what is already submitted stores nothing: an error, or it reads as done.
 							const resent = await report
 								.execute("o-3", revise("The login change calls an insecure helper"))
 								.then((answer) => JSON.stringify(answer))
@@ -3332,8 +3263,6 @@ if (scenario !== undefined && scenario !== "") {
 							practiceCriteria,
 						);
 					}
-					// The program inputs the server stages for every admitted practice; a practice with a staged
-					// program of its own runs it, and every other practice runs the built-in.
 					mkdirSync(nodePath.join(cwd, PRACTICES_DIR), { recursive: true });
 					if (stage === "batch" || stage.startsWith("measure-context-")) {
 						writeFileSync(nodePath.join(cwd, "package.json"), '{"type":"module"}\n');
@@ -3425,7 +3354,6 @@ if (scenario !== undefined && scenario !== "") {
 							files: [
 								{ kind: "scm.pull-request.core", file: { path: "evidence/metadata.json" } },
 								{ kind: "scm.pull-request.diff", file: { path: "evidence/change.json" } },
-								// The checkout witness: admission verifies every quote of code against it.
 								{ kind: "scm.repository.tree", file: { path: "repos/primary/.git/HEAD" } },
 								{
 									kind: "scm.repository.tree",
@@ -3491,7 +3419,6 @@ if (scenario !== undefined && scenario !== "") {
 								: []),
 						];
 					} else if (stage === "stall") {
-						// Two catalog groups: two turns, each with a session of its own.
 						index = [
 							practice("test-practice"),
 							practice("second-practice", undefined, undefined, "docs"),
@@ -3650,8 +3577,6 @@ if (scenario !== undefined && scenario !== "") {
 								outcome,
 							})),
 						});
-					// A continuing writer derives no change and runs no program; every other run derives the change
-					// view first and reports one execution entry for each admitted practice, sorted by slug.
 					const slugs = index.map(({ slug }) => slug).toSorted();
 					assert.equal(
 						events.includes("derive-change"),
@@ -3673,7 +3598,6 @@ if (scenario !== undefined && scenario !== "") {
 						assert.equal(report.schemaVersion, 2);
 						assert.deepEqual([...executions.keys()], slugs, child.stderr);
 					}
-					/** How each practice's program ran, as `status` or `status (stopReason)`. */
 					const ran = (expected: Record<string, string>) =>
 						assert.deepEqual(
 							Object.fromEntries(
@@ -3687,8 +3611,6 @@ if (scenario !== undefined && scenario !== "") {
 							expected,
 							child.stderr,
 						);
-					// Admission is asked once, with one final result per practice that has one, sorted by slug; the
-					// request body is what out/result.json and out/review-state.json hold.
 					const admissionPath = nodePath.join(cwd, "admission.json");
 					const admissions = events.filter((event) => event === "admit").length;
 					assert.equal(admissions, existsSync(admissionPath) ? 1 : 0);
@@ -3704,7 +3626,6 @@ if (scenario !== undefined && scenario !== "") {
 							);
 						}
 					}
-					// Composition follows measuring: one session per practice, and none after its result was submitted.
 					const measuringSessions = events.filter(
 						(event) => event.startsWith("create:session") && event.endsWith(",submit_result"),
 					);
@@ -3846,7 +3767,6 @@ if (scenario !== undefined && scenario !== "") {
 							);
 							const candidates = candidatesIn(nodePath.join(cwd, "out/result.json"));
 							assert.equal(candidates.get("test-practice")?.summary, "Revised within the batch");
-							// A submission always binds to its session's practice, so the first one settles it.
 							assert.equal(
 								candidates.get("second-practice")?.summary,
 								stage === "scope-native-completion"
@@ -3965,7 +3885,6 @@ if (scenario !== undefined && scenario !== "") {
 								child.stderr,
 								/24 recording calls without a record — aborting this turn/u,
 							);
-							// The guarded practice gets no result, and no second session reviews it again.
 							assert.equal(events.filter((event) => event.startsWith("create:")).length, 2);
 							assert.deepEqual(
 								[...candidatesIn(nodePath.join(cwd, "out/result.json")).keys()],
@@ -4005,8 +3924,6 @@ if (scenario !== undefined && scenario !== "") {
 							reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
 							ran({ "second-practice": "ok", "test-practice": "ok" });
 							if (stage === "scope-ownership") {
-								// Each session's six refusals are its own practice's, and each result is bound to the
-								// practice of the session that submitted it, only after the candidate is valid.
 								for (const slug of ["test-practice", "second-practice"]) {
 									assert.match(
 										events.find((event) => event.startsWith(`own:${slug}:`)) ?? "",
@@ -4027,8 +3944,6 @@ if (scenario !== undefined && scenario !== "") {
 						}
 						case "scope-stop-hangs":
 						case "scope-stop-failure": {
-							// The run ends: no later session starts, nothing is admitted, and the usage stays. A draft is
-							// the session's own until its review returns it, so no result is final.
 							assert.equal(child.status, 2, child.stderr);
 							assert.equal(events.filter((event) => event.startsWith("create:")).length, 1);
 							assert.deepEqual(readResults(nodePath.join(cwd, "out/review-state.json")), []);
@@ -4080,7 +3995,6 @@ if (scenario !== undefined && scenario !== "") {
 							assert.equal(child.status, 1, child.stderr);
 							assert.ok(!events.some((event) => event.startsWith("prompt:")), events.join("\n"));
 							reached({ "test-practice": "NOT_REACHED", "second-practice": "NOT_REACHED" });
-							// The practice whose session settled past the line is not prompted; the next is never started.
 							ran({
 								"second-practice": "not-reached (deadline)",
 								"test-practice": "failed (deadline)",
@@ -4123,7 +4037,6 @@ if (scenario !== undefined && scenario !== "") {
 							break;
 						}
 						case "session-init": {
-							// Each practice's review fails on its own session, and none is admitted.
 							assert.equal(child.status, 1, child.stderr);
 							assert.equal(events.filter((event) => event.startsWith("create:session")).length, 2);
 							ran({ "second-practice": "failed (error)", "test-practice": "failed (error)" });
@@ -4139,7 +4052,6 @@ if (scenario !== undefined && scenario !== "") {
 								child.stderr,
 								/2 calls in this session ran into the 16384-token output limit — aborting this turn/u,
 							);
-							// One notice, then the stop; the practice has no result, and no second session asks again.
 							const order = events.filter((event) => ["steer", "abort"].includes(event));
 							assert.ok(order.indexOf("steer") < order.indexOf("abort"));
 							assert.deepEqual(
@@ -4153,8 +4065,6 @@ if (scenario !== undefined && scenario !== "") {
 						}
 						case "work-budget": {
 							assert.equal(child.status, 0, child.stderr);
-							// One nudge, the submission, then the stop; the practice has its result, so no turn follows
-							// and the next abort is the session's own stop.
 							assert.deepEqual(
 								events
 									.filter(
@@ -4169,7 +4079,6 @@ if (scenario !== undefined && scenario !== "") {
 								["prompt:1", "steer", "recorded", "abort", "abort", "dispose"],
 							);
 							assert.match(events.find((event) => event.startsWith("recorded:")) ?? "", /stored/u);
-							// The nudge names the tool that submits what the turn owes.
 							const [nudge = ""] = readFileSync(nodePath.join(cwd, "steered"), "utf8")
 								.trim()
 								.split("\n")
@@ -4244,7 +4153,6 @@ if (scenario !== undefined && scenario !== "") {
 								["prompt:1", "steer", "abort-compaction", "abort", "prompt:2"].includes(event),
 							);
 							assert.ok(order.indexOf("abort-compaction") < order.indexOf("abort"));
-							// The next turn's session is prompted only once the stalled one was stopped.
 							assert.ok(events.indexOf("dispose") < events.indexOf("prompt:2"));
 							assert.match(child.stderr, /no model or tool event for 300s — aborting this turn/u);
 							assert.doesNotMatch(child.stderr, /already processing/u);
@@ -4265,7 +4173,6 @@ if (scenario !== undefined && scenario !== "") {
 							assert.equal(result.outcome, "NOT_MET");
 							const [problem] = listOf(result.problems).map(recordOf);
 							assert.deepEqual(problem?.citations, [{ ...changeCitation, quote: " insecure();" }]);
-							// Exercise Pi's public validator on the actual submit_result declaration and prepared arguments.
 							const native = spawnSync(
 								process.execPath,
 								[
@@ -4426,7 +4333,6 @@ for (const item of nullableCases) {
 								/test-practice: revised \(negative\)/u,
 								child.stderr,
 							);
-							// Only the replacement is final, and each practice has its own.
 							const result = candidatesIn(nodePath.join(cwd, "out/result.json"));
 							assert.deepEqual(
 								[...result].map(([slug, candidate]) => [
@@ -4449,7 +4355,6 @@ for (const item of nullableCases) {
 							]);
 							assert.ok(!JSON.stringify(admission).includes("revises"));
 							assert.ok(!JSON.stringify(admission).includes("Authentication call goes through"));
-							// After admission, a submission outside an open review is refused and changes nothing.
 							assert.match(
 								events.find((event) => event.startsWith("draft-closed:")) ?? "",
 								/Measurement is closed[\s\S]*"inserted":0,"revised":0,"duplicates":0,"refused":0/u,
@@ -4530,7 +4435,6 @@ for (const item of nullableCases) {
 							}
 							assert.doesNotMatch(system, /`(?:write|edit)`|tools\.(?:write|edit)\(/u);
 							assert.match(system, /Each fresh session names one practice/u);
-							// The submitter is a direct call only; scripts reach the evidence tools.
 							assert.match(system, /Call it directly: a codemode script cannot call it/u);
 							assert.match(
 								readFileSync(nodePath.join(cwd, "prompt-1.md"), "utf8"),
@@ -4547,9 +4451,7 @@ for (const item of nullableCases) {
 								events.find((event) => event.startsWith("outside:")) ?? "",
 								/unknown.*practiceSlug/u,
 							);
-							// Nothing is left for the session to submit, so it ends with this call.
 							assert.match(reply, /"terminate":true/u);
-							// One session per practice, each with the evidence tools and submit_result, and none after.
 							assert.deepEqual(measuringSessions, [
 								"create:session tools=read,grep,find,ls,bash,codemode,submit_result",
 								"create:session tools=read,grep,find,ls,bash,codemode,submit_result",
@@ -4573,7 +4475,6 @@ for (const item of nullableCases) {
 							for (const turn of [first, second]) {
 								assert.equal(turn.split("## How submit_result takes a result").length, 2);
 							}
-							// The custom program's prepared input reaches its practice's session, and only that one.
 							assert.match(
 								first,
 								/#### Leads from the practice script for `test-practice` — starting points to check against the criteria, not verdicts\n[\s\S]*An added insecure call\./u,
@@ -4625,8 +4526,6 @@ for (const item of nullableCases) {
 								events.filter((event) => event.startsWith("prompt:")),
 								["prompt:1", "prompt:2", "prompt:3"],
 							);
-							// One session per practice: the loop guard ends the second's turn, so the third was never
-							// started in it and the finish scope reviews it; the second is not reviewed again.
 							assert.equal(events.filter((event) => event.startsWith("create:")).length, 3);
 							const first = readFileSync(nodePath.join(cwd, "prompt-1.md"), "utf8");
 							const third = readFileSync(nodePath.join(cwd, "prompt-3.md"), "utf8");
@@ -4638,8 +4537,6 @@ for (const item of nullableCases) {
 							);
 							assert.ok(third.includes("### `evidence/metadata.json`"));
 							assert.doesNotMatch(third, /### Practice `test-practice`|test-practice: NOT_MET/u);
-							// The finish scope keeps back what submitting costs at the pace the first session showed:
-							// 1200 output tokens over the results it submitted, averaged with the prior of 1500.
 							const batch: unknown = JSON.parse(
 								(events.find((event) => event.startsWith("batch:")) ?? "batch:{}").slice(
 									"batch:".length,
@@ -4698,13 +4595,11 @@ for (const item of nullableCases) {
 								1,
 								events.join("\n"),
 							);
-							// The nudge names what is owed and the tool that submits it.
 							assert.match(
 								readFileSync(nodePath.join(cwd, "steered"), "utf8"),
 								/Still owed: test-practice\. Submit what the evidence you have read supports for these, in one submit_result call/u,
 							);
 							assert.ok(events.includes("abort"), events.join("\n"));
-							// The loop leaves the practice without a result; no second session reviews it again.
 							assert.equal(events.filter((event) => event.startsWith("create:session")).length, 1);
 							reached({ "test-practice": "NOT_REACHED" });
 							ran({ "test-practice": "failed (off-format)" });
@@ -4725,7 +4620,6 @@ for (const item of nullableCases) {
 								/the same refused test-practice result sent 3 times — aborting this turn/u,
 							);
 							assert.match(refusals[7] ?? "", /refused/u);
-							// The practice past its limit is closed: no more is accepted, and it is not asked again.
 							const afterCap = events.slice(
 								events.findIndex((event) => event.startsWith("refusal-9:")),
 							);
@@ -4747,7 +4641,6 @@ for (const item of nullableCases) {
 						}
 						case "natural-stop": {
 							assert.equal(child.status, 0, child.stderr);
-							// One session holds what it read: the request to submit goes to it, not to a fresh one.
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("natural-prompt:")),
 								["natural-prompt:1:session-1", "natural-prompt:2:session-1"],
@@ -4770,7 +4663,6 @@ for (const item of nullableCases) {
 							break;
 						}
 						case "natural-stop-twice": {
-							// Nothing submitted: the run fails as a review that reached no practice, not one that measured.
 							assert.equal(child.status, 1, child.stderr);
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("natural-prompt:")),
@@ -4786,8 +4678,6 @@ for (const item of nullableCases) {
 						}
 						case "met-coverage": {
 							assert.equal(child.status, 0, child.stderr);
-							// The host measured the cut read: the MET is refused with what its coverage lacks, and
-							// stored nowhere.
 							const refused = events.find((event) => event.startsWith("met-refused:")) ?? "";
 							assert.match(
 								refused,
@@ -4809,7 +4699,6 @@ for (const item of nullableCases) {
 								"test-practice",
 							);
 							assert.equal(result?.outcome, "NOT_MET");
-							// The result carries the coverage the host measured, incomplete as it was.
 							assert.deepEqual(result.coverage, {
 								source: "host",
 								reads: 1,
@@ -4928,7 +4817,6 @@ for (const item of nullableCases) {
 							);
 							const pieceReply = events.find((event) => event.startsWith("support-items:")) ?? "";
 							if (mode === "cooldown") {
-								// The cooldown closes PRACTICE_PAGE; the composer cannot open it again, and the notes stand.
 								assert.match(
 									pieceReply,
 									/#1: PRACTICE_PAGE is not a destination this run may write for/u,
@@ -4963,7 +4851,6 @@ for (const item of nullableCases) {
 								);
 							}
 							if (mode === "inline") {
-								// Nothing private is asked of the model; the review and every problem remain.
 								assert.equal(pieceReply, "");
 								assert.equal(payload.feedback.length, 0);
 								assert.match(
@@ -4980,7 +4867,6 @@ for (const item of nullableCases) {
 						case "compose":
 						case "compose-foreign-provider": {
 							assert.equal(child.status, 0, child.stderr);
-							// Composition cannot read the prepared review input: it is removed before admission.
 							assert.equal(existsSync(nodePath.join(cwd, "work/review-input")), false);
 							ran({ "test-practice": "ok" });
 							assert.deepEqual(executions.get("test-practice")?.program, {
@@ -5143,7 +5029,6 @@ for (const item of nullableCases) {
 									},
 								],
 							});
-							// The NOT_MET practice's standard comes whole, once, after the work and before the problems.
 							const standard = reviewTurn.indexOf("```markdown\n# Test practice\nCriteria.\n```");
 							assert.ok(
 								record < standard && standard < reviewTurn.indexOf('"resultId": "result-1"'),
@@ -5397,7 +5282,6 @@ for (const item of nullableCases) {
 								readFileSync(nodePath.join(cwd, "prompt-4.md"), "utf8"),
 								/## Undecided[\s\S]*each with a NOT_MET result: test-practice/u,
 							);
-							// The retry knows the room each lane has left, so it writes no piece that is skipped.
 							assert.match(
 								readFileSync(nodePath.join(cwd, "prompt-4.md"), "utf8"),
 								/Room left for new items: PRACTICE_PAGE 1 of 1/u,
@@ -5442,8 +5326,6 @@ for (const item of nullableCases) {
 						}
 						case "compose-empty": {
 							assert.equal(child.status, 0, child.stderr);
-							// A MET result is never acknowledged on the work: with no public NOT_MET result, no review
-							// session opens, and with no problem the private lanes are not composed either.
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("prompt:")),
 								["prompt:1"],
@@ -5469,8 +5351,6 @@ for (const item of nullableCases) {
 							assert.equal(child.status, 0, child.stderr);
 							const said = (label: string) =>
 								events.find((event) => event.startsWith(`${label}:`)) ?? "";
-							// A whole review that decides nothing is refused whole, each time it is sent, and the nudge
-							// points at the final review.
 							for (const label of ["invalid-report", "invalid-again"]) {
 								assert.match(
 									said(label),
@@ -5481,7 +5361,6 @@ for (const item of nullableCases) {
 								said("invalid-nudge"),
 								`invalid-nudge:${JSON.stringify([["report_review"]])}`,
 							);
-							// The final review ends the composition; a later call stores nothing more.
 							assert.match(said("invalid-after-final"), /The review on this work is final/u);
 							assert.match(
 								child.stderr,
@@ -5552,7 +5431,6 @@ for (const item of nullableCases) {
 							assert.ok(reviewTurn !== undefined, events.join("\n"));
 							if (fixture === "compose-compacted") {
 								const [concern = ""] = standards;
-								// The practice's standard is shown with its concern; its MET result is not shown at all.
 								assert.ok(reviewTurn.includes(concern), reviewTurn);
 								assert.ok(
 									!reviewTurn.includes(
@@ -5561,13 +5439,10 @@ for (const item of nullableCases) {
 									reviewTurn,
 								);
 								assert.ok(!reviewTurn.includes('"resultId": "result-2"'), reviewTurn);
-								// A text that also rests on the MET result is refused whole.
 								assert.match(
 									events.find((event) => event.startsWith("mixed-met:")) ?? "",
 									/review refused, nothing was stored:[\s\S]*basedOn names result-2, which is not one of the NOT_MET results or problems this review may rest on/u,
 								);
-								// A review sent after a compaction is refused with the whole review turn; one sent in the same
-								// batch is refused too; the next turn's is stored.
 								const refused = readToolText(nodePath.join(cwd, "compacted-refused.txt"));
 								assert.match(
 									refused,
@@ -5595,8 +5470,6 @@ for (const item of nullableCases) {
 								reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
 								break;
 							}
-							// Both practices have a NOT_MET problem: the review turn carries both standards whole,
-							// and a refusal answered while the session holds them does not repeat them.
 							for (const standard of standards) {
 								assert.ok(reviewTurn.includes(standard), reviewTurn);
 							}
@@ -5673,7 +5546,6 @@ for (const item of nullableCases) {
 							assert.ok(events.includes('reselect-terminal:{"action":"end"}'), events.join("\n"));
 							assert.ok(events.includes("reselect-drained:0"), events.join("\n"));
 							assert.equal(events.filter((event) => event === "native-finish-turn").length, 2);
-							// The review never acknowledges a MET result: a text that also rests on one is refused whole.
 							assert.match(
 								said("reselect-met"),
 								/review refused, nothing was stored:[\s\S]*basedOn names result-2, which is not one of the NOT_MET results or problems this review may rest on/u,
@@ -5715,18 +5587,14 @@ for (const item of nullableCases) {
 						case "compose-already-said": {
 							assert.equal(child.status, 0, child.stderr);
 							const first = events.find((event) => event.startsWith("said-first:")) ?? "";
-							// The primary second-practice has CONVERSATION notes; the folded-in NOT_MET test-practice has none.
 							assert.match(
 								first,
 								/#1: NO_MATERIAL_CHANGE rests on feedback recorded as delivered on CONVERSATION for test-practice in/u,
 							);
-							// Prepared notes, the PRACTICE_PAGE card, the public review, other practices, and malformed,
-							// MET-based, stale, withdrawn and undated CONVERSATION records leave test-practice without one.
 							assert.match(
 								first,
 								/#2: ALREADY_SAID rests on feedback recorded as delivered on CONVERSATION for test-practice in/u,
 							);
-							// Both NOT_MET practices have an PRACTICE_PAGE card; a withholding uses no slot on its lane.
 							assert.match(
 								first,
 								/#3: stored a PRACTICE_PAGE piece for test-practice \(WITHHOLD\); 0\/1 used on that destination\./u,
@@ -5757,7 +5625,6 @@ for (const item of nullableCases) {
 								payload.feedback.map((piece: unknown) => {
 									assert.ok(isRecord(piece));
 									assert.ok(Array.isArray(piece.basedOn));
-									// Each rests on results, written out as evidence references.
 									const refs = piece.basedOn.map((ref: unknown) => {
 										assert.ok(isRecord(ref) && ref.problemId === undefined);
 										return String(ref.resultId);
@@ -5779,8 +5646,6 @@ for (const item of nullableCases) {
 								events.find((event) => event.startsWith("feedback-fold:")) ?? "",
 								/stored/u,
 							);
-							// The turn, the finishing turn, the review and the private composition; the review's one
-							// decisions cover both problems, so neither composition asks again.
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("prompt:")),
 								["prompt:1", "prompt:2", "prompt:3", "prompt:4"],
@@ -5889,8 +5754,6 @@ for (const item of nullableCases) {
 								events.filter((event) => event.startsWith("prompt:")),
 								["prompt:1", "prompt:2", "prompt:3"],
 							);
-							// Neither an abstention nor a MET result carries a claim about the work: no review session
-							// opens, no failure is recorded, and every admitted result is kept.
 							assert.ok(
 								!events.some((event) => event.endsWith("tools=report_review")),
 								events.join("\n"),
@@ -5899,7 +5762,6 @@ for (const item of nullableCases) {
 								[...candidatesIn(nodePath.join(cwd, "out/result.json")).values()].map(
 									(item) => item.outcome,
 								),
-								// By slug: second-practice, test-practice, third-practice.
 								["DOES_NOT_APPLY", "MET", "COULD_NOT_DETERMINE"],
 							);
 							const echoed: unknown = JSON.parse(
@@ -5990,7 +5852,6 @@ for (const item of nullableCases) {
 								readFileSync(nodePath.join(cwd, "system-prompt.md"), "utf8"),
 								"Write clear, useful feedback.\n\nWrite the review on the work.",
 							);
-							// This attempt submitted no result of its own, ran no program and derived no change.
 							const result: unknown = JSON.parse(
 								readFileSync(nodePath.join(cwd, "out/result.json"), "utf8"),
 							);

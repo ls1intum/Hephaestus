@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -87,14 +88,8 @@ class FeedbackPreparationServiceTest {
         when(results.findByWorkspaceIdAndIdIn(1, List.of(resultId))).thenReturn(List.of(result(resultId, 3)));
         when(support.select(1, 7, 5, now))
                 .thenReturn(new PracticePageSupportReader.Selection(Optional.empty(), List.of(result(resultId, 3))));
-        when(composition.pageDecision(any(), anyList(), any(), any())).thenAnswer(call -> {
-            Result about = call.getArgument(0);
-            List<Result> evidence = call.getArgument(1);
-            return new PracticePageFeedbackRouter().supportsPattern(about, evidence)
-                    ? new FeedbackCompositionContextService.PageAdmission(PracticePageDecision.ADMIT, null)
-                    : new FeedbackCompositionContextService.PageAdmission(
-                            PracticePageDecision.UNCORROBORATED, FeedbackStopReason.UNCORROBORATED);
-        });
+        when(composition.pageDecision(any(), anyList(), any(), any()))
+                .thenReturn(new FeedbackCompositionContextService.PageAdmission(PracticePageDecision.ADMIT, null));
     }
 
     private Result result(UUID id, long item) {
@@ -143,6 +138,10 @@ class FeedbackPreparationServiceTest {
 
     @Test
     void shouldWithholdAnUncorroboratedPatternWithoutClaimingMissingCapture() {
+        doReturn(new FeedbackCompositionContextService.PageAdmission(
+                        PracticePageDecision.UNCORROBORATED, FeedbackStopReason.UNCORROBORATED))
+                .when(composition)
+                .pageDecision(any(), anyList(), any(), any());
         var prepared =
                 service.prepare(draft(List.of(resultId)), Optional.empty()).draft();
         assertThat(prepared.state()).isEqualTo(FeedbackState.WITHHELD);
@@ -201,8 +200,9 @@ class FeedbackPreparationServiceTest {
         "UNATTRIBUTABLE_SUBJECT,PUBLIC_SUBJECT_INELIGIBLE", "RECENTLY_SURFACED,NOTHING_NEW", "FEEDBACK_OFF,FEEDBACK_OFF"
     })
     void shouldRecordTheActualPageAdmissionRefusal(PracticePageDecision decision, FeedbackStopReason expected) {
-        when(composition.pageDecision(any(), anyList(), any(), any()))
-                .thenReturn(new FeedbackCompositionContextService.PageAdmission(decision, expected));
+        doReturn(new FeedbackCompositionContextService.PageAdmission(decision, expected))
+                .when(composition)
+                .pageDecision(any(), anyList(), any(), any());
         var prepared =
                 service.prepare(draft(List.of(resultId)), Optional.empty()).draft();
         assertThat(prepared.state()).isEqualTo(FeedbackState.WITHHELD);
@@ -211,9 +211,10 @@ class FeedbackPreparationServiceTest {
 
     @Test
     void shouldRecordTheSameGateReasonAtPagePreparation() {
-        when(composition.pageDecision(any(), anyList(), any(), any()))
-                .thenReturn(new FeedbackCompositionContextService.PageAdmission(
-                        PracticePageDecision.GATE_REFUSED, FeedbackStopReason.NO_AI));
+        doReturn(new FeedbackCompositionContextService.PageAdmission(
+                        PracticePageDecision.GATE_REFUSED, FeedbackStopReason.NO_AI))
+                .when(composition)
+                .pageDecision(any(), anyList(), any(), any());
         assertThat(service.prepare(draft(List.of(resultId)), Optional.empty())
                         .draft()
                         .stopReason())

@@ -1,5 +1,3 @@
-/** Readers of the project inventory that the server captures beside the reviewed work. */
-
 import {
 	isJsonObject,
 	optionalBoolean,
@@ -50,7 +48,6 @@ function parseInventoryItems(value: unknown): InventoryItem[] | undefined {
 			continue;
 		}
 		const number = optionalNumber(entry.number);
-		// An empty title still names an item that the inventory holds.
 		if (number === undefined || typeof entry.title !== "string") {
 			continue;
 		}
@@ -93,7 +90,6 @@ export async function readProjectInventory(
 	return parseProjectInventory(await readRecordJson(evidence, "project_inventory.json"));
 }
 
-/** A repository as the capture identifies it: its own id, or its provider and full name. */
 export type RepositoryScope = { repositoryId: number } | { providerId: number; fullName: string };
 
 type IdentifiedItem = InventoryItem & {
@@ -152,7 +148,6 @@ export function repositoryIssues(
 			);
 }
 
-/** Whether an inventory state is the provider's "open" — `OPEN` on GitHub, `OPENED` on GitLab. */
 export function isOpenState(state: string | undefined): boolean {
 	return state !== undefined && /^open(?:ed)?$/iu.test(state);
 }

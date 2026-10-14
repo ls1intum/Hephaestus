@@ -8,7 +8,6 @@ import { type PracticeGuidanceState, PracticeIntro } from "./PracticeIntro";
 
 const ready = { status: "ready", ...bundledGuidance } satisfies PracticeGuidanceState;
 
-/** The guidance with no picture or guide. */
 const wordsOnly = {
 	...ready,
 	visual: null,

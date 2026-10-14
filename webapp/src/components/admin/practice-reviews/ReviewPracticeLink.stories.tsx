@@ -39,7 +39,6 @@ export const WithoutThePracticeRecord: Story = {
 	args: { practice: undefined },
 	play: async ({ canvas, userEvent }) => {
 		const link = canvas.getByRole("link", { name: /Thin controllers/u });
-		// The link stands on its own: without the record it still opens the practice's results.
 		await expect(listOpenedBy(link)).toEqual({
 			list: "results",
 			search: { practiceSlug: "thin-controllers" },

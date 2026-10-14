@@ -10,10 +10,6 @@ import {
 	toneChip,
 } from "./lineage-chain";
 
-/**
- * How a result's chip looks: its verdict's tone, hollow where the practice does not apply, a ring
- * on the record the trace was opened for. The legend draws its samples with it.
- */
 export function resultChipClass({
 	outcome,
 	ringed = false,
@@ -52,12 +48,10 @@ export function LineageResultChip({
 	result: LineageResult;
 	number: number;
 	size?: "sm" | "md";
-	/** The record the trace was opened for. */
 	ringed: boolean;
 	/** Says the result's summary to a screen reader too, where nothing beside the chip does. */
 	withSummary?: boolean;
 	className?: string;
-	/** Where the details' connectors end: `source` on the result, `use:<feedback id>` on a piece. */
 	connector?: string;
 }) {
 	const outcome = OUTCOME_DEFS[result.outcome];
@@ -84,11 +78,6 @@ export function LineageResultChip({
 	);
 }
 
-/**
- * "From 1 3": the chips of the results a piece of feedback was composed from. A result the story
- * does not number has no chip, so it is counted: as one of another review where the piece came
- * from one, otherwise as one the story leaves out.
- */
 export function LineageSourceChips({
 	feedback,
 	byId,
@@ -98,11 +87,8 @@ export function LineageSourceChips({
 }: {
 	feedback: LineageFeedback;
 	byId: NumberedById;
-	/** Marks each chip as the end of a connector from its result. */
 	connectors?: boolean;
-	/** The review the piece was composed in, where it is not the chain's own. */
 	elsewhere?: "an earlier review" | "a later review";
-	/** The "From" word, which a table whose column is headed "From" hides from sight. */
 	fromClassName?: string;
 }) {
 	if (feedback.basis.length === 0) {

@@ -9,7 +9,6 @@ import type {
 
 import type { PracticeDefinitionValue } from "./PracticeDefinitionForm";
 
-/** The source contract the fixtures are written against, as the server reports it. */
 export const MOCK_SOURCE_CONTRACT = "2.0.0";
 
 function readSource(source: string, label: string, complete = true): ReadSourceOption {
@@ -154,7 +153,6 @@ export const mockDocumentItemType = {
 	scanItemKinds: [],
 } satisfies PracticeItemTypeOption;
 
-/** What a scan of files may read. A file is never reviewed on an event, so it offers none. */
 export const mockFileItemType = {
 	kind: "scm.file",
 	label: "File",
@@ -216,7 +214,6 @@ export function definitionOf(overrides: Partial<PracticeDefinition> = {}): Pract
 	};
 }
 
-/** A scan of every source file, read whole from the repository. */
 export const mockScan = {
 	itemKind: "scm.file",
 	include: ["**/*.ts", "**/*.tsx"],
@@ -228,7 +225,6 @@ export const mockScan = {
 	},
 } satisfies ScanDefinition;
 
-/** An existing pull request practice, as the form receives it for an edit. */
 export function practiceValueOf(
 	overrides: Partial<PracticeDefinition> = {},
 ): PracticeDefinitionValue {

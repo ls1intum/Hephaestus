@@ -1,12 +1,8 @@
-// Finds the I/O calls that the change adds inside SwiftUI view types: requests, decoding, files,
-// preferences and Core Data. Each lead tells the type that holds the line. SwiftData's own view-side
-// API (`@Query`, `modelContext.insert`) is not I/O in the view, so the script does not find it.
 import { scm } from "../kits/scm/index.ts";
 import { sampleNote, scanOccurrences, type SourcePattern } from "../kits/scm/source-scan.ts";
 import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
-/** A SwiftUI view: a type conforming to `View`, or an `App`/`Scene`, which also declare a body. */
 const SWIFTUI_VIEW = /\b(?:View|App|Scene)\b/u;
 
 const IO_IN_VIEW: readonly SourcePattern[] = [

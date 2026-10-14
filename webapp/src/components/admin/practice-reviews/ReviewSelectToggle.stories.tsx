@@ -47,10 +47,6 @@ export const Selected: Story = {
 	},
 };
 
-/**
- * A result names its review too, but the review is not the selection: a row of that review
- * stays unpressed.
- */
 export const AnotherKindSelected: Story = {
 	parameters: {
 		router: {

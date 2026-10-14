@@ -15,7 +15,6 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Retained confirmed appearances; no new admission or provider write is performed by this fixture. */
 public final class RetainedFeedbackTestData {
     private RetainedFeedbackTestData() {}
 

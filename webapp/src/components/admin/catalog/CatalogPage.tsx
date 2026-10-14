@@ -63,7 +63,6 @@ export interface CatalogPageProps {
 type StatusFilter = "OFFERED" | "NOT_OFFERED" | "ALL";
 type KindFilter = KnownItemKind | "ALL";
 
-/** The kinds of work the catalog holds, plus the one the URL names, in the one order kinds keep. */
 function kindFilters(
 	practices: readonly CatalogPractice[],
 	selected: KindFilter,

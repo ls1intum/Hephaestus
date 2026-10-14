@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 import { PURSE_DEFS, type Purse } from "@/components/practice-vocabulary/purse-defs";
 
-/** A purse's icon and name, over its columns in a usage table. The icon is untoned: a purse is not a state. */
 export function PurseHeading({ purse }: { purse: Purse }) {
 	const { icon: Icon, label } = PURSE_DEFS[purse];
 	return (

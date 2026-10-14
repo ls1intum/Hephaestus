@@ -355,11 +355,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    /**
-     * The webhook and the GraphQL sync must resolve the same issue review revision for the same
-     * GitLab issue: a sync that finds nothing new may not retire the result the webhook edit was
-     * reviewed into, while a sync that does bring a change still must.
-     */
     @Nested
     class ReviewRevision {
 
@@ -432,10 +427,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
                             null, null, new GitLabIssueEventDTO.AttributeChange(), null, null, null));
         }
 
-        /**
-         * The issue as GitLab GraphQL returns it; {@code ISSUE} is its enum form of the webhook's
-         * {@code Issue}.
-         */
         private GitLabIssueProcessor.SyncIssueData sync(String body, List<String> labels) {
             return new GitLabIssueProcessor.SyncIssueData(
                     "gid://gitlab/Issue/" + NATIVE_ISSUE_ID,

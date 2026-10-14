@@ -7,7 +7,6 @@ import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** One practice's share of a month's spend on models for practice scripts, inside {@link WorkspaceLlmUsageReportDTO}. */
 @Schema(
         description = "The decision, embedding and reranking calls that one practice's script made in "
                 + "finished reviews this month. The cost of each review's calls is split between its practices by "

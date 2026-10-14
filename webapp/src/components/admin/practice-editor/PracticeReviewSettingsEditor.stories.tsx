@@ -88,7 +88,6 @@ export const Document: Story = {
 	},
 };
 
-/** A conversation offers one event, so the strip is one node and there are no bands to tell apart. */
 export const ConversationHasOneEvent: Story = {
 	args: {
 		itemType: mockThreadItemType,
@@ -126,7 +125,6 @@ export const ReadingASourceWhole: Story = {
 	},
 };
 
-/** A request is a second way in, stated once under what it reads and never offered on the strip. */
 export const ARequestIsNotAnEvent: Story = {
 	play: async ({ canvas }) => {
 		const strip = within(canvas.getByRole("group", { name: "Review on" }));
@@ -135,7 +133,6 @@ export const ARequestIsNotAnEvent: Story = {
 	},
 };
 
-/** Nothing automated reviews the practice, so it reads nothing and promises no requested review. */
 export const ReviewedByPeople: Story = {
 	args: { reviewedBy: "PEOPLE" },
 	play: async ({ canvas }) => {

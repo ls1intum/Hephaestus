@@ -11,7 +11,6 @@ import {
 	runBundled,
 } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
-/** The captured records of a context folder that holds `source` as `commits.json`, or no record. */
 function evidence(source?: string) {
 	return {
 		record: async (name: string) =>
@@ -69,7 +68,6 @@ void test("a subject's shape is a fact — bare, repeated, listed, cut off — a
 		[by["1111111"]?.bare, by["2222222"]?.bare, by["8888888"]?.bare],
 		[false, true, false],
 	);
-	// commits.json promises no order: both commits carrying the subject are repeats.
 	assert.deepEqual(
 		[by["1111111"]?.repeat, by["3333333"]?.repeat, by["2222222"]?.repeat],
 		[true, true, false],
@@ -77,13 +75,11 @@ void test("a subject's shape is a fact — bare, repeated, listed, cut off — a
 	assert.equal(by["4444444"]?.joinedClauses, true);
 	assert.equal(by["7777777"]?.joinedClauses, true);
 	assert.equal(by["1111111"]?.joinedClauses, false);
-	// Two sentences in one subject are two clauses joined by a full stop.
 	assert.equal(by["9999999"]?.joinedClauses, true);
 	assert.equal(by["5555555"]?.cutOff, true);
 	assert.equal(by["6666666"]?.merge, true);
 });
 
-/** A run of the script on a pull request whose context folder holds `record` as `commits.json`. */
 async function runOnCommitRecord(slug: string, record: unknown) {
 	const result = await runBundled(slug, {
 		context: { "commits.json": record },
@@ -107,7 +103,6 @@ void test("both commit practices read the subjects from the commit record and st
 			result.directions?.[0] ?? "",
 			/2 authored commit\(s\), 1 merge commit\(s\) excluded/u,
 		);
-		// One lead per authored commit, named by its sha; the merge is set aside.
 		assert.deepEqual(
 			result.leads.map((lead) => [lead.at, keyOf(lead.label), lead.facts?.sha]),
 			[
@@ -205,8 +200,6 @@ const renamed = (name: string) => ({
 
 void test("a commit lead lists the edited files with their line counts before the moves, and names no kinds", async () => {
 	const commits = [
-		// A README subject whose commit also moves the source tree and adds a view: only the edited files
-		// and their counts show the second piece of item, so the moves must not push them out of view.
 		commit(
 			"1111111",
 			"Create problem statement\n",
@@ -219,7 +212,6 @@ void test("a commit lead lists the edited files with their line counts before th
 				{ status: "M", path: "README.md", additions: 20, deletions: 5 },
 			],
 		),
-		// A feature and its package entry: two top-level locations, one piece of item.
 		commit(
 			"2222222",
 			"Add order history, and adjust invoice loading\n",
@@ -245,7 +237,6 @@ void test("a commit lead lists the edited files with their line counts before th
 		String(readme.paths),
 		/^PillApp\/WelcomeView\.swift \+18\/-0, README\.md \+20\/-5, PillApp\//u,
 	);
-	// A rename that edits lines is not a move.
 	assert.equal(feature.moved, 0);
 	assert.equal(feature.joinedClauses, true);
 	assert.equal(
@@ -255,6 +246,5 @@ void test("a commit lead lists the edited files with their line counts before th
 	for (const lead of result.leads) {
 		assert.equal("kinds" in (lead.facts ?? {}), false);
 	}
-	// The directions describe the record; none of them counts concerns or names a lapse.
 	assert.doesNotMatch((result.directions ?? []).join(" "), /literally|concern|tangle|lapse/u);
 });

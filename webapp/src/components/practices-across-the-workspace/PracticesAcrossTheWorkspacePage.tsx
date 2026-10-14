@@ -41,10 +41,6 @@ export interface PracticesAcrossTheWorkspacePageProps {
 	focusFooter?: ReactNode;
 }
 
-/**
- * A view of the workspace, not the reader's profile: every practice group with how many practices it
- * has and how their results came out, counted without names. Each group opens its practices.
- */
 export function PracticesAcrossTheWorkspacePage({
 	state,
 	openGroupSlug,

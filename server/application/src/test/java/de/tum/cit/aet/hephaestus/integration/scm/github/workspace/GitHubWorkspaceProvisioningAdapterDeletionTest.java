@@ -20,17 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
 
-/**
- * Pins the vendor-side-uninstall contract: {@code installation.deleted} must run the real workspace
- * purge, not a status write.
- *
- * <p>Writing {@code status=PURGED} directly skipped every {@code WorkspacePurgeContributor}, so the
- * workspace was <em>labelled</em> purged — slug burned, terminal state, treated by the rest of the
- * system as erased — while Slack messages, Outline documents, org-tier teams and organization
- * memberships, derived practices/activity rows and still-ACTIVE {@code Connection} rows all
- * survived. The end-to-end row-level proof runs against real Postgres in {@code
- * ScmWorkspaceErasureIntegrationTest}; this test pins the delegation itself.
- */
 class GitHubWorkspaceProvisioningAdapterDeletionTest extends BaseUnitTest {
 
     private static final long INSTALLATION_ID = 5001L;

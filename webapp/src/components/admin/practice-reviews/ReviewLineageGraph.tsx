@@ -62,7 +62,6 @@ import { traceStepFacts } from "./TraceStepFacts";
 import { type StoryContext, StoryNodes } from "./TraceStoryNode";
 
 export interface ReviewLineageGraphProps {
-	/** The chain the trace tells, from `getReviewLineage`. */
 	lineage: PanelState<{ lineage: ReviewLineage }>;
 	/**
 	 * The record the trace was opened for, marked "You started here" and ringed: its path is drawn
@@ -70,11 +69,6 @@ export interface ReviewLineageGraphProps {
 	 * marked, as in the state matrix.
 	 */
 	here?: TraceNode;
-	/**
-	 * Opens a step's record over the trace: a result, a piece of feedback, the review, or the
-	 * item. Each record opens from one step; the start, the count of results and the end open
-	 * nothing. Absent, the steps are text.
-	 */
 	onOpen?: (record: RecordRef) => void;
 	/**
 	 * What the trace shows on top of its steps, for the whole trace at once: times, system info,
@@ -86,39 +80,11 @@ export interface ReviewLineageGraphProps {
 	/** What of the chain is shown. Uncontrolled when absent. */
 	filter?: TraceFilter;
 	onFilterChange?: (filter: TraceFilter) => void;
-	/**
-	 * The review itself, as its sheet reads it. Where it is the trace's review, the review's times,
-	 * model, start and runtime jobs come from it, so the trace and the sheet say the same.
-	 */
 	review?: ReviewDetail;
-	/** How the review came to run. Every result of the review shares it, so its step says it once. */
 	origin?: ReviewOrigin;
-	/**
-	 * Where the review stands among the reviews of its item: "Review 3 of 7 on this work". Re-reviews
-	 * of the same work are common, so the review's step says which one it is.
-	 */
 	position?: { index: number; total: number };
 }
 
-/**
- * The trace of a record: its chain as one story read top to bottom in the order things happened —
- * the work and the event that started the review, the review, its results as numbered verdict
- * dots or as a table of their own, the feedback written from them as a table with where each piece
- * went, how the developer answered and the results it came from, the merge wherever it fell,
- * and where the path ends. A sentence on top says what became of it.
- * Each step has its time and the gap since the step before; a long gap is coloured and its rail
- * dashed.
- *
- * The record the trace was opened for is "You started here", ringed. It tells the path of the record
- * and folds its siblings into one line. The "Show" control adds, each with one click and for the
- * whole trace: the times and gaps, the system info (states, model, every fact of a piece, the facts
- * under the record you started from), the siblings, and connectors from each result to the
- * feedback written from it, which the tables' From and Feedback columns also say in words. "Expand
- * all" opens every folded part at once, the results' table among them; that table also opens
- * and folds on its own button, whatever the Show control says. A click on a step opens
- * its record's sheet over the trace; the mark stays where the reader started. A filter narrows the
- * chain to its feedback, its losses or one practice.
- */
 export function ReviewLineageGraph({ lineage: state, ...props }: ReviewLineageGraphProps) {
 	if (state.status === "loading") {
 		return <LineageSkeleton />;
@@ -174,7 +140,6 @@ function Story({
 	const [siblingsOpen, setSiblingsOpen] = useState(false);
 	const [factsOpen, setFactsOpen] = useState(false);
 	const [legendOpen, setLegendOpen] = useState(false);
-	// The results' table, opened or folded by hand; undefined follows what the reader shows.
 	const [tableOpen, setTableOpen] = useState<boolean | undefined>(undefined);
 	const setAllOpen = (open: boolean) => {
 		setOthersOpen(open);
@@ -190,19 +155,14 @@ function Story({
 	const fullRecords = lineageRecords(full);
 	const records = lineageRecords(lineage);
 	const chain = chainReview(fullRecords);
-	// The review's own read, where it is the trace's review.
 	const ownReview = review !== undefined && review.id === chain?.id ? review : undefined;
 	const { numbered, self } = storyResults(records, here, fullRecords);
-	// A filter lists every step it leaves, and where the path folds away the record the reader
-	// started from — a sibling, a result drawn only as its dot — it is listed too.
 	const siblingsShown =
 		display.siblings || siblingsOpen || filtered || foldedOffPath(records, here, numbered, self);
 	const byId: NumberedById = new Map(numbered.map((entry) => [entry.result.id, entry]));
 	const letters = feedbackLetters(fullRecords.feedback);
 	const told = storyFeedback(records, here, siblingsShown);
 	const path = siblingsShown ? undefined : pathResults(records, here, numbered, self);
-	// Every result is a row of the table where the reader opened it, where the siblings show, or
-	// where connectors need an end to start from. Folded, the table holds the path's own rows.
 	const listed = tableOpen ?? (siblingsShown || display.connections);
 	const expanded = othersOpen && siblingsOpen && factsOpen && listed;
 	const siblings: StorySiblings | undefined =
@@ -221,8 +181,6 @@ function Story({
 
 	const recordOf = (node: TraceNode): RecordRef | undefined => {
 		switch (node.kind) {
-			// One step opens each record, once: the count of results is part of the review, and the
-			// end belongs to no record.
 			case "work": {
 				return fullRecords.item === undefined
 					? undefined
@@ -264,7 +222,6 @@ function Story({
 	};
 
 	const day = chain?.createdAt ?? numbered[0]?.result.recordedAt;
-	// A step's gap is from the step drawn above it with a time, and never runs backwards.
 	const drawn = stages.flatMap(({ items }) => items);
 	const endAt = verdict.end.at ?? verdict.end.since;
 	const previousAt = (item: RailItem) => {
@@ -456,7 +413,6 @@ function TraceDisplayControl({
 	);
 }
 
-/** Whether the path alone draws the step only folded: a result as a dot or a sibling, a sibling piece. */
 function foldedOffPath(
 	records: LineageRecords,
 	here: TraceNode | undefined,
@@ -474,7 +430,6 @@ function foldedOffPath(
 	return false;
 }
 
-/** Every step, only the feedback, only what was lost, or one practice's results and feedback. */
 function TraceFilterSelect({
 	value,
 	practices,
@@ -548,11 +503,6 @@ function useReveal(rail: React.RefObject<HTMLElement | null>, step: string | und
 	});
 }
 
-/**
- * The record the story stands on, and the results on its path where the simple story tells
- * only those: the result itself, or the results a piece of feedback was written from.
- * Undefined where the path is the whole review.
- */
 function pathResults(
 	records: LineageRecords,
 	here: TraceNode | undefined,

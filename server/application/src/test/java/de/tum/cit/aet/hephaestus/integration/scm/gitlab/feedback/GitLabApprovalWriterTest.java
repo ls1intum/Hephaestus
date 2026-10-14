@@ -131,7 +131,7 @@ class GitLabApprovalWriterTest extends BaseUnitTest {
         verify(feedbackChannel, never()).postSummary(any(), any());
     }
 
-    /** GitLab's approve endpoint carries no body, so a message rides as a separate note. */
+    // GitLab approval accepts no body; explanatory text requires a separate note.
     @Test
     void approvePostsTheMessageAsASeparateNote() {
         stubScope();

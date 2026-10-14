@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.chat.item;
 import java.util.Collection;
 import java.util.Set;
 
-/** Chat-domain source access. */
 public interface ConversationSourceLiveness {
     Set<Long> activeThreadIds(long workspaceId, Collection<Long> threadIds);
 

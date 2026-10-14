@@ -174,7 +174,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			await Promise.all(
 				affected.map(async (practice) => {
 					const filters = { queryKey: practiceQueryKey(practice.slug), exact: true };
-					// A cache refresh can reuse an in-flight first fetch; cancel it before reading the new basis.
+	// Cancel the in-flight read before refetching the reset basis; cache reuse can otherwise return the old basis.
 					await queryClient.cancelQueries(filters);
 					await queryClient.invalidateQueries(filters);
 				}),
@@ -224,11 +224,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		onSettled: invalidateGroupsAfterLastWrite,
 	});
 
-	/**
-	 * Resets a group's details to the catalog's. The server tags the group's reset basis only in the
-	 * `ETag` of its own read, so the reset reads it first and refuses, as the server would, when the
-	 * group or the offered version is no longer the one the reader compared.
-	 */
+	/** Reset requires the group read's ETag and the exact catalog version the reader compared. */
 	const resetGroup = useMutation({
 		mutationKey: groupMutationKey,
 		mutationFn: async ({
@@ -272,7 +268,6 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		onSettled: invalidateGroupsAfterLastWrite,
 	});
 
-	/** Installs the catalog's current definition as a new version; history and results stay. */
 	const resetPractice = useMutation({
 		...filedUnder(practiceMutationKey, resetPracticeToCatalogMutation()),
 		scope: structuralScope,
@@ -287,7 +282,6 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 				queryClient.invalidateQueries({
 					queryKey: listPracticeReleasesQueryKey({ path: { workspaceSlug } }),
 				}),
-				// A reset can change the practice script, which makes the needs on record stale.
 				queryClient.invalidateQueries({
 					queryKey: listPracticeScriptNeedsQueryKey({ path: { workspaceSlug } }),
 				}),

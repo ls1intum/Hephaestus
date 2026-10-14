@@ -62,9 +62,7 @@ export interface ReviewLevelProps {
 	nested?: boolean;
 	path: LevelPath;
 	review: PanelState<{ review: ReviewDetail }>;
-	/** The words of an event name, from the definition options the route reads. */
 	eventLabel: (name: string) => string;
-	/** The feedback checks the review ran; a piece of feedback shows its own on its sheet. */
 	feedbackChecks?: PanelState<{ checks: FeedbackCheck[] }>;
 	onCancel: () => void;
 	cancelPending: boolean;
@@ -82,7 +80,6 @@ const KIND_LABELS: Record<ReviewDetail["kind"], string> = {
 	SCAN: "Scan",
 };
 
-/** Said where the runtime records of a review have expired: the review's own facts remain. */
 export const RUNTIME_EXPIRED = "Execution details are no longer available.";
 
 /** "9 min" between two times, or undefined while either is missing. */
@@ -92,7 +89,6 @@ function between(from: Date | null | undefined, to: Date | null | undefined): st
 		: durationText((to.getTime() - from.getTime()) / 1000);
 }
 
-/** When the review first started running, from its jobs or, once they expired, its stage times. */
 function firstStart(review: ReviewDetail): Date | undefined {
 	let earliest: Date | undefined;
 	for (const { startedAt } of [...(review.runtime?.jobs ?? []), ...review.stageTiming]) {
@@ -103,7 +99,6 @@ function firstStart(review: ReviewDetail): Date | undefined {
 	return earliest;
 }
 
-/** What the history says of where the review stands now, where that is not plain from its events. */
 function reviewNow(review: ReviewDetail): string | undefined {
 	if (review.status === "PARTIAL") {
 		return "It ended early, so its results and feedback cover only the work it reached.";
@@ -114,16 +109,6 @@ function reviewNow(review: ReviewDetail): string | undefined {
 	return undefined;
 }
 
-/**
- * One review's sheet, and only the review, in the order every sheet has: the header's status line
- * (status, how long it ran, when it finished), what it is, its history from the ask to its end, every
- * practice with its state, the feedback checks and practice scripts it ran, and the technical facts.
- * Its actions are the footer.
- *
- * It lists no other record and links to none but its own scan report: its results and feedback are
- * its trace or the work's sheet. The work links out to its provider. A review whose runtime records
- * expired keeps every review fact; only the execution details are gone.
- */
 export function ReviewLevel({
 	workspaceSlug,
 	nested,
@@ -230,7 +215,6 @@ export function ReviewLevel({
 	);
 }
 
-/** The status line: its status, how long it ran, and the time that matters for where it is. */
 function ReviewStatusLine({ review }: { review: ReviewDetail }) {
 	const started = firstStart(review);
 	let at: { label: string; date: Date } = { label: "asked for", date: review.createdAt };
@@ -299,10 +283,6 @@ function ReviewWhat({
 	);
 }
 
-/**
- * From the ask to the end, each step once with its time and how long the step before it took, then
- * where the review stands now.
- */
 function ReviewHistory({ review }: { review: ReviewDetail }) {
 	const now = useNow();
 	return <SheetHistory events={reviewHistory(review, now)} now={reviewNow(review)} />;
@@ -356,7 +336,6 @@ export function reviewHistory(review: ReviewDetail, now: number): SheetEvent[] {
 	return events;
 }
 
-/** "1 met result, 3 not met results", or "No results" when nothing was counted. */
 function resultsLine(practice: ReviewPractice): string {
 	const counted = resultSlots(practice.results).filter((slot) => slot.count > 0);
 	return counted.length === 0
@@ -364,7 +343,6 @@ function resultsLine(practice: ReviewPractice): string {
 		: counted.map((slot) => `${slot.count} ${slot.label}`).join(", ");
 }
 
-/** A scan's files for one practice: "12 reviewed, 3 reused, 1 withheld". */
 function itemCountsLine(practice: ReviewPractice): string {
 	const { reviewed, reused, withheld, notReviewed, listed } = practice.itemCounts;
 	const counts: { count: number; label: string }[] = [
@@ -380,7 +358,6 @@ function itemCountsLine(practice: ReviewPractice): string {
 		.join(", ");
 }
 
-/** Why a practice stands as it does in this review, in the review's own terms. */
 function practiceReason(practice: ReviewPractice): string {
 	if (practice.status === "DONE") {
 		return resultsLine(practice);
@@ -390,11 +367,6 @@ function practiceReason(practice: ReviewPractice): string {
 		: REVIEW_PRACTICE_STATUS_DEFS[practice.status].description;
 }
 
-/**
- * Every practice the review answered, with its state and the reason for it: the one list of what the
- * review judged, including the practices it withheld or failed. A withheld practice has no result;
- * the list says so instead of counting it. A list rather than a table, so a row reflows at 390px.
- */
 function ReviewPracticeList({
 	workspaceSlug,
 	review,
@@ -449,7 +421,6 @@ function ReviewPracticeList({
 	);
 }
 
-/** "$0.04", or why there is no total: no usage recorded, or an attempt has no price. */
 function costText(usage: ReviewUsage): string {
 	const { attempts, costUsd, priced } = usage;
 	if (attempts.length === 0) {
@@ -465,7 +436,6 @@ function costText(usage: ReviewUsage): string {
 		: `Not known: ${unpriced} attempts have no price`;
 }
 
-/** One attempt's cost, or that its model had no price when it ran. */
 function attemptCostText(attempt: ReviewUsageAttempt): string {
 	if (attempt.pricingState === "NO_CHARGE") {
 		return "no charge";
@@ -473,7 +443,6 @@ function attemptCostText(attempt: ReviewUsageAttempt): string {
 	return attempt.costUsd === null ? "no price known" : formatCostUsd(Number(attempt.costUsd));
 }
 
-/** Each attempt that reached the model, where a retry or a scan made more than one. */
 function UsageAttempts({ attempts }: { attempts: ReviewUsageAttempt[] }) {
 	return (
 		<Section level={4} size="sm" title="Attempts" className="space-y-2">
@@ -496,10 +465,6 @@ function UsageAttempts({ attempts }: { attempts: ReviewUsageAttempt[] }) {
 	);
 }
 
-/**
- * What ran the review, one entry per attempt: a scan runs many. Once the runtime records expired,
- * it says so instead of an empty list.
- */
 function ReviewJobs({ jobs }: { jobs: ReviewJob[] | undefined }) {
 	return (
 		<Section level={4} size="sm" title="Execution" className="space-y-2">
@@ -584,7 +549,6 @@ function technicalFacts(review: ReviewDetail): TechnicalFact[] {
 	return facts;
 }
 
-/** The paths the review kept as generated output, or why it did not look. */
 function GeneratedPaths({ review }: { review: ReviewDetail }) {
 	const { generatedPaths } = review;
 	if (generatedPaths === null) {
@@ -629,7 +593,6 @@ function GeneratedPaths({ review }: { review: ReviewDetail }) {
 	);
 }
 
-/** The checks the review ran; a piece of feedback shows its own on its sheet. */
 function ReviewFeedbackChecks({ state }: { state: PanelState<{ checks: FeedbackCheck[] }> }) {
 	if (state.status === "ready" && state.checks.length === 0) {
 		return null;

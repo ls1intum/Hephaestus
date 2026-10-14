@@ -1,6 +1,4 @@
 import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
-// A program that decides in code alone: it cites the record of the work and returns its own result,
-// with the coverage that it claims. It asks for no review.
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({

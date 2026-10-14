@@ -21,7 +21,6 @@ function subIssueSource(value: unknown): SubIssueSource | undefined {
 	return value === "provider" || value === "children" ? value : undefined;
 }
 
-/** Case, spacing and punctuation set aside; letters and digits of every script kept. */
 function norm(s: string): string {
 	return s.toLowerCase().replaceAll(/[^\p{L}\p{N}]/gu, "");
 }

@@ -10,8 +10,6 @@ import { reviewSettings } from "@/components/admin/practices/review/fixtures";
 import type { FeedbackMode } from "@/lib/practice-feedback-mode";
 import { mockPullRequestReviewedBy, mockPullRequestReviewFields } from "@/mocks/fixtures/practice";
 
-/** Builds internally consistent settings, rollup, groups and practices from the inheritance inputs. */
-
 export interface PracticeSpec {
 	name: string;
 	override?: FeedbackMode;
@@ -218,23 +216,16 @@ const SCALE_PRACTICE_NAMES = [
 	"keeps the change reviewable in one sitting",
 ];
 
-/** The hand-set groups, by their index in `SCALE_GROUP_NAMES`. */
 const SCALE_GROUP_OVERRIDES: Partial<Record<number, FeedbackMode>> = {
 	2: "OFF",
 	7: "AUTOMATIC",
 };
 
-/** The hand-set practices, keyed `group index:practice index`. */
 const SCALE_PRACTICE_OVERRIDES: Partial<Record<`${number}:${number}`, FeedbackMode>> = {
 	"0:0": "AUTOMATIC",
 	"4:1": "OFF",
 };
 
-/**
- * Deliberately lopsided: most of it inherits, a handful of groups and practices were changed by hand,
- * and one practice is reviewed by people. A fixture where everything is set says nothing about
- * whether the inherited case recedes.
- */
 export function scaleFixture(): FeedbackModeFixture {
 	return buildFeedbackModeFixture({
 		workspaceDefault: "APPROVE_FIRST",

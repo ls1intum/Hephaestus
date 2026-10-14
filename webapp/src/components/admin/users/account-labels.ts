@@ -13,7 +13,6 @@ export const APP_ROLE_LABELS: Record<AppRole, string> = {
 	APP_ADMIN: "Instance admin",
 };
 
-/** Unclaimed: roster sync created the account, and the person has not signed in yet. */
 export const ACCOUNT_STATUS_LABELS: Record<AccountRef["status"], string> = {
 	UNCLAIMED: "Unclaimed",
 	ACTIVE: "Active",
@@ -36,7 +35,6 @@ export function workspaceIdentity(
 	return named.find((identity) => identity.provider === provider) ?? named[0];
 }
 
-/** The account's own name, else the name or login of its workspace identity. */
 export function accountName(
 	account: AccountRef,
 	provider?: ProviderIdentityRef["provider"],

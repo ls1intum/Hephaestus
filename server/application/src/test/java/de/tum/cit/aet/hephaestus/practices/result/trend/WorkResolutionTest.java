@@ -38,7 +38,6 @@ class WorkResolutionTest {
 
     @Test
     void shouldCountAPieceOfWorkOnceWhenItWasReviewedTwice() {
-        // The same pull request re-reviewed is one occasion, read off its latest run: two pieces of work, not three.
         UUID firstRun = UUID.randomUUID();
         UUID secondRun = UUID.randomUUID();
         UUID otherWork = UUID.randomUUID();
@@ -83,7 +82,6 @@ class WorkResolutionTest {
         assertThat(resolution.resolvedAt()).isNull();
     }
 
-    /** The path the cards and the profile take: bundle the practice's work once, then read one piece of feedback. */
     private static WorkResolution resolve(List<ResultView> practiceResults) {
         return WorkResolution.Opportunities.of(practiceResults, Instant.EPOCH).resolve(PREPARED_AT);
     }

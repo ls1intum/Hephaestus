@@ -1,13 +1,3 @@
-// pi-mentor-protocol.ts — the JSON-RPC 2.0 contract spoken between the Java mentor chat service
-// and pi-mentor-runner.ts over the sandbox's stdin/stdout (one JSON object per line, terminator
-// strictly `\n`).
-//
-// The authoritative Java counterparts, for anyone reconciling the two:
-//   requests / responses  → MentorRunnerClient
-//   hello handshake       → MentorChatService#verifyProtocol
-//   event → UI chunks     → PiEventToUiChunkTranslator
-//   fetch_context replies → MentorChatService#handleFetchContext
-//   link_result / link_problem → MentorRunnerClient#handleLink
 
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
@@ -44,12 +34,9 @@ export const FETCH_CONTEXT_ALLOWED = new Set([
 	"inputs/context/current_thread_history.json",
 	"inputs/context/outline_docs.json",
 ]);
-// One authored pull request by itemId, in any stored state, read on demand; mirrors MergeReadinessContentSource.ITEM_KEY.
 const MERGE_READINESS_ITEM = /^inputs\/context\/merge_readiness\/[1-9][0-9]{0,18}\.json$/u;
-// One listed result's detail by its canonical id; mirrors ResultHistoryContentSource.DETAIL_KEY.
 const RESULT_DETAIL =
 	/^inputs\/context\/results_history\/[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.json$/u;
-// One authored pull request's or issue's retained reviews by sourceId; mirrors ReviewAttemptsContentSource.ITEM_KEY.
 const REVIEW_ATTEMPTS_ITEM =
 	/^inputs\/context\/review_attempts\/(?:pull_request|issue)\/[1-9][0-9]{0,18}\.json$/u;
 
@@ -239,17 +226,12 @@ export interface LinkResultEvent {
 	text: string;
 }
 
-/**
- * Emitted by the `link_problem` tool: feedback about one problem, a located problem of a `NOT_MET` result.
- * Java reads `problemId` and `text` as it reads a {@link LinkResultEvent}'s.
- */
 export interface LinkProblemEvent {
 	type: "link_problem";
 	problemId: string;
 	text: string;
 }
 
-/** Prepared feedback shown after its exact copy was claimed for this mentor turn. */
 export interface ShowFeedbackEvent {
 	type: "show_feedback";
 	feedbackId: string;
@@ -335,7 +317,6 @@ export interface LinkResultRequest {
 	params: LinkResultParams;
 }
 
-/** The `link_problem` counterpart of {@link LinkResultRequest}, for one problem of a result. */
 export interface LinkProblemRequest {
 	jsonrpc: typeof JSONRPC_VERSION;
 	id: string;
@@ -343,7 +324,6 @@ export interface LinkProblemRequest {
 	params: LinkProblemParams;
 }
 
-/** The server claims the prepared copy before admitting any words to the turn. */
 export interface ShowFeedbackRequest {
 	jsonrpc: typeof JSONRPC_VERSION;
 	id: string;

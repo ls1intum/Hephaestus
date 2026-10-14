@@ -39,10 +39,6 @@ export const REVIEW_PAGE_SIZE = 25;
  */
 export const ACTIVE_REVIEW_POLL_MS = 5000;
 
-/**
- * Every admin read of what reviews produced, which a change to one review, result or piece of
- * feedback can move: its row in any list, every count, the queue and the review time.
- */
 export const PRACTICE_REVIEW_READS: ReadonlySet<string> = new Set([
 	"getReviewOverview",
 	"listReviews",
@@ -65,10 +61,6 @@ export const PRACTICE_REVIEW_READS: ReadonlySet<string> = new Set([
 	"getItemTrace",
 ]);
 
-/**
- * Ordering names the server understands. `ACTIONABILITY` puts not met results first, worst
- * severity down to trivial, then met results, then the results that judged nothing.
- */
 export const RESULT_SORTS = ["NEWEST", "ACTIONABILITY"] as const;
 
 export type ResultSort = (typeof RESULT_SORTS)[number];
@@ -91,7 +83,6 @@ const flag = z.boolean().optional().catch(undefined);
 const enumValues = <T extends string>(allowed: readonly T[]) =>
 	multiValue.transform((values): T[] | undefined => narrowToEnum(values, allowed));
 
-/** The shared scope that every tab keeps in its URL; `review-scope.ts` says which tab applies which part. */
 const scope = {
 	developerId: positiveIdParam,
 	reviewId: uuidParam,
@@ -109,11 +100,6 @@ const scope = {
 	practiceSlug: multiValue,
 };
 
-/**
- * The shared scope out of whichever tab's search holds it, for a reader above the tabs: the router
- * hands such a reader the address as written, where a list of one is its one value and an id may be
- * a number, and with every tab's own filters in it.
- */
 export function parseScopeSearch(search: unknown): ReviewScope {
 	const parsed = z.object(scope).safeParse(search);
 	return parsed.success ? readScope(parsed.data) : {};
@@ -131,16 +117,11 @@ export const feedbackSearchSchema = z
 		...scope,
 		state: enumValues(statusValues(DELIVERY_STATE_DEFS)),
 		destination: enumValues(statusValues(FEEDBACK_DESTINATION_DEFS)),
-		// The URL carries families, not individual reasons: the family is the question an admin asks,
-		// and `feedbackQuery` expands it to the reasons the API filters on.
 		withheldFamily: enumValues(statusValues(WITHHOLDING_FAMILY_DEFS)),
 		location: z.enum(statusValues(FEEDBACK_LOCATION_DEFS)).optional().catch(undefined),
 		withdrawn: flag,
 		disagreed: flag,
-		// The endpoint's `sort`. The results list declares `order` too, with other values. A link
-		// without `from` types `previous` in `search={(previous) => …}` as every route's search, where
-		// a param two sibling routes declare with different types holds both, so returning it to either
-		// list stops compiling: a relative link on either list names its `from`.
+		// Sibling routes type sort differently; relative search links must specify from to retain their route's type.
 		order: z.enum(FEEDBACK_SORTS).optional().catch(undefined),
 	})
 	.transform(canonicalDateRange);
@@ -170,7 +151,6 @@ export const problemsSearchSchema = z
 	})
 	.transform(canonicalDateRange);
 
-/** `from`/`to` window when a review was ordered. */
 export const reviewsSearchSchema = z
 	.object({
 		...scope,
@@ -191,10 +171,6 @@ export const overviewSearchSchema = z
 	})
 	.transform(canonicalDateRange);
 
-/**
- * One review's own page keeps the scope for the tabs, and adds the record it opens on: `focus`,
- * `result:<id>`, `feedback:<id>` or `item` (`review-trace.ts`).
- */
 export const reviewPageSearchSchema = z
 	.object({
 		...scope,
@@ -220,18 +196,12 @@ export function dateWindowQuery(search: { from?: string; to?: string }) {
 	};
 }
 
-/** A decimal id where the generated query still types it as a number. */
 const numericId = (id: string | undefined) => (id === undefined ? undefined : Number(id));
 
-/** The one value a filter narrows to, or undefined where it narrows to none or to several. */
 function oneValue(values: string[] | undefined): string | undefined {
 	return values?.length === 1 ? values[0] : undefined;
 }
 
-/**
- * The one practice a list narrows to: a tracked practice alone, since tracking it is the question
- * the reader asks now, or else the practice filter.
- */
 export function onePracticeQuery(search: {
 	practiceSlug?: string[];
 	selectedPractice?: string;
@@ -239,7 +209,6 @@ export function onePracticeQuery(search: {
 	return hasText(search.selectedPractice) ? search.selectedPractice : oneValue(search.practiceSlug);
 }
 
-/** The scope every review list applies, in the names the endpoints share. */
 function scopeQuery(search: Partial<ReviewScopeSearch>) {
 	return {
 		...dateWindowQuery(search),

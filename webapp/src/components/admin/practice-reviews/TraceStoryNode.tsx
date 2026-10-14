@@ -27,10 +27,6 @@ export interface StoryContext {
 	factsOpen: boolean;
 	/** How the review came to run, from its row. */
 	origin: ReviewOrigin | undefined;
-	/**
-	 * The review's detail, where the page read it and it is the trace's review: its stop reason,
-	 * its practices and its runtime jobs.
-	 */
 	review: ReviewDetail | undefined;
 	/** Where the review stands among the reviews of its work. */
 	position: { index: number; total: number } | undefined;
@@ -48,7 +44,6 @@ export function useStory(): StoryContext {
 	return context;
 }
 
-/** Whether a step lies off the path of the record in front. The item, the review and its event never do. */
 export function offPath(traced: Traced | undefined, node: TraceNode): boolean {
 	if (traced === undefined) {
 		return false;
@@ -66,11 +61,6 @@ export function offPath(traced: Traced | undefined, node: TraceNode): boolean {
 // A step the reader can stand on and open
 // ------------------------------------------------------------------------------------------------
 
-/**
- * The control of a step that opens its record. "You started here" and a ring mark the record the trace
- * was opened for, with its facts under it where system info shows. A press on a step opens its
- * record's sheet over the trace; the mark stays where it is.
- */
 export function StoryNode({
 	node,
 	className,
@@ -80,7 +70,6 @@ export function StoryNode({
 }: {
 	node: TraceNode;
 	className?: string;
-	/** What belongs to the step but is not in its control: the dots, which open themselves. */
 	after?: ReactNode;
 	/** A row of a table in a stage: flush with its neighbours, its columns saying what "Open" would. */
 	row?: boolean;
@@ -165,26 +154,19 @@ function HereMarker({ inset = false }: { inset?: boolean }) {
 }
 
 export interface StepProps {
-	/** The graph as the filter leaves it. */
 	lineage: ReviewLineage;
-	/** The whole graph, which says what the review did whatever the filter hides. */
 	full: ReviewLineage;
 	filter: TraceFilter;
 	numbered: NumberedResult[];
 	self: NumberedResult | undefined;
-	/** The results on the record's path, where the siblings fold; undefined lists them all. */
 	path: NumberedResult[] | undefined;
-	/** Whether every result is a row of the review stage's table rather than a dot. */
 	listed: boolean;
-	/** The results the table lists, the rest being dots. */
 	rows: NumberedResult[];
-	/** Opens or folds the results' table by hand. */
 	onListedChange: (open: boolean) => void;
 	byId: NumberedById;
 	letters: ReadonlyMap<string, string>;
 	traced: Traced | undefined;
 	here: TraceNode | undefined;
-	/** Whether the event that started the review starts the rail, so the review need not say why it ran. */
 	hasStart: boolean;
 	othersOpen: boolean;
 	onOthersOpenChange: (open: boolean) => void;

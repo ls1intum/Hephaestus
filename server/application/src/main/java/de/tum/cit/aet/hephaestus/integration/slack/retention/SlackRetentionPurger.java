@@ -12,29 +12,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Per-workspace transactional boundary for the Slack retention sweep.
- *
- * <p>This is a <b>separate bean</b> from {@link SlackRetentionSweeper} on purpose: the sweep's
- * {@code REQUIRES_NEW} boundary only takes effect across a real proxy hop. If the sweeper
- * self-invoked a {@code @Transactional} method on itself the annotation would be ignored, and one
- * poisoned workspace's rollback could unwind the whole sweep. With each workspace in its own
- * committed transaction, a failure is isolated to that workspace and the rest still prune.
- *
- * <p><b>Thread-grain retention (GDPR Art. 5(1)(e) / Art. 17).</b> Retention runs at <em>thread</em> grain, not
- * just message grain, so no derived personal data outlives its source. A thread is "aged" when its most recent
- * activity ({@code last_ts}) is older than the cutoff — equivalently every message in it is older than the cutoff,
- * since {@code last_ts} is the maximum message {@code ts}. For each aged thread the purge, in one transaction:
- * <ol>
- *   <li>erases the derived {@code chat.thread} results/feedback via the practices
- *       {@link ConversationFeedbackErasure} port <b>before</b> the aggregates are dropped, so the derived rows
- *       (and their cascade children) never outlive the {@code slack_thread} they were composed over;</li>
- *   <li>deletes the raw {@code slack_message} rows belonging to those aged thread aggregates; and</li>
- *   <li>drops the aged {@code slack_thread} aggregates — which hold the {@code participant_account_ids} PII.</li>
- * </ol>
- * A thread with any activity newer than the cutoff is retained whole (its recent messages keep it a live
- * conversation), so nothing is half-pruned and no derived row is orphaned.
- *
- * <p>Every statement carries the {@code workspace_id} predicate the tenancy inspector requires.
+ * Each workspace needs a separate proxy call for REQUIRES_NEW so one rollback cannot stop the sweep.
+ * Erase derived content through {@link ConversationFeedbackErasure} before deleting its source thread.
+ * Retain whole threads that have any activity after the cutoff.
  */
 @Component
 @RequiredArgsConstructor

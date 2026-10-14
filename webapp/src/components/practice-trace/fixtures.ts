@@ -25,7 +25,6 @@ const EVENT_LABELS: Record<string, string> = {
 	"scm.issue.opened": "Opened",
 };
 
-/** The words the definition options give each event name these fixtures use. */
 export function eventLabel(name: string): string {
 	return EVENT_LABELS[name] ?? name;
 }
@@ -63,7 +62,6 @@ const ISSUE_1430 = item({
 	container: "ls1intum/Hephaestus",
 });
 
-/** The items the trace lists, newest activity first. A removed item still lists. */
 export const tracedItems: ItemRef[] = [
 	PULL_REQUEST_1423,
 	item({
@@ -76,7 +74,6 @@ export const tracedItems: ItemRef[] = [
 		container: "ls1intum/Hephaestus",
 	}),
 	ISSUE_1430,
-	// No number, no container, no upstream link: a removed or unlinkable item still lists.
 	item({
 		id: "88",
 		kind: "chat.thread",
@@ -120,10 +117,6 @@ const pushReview: ReviewRef = {
 
 export const traceReviews: ReviewRef[] = [readyReview, pushReview];
 
-/**
- * `scm.pull_request.synchronized` appears twice at different versions. That collision is the point:
- * the name cannot say which push a review rests on, so a review links its event through the ids.
- */
 export const itemEvents: ItemEvent[] = [
 	{
 		id: "event-opened",
@@ -274,7 +267,6 @@ const script = (
 	...fields,
 });
 
-/** What a practice's script did in one review, one entry per way it can end. */
 export const practiceScriptRuns = {
 	returned: script({ scriptKind: "CUSTOM", status: "OK" }),
 	builtin: script({ scriptKind: "BUILTIN", status: "OK" }),
@@ -306,7 +298,6 @@ export const practiceScriptRuns = {
 	}),
 } satisfies Record<string, PracticeScriptRun>;
 
-/** A feedback check that stopped feedback because the reviewed version is no longer current. */
 export const deniedFeedbackCheck: FeedbackCheck = {
 	stage: "EGRESS",
 	allowed: false,
@@ -380,7 +371,6 @@ const ownResult = (
 	...fields,
 });
 
-/** The reader's Not met result from the Ready review, with two problems. */
 export const notMetOwnResult = ownResult({
 	id: "00000000-0000-0000-0000-0000000001a1",
 	practiceSlug: "thin-controllers",
@@ -402,7 +392,6 @@ export const notMetOwnResult = ownResult({
 	],
 });
 
-/** A Met result with no summary of its own. */
 export const metOwnResult = ownResult({
 	id: "00000000-0000-0000-0000-0000000001a2",
 	practiceSlug: "descriptive-pull-requests",
@@ -410,7 +399,6 @@ export const metOwnResult = ownResult({
 	outcome: "MET",
 });
 
-/** A result the Ready review reused, which keeps the id of the earlier review that recorded it. */
 export const reusedOwnResult = ownResult({
 	id: "00000000-0000-0000-0000-0000000001a3",
 	practiceSlug: "product-language",
@@ -420,10 +408,8 @@ export const reusedOwnResult = ownResult({
 	reviewId: "00000000-0000-4000-8000-0000000000e1",
 });
 
-/** The reader's own results from the Ready review. */
 export const ownResults: ResultList[] = [notMetOwnResult, metOwnResult, reusedOwnResult];
 
-/** What the developer may read about the Ready review: its events and their own results. */
 export const ownItemTrace: OwnItemTrace = {
 	item: PULL_REQUEST_1423,
 	review: readyReview,

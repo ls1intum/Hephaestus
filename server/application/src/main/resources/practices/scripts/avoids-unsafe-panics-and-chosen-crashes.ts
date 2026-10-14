@@ -1,8 +1,3 @@
-// Finds the selected lines that spell a crash operator that the author wrote, in all languages: a force
-// unwrap, `try!`, a force cast or an abort. Each lead tells if the line is inside a preview block or in
-// a test file. A lead matches spelling on one line. It does not know the type of the operand, where the
-// value came from, or what bounds it, so the review decides which leads are lapses. The input practice
-// owns implicit traps, such as a subscript or an integer division. To add a language, add a row.
 import { blockExtents } from "../kits/scm/declarations.ts";
 import { scm } from "../kits/scm/index.ts";
 import { isTestPath } from "../kits/scm/languages.ts";
@@ -15,7 +10,6 @@ export const LABELS = {
 		"A selected line that spells a crash operator; its facts name the language, the operators, and if it runs in a preview block or a test file.",
 };
 
-// language key -> [label, regex] of crash operators the author writes, matched against the line's code.
 const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
 	swift: [
 		["try!", /\btry!/u],
@@ -26,7 +20,6 @@ const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
 			/\b(?:precondition|preconditionFailure|assert|assertionFailure)\s*\(/u,
 		],
 		["exit or abort", /\b(?:exit|abort)\s*\(/u],
-		// `try!` and `as!` have their own rows.
 		["force unwrap", /[A-Za-z0-9_)\]](?<!\btry|\bas)!(?:[.\s),\]]|$)/u],
 	],
 	typescript: [
@@ -71,7 +64,7 @@ const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
 		["exit(", /\bexit\s*\(/u],
 		["assert(", /\bassert\s*\(/u],
 	],
-	// Objective-C is C with Cocoa's assertion macros, not Swift: no bang operators to find.
+	// Objective-C uses C/Cocoa assertions rather than Swift bang operators.
 	"objective-c": [
 		["abort(", /\babort\s*\(/u],
 		["exit(", /\bexit\s*\(/u],
@@ -85,10 +78,8 @@ const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
 	],
 };
 
-// Code that runs only when Xcode renders a preview, never on a user's device.
 const PREVIEW_OPENER = /^\s*(?:#Preview\b|(?:\w+\s+)*struct\s+\w+\s*:\s*PreviewProvider\b)/mu;
 
-/** One selected line that spells a crash operator, with where it runs. */
 interface CrashLine {
 	path: string;
 	line: number;
@@ -136,7 +127,6 @@ export default definePracticeScript({
 				}
 			}
 		}
-		// Rows on an ordinary path first, so preview and test rows cannot push them out of the leads.
 		rows.sort((a, b) => Number(a.inPreview || a.testFile) - Number(b.inPreview || b.testFile));
 		const inPreview = rows.filter((row) => row.inPreview).length;
 		const inTests = rows.filter((row) => row.testFile).length;

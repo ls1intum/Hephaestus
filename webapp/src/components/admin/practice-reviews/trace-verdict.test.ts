@@ -21,7 +21,6 @@ function verdictOf(key: string, node: TraceNode = REVIEW) {
 	return traceVerdict(lineageStateCase(key).lineage, node);
 }
 
-/** Every record a case's graph holds, so every verdict the story can draw is read. */
 function nodesOf(lineage: ReviewLineage): TraceNode[] {
 	const { results, feedback } = lineageRecords(lineage);
 	return [
@@ -210,7 +209,6 @@ describe("traceVerdict on a piece of feedback", () => {
 	});
 });
 
-/** The graph with every piece of feedback changed the same way. */
 function withFeedback(
 	lineage: ReviewLineage,
 	change: Partial<NonNullable<ReviewLineage["nodes"][number]["feedback"]>>,
@@ -223,7 +221,6 @@ function withFeedback(
 	};
 }
 
-/** An event on work no review started on, as the item's trace names its latest. */
 function event(overrides: Partial<ItemEvent>): ItemEvent {
 	return {
 		decidedAt: null,

@@ -176,7 +176,7 @@ record TerminalUsage(
         return billed;
     }
 
-    /** The frozen rate applies only to a verified measurement. */
+    // Only verified measurements may use the frozen price.
     private static boolean append(LlmUsageRecorder recorder, Long workspaceId, LlmUsageRecorder.LlmUsageSample sample) {
         recorder.record(workspaceId, sample);
         return sample.measurementVerification() == MeasurementVerification.VERIFIED

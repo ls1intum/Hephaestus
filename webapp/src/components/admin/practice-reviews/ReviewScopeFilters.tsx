@@ -28,13 +28,11 @@ export interface ScopeFiltersProps {
 	tab: ReviewTab;
 	scope: ReviewScope;
 	onChange: (patch: Partial<ReviewScope>) => void;
-	/** Which date this tab filters, in the words its rows use: "Recorded", "Composed". */
 	dateTitle: string;
 	groups: FacetSource;
 	/** Every practice, with its group. A chosen group narrows what the practice facet offers. */
 	practices: FacetSource<PracticeFacetOption>;
 	people: ReviewPeople;
-	/** The name of the developer in the scope, when the rows already carry it. */
 	personName?: string;
 	/**
 	 * The one review, item or result the scope is filtered to, by name — set by a "See
@@ -70,7 +68,6 @@ const RECORD_UNNAMED: Record<ScopeRecordFilter["facet"], string> = {
 	result: "one result",
 };
 
-/** The developer facet's name on every tab: whose work was reviewed, or whom the feedback reached. */
 const DEVELOPER_TITLE = "Developer";
 
 interface ScopePill {
@@ -335,10 +332,6 @@ function scopePills(
 	return pills;
 }
 
-/**
- * The parts of the scope that no facet sets, only a link: the kind of item and the one problem. Each
- * shows as a pill the reader can clear.
- */
 function referenceScopePills(
 	scope: ReviewScope,
 	onChange: (patch: Partial<ReviewScope>) => void,

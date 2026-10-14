@@ -75,6 +75,8 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
         return List.of(
                 "mkdir -p " + SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.PRACTICE_SCRIPT_PREFIX,
                 "ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_TARGET + " " + SandboxLayout.WORKSPACE_ROOT + "/"
-                        + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK);
+                        + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK,
+                "ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_KITS_TARGET + " " + SandboxLayout.WORKSPACE_ROOT + "/"
+                        + SandboxLayout.PRACTICE_SCRIPT_KITS_LINK);
     }
 }

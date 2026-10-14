@@ -77,7 +77,7 @@ class PiResultParserTest extends BaseUnitTest {
     @Test
     void shouldAssembleTheAdmissionBodyWhenOnlyTheReviewStateIsLeft() {
         String reviewState = """
-            {"schemaVersion":2,"results":[{"practiceSlug":"x","candidate":{"outcome":"MET","summary":"t",\
+            {"contractVersion":3,"results":[{"practiceSlug":"x","candidate":{"outcome":"MET","summary":"t",\
             "explanation":"r","citations":[]}}]}\
             """;
         var result = parser.parse(new SandboxResult(
@@ -90,7 +90,7 @@ class PiResultParserTest extends BaseUnitTest {
         JsonMapper mapper = JsonMapper.builder().build();
         JsonNode assembled = mapper.readTree(rawOutput(result).toString());
         assertThat(result.success()).isFalse();
-        assertThat(assembled.path("schemaVersion").asInt()).isEqualTo(2);
+        assertThat(assembled.path("contractVersion").asInt()).isEqualTo(SandboxLayout.PRACTICE_CONTRACT_VERSION);
         assertThat(assembled.path("results"))
                 .isEqualTo(mapper.readTree(reviewState).path("results"));
     }
@@ -100,7 +100,7 @@ class PiResultParserTest extends BaseUnitTest {
     void keepsNativeJsonExactly() {
         // As JSON.stringify writes it: escaped quotes, a backslash pair before a Swift interpolation, a newline.
         String nativeJson = """
-            {"schemaVersion":2,"results":[{"practiceSlug":"silent-failure","candidate":{"outcome":"NOT_MET",\
+            {"contractVersion":3,"results":[{"practiceSlug":"silent-failure","candidate":{"outcome":"NOT_MET",\
             "summary":"Catch says \\"ok\\"","explanation":"print(\\"Error: \\\\(error)\\")\\nC:\\\\temp",\
             "citations":[],"problems":[{"severity":"MAJOR","summary":"s","explanation":"e",\
             "citations":[{"path":"App/Weather.swift","quote":"Text(\\"\\\\(weather.temp)°\\")"}]}]}}]}\
@@ -122,10 +122,9 @@ class PiResultParserTest extends BaseUnitTest {
         assertThat(citation.path("quote").asString()).isEqualTo("Text(\"\\(weather.temp)°\")");
     }
 
-    /** A composition continuation submits nothing and runs no program, so it writes no execution report. */
     @Test
     void shouldAcceptAnEmptySubmissionWhenAContinuationWritesNoReport() {
-        String empty = "{\"schemaVersion\":2,\"results\":[]}";
+        String empty = "{\"contractVersion\":3,\"results\":[]}";
 
         var result = parser.parse(new SandboxResult(
                 0, Map.of("result.json", empty.getBytes(UTF_8)), "done", false, Duration.ofSeconds(10)));
@@ -138,7 +137,7 @@ class PiResultParserTest extends BaseUnitTest {
     @DisplayName("a malformed result is not rescued by the backup, and the run's other artifacts are kept")
     void malformedResultKeepsOtherArtifacts() {
         String reviewState = """
-            {"schemaVersion":2,"results":[{"practiceSlug":"x","candidate":{"outcome":"MET","summary":"t",
+            {"contractVersion":3,"results":[{"practiceSlug":"x","candidate":{"outcome":"MET","summary":"t",
             "explanation":"r","citations":[]}}]}\
             """;
         var result = parser.parse(new SandboxResult(
@@ -187,7 +186,7 @@ class PiResultParserTest extends BaseUnitTest {
     @Test
     void surfacesUsageAndRunnerDebug() {
         String practiceResults =
-                "{\"schemaVersion\":2,\"results\":[{\"practiceSlug\":\"t\",\"candidate\":{\"outcome\":\"MET\","
+                "{\"contractVersion\":3,\"results\":[{\"practiceSlug\":\"t\",\"candidate\":{\"outcome\":\"MET\","
                         + "\"summary\":\"x\",\"explanation\":\"y\",\"citations\":[]}}]}";
         String usage = "{\"model\":\"m\",\"inputTokens\":10,\"outputTokens\":5,\"cacheReadTokens\":20,"
                 + "\"costUsd\":0.12,\"totalCalls\":2}";

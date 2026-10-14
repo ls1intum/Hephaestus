@@ -28,7 +28,6 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
-/** Reserves the finite worst cost before the single next file job enters the queue. */
 @Component
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
@@ -46,7 +45,7 @@ public class ScanBudget {
         try {
             return permitsModel(scan, selected);
         } catch (LlmModelUnavailableException unavailable) {
-            throw new ScanModelUnavailableException("The frozen scan model is unavailable");
+            throw new ScanModelUnavailableException("The frozen scan model is unavailable", unavailable);
         }
     }
 

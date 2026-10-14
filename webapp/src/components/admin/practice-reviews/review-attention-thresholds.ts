@@ -1,12 +1,4 @@
-/**
- * Every threshold the overview uses to mark what needs attention, in one place, so no screen marks
- * the same figure at a different point.
- *
- * The overview's one colour rule: red means broken, and nothing else is coloured. A figure is red
- * when developers do not get their feedback and an admin can fix it now: feedback that failed to
- * deliver past its mark, and reviews held for budget. There is no amber. Advice, such as a long wait
- * or a practice marker, is said in words and an icon, in the colour of the text around it.
- */
+// Reserve red for failed delivery or budget holds an admin can fix; advice stays neutral.
 
 /**
  * The queue's oldest wait (report F1): marked in words from 30 minutes, the same wait the trace
@@ -27,12 +19,7 @@ export const PROBLEM_THRESHOLDS = {
 	deliveriesDestructiveAbove: 0.05,
 } as const;
 
-/**
- * Markers on the overview's practices (report F8): "Mostly not applicable" from 90 % of a practice's
- * results not applicable, "Often undecided" from 30 % undetermined. Each only once the practice
- * has 20 results in the range, so a handful of reviews never marks it. In the first course,
- * three practices were not applicable in every result, and two undecided in a third to a half.
- */
+// Require enough results before marking a practice; small samples do not establish a pattern.
 export const PRACTICE_MARKER_THRESHOLDS = {
 	neverAppliesShare: 0.9,
 	oftenUndecidedShare: 0.3,

@@ -12,15 +12,7 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
-/**
- * The evidence identity of an issue update, one rule for every owner that keys, admits, coalesces,
- * supersedes or captures it.
- *
- * <p>An issue's fields and discussion form its identity: a comment can clarify the current request
- * or record what was done and what moved elsewhere. A comment written, edited or removed is new
- * evidence. Comments identified by recorded delivery provenance are never evidence, so a posted
- * piece of feedback does not occasion a review of itself.
- */
+// Discussion edits change issue evidence; comments with recorded delivery provenance cannot review themselves.
 @Component
 public class IssueEvidenceVersion {
 

@@ -45,14 +45,6 @@ export interface PracticeReviewsLayoutProps {
 	children: ReactNode;
 }
 
-/**
- * Practice reviews: an overview, then the lists behind it — the reviews, the results they recorded, the
- * problems those results name, and the feedback written from them. A review opens on its own page; a result or a piece of feedback
- * opens as one level over whichever list the reader is on, so a list is never left to read it.
- *
- * The scope and the tracked record sit above the tabs, because they apply to every tab. Each tab
- * draws its scope there (`GlobalScopeRow`) and keeps its own filters below the tabs.
- */
 export function PracticeReviewsLayout({
 	workspaceSlug,
 	counts = NO_COUNTS,

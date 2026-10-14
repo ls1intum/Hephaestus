@@ -6,20 +6,14 @@ import type { DiffFile, DiffHunk } from "./types.ts";
 const HUNK_HEADER =
 	/^@@\s+-(?<oldStart>\d+)(?:,(?<oldCount>\d+))?\s+\+(?<newStart>\d+)(?:,(?<newCount>\d+))?\s+@@/u;
 
-/**
- * Parse a unified diff (with optional [L<n>] annotations) into structured DiffFile objects.
- * Returns a Map of file path -> DiffFile.
- */
 export function parseDiff(diffContent: string): Map<string, DiffFile> {
 	const files = new Map<string, DiffFile>();
 
-	// Split on "diff --git" boundaries
 	const fileDiffs = diffContent.split(/^diff --git /mu).filter(Boolean);
 
 	for (const fileDiff of fileDiffs) {
 		const lines = fileDiff.split("\n");
 
-		// Extract file path from "a/path b/path"
 		const filePath = /a\/.+?\s+b\/(?<path>.+)/u.exec(lines[0] ?? "")?.groups?.path;
 		if (filePath === undefined) {
 			continue;
@@ -32,7 +26,6 @@ export function parseDiff(diffContent: string): Map<string, DiffFile> {
 		let currentHunk: DiffHunk | null = null;
 		let newLineNum = 0;
 		let oldLineNum = 0;
-		// Lines the current hunk still holds, by its header; a hunk line is read by its first character only.
 		let oldLeft = 0;
 		let newLeft = 0;
 
@@ -80,7 +73,6 @@ export function parseDiff(diffContent: string): Map<string, DiffFile> {
 			}
 		}
 
-		// Normalize path: strip leading ./
 		const normalizedPath = filePath.replace(/^\.\//u, "");
 		files.set(normalizedPath, { path: normalizedPath, addedLines, removedLines, hunks });
 	}

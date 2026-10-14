@@ -41,7 +41,6 @@ function ScansRoute() {
 	);
 }
 
-/** The start form, over the list. A started scan replaces the list with its report. */
 function StartScanLevel({ workspaceSlug, nested }: { workspaceSlug: string; nested: boolean }) {
 	const navigate = useNavigate();
 	const startScan = useStartScan(workspaceSlug, (scan) => {

@@ -12,11 +12,6 @@ export interface DataHandlingMarkProps {
 	className?: string;
 }
 
-/**
- * A model's data-handling tier as its muted icon, in running text and in table cells. The tier is a
- * fact about the model, not a state, so the icon is never toned; `DataHandlingBadge` is for a
- * surface that asks the reader to check it.
- */
 export function DataHandlingMark({ tier, label = "sr-only", className }: DataHandlingMarkProps) {
 	const { icon: Icon, label: name } = DATA_HANDLING_DEFS[tier];
 	return (

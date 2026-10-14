@@ -17,12 +17,7 @@ export type ItemEventState = ItemEvent["state"];
 export type ItemEventReason = NonNullable<ItemEvent["reason"]>;
 export type ItemEventFoundBy = ItemEvent["foundBy"];
 
-/**
- * What became of one event on an item: whether it started a review — its "Review on" — or why it
- * did not. A withheld event is a decision with a recorded reason, never a missing review. The
- * event's own name comes from the definition options (`practice-editor/review-events`), never from
- * a second copy here.
- */
+// Withheld events record a decision and reason, never a practice verdict.
 export const ITEM_EVENT_STATE_DEFS: StatusDefs<ItemEventState> = {
 	RECORDED: {
 		label: "Recorded",
@@ -62,7 +57,6 @@ export const ITEM_EVENT_STATE_DEFS: StatusDefs<ItemEventState> = {
 	},
 };
 
-/** Why an event did not start a review, in one sentence for the row that has it. */
 export const ITEM_EVENT_REASON_SENTENCES: Record<ItemEventReason, string> = {
 	GATE_WITHHELD: "A review check withheld it.",
 	COOLDOWN_ACTIVE: "The work was reviewed recently, so it waits before another review.",
@@ -90,10 +84,7 @@ export const ITEM_EVENT_REASON_SENTENCES: Record<ItemEventReason, string> = {
 	ITEM_GONE: "The work no longer exists.",
 };
 
-/**
- * How Hephaestus learned of an event, which says how exact its time is. The three that are also a
- * review's origin share its words, so a trace and a review say how it came about alike.
- */
+// Event discovery determines timestamp precision; shared origins use the review-origin wording.
 export const ITEM_EVENT_FOUND_BY: Record<ItemEventFoundBy, { label: string; description: string }> =
 	{
 		WEBHOOK: {

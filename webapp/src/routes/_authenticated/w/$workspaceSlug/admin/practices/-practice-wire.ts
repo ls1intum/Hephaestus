@@ -13,7 +13,6 @@ import { mockDefinitionOptions } from "@/components/admin/practice-editor/fixtur
 import type { Wire } from "@/lib/dates";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 
-/** What the practice setup routes read as JSON, with ISO strings where the client makes `Date`s. */
 
 const ADMIN: Wire<AccountRef> = {
 	id: "7",
@@ -105,11 +104,7 @@ export function wireGroup(
 	};
 }
 
-/**
- * An admin of `acme` on Practice setup with nothing in it yet. Later `server.use` calls take
- * precedence, so a test adds only what it is about. The `definition-options` and `releases`
- * handlers come before any `:practiceSlug` one, which would otherwise match those paths.
- */
+/** Install defaults first; tests prepend their specific overrides through server.use. */
 export function practiceSetupHandlers() {
 	return [
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
@@ -128,11 +123,7 @@ export function practiceSetupHandlers() {
 	];
 }
 
-/**
- * The workspace's practices, listed and each readable by slug. The fixed paths under `/practices/`
- * are declared again before the `:practiceSlug` handler: a later `server.use` takes precedence, and
- * that handler would otherwise answer for them.
- */
+// Register fixed practice paths before the slug handler, which can match them too.
 export function practicesHandlers(practices: Wire<Practice>[]) {
 	return [
 		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(practices)),
@@ -152,7 +143,6 @@ export function practicesHandlers(practices: Wire<Practice>[]) {
 	];
 }
 
-/** A practice's guidance as `/guidance` returns it, with only a guide written. */
 export function wireGuidance(
 	practiceSlug: string,
 	guide: string | null,

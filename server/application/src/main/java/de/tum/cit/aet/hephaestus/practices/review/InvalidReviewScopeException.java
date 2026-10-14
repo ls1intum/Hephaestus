@@ -10,4 +10,8 @@ public class InvalidReviewScopeException extends RuntimeException {
     InvalidReviewScopeException(String message) {
         super(message);
     }
+
+    InvalidReviewScopeException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

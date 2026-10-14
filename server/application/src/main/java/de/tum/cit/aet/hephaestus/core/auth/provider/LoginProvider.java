@@ -94,10 +94,6 @@ public class LoginProvider {
     @Column(name = "display_name", nullable = false, length = 255)
     private String displayName;
 
-    /**
-     * OAuth host root, e.g. {@code https://github.com}, {@code https://gitlab.com}, {@code
-     * https://gitlab.lrz.de}.
-     */
     @Column(name = "base_url", nullable = false, length = 512)
     private String baseUrl;
 
@@ -115,10 +111,6 @@ public class LoginProvider {
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 
-    /**
-     * True when the row was seeded from {@code hephaestus.auth.*} env config rather than created
-     * via the admin UI.
-     */
     @Column(name = "seeded_from_env", nullable = false)
     private boolean seededFromEnv = false;
 

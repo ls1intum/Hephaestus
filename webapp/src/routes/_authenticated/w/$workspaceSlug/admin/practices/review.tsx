@@ -70,7 +70,6 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/pra
 	component: ReviewRoute,
 });
 
-/** The largest page the server serves; the pickers list every repository and member it returns. */
 const PICKER_PAGE_SIZE = 100;
 
 function ReviewRoute() {
@@ -216,7 +215,6 @@ function FeedbackModeSection({
 	);
 }
 
-/** The name a reader knows, falling back to a provider identity for an account with no name yet. */
 function accountLabel(account: AccountRef): string {
 	return (
 		[
@@ -268,11 +266,7 @@ function AutomatedReviewSection({ workspaceSlug }: { workspaceSlug: string }) {
 		error: "We could not update practice review settings",
 	});
 
-	/**
-	 * The server owns the schedule list (it computes the next run), so each write invalidates rather
-	 * than writing a guess into the cache. A recurring check is a standing authorization to spend, so
-	 * every write says whether it landed, except an edit the reader is looking straight at.
-	 */
+	// The server computes schedule timing; invalidate the list rather than predict the next run.
 	const invalidateSchedules = async () =>
 		queryClient.invalidateQueries({
 			queryKey: listReviewSchedulesQueryKey({ path: { workspaceSlug } }),

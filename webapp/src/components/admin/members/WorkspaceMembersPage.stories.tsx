@@ -73,8 +73,8 @@ export const TeamsUnavailable: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("We could not load teams")).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Retry" })).toBeVisible();
-		await expect(canvas.getByText("Alice Smith")).toBeVisible();
-		await expect(canvas.getByText("David Brown")).toBeVisible();
+		await expect(canvas.getByText("Alice Johnson")).toBeVisible();
+		await expect(canvas.getByText("Diana Prince")).toBeVisible();
 	},
 };
 
@@ -90,11 +90,10 @@ export const TeamsRefused: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("You do not have access to teams")).toBeVisible();
 		await expect(canvas.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
-		await expect(canvas.getByText("Alice Smith")).toBeVisible();
+		await expect(canvas.getByText("Alice Johnson")).toBeVisible();
 	},
 };
 
-/** A failed read keeps the page and offers Retry, never an empty member list. */
 export const Error: Story = {
 	args: {
 		members: [],

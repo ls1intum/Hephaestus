@@ -69,10 +69,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Integration tests for workspace purge (deletion) covering data cleanup completeness, idempotency,
- * shared entity protection, credential clearing, and authorization.
- */
 class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private PracticeModelTestFixtures modelFixtures;
@@ -154,7 +150,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OM = new ObjectMapper();
 
-    /** Creates a GitLab workspace with typical associated data for purge testing. */
     private Workspace createGitLabWorkspaceWithData(String slug) {
         User owner = persistUser(slug + "-owner");
         Workspace workspace = workspaceService.createWorkspace(new CreateWorkspaceRequestDTO(
@@ -166,10 +161,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 IntegrationKind.GITLAB,
                 "glpat-purge-test-token",
                 null));
-
-        // The workspace creation request above encrypted the PAT onto the GitLab Connection, which
-        // is what
-        // the credential-clearing assertion below exercises.
 
         // Add a monitored repository (saved directly — purge reloads workspace with EAGER fetch)
         RepositoryToMonitor monitor = new RepositoryToMonitor();
@@ -602,10 +593,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             return slackThreadRepository.save(thread);
         }
 
-        /**
-         * Insert one ingested Slack message with a controlled {@code ingested_at} (native —
-         * bypasses @CreationTimestamp).
-         */
         private void insertMessage(Long workspaceId, String slackTs, String slackThreadTs, Instant ingestedAt) {
             jdbcTemplate.update(
                     "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id,"

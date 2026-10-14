@@ -114,10 +114,6 @@ export function validateConnectionFields(
 	});
 }
 
-/**
- * What a connection's key is, without the key: its last four characters, or that there is none. Both
- * consoles say it in these words, beside a provider and in the edit form.
- */
 export function apiKeyLine({
 	hasApiKey,
 	apiKeyLast4,

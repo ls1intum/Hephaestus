@@ -62,8 +62,6 @@ describe("NavAdmin", () => {
 		// Both directions, because the two paths differ by one trailing character and a matcher that
 		// compared strings rather than whole segments would light both entries up on either.
 		["/w/acme/admin/practices/reviews", "Practice reviews"],
-		// A scan's report is under Scans, so the catalogue entry that every practices URL starts with
-		// must not light up beside it.
 		["/w/acme/admin/practices/scans", "Scans"],
 		["/w/acme/admin/practices/scans/6f1c2a7e-0d4b-4a8e-9b51-1a2b3c4d5e6f", "Scans"],
 		["/w/acme/admin/integrations/scm", "GitHub"],

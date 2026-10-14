@@ -5,7 +5,6 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import org.jspecify.annotations.Nullable;
 
-/** Immutable pricing provenance captured when an LLM turn is admitted. */
 public record LlmPriceSnapshot(
         UsageFundingSource fundingSource,
         UsagePricingState pricingState,
@@ -25,20 +24,11 @@ public record LlmPriceSnapshot(
     /** Banker's rounding, so a long run of amounts does not drift up. */
     static final RoundingMode LEDGER_ROUNDING = RoundingMode.HALF_EVEN;
 
-    /**
-     * Wide enough that the only rounding deciding a stored amount is the {@link #LEDGER_SCALE} one.
-     */
     private static final MathContext CALC = new MathContext(20, LEDGER_ROUNDING);
 
-    /** The smallest amount the ledger column can hold. */
     private static final BigDecimal MIN_COST = BigDecimal.ONE.movePointLeft(LEDGER_SCALE);
 
-    /**
-     * Not the column's maximum but the wire's, which is narrower: a cost leaves as a JSON number
-     * and is read into a binary64, which reproduces at most fifteen significant digits exactly — at
-     * scale 6, everything below this. Storing more would mean the API cannot state the amount
-     * without changing it.
-     */
+    // Bound costs to the precision binary64 can preserve on the JSON wire.
     private static final BigDecimal EXACT_ON_WIRE_CEILING = BigDecimal.valueOf(1_000_000_000L);
 
     private static final BigDecimal MAX_COST = EXACT_ON_WIRE_CEILING.subtract(MIN_COST);

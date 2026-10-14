@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/** Frozen direct model availability recorded with a script's execution. */
 record StoredModelUse(
         ModelSlot slot,
         Need need,

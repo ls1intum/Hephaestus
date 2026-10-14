@@ -76,7 +76,6 @@ public class ReviewJobRetentionService {
         deleteOldRows();
     }
 
-    /** Original writer inputs go as soon as no writer can use them, not after the job's own payload retention. */
     private void deleteUnusableCompositionInputs() {
         Instant now = clock.instant();
         BoundedBatchPass.Result result = pass.run(log, "composition-inputs", () -> {

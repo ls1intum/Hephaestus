@@ -4,14 +4,7 @@ import { expect, within } from "storybook/test";
 import { RefusalFixLink } from "./RefusalFixLink";
 import { TraceRefusalAlert } from "./TraceRefusalAlert";
 
-/**
- * Why an ask started nothing. A refusal is a 200 carrying the workspace's own answer, not an error,
- * so it is shown on the page rather than as a toast — a toast is gone before the reader has
- * finished reading it.
- *
- * The sentence is the server's, verbatim. The fix is a node the route renders beside it, keyed on
- * the coded reason, so re-worded prose can never cost a reader the way out.
- */
+/** A refused request is a successful HTTP read of a domain decision; keep its reason on the page. */
 const meta = {
 	component: TraceRefusalAlert,
 	parameters: { layout: "padded" },
@@ -31,7 +24,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** An admin can go and undo this one, so the route passes the way out with the sentence. */
 export const OffersTheFixToAnAdmin: Story = {
 	play: async ({ canvas }) => {
 		const alert = within(canvas.getByRole("alert"));
@@ -45,10 +37,7 @@ export const OffersTheFixToAnAdmin: Story = {
 	},
 };
 
-/**
- * The same refusal for a member. The route passes no link rather than one that bounces: `/admin`
- * turns every non-admin away, losing the page they were reading.
- */
+/** Members cannot follow admin fix links; keep their current page usable without a dead-end link. */
 export const WithoutAFix: Story = {
 	args: { fix: undefined },
 	play: async ({ canvas }) => {

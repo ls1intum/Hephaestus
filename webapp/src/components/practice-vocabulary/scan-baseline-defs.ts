@@ -20,10 +20,7 @@ import type { RemovalGuard, ScanReport } from "@/api/types.gen";
 
 import type { StatusDef, StatusDefs } from "@/components/common/status-def";
 
-/**
- * How one problem of a scan compares with the scan before it. The problem list has no generated
- * type yet, so the values are written out here, as the server's `ProblemBaselineState` names them.
- */
+// Compare scan problems against the preceding scan; absence alone establishes no fix.
 export type ProblemBaselineState = "NEW" | "UNCHANGED" | "UPDATED" | "ABSENT";
 export const PROBLEM_BASELINE_STATES = [
 	"NEW",
@@ -32,7 +29,6 @@ export const PROBLEM_BASELINE_STATES = [
 	"ABSENT",
 ] as const satisfies readonly ProblemBaselineState[];
 
-/** Why a problem of the earlier scan is absent from this one. Only a proved repair is named. */
 export type ProblemAbsentReason = "REPAIRED";
 
 export type ScanComparison = ScanReport["comparison"];
@@ -78,7 +74,6 @@ export const NOW_MET_DEF: StatusDef = {
 		"The file changed and was reviewed again under the same standard. This problem is no longer there.",
 };
 
-/** The badge for one problem's comparison: a proved repair reads "Now met", never just "Absent". */
 export function baselineDef(
 	state: ProblemBaselineState,
 	absentReason: ProblemAbsentReason | null,
@@ -91,7 +86,6 @@ export function baselineDef(
 export const METHOD_CHANGED_SENTENCE =
 	"The review method changed. This scan cannot show which problems were fixed.";
 
-/** Whether a scan can be compared with the scan before it, and so whether it can show fixes. */
 export const SCAN_COMPARISON_DEFS: StatusDefs<ScanComparison> = {
 	COMPARABLE: {
 		label: "Compared",
@@ -170,7 +164,6 @@ export const REMOVAL_GUARD_DEFS: StatusDefs<RemovalGuardState> = {
 	},
 };
 
-/** Comparisons under which an absent problem can be a proved fix. */
 export function comparisonCanShowFixes(comparison: ScanComparison): boolean {
 	return comparison === "COMPARABLE" || comparison === "MIXED";
 }

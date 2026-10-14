@@ -44,7 +44,6 @@ public class MembershipController {
     private final MembershipService workspaceMembershipService;
     private final AccountReferenceService accounts;
 
-    /** One representative membership, with the account's effective workspace role. */
     @GetMapping("/me")
     @Operation(operationId = "getOwnMembership", summary = "Get your workspace membership")
     public ResponseEntity<WorkspaceMembershipDTO> getCurrentUserMembership(WorkspaceContext context) {

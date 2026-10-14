@@ -99,10 +99,7 @@ public class UserViewAccessService implements UserViewAccess {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The user view audit is not available.");
     }
 
-    /**
-     * Format characters (bidi overrides, zero-width joiners) would make the stored reason read
-     * differently.
-     */
+    // Invisible format characters can change how a stored reason reads.
     private static boolean isInvisible(int codePoint) {
         return Character.isISOControl(codePoint) || Character.getType(codePoint) == Character.FORMAT;
     }

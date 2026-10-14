@@ -25,7 +25,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Renders the complete document supplied by its provider, including an explicit absence. */
 @Component
 public class DocumentContentSource {
     public static final SourceKind SOURCE = new SourceKind("docs.document.core");

@@ -172,18 +172,11 @@ export function useReviewAttention(
 	};
 }
 
-/** What the Delivery card splits: delivered feedback by location and withheld feedback by reason. */
 export interface DeliveryBreakdownReads {
 	delivered: DeliveredByLocationState;
 	withheld: WithheldByReasonState;
 }
 
-/**
- * The feedback of `scope` split as the Delivery card shows it: delivered by location and withheld by
- * reason, each read with the Feedback table's own filter, so a row and the table it opens hold the
- * same rows. Counts only: the server returns no text, rating or comment. Re-read with the overview
- * while a review in the range is queued or running.
- */
 export function useDeliveryBreakdown(
 	workspaceSlug: string,
 	scope: OutcomeScope,

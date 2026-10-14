@@ -1,5 +1,3 @@
-// A program that ignores the host's abort: it logs what its review answered, and every reply that
-// reaches it later, then never returns. The host ends its process.
 import { definePracticeScript, reasonOf } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({

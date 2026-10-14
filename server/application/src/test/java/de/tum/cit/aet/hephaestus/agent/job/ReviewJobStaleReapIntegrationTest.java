@@ -44,13 +44,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * The absolute-timeout reaper against REAL Postgres. The unit test for this path mocks both the
- * {@code TransactionTemplate} and the {@link LlmUsageRecorder},
- * so it cannot see the two things that matter here: a throw in the ledger append genuinely rolls the
- * state transition back, and the recorder's {@code @Transactional(propagation = MANDATORY)} is
- * genuinely satisfied by the reaper's own per-job transaction.
- */
+// Real transactions must roll back the state change when ledger append fails and satisfy MANDATORY propagation.
 @DisplayName("Stale RUNNING reaper over PostgreSQL Integration")
 class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
 

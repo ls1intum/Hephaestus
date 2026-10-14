@@ -95,11 +95,7 @@ public class GitHubLabelProcessor {
 
         Label label = existingOpt.orElseGet(Label::new);
 
-        // Set or update fields
-        // For labels, all fields including description are always updated (null values are allowed)
-        // CRITICAL: NEVER change the nativeId/provider of an existing (managed) entity - Hibernate
-        // will throw
-        // "identifier of an instance was altered" exception. Only set these for NEW entities.
+        // Hibernate forbids changing a managed entity's nativeId/provider identifier.
         if (isNew) {
             long nativeId = dto.id() != null ? dto.id() : generateDeterministicId(repository.getId(), dto.name());
             label.setNativeId(nativeId);

@@ -34,7 +34,6 @@ const question = {
 	wouldSettleIt: "The caller of login().",
 	citation: treeCitation,
 };
-/** A submitted result in the form submit_result declares: nothing for the preparation to repair. */
 const result = {
 	outcome: "NOT_MET",
 	summary: "Added authentication call is insecure",
@@ -154,7 +153,6 @@ void test("the indices of a problem's basis are read from their digits", () => {
 	});
 	assert.deepEqual(worsened, { ...basis, base: 1, head: 0 });
 	assert.deepEqual(owed, { ...duty, event: 0 });
-	// What is not the digits of an index stays for validation to refuse.
 	const odd = { type: "introduced", head: "first", explanation: "x" };
 	assert.deepEqual(prepareResultArguments({ ...result, problems: [{ ...problem, basis: odd }] }), {
 		...result,
@@ -211,7 +209,6 @@ void test("a side, revision or quote that is not text is refused, wherever the c
 			);
 		}
 	}
-	// An empty quote is text: validation decides whether it quotes the line.
 	assert.doesNotThrow(() =>
 		prepareResultArguments({ ...result, citations: [{ ...treeCitation, quote: "" }] }),
 	);

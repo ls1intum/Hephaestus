@@ -35,7 +35,6 @@ const DIFF_CITATION = {
 	quote: "+ insecure();",
 };
 
-/** A fresh copy of a citation, so that a test can change it. */
 function citationFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
 	return { ...DIFF_CITATION, ...overrides };
 }
@@ -51,7 +50,6 @@ function problemFixture(overrides: Record<string, unknown> = {}): Record<string,
 	};
 }
 
-/** A NOT_MET result with one problem. */
 function baseSubmission(overrides: Record<string, unknown> = {}): Record<string, unknown> {
 	return {
 		outcome: "NOT_MET",
@@ -64,7 +62,6 @@ function baseSubmission(overrides: Record<string, unknown> = {}): Record<string,
 	};
 }
 
-/** A submission that cites one place of the work: the citation under test. */
 function citing(citation: Record<string, unknown>): Record<string, unknown> {
 	return baseSubmission({ citations: [citation] });
 }
@@ -77,12 +74,10 @@ function onlyCitation<T extends object>(citations: readonly T[]): T {
 	return citation;
 }
 
-/** The result citation of a normalized submission that cites one place. */
 function normalizedCitation(citation = citationFixture()): Citation {
 	return onlyCitation(normalizeSubmission(citing(citation)).citations);
 }
 
-/** The message of a refusal. */
 function refusal(raw: unknown, notes: string[] = []): string {
 	try {
 		normalizeSubmission(raw, notes);
@@ -121,7 +116,6 @@ const EXAMPLE = {
 	note: "The title names the one change that the pull request makes.",
 };
 
-/** A valid submission of each outcome, with every part that the outcome permits. */
 function resultOf(outcome: Outcome): Record<string, unknown> {
 	const question = {
 		...UNDECIDABLE,
@@ -160,7 +154,6 @@ function resultOf(outcome: Outcome): Record<string, unknown> {
 	}
 }
 
-// ── The submission ───────────────────────────────────────────────────────────
 
 void test("each outcome is accepted with every part that it permits", () => {
 	for (const outcome of OUTCOMES) {
@@ -210,7 +203,6 @@ void test("a NOT_MET result lists its problems, and no other outcome has one", (
 		refusal({ ...resultOf("COULD_NOT_DETERMINE"), problems: [problemFixture()] }),
 		/^an? COULD_NOT_DETERMINE result has no problems/u,
 	);
-	// An empty list on another outcome carries nothing.
 	assert.throws(() => normalizeSubmission({ ...resultOf("MET"), problems: [] }), /no problems/u);
 });
 
@@ -388,7 +380,6 @@ void test("an COULD_NOT_DETERMINE result records each open question it could not
 		}),
 		/^open question 1 citation: evidence citation sourceKind is required$/u,
 	);
-	// An open question may stand without a citation.
 	assert.deepEqual(
 		normalizeSubmission({
 			...resultOf("COULD_NOT_DETERMINE"),
@@ -500,7 +491,6 @@ void test("submissionCitations lists the result's, each problem's, the example's
 		listed.map((citation) => citation.path),
 		["a.ts", "b.ts", "c.ts", "d.ts", "e.ts", "f.ts"],
 	);
-	// The objects are the submission's own: a quote repaired in the list is repaired in the submission.
 	for (const citation of listed) {
 		citation.quote = "repaired";
 	}
@@ -624,12 +614,10 @@ void test("a summary over the bound is refused whole, never recorded as a fragme
 	const atTheLimit = `${"x ".repeat(MAX_SUMMARY_CHARS / 2).trim()}x`;
 	assert.equal(atTheLimit.length, MAX_SUMMARY_CHARS);
 	assert.equal(normalizeSubmission(baseSubmission({ summary: atTheLimit })).summary, atTheLimit);
-	// Runs of whitespace are one space: a summary is one line on the page.
 	assert.equal(
 		normalizeSubmission(baseSubmission({ summary: "PR mixes\n  unrelated   changes" })).summary,
 		"PR mixes unrelated changes",
 	);
-	// The same rule holds for the summary of each problem.
 	assert.match(
 		refusal(baseSubmission({ problems: [problemFixture({ summary: quotedTitle })] })),
 		/^problem 1: summary must be at most 160 characters/u,
@@ -658,7 +646,6 @@ void test("an explanation over its bound is refused", () => {
 	);
 });
 
-// ── Citations ────────────────────────────────────────────────────────────────
 
 void test("a line-number refusal names what was received, and an omitted line as omitted", () => {
 	const cited = (lines: Record<string, unknown>) =>
@@ -684,7 +671,6 @@ void test("citation requires an exact sourceFile path and quote", () => {
 		refusal(citing(citationFixture({ sourcePath: undefined }))),
 		/sourcePath is required/u,
 	);
-	// Coordinates alone verify nothing: an invented range would read as evidence.
 	for (const quote of [undefined, null, "", "  "]) {
 		assert.match(
 			refusal(citing(citationFixture({ quote }))),
@@ -724,13 +710,11 @@ void test("a citation of change.json is refused with what to quote instead", () 
 	);
 });
 
-/** The reviewed checkout's witnesses, which admission needs to verify any quote of code. */
 const CHECKOUT_WITNESSES = [
 	["repos/reviewed/.git/HEAD", "scm.repository.tree"],
 	["repos/reviewed/.git/hephaestus-captured-refs", "scm.repository.tree"],
 ] as const;
 
-/** The staged sources and sourceFiles with the reviewed checkout captured beside them. */
 function withCheckout(
 	sources: readonly string[],
 	sourceFiles: readonly (readonly [string, string])[],
@@ -751,7 +735,6 @@ void test("a quote of code is refused unless the checkout admission verifies it 
 		() => validateEvidenceSources(submission, new Set(["scm.pull-request.diff"]), new Map(diff)),
 		/a quote of code needs the captured checkout repos\/reviewed\//u,
 	);
-	// Both witnesses, under the repository tree source, and that source available.
 	const [available, sourceFiles] = withCheckout(["scm.pull-request.diff"], diff);
 	sourceFiles.delete("repos/reviewed/.git/hephaestus-captured-refs");
 	assert.throws(
@@ -767,7 +750,6 @@ void test("a quote of code is refused unless the checkout admission verifies it 
 			),
 		/needs the captured checkout/u,
 	);
-	// The task names the reviewed checkout; a quote of the change is verified against that one.
 	assert.throws(
 		() =>
 			validateEvidenceSources(
@@ -777,7 +759,6 @@ void test("a quote of code is refused unless the checkout admission verifies it 
 			),
 		/needs the captured checkout repos\/primary\//u,
 	);
-	// A repository citation names the witness of the checkout it quotes, exactly as admission reads it.
 	assert.match(
 		refusal(
 			citing(
@@ -793,7 +774,7 @@ void test("a quote of code is refused unless the checkout admission verifies it 
 });
 
 void test("the server's live harnesses stage the checkout a quote of the change is verified against", () => {
-	// LiveWorkRecordsTest pins this index from the harness that stages the live reviews.
+	// LiveWorkRecordsTest pins this fixture from the live-review staging harness.
 	const { availableSourceKinds, sourceFileSources } = folderCitationIndex(
 		JSON.parse(
 			readFileSync(new URL("../practice-results/live-manifest.json", import.meta.url), "utf8"),
@@ -862,7 +843,6 @@ void test("a citation must name a source this run staged, and the sourceFile tha
 			),
 		/was not staged by 'scm\.pull-request\.diff';/u,
 	);
-	// The change view is derived in the container; a citation of it is told what the sourceFile is.
 	const derived = normalizeSubmission(baseSubmission());
 	onlyCitation(derived.citations).sourcePath = "work/change/files.json";
 	assert.throws(
@@ -976,8 +956,6 @@ void test("historical citations preserve a full revision for trusted admission",
 		() => normalizeCitation({ ...citation, revision: "x".repeat(1025) }, "citation 1: "),
 		/^Error: citation 1: revision must be an opaque nonempty version/u,
 	);
-	// Whether a revision applies is decided once the manifest has settled the source, so it is kept
-	// here; the runner drops it from any citation that is not of the repository, with a note.
 	assert.equal(
 		normalizeCitation({ ...citation, sourceKind: "scm.issue.core" }, "").revision,
 		citation.revision,
@@ -1028,7 +1006,6 @@ void test("a citation is completed from the manifest and its line numbers read a
 		'problem 1 citation 1: startLine "L10" read as 10',
 		'problem 1 citation 1: endLine "12" read as 12',
 	]);
-	// What the manifest does not know is still asked for, naming each citation it is missing from.
 	assert.throws(
 		() =>
 			normalizeSubmission(
@@ -1095,7 +1072,6 @@ void test("normalization preserves nonblank citation path identifiers", () => {
 void test("a quote copied with the brief's line coordinates is stored without them", () => {
 	assert.equal(withoutCoordinates("[L15] to test the winner", 15), "to test the winner");
 	assert.equal(withoutCoordinates("[L15] first\n[L16] second\n", 15), "first\nsecond\n");
-	// A coordinate that names another line is text, and stays.
 	assert.equal(withoutCoordinates("[L9] elsewhere", 15), "[L9] elsewhere");
 	assert.equal(withoutCoordinates("plain", 3), "plain");
 	assert.equal(
@@ -1104,7 +1080,6 @@ void test("a quote copied with the brief's line coordinates is stored without th
 	);
 });
 
-// ── Quote resolution ─────────────────────────────────────────────────────────
 
 void test("diff citations bind the quote to the claimed file and side; a wrong line is corrected when the text is unique", () => {
 	const citation = normalizedCitation();
@@ -1128,19 +1103,16 @@ void test("a quote may drop the diff marker and read the spacing differently; th
 	const diff =
 		"diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] +    insecure();\n";
 
-	// The coordinate pins the line, so spacing cannot confuse two lines; the record is the line's bytes.
 	assert.deepEqual(resolveQuote({ ...citation, quote: "insecure();" }, diff), {
 		quote: "    insecure();",
 	});
 	assert.equal(describeCitationMismatch({ ...citation, quote: "    insecure();" }, diff), null);
 	assert.equal(describeCitationMismatch({ ...citation, quote: "+    insecure();" }, diff), null);
-	// Different text at that coordinate is still refused, trimmed or not.
 	assert.match(
 		describeCitationMismatch({ ...citation, quote: "secure();" }, diff) ?? "",
 		/\[L10\] reads/u,
 	);
 
-	// Code that begins with the same character the diff uses as a marker keeps it.
 	const flagDiff =
 		"diff --git a/run.sh b/run.sh\n+++ b/run.sh\n@@ -10 +10 @@\n[L10] +    -flag --now\n";
 	assert.equal(
@@ -1153,15 +1125,12 @@ void test("a quote may drop the diff marker and read the spacing differently; th
 	);
 });
 
-/** The mismatch a resolution reports, or nothing when it resolved. */
 const mismatch = (result: ReturnType<typeof resolveQuote>) =>
 	"mismatch" in result ? result.mismatch : "";
 
-/** One indented `"text" : <value>` line of a serialized object per value, comma-separated. */
 const serializedFields = (values: string[]) =>
 	values.map((value, index) => `    "text" : ${value}${index < values.length - 1 ? "," : ""}`);
 
-/** A citation of the pull request's title, quoting what the test says it quotes. */
 const cite = (quote: string): Citation => ({
 	sourceKind: "scm.pull-request.core",
 	sourcePath: "inputs/context/core.md",
@@ -1176,7 +1145,6 @@ void test("a matching diff quote is recorded as the content its lines carry, mar
 	const diff =
 		"diff --git a/run.sh b/run.sh\n+++ b/run.sh\n@@ -10,2 +10,2 @@\n[L10] +    -flag --now\n[L11] +  next\n";
 	const cited = { ...citation, path: "run.sh", endLine: 11 };
-	// Admission reads the blob at the revision, where no marker exists; so the quote must not carry one.
 	assert.deepEqual(resolveQuote({ ...cited, quote: "+    -flag --now\n+  next" }, diff), {
 		quote: "    -flag --now\n  next",
 	});
@@ -1189,7 +1157,6 @@ void test("a matching diff quote is recorded as the content its lines carry, mar
 		mismatch(resolveQuote({ ...cited, path: "work/change/diff.patch", quote: "" }, diff)),
 		/has no quote/u,
 	);
-	// A marker the quote carries that is not the line's own: a blank context line read as an added one.
 	const blankContext =
 		"diff --git a/a.md b/a.md\n+++ b/a.md\n@@ -9,2 +10,2 @@\n[L10] +text\n[L11]  \n";
 	assert.deepEqual(
@@ -1199,7 +1166,6 @@ void test("a matching diff quote is recorded as the content its lines carry, mar
 		),
 		{ quote: "text\n" },
 	);
-	// Blank lines cannot be evidence: admission refuses a blank quote, so the runner does too.
 	const blankDiff = "diff --git a/a.md b/a.md\n+++ b/a.md\n@@ -9,0 +10,2 @@\n[L10] +\n[L11] +\n";
 	assert.match(
 		mismatch(
@@ -1214,7 +1180,6 @@ void test("a matching diff quote is recorded as the content its lines carry, mar
 		mismatch(resolveQuote({ ...cited, quote: "+    -flag --now\n+  next\n+x", endLine: 12 }, diff)),
 		/no \[L12\]/u,
 	);
-	// What does not match is refused with what the line reads.
 	assert.match(
 		mismatch(resolveQuote({ ...cited, quote: "+    -flag\n+  next" }, diff)),
 		/\[L10\] reads/u,
@@ -1226,7 +1191,6 @@ void test("a quote is recorded as the sourceFile spells it: JSON escapes and non
 	const citation = { ...plain, sourceKind: "scm.linked-work-items", startLine: 2, endLine: 2 };
 	const serialized =
 		'{\n  "body" : "## Criteria\\n- [x] stored in `diagrams/`\\n- say \\"hi\\""\n}\n';
-	// The model quotes the text it read; the record is the escaped form the file holds.
 	assert.deepEqual(resolveQuote({ ...citation, quote: '- say "hi"' }, serialized), {
 		quote: '- say \\"hi\\"',
 	});
@@ -1236,13 +1200,11 @@ void test("a quote is recorded as the sourceFile spells it: JSON escapes and non
 			quote: "- [x] stored in `diagrams/`",
 		},
 	);
-	// A non-breaking space read as a space still records the sourceFile's own byte.
 	const nbsp = "* Launch app and open\u00A0`Venues`.\n";
 	const first = { ...citation, startLine: 1, endLine: 1 };
 	assert.deepEqual(resolveQuote({ ...first, quote: "* Launch app and open `Venues`." }, nbsp), {
 		quote: "* Launch app and open\u00A0`Venues`.",
 	});
-	// A blank line read with a stray space, and non-breaking spaces read as spaces, across lines.
 	const steps = "## Testing\n\n1. Launch app and open\u00A0**Coupons**\u00A0tab.\n2. Verify.\n";
 	assert.deepEqual(
 		resolveQuote(
@@ -1259,7 +1221,6 @@ void test("a quote is recorded as the sourceFile spells it: JSON escapes and non
 	// Coordinates alone verify nothing, so a citation without a quote is refused.
 	assert.match(mismatch(resolveQuote({ ...first, quote: "" }, nbsp)), /has no quote/u);
 	assert.match(mismatch(resolveCapturedText({ ...first, quote: " " }, nbsp)), /has no quote/u);
-	// A quote across the body's line breaks is a reading of the escaped form and resolves to it.
 	assert.deepEqual(resolveQuote({ ...citation, quote: "## Criteria\n- [x] stored" }, serialized), {
 		quote: "## Criteria\\n- [x] stored",
 	});
@@ -1277,18 +1238,15 @@ void test("spacing reads as spacing only where the quote has some, and line brea
 	assert.deepEqual(resolveQuote({ ...line, quote: "return  null;" }, "return null;\n"), {
 		quote: "return null;",
 	});
-	// No spacing in the quote, none in the text: dropping a space is not a reading of it.
 	assert.match(
 		mismatch(resolveQuote({ ...line, quote: "returnnull;" }, "return null;\n")),
 		/reads/u,
 	);
 	assert.match(mismatch(resolveQuote({ ...line, quote: "foo" }, "f oo\n")), /reads/u);
-	// A line break read as a line break, whatever the file ends its lines with and indents them by.
 	const crlf = "if (a) {\r\n  return null;\r\n}\r\n";
 	assert.deepEqual(resolveQuote({ ...line, endLine: 2, quote: "if (a) {\nreturn null;" }, crlf), {
 		quote: "if (a) {\r\n  return null;",
 	});
-	// Two lines are never one, and one line is never two.
 	assert.match(
 		mismatch(resolveQuote({ ...line, endLine: 2, quote: "if (a) { return null;" }, crlf)),
 		/reads/u,
@@ -1297,7 +1255,6 @@ void test("spacing reads as spacing only where the quote has some, and line brea
 		mismatch(resolveQuote({ ...line, quote: "return\nnull;" }, "return null;\n")),
 		/reads/u,
 	);
-	// A quote ending in the `\r` of a `\r\n` line is found where that line is, spacing read as before.
 	assert.deepEqual(resolveQuote({ ...line, quote: "end\r" }, "none\nend\r\n"), {
 		quote: "end\r",
 		startLine: 2,
@@ -1316,7 +1273,6 @@ void test("spacing reads as spacing only where the quote has some, and line brea
 });
 
 void test("a quote of many indented lines resolves promptly, and so does a near miss", () => {
-	// The shape of a serialized review thread: blocks of indented fields, the same names over and over.
 	const block = serializedFields([
 		"0",
 		'"text"',
@@ -1352,9 +1308,7 @@ void test("a quote of many indented lines resolves promptly, and so does a near 
 		endLine: 19,
 		quote,
 	};
-	// The cited lines stop one line short of the quote; the quote occurs once, a line further on.
 	assert.deepEqual(resolveQuote(citation, threads), { quote, startLine: 2, endLine: 20 });
-	// Read without its indentation, the same lines are recorded as the file indents them.
 	const unindented = quote
 		.split("\n")
 		.map((quoted) => quoted.trimStart())
@@ -1364,9 +1318,7 @@ void test("a quote of many indented lines resolves promptly, and so does a near 
 		startLine: 2,
 		endLine: 20,
 	});
-	// One character off at the very end, after every line before it matched.
 	assert.match(mismatch(resolveQuote({ ...citation, quote: `${quote}]` }, threads)), /reads/u);
-	// A long spaced prefix the text repeats, ending in a character the text does not hold.
 	assert.match(
 		mismatch(
 			resolveQuote(
@@ -1399,8 +1351,6 @@ void test("a quote may carry its exact displayed coordinate", () => {
 		"diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n";
 
 	assert.equal(describeCitationMismatch({ ...citation, quote: "[L10] + insecure();" }, diff), null);
-	// The coordinate still has to be the one being matched, so a quote cannot claim a line it did
-	// not read — even when that line's text is in the diff somewhere else.
 	assert.match(
 		describeCitationMismatch({ ...citation, quote: "[L11] + insecure();" }, diff) ?? "",
 		/\[L10\] reads/u,
@@ -1413,24 +1363,20 @@ void test("a refused citation says which of the coordinate, the side and the tex
 		"diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n";
 
 	assert.equal(describeCitationMismatch(citation, diff), null);
-	// The coordinate is not in the diff, but the text is, once: it is recorded where it is.
 	assert.deepEqual(resolveQuote({ ...citation, startLine: 11, endLine: 11 }, diff), {
 		quote: " insecure();",
 		startLine: 10,
 		endLine: 10,
 	});
-	// Neither the coordinate nor the text is in the diff.
 	assert.match(
 		describeCitationMismatch({ ...citation, startLine: 11, endLine: 11, quote: "gone();" }, diff) ??
 			"",
 		/no \[L11\] on that side of that path/u,
 	);
-	// The coordinate is there and says something else, so the refusal shows both.
 	assert.match(
 		describeCitationMismatch({ ...citation, quote: "+ secure();" }, diff) ?? "",
 		/\[L10\] reads "\+ insecure\(\);", not "\+ secure\(\);"/u,
 	);
-	// The quote and the line span disagree, but the block occurs once: recorded where it is.
 	assert.deepEqual(resolveQuote({ ...citation, endLine: 12 }, diff), {
 		quote: " insecure();",
 		startLine: 10,
@@ -1448,7 +1394,6 @@ void test("a citation of the diff view itself is placed at the changed line its 
 		"diff --git a/src/Auth.java b/src/Auth.java\n--- a/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10,2 @@\n" +
 		"[L10] -    secure();\n[L10] +    insecure();\n[L11] +    audit();\n" +
 		"diff --git a/src/Log.java b/src/Log.java\n+++ b/src/Log.java\n@@ -3 +3 @@\n[L3] +    audit();\n";
-	// Line 92 of the view, not a coordinate of the change: the quote names src/Auth.java [L10] on NEW.
 	const ofView = { ...citation, path: "work/change/diff.patch", startLine: 92, endLine: 92 };
 	assert.deepEqual(resolveQuote({ ...ofView, quote: "insecure();" }, diff), {
 		quote: "    insecure();",
@@ -1464,7 +1409,6 @@ void test("a citation of the diff view itself is placed at the changed line its 
 		path: "src/Auth.java",
 		side: "OLD",
 	});
-	// A quote on two changed lines, or on none, is refused with what a citation of the change names.
 	assert.match(
 		describeCitationMismatch({ ...ofView, quote: "audit();" }, diff) ?? "",
 		/work\/change\/diff\.patch is the view of the change, not a file in it: cite the changed file's path[\s\S]*occurs 2 times/u,
@@ -1477,7 +1421,6 @@ void test("a citation of the diff view itself is placed at the changed line its 
 
 void test("a coordinate copied from a numbered view of diff.patch is read as the line it names", () => {
 	const citation = normalizedCitation();
-	// The text occurs twice in the file; the session cites line 7 of diff.patch, as sed -n prints it.
 	const diff =
 		"diff --git a/src/Auth.java b/src/Auth.java\n--- a/src/Auth.java\n+++ b/src/Auth.java\n" +
 		"@@ -10,0 +10,1 @@\n[L10] + insecure();\n@@ -20,0 +21,1 @@\n[L21] + insecure();\n";
@@ -1485,7 +1428,6 @@ void test("a coordinate copied from a numbered view of diff.patch is read as the
 		resolveQuote({ ...citation, startLine: 7, endLine: 7, quote: "insecure();" }, diff),
 		{ quote: " insecure();", startLine: 21, endLine: 21 },
 	);
-	// A view line that is not a line of the cited file still names nothing: the choice is the session's.
 	assert.match(
 		describeCitationMismatch(
 			{ ...citation, startLine: 4, endLine: 4, quote: "insecure();" },
@@ -1507,13 +1449,10 @@ void test("a file the diff shows without numbered lines is refused with what to 
 	const at = (path: string, side: "OLD" | "NEW" = "NEW") =>
 		describeCitationMismatch({ ...citation, path, side, startLine: 361, endLine: 361 }, diff) ?? "";
 
-	// A binary file and a rename without edits have a header only: the commit that touches them is citable.
 	assert.match(at("logo.png"), /no numbered lines in the diff[\s\S]*commits\.json/u);
 	assert.match(at("new.txt"), /no numbered lines in the diff/u);
 	assert.match(at("old.txt", "OLD"), /no numbered lines in the diff/u);
-	// A deleted file's lines are on the old side.
 	assert.match(at("gone.txt"), /no lines on the NEW side[\s\S]*on the OLD side/u);
-	// A path the change never names is not a file of the change at all.
 	assert.match(at("elsewhere.txt"), /the change does not touch elsewhere\.txt/u);
 });
 
@@ -1556,7 +1495,6 @@ void test("a claim about an earlier review is bound to the staged history like a
 	assert.equal(describeCitationMismatch(cited, bytes) === null, true);
 	const invented = { ...cited, quote: '"recurrenceKey": "invented"' };
 	assert.equal(describeCitationMismatch(invented, bytes) === null, false);
-	// The refusal shows what the cited lines hold: a body serialized into one JSON line is one line.
 	assert.equal(
 		describeCitationMismatch(invented, bytes),
 		`[L1] reads ${JSON.stringify(bytes)}, not ${JSON.stringify(invented.quote)}`,
@@ -1565,8 +1503,6 @@ void test("a claim about an earlier review is bound to the staged history like a
 		describeCitationMismatch({ ...invented, startLine: 3, endLine: 3 }, `${bytes}\n`),
 		"the sourceFile has 1 line(s), so there is no [L3]",
 	);
-	// A quote across a serialized body's line breaks is a reading of the escaped form, and resolves to it;
-	// text that is not there at all is refused with how to quote such a line.
 	const serialized = '{"body": "## Criteria\\n- [x] stored in `diagrams/`\\n- [x] embedded"}\n';
 	assert.deepEqual(
 		resolveQuote({ ...invented, quote: "## Criteria\n- [x] stored in `diagrams/`" }, serialized),
@@ -1642,7 +1578,6 @@ void test("a serialized-source quote at the wrong lines is recorded where it occ
 		startLine: 2,
 		endLine: 2,
 	});
-	// The same text in two places is not relocated: the refusal names both.
 	assert.match(
 		describeCitationMismatch(citation, `${content}  "changed_files" : 1\n`) ?? "",
 		/it occurs at \[L2\], \[L4\] — cite the one you mean/u,
@@ -1685,7 +1620,6 @@ void test("annotated source text is not parsed as a header and Unicode separator
 	);
 });
 
-// ── Warrant scope ────────────────────────────────────────────────────────────
 
 void test("a decided claim preserves its submitted bounded search", () => {
 	assert.equal("search" in normalizeSubmission(baseSubmission()).evidence, false);
@@ -1727,7 +1661,6 @@ void test("a NOT_MET or COULD_NOT_DETERMINE search names every exhaustive source
 		normalizeSubmission(baseSubmission({ evidence: { search: goodSearch } })),
 		normalizeSubmission(resultOf("COULD_NOT_DETERMINE")),
 	]) {
-		// A search that is not an absence-only MET needs no exhaustive source.
 		assert.doesNotThrow(() => validateSearchScope(submission, new Set(), available));
 		assert.throws(
 			() => validateSearchScope(submission, available, available),
@@ -1745,15 +1678,12 @@ void test("an inapplicability names only sources the run staged", () => {
 	assert.doesNotThrow(() =>
 		validateInapplicabilityScope(submission, new Set(["scm.pull-request.diff"])),
 	);
-	// Another outcome has no inapplicability to check.
 	assert.doesNotThrow(() =>
 		validateInapplicabilityScope(normalizeSubmission(resultOf("MET")), new Set()),
 	);
 });
 
-// ── Conversation turns ───────────────────────────────────────────────────────
 
-/** A thread as the server writes it: the reviewed participant wrote the second turn. */
 const THREAD = `{
   "channel" : "C123",
   "messages" : [ {
@@ -1810,7 +1740,6 @@ void test("logical message text citations use the frozen native account rather t
 });
 
 void test("a thread whose messages are not all objects is refused, never read with shifted turns", () => {
-	// Counted by objects alone, the third message's lines would be read as the second message's turn.
 	const thread = `{
   "messages" : [ "joined", {
     "accountId" : "42"

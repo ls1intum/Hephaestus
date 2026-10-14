@@ -48,14 +48,9 @@ class CatalogServiceTest extends BaseUnitTest {
     private final PracticeReviewDigest digest = mock(PracticeReviewDigest.class);
     private final ConfigAuditPort audit = mock(ConfigAuditPort.class);
     private final Map<CatalogEntry.Id, CatalogEntry> rows = new HashMap<>();
-    private final CatalogService service = new CatalogService(
-            repository,
-            loader,
-            digest,
-            mock(PracticeDefinitionValidator.class),
-            mock(CatalogLock.class),
-            mapper,
-            audit);
+    private final CatalogService service = new CatalogService(repository, loader, digest, mapper);
+    private final CatalogCustomizationService customization = new CatalogCustomizationService(
+            service, repository, mock(PracticeDefinitionValidator.class), mock(CatalogLock.class), mapper, audit);
     private final PracticeDefinition original = DefinitionTestFixtures.definition();
     private final CatalogPracticeDocument document =
             new CatalogPracticeDocument(new ItemKind("scm.pull_request"), "review", original);
@@ -96,7 +91,7 @@ class CatalogServiceTest extends BaseUnitTest {
     }
 
     private CatalogOffer<CatalogPracticeDocument> customize(PracticeDefinition definition) {
-        return service.updatePractice(
+        return customization.updatePractice(
                 "description",
                 new CatalogPracticeInputDTO("description", "scm.pull_request", "review", definition, 4),
                 tag(service.practice("description").etag()));
@@ -104,8 +99,8 @@ class CatalogServiceTest extends BaseUnitTest {
 
     @Test
     void shouldRecordNoInventedUpstreamForALocalPractice() {
-        var offered =
-                service.createPractice(new CatalogPracticeInputDTO("local", "scm.pull_request", null, original, null));
+        var offered = customization.createPractice(
+                new CatalogPracticeInputDTO("local", "scm.pull_request", null, original, null));
         assertThat(offered.state()).isEqualTo(CatalogEntryState.YOURS);
         assertThat(offered.shipped()).isNull();
         assertThat(offered.base()).isNull();
@@ -119,7 +114,7 @@ class CatalogServiceTest extends BaseUnitTest {
     void shouldDeclineAnUpdateAndKeepResetAvailableWithIndependentControls() {
         var local = DefinitionTestFixtures.rename(original, "My description");
         var first = customize(local);
-        service.setExcluded(CatalogEntryType.PRACTICE, "description", true, tag(first.etag()));
+        customization.setExcluded(CatalogEntryType.PRACTICE, "description", true, tag(first.etag()));
         var offered = DefinitionTestFixtures.rename(original, "New bundled description");
         when(digest.of(local)).thenReturn("same-review");
         when(digest.of(offered)).thenReturn("same-review");
@@ -127,12 +122,12 @@ class CatalogServiceTest extends BaseUnitTest {
         var pending = service.practice("description");
         assertThat(pending.state()).isEqualTo(CatalogEntryState.UPDATE_WAITING);
         assertThat(pending.changeKind()).isEqualTo(CatalogChangeKind.WORDING);
-        service.acknowledge(CatalogEntryType.PRACTICE, "description", tag(pending.etag()));
+        customization.acknowledge(CatalogEntryType.PRACTICE, "description", tag(pending.etag()));
         var declined = service.practice("description");
         assertThat(declined.effective().definition()).isEqualTo(local);
         assertThat(Objects.requireNonNull(declined.base()).definition()).isEqualTo(offered);
         assertThat(declined.state()).isEqualTo(CatalogEntryState.EDITED_HERE);
-        service.reset(CatalogEntryType.PRACTICE, "description", tag(declined.etag()));
+        customization.reset(CatalogEntryType.PRACTICE, "description", tag(declined.etag()));
         var reset = service.practice("description");
         assertThat(reset.effective().definition()).isEqualTo(offered);
         assertThat(reset.position()).isEqualTo(4);
@@ -154,7 +149,7 @@ class CatalogServiceTest extends BaseUnitTest {
 
     @Test
     void shouldExcludeTheWholeGroupFromTheOfferedCatalogAndAllowInclusion() {
-        service.setExcluded(
+        customization.setExcluded(
                 CatalogEntryType.GROUP,
                 "review",
                 true,
@@ -162,7 +157,7 @@ class CatalogServiceTest extends BaseUnitTest {
         assertThat(service.practiceView(service.practice("description")).offered())
                 .isFalse();
         assertThat(service.effectiveCatalog().installablePractices()).isEmpty();
-        service.setExcluded(
+        customization.setExcluded(
                 CatalogEntryType.GROUP,
                 "review",
                 false,
@@ -173,9 +168,10 @@ class CatalogServiceTest extends BaseUnitTest {
 
     @Test
     void shouldRejectStaleAndMissingPreconditionsWithoutWriting() {
-        assertThatThrownBy(() -> service.setExcluded(CatalogEntryType.PRACTICE, "description", true, null))
+        assertThatThrownBy(() -> customization.setExcluded(CatalogEntryType.PRACTICE, "description", true, null))
                 .isInstanceOf(CatalogPreconditionRequiredException.class);
-        assertThatThrownBy(() -> service.setExcluded(CatalogEntryType.PRACTICE, "description", true, tag("stale")))
+        assertThatThrownBy(
+                        () -> customization.setExcluded(CatalogEntryType.PRACTICE, "description", true, tag("stale")))
                 .isInstanceOf(StaleCatalogEntryException.class)
                 .hasMessage("This entry changed after you loaded it. Reload and try again.");
         assertThat(rows).isEmpty();
@@ -184,7 +180,7 @@ class CatalogServiceTest extends BaseUnitTest {
 
     @Test
     void shouldKeepKindImmutableEvenWhenTheDefinitionHasNoEvents() {
-        assertThatThrownBy(() -> service.updatePractice(
+        assertThatThrownBy(() -> customization.updatePractice(
                         "description",
                         new CatalogPracticeInputDTO("description", "scm.issue", null, original, 0),
                         tag(service.practice("description").etag())))
@@ -194,14 +190,15 @@ class CatalogServiceTest extends BaseUnitTest {
 
     @Test
     void shouldResequenceMovedPracticesAndRestoreTheBundledOrder() {
-        service.createPractice(new CatalogPracticeInputDTO("local", "scm.pull_request", "review", original, null));
-        service.move("local", "review", 0, tag(service.effectiveCatalog().etag()));
+        customization.createPractice(
+                new CatalogPracticeInputDTO("local", "scm.pull_request", "review", original, null));
+        customization.move("local", "review", 0, tag(service.effectiveCatalog().etag()));
         assertThat(service.effectiveCatalog().practices())
                 .extracting(CatalogOffer::slug)
                 .containsExactly("local", "description");
         assertThat(service.practice("local").position()).isZero();
         assertThat(service.practice("description").position()).isEqualTo(1);
-        service.resetOrder(tag(service.effectiveCatalog().etag()));
+        customization.resetOrder(tag(service.effectiveCatalog().etag()));
         assertThat(service.effectiveCatalog().practices())
                 .extracting(CatalogOffer::slug)
                 .containsExactly("description", "local");
@@ -214,7 +211,7 @@ class CatalogServiceTest extends BaseUnitTest {
         clearInvocations(audit);
         var offered = DefinitionTestFixtures.rename(original, "New name");
         ship(new CatalogPracticeDocument(document.kind(), document.groupSlug(), offered));
-        var result = service.applyRelease(
+        var result = customization.applyRelease(
                 "description",
                 Map.of(PracticeDefinitionField.NAME, PracticeReleaseChoice.OFFERED),
                 tag(service.practice("description").etag()));
@@ -235,7 +232,7 @@ class CatalogServiceTest extends BaseUnitTest {
         customize(DefinitionTestFixtures.rename(original, "Local name"));
         ship(new CatalogPracticeDocument(new ItemKind("scm.issue"), document.groupSlug(), original));
         var current = service.practice("description");
-        assertThatThrownBy(() -> service.reset(CatalogEntryType.PRACTICE, "description", tag(current.etag())))
+        assertThatThrownBy(() -> customization.reset(CatalogEntryType.PRACTICE, "description", tag(current.etag())))
                 .isInstanceOf(CatalogConflictException.class);
         assertThat(service.practice("description").effective().kind()).isEqualTo(document.kind());
         assertThat(service.practice("description").effective().definition().name())

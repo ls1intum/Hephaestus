@@ -28,13 +28,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.HtmlUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/**
- * The footer every comment Hephaestus posts on reviewed work carries: that it is AI-generated,
- * where the developer answers it in Hephaestus, and, on a summary, why they see it. Hephaestus
- * reads no reaction or reply on the provider, so the footer asks for none. The answer link names
- * the work, not the review, so two reviews of the same work still write the same note and a
- * repeated one is still recognised.
- */
+// Key the answer link by work so repeated reviews retain the same copy marker.
 @Component
 public class ScmFeedbackFormatter {
 
@@ -112,10 +106,6 @@ public class ScmFeedbackFormatter {
                 .append("</sub>\n");
     }
 
-    /**
-     * Where the developer answers what the review of this work said: their own reviews of it, in
-     * Hephaestus.
-     */
     private String respondLink(ItemRef item) {
         String slug = workspaces
                 .findById(item.workspaceId())
@@ -132,38 +122,23 @@ public class ScmFeedbackFormatter {
     /** Maximum comment body length before header/footer (GitHub limit is 65,536). */
     static final int MAX_BODY_LENGTH = 60_000;
 
-    /**
-     * Matches @mentions (e.g., @username) — backtick-escaped to prevent notification spam.
-     * Lookbehind covers start-of-line, whitespace, punctuation, and markdown formatting chars
-     * ({@code * _ ~ > | - `}) to prevent bypass via {@code *@user*}, {@code >@user}, {@code
-     * - @user}, or a literal backtick outside code.
-     */
+    // Escape live mentions, including those adjacent to Markdown punctuation, to prevent notifications.
     private static final Pattern AT_MENTION =
             Pattern.compile("(?<=^|[\\s(\\[\"'*_~>|#!+={}\\-,.:;/)`])@([a-zA-Z0-9][-a-zA-Z0-9._]*)", Pattern.MULTILINE);
 
-    /** Matches HTML comments — stripped to prevent hidden instructions for AI tools. */
+    // Hidden HTML comments can carry instructions for downstream AI tools.
     private static final Pattern HTML_COMMENT = Pattern.compile("<!--[\\s\\S]*?-->");
 
     private static final Pattern COMMENT_OPENER = Pattern.compile("<!--");
 
-    /**
-     * Parses with source positions, so code literals can be told apart from live Markdown and HTML.
-     */
     private static final Parser MARKDOWN = Parser.builder()
             .includeSourceSpans(IncludeSourceSpans.BLOCKS_AND_INLINES)
             .build();
 
-    /**
-     * Bounds the reparse loop. Removals only shorten the text and a wrapped mention is code on the
-     * next pass, so ordinary text settles in two passes; a text that has not settled by the bound
-     * is not published.
-     */
+    // Stop if sanitization cannot settle within the bound; partial sanitization must not be published.
     private static final int MAX_SANITIZE_PASSES = 16;
 
-    /**
-     * Only http(s) links stay live; any other destination could phish or run script from untrusted
-     * output.
-     */
+    // Only HTTP(S) links may remain live in untrusted feedback.
     private static final Pattern SAFE_LINK_DESTINATION = Pattern.compile("(?i)https?://");
 
     private static final String TRUNCATION_NOTICE = "\n\n[... truncated. The comment exceeded the length limit.]";
@@ -204,10 +179,6 @@ public class ScmFeedbackFormatter {
             "td",
             "th");
 
-    /**
-     * Matches standalone approval language that could mislead reviewers. Tolerates trailing
-     * punctuation (e.g., "LGTM!", "Approved.").
-     */
     private static final Pattern APPROVAL_LANGUAGE = Pattern.compile(
             "^\\s*(?:LGTM|(?:looks good to me)|(?:approved)|(?:ready to merge)|(?:ship it)|(?:approved by\\b[^\\n]*))[.!?]*\\s*$",
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
@@ -220,15 +191,11 @@ public class ScmFeedbackFormatter {
         return APPROVAL_LANGUAGE.matcher(body).find();
     }
 
-    /**
-     * Matches invisible Unicode characters: bidi controls, zero-width chars, BOM. Prevents text
-     * direction attacks and @mention bypass via zero-width spaces. Excludes U+200D (Zero Width
-     * Joiner) — used in compound emoji sequences.
-     */
+    // Strip invisible direction and mention-bypass characters; preserve ZWJ for compound emoji.
     private static final Pattern INVISIBLE_CHARS =
             Pattern.compile("[\\u200B\\u200C\\u200E\\u200F\\u061C\\u202A-\\u202E\\u2066-\\u2069\\uFEFF]");
 
-    /** Matches markdown autolinks: &lt;https://...&gt; — protected from HTML tag stripping. */
+    // Preserve HTTP(S) autolinks during HTML tag stripping.
     private static final Pattern AUTOLINK = Pattern.compile("<(https?://[^>\\s]+)>");
 
     public static String sanitize(@Nullable String raw) {
@@ -251,9 +218,6 @@ public class ScmFeedbackFormatter {
         return result;
     }
 
-    /**
-     * The text once a pass changes nothing more, or null when it does not settle within the bound.
-     */
     private static @Nullable String settle(String text) {
         String result = text;
         for (int pass = 0; pass < MAX_SANITIZE_PASSES; pass++) {
@@ -265,10 +229,7 @@ public class ScmFeedbackFormatter {
         return null;
     }
 
-    /**
-     * One pass in the load-bearing order: autolinks survive tag stripping, which settles before
-     * Markdown.
-     */
+    // Protect autolinks before stripping tags; settle HTML before sanitizing Markdown.
     private static @Nullable String sanitizePass(String text) {
         String result = outsideCode(text, HTML_COMMENT, match -> "");
         // An unterminated opener matches nothing above, and runs to end of document in both
@@ -285,10 +246,6 @@ public class ScmFeedbackFormatter {
         return result == null ? null : outsideCode(result, AT_MENTION, match -> "`@" + match.group(1) + "`");
     }
 
-    /**
-     * Keeps a safe tag without its attributes, so no onclick/onload survives, and drops every other
-     * tag.
-     */
     private static String safeTag(MatchResult match) {
         String tagName = match.group(1).toLowerCase(Locale.ROOT);
         if (!SAFE_HTML_TAGS.contains(tagName)) {
@@ -300,11 +257,6 @@ public class ScmFeedbackFormatter {
         return "<" + tagName + ">";
     }
 
-    /**
-     * Applies {@code replacement} to each match of {@code pattern} in the text between code
-     * literals. Each stretch is matched on its own, so a mention right after a code span counts as
-     * starting a word.
-     */
     private static String outsideCode(String text, Pattern pattern, Function<MatchResult, String> replacement) {
         StringBuilder out = new StringBuilder(text.length());
         Matcher matcher = pattern.matcher(text);
@@ -336,7 +288,6 @@ public class ScmFeedbackFormatter {
         out.append(text, last, to);
     }
 
-    /** The source ranges of every code span and code block line, in order. */
     private static List<Range> codeRanges(String text) {
         List<Range> ranges = new ArrayList<>();
         MARKDOWN.parse(text).accept(new AbstractVisitor() {
@@ -367,12 +318,6 @@ public class ScmFeedbackFormatter {
 
     private record Range(int from, int to) {}
 
-    /**
-     * Removes every live image and reduces every link that is not http(s) to its label, both as the
-     * parser reads them: the whole construct goes, whatever its label holds, and the label keeps
-     * its own source text. An image or link inside a label that stays is handled by the next pass.
-     * Null when the parser gives such a construct no source position, so it cannot be removed.
-     */
     private static @Nullable String withoutLiveImagesOrUnsafeLinks(String text) {
         List<Edit> edits = new ArrayList<>();
         boolean[] unplaced = {false};
@@ -409,10 +354,6 @@ public class ScmFeedbackFormatter {
         return out.append(text, position, text.length()).toString();
     }
 
-    /**
-     * From the start of {@code first} to the end of {@code last}; null when either has no source
-     * position.
-     */
     private static @Nullable Range rangeOf(@Nullable Node first, @Nullable Node last) {
         if (first == null || last == null) return null;
         List<SourceSpan> start = first.getSourceSpans();
@@ -424,11 +365,7 @@ public class ScmFeedbackFormatter {
 
     private record Edit(Range range, String replacement) {}
 
-    /**
-     * The first {@code budget} characters, with a fence the cut leaves open closed inside the
-     * budget, then the notice. The cut moves back until the closing fence fits, so the code stays
-     * code.
-     */
+    // Reserve space to close any cut code fence so truncated code cannot become live Markdown.
     private static String truncate(String text, int budget) {
         String cut = text.substring(0, Math.min(budget, text.length()));
         FencedCodeBlock open;
@@ -465,7 +402,6 @@ public class ScmFeedbackFormatter {
         return block.getFenceCharacter().repeat(opening == null ? 3 : opening);
     }
 
-    /** Preserves the existing external correlation markers when a copy is withdrawn. */
     public static String withdrawnCopyBody(String original) {
         var markers = Pattern.compile("<!--[ ]*hephaestus[^<>]*-->").matcher(original);
         var body = new StringBuilder("This feedback was withdrawn.");

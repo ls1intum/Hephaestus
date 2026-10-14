@@ -3,11 +3,9 @@ import type { PracticeScriptRun } from "@/api/types.gen";
 export type PracticeScriptRunStatus = PracticeScriptRun["status"];
 export type PracticeScriptStopReason = NonNullable<PracticeScriptRun["stopReason"]>;
 
-/** What ran: the practice's own script, or the built-in review a practice without one gets. */
 const program = (run: Pick<PracticeScriptRun, "scriptKind">) =>
 	run.scriptKind === "BUILTIN" ? "Built-in review" : "Practice script";
 
-/** Why a program stopped without a result, as the end of "… stopped without a result: …". */
 export const PRACTICE_SCRIPT_STOP_REASON_DEFS = {
 	UNAVAILABLE: { sentence: "a model it needed was unavailable", result: "Model unavailable" },
 	BUDGET: { sentence: "it used up its budget", result: "Out of budget" },
@@ -34,11 +32,7 @@ interface PracticeScriptRunStatusDef {
 	result: (run: PracticeScriptRun) => string;
 }
 
-/**
- * How one practice's program ended. Never a badge: it is an operating fact about the program, and a
- * badge would read as the practice's own outcome. A result the program returned can still be
- * withheld when it is admitted, so the words say it returned one, never that it was recorded.
- */
+// Script execution is an operating fact; a status badge would imply a practice outcome.
 export const PRACTICE_SCRIPT_RUN_STATUS_DEFS = {
 	OK: {
 		sentence: (run) => `${program(run)} returned a result.`,
@@ -68,12 +62,10 @@ export const PRACTICE_SCRIPT_RUN_STATUS_DEFS = {
 	},
 } satisfies Record<PracticeScriptRunStatus, PracticeScriptRunStatusDef>;
 
-/** The trace line's words: how the run ended. */
 export function practiceScriptRunSentence(run: PracticeScriptRun): string {
 	return PRACTICE_SCRIPT_RUN_STATUS_DEFS[run.status].sentence(run);
 }
 
-/** The operations guide, whose sections say who can act where nothing in the workspace can. */
 const OPERATIONS_GUIDE_URL = "https://docs.hephaestus.build/admin/practice-review-operations";
 
 interface PracticeScriptGuideDef {
@@ -83,7 +75,6 @@ interface PracticeScriptGuideDef {
 	anchor: string;
 }
 
-/** The sections of the operations guide that a practice script fix can open. */
 export const PRACTICE_SCRIPT_GUIDE_DEFS = {
 	/** Why a program ran out of time or budget, or did not finish, and what to raise or speed up. */
 	STOPPED_EARLY: { label: "Why scripts stop early", anchor: "the-trace-line" },
@@ -95,10 +86,6 @@ export function practiceScriptGuideUrl(guide: PracticeScriptGuide): string {
 	return `${OPERATIONS_GUIDE_URL}#${PRACTICE_SCRIPT_GUIDE_DEFS[guide].anchor}`;
 }
 
-/**
- * The one change that would most help a program next time: edit a script that failed, or read the
- * guide where a cap, a slow host or an oversized call stopped it, since no page here fixes those.
- */
 export type PracticeScriptFix = { kind: "EDIT" } | { kind: "GUIDE"; guide: PracticeScriptGuide };
 
 export function practiceScriptFix(run: PracticeScriptRun): PracticeScriptFix | undefined {
@@ -117,11 +104,7 @@ export function practiceScriptFix(run: PracticeScriptRun): PracticeScriptFix | u
 	}
 }
 
-/**
- * A program that ran out of time or budget is helped by the guide, not by an edit. A cancelled
- * review needs nothing. Anything else is the script's own doing, and the built-in review has no
- * script anyone here can edit.
- */
+// Time and budget stops link to operating limits; cancellation needs no script fix.
 function failedFix(run: PracticeScriptRun): PracticeScriptFix | undefined {
 	if (run.stopReason === "DEADLINE" || run.stopReason === "BUDGET") {
 		return { kind: "GUIDE", guide: "STOPPED_EARLY" };

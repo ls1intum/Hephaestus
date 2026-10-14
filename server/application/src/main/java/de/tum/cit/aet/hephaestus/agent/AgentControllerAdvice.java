@@ -20,14 +20,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.annotation.ResponseStatusExceptionResolver;
 
-/**
- * Error mapper for agent-module exceptions, per {@code docs/contributor/api-error-handling.md}.
- *
- * <p>An agent exception without an explicit handler below returns 500 regardless of any
- * {@code @ResponseStatus} on it: {@code GlobalControllerAdvice}'s
- * {@code @ExceptionHandler(Exception.class)} catches it before
- * {@link ResponseStatusExceptionResolver} can run.
- */
+/** Explicit handlers are required: GlobalControllerAdvice catches exceptions before {@link ResponseStatusExceptionResolver}. */
 @RestControllerAdvice(basePackageClasses = AgentControllerAdvice.class)
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AgentControllerAdvice {

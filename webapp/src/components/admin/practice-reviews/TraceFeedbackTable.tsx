@@ -48,10 +48,6 @@ function feedbackTone(feedback: LineageFeedback, item: ItemRef | undefined): Bad
 	return outcome.kind === "delivered" ? "success" : outcome.def.badgeVariant;
 }
 
-/**
- * The review a piece was composed in, where it is not the trace's own: every result it rests on
- * was recorded by another review, before this one started or after.
- */
 function composedElsewhere(
 	feedback: LineageFeedback,
 	records: LineageRecords,
@@ -69,12 +65,6 @@ function composedElsewhere(
 		: "a later review";
 }
 
-/**
- * Pieces of feedback one after the other as one table on the rail: a row per piece with its
- * letter, its destination, its state and the results it was composed from by number, and when it
- * reached the developer. Its dot takes the tone of the piece that most needs a look, and the rail
- * is dashed into it after a long wait.
- */
 export function FeedbackTableStep({
 	items,
 	previous,
@@ -120,11 +110,6 @@ export function FeedbackTableStep({
 	);
 }
 
-/**
- * One piece of feedback as a row: its letter, its destination, where it went or why not, the
- * results it was composed from, and when it reached the developer with the wait since the row
- * above. With system info, what the short words leave out stands under its state.
- */
 function FeedbackRow({
 	feedback,
 	item,
@@ -144,7 +129,6 @@ function FeedbackRow({
 	// Where the facts box opens under the row, it says all of this once; the row keeps its one line.
 	const boxed = factsOpen || (display.system && sameTraceNode(here, node));
 	const outcome = branchOutcome(feedback, item);
-	// The destination column says where it went, so a delivered piece only says that it arrived.
 	const stateText = outcome.kind === "delivered" ? "Delivered" : outcome.text;
 	const notes = [
 		elsewhere === undefined ? undefined : `Composed by ${elsewhere}`,
@@ -231,10 +215,6 @@ function GapText({ from, to }: { from: Date; to: Date }) {
 	);
 }
 
-/**
- * The results a piece was composed from, as chips. A piece another review composed may rest on
- * results this graph does not number: those are counted as that review's, never as missing.
- */
 function FeedbackSources({
 	feedback,
 	byId,

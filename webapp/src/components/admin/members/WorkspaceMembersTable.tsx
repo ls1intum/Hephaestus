@@ -84,7 +84,7 @@ export interface WorkspaceMembersTableView {
 	size: number;
 }
 
-/** Unclaimed accounts have not signed in, so they read as neutral rather than as a problem. */
+// An unclaimed account has not signed in; it does not indicate a fault.
 function AccountStatus({ row }: { row: WorkspaceMemberRow }) {
 	const { account, leftAt } = row.membership;
 	if (leftAt !== null) {

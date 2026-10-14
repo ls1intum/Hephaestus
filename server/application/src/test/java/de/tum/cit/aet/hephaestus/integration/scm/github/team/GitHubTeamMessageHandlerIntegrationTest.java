@@ -32,11 +32,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Integration tests for GitHubTeamMessageHandler.
- *
- * <p>Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
- */
 class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

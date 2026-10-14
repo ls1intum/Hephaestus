@@ -226,7 +226,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
         assertThat(admitted.price().per1mInputUsd()).isEqualByComparingTo("0.02");
     }
 
-    /** An exception that leaves a transactional proxy would mark the claim's transaction rollback-only. */
+    // A failure escaping the transactional proxy would mark the claim rollback-only.
     @Test
     void shouldAdmitNothingWithoutThrowingWhenAnOptionalModelHasNoPrice() {
         WorkspaceAgentBinding binding = byoBinding();

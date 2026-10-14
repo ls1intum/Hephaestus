@@ -10,15 +10,7 @@ import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
-/**
- * Slack-owned implementation of the agent {@link ConversationCandidateSource} SPI, over Slack's own
- * {@code slack_thread}/{@code slack_message} tables. The provider {@code SlackThreadEventScheduler} consumes
- * it through the SPI to enqueue {@code CONVERSATION_REVIEW} jobs and never reaches into the Slack schema.
- *
- * <p>{@link #settledCandidates} is an inherently cross-workspace sweep (each candidate carries its own
- * {@code workspace_id}, allowlisted in {@code SlackIntegrationArchitectureTest}); every other method carries an
- * explicit {@code workspace_id} predicate through its repository call.
- */
+/** Only {@link #settledCandidates} spans workspaces; all other reads require an explicit workspace predicate. */
 @Service
 public class SlackConversationCandidateSource implements ConversationCandidateSource {
 

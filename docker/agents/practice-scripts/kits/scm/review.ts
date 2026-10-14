@@ -34,12 +34,10 @@ export interface LinkedWorkItem {
 	subIssuesSource?: SubIssueSource;
 }
 
-/** A comment anchored to a line of the change (`comments.json`). */
 export interface ReviewComment {
 	id?: number;
 	/** The `id` of the thread in `review_threads.json` this comment belongs to. */
 	thread?: number;
-	/** The `id` of the comment this one answers. */
 	inReplyTo?: number;
 	path: string;
 	line?: number;
@@ -55,7 +53,6 @@ export interface ReviewComment {
 	recordLine: number;
 }
 
-/** A comment in the conversation, not on a line (`general_comments.json`). */
 export interface GeneralComment {
 	body: string;
 	author?: string;
@@ -175,7 +172,6 @@ async function readReviewRecord<T>(
 	return { data: parsed.data, source: record.text };
 }
 
-/** What `linked_work_items.json` records: the resolved items and the numbers this repository holds no issue for. */
 interface LinkedWorkItemCapture {
 	items: LinkedWorkItem[];
 	unresolved: number[];
@@ -277,7 +273,7 @@ export async function readGeneralComments(
 	}));
 }
 
-/** The threads and submitted decisions; null when `review_threads.json` was not captured. */
+/** Null means review_threads.json was not captured; an empty array is a captured empty record. */
 export async function readReviewThreads(
 	evidence: Pick<Evidence, "record">,
 ): Promise<{ threads: ReviewThread[]; decisions: ReviewDecision[] } | null> {
@@ -293,7 +289,6 @@ export async function readReviewThreads(
 			};
 }
 
-/** One task-list item of an issue or description body, as written. */
 interface CheckableItem {
 	line: number;
 	text: string;
@@ -331,12 +326,10 @@ export function later(a: string | undefined, b: string | undefined): boolean {
 	return a !== undefined && b !== undefined && Date.parse(a) > Date.parse(b);
 }
 
-/** A body on one line, cut to `length` characters, for a row's context or a flag. */
 export function excerpt(body: string, length = 160): string {
 	return body.replaceAll(/\s+/gu, " ").trim().slice(0, length);
 }
 
-/** Whether the change adds or removes a line within `radius` lines of the anchor. */
 export function changeNear(
 	diff: DiffFile | undefined,
 	line: number | undefined,
@@ -349,14 +342,11 @@ export function changeNear(
 	return [...diff.addedLines.keys()].some(near) || [...diff.removedLines.keys()].some(near);
 }
 
-/** A comment by someone other than the author, with what the record shows beside it. */
 interface ReviewerCommentRow {
 	comment: ReviewComment;
 	/** No earlier comment by others in the same thread: this one opens it. */
 	opensThread: boolean;
-	/** The author's later comments in the same thread. */
 	replies: ReviewComment[];
-	/** Others' later comments in the same thread. */
 	followUps: ReviewComment[];
 	thread?: ReviewThread;
 }
@@ -368,7 +358,6 @@ function sameThread(a: ReviewComment, b: ReviewComment): boolean {
 		: a.path === b.path && a.line === b.line;
 }
 
-/** Group replies by thread ID, falling back to path and line when the IDs are absent. */
 export function reviewerCommentRows(
 	inline: readonly ReviewComment[],
 	threads: readonly ReviewThread[],
@@ -401,7 +390,6 @@ export function reviewerCommentRows(
 	});
 }
 
-/** The authored (non-merge) commits committed after an instant, and those touching a path. */
 export function commitsAfter(
 	commits: readonly ChangeCommit[],
 	at: string | undefined,
@@ -415,7 +403,6 @@ export function commitsAfter(
 	).length;
 }
 
-/** What the pull request record says about its merge, for the practices that review one. */
 interface MergeFacts {
 	mergedAt?: string;
 	mergedBy?: string;
@@ -423,7 +410,6 @@ interface MergeFacts {
 	author?: string;
 }
 
-/** The fields of a pull request record that tell about its merge, as `ctx.work` holds them. */
 type MergeRecord = Pick<
 	z.infer<typeof pullRequestRecordSchema>,
 	"merged_at" | "merged_by" | "author" | "review_decision" | "merge_state_status" | "head_checks"
@@ -449,7 +435,6 @@ export function mergeFacts(record: MergeRecord): MergeFacts {
 	};
 }
 
-/** The merge as one lead on the record: who merged, when, with the provider's own decision fields. */
 export function mergeLead(record: MergeRecord, merge: MergeFacts, label: string): ReviewLead {
 	return {
 		at: { record: "metadata.json" },
@@ -505,7 +490,7 @@ export function lastDecisionPerReviewer(decisions: readonly ReviewDecision[]): R
 		.map(([, decision]) => decision);
 }
 
-/** Whether a time is one `Date.parse` can read; a missing or unparseable time places nothing. */
+// Missing or invalid timestamps cannot establish event order.
 export function dated(time: string | undefined): boolean {
 	return !Number.isNaN(Date.parse(time ?? ""));
 }
@@ -533,7 +518,6 @@ export function candidateThreads(
 	);
 }
 
-/** What a candidate thread is against the merge, each told to the reviewer by its own label. */
 export type ThreadKind =
 	| "unresolved-thread"
 	| "thread-resolved-after-the-merge"
@@ -555,7 +539,6 @@ function threadKind(t: ReviewThread, merge: MergeFacts): ThreadKind {
 		: "resolved-thread-both-times-unknown";
 }
 
-/** A candidate thread as a lead on the threads record, with where the thread is anchored. */
 export function threadLead(
 	t: ReviewThread,
 	merge: MergeFacts,

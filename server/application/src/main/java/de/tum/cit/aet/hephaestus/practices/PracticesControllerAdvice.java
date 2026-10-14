@@ -18,10 +18,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/**
- * Error mapper for practices-specific exceptions. Kept in the practices module to avoid a cyclic
- * dependency between practices and core.
- */
+// Practices exception handling stays in this module to avoid a dependency cycle with core.
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class PracticesControllerAdvice {

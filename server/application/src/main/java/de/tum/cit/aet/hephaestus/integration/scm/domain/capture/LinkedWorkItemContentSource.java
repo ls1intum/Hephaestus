@@ -41,11 +41,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Captures the provider's closing candidates for the pull request and same-repository issue
- * references from the title, description, branch and commit messages. The review interprets textual
- * references.
- */
+// Textual issue references are candidates for the review to interpret.
 @Component
 @ConditionalOnCaptureRole
 @Order(200)
@@ -75,20 +71,11 @@ public class LinkedWorkItemContentSource {
     private static final String BODY_PROVENANCE =
             "The body below is the issue's text as mirrored when this was captured; these dates are the issue's, not when any line of it was written.";
 
-    /**
-     * {@code #N} standing on its own. The leading boundary {@code (?<![\w/.-])} rejects a number
-     * that belongs to another name: {@code owner/repo#12} and {@code group/project#12} point at
-     * another repository, {@code v1.2#3} at a version, {@code GH-12} at a tracker key — none of
-     * them this repository's issue N. The trailing boundary {@code (?![\w]|\.[0-9])} rejects what
-     * looks like a reference but is not: a hex colour ({@code #1a2b}), a unit ({@code #42px}), a
-     * version ({@code #1.2}). A sentence period after the number is still a reference.
-     */
+    // Unqualified #N references belong to this repository; qualified names, colors, and versions must not match.
     private static final Pattern NUMBER_REF = Pattern.compile("(?<![\\w/.-])#(\\d+)(?![\\w]|\\.[0-9])");
 
-    /** An issue number opening a branch-slug segment: {@code 18-foo}, {@code feat/18-foo}. */
     private static final Pattern BRANCH_REF = Pattern.compile("(?:^|/)(\\d{1,7})-");
 
-    /** Ignore template examples inside HTML comments when extracting issue references. */
     private static final Pattern HTML_COMMENT = Pattern.compile("<!--.*?-->", Pattern.DOTALL);
 
     private final ObjectMapper objectMapper;
@@ -271,12 +258,6 @@ public class LinkedWorkItemContentSource {
         return "# " + issue.getTitle() + "\n\n" + dates + "\n" + BODY_PROVENANCE + "\n\n" + body;
     }
 
-    /**
-     * @param how {@code closesOnMerge} for a provider-recorded closing candidate, which may close
-     *     on an eligible merge; {@code mentions} when only the title, description, branch or a
-     *     commit message names it. Only the issue's {@code state} and {@code closedAt} say whether
-     *     it closed
-     */
     private ObjectNode toItem(Issue issue, String how) {
         ObjectNode node = objectMapper.createObjectNode();
         node.put("number", issue.getNumber());
@@ -320,10 +301,6 @@ public class LinkedWorkItemContentSource {
         return text == null ? null : HTML_COMMENT.matcher(text).replaceAll("");
     }
 
-    /**
-     * Adds every provider-shaped reference; malformed and overflowing issue numbers are not
-     * references.
-     */
     private static void collect(Pattern pattern, @Nullable String text, Set<Integer> numbers) {
         if (text == null || text.isBlank()) return;
         Matcher matcher = pattern.matcher(text);

@@ -86,7 +86,6 @@ void test("an empty range is named as such", async () => {
 	assert.match(result.directions?.[0] ?? "", /empty diff is one of the kinds/u);
 });
 
-/** The course template's Definition of Done, which shows a closing keyword as an example. */
 const TEMPLATE = "## Definition of Done\n\n- [ ] Related issue is linked (e.g., `Closes #12`)\n";
 
 void test("a closing keyword a template shows as an example adopts no issue, and the captured issue is named as not adopted", async () => {
@@ -143,7 +142,6 @@ void test("a testing section of only N/A is stated as such, not as a section to 
 	assert.doesNotMatch(directions, /judge whether/u);
 });
 
-/** A file the diff moves or renames without changing a line. */
 function moved(file: string): [string, DiffFile] {
 	return [file, { path: file, addedLines: new Map(), removedLines: new Map(), hunks: [] }];
 }

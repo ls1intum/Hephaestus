@@ -75,7 +75,7 @@ public class PracticeReviewCoverageService {
         try {
             return Long.parseLong(value);
         } catch (NumberFormatException invalid) {
-            throw new InvalidReviewScopeException("Use a positive account or repository item id.");
+            throw new InvalidReviewScopeException("Use a positive account or repository item id.", invalid);
         }
     }
 

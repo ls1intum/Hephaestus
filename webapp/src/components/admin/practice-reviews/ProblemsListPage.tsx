@@ -21,7 +21,6 @@ import { ReviewTabIntro } from "./ReviewTabIntro";
 export interface ProblemsListPageProps {
 	search: ProblemsSearch;
 	onSearchChange: (patch: Partial<ProblemsSearch>) => void;
-	/** The problems the current `search` selects, as far as they are loaded. */
 	problems: PagedListState<ReviewProblem>;
 	groups: FacetSource;
 	practices: FacetSource<PracticeFacetOption>;
@@ -51,7 +50,6 @@ export function ProblemsListPage({
 	record,
 }: ProblemsListPageProps) {
 	const rows = problems.status === "ready" ? problems.rows : [];
-	// Only while the filter is on does the first row name the filtered developer.
 	const filteredDeveloper = search.developerId === undefined ? undefined : rows[0]?.developer;
 	const reset = () => onSearchChange(clearedProblemFilters());
 

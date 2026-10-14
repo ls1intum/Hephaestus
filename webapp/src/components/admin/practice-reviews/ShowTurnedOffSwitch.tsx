@@ -7,11 +7,7 @@ import { Switch } from "@/components/ui/switch";
 /** What decides whether a practice is turned off: its practice setup as it is now. */
 export type CurrentPractice = Pick<Practice, "slug" | "feedbackMode">;
 
-/**
- * Whether a practice is turned off in this workspace today: its feedback mode is Off now, whatever it was
- * when its results were made. A practice that is no longer in the workspace is turned off too.
- * While the practices load, nothing is: a list must not hide rows on a guess.
- */
+// Do not hide results while practice settings are loading; the current feedback mode determines visibility.
 export function isTurnedOff(
 	slug: string,
 	practices: readonly CurrentPractice[] | undefined,
@@ -37,11 +33,18 @@ export function ShowTurnedOffSwitch({
 	hidden,
 }: ShowTurnedOffSwitchProps) {
 	const id = useId();
+	const labelId = `${id}-label`;
 	return (
 		// Not a `Field`: that fills its row, and this sits beside the filters it belongs to.
 		<div className="flex h-8 items-center gap-2">
-			<Switch id={id} size="sm" checked={checked} onCheckedChange={onCheckedChange} />
-			<Label htmlFor={id} className="font-normal">
+			<Switch
+				id={id}
+				aria-labelledby={labelId}
+				size="sm"
+				checked={checked}
+				onCheckedChange={onCheckedChange}
+			/>
+			<Label id={labelId} htmlFor={id} className="font-normal">
 				Show turned-off practices
 				{!checked && hidden !== undefined && hidden > 0 && (
 					<>

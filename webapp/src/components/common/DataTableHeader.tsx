@@ -5,22 +5,6 @@ import type { DataTableFeatures } from "@/components/common/data-table";
 import { SortButton } from "@/components/common/SortButton";
 import { TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-/**
- * The header rows of a TanStack table: the `<th>`s, the sort control on every column that can sort,
- * and the `aria-sort` that makes the state legible without the icon.
- *
- * A grouped column spans its leaves with `colSpan`, as a `col` header: `colgroup` scope needs a
- * `<colgroup>` element to anchor it. A leaf with no group above it is one cell that spans every
- * header row: TanStack reports the span on the top placeholder and `rowSpan` 0 on each cell that it
- * covers, so those are skipped. Only a leaf sorts, so only a leaf carries `aria-sort`. The first
- * click sorts in the column's `getFirstSortDir()`, which a figure column sets with `sortDescFirst`.
- *
- * The sort state is read here rather than inside a column's `header`, and that is load-bearing.
- * `header.getContext()` is memoised on the identity of `columns`, so a header renderer is called
- * with the same props object on every render and the compiler caches its output — a `getIsSorted()`
- * read inside one is stale from the first click onwards. A column declares a label; the state
- * belongs to whoever re-renders when it changes.
- */
 export function DataTableHeader<TData extends RowData>({
 	table,
 }: {
@@ -53,7 +37,6 @@ export function DataTableHeader<TData extends RowData>({
 									{isLeaf && column.getCanSort() ? (
 										<SortButton
 											sorted={sorted}
-											// A right-aligned number keeps its arrow on the inside, next to the column.
 											reverse={numeric}
 											onToggle={() =>
 												column.toggleSorting(

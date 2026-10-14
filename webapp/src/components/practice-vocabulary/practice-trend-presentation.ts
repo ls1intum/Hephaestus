@@ -56,16 +56,6 @@ function allWork(work: number): string {
 /** Work of several kinds, or of a kind the wire does not name, as one noun. */
 const ANY_WORK = { one: "piece of work", many: "pieces of work" };
 
-/**
- * The registry's sentence, then what the standing rests on: the newest reviewed work it is read
- * from, and how much work was reviewed for the practice or the group in the look-back. Below
- * {@link EARLY_READ_BELOW} pieces it is an early read and says so instead of the registry's words.
- * A standing no live review counted keeps the registry's sentence alone.
- *
- * The work is named by its kind where every piece shares one ("pull requests", "merge requests" on
- * GitLab), else as "pieces of work". Both counts come from the server, from the same live reviews
- * the standing reads, so the sentence can never count more work than the results show.
- */
 export function explainStanding(
 	standing: PracticeGroupStandingValue,
 	scope: StandingScope,

@@ -6,13 +6,6 @@ import type { StatusDefs } from "@/components/common/status-def";
 
 export type ReviewOrigin = ReviewRef["origin"];
 
-/**
- * What started a review — its "Started by" — in one set of words for every surface that says it: a
- * review, its results and the step in its trace. An event is the ordinary case; the other three
- * were self-selected — asked for by hand, run on a schedule, or made while catching up on work that
- * predates the connection — so reading one as a random draw from the work is the mistake the badge
- * prevents.
- */
 export const REVIEW_ORIGIN_DEFS: StatusDefs<ReviewOrigin> = {
 	EVENT: {
 		label: "Event",

@@ -29,19 +29,13 @@ export interface ReviewFeedProps extends Pick<
 	 * narrows them to its results.
 	 */
 	reviews?: ProfileReview[];
-	/** How many review cards the skeleton draws, so nothing jumps when the real ones land. */
 	skeletonRows: number;
-	/** Why there is nothing here, in this surface's words. */
 	emptyTitle: string;
 	emptyDescription: string;
 	/** A way out of a narrowing that left the feed empty. */
 	emptyAction?: ReactNode;
 }
 
-/**
- * One practice surface's review feed with its error, loading and empty states, in one home so the
- * rail cannot end one way on one surface and another way on the next.
- */
 export function ReviewFeed({
 	feed,
 	reviews,
@@ -66,8 +60,7 @@ export function ReviewFeed({
 		return <ReviewFeedSkeleton rows={skeletonRows} />;
 	}
 	const shown = reviews ?? feed.reviews;
-	// The reviews already read stay, and the responses being written on them, under a warning that
-	// they may be out of date. It leads every ready state, so it appearing remounts nothing.
+	// Refresh failures must preserve loaded reviews and pending responses, with a stale-data warning.
 	const refreshAlert =
 		feed.refreshFailure === undefined ? undefined : (
 			<QueryErrorAlert
@@ -79,8 +72,7 @@ export function ReviewFeed({
 			/>
 		);
 
-	// A narrowing can leave the pages read so far empty while earlier ones still hold its reviews, so
-	// the empty state, which says nothing reached this surface at all, waits for the last page.
+	// Filtered loaded pages cannot prove the whole feed empty while earlier pages remain.
 	if (shown.length === 0 && feed.hasMore) {
 		return (
 			<div className="flex flex-col items-start gap-2">
@@ -125,7 +117,6 @@ export function ReviewFeed({
 
 const REVIEW_CARD_SKELETON = <Skeleton className="h-24 w-full" />;
 
-/** The earlier pages, in the words every review feed uses. */
 export function EarlierReviews({ loadingRow, ...more }: MorePages & { loadingRow: ReactNode }) {
 	return (
 		<InfiniteListEnd
@@ -137,7 +128,6 @@ export function EarlierReviews({ loadingRow, ...more }: MorePages & { loadingRow
 	);
 }
 
-/** One block per review card the feed will show, so the surface does not jump when they land. */
 export function ReviewFeedSkeleton({ rows }: { rows: number }) {
 	return (
 		<div className="flex flex-col gap-2.5" aria-busy="true">

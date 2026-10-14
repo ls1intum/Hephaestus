@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
-/** Posts and reconciles one summary on the provider target resolved from its workspace item. */
 @Component
 @ConditionalOnServerRole
 @OutboundEgressGateway
@@ -34,13 +33,9 @@ public class GitHubSummaryWriter implements SummaryWriter {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubSummaryWriter.class);
 
-    /** GitHub caps a connection page at 100. */
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
 
-    /**
-     * Our cap, not GitHub's: an unscanned tail answers {@code UNKNOWN}, so recovery retries rather
-     * than reposts.
-     */
+    // An unscanned tail is UNKNOWN; recovery must read again rather than repost.
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_BUDGET = 3;
 
     private final GitHubGraphQlClientProvider gitHubProvider;
@@ -170,13 +165,7 @@ public class GitHubSummaryWriter implements SummaryWriter {
                         response.field("updateIssueComment.issueComment.url").getValue()));
     }
 
-    /**
-     * Scans this PR/issue's comments for the viewer's own comment with the exact body {@link
-     * #postSummary} sends, walking the connection backwards from its newest end — the summary a
-     * crashed delivery already posted is the newest comment. A marker-bearing comment that is not
-     * that copy, a human's included, leaves the answer {@code UNKNOWN} unless the copy itself is
-     * found.
-     */
+    /** Search newest-first; a marker without the viewer's exact posted copy cannot establish success or absence. */
     @Override
     public SummaryLookup findExistingSummary(FeedbackTarget target, SummaryContent expected) {
         String marker = expected.writeMarker();
@@ -298,7 +287,6 @@ public class GitHubSummaryWriter implements SummaryWriter {
         return subjectExternalId != null && subjectExternalId.matches(".+/issues/\\d+");
     }
 
-    /** Splits {@code "owner/repo/issues/42"} into the components the issue node-id query needs. */
     static IssueCoordinates parseIssueSubjectExternalId(String subjectExternalId) {
         if (subjectExternalId == null || !subjectExternalId.matches(".+/issues/\\d+")) {
             throw new FeedbackDeliveryException(

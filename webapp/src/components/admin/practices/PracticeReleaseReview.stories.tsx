@@ -45,7 +45,6 @@ export const ConflictingUpdate: Story = {
 	},
 };
 
-/** Settings read as words on every side, never as the value the wire carries. */
 export const LineNotesInWords: Story = {
 	play: async () => {
 		await expect(screen.getByText("Summary only")).toBeVisible();
@@ -54,7 +53,6 @@ export const LineNotesInWords: Story = {
 	},
 };
 
-/** Without the adopted version, nothing is chosen for the reader. */
 export const AdoptedVersionUnknown: Story = {
 	args: { proposal: { ...proposal, base: null } },
 	play: async ({ args }) => {
@@ -130,7 +128,6 @@ export const UnsavedDraft: Story = {
 	},
 };
 
-/** Declining does not close the way back: the copy says where Reset to catalog stays. */
 export const Declining: Story = {
 	args: { proposal: readyProposal, pending: "decline" },
 	play: async () => {
@@ -212,7 +209,6 @@ export const GuidanceUpdate: Story = {
 	},
 };
 
-/** A practice script reads as built-in where a version has none. */
 export const PracticeScriptUpdate: Story = {
 	args: {
 		proposal: {

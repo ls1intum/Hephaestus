@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -96,7 +96,6 @@ function AdminMembersContainer() {
 		...setMemberHiddenMutation(),
 		onSuccess: (_data, variables) => {
 			void queryClient.invalidateQueries({ queryKey: membersKey });
-			// Workspace activity lists the same people and leaves hidden ones out.
 			void queryClient.invalidateQueries({
 				queryKey: getUsersWithTeamsQueryKey({
 					path: { workspaceSlug: variables.path.workspaceSlug },
@@ -126,19 +125,21 @@ function AdminMembersContainer() {
 		},
 	});
 
-	const handleToggleHidden = (accountId: string, hidden: boolean) => {
+	const { mutate: changeHidden } = toggleHidden;
+	const { mutate: changeRole } = assignRole;
+	const handleToggleHidden = useCallback((accountId: string, hidden: boolean) => {
 		if (!hasText(workspaceSlug)) {
 			return;
 		}
-		toggleHidden.mutate({ path: { workspaceSlug, accountId }, body: { hidden } });
-	};
+		changeHidden({ path: { workspaceSlug, accountId }, body: { hidden } });
+	}, [workspaceSlug, changeHidden]);
 
-	const handleRoleChange = (accountId: string, role: WorkspaceMembership["role"]) => {
+	const handleRoleChange = useCallback((accountId: string, role: WorkspaceMembership["role"]) => {
 		if (!hasText(workspaceSlug)) {
 			return;
 		}
-		assignRole.mutate({ path: { workspaceSlug }, body: { accountId, role } });
-	};
+		changeRole({ path: { workspaceSlug }, body: { accountId, role } });
+	}, [workspaceSlug, changeRole]);
 
 	const teams = teamsQuery.isError
 		? []

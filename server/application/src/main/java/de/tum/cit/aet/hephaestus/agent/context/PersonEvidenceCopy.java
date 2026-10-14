@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
@@ -25,7 +26,11 @@ import tools.jackson.databind.JsonNode;
         indexes = {
             @Index(name = "idx_person_evidence_copy_store", columnList = "store_id,state"),
             @Index(name = "idx_person_evidence_copy_job", columnList = "job_id")
-        })
+        },
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_person_evidence_copy_workspace",
+                        columnNames = {"id", "workspace_id"}))
 @Getter
 @Setter
 public class PersonEvidenceCopy {

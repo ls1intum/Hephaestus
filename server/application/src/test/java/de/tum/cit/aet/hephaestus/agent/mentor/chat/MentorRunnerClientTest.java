@@ -46,7 +46,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
     private final AtomicInteger streamLost = new AtomicInteger();
     private final AtomicReference<MentorRunnerClient.FetchContextRequest> lastFetchContext = new AtomicReference<>();
     private final AtomicReference<MentorRunnerClient.LinkRequest> lastLink = new AtomicReference<>();
-    /** What the server answers a link; refuses unless a test admits. */
     private volatile Predicate<MentorRunnerClient.LinkRequest> admits = link -> false;
 
     private ScheduledExecutorService scheduler;
@@ -318,7 +317,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
         assertThat(MentorRunnerClient.PROTOCOL_VERSION).isEqualTo(3);
     }
 
-    /** Fields of any other shape are refused at once, the same way as an unknown result, never left to time out. */
     @ParameterizedTest
     @ValueSource(
             strings = {

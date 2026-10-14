@@ -178,7 +178,7 @@ public class AgentBindingService {
         };
     }
 
-    /** Only after {@link #applyModel}, which binds exactly one model. */
+    // applyModel must bind exactly one model before this lookup.
     private static LlmApiProtocol boundProtocol(WorkspaceAgentBinding binding) {
         LlmModel instance = binding.getInstanceModel();
         return instance != null

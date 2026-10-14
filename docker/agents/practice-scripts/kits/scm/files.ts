@@ -3,11 +3,7 @@ import nodePath from "node:path";
 
 import { makeRe } from "minimatch";
 
-/**
- * Return matching regular files, including hidden paths, without following symlinks.
- * The checkout's `.git` folder holds the clone's configuration, not the work, so it is never walked.
- * `fs.globSync` would replace this walker, but it has no option to match hidden paths such as `.github/`.
- */
+// Hidden paths are reviewed code; exclude .git and symlinks. fs.globSync cannot include hidden paths.
 export function globFilesSync(pattern: string, cwd: string): string[] {
 	const matcher = makeRe(pattern, { dot: true });
 	if (matcher === false) {

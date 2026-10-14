@@ -359,10 +359,6 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(problem.getDetail()).contains("App installation");
     }
 
-    /**
-     * An App installation runs on no stored token; the install flow activates this row in
-     * production.
-     */
     private void seedGitHubAppConnection(Workspace workspace) {
         Connection connection = new Connection(
                 workspace,
@@ -697,7 +693,6 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         User owner = persistUser("purge-suspended-owner");
         Workspace workspace =
                 createWorkspace("purge-suspended", "Purge Suspended", "purge-suspended", AccountType.ORG, owner);
-        // Delete requires OWNER role, not just ADMIN
         ensureOwnerMembership(workspace);
         workspaceLifecycleService.suspendWorkspace(workspace.getWorkspaceSlug());
 
@@ -789,7 +784,6 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(patchResponse.practiceReviewAutoTriggerEnabled()).isFalse();
         assertThat(patchResponse.practiceReviewManualTriggerEnabled()).isFalse();
 
-        // Verify via GET (true round-trip through the read path)
         WorkspaceDTO getResponse = webTestClient
                 .get()
                 .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
@@ -934,7 +928,6 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(afterToggle.practiceReviewAutoTriggerEnabled()).isTrue();
         assertThat(afterToggle.practiceReviewManualTriggerEnabled()).isFalse();
 
-        // Verify via GET
         WorkspaceDTO getResponse = webTestClient
                 .get()
                 .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
@@ -954,7 +947,6 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @Test
     @WithMentorUser
     void updateFeaturesRequiresWorkspaceAdmin() {
-        // Create the mentor user to match @WithMentorUser's default username
         persistUser("mentor");
 
         User owner = persistUser("feature-auth-owner");
@@ -992,7 +984,6 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
                 .isOk()
                 .expectBody(Void.class);
 
-        // Verify list endpoint includes feature flags
         List<WorkspaceListItemDTO> workspaces = webTestClient
                 .get()
                 .uri("/workspaces")

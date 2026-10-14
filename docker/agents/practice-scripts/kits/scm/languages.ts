@@ -1,5 +1,3 @@
-/** Shared path-based language and test-file classification for practice scripts. */
-
 const EXTENSION_LANGUAGE: Record<string, string> = {
 	swift: "swift",
 	kt: "kotlin",
@@ -29,7 +27,6 @@ const EXTENSION_LANGUAGE: Record<string, string> = {
 	hpp: "c",
 };
 
-/** The language a path's extension names, or null for a file no script reads as source. */
 export function languageOf(path: string): string | null {
 	const ext = path.split(".").pop()?.toLowerCase() ?? "";
 	return EXTENSION_LANGUAGE[ext] ?? null;

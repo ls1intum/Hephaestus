@@ -2,7 +2,6 @@ import { PracticeTabsSkeleton } from "@/components/common/practice-tabs";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 
-/** The report's shape while its first read is on the way: header, counts, tabs and a table. */
 export function ScanReportSkeleton() {
 	return (
 		<PageLayout aria-busy>

@@ -77,7 +77,6 @@ describe("AdminLlmConnectionFormDialog", () => {
 		);
 	});
 
-	// An endpoint for practice scripts may serve no `/models`, so only that failure is neutral, not an alert.
 	it.each([
 		[
 			"openai-embeddings",

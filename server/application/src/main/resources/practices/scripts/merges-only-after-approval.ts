@@ -1,6 +1,3 @@
-// Finds the merge as the record holds it, with the review decision of the provider, and each captured
-// review decision placed against the time of the merge. The last decision of each reviewer is a lead
-// of its own. The order of the leads does not show that the decision history is complete.
 import { scm, expectKind } from "../kits/scm/index.ts";
 import {
 	decisionLeads,

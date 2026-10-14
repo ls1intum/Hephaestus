@@ -53,10 +53,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Manages monitored repositories within workspaces. All methods take workspace slug/context as
- * parameters to identify which workspace to operate on.
- */
 @Service
 @WorkspaceAgnostic("Manages workspace-repository mapping configuration")
 public class WorkspaceRepositoryMonitorService {
@@ -76,12 +72,6 @@ public class WorkspaceRepositoryMonitorService {
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitRepositoryManager gitRepositoryManager;
 
-    /**
-     * Per-kind ports. The workspace module never imports a vendor-specific service —
-     * installation-bound operations dispatch by the workspace's bound kind. A missing impl for a
-     * given kind is treated as "this kind doesn't support installation-bound operations" (e.g.
-     * GitLab PAT) rather than an error.
-     */
     private final Map<IntegrationKind, InstallationSuspensionTracker> suspensionTrackers;
 
     private final Map<IntegrationKind, InstallationRepositoryEnumerator> installationEnumerators;
@@ -215,14 +205,7 @@ public class WorkspaceRepositoryMonitorService {
         announceRepositoryMonitor(workspace, Objects.requireNonNull(monitor), false);
     }
 
-    /**
-     * Adds a GitLab project by name. The check and the write happen in one transaction holding the
-     * connection's lifecycle lock, which disconnect and {@code GitLabRepositoryMonitors} also take,
-     * and a project already stored for the connection's instance is recognised by its id, so a
-     * project the workspace monitors under another path is not monitored twice. A name GitLab has
-     * not reported yet is monitored without an id until GitLab reports it at that path. Only the
-     * scope consumer refresh and the sync run after the commit.
-     */
+    // Hold the connection lifecycle lock across lookup and write; a renamed project must not acquire a second monitor.
     private void addGitLabRepositoryToMonitor(Workspace workspace, String nameWithOwner) {
         Long workspaceId = workspace.getId();
         RepositoryToMonitor monitor = transactionTemplate.execute(status -> {
@@ -363,14 +346,6 @@ public class WorkspaceRepositoryMonitorService {
         return result;
     }
 
-    /**
-     * Remove all repository monitors tied to an installation and optionally delete orphaned
-     * repositories.
-     *
-     * @param installationId the GitHub App installation ID
-     * @param deleteRepositories if true, also delete Repository entities that are no longer
-     *     monitored by any workspace
-     */
     @Transactional
     public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId, boolean deleteRepositories) {
         return removeAllRepositoriesInTransaction(installationId, deleteRepositories);
@@ -433,8 +408,7 @@ public class WorkspaceRepositoryMonitorService {
     @Transactional
     public void ensureAllInstallationRepositoriesCovered(
             long installationId, @Nullable Collection<String> protectedRepositories, boolean deferSync) {
-        // Check suspension BEFORE adding repos so NATS replay of old "created" events
-        // cannot trigger hundreds of failed syncs.
+        // Suspended workspaces must not restart syncs when NATS replays creation events.
         if (isInstallationSuspended(installationId)) {
             log.info(
                     "Skipped repository enumeration: reason=installationSuspended," + " installationId={}",
@@ -469,8 +443,7 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        // Filter snapshots BEFORE processing to avoid creating Repository entities for filtered
-        // repos
+        // Filter before processing so excluded repositories do not acquire mirror rows.
         List<InstallationRepositoryEnumerator.InstallationRepository> allowedSnapshots = snapshots.stream()
                 .filter(s -> workspaceScopeFilter.isRepositoryAllowed(s.nameWithOwner()))
                 .toList();
@@ -527,15 +500,7 @@ public class WorkspaceRepositoryMonitorService {
                         IdentityProviderType.from(kind), namespace.serverUrl()));
     }
 
-    /**
-     * Best-effort capture of the provider's stable repository id ({@code native_id}) at
-     * monitor-creation time by resolving the (already-upserted) domain {@link Repository} by name
-     * on the workspace's provider. A repository of the same name on another provider does not
-     * count: its id would hide the monitored one from every scoped query ({@code
-     * MonitoredRepositoryScope}). Returns {@code null} when the repository is not yet known locally
-     * on that provider, in which case the periodic sync backfills it later via {@link
-     * de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider#reconcileSyncTargetIdentity}.
-     */
+    // Resolve native ids on the exact provider; another provider's same-named repository cannot scope this monitor.
     @Nullable
     private Long resolveNativeId(String nameWithOwner, @Nullable IdentityProvider provider) {
         if (StringUtils.isBlank(nameWithOwner) || provider == null || provider.getId() == null) {
@@ -574,12 +539,6 @@ public class WorkspaceRepositoryMonitorService {
         });
     }
 
-    /**
-     * Persist a repository monitor and optionally trigger immediate sync.
-     *
-     * @param deferSync if true, skip immediate sync (useful during provisioning when activation
-     *     will sync all repositories in bulk)
-     */
     private void persistRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor, boolean deferSync) {
         // Use saveAndFlush to force immediate constraint check so callers can catch
         // DataIntegrityViolationException
@@ -589,12 +548,7 @@ public class WorkspaceRepositoryMonitorService {
         announceRepositoryMonitor(workspace, monitor, deferSync);
     }
 
-    /**
-     * Refreshes the scope consumer for a stored monitor and starts its sync unless {@code
-     * deferSync}; persists neither the monitor nor its workspace. The consumer reads its routing
-     * from committed monitors, so the refresh waits for the caller's transaction to commit and does
-     * not run if it rolls back.
-     */
+    // Consumers read committed monitors; refresh only after commit, never after rollback.
     private void announceRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor, boolean deferSync) {
         boolean repositoryAllowed = workspaceScopeFilter.isRepositoryAllowed(monitor);
         if (shouldUseNats(workspace) && repositoryAllowed) {
@@ -640,13 +594,6 @@ public class WorkspaceRepositoryMonitorService {
         }
     }
 
-    /**
-     * Idempotently ensures a repository monitor exists for a workspace.
-     *
-     * <p>Handles race conditions from NATS message replay by catching duplicate key violations. If
-     * another thread/message already created the monitor, we simply return success - that's the
-     * idempotent behavior we want.
-     */
     private Optional<Workspace> ensureRepositoryMonitorInternal(
             Workspace workspace, IdentityProvider provider, String nameWithOwner, boolean deferSync) {
         if (workspace == null || StringUtils.isBlank(nameWithOwner)) {
@@ -683,16 +630,6 @@ public class WorkspaceRepositoryMonitorService {
         return Optional.of(workspace);
     }
 
-    /**
-     * Creates or updates a Repository entity from a snapshot (installation enumeration or
-     * provisioning). The organization comes from the workspace so repositories from organization
-     * installations get the proper organization_id.
-     *
-     * <p>Uses a native SQL upsert ({@code INSERT ... ON CONFLICT DO UPDATE}) to atomically handle
-     * concurrent inserts from NATS event processing and GraphQL sync, eliminating optimistic
-     * locking errors. Visibility and HTML URL are derived inside the SQL from {@code isPrivate} and
-     * {@code nameWithOwner} respectively.
-     */
     private void ensureRepositoryFromSnapshot(
             Workspace workspace,
             IdentityProvider provider,
@@ -731,10 +668,6 @@ public class WorkspaceRepositoryMonitorService {
         return slug;
     }
 
-    /**
-     * Dispatches the installation-suspension check across kind-specific trackers (today only the
-     * GitHub adapter contributes an impl); true if any tracker reports suspended.
-     */
     private boolean isInstallationSuspended(long installationId) {
         for (InstallationSuspensionTracker t : suspensionTrackers.values()) {
             if (t.isInstallationMarkedSuspended(installationId)) {
@@ -744,7 +677,6 @@ public class WorkspaceRepositoryMonitorService {
         return false;
     }
 
-    /** Workspace is bound to a GitHub App installation (vs GitHub PAT or GitLab PAT). */
     private boolean isGitHubAppWorkspace(Workspace workspace) {
         return (connectionService
                         .findActiveProviderKind(workspace.getId())

@@ -11,11 +11,7 @@ import type { StatusDef, StatusDefs } from "@/components/common/status-def";
 
 export type ResultMarkKind = ResultMark["kind"];
 
-/**
- * A workspace admin's assessment of one result. A mark is not a developer response: the
- * developer's disagreement lives on the feedback. Accepted never overrides an active Incorrect
- * mark. `note` is what a count of marked results does and does not say.
- */
+// Accepted marks cannot override Incorrect; developer disagreement belongs to feedback responses.
 export const RESULT_MARK_DEFS: Record<ResultMarkKind, StatusDef & { note: string }> = {
 	INCORRECT: {
 		label: "Marked incorrect",
@@ -35,16 +31,13 @@ export const RESULT_MARK_DEFS: Record<ResultMarkKind, StatusDef & { note: string
 	},
 };
 
-/** The action that creates each mark, as a button names it. */
 export const RESULT_MARK_ACTIONS: Record<ResultMarkKind, string> = {
 	INCORRECT: "Mark incorrect",
 	ACCEPTED: "Mark accepted",
 };
 
-/** The action that reverses a mark. */
 export const REMOVE_MARK_ACTION = "Remove mark";
 
-/** Whether the developer disagrees with feedback written from a result, as admins filter it. */
 export type Disagreement = "DISAGREED" | "NOT_DISAGREED";
 
 export const DISAGREEMENT_DEFS: StatusDefs<Disagreement> = {

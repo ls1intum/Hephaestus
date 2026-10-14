@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { parseSearch } from "@/lib/router-search";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,18 +14,12 @@ import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harnes
 vi.setConfig({ testTimeout: 15_000 });
 
 const REVIEWS = "/w/acme/admin/practices/reviews";
-/** The Reviews tab. */
 const REVIEWS_TAB = `${REVIEWS}/runs`;
 
-/**
- * Real version-4 UUIDs: the lists' schema drops an id that is not one, as the fixtures' are. The
- * fixture review and result are served under them.
- */
 const REVIEW = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
 const RESULT = "9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c";
 const FIXTURE_REVIEW = "11111111-1111-1111-1111-111111111111";
 const FIXTURE_RESULT = "55555555-5555-5555-5555-555555555555";
-/** The fixture review's item: pull request #1423, whose workspace item id is 42. */
 const ITEM = "42";
 
 const fixtureReview = reviews.find((review) => review.id === FIXTURE_REVIEW);
@@ -59,7 +54,6 @@ function recordRequests() {
 			urls.feedback.push(new URL(request.url));
 			return HttpResponse.json(emptyPage);
 		}),
-		// Only the ids above: any other path under the reviews falls through to the fixture's handlers.
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/:reviewId", ({ params }) =>
 			params.reviewId === REVIEW
 				? HttpResponse.json({ ...reviewDetail(FIXTURE_REVIEW), id: REVIEW })
@@ -84,9 +78,7 @@ function pathOf(link: HTMLElement) {
 }
 
 function carriedSearch(link: HTMLElement) {
-	return Object.fromEntries(
-		new URL(String(link.getAttribute("href")), window.location.origin).searchParams,
-	);
+	return parseSearch(new URL(String(link.getAttribute("href")), window.location.origin).search);
 }
 
 describe("the selection across practice review tabs", () => {
@@ -100,7 +92,6 @@ describe("the selection across practice review tabs", () => {
 
 		const toggle = await screen.findByRole(
 			"button",
-			// The row names the review by its item and when it ran, so two reviews of one pull request differ.
 			{ name: /^Track review of #1423, .+\d:\d{2}/u },
 			ROUTE_RENDER_WAIT,
 		);
@@ -116,7 +107,7 @@ describe("the selection across practice review tabs", () => {
 		for (const tab of ["Overview", "Results", "Feedback"]) {
 			expect(
 				carriedSearch(within(navigation).getByRole("link", { name: new RegExp(`^${tab}`, "u") })),
-			).toStrictEqual({ reviewId: REVIEW, selected: "true" });
+			).toStrictEqual({ reviewId: REVIEW, selected: true });
 		}
 	});
 
@@ -142,19 +133,14 @@ describe("the selection across practice review tabs", () => {
 		const bar = await selectionBar();
 		await waitFor(() => expect(urls.reviews.at(-1)?.searchParams.get("itemId")).toBe(ITEM));
 		const trace = await within(bar).findByRole("link", { name: "Show trace" });
-		// The item's trace over the tab, keeping the selection.
 		expect(pathOf(trace)).toBe(REVIEWS_TAB);
 		expect(carriedSearch(trace)).toMatchObject({
 			itemId: ITEM,
-			selected: "true",
+			selected: true,
 			detail: `trace:item:${ITEM}`,
 		});
 	});
 
-	/**
-	 * A result names its review: the reviews and the feedback narrow to that review, since feedback
-	 * has no filter of its own by result.
-	 */
 	it("narrows the reviews and the feedback to a selected result's review", async () => {
 		const urls = recordRequests();
 		const selected = `reviewId=${REVIEW}&resultId=${RESULT}&selected=true`;
@@ -164,13 +150,12 @@ describe("the selection across practice review tabs", () => {
 		await within(bar).findByText("The controller delegates before it does anything else");
 		await waitFor(() => expect(urls.feedback.at(-1)?.searchParams.get("reviewId")).toBe(REVIEW));
 		expect(urls.feedback.at(-1)?.searchParams.has("resultId")).toBe(false);
-		// Show trace opens the result's own trace over the tab.
 		const trace = within(bar).getByRole("link", { name: "Show trace" });
 		expect(pathOf(trace)).toBe(`${REVIEWS}/feedback`);
 		expect(carriedSearch(trace)).toMatchObject({
 			reviewId: REVIEW,
 			resultId: RESULT,
-			selected: "true",
+			selected: true,
 			detail: `trace:result:${RESULT}`,
 		});
 		const navigation = screen.getByRole("navigation", { name: "Practice review sections" });

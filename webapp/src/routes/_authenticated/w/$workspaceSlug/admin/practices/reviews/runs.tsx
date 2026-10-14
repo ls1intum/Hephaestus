@@ -82,8 +82,6 @@ function ReviewsRoute() {
 		};
 	}
 
-	// Every row asks for a review of its work. A refusal is said once above the list, and the hook
-	// refreshes the list when a review starts.
 	const review = useRequestPracticeReview(workspaceSlug, { showsInline: () => true });
 	const record = useScopeRecordFilter(workspaceSlug, search);
 	const front = parsePracticeReviewLevels(search.detail).at(-1);
@@ -122,12 +120,7 @@ function ReviewsRoute() {
 	);
 }
 
-/**
- * While a loaded review is queued or running, re-read only the active reviews under the same
- * filters, every few seconds: their rows change in place, and the loaded pages are read again once,
- * when a review starts or stops being active. Re-reading every loaded page on the timer cost one
- * request per page per tab.
- */
+// Poll only loaded active reviews, then refresh once on settlement to include final rows and newly matching reviews.
 function useActiveReviewPoll(
 	workspaceSlug: string,
 	search: ReviewsSearch,
@@ -139,7 +132,6 @@ function useActiveReviewPoll(
 		query: listQuery,
 	}).queryKey;
 	const loaded = loadedPages(data).flatMap((page) => page.content);
-	// The active reviews the list's own filter keeps.
 	const statuses = ACTIVE_REVIEW_STATUSES.filter(
 		(status) => listQuery.status === undefined || listQuery.status.includes(status),
 	);

@@ -115,7 +115,6 @@ export const SAMPLE_NEVER_APPLIED = [
 	{ slug: "platform-logger", name: "Log through the platform logger" },
 ];
 
-/** Practices no review has recorded in the reader's work yet; made up, like every sample here. */
 export const SAMPLE_NOT_OBSERVED = [
 	{ slug: "names-the-risk", name: "Name the risk a change carries" },
 	{ slug: "rollback-plan", name: "Say how to roll the change back" },

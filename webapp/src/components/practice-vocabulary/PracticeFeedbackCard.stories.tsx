@@ -561,10 +561,6 @@ export const ResponseLabels: Story = {
 	},
 };
 
-/**
- * The ratings: icon buttons named by their words, each with its tooltip, that still write
- * the registry's values and still open the disagreement.
- */
 export const Ratings: Story = {
 	args: { card: { ...card, state: "open" }, usefulness: "HELPFUL" },
 	play: async ({ args, canvas }) => {
@@ -605,7 +601,6 @@ export const DisagreeOpen: Story = {
 	},
 };
 
-/** A standing disagreement leaves the card open; the Disagree icon stays pressed in its tone. */
 export const Disagreed: Story = {
 	args: { card: { ...card, state: "open" }, resolution: "DISAGREE" },
 	play: async ({ canvas }) => {
@@ -634,7 +629,6 @@ export const HelpfulNoteOpen: Story = {
 	},
 };
 
-/** "Not helpful" opens an optional note, as "Helpful" does; Disagree is the one path to a disagreement. */
 export const NotHelpfulNoteOpen: Story = {
 	args: { card: { ...card, state: "open" }, usefulness: "UNHELPFUL", openBand: "comment" },
 	play: async ({ args, canvas }) => {
@@ -820,7 +814,7 @@ export const GitLabWork: Story = {
 			state: "open",
 			reviewedWork: card.reviewedWork.map((piece) => ({
 				...piece,
-				ref: { ...piece.ref, provider: "GITLAB", label: `!${piece.ref.id}` },
+				ref: { ...piece.ref, provider: "GITLAB", label: piece.ref.label.replace("#", "!") },
 			})),
 		},
 	},

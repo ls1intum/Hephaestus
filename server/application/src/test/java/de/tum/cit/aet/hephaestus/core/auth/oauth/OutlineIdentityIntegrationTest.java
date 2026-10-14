@@ -20,24 +20,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
-/**
- * Authenticated Outline identity link, against a REAL Postgres. Drives {@link
- * AccountProvisioningService} with the principal {@code OutlineAuthInfoUserService} builds from
- * {@code POST /api/auth.info} (the immutable user UUID as {@code id}, the Outline team UUID
- * flattened onto {@code team_id}) — exactly what the OAuth2 callback hands the provisioner, so the
- * full link path is exercised without a live Outline round-trip (that is LIVE-only).
- *
- * <p>Asserts the three invariants of a link-only provider: (1) linking Outline while signed in
- * attaches exactly one {@code Identity(OUTLINE, user-uuid, team-uuid) MANUAL_LINK} to the SAME
- * account and creates none; (2) a login-mode Outline callback is refused ({@code
- * link_requires_auth}) — Outline can never be a sign-in button — as is a link with no authenticated
- * account binding, neither leaving an orphan account behind; (3) an Outline identity already linked
- * to a DIFFERENT account cannot be re-bound ({@code identity_already_linked}) — that would be
- * account takeover.
- */
 class OutlineIdentityIntegrationTest extends RealAuthIntegrationTest {
 
-    /** Outline's subject is the immutable user UUID; the tenant key is the team UUID. */
     private static final String OUTLINE_USER = "0aa1bb2c-user";
 
     private static final String OUTLINE_TEAM = "9ff8ee7d-team";
@@ -75,7 +59,6 @@ class OutlineIdentityIntegrationTest extends RealAuthIntegrationTest {
 
         assertThat(linked.identityLinked()).isTrue();
         assertThat(linked.account().getId()).isEqualTo(persistedId(github.getId()));
-        // The link attached to the existing account — it did NOT JIT a new one.
         assertThat(accountRepository.findById(persistedId(github.getId()))).isPresent();
 
         List<Identity> links = identityRepository.findActiveByAccountId(persistedId(github.getId()));
@@ -84,7 +67,6 @@ class OutlineIdentityIntegrationTest extends RealAuthIntegrationTest {
                 .filter(l -> l.getProviderUserKey().equals(OUTLINE_USER))
                 .findFirst()
                 .orElseThrow();
-        // The tenant key is mandatory: an Outline user UUID is only unique within its team.
         assertThat(outline.getTeamKey()).isEqualTo(OUTLINE_TEAM);
         assertThat(outline.getLinkedVia()).isEqualTo(Identity.LinkedVia.MANUAL);
     }
@@ -146,10 +128,6 @@ class OutlineIdentityIntegrationTest extends RealAuthIntegrationTest {
                         AuthIntentCookie.Intent.login(null, null))
                 .account();
 
-        // The SAME (OUTLINE, user, team) identity, linked from a different session: rebinding it
-        // would
-        // hand the attacker the owner's wiki identity. Mapped to
-        // /auth/error?code=identity_already_linked.
         assertThatThrownBy(() -> service.resolveOrProvision(
                         "outline-conflict",
                         OUTLINE_USER,
@@ -157,7 +135,6 @@ class OutlineIdentityIntegrationTest extends RealAuthIntegrationTest {
                         AuthIntentCookie.Intent.link(persistedId(attacker.getId()), "/settings")))
                 .isInstanceOf(AccountLinkConflictException.class);
 
-        // The link still hangs off the original owner, and the attacker gained nothing.
         assertThat(identityRepository.findActiveByAccountId(persistedId(attacker.getId())))
                 .extracting(Identity::getProviderUserKey)
                 .containsExactly("gh-attacker");
@@ -188,7 +165,6 @@ class OutlineIdentityIntegrationTest extends RealAuthIntegrationTest {
                 "id");
     }
 
-    /** The principal {@code OutlineAuthInfoUserService} flattens out of {@code auth.info}. */
     private static OAuth2User outlinePrincipal(String subject, String teamId, String email) {
         return new DefaultOAuth2User(
                 List.of(new SimpleGrantedAuthority("ROLE_USER")),

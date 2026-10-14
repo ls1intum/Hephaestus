@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Serializes frozen facts into the single v3 inputs file beside a practice script. */
 @Component
 public final class PracticeScriptInputs {
     private final ObjectMapper mapper;

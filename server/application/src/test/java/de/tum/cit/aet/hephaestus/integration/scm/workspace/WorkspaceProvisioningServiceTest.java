@@ -138,7 +138,8 @@ class WorkspaceProvisioningServiceTest {
                 .thenReturn(Optional.of(githubProvider));
 
         when(workspaceRepository.count()).thenReturn(0L);
-        when(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(1L, admin.getId()))
+        when(workspaceMembershipService.accountIdForUser(admin.getId())).thenReturn(199L);
+        when(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(1L, 199L))
                 .thenReturn(Optional.empty());
         when(workspaceService.createWorkspace(anyString(), anyString(), anyString(), any(AccountType.class), anyLong()))
                 .thenReturn(workspace);
@@ -148,9 +149,7 @@ class WorkspaceProvisioningServiceTest {
 
         provisioningService.bootstrapDefaultPatWorkspace();
 
-        verify(workspaceMembershipService).createMembership(workspace, admin.getId(), Membership.WorkspaceRole.ADMIN);
-        // Default admin handling should not throw and should not trigger redundant
-        // workspace creations
+        verify(workspaceMembershipService).createMembership(workspace, 199L, Membership.WorkspaceRole.ADMIN);
         verify(workspaceService).createWorkspace(anyString(), anyString(), anyString(), any(), anyLong());
 
         verify(connectionService)
@@ -215,12 +214,13 @@ class WorkspaceProvisioningServiceTest {
         when(workspaceRepository.findByWorkspaceSlug("aet-org")).thenReturn(Optional.empty());
         when(workspaceRepository.findAll()).thenReturn(List.of(workspace));
         when(userRepository.findByLogin("admin")).thenReturn(Optional.of(admin));
-        when(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(workspace.getId(), admin.getId()))
+        when(workspaceMembershipService.accountIdForUser(admin.getId())).thenReturn(199L);
+        when(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(workspace.getId(), 199L))
                 .thenReturn(Optional.empty());
 
         provisioningService.bootstrapDefaultPatWorkspace();
 
-        verify(workspaceMembershipService).createMembership(workspace, admin.getId(), Membership.WorkspaceRole.ADMIN);
+        verify(workspaceMembershipService).createMembership(workspace, 199L, Membership.WorkspaceRole.ADMIN);
         verify(workspaceService, never()).createWorkspace(anyString(), anyString(), anyString(), any(), anyLong());
     }
 

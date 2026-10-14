@@ -130,20 +130,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Practice programs end to end against real models: workspace bindings, the frozen snapshot, the one job token, the
- * spec that {@link PracticePiAdapter} builds, the real LLM proxy on the sandbox gateway connector, the real result
- * admission, the per-attempt usage rows, the execution report and the ledger rows at the end of the attempt. The real
- * {@code pi-runner.ts} hosts {@code fixtures/every-slot.ts}, which calls every bound direct slot and then
- * {@code ctx.review()}, whose review session runs on the bound review model through the same proxy.
- *
- * <p>{@code docs/contributor/testing.mdx} § Live models for practice scripts names the variables. The worker role is on
- * so that the proxy and its gateway connector exist. The agent stays off, so no poller claims the job.
- *
- * <p>The job captures the pull request's record, change, comments and checkout once; the runner's folder index and the
- * job's snapshot are the same manifest, so admission verifies every quote the session may make, code included. The
- * change is {@code fixtures/cart-change.diff}, as in {@code live.test.ts}: its added comments are what every slot reads.
- */
+// Enable the worker role for the gateway and proxy, but keep the agent off so no poller claims the fixture job.
 @LiveLlmTest
 class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
@@ -202,8 +189,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     static void workerRole(DynamicPropertyRegistry registry) {
         registry.add("hephaestus.runtime.worker.enabled", () -> "true");
         registry.add("hephaestus.sandbox.gateway.port", () -> Integer.toString(GATEWAY_PORT));
-        // The worker's maintenance removes the containers of its owner and the ended job folders under its
-        // root. Other checkouts and test runs on this host keep theirs.
+        // Cleanup is scoped to this worker owner and root; other checkouts share the host.
         registry.add("hephaestus.sandbox.docker.owner", () -> "practice-script-live-test");
         registry.add("hephaestus.fabric.root", FABRIC_ROOT::toString);
         // No sandbox runs here, so the worker does not pull the agent image.
@@ -379,7 +365,6 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
 
         Path workDir = temporaryDirectory("practice-script-live-").toRealPath();
         root = workDir;
-        // The spec is staged first: the change's checkout and the job's capture are pinned to the same commit.
         Practice practice = practice(workspace, Files.readString(EVERY_SLOT));
         LiveRunnerWorkspace.stageCartChange(workDir);
         ReviewJob job = capture(runningJob(workspace, practice), workDir, developer);
@@ -544,7 +529,6 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         return workspace;
     }
 
-    /** One workspace connection and priced model per purpose, bound to the workspace's undeclared slot. */
     private void bind(
             WorkspaceContext context,
             AgentPurpose purpose,
@@ -585,7 +569,6 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                 new AgentBindingRequestDTO(null, modelId, null, null, null, true));
     }
 
-    /** The practice whose program is the every-slot fixture. */
     private Practice practice(Workspace workspace, String program) {
 
         Practice practice = runtimePracticeVersions.create(new PracticeVersionService.NewPractice(
@@ -600,10 +583,6 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         return practiceRepository.saveAndFlush(practice);
     }
 
-    /**
-     * A running review owned by this worker, so that the proxy accepts its token. Submission freezes the bound models
-     * and the claim prices them; both are private to the job pipeline, so this does the same from the same bindings.
-     */
     private ReviewJob runningJob(Workspace workspace, Practice practice) {
         long actor = SecurityUtils.getCurrentAccountId().orElseThrow();
         var binding = runtimeModelRouting
@@ -632,10 +611,6 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         return job;
     }
 
-    /**
-     * What the server captured for the job: the pull request at the staged commit, the job's metadata naming it, and
-     * the record {@code PullRequestContentSource} writes from both, staged where the runner reads it.
-     */
     private ReviewJob capture(ReviewJob job, Path workDir, User developer) throws IOException, InterruptedException {
         Path context = workDir.resolve(SandboxLayout.CONTEXT_PREFIX);
         JsonNode change = objectMapper.readTree(context.resolve("change.json").toFile());
@@ -777,8 +752,6 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         job.setCapture(snapshot);
         reviews.start(item.workspaceId(), reviewId);
         job = jobRepository.saveAndFlush(job);
-        // The checkout goes with its witnesses, as RepositoryTreeContentSource stages it, so admission can verify a
-        // quote of code against it.
         prepared.add(PreparedJobInputsFixtures.prepare(
                 evidenceFiles,
                 job,
@@ -795,10 +768,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         return jobRepository.findById(job.getId()).orElseThrow();
     }
 
-    /**
-     * The model host loads a model on its first request, which can take longer than a program's deadline: the host
-     * would then report the slot as unrated for its deadline. Each self-hosted model answers one request here first.
-     */
+    // Warm self-hosted models before script deadlines; model startup can exceed the deadline.
     private void warmUp(LiveLlmCredentials host, Map<String, Map<String, Object>> bodies) {
         String base = host.baseUrl().replaceAll("/+$", "");
         try (HttpClient client = HttpClient.newHttpClient()) {

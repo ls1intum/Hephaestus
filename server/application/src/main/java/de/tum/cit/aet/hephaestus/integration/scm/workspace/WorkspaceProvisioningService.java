@@ -44,9 +44,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
-/**
- * Central orchestrator for keeping workspace records in sync with external provisioning sources.
- */
 @Service
 @ConditionalOnServerRole
 public class WorkspaceProvisioningService implements WorkspaceProvisioning {
@@ -66,11 +63,6 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
     private final WebClient webClient;
     private final ScmServerEndpointPolicy endpoints;
 
-    /**
-     * Per-kind availability providers — used to derive default server URLs for PAT bootstrap
-     * without binding to a specific vendor's {@code Properties} bean. The workspace module never
-     * has to know which vendor owns which property prefix.
-     */
     private final Map<IntegrationKind, WorkspaceProviderAvailability> providerAvailability;
 
     public WorkspaceProvisioningService(
@@ -110,7 +102,6 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
                 .build();
     }
 
-    /** Bootstrap a default GitHub PAT workspace from configuration properties. */
     @Override
     @Transactional
     public void bootstrapDefaultPatWorkspace() {
@@ -185,7 +176,6 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
         ensureAdminMembership(savedWorkspace);
     }
 
-    /** Bootstrap a default GitLab PAT workspace from configuration properties. */
     @Override
     @Transactional
     public void bootstrapDefaultGitLabPatWorkspace() {
@@ -291,12 +281,6 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
         return syncGitLabUserForPAT(patToken, resolvedServerUrl, accountLogin);
     }
 
-    /**
-     * Resolves the GitLab server URL from the workspace config, falling back to the default exposed
-     * via {@link WorkspaceProviderAvailability} ({@code
-     * hephaestus.integration.gitlab.default-server-url}). Throws when availability is unset
-     * (feature flag off) — GitLab bootstrap cannot proceed without a URL.
-     */
     private String resolveGitLabServerUrl(@Nullable String configServerUrl) {
         if (!isBlank(configServerUrl)) {
             String url = Objects.requireNonNull(configServerUrl).trim();
@@ -316,15 +300,7 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
                         + " The default server URL is not available."));
     }
 
-    /**
-     * Validates the GitLab token and upserts the token owner or a synthetic bot user.
-     *
-     * <p>First tries {@code GET /api/v4/user} which works for personal access tokens. If that is
-     * refused, falls back to {@code GET /api/v4/groups/:groupPath} to validate the token against
-     * the target group and creates a synthetic bot user from group info.
-     */
     private Long syncGitLabUserForPAT(String patToken, String serverUrl, String groupPath) {
-        // Resolve the GitLab provider first so all lookups are provider-scoped
         IdentityProvider provider = gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITLAB, serverUrl)
                 .orElse(null);

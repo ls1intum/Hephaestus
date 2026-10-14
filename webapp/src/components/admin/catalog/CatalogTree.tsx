@@ -35,7 +35,6 @@ import { CatalogEntryBadges } from "./CatalogEntryBadges";
 interface TreePractice {
 	slug: string;
 	name: string;
-	/** The group the tree files it under; a group that no longer exists files it as unassigned. */
 	groupSlug: string | null;
 	position: number;
 	missingGroupSlug?: string;
@@ -43,7 +42,7 @@ interface TreePractice {
 	practice: CatalogPractice;
 }
 
-/** Only the reviews that are not automated are worth a badge; Hephaestus review is the norm. */
+// Automated review is the default; badge only exceptions.
 const REVIEWED_BY_BADGE = {
 	HEPHAESTUS: undefined,
 	PEOPLE: "Reviewed by people",

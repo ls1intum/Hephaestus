@@ -20,26 +20,8 @@ import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Append-only auth-event log. Monthly RANGE-partitioned on {@code occurred_at} and self-managed by
- * pg_partman (create-ahead + 12-month retention, oldest dropped).
- *
- * <h2>Append-only</h2>
- *
- * Storage-layer append-only is enforced in prod by the {@code trg_auth_event_block_mutation} BEFORE
- * UPDATE OR DELETE trigger (RAISES EXCEPTION) plus a {@code REVOKE UPDATE, DELETE, TRUNCATE}
- * guardrail — the only permitted mutation is the GDPR Art. 17 redaction that NULLs
- * ip_inet/user_agent/details. A superuser bypasses the trigger, but the app never connects as
- * superuser. {@link AuthEventWriter} only INSERTs; partition retention is the only deletion.
- * Backups + WAL archive provide forensic recovery.
- *
- * <h2>IP retention</h2>
- *
- * {@code ip_inet} is stored verbatim for the audit-partition window (12 months) as a security
- * measure (legitimate interest) and dropped when its monthly partition is retired. There is no
- * separate truncation job today.
- *
- * <p>Composite PK {@code (id, occurred_at)} because partitioned tables in Postgres require the
- * partition key in every unique index.
+ * Monthly partition retention is the only deletion; authorized erasure can redact personal fields.
+ * The composite key includes occurred_at because PostgreSQL requires the partition key in every unique index.
  */
 @Entity
 @Table(name = "auth_event")
@@ -111,13 +93,7 @@ public class AuthEvent {
     @Nullable
     private String details;
 
-    /**
-     * Whether the request that produced this event reached its workspace on instance-admin
-     * authority rather than membership. Derived by {@link AuthEventLogger} from {@code
-     * WorkspaceElevationContext}, never supplied by the producer. {@code false} on every row
-     * written before elevation was recorded, so a false here is "not known to be elevated", not
-     * "known to be a member".
-     */
+    // False means elevation was not recorded; it does not prove membership authority.
     @ColumnDefault("false")
     @Column(name = "elevated_via_instance_admin", nullable = false)
     private boolean elevatedViaInstanceAdmin;

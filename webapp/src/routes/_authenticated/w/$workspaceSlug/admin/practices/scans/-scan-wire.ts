@@ -16,7 +16,6 @@ import type {
 import type { Wire } from "@/lib/dates";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 
-/** What the scan routes read as JSON, with ISO strings where the client makes `Date`s. */
 
 export const SCAN_ID = "6f1c2a7e-0d4b-4a8e-9b51-1a2b3c4d5e6f";
 export const COMMIT = "4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39";
@@ -58,7 +57,6 @@ export function wireFile(id: string, path: string, removedAt: string | null = nu
 	};
 }
 
-/** Three files reviewed against two practices: six practice and file pairs. */
 export const COUNTS: ScanCounts = {
 	files: 3,
 	practiceItemPairs: 6,
@@ -364,7 +362,7 @@ export function wirePractice(
 	};
 }
 
-/** An admin of `acme`. Later `server.use` calls take precedence, so a test adds only its own. */
+/** Install base handlers first so each test can prepend its own overrides. */
 export function adminHandlers() {
 	return [
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
@@ -390,7 +388,6 @@ export function scanPage(scans: Wire<ScanSummary>[]) {
 	};
 }
 
-/** A read that fails on the server until `recover()`, and then answers with `body`. */
 export function failingUntilRecovered(body: JsonBodyType) {
 	let failing = true;
 	return {
@@ -404,7 +401,6 @@ export function failingUntilRecovered(body: JsonBodyType) {
 	};
 }
 
-/** Answers the first request with `first` and every later one with `rest`. */
 export function firstThen(first: () => Response, rest: () => Response) {
 	let answered = 0;
 	return () => {
@@ -413,7 +409,6 @@ export function firstThen(first: () => Response, rest: () => Response) {
 	};
 }
 
-/** The table row an element sits in. */
 export function rowOf(element: Element | undefined): HTMLElement {
 	const row = element?.closest("tr");
 	if (!row) {
@@ -422,7 +417,6 @@ export function rowOf(element: Element | undefined): HTMLElement {
 	return row;
 }
 
-/** A scan in `status`. An active one is still listing files, so it knows no totals yet. */
 export function wireScanIn(
 	status: ScanSummary["status"],
 	overrides: Partial<Wire<ScanSummary>> = {},

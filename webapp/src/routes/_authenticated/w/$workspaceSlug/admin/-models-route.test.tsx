@@ -5,13 +5,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	getMemberOnboardingSettingsQueryKey,
 	workspaceListAvailableLlmModelsQueryKey,
+	getMemberOnboardingQueryKey,
+	listAgentsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
-import type { AgentBindingRequest } from "@/api/types.gen";
 import { deferred } from "@/test/async";
 
-import { getMemberOnboardingQueryKey, listAgentsQueryKey } from "@/api/@tanstack/react-query.gen";
 import type {
 	AgentBinding,
+	AgentBindingRequest,
 	AvailableLlmModel,
 	PracticeScriptSummary,
 	WorkspaceLlmConnection,
@@ -133,7 +134,6 @@ function mockModelsRoute(
 	);
 }
 
-/** Holds every later read of the bindings until released, and says whether one was asked for. */
 function deferredBindingsRefetch(bindings: () => AgentBinding[]) {
 	const { promise: pending, resolve: release } = deferred();
 	let asked = false;
@@ -159,7 +159,6 @@ async function renderModelsRoute(bindings: () => AgentBinding[], aiChoiceRequire
 type PurposeTitle = "Practice reviews" | "Heph";
 const UNCHOSEN = "Members who have not chosen";
 
-/** A purpose's row, opened if it is closed: a closed row holds no forms. */
 function purposeRegion(purpose: string): HTMLElement {
 	const trigger = screen.getByRole("button", { name: purpose });
 	if (trigger.getAttribute("aria-expanded") !== "true") {
@@ -172,14 +171,12 @@ function row(purpose: PurposeTitle, title: string = UNCHOSEN): HTMLElement {
 	return within(purposeRegion(purpose)).getByRole("group", { name: title });
 }
 
-/** What a purpose's closed row says, as a screen reader hears it. */
 const rowSummary = (purpose: PurposeTitle) =>
 	(screen.getByRole("button", { name: purpose }).getAttribute("aria-describedby") ?? "")
 		.split(" ")
 		.map((id) => document.getElementById(id)?.textContent ?? "")
 		.join(" ");
 
-/** Named "Saving…" while its own save is in flight. */
 const saveButton = (purpose: PurposeTitle, title: string = UNCHOSEN) =>
 	within(row(purpose, title)).getByRole<HTMLButtonElement>("button", {
 		name: /^(?:Save assignment|Saving…)/u,
@@ -282,7 +279,6 @@ describe("workspace AI models route", () => {
 
 		fireEvent.click(saveButton("Practice reviews"));
 		await waitFor(() => expect(refetch.asked()).toBe(true));
-		// Until the bindings are back, the row waits on its save and claims nothing new.
 		expect(saveButton("Practice reviews").textContent).toMatch(/^Saving…/u);
 		expect(screen.queryByText("Not ready")).toBeNull();
 
@@ -326,7 +322,6 @@ describe("workspace AI models route", () => {
 
 	it("shows every tier of a purpose as the server routes it once a save lands", async () => {
 		const user = userEvent.setup();
-		// Each tier has its own ready review model, so each serves only its own members.
 		let bindings: AgentBinding[] = [
 			{ ...binding("PRACTICE_REVIEW", 20, "IN_HOUSE"), servedTiers: ["IN_HOUSE"] },
 			binding("PRACTICE_REVIEW", 21, "CLOUD"),
@@ -337,7 +332,6 @@ describe("workspace AI models route", () => {
 		server.use(
 			refetch.handler,
 			http.put("*/workspaces/acme/agents/PRACTICE_REVIEW", () => {
-				// Turned off, the Cloud model serves no one, and the In-house one takes Cloud members.
 				const cloud = {
 					...binding("PRACTICE_REVIEW", 21, "CLOUD"),
 					enabled: false,
@@ -352,8 +346,6 @@ describe("workspace AI models route", () => {
 		await user.click(within(cloud).getByRole("switch", { name: /^Use this model/u }));
 		await user.click(saveButton("Practice reviews", "Cloud"));
 		await waitFor(() => expect(refetch.asked()).toBe(true));
-		// The saved row alone would leave Cloud members unserved beside a sibling that still says
-		// it serves only In-house members.
 		expect(rowSummary("Practice reviews")).toContain("Cloud: GPT Other");
 
 		refetch.release();
@@ -761,7 +753,6 @@ it("resets model drafts on workspace navigation while a previous workspace save 
 	await act(async () => {
 		release();
 	});
-	// The save lands on the workspace it was made in: its bindings are read again on the next visit.
 	await waitFor(() =>
 		expect(queryClient.getQueryState(AGENTS_QUERY_KEY)?.isInvalidated).toBe(true),
 	);
@@ -848,14 +839,12 @@ it("keeps the page usable when the practice script needs fail, and says so in th
 	);
 	expect(screen.queryByText("We could not load AI models")).toBeNull();
 	expect(saveButton("Practice reviews").disabled).toBe(false);
-	// Nothing claims a practice uses a model for practice scripts, or that none does.
 	expect(
 		within(screen.getByRole("button", { name: "Decision model" })).queryByText(/practice/u),
 	).toBeNull();
 });
 
 it("asks again which practices miss a model once a binding is saved", async () => {
-	// The server judges the needs against the bindings, so after the save it reports none unmet.
 	let unmetTiers: UnmetTiers = ["IN_HOUSE"];
 	mockModelsRoute(() => [binding("PRACTICE_REVIEW", 20)], true);
 	server.use(
@@ -933,7 +922,6 @@ function ownModel(id: number, displayName: string): Wire<WorkspaceLlmModel> {
 	};
 }
 
-/** The route with the workspace's own providers on: one connection, these models on it. */
 function mockOwnProviders(models: () => Wire<WorkspaceLlmModel>[]) {
 	mockModelsRoute(() => [binding("PRACTICE_REVIEW", 20)]);
 	server.use(
@@ -990,7 +978,6 @@ it("offers a model added under the workspace's own provider in the pickers above
 	await screen.findByRole("option", { name: /Own embeddings/u });
 });
 
-/** Turns one of the workspace's own models off through its edit dialog. */
 async function turnOffModel(name: string) {
 	const user = userEvent.setup();
 	await user.click(await screen.findByRole("button", { name: `Edit ${name}` }, ROUTE_RENDER_WAIT));
@@ -1000,7 +987,6 @@ async function turnOffModel(name: string) {
 	await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 }
 
-/** The route with one of the workspace's own models assigned to Cloud members' reviews. */
 function mockOwnModelAssigned() {
 	const own: Wire<WorkspaceLlmModel> = {
 		...ownModel(40, "Own chat"),
@@ -1066,7 +1052,6 @@ it("shows whom each assignment serves again after a write to the workspace's own
 
 	await turnOffModel("Own chat");
 
-	// The server now routes Cloud members to the In-house model.
 	await waitFor(() => expect(rowSummary("Practice reviews")).toContain("Cloud: GPT TestIn-house"));
 });
 
@@ -1082,8 +1067,7 @@ it("reads this month's usage again after a write to the workspace's own models",
 });
 
 it("keeps each provider's test pending on its own card when two run at once", async () => {
-	// A single "which card is testing" flag would be cleared by the fast one and put the slow card
-	// back to idle mid-flight.
+	// Track each concurrent provider probe so a fast answer cannot clear another provider's pending state.
 	const slowProbe = deferred();
 	const second = { ...OWN_CONNECTION, id: 8, displayName: "Second provider" };
 	mockOwnProviders(() => []);
@@ -1125,8 +1109,7 @@ async function confirmDelete(name: string) {
 }
 
 it("keeps each model's delete pending on its own row when two run at once", async () => {
-	// A single "which model is busy" id would be cleared by the fast one, re-enabling the slow row's
-	// Delete mid-flight: a second DELETE, and a failure toast for a model that was deleted.
+	// Track each model write so one settled request cannot re-enable another model's pending delete.
 	const slowDelete = deferred();
 	let slowDeleteCalls = 0;
 	mockOwnProviders(() => [ownModel(10, "Slow model"), ownModel(20, "Fast model")]);

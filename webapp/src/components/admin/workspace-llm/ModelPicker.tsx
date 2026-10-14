@@ -28,13 +28,9 @@ import { LLM_API_PROTOCOL_LABELS, practiceScriptApiFor } from "@/lib/llm-api-pro
 import { priceLabel } from "@/lib/llm-pricing";
 import { hasText } from "@/lib/text";
 
-/** The anchor of the workspace's own providers on AI models, where a picker with nothing to offer sends the admin. */
 export const PROVIDER_PANEL_ID = "provider-panel";
 
-/**
- * Scrolls to the providers and moves focus there. The router owns the URL, so a bare fragment jump
- * would go through it; with no panel on the page, the link falls back to that jump.
- */
+// Move focus directly within this page; a bare fragment would pass through the router.
 function revealProviderPanel(event: MouseEvent<HTMLAnchorElement>) {
 	const panel = event.currentTarget.ownerDocument.getElementById(PROVIDER_PANEL_ID);
 	if (!panel) {
@@ -99,7 +95,6 @@ export function listedModels<TModel extends Pick<AvailableLlmModel, "dataHandlin
 	return tier === undefined ? models : models.filter((model) => model.dataHandlingTier === tier);
 }
 
-/** What a screen reader hears for an option: everything the two lines show, in reading order. */
 function optionLabel(model: AvailableLlmModel): string {
 	const tier = DATA_HANDLING_DEFS[model.dataHandlingTier].label;
 	return `${model.displayName}, ${model.connectionDisplayName}, ${tier}, ${priceLabel(model, "workspace")}`;
@@ -118,7 +113,6 @@ const RERANK_UNPRICED_HINT = {
 		"If this provider reports no tokens, its calls count as unpriced, which pauses reviews while their spend has a monthly cap. Set No metered API cost on this model below for a self-hosted reranker.",
 } satisfies Record<ModelSelection["scope"], string>;
 
-/** What the picker says under itself for `purpose`, from the models it was given and the one chosen. */
 function purposeHint(
 	purpose: AgentPurpose | undefined,
 	availableModels: AvailableLlmModel[],
@@ -163,10 +157,6 @@ function purposeHint(
 	return undefined;
 }
 
-/**
- * Each model on two lines: its mark, name and price, then where it runs, muted: the connection and
- * the tier's icon and name, as every other surface draws a tier.
- */
 function ModelOptions({ models }: { models: AvailableLlmModel[] }) {
 	return models.map((model) => (
 		<SelectItem
@@ -195,7 +185,6 @@ function ModelOptions({ models }: { models: AvailableLlmModel[] }) {
 	));
 }
 
-/** The closed picker: the chosen model's mark and name, as the cells on AI models draw it. */
 function TriggerValue({ current, models }: { current: unknown; models: AvailableLlmModel[] }) {
 	if (typeof current !== "string") {
 		return "Select a model…";
@@ -241,8 +230,7 @@ export function ModelPicker({
 	return (
 		<>
 			<Select
-				// Every model, not only the listed ones: a bound model whose declaration no longer matches
-				// the row's tier still needs its name on the trigger, even though it is no longer offered.
+				// A saved model excluded by the current tier filter must still be named in the trigger.
 				items={availableModels.map((model) => ({
 					value: encode(model.scope, model.id),
 					label: model.displayName,

@@ -15,9 +15,6 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Checks the bundled criteria sections and their change or scan instructions.
- */
 class CatalogCriteriaShapeTest extends BaseUnitTest {
 
     /** The section headings, in order; each practice carries all of them. */

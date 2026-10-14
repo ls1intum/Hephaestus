@@ -42,7 +42,11 @@ public class ScmCaptureConsent {
             try {
                 accountId = identities.accountFor(new PersonIdentity(providerId, key, null));
             } catch (ResponseStatusException conflict) {
-                if (conflict.getStatusCode().value() == HttpStatus.CONFLICT.value()) throw withheld();
+                if (conflict.getStatusCode().value() == HttpStatus.CONFLICT.value())
+                    throw new ItemCaptureException(
+                            ItemCaptureCode.CONSENT_WITHHELD,
+                            "A contributor has withheld permission to process this work",
+                            conflict);
                 throw conflict;
             }
             if (accountId.isPresent()) {

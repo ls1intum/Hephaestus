@@ -27,14 +27,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.view.RedirectView;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/**
- * Entry point for the OAuth login dance — stamps the {@link AuthIntentCookie} with the caller's
- * intent (workspace + returnTo + mode) and 302s to Spring's standard {@code
- * /oauth2/authorization/{registrationId}} initiation endpoint.
- *
- * <p>This is the SPA's "Sign in with X" target. The intent cookie survives the round-trip to the
- * IdP and is read by the success handler to decide where to land the user post-login.
- */
 @ConditionalOnServerRole
 @RestController
 @RequestMapping("/auth")
@@ -48,10 +40,7 @@ public class AuthBeginController {
     private final IdentityAuthentication identityLinkAuthentication;
     private final InstalledClientRegistry installedClients;
 
-    /**
-     * Proxy-stripped API prefix re-added to the init redirect — see {@code
-     * AuthProperties#apiBasePath}.
-     */
+    // Restore the API prefix stripped by the reverse proxy before redirecting to OAuth initiation.
     private final String apiBasePath;
 
     public AuthBeginController(

@@ -70,7 +70,6 @@ if (!earlier) {
 	throw new Error("The fixtures carry a second review");
 }
 
-/** The open review, reusing the earlier review's result on its first practice. */
 const [reused, ...unreused] = openProfileReviewDetail.results;
 if (!reused) {
 	throw new Error("The open review carries a result");
@@ -80,13 +79,11 @@ const reusingDetail: ProfileReviewDetail = {
 	results: [{ ...reused, reviewId: earlier.review.id }, ...unreused],
 };
 
-/** One review of the first practice, so its level has a result to show. */
 const groupReview: ProfileReview = {
 	...detailReview,
 	results: [{ ...ownResult, practiceSlug: practice.slug, practiceName: practice.name }],
 };
 
-/** The reader's account in this workspace, a plain MEMBER: the profile is their own page. */
 const membership: WorkspaceMembership = {
 	account: {
 		id: "1",
@@ -103,7 +100,6 @@ const membership: WorkspaceMembership = {
 	leftAt: null,
 };
 
-/** The catalog as a member reads it: every practice Hephaestus reviews, with its group. */
 const reviewedPractices: ReviewedPractice[] = practiceStandings.map((standing) => ({
 	slug: standing.slug,
 	name: standing.name,
@@ -112,20 +108,17 @@ const reviewedPractices: ReviewedPractice[] = practiceStandings.map((standing) =
 	whatGoodLooksLike: null,
 }));
 
-/** The guidance a practice with no picture or guide answers with. */
 const plainGuidance: PracticeGuidanceDto = {
 	practiceSlug: "scope-the-change",
 	visual: null,
 	guide: null,
 };
 
-/** A Spring page of reviews, all on one page. */
 const pageOf = (reviews: ProfileReview[]) => ({
 	content: reviews,
 	page: { number: 0, size: 10, totalElements: reviews.length, totalPages: 1 },
 });
 
-/** Each review's own read, by id: the open review in full, every other one as its list row has it. */
 function reviewDetailOf(reviewId: string): ProfileReviewDetail | undefined {
 	if (reviewId === openProfileReview.review.id) {
 		return openProfileReviewDetail;
@@ -147,7 +140,6 @@ function reviewDetailOf(reviewId: string): ProfileReviewDetail | undefined {
 
 const notFound = () => HttpResponse.json({ status: 404, title: "Not Found" }, { status: 404 });
 
-/** Each review's own read: `open` for the open review, every other one as its list row has it. */
 function reviewReads(open: ProfileReviewDetail = openProfileReviewDetail) {
 	return http.get(
 		"*/workspaces/:workspaceSlug/practice-profile/reviews/:reviewId",
@@ -182,11 +174,9 @@ beforeEach(() => {
 		http.get("*/workspaces/:workspaceSlug/practices/feedback/practice-page", () =>
 			HttpResponse.json([]),
 		),
-		// The practice level's reviews, read through its group.
 		http.get("*/workspaces/:workspaceSlug/practice-groups/:groupSlug/reviews", () =>
 			HttpResponse.json(pageOf([groupReview])),
 		),
-		// The practice's guidance, a request of its own; words only unless a case adds more.
 		http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/guidance", () =>
 			HttpResponse.json(plainGuidance),
 		),
@@ -205,7 +195,6 @@ const OPEN_REVIEW_PAGE = `${PAGE}?detail=${encodeURIComponent(
 	JSON.stringify(["reviews:all", `review:${openProfileReview.review.id}`]),
 )}`;
 
-/** The open review's row link, named for its item and its time. */
 const openReviewRowName = `Open review of ${openProfileReview.review.item.label}, ${formatDayTime(
 	openProfileReview.review.completedAt ?? openProfileReview.review.createdAt,
 	new Date(STORY_NOW),
@@ -223,7 +212,6 @@ const openReviewsChip = async () =>
 const group = `practice-group:${packagingGroup.slug}`;
 const practiceEntry = `practice:${practice.slug}`;
 
-/** A group of reviewed practices with no standing: nothing in it is reviewed for the reader. */
 const emptyGroup = { ...packagingGroup, slug: "empty-group", name: "Nothing in here" };
 
 function useEmptyGroup() {
@@ -271,7 +259,6 @@ async function openPractice(router: Awaited<ReturnType<typeof renderProfile>>) {
 	);
 }
 
-/** The practice level opens on its feedback; the results are the tab beside it. */
 async function showResults() {
 	fireEvent.click(
 		await screen.findByRole("tab", { name: /^Results/u, selected: false }, ROUTE_RENDER_WAIT),
@@ -397,11 +384,11 @@ describe("practice profile route", () => {
 		await waitFor(() =>
 			expect(detail()).toStrictEqual(["reviews:all", `review:${openProfileReview.review.id}`]),
 		);
-		const table = await screen.findByRole(
-			"table",
-			{ name: "Every practice in this review" },
-			ROUTE_RENDER_WAIT,
-		);
+		const table = await waitFor(() => {
+			const loaded = screen.getByRole("table", { name: "Every practice in this review" });
+			expect(loaded.getAttribute("aria-busy")).not.toBe("true");
+			return loaded;
+		}, ROUTE_RENDER_WAIT);
 		await within(table).findByRole("button", { name: "Thin controllers" }, SETTLE_WAIT);
 		// The row under the level and the head over it.
 		await waitFor(() => expect(screen.getAllByText("Review 2")).toHaveLength(2));
@@ -470,7 +457,6 @@ describe("practice profile route", () => {
 			undefined,
 			ROUTE_RENDER_WAIT,
 		);
-		// The ask names the item by its workspace id, never by a provider number.
 		const failed = profileReviews.find((entry) => entry.review.item.label === "#890");
 		expect(asked).toStrictEqual([{ itemId: failed?.review.item.id }]);
 	});
@@ -494,7 +480,6 @@ describe("practice profile route", () => {
 		);
 		await screen.findByText("No review was started", undefined, SETTLE_WAIT);
 
-		// Another review of the same item, opened by its address.
 		router.history.push(
 			`${PAGE}?detail=${encodeURIComponent(
 				JSON.stringify(["reviews:all", `review:${earlier.review.id}`]),
@@ -671,13 +656,7 @@ if (linkedSentence === null) {
 	throw new Error("The first practice going well carries its workspace's sentence");
 }
 
-/**
- * "Going well" between the header and the feedback: each practice a real link to its level, each
- * supporting result a real link into its review at that result, the workspace's own sentence and
- * no other praise.
- */
 describe("going well", () => {
-	/** The review that recorded the supporting result, with that result in it. */
 	const provingReview: ProfileReviewDetail = {
 		...openProfileReviewDetail,
 		review: { ...openProfileReviewDetail.review, id: proof.reviewId, item: proof.item },
@@ -703,7 +682,6 @@ describe("going well", () => {
 		const section = await screen.findByRole("region", { name: "Going well" }, ROUTE_RENDER_WAIT);
 		const name = within(section).getByRole("link", { name: linked.practiceName });
 		expect(name.closest("h3")).not.toBeNull();
-		// The workspace's sentence as written; a practice without one shows no sentence at all.
 		within(section).getByText(linkedSentence);
 		within(section).getByRole("link", { name: unworded.practiceName });
 
@@ -753,7 +731,6 @@ describe("going well", () => {
 			]),
 		);
 		expect(router.state.location.search.reviewResult).toBe(proof.resultId);
-		// The row of that result opens on arrival, with the result in full.
 		await screen.findByText(
 			"The description opens with Closes #41 and the pull request left draft first.",
 			undefined,
@@ -857,10 +834,7 @@ describe("going well", () => {
 	});
 });
 
-/**
- * The reader's own result, read through the self endpoint: what it carries is all the page shows.
- * Evidence the server withheld under consent is absent, and the page makes up no proof in its place.
- */
+// The self endpoint owns evidence visibility; this route may show only the fields it returns.
 describe("own result", () => {
 	it("shows a result whose evidence was withheld without inventing proof", async () => {
 		server.use(
@@ -881,13 +855,11 @@ describe("own result", () => {
 		);
 		renderRouteAtWithRouter(`${OPEN_REVIEW_PAGE}&reviewResult=${reused.id}`);
 
-		// The problems the reader may read stand, by their summaries.
 		await screen.findByText(
 			"The caching change hides inside the package move",
 			undefined,
 			ROUTE_RENDER_WAIT,
 		);
-		// No quote, no file and no explanation the server did not send.
 		expect(screen.queryByText(/PracticeCatalogLoader/u)).toBeNull();
 		expect(screen.queryByText(/so a reviewer cannot tell which hunk/u)).toBeNull();
 	});
@@ -921,10 +893,6 @@ const guidance = bundledGuidance satisfies PracticeGuidanceDto;
 
 const PRACTICE_PAGE = `${PAGE}?detail=${encodeURIComponent(JSON.stringify([group, practiceEntry]))}`;
 
-/**
- * The introduction and the Guide tab of the practice level: the guidance is a request of its own,
- * asked for only once a practice is open.
- */
 describe("practice introduction", () => {
 	let guidanceAsked: unknown[] = [];
 
@@ -997,12 +965,7 @@ describe("practice introduction", () => {
 	});
 });
 
-/**
- * A user view is an administrator reading the developer's page: everything the developer would
- * answer — a rating, a comment, the card's own answer, a response to feedback — is theirs alone, so
- * none of it is offered. The developer's own visit is the control that shows the same controls are
- * there.
- */
+// User view is read-only; every response control must stay absent.
 describe("practice profile in a user view", () => {
 	beforeEach(() => {
 		server.use(
@@ -1013,10 +976,6 @@ describe("practice profile in a user view", () => {
 	});
 	afterEach(clearUserView);
 
-	/**
-	 * The card's rating and answer buttons on the page, then the responses to the feedback a review
-	 * of the practice gave.
-	 */
 	const responseControls = async () => {
 		const router = await renderProfile();
 		await screen.findByText(feedback.headline, undefined, ROUTE_RENDER_WAIT);
@@ -1059,7 +1018,6 @@ describe("practice profile in a user view", () => {
 	});
 });
 
-/** A result recorded on one pull request, for a card that rests on several. */
 const pullRequestEvidence = (number: number) => ({
 	resultId: `0b9c6f0e-0000-4000-8000-0000000090${number}`,
 	reviewId: `5d1e2a3b-0000-4000-8000-0000000090${number}`,

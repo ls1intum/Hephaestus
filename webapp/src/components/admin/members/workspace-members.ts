@@ -9,11 +9,9 @@ export const WORKSPACE_ROLE_LABELS: Record<WorkspaceRole, string> = {
 	MEMBER: "Member",
 };
 
-/** One member: an account, however many provider identities it has. */
 export interface WorkspaceMemberRow {
 	membership: WorkspaceMembership;
 	name: string;
-	/** The account's provider logins, which search and the Username sort read. */
 	logins: string[];
 	teams: TeamInfo[];
 }

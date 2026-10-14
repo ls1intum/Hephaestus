@@ -11,7 +11,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-/** Connects a prepared conversation copy to its actual mentor transport receipt. */
 @Service
 @RequiredArgsConstructor
 @ConditionalOnCaptureRole

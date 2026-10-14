@@ -25,15 +25,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-/**
- * GitLab adapter for {@link ApprovalWriter}: approves a merge request through the REST {@code POST
- * /projects/:id/merge_requests/:iid/approve} endpoint.
- *
- * <p>REST, not GraphQL, because GitLab's schema defines no approval mutation.
- *
- * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track {@link
- * GitLabGraphQlClientProvider}.
- */
+// GitLab provides approval only through REST; its GraphQL schema has no approval mutation.
 @Component
 @ConditionalOnServerRole
 @OutboundEgressGateway
@@ -119,12 +111,7 @@ public class GitLabApprovalWriter implements ApprovalWriter {
         }
     }
 
-    /**
-     * A ready-made {@link URI} so no template expansion re-encodes the {@code %2F} separators
-     * GitLab requires in a project's full path — a double-encoded {@code %252F} resolves to no
-     * project at all. Namespace and project paths are restricted to unreserved characters, so
-     * escaping the separators is the whole encoding.
-     */
+    // Pass a URI to avoid template expansion double-encoding GitLab project separators as %252F.
     private static URI approvalUri(String serverUrl, MrCoordinates mr) {
         String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
         return URI.create(base

@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-/**
- * The ids are in the URL, so bookmarks and the links that point here depend on them. Renaming one
- * breaks those links.
- */
+// Section ids are URL contracts used by bookmarks and deep links.
 const REVIEW_SECTION_IDS = ["feedback-mode", "automated-review", "past-work"] as const;
 
 export type ReviewSectionId = (typeof REVIEW_SECTION_IDS)[number];

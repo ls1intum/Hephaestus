@@ -42,7 +42,6 @@ function isTabCount(url: URL): boolean {
 	return url.searchParams.get("size") === "1";
 }
 
-/** A Spring page, as every list endpoint answers: page `number` of `totalPages`. */
 function springPage<T>(content: T[], number = 0, totalPages = 1, totalElements = content.length) {
 	return {
 		content,
@@ -57,18 +56,12 @@ function springPage<T>(content: T[], number = 0, totalPages = 1, totalElements =
 	};
 }
 
-/** The page a list endpoint answers with, every row on it. */
 function pageOf<T>(rows: T[]) {
 	return springPage(rows);
 }
 
 const emptyPage = pageOf([]);
 
-/**
- * Every request the list routes make, with the review, result, problem and feedback URLs recorded.
- * The screens they feed take their rows as props, so a story mounts them without ever issuing the
- * request — this route test is the only place that can see what went on the wire.
- */
 function recordRequests() {
 	const reviewUrls: URL[] = [];
 	const resultUrls: URL[] = [];
@@ -103,10 +96,6 @@ function recordRequests() {
 	return { reviewUrls, resultUrls, problemUrls, feedbackUrls, locationCountUrls };
 }
 
-/**
- * The reviews endpoint as the list and its poll of the active reviews read it. The poll is the
- * request with no page: it asks for the active statuses alone, so a review that stopped is not in it.
- */
 function activeReviewsHandler(getReview: () => ReviewSummary, polls: URL[], reads: URL[]) {
 	return http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
 		const url = new URL(request.url);
@@ -120,7 +109,6 @@ function activeReviewsHandler(getReview: () => ReviewSummary, polls: URL[], read
 	});
 }
 
-/** Two finished reviews of two different items, so the second page's row shows that it arrived. */
 const [FIRST_PAGE, SECOND_PAGE] = twoCompleteReviews();
 
 function twoCompleteReviews(): [ReviewSummary, ReviewSummary] {
@@ -133,7 +121,6 @@ function twoCompleteReviews(): [ReviewSummary, ReviewSummary] {
 	return [first, second];
 }
 
-/** The accessible name of a review row's link, by the item it reviewed. */
 function reviewLinkName(review: ReviewSummary): RegExp {
 	return new RegExp(`^Open review of ${review.item.label},`, "u");
 }
@@ -162,13 +149,6 @@ describe("practice review list routes", () => {
 		vi.unstubAllGlobals();
 	});
 
-	/**
-	 * The one wire detail these screens can get wrong silently. The URL spells the ordering `order`,
-	 * because another route already owns the word `sort` in the same search namespace with entirely
-	 * different values; the endpoint spells it `sort`. A list ordered by the server looks exactly like
-	 * a list ordered by the server's default, so nothing but the request itself can catch a rename —
-	 * and this is the surface that exists to put the results most worth acting on at the top.
-	 */
 	it("asks the endpoint for the ordering the URL chose, under the name the endpoint uses", async () => {
 		const { resultUrls } = recordRequests();
 
@@ -240,11 +220,6 @@ describe("practice review list routes", () => {
 		expect(requested?.searchParams.get("markedIncorrect")).toBe("true");
 	});
 
-	/**
-	 * The URL carries withholding *families*, which is the question an operator asks; the endpoint
-	 * filters on individual stop reasons. The expansion happens on the way to the request, so a family
-	 * that stopped expanding would return everything and read as a filter that simply matched a lot.
-	 */
 	it("expands a withholding family to the stop reasons the endpoint filters on", async () => {
 		const { feedbackUrls } = recordRequests();
 
@@ -274,7 +249,6 @@ describe("practice review list routes", () => {
 		expect(values(requested, "groupSlug")).toStrictEqual(["design"]);
 		expect(requested?.searchParams.get("from")).not.toBeNull();
 		expect(requested?.searchParams.get("to")).not.toBeNull();
-		// A filter to one result lists only its problems.
 		expect(requested?.searchParams.get("resultId")).toBe("3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84");
 	});
 
@@ -308,7 +282,6 @@ describe("practice review list routes", () => {
 		expect(values(feedbackUrls.at(-1), "practiceSlug")).toStrictEqual(["thin-controllers"]);
 	});
 
-	/** A location is a destination split by the provider that shows it; the endpoint filters by it. */
 	it("sends the location filter to the feedback endpoint", async () => {
 		const { feedbackUrls, locationCountUrls } = recordRequests();
 
@@ -316,14 +289,9 @@ describe("practice review list routes", () => {
 		await screen.findByText("No feedback matches these filters", undefined, ROUTE_RENDER_WAIT);
 
 		expect(feedbackUrls.at(-1)?.searchParams.get("location")).toBe("GITLAB");
-		// No developer is filtered to, so there is no summary to count.
 		expect(locationCountUrls).toHaveLength(0);
 	});
 
-	/**
-	 * Filtered to a developer, the list leads with their summary. It counts everything for them,
-	 * whatever else the list is narrowed to, so its counts can open the list for them alone.
-	 */
 	it("counts everything for the developer filtered to, and nothing narrower", async () => {
 		const { feedbackUrls, locationCountUrls } = recordRequests();
 
@@ -339,7 +307,6 @@ describe("practice review list routes", () => {
 		expect(values(counts, "state")).toStrictEqual([]);
 	});
 
-	/** A row's developer opens the list filtered to them alone, which is where their summary is. */
 	it("names a row's developer as text, so the row opens one thing", async () => {
 		recordRequests();
 		const [feedback] = reviewFeedback;
@@ -354,7 +321,6 @@ describe("practice review list routes", () => {
 		renderRouteAtWithRouter("/w/acme/admin/practices/reviews/feedback");
 		await screen.findByText(name, undefined, ROUTE_RENDER_WAIT);
 
-		// The feedback's level links the developer; the row's one link is the feedback itself.
 		expect(screen.queryByRole("link", { name: `All feedback for ${name}` })).toBeNull();
 	});
 
@@ -380,7 +346,6 @@ describe("practice review list routes", () => {
 			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
 			// The interval is faked, so the waits poll on vitest's own timer rather than on setInterval.
 			await vi.waitFor(() => expect(polls.length).toBeGreaterThan(0));
-			// The poll keeps the list's own filter: a status it leaves out is not asked for.
 			expect(values(polls.at(-1), "status")).toStrictEqual(["RUNNING"]);
 			expect(within(table).queryAllByText("Failed")).toHaveLength(0);
 
@@ -398,10 +363,6 @@ describe("practice review list routes", () => {
 		}
 	});
 
-	/**
-	 * The shared scope reaches the reviews endpoint under the names the result list uses: the
-	 * developer, the practice and the group that a review recorded a result of.
-	 */
 	it("sends the shared developer, practice, group, range and review to the reviews endpoint", async () => {
 		const { reviewUrls } = recordRequests();
 
@@ -420,7 +381,6 @@ describe("practice review list routes", () => {
 		expect(requested?.searchParams.get("reviewId")).toBe("3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84");
 	});
 
-	/** A group finds the feedback written from results of any practice in it. */
 	it("sends the group filter to the feedback endpoint", async () => {
 		const { feedbackUrls } = recordRequests();
 
@@ -526,10 +486,6 @@ describe("practice review list routes", () => {
 		expect(screen.queryByRole("button", { name: "Show more reviews" })).toBeNull();
 	});
 
-	/**
-	 * What the wire says of a review reaches its row: who asked for it and a stop worth a second look.
-	 * The row opens the review's sheet over the list.
-	 */
 	it("names who asked for a review and its failure on its row, and opens its sheet", async () => {
 		server.use(...reviewHandlers());
 		const requestedReview: ReviewSummary = {

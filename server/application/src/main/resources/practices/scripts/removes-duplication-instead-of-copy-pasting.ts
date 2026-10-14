@@ -1,6 +1,3 @@
-// Finds each pair of added blocks whose lines have the same shape when names and literals are set
-// aside. The review decides if a pair is one unit of knowledge written twice, or an idiom that the
-// platform makes look alike.
 import { duplicatePairs, MIN_RUN_LINES } from "../kits/scm/duplication.ts";
 import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
 import { isTestPath, languageOf } from "../kits/scm/languages.ts";

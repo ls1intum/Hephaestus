@@ -182,7 +182,6 @@ public class GeneralReviewCommentContentSource {
         return node;
     }
 
-    /** The provider's own classification, as the adapter stored it. */
     private static boolean isBot(@Nullable User user) {
         return user != null && user.getType() == User.Type.BOT;
     }

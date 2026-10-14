@@ -64,10 +64,6 @@ function reviewedSentence(context: ReadyContext): string {
 	return `Reviewed ${formatDateTime(reviewed) ?? reviewed}${version === undefined ? "" : ` at ${version}`}.`;
 }
 
-/**
- * The opened report's last line: when, precisely, and where the rest is — the review's history and
- * evidence in Hephaestus, and for a workspace admin every developer's records and the review itself.
- */
 function Footer({
 	context,
 	webAppOrigin,
@@ -100,10 +96,6 @@ function Footer({
 	);
 }
 
-/**
- * No result beside comments that are there says nothing worth a section; with no comments either,
- * it is the one fact the opened report has, and it stays. Loading and failure always show.
- */
 function quietlyEmpty(
 	results: Loadable<ResultPage>,
 	feedback: Loadable<WorkFeedback> | undefined,

@@ -289,7 +289,6 @@ function project(
 
 type Capture = { shown: Record<string, unknown> } | { omitted: string };
 
-/** The source's capture state, and whether it recorded exactly this sourceFile under this kind. */
 function captureOf(
 	index: Record<string, unknown>,
 	kind: string,
@@ -1040,10 +1039,6 @@ interface CitedFile {
 	sha256: string;
 }
 
-/**
- * Every citation of one admitted result: its own, its example's, then each of its problems', in order. A result
- * cites from all three, and the review may speak about any of them.
- */
 function resultCitations(result: Record<string, unknown>): unknown[] {
 	const example = isRecord(result.example) ? [result.example.citation] : [];
 	const problems = listOf(result.problems).flatMap((problem) =>
@@ -1052,7 +1047,6 @@ function resultCitations(result: Record<string, unknown>): unknown[] {
 	return [...listOf(result.citations), ...example, ...problems];
 }
 
-/** The verified primary code citations of the server-admitted public NOT_MET results and their problems, in order. */
 function citedPrimaryFiles(
 	results: readonly Record<string, unknown>[],
 	contextRoot: string,
@@ -1259,12 +1253,6 @@ function verifiedText(blob: PinnedBlob, sha256: string): { text: string } | { om
 	}
 }
 
-/**
- * The primary code the admitted public NOT_MET results and their problems cite, read from the pinned revision each
- * citation names: every cited file whole with its line numbers, and for a cited change its complete section of Git's
- * pinned diff. A file whose bytes differ from what admission verified, or that is binary, too large, absent or not a
- * regular file, is named with the reason and never shown in part. It is data from the work, and it assesses nothing.
- */
 export function buildPrimarySourceReference(
 	root: string,
 	contextRoot: string,

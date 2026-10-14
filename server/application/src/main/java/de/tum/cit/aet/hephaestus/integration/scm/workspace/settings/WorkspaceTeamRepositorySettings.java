@@ -22,33 +22,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-/**
- * Workspace-scoped settings for a team's repository access.
- *
- * <p>This entity stores Hephaestus-specific repository settings that are scoped to a particular
- * team within a workspace, enabling different configurations for the same team-repository
- * relationship across multiple workspaces.
- *
- * <h2>Composite Primary Key</h2>
- *
- * Uses {@link Id} as an embedded composite key of (workspaceId, teamId, repositoryId), ensuring:
- *
- * <ul>
- *   <li>A team-repository pair can have different settings per workspace
- *   <li>Each team-repository pair has exactly one settings record per workspace
- * </ul>
- *
- * <h2>Settings</h2>
- *
- * <ul>
- *   <li><b>hiddenFromContributions:</b> Controls whether contributions from this repository should
- *       be excluded from contribution calculations for this team in this workspace
- * </ul>
- *
- * @see Workspace
- * @see Team
- * @see Repository
- */
 @Entity
 @Table(name = "workspace_team_repository_settings")
 @Getter
@@ -58,12 +31,10 @@ import lombok.ToString;
 @ToString
 public class WorkspaceTeamRepositorySettings {
 
-    /** Composite primary key (workspaceId, teamId, repositoryId) */
     @EmbeddedId
     @EqualsAndHashCode.Include
     private Id id = new Id();
 
-    /** The workspace these settings belong to */
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("workspaceId")
     @JoinColumn(
@@ -73,7 +44,6 @@ public class WorkspaceTeamRepositorySettings {
     @ToString.Exclude
     private Workspace workspace;
 
-    /** The team these settings apply to */
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("teamId")
     @JoinColumn(
@@ -83,7 +53,6 @@ public class WorkspaceTeamRepositorySettings {
     @ToString.Exclude
     private Team team;
 
-    /** The repository these settings apply to */
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("repositoryId")
     @JoinColumn(
@@ -93,23 +62,9 @@ public class WorkspaceTeamRepositorySettings {
     @ToString.Exclude
     private Repository repository;
 
-    /**
-     * Controls whether contributions from this repository should be excluded from contribution
-     * calculations for this team in this workspace.
-     *
-     * <p>When {@code true}, pull requests, reviews, and other contributions from this repository
-     * will not count toward the team's statistics in this workspace.
-     */
     @Column(name = "hidden_from_contributions", nullable = false)
     private boolean hiddenFromContributions = false;
 
-    /**
-     * Creates a new WorkspaceTeamRepositorySettings for the given workspace, team, and repository.
-     *
-     * @param workspace the workspace these settings belong to
-     * @param team the team these settings apply to
-     * @param repository the repository these settings apply to
-     */
     public WorkspaceTeamRepositorySettings(Workspace workspace, Team team, Repository repository) {
         this.workspace = workspace;
         this.team = team;

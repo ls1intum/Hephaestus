@@ -26,10 +26,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * A team sync event changes a workspace only when its teams are that workspace's group on its
- * connected instance.
- */
 class WorkspaceTeamMembershipAdapterTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 1L;

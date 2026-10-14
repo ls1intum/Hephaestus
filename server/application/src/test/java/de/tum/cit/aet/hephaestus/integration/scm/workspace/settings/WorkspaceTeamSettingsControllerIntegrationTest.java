@@ -85,11 +85,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         label = createLabel("feature", "0366d6", repository);
     }
 
-    /**
-     * Links the synced {@link Organization} that install creates before any team is synced ({@code
-     * GitHubLifecycleListener}). Team scoping resolves the workspace's provider through it, so
-     * without this the workspace has no resolvable team scope and correctly sees no teams.
-     */
     private void linkSyncedOrganization(String login) {
         Organization organization = new Organization();
         organization.setNativeId(entityIdGenerator.incrementAndGet());
@@ -463,7 +458,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
                     .isCreated()
                     .expectBody(Void.class);
 
-            // Verify filter exists
             var filtersBefore = labelFilterRepository.findByWorkspaceIdAndTeamId(workspace.getId(), team.getId());
             assertThat(filtersBefore).hasSize(1);
 
@@ -665,13 +659,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         }
     }
 
-    /**
-     * Creates and persists a team entity for testing.
-     *
-     * @param name the team name
-     * @param organization the organization name (should match workspace.accountLogin)
-     * @return the persisted team
-     */
     private Team createTeam(String name, String organization) {
         Team newTeam = new Team();
         newTeam.setNativeId(entityIdGenerator.incrementAndGet());
@@ -685,12 +672,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         return teamRepository.save(newTeam);
     }
 
-    /**
-     * Creates and persists a repository entity for testing.
-     *
-     * @param nameWithOwner the full repository name (e.g., "org/repo")
-     * @return the persisted repository
-     */
     private Repository createRepository(String nameWithOwner) {
         String[] parts = nameWithOwner.split("/", -1);
         String repoName = parts.length > 1 ? parts[1] : nameWithOwner;
@@ -708,14 +689,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         return repositoryRepository.save(repo);
     }
 
-    /**
-     * Creates and persists a label entity for testing.
-     *
-     * @param name the label name
-     * @param color the label color (hex without #)
-     * @param labelRepository the repository the label belongs to
-     * @return the persisted label
-     */
     private Label createLabel(String name, String color, Repository labelRepository) {
         Label newLabel = new Label();
         newLabel.setNativeId(entityIdGenerator.incrementAndGet());

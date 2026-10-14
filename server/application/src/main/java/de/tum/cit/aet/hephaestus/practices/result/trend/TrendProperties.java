@@ -5,7 +5,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/** Research parameters for the opportunity-indexed trend estimator. */
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "hephaestus.practices.trend")

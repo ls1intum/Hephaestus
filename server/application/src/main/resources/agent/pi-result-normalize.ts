@@ -1,11 +1,6 @@
 import { isRecord } from "./pi-text.ts";
 import { DIFF_SOURCE, TREE_SOURCE } from "./work/practice-scripts/kits/scm/sources.ts";
-/**
- * The host's check of what a review session submits with `submit_result`: one result for its one
- * practice. This module repairs what it can and notes each repair. It refuses the rest and names every
- * problem at once. After the host adds the coverage it measured, `parseCandidate` in the contract
- * applies the final rules. The quote helpers at the end resolve each citation against its sourceFile.
- */
+// Repair transport and coordinates before admission; emit a result only when its full contract holds.
 import {
 	CANDIDATE_LIMITS,
 	type Citation,
@@ -27,34 +22,29 @@ export const CHECKOUT_WITNESS = /^(?<root>repos\/[a-zA-Z0-9_-]+\/)\.git\/HEAD$/u
  * against it. The runner passes its task's repository root, which is this path in every sandbox.
  */
 export const REVIEWED_CHECKOUT = "repos/reviewed/";
-/** The refs file beside a checkout's HEAD witness; admission needs both captured. */
 const CAPTURED_REFS = ".git/hephaestus-captured-refs";
 
 /** Which side of a diff hunk a citation quotes. It is absent on every source that is not a diff. */
 export type DiffSide = "OLD" | "NEW";
 
-/** What a search for something missing consulted, looked for, and did not cover. */
 export interface RecordedSearch {
 	consulted: string[];
 	lookedFor: string;
 	boundary: string;
 }
 
-/** Why this practice has no prerequisite here: the warrant of a DOES_NOT_APPLY result. */
 export interface RecordedInapplicability {
 	consulted: string[];
 	prerequisite: string;
 	ruledOutBy: string;
 }
 
-/** A question that the evidence leaves open, located where the session could cite it. */
 export interface RecordedOpenQuestion {
 	openQuestion: string;
 	wouldSettleIt: string;
 	citation?: Citation;
 }
 
-/** One gap of a NOT_MET result, checked. */
 export interface NormalizedProblem {
 	key?: string;
 	severity: Severity;
@@ -101,10 +91,6 @@ export const OUTCOME_DESCRIPTIONS: Record<Outcome, string> = {
 		"A capture failure is a review readiness failure, not a result.",
 };
 
-/**
- * The practice's own severity table gives the severity, keyed to the quoted fact. These descriptions
- * calibrate the bands, so that the same fact gets the same band in every run. Do not grade by feel.
- */
 export const SEVERITY_DESCRIPTIONS: Record<Severity, string> = {
 	CRITICAL:
 		"The consequence is expensive or impossible to undo once this merges — a leaked credential, data loss, " +
@@ -119,7 +105,6 @@ export const SEVERITY_DESCRIPTIONS: Record<Severity, string> = {
 		"A real gap with trivial impact. Still a problem of a NOT_MET result; a strength is never a problem.",
 };
 
-/** Require a model-facing description for each enum value. */
 export function describeVocabulary<T extends string>(
 	values: readonly T[],
 	descriptions: Record<T, string>,
@@ -135,17 +120,12 @@ export function describeVocabulary<T extends string>(
 		.join("\n");
 }
 
-/** The summary heads the developer's practice page. It is a phrase, not the explanation. */
 export const MAX_SUMMARY_CHARS: number = CANDIDATE_LIMITS.summaryChars;
 
 export function trimmedText(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";
 }
 
-/**
- * The non-empty trimmed strings in a value that the model sent as a list, and [] for any other value.
- * The tool schema asks for a list of strings, but the model can send something else.
- */
 function trimmedStrings(value: unknown): string[] {
 	return Array.isArray(value)
 		? value.map((entry: unknown) => trimmedText(entry)).filter(Boolean)
@@ -156,7 +136,6 @@ function nullish(value: unknown): boolean {
 	return value == null;
 }
 
-/** The text, or an error that names the field and its bound. */
 function withinBound(text: string, name: string, max: number): string {
 	if (text.length > max) {
 		throw new Error(`${name} must be at most ${max} characters; this one is ${text.length}`);
@@ -164,7 +143,6 @@ function withinBound(text: string, name: string, max: number): string {
 	return text;
 }
 
-/** The distinct source kinds of a warrant, sorted, or an error that says what is missing. */
 function consultedSources(value: unknown, name: string, missing: string): string[] {
 	const consulted = [...new Set(trimmedStrings(value))].toSorted();
 	if (consulted.length === 0) {
@@ -181,7 +159,6 @@ function consultedSources(value: unknown, name: string, missing: string): string
 	return consulted;
 }
 
-/** Requires the source list, the named behavior and the boundary of an absence claim. */
 export function normalizeSearch(search: unknown): RecordedSearch {
 	if (!isRecord(search)) {
 		throw new Error("search is required");
@@ -236,11 +213,6 @@ export function normalizeInapplicability(inapplicability: unknown): RecordedInap
 	};
 }
 
-/**
- * One question that the evidence leaves open.
- * @param which names the question in an error, e.g. "open question 2". Its citation is named
- *   "open question 2 citation".
- */
 export function normalizeOpenQuestion(
 	raw: unknown,
 	which: string,
@@ -268,20 +240,11 @@ export function normalizeOpenQuestion(
 	};
 }
 
-/**
- * How a citation is completed when it leaves out what the run already knows, and where the repairs
- * made on the way in are reported, one line each.
- */
 export interface CitationRepairs {
-	/** The source kind that the manifest staged a source file under; undefined when it staged no such sourceFile. */
 	sourceOf?: (sourcePath: string) => string | undefined;
 	notes?: string[];
 }
 
-/**
- * A line number as the session writes it: an integer, or the `[L<n>]`, `L<n>` or `"<n>"` it copied from
- * a view. NaN when it is none of these, so the range checks name what was received.
- */
 function citedLine(value: unknown): number {
 	if (typeof value === "number") {
 		return value;
@@ -290,7 +253,6 @@ function citedLine(value: unknown): number {
 	return written?.groups?.line === undefined ? Number.NaN : Number(written.groups.line);
 }
 
-/** A checkout file named by its workspace path, as `ls` shows it, is the file at its path inside the checkout. */
 function insideCheckout(
 	path: string,
 	sourceKind: string,
@@ -307,10 +269,6 @@ function insideCheckout(
 	return read;
 }
 
-/**
- * What the manifest already knows is filled in, not asked for: the sourceFile of a staged record is its
- * own path, and the source of a source file is the source that staged it. Each fill is noted.
- */
 function completedFromManifest(
 	fields: Record<string, unknown>,
 	path: string,
@@ -332,19 +290,12 @@ function completedFromManifest(
 	return { sourcePath, sourceKind };
 }
 
-/**
- * One citation, checked and completed from the manifest. The quote is required: admission verifies it
- * verbatim against the sourceFile, so coordinates alone prove nothing.
- * @param which prefixes each note and error, e.g. "problem 2 citation 1: ", so that the session knows
- *   which citation it is about.
- */
+/** Quotes are required and verified verbatim against captured text; coordinates alone cannot establish evidence. */
 export function normalizeCitation(
 	raw: unknown,
 	which: string,
 	{ sourceOf, notes = [] }: CitationRepairs = {},
 ): Citation {
-	// A citation that is not an object reads as one with every field missing. The required-field
-	// checks below refuse it by name.
 	const fields: Record<string, unknown> = isRecord(raw) ? raw : {};
 	const given = typeof fields.path === "string" ? fields.path : "";
 	const { sourcePath, sourceKind } = completedFromManifest(fields, given, which, sourceOf, notes);
@@ -353,8 +304,6 @@ export function normalizeCitation(
 	});
 	const declaredSide = nullish(fields.side) ? null : trimmedText(fields.side).toUpperCase();
 	const revision = nullish(fields.revision) ? null : trimmedText(fields.revision);
-	// Whether a revision applies is settled once the source is (the caller drops it elsewhere). Its
-	// form is not the caller's to guess.
 	if (revision !== null && (revision.length === 0 || revision.length > 1024)) {
 		throw new Error(
 			`${which}revision must be an opaque nonempty version of at most 1024 characters, received ${JSON.stringify(fields.revision)}`,
@@ -397,8 +346,7 @@ export function normalizeCitation(
 	if (declaredSide !== null && declaredSide !== "OLD" && declaredSide !== "NEW") {
 		throw new Error(`${which}diff evidence citation side must be OLD or NEW`);
 	}
-	// Number(undefined) is NaN and Number(null) is 0. An omitted line must be named as omitted, not as
-	// a bad integer, or the session cannot tell which of the two it did.
+	// Number(null) is zero; distinguish an omitted coordinate before numeric validation.
 	if (nullish(fields.startLine) || fields.startLine === "") {
 		throw new Error(
 			`${which}evidence citation startLine is required:` +
@@ -426,7 +374,6 @@ export function normalizeCitation(
 			`${which}quote must be at most ${CANDIDATE_LIMITS.quoteChars} characters; this one is ${quote.length}. Quote a fragment of the lines`,
 		);
 	}
-	// A side on anything but a quote of the change says nothing. It is surplus: dropped, not refused.
 	const side: DiffSide | null =
 		declaredSide === "OLD" || declaredSide === "NEW" ? declaredSide : null;
 	return {
@@ -457,7 +404,6 @@ function parseVocabulary<T extends string>(
 	return admitted;
 }
 
-// ── The submission ───────────────────────────────────────────────────────────
 
 const RESULT_FIELDS = [
 	"outcome",
@@ -486,7 +432,6 @@ const BASIS_FIELDS = {
 	state: ["type", "explanation"],
 } as const satisfies Record<ClaimBasis["type"], readonly string[]>;
 
-/** Run one check. Its error joins the problems, and the result is undefined. */
 function collect<T>(problems: string[], check: () => T): T | undefined {
 	try {
 		return check();
@@ -496,20 +441,17 @@ function collect<T>(problems: string[], check: () => T): T | undefined {
 	}
 }
 
-/** A one-line summary as the developer's practice page shows it, or undefined with the problem noted. */
 function checkedSummary(value: unknown, prefix: string, problems: string[]): string | undefined {
 	const summary = trimmedText(value).replaceAll(/\s+/gu, " ");
 	if (!summary) {
 		problems.push(`${prefix}summary is required`);
 	} else if (!/\S\s+\S/u.test(summary)) {
-		// The developer reads the summary on their practice page, with no evidence beside it. One word
-		// ("Test") names nothing that the practice's own name does not.
 		problems.push(
 			`${prefix}summary must say what was observed as a short phrase, not one word — e.g. ` +
 				"'Debug print left in the request handler'",
 		);
 	} else if (summary.length > MAX_SUMMARY_CHARS) {
-		// Refused, never shortened: a cut that the runner chooses changes what the result says.
+		// Reject overlong result text; truncation would change the submitted claim.
 		problems.push(
 			`${prefix}summary must be at most ${MAX_SUMMARY_CHARS} characters; this one is ${summary.length}. ` +
 				"Resend the result with a shorter summary that reads as a complete phrase on its own — name " +
@@ -521,7 +463,6 @@ function checkedSummary(value: unknown, prefix: string, problems: string[]): str
 	return undefined;
 }
 
-/** Required trimmed text within its bound, or undefined with the problem noted. */
 function checkedText(
 	value: unknown,
 	name: string,
@@ -537,7 +478,6 @@ function checkedText(
 	return collect(problems, () => withinBound(text, name, max));
 }
 
-/** Unknown keys of an object, as one problem that names the keys it may have. */
 function checkedKeys(
 	value: Record<string, unknown>,
 	allowed: readonly string[],
@@ -552,7 +492,6 @@ function checkedKeys(
 	}
 }
 
-/** A list of citations, each checked. Undefined when the list or any citation is refused. */
 function citationList(
 	value: unknown,
 	name: string,
@@ -734,7 +673,6 @@ function normalizeProblem(
 	};
 }
 
-/** The problems of a NOT_MET result, and no problem on any other outcome. */
 function checkedProblems(
 	value: unknown,
 	outcome: Outcome | undefined,
@@ -820,7 +758,6 @@ function checkedExample(
 	return note === undefined || citation === undefined ? undefined : { citation, note };
 }
 
-/** The warrants that the outcome permits, each checked. */
 function checkedEvidence(
 	value: unknown,
 	outcome: Outcome | undefined,
@@ -919,12 +856,7 @@ function checkedOpenQuestions(
 	return problems.length > before ? undefined : questions;
 }
 
-/**
- * Validate and repair a `submit_result` input. The error names every problem at once, joined with
- * "; also: ": one resend per problem costs one model call each.
- * @param notes receives one line for each repair on the way in, such as a field moved to its home or a
- *   value filled in from the manifest, so the caller can echo what it recorded.
- */
+/** Report all submission errors together so each correction does not require another model call. */
 export function normalizeSubmission(
 	raw: unknown,
 	notes: string[] = [],
@@ -989,10 +921,6 @@ export function normalizeSubmission(
 	};
 }
 
-/**
- * Every citation of a submission, in order: the result's, each problem's, the example's, then each
- * open question's. The objects are the submission's own, so a caller can repair a quote in place.
- */
 export function submissionCitations(submission: NormalizedSubmission): Citation[] {
 	return [
 		...submission.citations,
@@ -1004,7 +932,6 @@ export function submissionCitations(submission: NormalizedSubmission): Citation[
 	];
 }
 
-/** Requires each citation of the submission to name a source file that its declared source staged. */
 export function validateEvidenceSources(
 	submission: NormalizedSubmission,
 	availableSourceKinds: ReadonlySet<string>,
@@ -1022,8 +949,6 @@ export function validateEvidenceSources(
 		const sourceFileSource = sourceFileSources.get(citation.sourcePath);
 		if (sourceFileSource !== sourceKind) {
 			if (sourceFileSource === undefined) {
-				// The container derives the change view under work/ from the checkout. A quote of it is a
-				// quote of the change: the pinned range is the sourceFile, and the diff holds its lines.
 				const derived = citation.sourcePath.startsWith("work/")
 					? " The change view under work/ is derived here and is not a source file: quote a changed line " +
 						`from work/change/diff.patch as ${DIFF_SOURCE} with the pinned change.json as ` +
@@ -1059,7 +984,6 @@ export function validateEvidenceSources(
 	}
 }
 
-/** The checkout a quote of code is verified against: the reviewed one for the change, the cited one for a tree. */
 function checkoutOf(citation: Citation, reviewedCheckout: string): string | undefined {
 	if (citation.sourceKind === DIFF_SOURCE) {
 		return reviewedCheckout;
@@ -1073,11 +997,6 @@ function describeAvailableSources(sourceKinds: ReadonlySet<string>): string {
 	return sourceKinds.size === 0 ? "(none)" : [...sourceKinds].toSorted().join(", ");
 }
 
-/**
- * Requires each searched source to be staged, and each declared exhaustive source to be consulted.
- * A MET that rests on a search also needs an exhaustive source policy: a positive absence claim needs
- * a closed search boundary. These checks validate the declared search, not whether the model read it.
- */
 export function validateSearchScope(
 	submission: NormalizedSubmission,
 	exhaustiveSourceKinds: ReadonlySet<string>,
@@ -1137,12 +1056,8 @@ export function validateInapplicabilityScope(
 	}
 }
 
-/** The thread a conversation review judges. Native account identities identify each author. */
 export const CONVERSATION_THREAD = "context/conversation_thread.json";
 
-/**
- * Whether a citation lies inside a turn whose native account matches the frozen developer.
- */
 export function citesReviewedTurn(
 	citations: readonly Citation[],
 	thread: string,
@@ -1164,7 +1079,6 @@ export function citesReviewedTurn(
 	);
 }
 
-/** The first and last line of each turn under review, read from the record as written. */
 function reviewedTurnLines(
 	thread: string,
 	developerId: string,
@@ -1176,12 +1090,10 @@ function reviewedTurnLines(
 		return [];
 	}
 	const messages: unknown = isRecord(parsed) ? parsed.messages : undefined;
-	// The pass below counts the objects of `messages`; only when every element is one does its count
-	// index the array.
 	if (!Array.isArray(messages) || !messages.every(isRecord)) {
 		return [];
 	}
-	// JSON.parse keeps no positions, so one pass finds each turn's lines, in the same order.
+	// JSON.parse retains no source positions; locate turn spans separately in record order.
 	const spans: { first: number; last: number; index: number }[] = [];
 	let line = 1;
 	let depth = 0;
@@ -1234,13 +1146,10 @@ function reviewedTurnLines(
 	return spans.filter((span) => messages[span.index]?.accountId === developerId);
 }
 
-/** How much of a diff line a refusal quotes back; enough to see the difference, not the whole line. */
 const MISMATCH_EXCERPT_CHARS = 160;
 
-/** Why a citation without a quote is refused: coordinates alone verify nothing. */
 const NO_QUOTE = "the citation has no quote; quote the cited text verbatim";
 
-/** Why a citation does not match, in one phrase, or null when it does. */
 export function describeCitationMismatch(citation: Citation, content: string): string | null {
 	const resolved = resolveQuote(citation, content);
 	return "mismatch" in resolved ? resolved.mismatch : null;
@@ -1258,14 +1167,12 @@ export function resolveQuote(
 		return { mismatch: NO_QUOTE };
 	}
 	const resolved = resolveQuoteText(citation, content);
-	// Admission refuses a blank quote, so a citation of blank lines is refused here, with the reason.
 	if ("quote" in resolved && resolved.quote.trim() === "") {
 		return { mismatch: "the cited lines are blank; cite a line that has text" };
 	}
 	return resolved;
 }
 
-/** Resolve plain captured text independently of a provider's source naming. */
 export function resolveCapturedText(
 	citation: Citation,
 	content: string,
@@ -1289,8 +1196,7 @@ export function resolveCapturedText(
 	if (found !== null) {
 		return { quote: found };
 	}
-	// The text is real but the coordinates are not: a file read without line numbers is cited by
-	// a guess. When the quote occurs exactly once in the sourceFile, that is where it is recorded.
+	// Repair guessed coordinates only when the quote occurs exactly once in the captured text.
 	const elsewhere = locateAsWritten(content, quote);
 	if (elsewhere.length === 1 && elsewhere[0] !== undefined) {
 		return elsewhere[0];
@@ -1300,8 +1206,6 @@ export function resolveCapturedText(
 			mismatch: `${where} does not hold that text; it occurs at ${elsewhere.map((hit) => `[L${hit.startLine}]`).join(", ")} — cite the one you mean`,
 		};
 	}
-	// A body serialized into one JSON line reads as one line, escapes and all: the excerpt shows
-	// it, and the hint says how to quote it, since a quote spanning its line breaks is never found.
 	const hint = citedText.includes(String.raw`\n`)
 		? String.raw`; this is a JSON string whose line breaks are the two characters \n, so quote a fragment from between two of them, or spell them as the line does`
 		: "";
@@ -1344,8 +1248,6 @@ function resolveQuoteText(
 	if ("text" in atCited) {
 		return { quote: atCited.text };
 	}
-	// The text may be real with the coordinates guessed, or the span miscounted: when the quoted
-	// block occurs exactly once on that side of that path, it is recorded there.
 	const found = [...citedLines.keys()].flatMap((start) => {
 		const match = diffLinesMatch(citedLines, start, quoteLines.length, quoteLines);
 		return "text" in match ? [{ start, text: match.text }] : [];
@@ -1366,10 +1268,6 @@ function resolveQuoteText(
 	return atCited;
 }
 
-/**
- * Why a changed file has no line to cite on the side named, and what to cite instead: its other side,
- * the commit that touches it when the diff shows its header alone, or the file the change does touch.
- */
 function noLinesToCite(
 	lines: ReadonlyMap<string, ReadonlyMap<number, string>>,
 	path: string,
@@ -1389,23 +1287,16 @@ function noLinesToCite(
 	return `the change does not touch ${path}: name the changed file as the \`+++ b/\` header of its hunk does`;
 }
 
-/** A quote as recorded, with corrected coordinates when the text was found elsewhere than cited. */
 export interface ResolvedQuote {
 	quote: string;
 	startLine?: number;
 	endLine?: number;
-	/** The changed file and side the quote is on, when the citation named the diff view itself. */
 	path?: string;
 	side?: DiffSide;
 }
 
-/** The derived view of the change; its own line numbers are not the coordinates a citation needs. */
 const DIFF_VIEW = "work/change/diff.patch";
 
-/**
- * The diff's lines from `start` matched against the quote's lines, one each: the content they carry
- * when every line matches, or why not.
- */
 function diffLinesMatch(
 	citedLines: ReadonlyMap<number, string>,
 	start: number,
@@ -1431,10 +1322,8 @@ function diffLinesMatch(
 	return { text: recorded.join("\n") };
 }
 
-/** A quote found in the sourceFile, so it always has the lines it is on. */
 type LocatedQuote = ResolvedQuote & { startLine: number; endLine: number };
 
-/** Every place the quote occurs in the whole sourceFile, as written there, with its line range. */
 function locateAsWritten(content: string, quote: string): LocatedQuote[] {
 	const hits: LocatedQuote[] = [];
 	for (const candidate of [quote, JSON.stringify(quote).slice(1, -1)]) {
@@ -1472,19 +1361,11 @@ function diffKey(path: string | null, side: DiffSide | undefined): string {
 	return `${side ?? "NEW"} ${path ?? ""}`;
 }
 
-/**
- * For each parsed diff, which [L<n>] of which file and side each line of the diff view itself carries:
- * a coordinate copied from `sed -n` or `grep -n` over diff.patch names a line of the view.
- */
 const viewLines = new WeakMap<
 	ReadonlyMap<string, ReadonlyMap<number, string>>,
 	ReadonlyMap<number, { key: string; line: number }>
 >();
 
-/**
- * The annotated diff's lines by file and side (keyed by {@link diffKey}), each by its line number, or
- * why they could not be read.
- */
 function annotatedDiff(content: string): Map<string, Map<number, string>> | string {
 	let oldPath: string | null = null;
 	let newPath: string | null = null;
@@ -1492,8 +1373,6 @@ function annotatedDiff(content: string): Map<string, Map<number, string>> | stri
 	const atViewLine = new Map<number, { key: string; line: number }>();
 	const viewed = content.split("\n");
 	viewLines.set(byFile, atViewLine);
-	// A file the diff names without a hunk — binary, renamed without edits, mode only — is known with no
-	// lines, so a citation of it is told why rather than that the change does not touch it.
 	const known = (side: DiffSide, filePath: string) => {
 		const key = diffKey(filePath, side);
 		if (!byFile.has(key)) {
@@ -1501,14 +1380,11 @@ function annotatedDiff(content: string): Map<string, Map<number, string>> | stri
 		}
 	};
 	for (const [index, storedLine] of viewed.entries()) {
-		// Both groups are mandatory, so binding them here is what lets the annotated branch below turn
-		// on a value the compiler has seen rather than on the match object being non-null.
 		const [, annotatedLineNumber, annotatedText] =
 			/^\[L(?<line>\d+)\] (?<text>[\s\S]*)$/u.exec(storedLine) ?? [];
 		const line = annotatedText ?? storedLine;
 		if (annotatedLineNumber === undefined && line.startsWith("diff --git ")) {
-			// `a/<path> b/<path>`: only an unrenamed header splits unambiguously, and a rename says its
-			// paths on the lines below.
+			// Renamed paths are ambiguous in diff headers; read their explicit path lines.
 			const header = line.slice("diff --git ".length);
 			const middle = (header.length - 1) / 2;
 			const filePath = header.slice(2, middle);
@@ -1550,11 +1426,6 @@ function annotatedDiff(content: string): Map<string, Map<number, string>> | stri
 	return byFile;
 }
 
-/**
- * The coordinates may be lines of diff.patch itself, as a numbered view prints them: the view's line names the
- * cited file's line that must hold the quote. Null when the view names no line of the cited file there, or the
- * lines do not hold the quote.
- */
 function readAtViewLines(
 	lines: ReadonlyMap<string, ReadonlyMap<number, string>>,
 	citedLines: ReadonlyMap<number, string>,
@@ -1575,11 +1446,6 @@ function readAtViewLines(
 		: null;
 }
 
-/**
- * A citation that names the diff view is a citation of a changed file: when its quote occurs once in
- * the change, the file, side and [L<n>] it occurs at are what it cites. Otherwise the session is told
- * what a citation of the change names.
- */
 function placedInDiff(
 	lines: ReadonlyMap<string, ReadonlyMap<number, string>>,
 	quote: string,
@@ -1613,7 +1479,6 @@ function placedInDiff(
 	};
 }
 
-/** Compare text at pinned coordinates, allowing diff markers and horizontal whitespace variants. */
 function quotesDiffLine(diffLine: string, quoted: string): boolean {
 	if (diffLine.length === 0) {
 		return false;
@@ -1630,7 +1495,6 @@ function quotesDiffLine(diffLine: string, quoted: string): boolean {
 	);
 }
 
-/** Horizontal whitespace, including the non-breaking kinds, is presentation. */
 const HORIZONTAL_SPACE = String.raw`[ \t\u00a0\u2007\u202f]`;
 
 function squash(text: string): string {
@@ -1639,13 +1503,8 @@ function squash(text: string): string {
 
 const IS_HORIZONTAL_SPACE = new RegExp(`^${HORIZONTAL_SPACE}$`, "u");
 
-/** What {@link flattened} leaves out: horizontal spacing, and a `\r` that ends a line before its `\n`. */
 const FLATTENED_OUT = new RegExp(String.raw`${HORIZONTAL_SPACE}|\r(?=\n)`, "gu");
 
-/**
- * Text without its horizontal spacing and with `\r\n` read as `\n`, and for each character kept, its
- * offset in the text.
- */
 function flattened(text: string): { flat: string; offsets: Uint32Array } {
 	const offsets = new Uint32Array(text.length);
 	let kept = 0;
@@ -1662,14 +1521,6 @@ function flattened(text: string): { flat: string; offsets: Uint32Array } {
 	return { flat: text.replaceAll(FLATTENED_OUT, ""), offsets: offsets.subarray(0, kept) };
 }
 
-/**
- * Where the quote occurs in the text as the sourceFile may write it, leftmost first and never
- * overlapping: the same characters and line breaks, each break `\n` or `\r\n`, with horizontal spacing
- * in the text only where the quote has spacing or a line break beside it. Spacing in the quote may be
- * absent from the text. The whole quote, spacing removed, is found by plain search in the text, spacing
- * removed; a place found is kept only when the text's spacing there falls where the quote allows it.
- * Each place found that is refused costs up to one pass over the quote.
- */
 function* occurrencesAsWritten(
 	text: string,
 	candidate: string,
@@ -1678,14 +1529,11 @@ function* occurrencesAsWritten(
 	if (quote.flat === "") {
 		return;
 	}
-	// Whether the quote has spacing before each of its characters, and after its last.
 	const spaced = Array.from(
 		quote.offsets,
 		(offset, index) => offset > (quote.offsets[index - 1] ?? -1) + 1,
 	);
 	const spacedAfter = (quote.offsets.at(-1) ?? 0) < candidate.length - 1;
-	// A quote that ends in a bare `\r` may end where a `\r\n` of the text does, whose `\r` the text's
-	// flat form leaves out; so that `\r` is sought in the text itself, after the rest is found.
 	const endsInReturn = quote.flat.endsWith("\r");
 	const sought = endsInReturn ? quote.flat.slice(0, -1) : quote.flat;
 	if (sought === "") {
@@ -1732,7 +1580,6 @@ function* occurrencesAsWritten(
 		}
 		yield { start, end };
 		limit = end;
-		// The search resumes at the first character the occurrence did not take, its bare `\r` included.
 		let next = at + sought.length;
 		while ((source.offsets[next] ?? text.length) < end) {
 			next += 1;
@@ -1741,11 +1588,6 @@ function* occurrencesAsWritten(
 	}
 }
 
-/**
- * The quote without the `[L<n>] ` coordinates the brief and the diff view print in front of every
- * line. A coordinate that names the line it sits on is presentation, copied along with the text;
- * one that does not is left in place, so a mismatch is reported as the text it is.
- */
 export function withoutCoordinates(quote: string, startLine: number): string {
 	if (!Number.isSafeInteger(startLine)) {
 		return quote;
@@ -1760,14 +1602,12 @@ export function withoutCoordinates(quote: string, startLine: number): string {
 		.join("");
 }
 
-/** A copied annotation must agree with the cited coordinate. */
 function withoutOwnCoordinate(quoteLine: string, lineNumber: number): string {
 	const [, quotedNumber, quotedText] =
 		/^\[L(?<line>\d+)\] (?<text>[\s\S]*)$/u.exec(quoteLine) ?? [];
 	return quotedText !== undefined && quotedNumber === String(lineNumber) ? quotedText : quoteLine;
 }
 
-/** One line as evidence in a refusal: quoted, and cut where a reader has already seen the difference. */
 function excerpt(line: string): string {
 	const cut =
 		line.length > MISMATCH_EXCERPT_CHARS ? `${line.slice(0, MISMATCH_EXCERPT_CHARS)}…` : line;

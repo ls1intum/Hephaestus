@@ -32,10 +32,6 @@ const requested: ReviewSummary = {
 };
 const requestReview = fn();
 
-/**
- * One row of the admin Reviews list, drawn as the developer's own list draws a review: the time and
- * status, the work, and what started it. The whole row opens the review over the list.
- */
 const meta = {
 	component: ReviewSummaryRow,
 	parameters: { layout: "padded", chromatic: { viewports: [320, 1440] } },
@@ -60,28 +56,19 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * A finished review with nothing notable: no chip beside the work and no count. What it found is on
- * its sheet, and the Feedback tab narrows to the review when it is tracked.
- */
 export const Complete: Story = {
 	play: async ({ canvas }) => {
-		// The status is the icon, named for a screen reader and by its native title, and no button.
 		await expect(canvas.getByText("Complete").parentElement).toHaveAttribute("title", "Complete");
 		await expect(canvas.queryByRole("button", { name: "Complete" })).not.toBeInTheDocument();
-		// The work is text; the review's level links it to the provider.
 		await expect(canvas.queryByRole("link", { name: /^#1423/u })).not.toBeInTheDocument();
 		canvas.getByText("Event");
-		await expect(
-			canvas.getByRole("row", { name: /#1423/u }).querySelector("tbody [data-slot=badge]"),
-		).toBeNull();
+		await expect(canvas.queryByText("Failed")).toBeNull();
 		await expect(
 			levelsOpenedBy(canvas.getByRole("link", { name: /^Open review of #1423,/u })),
 		).toEqual([`review:${completed.id}`]);
 	},
 };
 
-/** A review someone asked for names who asked. */
 export const Requested: Story = {
 	args: { review: requested },
 	play: async ({ canvas }) => {
@@ -89,10 +76,6 @@ export const Requested: Story = {
 	},
 };
 
-/**
- * Request review, the third action after Track and Trace: it asks before it starts a review and
- * names the work it would review.
- */
 export const RequestAnotherReview: Story = {
 	args: { request: { work: "pull request #1423", onRequest: requestReview } },
 	play: async ({ canvas, userEvent }) => {
@@ -107,7 +90,6 @@ export const RequestAnotherReview: Story = {
 	},
 };
 
-/** While a review of the work is queued or running, another would only join it: disabled, with why. */
 export const RequestBlockedWhileRunning: Story = {
 	args: {
 		review: running,
@@ -121,7 +103,6 @@ export const RequestBlockedWhileRunning: Story = {
 	},
 };
 
-/** The reviewed work is not always a pull request, and the row's icon says which kind it was. */
 export const AConversation: Story = {
 	args: { review: conversation },
 	play: async ({ canvas }) => {
@@ -129,7 +110,6 @@ export const AConversation: Story = {
 	},
 };
 
-/** Nothing decided yet: the status icon says it is running, and no chip stands beside the work. */
 export const StillRunning: Story = {
 	args: { review: running },
 	play: async ({ canvas }) => {
@@ -137,7 +117,6 @@ export const StillRunning: Story = {
 	},
 };
 
-/** A review that failed is marked beside the work, as well as by its status icon. */
 export const Failed: Story = {
 	args: { review: failed },
 	play: async ({ canvas }) => {
@@ -145,7 +124,6 @@ export const Failed: Story = {
 	},
 };
 
-/** A scan that closed with files it did not review is marked Partial beside the repository. */
 export const PartialScan: Story = {
 	args: { review: scan },
 	play: async ({ canvas }) => {
@@ -153,7 +131,6 @@ export const PartialScan: Story = {
 	},
 };
 
-/** At the reflow width the table scrolls inside its frame, never the page. */
 export const Narrow: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" } },
 	play: async () => {
@@ -161,10 +138,6 @@ export const Narrow: Story = {
 	},
 };
 
-/**
- * The review open in the panel beside the list keeps a bar on its row's leading edge, so the list
- * says which row the panel belongs to.
- */
 export const OpenInThePanel: Story = {
 	args: { open: true },
 	play: async ({ canvas }) => {

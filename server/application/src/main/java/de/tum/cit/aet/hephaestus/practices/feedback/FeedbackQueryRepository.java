@@ -100,6 +100,7 @@ public interface FeedbackQueryRepository extends Repository<Feedback, UUID> {
             nativeQuery = true)
     Optional<String> contentDigest(@Param("workspaceId") long workspaceId, @Param("feedbackId") UUID feedbackId);
 
+    @WorkspaceAgnostic("Computes a digest only from supplied piece hashes; reads no workspace table")
     @Query(value = """
         SELECT feedback_package_digest(ARRAY(
           SELECT value FROM jsonb_array_elements_text(CAST(:digests AS jsonb))
@@ -119,7 +120,7 @@ public interface FeedbackQueryRepository extends Repository<Feedback, UUID> {
     @Query(value = FILTERED + """
         SELECT CASE WHEN :byLocation THEN location ELSE stop_reason END AS reason,count(*) AS count
         FROM filtered WHERE :byLocation OR stop_reason IS NOT NULL
-        GROUP BY CASE WHEN :byLocation THEN location ELSE stop_reason END
+        GROUP BY reason
         ORDER BY reason
         """, nativeQuery = true)
     List<CountRow> counts(

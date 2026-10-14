@@ -14,13 +14,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * The tick itself, which is deliberately almost nothing: select, delegate, and survive.
- *
- * <p>The two behaviours worth pinning are both about failure. One workspace's broken sweep must not stop
- * the rest, and it must not retry itself to death either — a failed turn rolls back its own advance, so
- * without an explicit deferral the same schedule would come due again in five minutes, for ever.
- */
 @DisplayName("Review sweep scheduler")
 class ReviewSchedulerTest extends BaseUnitTest {
 
@@ -58,7 +51,6 @@ class ReviewSchedulerTest extends BaseUnitTest {
         verify(opener).deferAfterFailure(eq(FIRST), any(Instant.class));
     }
 
-    /** A deferral that fails too must not take the whole tick down with it. */
     @Test
     void aFailedDeferralIsSwallowedSoTheRemainingSchedulesStillRun() {
         when(scheduleRepository.findDue(any(), any())).thenReturn(List.of(schedule(FIRST), schedule(SECOND)));

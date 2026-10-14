@@ -17,7 +17,9 @@ class PracticeCatalogContentSourceTest extends BaseUnitTest {
         var practices = mock(MentorPracticeQuery.class);
         when(practices.current(1))
                 .thenReturn(List.of(new MentorPracticeQuery.MentorPractice(
-                        "clear-names", DefinitionTestFixtures.withAbout(DefinitionTestFixtures.definition(), null))));
+                        "clear-names",
+                        DefinitionTestFixtures.withAbout(
+                                DefinitionTestFixtures.definition("Clear names", "Use clear names."), null))));
         var row = new PracticeCatalogContentSource(practices, new JsonMapper())
                 .buildPayload(1L)
                 .path("practices")

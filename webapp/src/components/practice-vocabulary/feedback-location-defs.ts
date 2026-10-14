@@ -8,15 +8,6 @@ import { FEEDBACK_DESTINATION_DEFS } from "./feedback-destination-defs";
 
 export type FeedbackLocation = ReviewFeedback["location"];
 
-/**
- * **Where** a piece of feedback appears, by the provider that shows it: its destination split where the
- * record names the provider (`docs/contributor/practice-feedback-language.md`, location). It answers
- * the same question as `FEEDBACK_DESTINATION_DEFS`, more precisely, so a row shows one of the two, never
- * both. The three destination-wide entries stand where no provider is known.
- *
- * <p>The labels are the facet's words and the badge's. The sentence a row and the drawer show is
- * {@link feedbackLocationSentence}.
- */
 export const FEEDBACK_LOCATION_DEFS: StatusDefs<FeedbackLocation> = {
 	GITHUB: {
 		label: "On GitHub",

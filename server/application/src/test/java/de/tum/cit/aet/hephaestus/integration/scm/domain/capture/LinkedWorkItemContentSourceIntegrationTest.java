@@ -22,7 +22,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Checks child-issue rollups against PostgreSQL, including exclusion of pull requests. */
 class LinkedWorkItemContentSourceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

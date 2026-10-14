@@ -5,11 +5,6 @@ import { expectNoPageOverflow } from "@/stories/reflow";
 
 import { UnmetTiers } from "./UnmetTiers";
 
-/**
- * The members a needed model misses: one icon per tier, then one phrase in tier order, whatever
- * order the server sent. AI models shows it under a practice in *Used by*, and a practice's panel
- * under the model it needs.
- */
 const meta = {
 	component: UnmetTiers,
 	parameters: { layout: "centered" },
@@ -26,7 +21,6 @@ export const Default: Story = {
 	},
 };
 
-/** The phrase follows the page's column order, whatever order the server sent. */
 export const SeveralTiers: Story = {
 	args: { tiers: ["UNDECLARED", "CLOUD"] },
 	play: async ({ canvas }) => {
@@ -36,7 +30,6 @@ export const SeveralTiers: Story = {
 	},
 };
 
-/** The longest phrase wraps beside its icons at 320 px. */
 export const EveryTier: Story = {
 	args: { tiers: ["CLOUD", "UNDECLARED", "IN_HOUSE"] },
 	parameters: { viewport: { defaultViewport: "reflow" } },
@@ -48,7 +41,6 @@ export const EveryTier: Story = {
 	},
 };
 
-/** A model that misses no one has nothing to say, so nothing renders. */
 export const MissesNoOne: Story = {
 	args: { tiers: [] },
 	play: async ({ canvas }) => {

@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.events;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
-/** Immutable native SCM events published inside the provider write transaction. */
 public final class ScmDomainEvent {
 
     private ScmDomainEvent() {}
@@ -50,7 +49,6 @@ public final class ScmDomainEvent {
 
     public record IssueReopened(ScmEventPayload.IssueData issue, EventContext context) implements IssueEvent {}
 
-    /** Deleted event is separate - entity no longer exists, only ID available. */
     public record IssueDeleted(Long issueId, EventContext context) implements IssueEvent {
         @Override
         public ScmEventPayload.@Nullable IssueData issue() {
@@ -229,12 +227,7 @@ public final class ScmDomainEvent {
 
     public record CommitCreated(ScmEventPayload.CommitData commit, EventContext context) implements CommitEvent {}
 
-    /**
-     * Bulk reconciliation marker emitted after commit author identities have been resolved for a
-     * repository (via email lookup, provider user API, or server-side author harvest). Carries no
-     * per-commit payload; downstream consumers use it as a signal that previously unresolved {@code
-     * actor_id} references across the repository's ledger can now be re-evaluated.
-     */
+    /** Repository-wide author resolution permits ledger attribution to be checked again without per-commit events. */
     public record CommitAuthorsReconciled(@Nullable Long repositoryId, EventContext context) implements CommitEvent {
         @Override
         public ScmEventPayload.@Nullable CommitData commit() {
@@ -271,7 +264,6 @@ public final class ScmDomainEvent {
             ScmEventPayload.DiscussionData discussion, Long answerCommentId, EventContext context)
             implements DiscussionEvent {}
 
-    /** Deleted event is separate - entity no longer exists, only ID available. */
     public record DiscussionDeleted(Long discussionId, EventContext context) implements DiscussionEvent {
         @Override
         public ScmEventPayload.@Nullable DiscussionData discussion() {

@@ -85,7 +85,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A complete scan compared with the one before: Export SARIF, no Cancel. */
 export const Complete: Story = {
 	play: async ({ canvas, userEvent, args }) => {
 		await expect(canvas.getByRole("heading", { name: "ls1intum/hephaestus" })).toBeVisible();
@@ -112,7 +111,6 @@ export const Queued: Story = {
 	},
 };
 
-/** Still listing files: progress names what finished, and no total or percentage it cannot know. */
 export const Running: Story = {
 	args: { state: loaded(RUNNING_SCAN, RUNNING_REPORT) },
 	play: async ({ canvas, userEvent, args }) => {
@@ -152,7 +150,6 @@ export const CancelFailed: Story = {
 	},
 };
 
-/** A partial scan keeps its results and says they cover only the work it reached. */
 export const Partial: Story = {
 	args: { state: loaded(PARTIAL_SCAN, PARTIAL_REPORT) },
 	play: async ({ canvas }) => {
@@ -162,7 +159,6 @@ export const Partial: Story = {
 			),
 		).toBeVisible();
 		await expect(canvas.getByText("Not comparable")).toBeVisible();
-		// Partial results can still be exported.
 		await expect(canvas.getByRole("button", { name: "Export SARIF" })).toBeEnabled();
 	},
 };
@@ -209,7 +205,6 @@ export const SuspectListing: Story = {
 	},
 };
 
-/** Withheld and not reviewed pairs have their reasons in words; no problems is not all met. */
 export const WithheldNoProblems: Story = {
 	args: {
 		state: loaded(WITHHELD_NO_PROBLEMS_REPORT.scan, WITHHELD_NO_PROBLEMS_REPORT),
@@ -219,7 +214,6 @@ export const WithheldNoProblems: Story = {
 		await expect(canvas.getByRole("region", { name: "Why pairs were withheld" })).toHaveTextContent(
 			"2 · The assigned AI model was unavailable.",
 		);
-		// A reason this page has no words for is never shown as its code.
 		await expect(canvas.queryByText(/SOMETHING_NEW/u)).not.toBeInTheDocument();
 		await expect(
 			canvas.getByText(
@@ -247,7 +241,6 @@ export const ExportFailed: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("We could not export the SARIF file.")).toBeVisible();
 		await expect(canvas.getByText("This scan’s details are past their retention.")).toBeVisible();
-		// The report stays, and the export can be tried again.
 		await expect(canvas.getByRole("region", { name: "Counts" })).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Export SARIF" })).toBeEnabled();
 	},

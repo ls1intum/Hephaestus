@@ -76,7 +76,6 @@ function PracticesAcrossTheWorkspace() {
 		return <Navigate to="/w/$workspaceSlug" params={{ workspaceSlug }} replace />;
 	}
 
-	// The overview waits on the feature read, so its failure is the overview's.
 	const featureLoad = queryLoadState({ ...featureState, isPending: featureState.isLoading });
 	const state: PanelState<{ overview: PracticeWorkspaceOverview }> =
 		featureLoad.status === "error"

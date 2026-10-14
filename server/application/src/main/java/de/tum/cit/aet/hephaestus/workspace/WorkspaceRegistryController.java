@@ -30,10 +30,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-/**
- * Workspace registry endpoints under /workspaces that operate outside of a specific workspace slug;
- * slugged routes use {@code @WorkspaceScopedController} at the integration boundary.
- */
 @RestController
 @RequestMapping("/workspaces")
 @RequiredArgsConstructor

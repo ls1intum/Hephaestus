@@ -5,19 +5,8 @@ import { hasText } from "@/lib/text";
 import type { PracticeReviewLevel } from "./review-levels";
 import type { ReviewSelection } from "./review-selection";
 
-/**
- * How Practice reviews is layered. Layer 0 is the tables. Layer 1 is one record's sheet, opened from
- * its row, or the trace of one record, opened from the row's Trace action. Layer 2 is a record's
- * sheet opened from a step of the trace, over it. A problem's sheet links its parent result, which
- * opens in its place, so nothing opens deeper than that.
- *
- * In the address, a sheet is `?detail=<kind>:<id>` and a trace `?detail=trace:<kind>:<id>`, with the
- * sheet opened from it as a second `detail`. A `trace` describes the record it stands on; it is no
- * record of its own.
- */
 export type RecordKind = "review" | "result" | "problem" | "feedback" | "item" | "practice";
 
-/** One record of Practice reviews. An item is its workspace item id. */
 export interface RecordRef {
 	kind: RecordKind;
 	id: string;
@@ -26,10 +15,6 @@ export interface RecordRef {
 const uuid = z.guid();
 const itemId = z.string().regex(/^[1-9]\d{0,18}$/u);
 
-/**
- * Whether `id` is a well-formed id of `kind`: a UUID for a review, result, problem or feedback, a
- * positive item id, and any slug for a practice. A malformed level closes instead of loading.
- */
 function isRecordId(kind: RecordKind, id: string): boolean {
 	switch (kind) {
 		case "item": {
@@ -81,11 +66,6 @@ export function levelRecord(level: PracticeReviewLevel): RecordRef | undefined {
 	return separator > 0 && isRecordKind(kind) && isRecordId(kind, id) ? { kind, id } : undefined;
 }
 
-/**
- * What tracking a record selects: the record, with the review it came from where the row knows it,
- * so every list narrows to the same review at once. A problem selects its parent result, which is
- * what the lists filter by.
- */
 export function recordSelection(
 	record: RecordRef,
 	context: { reviewId?: string; resultId?: string } = {},
@@ -135,11 +115,6 @@ export function selectionRecord(selection: ReviewSelection): RecordRef {
 	}
 }
 
-/**
- * The levels the address may hold: one record's sheet, a trace, or a trace with one record's sheet
- * over it. Anything else keeps its front level as that record's sheet, and a trace keeps the last
- * level over it.
- */
 export function layeredStack(stack: readonly PracticeReviewLevel[]): PracticeReviewLevel[] {
 	const at = stack.map((entry) => entry.kind).lastIndexOf("trace");
 	const front = stack.at(-1);

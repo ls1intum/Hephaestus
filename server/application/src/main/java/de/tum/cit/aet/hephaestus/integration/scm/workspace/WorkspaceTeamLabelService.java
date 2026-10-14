@@ -24,22 +24,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-/**
- * Service for managing team and label associations within workspaces.
- *
- * <p>Provides business logic for:
- *
- * <ul>
- *   <li>Retrieving users with their team memberships
- *   <li>Adding and removing label filters for teams
- * </ul>
- *
- * <p>This service works in conjunction with {@link WorkspaceTeamSettingsService} for
- * workspace-scoped team settings.
- *
- * @see WorkspaceTeamSettingsService
- * @see WorkspaceService
- */
 @Service
 @WorkspaceAgnostic(
         "Manages team labels across workspaces - operates on workspace context, not within" + " workspace scope")
@@ -66,10 +50,6 @@ public class WorkspaceTeamLabelService {
         this.workspaceTeamScopeResolver = workspaceTeamScopeResolver;
     }
 
-    /**
-     * The predicate selecting teams that belong to {@code workspace}. Fails closed: a workspace
-     * with no resolvable scope (no synced organization) has no teams.
-     */
     private Predicate<Team> inScope(Workspace workspace) {
         WorkspaceTeamScope scope = workspaceTeamScopeResolver.resolve(workspace).orElse(null);
         return scope == null ? team -> false : scope::contains;
@@ -86,9 +66,7 @@ public class WorkspaceTeamLabelService {
         List<User> users = workspaceMembershipRepository.findHumanUsersWithTeamsByWorkspaceId(workspace.getId());
         Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspace.getId());
         Set<Long> hiddenMemberIds = workspaceMembershipRepository.findHiddenUserIdsByWorkspaceId(workspace.getId());
-        // The roster is workspace-scoped, but a User is global: its fetched memberships span every
-        // tenant
-        // it belongs to, so the teams must be scoped separately.
+        // User memberships span tenants; filter teams to this workspace independently of the roster.
         Predicate<Team> inScope = inScope(workspace);
         return users.stream()
                 .map(user -> UserTeamsDTO.fromUserWithScopeSettings(
@@ -176,7 +154,6 @@ public class WorkspaceTeamLabelService {
 
     // Helper Methods
 
-    /** Creates a TeamInfoDTO with workspace-scoped settings applied. */
     private TeamInfoDTO createTeamInfoDTOWithWorkspaceSettings(Workspace workspace, Team team) {
         Long workspaceId = workspace.getId();
         boolean isHidden = workspaceTeamSettingsService.isTeamHidden(workspaceId, team.getId());

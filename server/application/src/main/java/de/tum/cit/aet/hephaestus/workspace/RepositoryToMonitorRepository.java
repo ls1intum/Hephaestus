@@ -79,14 +79,7 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
             + " :nameWithOwner ORDER BY m.workspace.id")
     List<RepositoryToMonitor> findAllWithWorkspaceByNameWithOwner(@Param("nameWithOwner") String nameWithOwner);
 
-    /**
-     * Finds every monitor tracking the repository with the given provider-stable id on {@code
-     * providerId} — across all workspaces whose SCM connection is registered under that provider,
-     * because a repository can be monitored by several tenants at once. A native id is unique only
-     * on its provider, so a monitor of another provider instance with the same id is not one of
-     * them. Used to re-key {@code nameWithOwner} after an upstream rename/transfer, where the name
-     * is exactly the value that has gone stale and so cannot be the lookup key.
-     */
+    /** Resolve monitors by provider-stable id across workspaces; a renamed path cannot serve as the lookup key. */
     @Query(
             value = "SELECT rtm.* FROM repository_to_monitor rtm WHERE rtm.native_id = :nativeId"
                     + " AND "

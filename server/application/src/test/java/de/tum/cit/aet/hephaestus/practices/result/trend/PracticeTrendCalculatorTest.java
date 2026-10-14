@@ -21,9 +21,6 @@ class PracticeTrendCalculatorTest {
 
     @Test
     void shouldDateAPracticeSpanFromComparedOpportunitiesOnly() {
-        // The run in March looked and found nothing to judge. It belongs in the trail — the practice DID see
-        // that piece of reviewed work — but "these comparisons span N days" must not count it, or a quiet stretch would
-        // stretch the provenance without adding a comparison.
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(
                 List.of(
                         noVerdict(7L, "2026-03-01T09:00:00Z"),
@@ -41,9 +38,6 @@ class PracticeTrendCalculatorTest {
 
     @Test
     void shouldReportPracticeScopeWithoutPracticeCounts() {
-        // The two practice counts are a group fact. At practice scope they are absent, and that absence
-        // reaches the client — which is why the support factory has two entry points rather than one with
-        // optional arguments.
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(
                 List.of(judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),

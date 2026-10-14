@@ -18,7 +18,6 @@ import { useFeedbackResponseWrite } from "@/hooks/use-feedback-response-write";
 
 export interface PracticePageFeedbackRequest {
 	workspaceSlug: string;
-	/** The workspace's groups; a card's colour and icon are its group's. */
 	groups: GroupRef[];
 	/**
 	 * Whether to read the cards at all. Reading them delivers them, so a page that may yet send the
@@ -28,9 +27,7 @@ export interface PracticePageFeedbackRequest {
 }
 
 export interface PracticePageFeedbackCards {
-	/** Every readable card, newest first; empty until loaded. */
 	cards: PracticeFeedbackCardEntry[];
-	/** The card props that wire one piece of feedback's rating and answer to the server. */
 	ratingProps: (feedbackId: string) => FeedbackRatingProps;
 	state: LoadState;
 }
@@ -53,10 +50,7 @@ export function nextRating(
 	};
 }
 
-/**
- * Whether a rating opens its note band. A response has one comment and a disagreement holds it, so
- * a note would replace the reason that admins read.
- */
+// A disagreement owns the comment; opening a rating note would replace its reason.
 export function opensNoteBand(response: FeedbackResponseRequest): boolean {
 	return response.usefulness !== undefined && response.resolution !== "DISAGREE";
 }
@@ -116,30 +110,10 @@ interface WriteFrom {
 	control: ResponseControl;
 }
 
-/**
- * Nothing in flight and nothing to wait for. A query held back by `enabled` reports `isPending`
- * for as long as it is held, which a page reads as a skeleton that never resolves; with the
- * reading disabled the feedback is settled and empty instead.
- */
+// A disabled query stays pending; report settled absence so its page does not show a permanent skeleton.
 const SETTLED_EMPTY: LoadState = { status: "ready" };
 
-/**
- * The developer's feedback on their practice pages and the ratings on it.
- *
- * Reading the cards is what delivers them: the server flips an unread card to delivered on this
- * very GET, so a card reads as new exactly once. Each card arrives with the developer's current
- * response, so the list is the one query; a card whose response is being written says so on its
- * own rating buttons, and a refetch that adds a card never re-skeletons the list.
- *
- * Every press writes the complete response, keeping what the reader said before: "Helpful" and
- * "Not helpful" replace the usefulness, Send adds the comment, "Addressed" and "Not applicable"
- * replace the resolution, and pressing the chosen one again withdraws it. "Disagree" opens the band
- * that asks why, and its Send writes the disagreement; pressed on a standing one, it takes it back.
- *
- * The read records the first read, so only the route that shows the cards calls this: never a
- * story, never the extension. A user view reads the page and writes nothing: its route passes no
- * `ratingProps` on.
- */
+// Reading practice-page cards delivers them; hold the request until navigation is settled.
 export function usePracticePageFeedback({
 	workspaceSlug,
 	groups,
@@ -156,7 +130,6 @@ export function usePracticePageFeedback({
 	const { pendingResponses } = responses;
 	const recordedOf = (feedbackId: string): FeedbackResponse | null =>
 		feedback.find((item) => item.id === feedbackId)?.response ?? null;
-	// The response a write is carrying stands over the recorded one until the refetch brings it back.
 	const responseOf = (feedbackId: string) =>
 		responses.responseOf(feedbackId, recordedOf(feedbackId));
 
@@ -168,8 +141,7 @@ export function usePracticePageFeedback({
 		setLastWrite({ feedbackId, control });
 		responses.write(feedbackId, recordedOf(feedbackId), response);
 	};
-	// A quick write says nothing; a slow one says "Saving…" after a second, for at least 500ms.
-	// `ssr: false`: its default shows the word at once when a page mounts with a write in flight.
+	// Disable the SSR default so Saving does not appear immediately when the page mounts.
 	const showSaving = useSpinDelay(
 		lastWrite !== undefined && pendingResponses.has(lastWrite.feedbackId),
 		{ delay: 1000, minDuration: 500, ssr: false },

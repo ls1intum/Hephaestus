@@ -61,7 +61,6 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final int GATEWAY_PORT = 9081;
     private static final int APPLICATION_PORT = 9080;
-    /** One call per principal and minute, so a call that spends from the wrong bucket shows as a 429. */
     private static final SandboxGatewayProperties GATEWAY = new SandboxGatewayProperties(GATEWAY_PORT, 16, 1);
 
     @Mock
@@ -305,7 +304,6 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         assertThat(servedAs.get()).isNotNull();
     }
 
-    /** The retired practice script scope names no capability: a token that carries only it reaches nothing. */
     @Test
     void shouldRefuseATokenWhenItCarriesOnlyTheRetiredPracticeScriptScope() throws Exception {
         ReviewJob job = runningJobOnAttempt(1);

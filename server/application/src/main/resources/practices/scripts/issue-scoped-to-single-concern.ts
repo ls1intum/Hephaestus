@@ -1,5 +1,3 @@
-// Counts the task-list items and the issue-number mentions in the issue body, and reads the captured
-// sub-issue rollup with its source. The review decides if the issue is one concern at its level.
 import { scm, expectKind } from "../kits/scm/index.ts";
 import { bodyFact, classifyIssue, subIssueRollup } from "../kits/scm/issue-classification.ts";
 import { checkableItems } from "../kits/scm/review.ts";

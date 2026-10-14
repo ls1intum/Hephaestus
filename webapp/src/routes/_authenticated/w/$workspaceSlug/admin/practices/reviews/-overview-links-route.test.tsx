@@ -9,7 +9,7 @@ import { OVERVIEW, serveAttention } from "./-overview-attention-server";
 
 vi.setConfig({ testTimeout: 30_000 });
 
-// jsdom has no IntersectionObserver, and the lists load their next page as their end scrolls into view.
+// jsdom needs an IntersectionObserver stub for paged lists.
 beforeEach(() => {
 	vi.stubGlobal("IntersectionObserver", ObserverStub);
 });

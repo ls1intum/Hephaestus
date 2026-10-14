@@ -37,10 +37,7 @@ public class Account {
     @Column(name = "display_name", nullable = false, length = 255)
     private String displayName;
 
-    /**
-     * Contact email (CITEXT). NEVER used for authentication lookup — see class doc. Unique among
-     * non-deleted active accounts.
-     */
+    // Contact email is never an authentication lookup key.
     @Column(name = "primary_email", columnDefinition = "citext")
     @Nullable
     private String primaryEmail;

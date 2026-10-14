@@ -1,6 +1,3 @@
-// Finds the interface lines that the change adds in Swift files and that the criteria ask about:
-// icon-only controls, images, fixed-size fonts, height caps and colour-only state. It also finds the
-// accessibility modifiers that the change adds with them. The review reads the view chain.
 import { scm } from "../kits/scm/index.ts";
 import {
 	countLabel,
@@ -11,8 +8,7 @@ import {
 import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
-// Font.custom(_:size:) scales with the body style, custom(_:size:relativeTo:) with the style it names;
-// only custom(_:fixedSize:) does not scale. Font.system(size:) is fixed at the size it is given.
+// SwiftUI custom(size:) scales; custom(fixedSize:) does not.
 const INTERFACE_LINES: readonly SourcePattern[] = [
 	[
 		"accessibility-modifier",

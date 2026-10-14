@@ -135,6 +135,8 @@ class ItemEventServiceIntegrationTest extends BaseIntegrationTest {
             assertThat(event.getOccurredAt()).isEqualTo(input.occurredAt());
             assertThat(event.getItemVersion()).isEqualTo(input.itemVersion());
             assertThat(event.getRetryAt()).isEqualTo(retry);
+            assertThat(service.find(input.workspaceId(), id))
+                    .contains(new ItemEventView(input.name(), input.itemVersion(), ItemEventState.WAITING));
         });
     }
 
@@ -183,6 +185,7 @@ class ItemEventServiceIntegrationTest extends BaseIntegrationTest {
                     .save(WorkspaceTestFixtures.activeWorkspace(
                             "decision-foreign-" + UUID.randomUUID().toString().substring(0, 12)))
                     .getId();
+            assertThat(service.find(foreign, id)).isEmpty();
             assertThat(service.decide(foreign, id, ItemEventState.RECORDED, ItemEventState.STARTED, null, null))
                     .isFalse();
             assertThat(service.decide(

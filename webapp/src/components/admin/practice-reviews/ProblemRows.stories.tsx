@@ -30,10 +30,6 @@ const retry = fn();
 
 const TABLE = { name: "Problems" } as const;
 
-/**
- * The Problems list: one row per problem, by day, its severity as the row's icon, what it says
- * with its practice and place, the work and the developer. The row opens the result it belongs to.
- */
 const meta = {
 	component: ProblemRows,
 	parameters: {
@@ -109,14 +105,12 @@ export const Places: Story = {
 	},
 };
 
-/** The result's sheet hides its evidence: the row says its summary and place are hidden. */
 export const EvidenceHidden: Story = {
 	args: {
 		state: {
 			status: "ready",
 			problems: [
 				hiddenRow(first, "cccccccc-cccc-cccc-cccc-cccccccccccc"),
-				// The same practice, work number and minute, but another result in another repository.
 				{
 					...hiddenRow(first, "dddddddd-dddd-dddd-dddd-dddddddddddd"),
 					resultId: "eeeeeeee-0000-0000-0000-000000000000",
@@ -128,7 +122,6 @@ export const EvidenceHidden: Story = {
 	play: async ({ canvas }) => {
 		const table = canvas.getByRole("table", TABLE);
 		await expect(within(table).getAllByText("Details hidden")).toHaveLength(2);
-		// Two hidden rows of different results still name different results, in every control.
 		for (const [role, name] of [
 			["link", /^Open result Details hidden/u],
 			["button", /^Track result Details hidden/u],
@@ -142,7 +135,6 @@ export const EvidenceHidden: Story = {
 	},
 };
 
-/** A problem of a result an admin marked incorrect says so, as the result's own row does. */
 export const ResultMarkedIncorrect: Story = {
 	args: {
 		state: {
@@ -156,7 +148,6 @@ export const ResultMarkedIncorrect: Story = {
 	},
 };
 
-/** The head stands and the rows wait in their shape, so nothing jumps when they arrive. */
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async ({ canvas }) => {

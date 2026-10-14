@@ -15,10 +15,6 @@ import java.util.Map;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import reactor.core.publisher.Mono;
 
-/**
- * The real {@link GitHubSummaryWriter} over a GitHub whose issue and pull request comments the test
- * controls.
- */
 public final class ScriptedGitHubComments {
 
     private final ScriptedCommentThreads threads = new ScriptedCommentThreads("IC_");

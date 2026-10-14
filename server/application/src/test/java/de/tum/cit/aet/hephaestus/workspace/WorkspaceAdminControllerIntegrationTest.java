@@ -11,13 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * {@code GET /admin/workspaces} — the instance-admin (app_admin) cross-tenant workspaces overview.
- * Authenticated via the mock-decoder bearer tokens ({@code TestSecurityConfig}); the admin token
- * now carries {@code app_admin}. Verifies the authority gate (a non-admin is 403'd) and that a
- * seeded workspace is surfaced with metadata only (slug, status, owner login, member count) across
- * tenants.
- */
 @Tag("integration")
 class WorkspaceAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 

@@ -201,10 +201,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         boolean settling = isSettling(facts.detailedMergeStatus());
         facts.headPipeline().observeOn(pr, requestedAt);
         if (pr.takesReviewSnapshotAt(requestedAt)) {
-            // The diff version GitLab paired with the stored head. A read begun before a later
-            // accepted one never
-            // reaches this branch, so it cannot replace the newer pair; an absent pair leaves the
-            // stored one as it is.
+            // Accept diff refs only from a current read; an absent pair cannot replace the stored pair.
             var pair = facts.diffRefs();
             if (pair != null && pair.head().equals(pr.getHeadRefOid())) {
                 pr.setBaseRefOid(pair.base());

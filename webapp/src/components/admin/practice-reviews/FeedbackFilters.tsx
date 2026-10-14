@@ -68,9 +68,7 @@ export interface FeedbackFiltersProps {
 	onReset: () => void;
 	/** Clears the shared scope, on this tab and every tab after it. */
 	onClearScope: () => void;
-	/** The groups whose practices' results the feedback was written from. */
 	groups: FacetSource;
-	/** The practices whose results the feedback was written from. */
 	practices: FacetSource<PracticeFacetOption>;
 	people: ReviewPeople;
 	/** How many rows the filters currently select, or `undefined` while that is unknown. */
@@ -115,8 +113,6 @@ export function FeedbackFilters({
 			scope={readScope(search)}
 			onChange={onPatch}
 			onClearScope={onClearScope}
-			// "Composed" rather than "Date": this range filters when the feedback was written, which is
-			// not when it was delivered and not when the result behind it was recorded.
 			dateTitle="Composed"
 			groups={groups}
 			practices={practices}
@@ -136,8 +132,6 @@ export function FeedbackFilters({
 				</>
 			}
 			pills={[...state.pills, ...destination.pills, ...withheld.pills]}
-			// A link from a count narrows to one provider, a withdrawal or a disagreement; the
-			// toolbar offers none of these, so each shows as a pill the reader can clear.
 			referencePills={
 				<>
 					{search.location !== undefined && (

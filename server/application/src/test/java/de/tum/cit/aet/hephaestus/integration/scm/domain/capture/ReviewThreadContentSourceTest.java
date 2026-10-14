@@ -278,15 +278,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_moreDecisionsThanCap_keepsLatestApprove() throws Exception {
-        // The repository returns decisions newest-first (ORDER BY submittedAt DESC, id DESC). With
-        // more
-        // than MAX_DECISIONS rows, the consumer's truncation keeps the NEWEST — so a final
-        // superseding APPROVE
-        // must survive, not be dropped behind older CHANGES_REQUESTED (which would fabricate a
-        // false
-        // "merged past unresolved request-changes" result).
         List<PullRequestReview> newestFirst = new ArrayList<>();
-        // The latest decision: an APPROVE at the most recent timestamp.
         newestFirst.add(review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-30T23:59:00Z")));
         // Followed by MAX_DECISIONS + 5 older CHANGES_REQUESTED rows (descending timestamps).
         for (int i = 0; i < 10_000 + 5; i++) {
@@ -354,9 +346,6 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                 .files());
 
         JsonNode decisions = objectMapper.readTree(files.get(FILE_KEY)).get("reviewDecisions");
-        // The inline batch and the synthetic per-discussion row decided nothing and their comments
-        // are in
-        // comments.json; the worded comment and the approval stay, with what the reviewer wrote.
         assertThat(decisions).hasSize(2);
         assertThat(decisions.get(0).get("author").asString()).isEqualTo("reviewer-c");
         assertThat(decisions.get(0).get("body").asString()).isEqualTo("Looks right overall; two questions inline.");

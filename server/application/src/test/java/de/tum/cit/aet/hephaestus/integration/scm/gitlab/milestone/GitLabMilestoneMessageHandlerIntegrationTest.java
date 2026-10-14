@@ -31,24 +31,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Integration tests for GitLabMilestoneMessageHandler.
- *
- * <p>Tests the full webhook handling flow: JSON fixtures &rarr; DTO &rarr; handler &rarr; processor
- * &rarr; DB.
- *
- * <p><b>Fixture values (milestone.create.json — Milestone IID #2):</b>
- *
- * <ul>
- *   <li>Native ID: 18066
- *   <li>IID: 2
- *   <li>Title: "v2.0.0"
- *   <li>Description: "Second major release"
- *   <li>State: active &rarr; OPEN
- *   <li>Due date: 2026-06-01
- *   <li>Project ID: 246765
- * </ul>
- */
 @Tag("integration")
 @DisplayName("GitLab Milestone Message Handler")
 class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {

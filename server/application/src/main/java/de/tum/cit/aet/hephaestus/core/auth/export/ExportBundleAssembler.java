@@ -147,10 +147,7 @@ public class ExportBundleAssembler {
                 e.getUserAgent());
     }
 
-    /**
-     * Impersonation events are operator-authored records about the subject; excluded under Art.
-     * 20(4).
-     */
+    // Operator-authored impersonation events are excluded from export under Art. 20(4).
     private static boolean isImpersonationEvent(AuthEvent e) {
         AuthEvent.EventType t = e.getEventType();
         return (t == AuthEvent.EventType.IMPERSONATION_BEGIN || t == AuthEvent.EventType.IMPERSONATION_END);

@@ -11,8 +11,6 @@ import type {
 } from "@/api/types.gen";
 import { daysBefore, hoursBefore, minutesBefore } from "@/stories/story-clock";
 
-/** Prop fixtures: real `Date`s, the shape the generated client hands a component. */
-
 export const ADA: AccountRef = {
 	id: "7",
 	displayName: "Ada Lovelace",
@@ -59,10 +57,6 @@ export const ELIGIBLE_PRACTICES = [
 	{ slug: "test-coverage", name: "Changed code is tested" },
 ];
 
-/**
- * Three files, each reviewed against two practices: six pairs. Of the six, four were reviewed (one of
- * them reused), one was withheld and one was not reviewed.
- */
 export const COMPLETE_COUNTS: ScanCounts = {
 	files: 3,
 	practiceItemPairs: 6,
@@ -78,7 +72,6 @@ export const COMPLETE_COUNTS: ScanCounts = {
 	notReviewed: 1,
 };
 
-/** While the scan still lists files it knows no totals. */
 export const RUNNING_COUNTS: ScanCounts = {
 	...COMPLETE_COUNTS,
 	files: null,
@@ -311,7 +304,6 @@ export const SUSPECT_LISTING_REPORT = scanReport(COMPLETE_SCAN, {
 	removalGuard: { state: "SUSPECT_LISTING", previousFiles: 40, wouldRemove: 12 },
 });
 
-/** Every pair was withheld or met: no problems, which is not the same as every practice met. */
 export const WITHHELD_NO_PROBLEMS_REPORT = scanReport(
 	scanSummary({
 		counts: {

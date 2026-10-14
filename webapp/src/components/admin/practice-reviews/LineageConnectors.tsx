@@ -20,11 +20,6 @@ const LANE_INSET_PX = 16;
 /** More lanes than this would take too much of a narrow sheet: the numbers say the same alone. */
 const MOST_LANES = 10;
 
-/**
- * The results that get a lane: each listed one some shown piece of feedback was written from,
- * in their numbered order. Empty past `MOST_LANES`, so the story draws no connectors at all rather
- * than a thicket.
- */
 export function connectorLanes(
 	numbered: readonly NumberedResult[],
 	feedback: readonly LineageFeedback[],
@@ -48,7 +43,6 @@ interface Connector {
 	d: string;
 	/** The middle of the lane the line runs down, for a test to read. */
 	laneX: number;
-	/** Where the line starts, on the right edge of the result's card, at its vertical centre. */
 	start: { x: number; y: number };
 	/** Where the line ends, on the right edge of the piece's card, at its vertical centre, marked with a dot. */
 	end: { x: number; y: number };
@@ -81,10 +75,6 @@ export function ConnectorSample({ className }: { className?: string }) {
 	);
 }
 
-/**
- * The colour of a connector: its result's verdict at full strength on the path of the record
- * in front, softer where no record is in front, and grey off the path.
- */
 export function connectorTone(
 	variant: BadgeVariant | undefined,
 	state: "strong" | "plain" | "faint",
@@ -144,17 +134,11 @@ interface Measured {
 	ends: { feedbackId: string; x: number; y: number }[];
 }
 
-/** How far down the rail a result's lines reach, from its card to its farthest piece. */
 function spanOf(entry: Measured): number {
 	const ys = [entry.start.y, ...entry.ends.map((end) => end.y)];
 	return Math.max(...ys) - Math.min(...ys);
 }
 
-/**
- * Which lane each result's line runs in, from the edge outwards: the shortest run nearest the
- * cards, so a line that spans another runs outside it and the two never cross where they turn. Two
- * of a length keep the rail's order, the later one nearer the cards.
- */
 function laneOrder(measured: readonly Measured[]): Map<string, number> {
 	const order = measured
 		.map((entry, index) => ({ entry, index, span: spanOf(entry) }))
@@ -162,14 +146,6 @@ function laneOrder(measured: readonly Measured[]): Map<string, number> {
 	return new Map(order.map(({ entry }, lane) => [entry.practiceResultId, lane]));
 }
 
-/**
- * Thin lines from each result to every piece of feedback written from it: right from the
- * middle of the result's card into its lane, down the lane, and left into the middle of the
- * piece's card. The positions are measured from the cards themselves after layout, and again
- * whenever a card or the rail changes size or the rail's content changes: wrapping words, tags,
- * facts, folded parts opening. A line on the path of the record in front is drawn in its verdict's
- * tone; the rest stay faint.
- */
 export function LineageConnectors({
 	container,
 	lanes,

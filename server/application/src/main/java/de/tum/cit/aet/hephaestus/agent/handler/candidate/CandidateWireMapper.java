@@ -64,7 +64,7 @@ final class CandidateWireMapper {
                 .build();
     }
 
-    /** JavaScript permits 3.0 as an integer, but never 3.5 or a numeric string. */
+    // Accept JavaScript integer values such as 3.0, while rejecting fractions and numeric strings.
     private static final class ContractInteger extends ValueDeserializer<Integer> {
         @Override
         public Integer deserialize(JsonParser parser, DeserializationContext context) {

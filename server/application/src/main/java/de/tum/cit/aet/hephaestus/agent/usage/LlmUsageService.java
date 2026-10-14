@@ -182,12 +182,10 @@ public class LlmUsageService {
         return hasOwnProviderUsage || (ownProviderConnected && isCurrentMonth(month));
     }
 
-    /** Whether the month is the current UTC month, in which the budget gate acts. */
     static boolean isCurrentMonth(YearMonth month) {
         return month.equals(YearMonth.now(ZoneOffset.UTC));
     }
 
-    /** The practice script purposes of the comma-separated model kinds, in their declared order. */
     private static List<AgentPurpose> purposes(String modelKinds) {
         List<ModelKind> kinds =
                 Arrays.stream(modelKinds.split(",")).map(ModelKind::valueOf).toList();

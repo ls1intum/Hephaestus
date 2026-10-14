@@ -4,7 +4,6 @@ import { practiceReviewOverview } from "./fixtures";
 import { feedbackComposed, practiceTotals, practiceTotalsNotes } from "./practice-totals";
 import { resultSlots, overviewFeedbackSlots, slotsTotal } from "./review-outcomes";
 
-/** The figures the Results and Feedback tiles show for the overview. */
 function tileFigures() {
 	const results = resultSlots(practiceReviewOverview.results);
 	const count = (key: string) => results.find((slot) => slot.key === key)?.count;
@@ -31,8 +30,6 @@ describe("practiceTotals", () => {
 			markedIncorrect: totals.markedIncorrect,
 			feedbackDelivered: totals.feedbackDelivered,
 		}).toStrictEqual(tileFigures());
-		// The result columns add up across the rows to the tile, as every result is of one
-		// practice.
 		const rows = practiceReviewOverview.practices;
 		expect(rows.reduce((sum, row) => sum + slotsTotal(resultSlots(row.results)), 0)).toBe(
 			totals.results,
@@ -43,12 +40,9 @@ describe("practiceTotals", () => {
 	});
 
 	it("counts the feedback composed once, leaving out the pieces replaced by newer ones", () => {
-		// 14 delivered, 3 awaiting approval, 3 withheld, 1 failed, 1 ready, 1 rejected, 1 unconfirmed;
-		// the one replaced by a newer piece is that newer piece already.
 		expect(feedbackComposed(practiceReviewOverview.feedback)).toBe(24);
 		const totals = practiceTotals(practiceReviewOverview, practiceReviewOverview.practices);
 		expect([totals.feedbackDelivered, totals.feedbackComposed]).toStrictEqual([14, 24]);
-		// 6 delivered, 1 ready, 1 rejected; the one replaced by newer is left out.
 		expect(
 			practiceReviewOverview.practices.map((row) => feedbackComposed(row.feedback)),
 		).toStrictEqual([12, 8, 2, 3, 0]);

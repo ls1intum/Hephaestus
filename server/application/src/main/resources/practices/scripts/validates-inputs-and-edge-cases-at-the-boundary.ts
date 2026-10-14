@@ -1,9 +1,3 @@
-// Finds the selected lines of source code with a construct that can fail or mislead on an edge value: a
-// subscript or slice, a division by a name, a parse that the language does not force the author to
-// handle, an extreme sentinel, a payload decode, or the input of a request. A lead is a place where a
-// value can be used, never a problem. The scan skips string literals and comments, a lookup or
-// parse whose result the language makes optional, and a crash operator that the author wrote, such as
-// `!`, `try!` or `unwrap()`, which the crash practice reads. Each language adds rows to the table.
 import { scm } from "../kits/scm/index.ts";
 import { isTestPath } from "../kits/scm/languages.ts";
 import {
@@ -22,24 +16,18 @@ export const LABELS = {
 };
 
 const COMMON: [string, RegExp][] = [
-	// `items[i]`, `cast[0..<2]`; not a lookup already made safe (`dict[k] ?? d`, `[k, default: 0]`,
-	// `ns[k] as? T`) nor an assignment target.
 	[
 		"subscript or slice",
 		/[A-Za-z0-9_)\]]\[(?![^\]]*\bdefault:)[^\]]+\](?!\s*(?:\?\?|as\?|=(?!=)))/u,
 	],
-	// A divisor that is a name or a call; a literal divisor cannot be zero.
 	["division or remainder by a name", /[A-Za-z0-9_)\]]\s*[/%](?![/*=])\s*[A-Za-z_(]/u],
-	// The seed of a minimum, a maximum or a fallback that can reach output unchanged.
 	[
 		"extreme sentinel",
 		/\b(?:U?Int\d*|Double|Float|CGFloat)\.(?:max|min|infinity|greatestFiniteMagnitude)\b|\b(?:Integer|Long|Double|Float)\.(?:MAX|MIN)_VALUE\b|\bNumber\.(?:MAX|MIN)_(?:SAFE_INTEGER|VALUE)\b|\bsys\.maxsize\b|\bmath\.inf\b/u,
 	],
 ];
 
-// language key -> [label, regex] of edge constructs in selected code, beside COMMON.
 const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
-	// `Int(text)`, `Double(s)`, `.first`, `dict[key]` return Optionals the compiler makes the author handle.
 	swift: [["payload decode", /(?<![Cc]ontainer)\.decode\s*\(/u]],
 	typescript: [
 		["parseInt/parseFloat", /\bparse(?:Int|Float)\s*\(/u],
@@ -90,7 +78,6 @@ const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
 	],
 };
 
-// Where a request's own input enters a handler: the criteria's "a request param, body or header".
 const REQUEST_INPUT: Record<string, RegExp> = {
 	java: /@(?:RequestParam|PathVariable|RequestBody|RequestHeader)\b/u,
 	kotlin: /@(?:RequestParam|PathVariable|RequestBody|RequestHeader)\b/u,
@@ -101,7 +88,6 @@ const REQUEST_INPUT: Record<string, RegExp> = {
 	swift: /\breq\.(?:parameters|query|content)\b/u,
 };
 
-/** The fact key of a construct label: `subscript or slice` → `subscriptOrSlice`. */
 function factKey(label: string): string {
 	const words = label.match(/[A-Za-z0-9]+/gu) ?? [];
 	return words

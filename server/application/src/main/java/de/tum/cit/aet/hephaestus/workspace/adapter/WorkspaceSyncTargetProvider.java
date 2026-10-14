@@ -34,26 +34,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Adapter that bridges workspace entities to the sync engine SPI.
- *
- * <p>This adapter maps workspace domain concepts to the generic SPI abstractions:
- *
- * <ul>
- *   <li>Workspace → Scope (identified by scopeId)
- *   <li>RepositoryToMonitor → SyncTarget (identified by syncTargetId)
- * </ul>
- *
- * <p>Implements the full sync provider interface hierarchy:
- *
- * <ul>
- *   <li>{@link SyncTargetProvider} - Core sync target operations
- *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.SyncTimestampProvider
- *       SyncTimestampProvider} - Sync timestamp operations
- *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider
- *       BackfillStateProvider} - Backfill state management
- * </ul>
- */
 @Component
 public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
 
@@ -456,11 +436,6 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         reconcileSyncTargetInTransaction(syncTargetId, resolvedNativeId, resolvedNameWithOwner);
     }
 
-    /**
-     * Whether the monitor's stored native id is that of another provider instance's repository of
-     * its name, as an id resolved by name alone once took it, and no repository of the workspace's
-     * own source provider holds it.
-     */
     private boolean holdsAnotherInstancesId(RepositoryToMonitor rtm, Long resolvedNativeId) {
         return rtm.getId() != null
                 && repositoryToMonitorRepository.monitorHoldsAnotherInstancesId(rtm.getId(), resolvedNativeId);

@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.repository.Repository;
 
-/** Composition receives admitted snapshots. It cannot read or write feedback storage. */
 class FeedbackCompositionBoundaryTest extends HephaestusArchitectureTest {
     @Test
     void shouldKeepCompositionOutOfFeedbackPersistence() {

@@ -30,7 +30,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 
-/** Who is allowed to attach a new identity, on the OAuth chain where no SecurityContext exists. */
 class IdentityAuthenticationTest extends BaseUnitTest {
 
     private static final Instant NOW = Instant.parse("2026-06-02T10:00:00Z");

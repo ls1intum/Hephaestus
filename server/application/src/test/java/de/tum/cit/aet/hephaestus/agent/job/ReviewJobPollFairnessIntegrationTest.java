@@ -33,12 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Head-of-line starvation fix for the poll candidate query. A plain {@code WHERE status='QUEUED' ORDER
- * BY created_at LIMIT n} has no awareness of per-bucket concurrency caps: if the oldest {@code n}
- * QUEUED rows all belong to a {@code (workspace, purpose)} already saturated on RUNNING jobs, a
- * younger, immediately-runnable job in a different bucket never enters the candidate batch at all.
- */
+// Saturated oldest buckets must not exclude runnable jobs in other buckets from the candidate batch.
 @DisplayName("Poll candidate fairness")
 class ReviewJobPollFairnessIntegrationTest extends BaseIntegrationTest {
 
@@ -167,7 +162,6 @@ class ReviewJobPollFairnessIntegrationTest extends BaseIntegrationTest {
         assertThat(candidates).contains(otherTier, otherWorkspace).doesNotContainAnyElementsOf(saturated);
     }
 
-    /** A job stored before snapshots named a tier counts against the UNDECLARED slot, as the claim counts it. */
     @Test
     void shouldCountAHistoricalRunningJobAgainstOnlyTheUndeclaredSlot() {
         Workspace ws = activeWorkspace("historical-ws");
@@ -182,7 +176,6 @@ class ReviewJobPollFairnessIntegrationTest extends BaseIntegrationTest {
         assertThat(candidates).contains(inHouse).doesNotContain(undeclared);
     }
 
-    /** No slot is bound for the job's tier: it stays a candidate, and the claim refuses it. */
     @Test
     void shouldKeepAJobWhoseTierHasNoBindingACandidateBesideASaturatedSlot() {
         Workspace ws = activeWorkspace("unbound-tier-ws");
@@ -229,7 +222,6 @@ class ReviewJobPollFairnessIntegrationTest extends BaseIntegrationTest {
         return runningJob(workspace, null);
     }
 
-    /** A job running on the slot of {@code tier}; null leaves the tier out of its snapshot, as older jobs did. */
     private UUID runningJob(Workspace workspace, @Nullable DataHandlingTier tier) {
         ReviewJob job = new ReviewJob();
         RuntimeJobTestData.initialize(job, workspace.getId());

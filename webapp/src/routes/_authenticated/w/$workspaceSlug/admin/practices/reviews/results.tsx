@@ -82,10 +82,6 @@ function ResultsListRoute() {
 	);
 }
 
-/**
- * The counts of the one practice the list is filtered to, over the list's own days: the overview's
- * per-practice row, read for that window.
- */
 function PracticeSummaryRead({
 	workspaceSlug,
 	practiceSlug,
@@ -101,7 +97,6 @@ function PracticeSummaryRead({
 	const query = useQuery({
 		...getReviewOverviewOptions({
 			path: { workspaceSlug },
-			// A list with no first day has no date limit, so its counts reach back to the first review.
 			query: {
 				...(window.from === undefined ? { allTime: true } : { from: window.from }),
 				to: window.to,

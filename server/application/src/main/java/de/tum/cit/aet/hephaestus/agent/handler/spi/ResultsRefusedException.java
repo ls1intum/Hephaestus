@@ -5,12 +5,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 
 /**
- * A review whose results the server will not record, either because the evidence does not
- * support them or because recording them is no longer permitted. This is a review-stage decision,
- * not a machinery failure: the sandbox stops rather than repeating a refused submission.
- *
- * <p>The reason code is a stable, lowercase name for the refusal, for metrics and logs — never the
- * message, which names one job.
+ * Refused results stop the sandbox without retry. Stable lowercase reason codes identify the refusal in metrics and logs.
+ * Messages describe individual jobs and must not serve as reason codes.
  */
 public class ResultsRefusedException extends JobDeliveryException {
 
@@ -25,7 +21,6 @@ public class ResultsRefusedException extends JobDeliveryException {
         this(reasonCode, reason, JsonNodeFactory.instance.arrayNode());
     }
 
-    /** A refusal decided by a check that failed with {@code cause}. */
     public ResultsRefusedException(String reasonCode, String reason, Throwable cause) {
         super(reason, cause);
         this.verificationFailures = JsonNodeFactory.instance.arrayNode();

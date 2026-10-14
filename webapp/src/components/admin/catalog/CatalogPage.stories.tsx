@@ -193,7 +193,6 @@ export const UnavailableMoveDestinationIsNamed: Story = {
 	},
 };
 
-/** Owns the search term, so filtering is a state transition rather than two separate renders. */
 function FilterTransition(props: ComponentProps<typeof CatalogPage>) {
 	const [search, setSearch] = useState<CatalogSearch>({});
 	return <CatalogPage {...props} search={search} onSearchChange={setSearch} />;

@@ -13,7 +13,6 @@ export interface LlmApiProtocolDef {
 	description?: string;
 }
 
-/** The one home for an API's words. Declaration order is the order the connection form offers. */
 export const LLM_API_PROTOCOL_LABELS = {
 	"openai-responses": { label: "Responses API", group: "CHAT" },
 	"openai-completions": {
@@ -42,7 +41,6 @@ const GROUP_LABELS = {
 	PRACTICE_SCRIPT: "For practice scripts",
 } satisfies Record<LlmApiProtocolGroup, string>;
 
-/** The API to connect for a purpose for practice scripts, which a picker with no such model names. */
 const PRACTICE_SCRIPT_API: Partial<Record<AgentPurpose, LlmApiProtocol>> = {
 	PRACTICE_DECISION: "openai-decisions",
 	PRACTICE_EMBEDDING: "openai-embeddings",
@@ -70,31 +68,21 @@ export function llmApiProtocolDescription(protocol: LlmApiProtocol): string | un
 	return def.description;
 }
 
-/** True for an API that serves only practice scripts. */
 export function isPracticeScriptApi(protocol: LlmApiProtocol): boolean {
 	return LLM_API_PROTOCOL_LABELS[protocol].group === "PRACTICE_SCRIPT";
 }
 
-/** The API to connect for `purpose`; none for a chat purpose. */
 export function practiceScriptApiFor(purpose: AgentPurpose): LlmApiProtocol | undefined {
 	return PRACTICE_SCRIPT_API[purpose];
 }
 
-/**
- * What a test says when `{baseUrl}/models` does not exist. Many endpoints for practice scripts serve no model
- * list, but a wrong base URL path looks the same, so the words name both.
- */
+// Missing /models and a wrong base path can look alike; the UI must not claim the endpoint is valid.
 export const UNLISTED_MODELS =
 	"No model list at this address. Add the model by its ID. If its calls fail too, check the base URL.";
 
-/** The answers with which a provider says `{baseUrl}/models` does not exist there. */
 const NO_MODEL_LIST_STATUSES: ReadonlySet<number> = new Set([404, 405, 501]);
 
-/**
- * Whether a failed test of an endpoint for practice scripts means only that it lists no models: many embedding,
- * decision and rerank endpoints serve no `{baseUrl}/models`. Any other failure, such as a wrong key
- * or a host that did not answer, is a real fault and keeps the server's own words.
- */
+/** A missing model list is neutral only for direct-model endpoints; other probe failures remain errors. */
 export function listsNoModels(
 	protocol: LlmApiProtocol,
 	probe: { reachable: boolean; statusCode?: number },

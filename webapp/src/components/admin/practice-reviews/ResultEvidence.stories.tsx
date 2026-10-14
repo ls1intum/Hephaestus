@@ -90,7 +90,6 @@ function citation(sourceKind: string, overrides: Partial<EvidenceCitation> = {})
 		quote,
 		startLine: 12,
 		endLine: quote.includes("\n") ? 13 : 12,
-		// The server enforces the biconditional: a side is set exactly when the kind is the diff.
 		side: isDiff ? "NEW" : null,
 		revision: null,
 		verification: null,
@@ -125,7 +124,6 @@ export const Default: Story = {
 		canvas.getByText("3 passages from 2 sources.");
 		canvas.getByRole("heading", { name: "The code changes", level: 4 });
 		canvas.getByRole("heading", { name: "Review threads on the code", level: 4 });
-		// A code citation is the only one that gets a file coordinate, and the only one with a side.
 		canvas.getByText("webapp/src/components/admin/practice-reviews/ReviewRow.tsx:12–13");
 		canvas.getByText("Before");
 		await expect(canvas.queryByText("scm.pull-request.diff")).not.toBeInTheDocument();
@@ -138,8 +136,6 @@ export const EverySource: Story = {
 		citations: knownEvidenceSourceKinds().map((kind) => citation(kind)),
 	},
 	play: async ({ canvas }) => {
-		// Compared whole rather than one `getByRole` per label, so a kind that arrives without words
-		// fails as an id this table does not list rather than going unasserted.
 		await expect(
 			canvas
 				.getAllByRole("heading", { level: 4 })
@@ -164,7 +160,6 @@ export const EverySource: Story = {
 				"Feedback already sent",
 			].sort(),
 		);
-		// Only a `code` locator has trustworthy line numbers, so no other source prints one.
 		await expect(canvas.queryByText(/Message from Ada Lovelace:\d/u)).not.toBeInTheDocument();
 	},
 };
@@ -181,7 +176,6 @@ export const LineNumbersOnlyWhereTheyAreReal: Story = {
 	},
 };
 
-/** A withheld quote still shows its location, because that is the part an operator can act on. */
 export const RedactedQuote: Story = {
 	args: {
 		citations: [citation("scm.pull-request.diff", { quote: null })],
@@ -210,7 +204,6 @@ export const UnknownSource: Story = {
 		],
 	},
 	play: async ({ canvas }) => {
-		// Named generically, never by the source's wire id.
 		canvas.getByRole("heading", { name: "Another source", level: 4 });
 		canvas.getByText("A source this version of the app has no description for.");
 		await expect(canvas.queryByText(/wiki\.page/u)).not.toBeInTheDocument();
@@ -227,7 +220,6 @@ export const NoEvidence: Story = {
 	},
 };
 
-/** A long path and a wide code quote must not push the page sideways on a phone. */
 export const Mobile: Story = {
 	args: {
 		citations: [
@@ -257,7 +249,6 @@ export const HistoricalSource: Story = {
 	},
 };
 
-/** A citation recorded without a place keeps its quote and says that no location was kept. */
 export const WithoutALocation: Story = {
 	args: {
 		citations: [citation("scm.pull-request.diff", { path: null, startLine: null, endLine: null })],

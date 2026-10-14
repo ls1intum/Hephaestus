@@ -14,7 +14,6 @@ const recorded: FeedbackResponse = {
 	createdAt: detailFeedback.deliveredAt,
 };
 
-/** The feedback on the work, answered addressed with a comment and rated helpful. */
 const answered: OwnFeedbackRef = { ...detailFeedback, response: recorded };
 
 function renderList(feedback = answered) {
@@ -76,7 +75,6 @@ describe("OwnFeedbackList", () => {
 	it("withdraws a recorded resolution, comment and all, when its button is pressed again", () => {
 		const { feedback, responses } = renderList();
 
-		// The response as it stands: the resolution pressed, the rating and the comment shown.
 		expect(screen.getByRole("button", { name: "Addressed" }).getAttribute("aria-pressed")).toBe(
 			"true",
 		);
@@ -84,7 +82,6 @@ describe("OwnFeedbackList", () => {
 		screen.getByText("Applied in the next commit.");
 		fireEvent.click(screen.getByRole("button", { name: "Addressed" }));
 
-		// The rating is not part of the change, so the write keeps it.
 		expect(responses.write).toHaveBeenCalledExactlyOnceWith(feedback.id, recorded, {
 			resolution: undefined,
 			comment: undefined,

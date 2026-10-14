@@ -4,6 +4,7 @@ import { expect, fn, screen, userEvent } from "storybook/test";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
 import { withPageBehind } from "@/stories/decorators";
+import { settledDrawerPanel } from "@/stories/overlay";
 import { Stateful } from "@/stories/stateful";
 import { expectGenuinelyDisabled } from "@/test/controls";
 
@@ -42,9 +43,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Every eligible practice selected, the default branch fixed, and unchanged results reused. */
 export const Default: Story = {
 	play: async ({ args }) => {
+		await settledDrawerPanel();
 		await expect(await screen.findByRole("combobox", { name: "Repository" })).toHaveTextContent(
 			"ls1intum/hephaestus",
 		);
@@ -63,6 +64,7 @@ export const Default: Story = {
 
 export const EmptySelection: Story = {
 	play: async ({ args }) => {
+		await settledDrawerPanel();
 		for (const practice of ELIGIBLE_PRACTICES) {
 			await userEvent.click(await screen.findByRole("checkbox", { name: practice.name }));
 		}
@@ -70,7 +72,6 @@ export const EmptySelection: Story = {
 		await userEvent.click(screen.getByRole("button", { name: "Start scan" }));
 		const error = await screen.findByText("Select at least one practice.");
 		await expect(error).toBeVisible();
-		// The message is the checkbox's description, not only a red line beside it.
 		const [first] = screen.getAllByRole("checkbox", { name: ELIGIBLE_PRACTICES[0]?.name });
 		await expect(first).toHaveAccessibleDescription("Select at least one practice.");
 		await expect(args.onSubmit).not.toHaveBeenCalled();
@@ -79,6 +80,7 @@ export const EmptySelection: Story = {
 
 export const InvalidBudget: Story = {
 	play: async ({ args }) => {
+		await settledDrawerPanel();
 		const budget = await screen.findByRole("textbox", { name: "Budget (US dollars)" });
 		await userEvent.clear(budget);
 		await userEvent.type(budget, "0.00001");
@@ -93,6 +95,7 @@ export const InvalidBudget: Story = {
 export const Starting: Story = {
 	args: { pending: true },
 	play: async () => {
+		await settledDrawerPanel();
 		const submit = await screen.findByRole("button", { name: "Starting scan…" });
 		await expectGenuinelyDisabled(submit);
 	},
@@ -101,6 +104,7 @@ export const Starting: Story = {
 export const AnotherScanRunning: Story = {
 	args: { refusal: { kind: "active-scan", scanId: "a0000000-0000-4000-8000-000000000002" } },
 	play: async () => {
+		await settledDrawerPanel();
 		await expect(
 			await screen.findByRole("link", { name: "Open the running scan" }),
 		).toHaveAttribute("href", "/w/aet/admin/practices/scans/a0000000-0000-4000-8000-000000000002");
@@ -116,6 +120,7 @@ export const VersionChanged: Story = {
 		expectedVersion: "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d",
 	},
 	play: async () => {
+		await settledDrawerPanel();
 		await expect(await screen.findByText("The repository changed")).toBeVisible();
 		await expect(screen.getByText("The next start expects version 9e8d7c6.")).toBeVisible();
 	},
@@ -129,6 +134,7 @@ export const ModelNotReady: Story = {
 		},
 	},
 	play: async () => {
+		await settledDrawerPanel();
 		await expect(await screen.findByText("The scan did not start")).toBeVisible();
 	},
 };
@@ -136,15 +142,16 @@ export const ModelNotReady: Story = {
 export const NoAnswer: Story = {
 	args: { refusal: { kind: "failed", message: "The server did not answer." } },
 	play: async () => {
+		await settledDrawerPanel();
 		await expect(await screen.findByText("We could not start the scan")).toBeVisible();
 		await expect(screen.getByText(/Starting again cannot start a second scan\./u)).toBeVisible();
 	},
 };
 
-/** No practice qualifies: the form says how to include one, in place of fields that cannot help. */
 export const NoEligiblePractices: Story = {
 	args: { options: { status: "ready", repositories: REPOSITORIES, practices: [] } },
 	play: async () => {
+		await settledDrawerPanel();
 		await expect(await screen.findByRole("link", { name: "Open Practice setup" })).toHaveAttribute(
 			"href",
 			"/w/aet/admin/practices",
@@ -156,6 +163,7 @@ export const NoEligiblePractices: Story = {
 export const NoRepositories: Story = {
 	args: { options: { status: "ready", repositories: [], practices: ELIGIBLE_PRACTICES } },
 	play: async () => {
+		await settledDrawerPanel();
 		await expect(await screen.findByText("No repository can be scanned")).toBeVisible();
 	},
 };
@@ -163,6 +171,7 @@ export const NoRepositories: Story = {
 export const Loading: Story = {
 	args: { options: { status: "loading" } },
 	play: async () => {
+		await settledDrawerPanel();
 		await expect(await screen.findByRole("heading", { name: "Start scan" })).toBeVisible();
 		await expect(screen.queryByRole("button", { name: "Start scan" })).not.toBeInTheDocument();
 	},
@@ -173,6 +182,7 @@ export const Error: Story = {
 		options: { status: "error", error: { status: 500 }, onRetry: fn() },
 	},
 	play: async () => {
+		await settledDrawerPanel();
 		await expect(await screen.findByText("We could not load what a scan needs")).toBeVisible();
 		await expect(screen.getByRole("button", { name: "Retry" })).toBeVisible();
 	},

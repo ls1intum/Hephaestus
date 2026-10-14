@@ -24,10 +24,7 @@ public class AccountPurger {
 
     private static final Logger log = LoggerFactory.getLogger(AccountPurger.class);
 
-    /**
-     * PII-cleared placeholder left on the tombstone so the NOT NULL display_name column stays
-     * valid.
-     */
+    // The erased tombstone still needs a non-null display name.
     private static final String TOMBSTONE_DISPLAY_NAME = "deleted-account";
 
     private final AccountRepository accountRepository;
@@ -92,11 +89,7 @@ public class AccountPurger {
         log.info("auth.account: hard-deleted accountId={} (purged account-owned rows," + " status=DELETED)", accountId);
     }
 
-    /**
-     * {@code auth_event} and {@code config_audit_event} rows survive erasure: they are the security
-     * and settings-change trail, and their non-identifying skeleton ({@code event_type}, {@code
-     * result}, {@code occurred_at}) is what the trail is. Only the personal columns are nulled.
-     */
+    // Erasure clears personal audit columns while retaining the security and configuration event history.
     private void anonymizeAuditRows(Long accountId) {
         int redacted = erasureRepository.redactAuthEvents(accountId);
         if (redacted > 0) {

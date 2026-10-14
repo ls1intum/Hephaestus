@@ -9,11 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Self-reported worker liveness for multi-replica orphan recovery. Each worker upserts its own row on a
- * timer, so staleness reflects the JVM that actually executes jobs, and a worker whose heartbeat goes
- * stale has its in-flight jobs requeued by {@link ReviewJobZombieSweeper}.
- */
+// Each worker writes its own heartbeat so staleness identifies the JVM that owns the execution.
 @Entity
 @Table(name = "worker_registry")
 @Getter

@@ -7,7 +7,6 @@ import { MockLanguageModelV4 } from "ai/test";
 
 import { logprobDecisionModel } from "./decision-logprobs.ts";
 
-/** A completion that writes `q1: <sampled>` with the given alternatives at the answer position. */
 function answering(
 	sampled: string,
 	top: { token: string; logprob: number }[],

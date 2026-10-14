@@ -125,14 +125,14 @@ public class ScanDriver {
         for (var assignment : pending) scans.reuse(review.workspaceId(), assignment.id());
         pending = scans.pending(review.workspaceId(), review.id(), ScanService.PAGE_SIZE);
         if (pending.isEmpty()) {
-            state = scans.lock(review.workspaceId(), review.id());
-            boolean complete = state.judged() + state.reused() == state.listed() && state.withheld() == 0;
+            var settled = scans.lock(review.workspaceId(), review.id());
+            boolean complete = settled.judged() + settled.reused() == settled.listed() && settled.withheld() == 0;
             close(
-                    state,
+                    settled,
                     complete ? ReviewStatus.COMPLETE : ReviewStatus.PARTIAL,
                     complete
                             ? null
-                            : state.withheld() > 0
+                            : settled.withheld() > 0
                                     ? ReviewStopReason.RESULT_WITHHELD
                                     : ReviewStopReason.EXECUTION_INCOMPLETE);
             return;

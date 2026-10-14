@@ -19,7 +19,6 @@ const standing = (slug: string, groupSlug: string | null = null) =>
 
 const REVIEWS = "*/workspaces/:workspaceSlug/practice-groups/:groupSlug/reviews";
 
-/** One page of reviews out of `totalPages`, empty. */
 const page = (number: number, totalPages = 1) => ({
 	content: [],
 	page: { number, size: 10, totalElements: 0, totalPages },
@@ -53,7 +52,6 @@ function readyFeed(feed: ReviewFeedState): Extract<ReviewFeedState, { status: "r
 	return feed;
 }
 
-/** Two pages of reviews; every page asked for is recorded. */
 function twoPages(pagesAsked: string[]) {
 	return ({ request }: { request: Request }) => {
 		const asked = new URL(request.url).searchParams.get("page") ?? "0";

@@ -19,22 +19,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
-/**
- * The acceptance suite every {@link IntegrationManifest} must pass.
- *
- * <p>Boot validation proves the beans a manifest promises exist. It cannot prove a manifest is
- * internally coherent, because it only ever sees the manifests a particular configuration happened
- * to enable — GitLab's declaration goes unchecked on an instance with GitLab switched off, which is
- * most of them, including CI until something breaks in production.
- *
- * <p>A subclass supplies its manifest and the descriptors for the kinds it observes; the assertions
- * are inherited and cannot be opted out of. {@code IntegrationManifestConformanceCoverageTest}
- * fails the build if a manifest ever ships without a subclass here.
- *
- * <p>The rules the real {@link ReviewContractValidator} already owns are checked by
- * <em>running</em> it rather than by restating them, so the suite and the boot check cannot drift
- * into disagreeing about what a valid manifest is.
- */
+/** Subclasses supply manifests and descriptors; inherited assertions exercise {@link ReviewContractValidator} rather than duplicating its rules. */
 abstract class IntegrationManifestContractTest extends BaseUnitTest {
 
     /** The manifest under test, constructed as production constructs it. */
@@ -80,9 +65,6 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
 
     @Test
     void spendsEveryDeliveryCapabilityItDeclares() {
-        // The mirror of the bootstrap's rule that a claimed lane needs its capability, so
-        // capability and
-        // lane must agree in both directions.
         IntegrationManifest manifest = manifest();
         Set<CopyCapability> lanes = manifest.reviewContribution().delivers().values().stream()
                 .flatMap(Set::stream)
@@ -100,10 +82,6 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * A validator with a handler for every event the supplied descriptors name, so the suite
-     * checks the manifest independently of runtime-role bean selection.
-     */
     private ReviewContractValidator validator() {
         List<ItemDescriptor> descriptors = descriptors();
         Set<EventTypeKey> producers = new LinkedHashSet<>();

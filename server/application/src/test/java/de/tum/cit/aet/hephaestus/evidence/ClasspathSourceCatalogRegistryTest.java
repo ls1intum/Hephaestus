@@ -30,7 +30,7 @@ class ClasspathSourceCatalogRegistryTest extends BaseUnitTest {
         assertThat(registry.requireSource(new SourceKind("scm.repository.tree"))
                         .citation()
                         .revision())
-                .isEqualTo(CitationRequirement.REQUIRED);
+                .isEqualTo(CitationRequirement.OPTIONAL);
         assertThat(registry.isSourceUsePermitted(
                         new SourceKind("scm.pull-request.diff"), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
                 .isTrue();

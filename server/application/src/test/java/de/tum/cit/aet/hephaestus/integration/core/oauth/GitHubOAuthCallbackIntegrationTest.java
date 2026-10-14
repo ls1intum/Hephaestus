@@ -35,10 +35,6 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.util.UriBuilder;
 
-/**
- * Connecting a GitHub App installation through the callback. Only GitHub's answers about the
- * authorizing person are a double; state signing, the callback and persistence are real.
- */
 class GitHubOAuthCallbackIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired

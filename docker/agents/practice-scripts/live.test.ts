@@ -1,9 +1,4 @@
-/**
- * Live: the host library runs custom programs that call every direct model slot against real models
- * behind the stand-in proxy routes. `docs/contributor/testing.mdx` § Live models for practice scripts
- * names the keys; without them the tests skip. They assert what the host guarantees, never what a
- * model judges.
- */
+// Live models may vary; these tests assert host guarantees rather than model verdicts.
 import assert from "node:assert/strict";
 import { cp, readFile, rm } from "node:fs/promises";
 import path from "node:path";
@@ -38,7 +33,7 @@ const embeddingModel = env.HEPHAESTUS_LIVE_EMBEDDING_MODEL ?? "";
 const rerankingModel = env.HEPHAESTUS_LIVE_RERANKING_MODEL ?? "";
 const live = chatBase !== "" && chatKey !== "" && chatModel !== "";
 const TOKEN = "live-practice-script-token";
-/** How long one program may run: a self-hosted model can be slow to answer. */
+// Self-hosted models can take longer than the unit fixtures to answer.
 const PROGRAM_MS = 170_000;
 
 const roots: string[] = [];
@@ -46,16 +41,10 @@ after(async () =>
 	Promise.all(roots.map(async (root) => rm(root, { recursive: true, force: true }))),
 );
 
-/** The change both live suites review: added comments, which every slot of the fixture reads. */
 const CHANGE = await readFile(path.join(import.meta.dirname, "fixtures/cart-change.diff"), "utf8");
 
-/** The every-slot fixture, the program the server's PracticeScriptLiveLlmTest runs too. */
 const EVERY_SLOT = await readFile(path.join(import.meta.dirname, "fixtures/every-slot.ts"), "utf8");
 
-/**
- * A program that rates the added comments with a decision model and returns its own result: what it
- * could not settle, with the coverage it claims.
- */
 const DECIDES = `import { addedComments, commentKinds, expectKind, requireChange, scm } from "../kits/scm/index.ts";
 import { classify, definePracticeScript } from "../lib/core/practice-script.ts";
 
@@ -95,7 +84,6 @@ export default definePracticeScript({
 });
 `;
 
-/** Each slot's real endpoint: the stand-in forwards a call there with the real key. */
 function upstream(slot: string, operation: string): { url: string; key: string } {
 	if (slot === "decision" && operation === "decisions") {
 		return { url: `${decisionBase.replace(/\/+$/u, "")}/decisions`, key: decisionKey };
@@ -103,11 +91,7 @@ function upstream(slot: string, operation: string): { url: string; key: string }
 	return { url: `${chatBase.replace(/\/+$/u, "")}/${operation}`, key: chatKey };
 }
 
-/**
- * One small request to each self-hosted model before the runs. A host can take minutes to load a
- * model after a pause, which is longer than a program's deadline: the host then reports the slot as
- * unrated for its deadline, which is correct, but is not what these tests prove.
- */
+// Warm models before measuring script deadlines; endpoint startup is outside the script's contract.
 async function warmUp(): Promise<void> {
 	const calls: [string, object][] = [
 		[
@@ -152,7 +136,6 @@ interface LiveRun {
 	log: string;
 }
 
-/** Run the program `source` as the practice `slug` through the host, with `bound` behind the stand-in. */
 async function runLive(slug: string, source: string, bound: BoundModels): Promise<LiveRun> {
 	const standIn = await startStandIn(TOKEN, async (request) => {
 		const { url, key } = upstream(request.slot, request.operation);
@@ -222,7 +205,6 @@ async function runLive(slug: string, source: string, bound: BoundModels): Promis
 	}
 }
 
-/** Every request left the host with the practice's token and its name. */
 function attributed(requests: readonly StandInRequest[], slug: string): void {
 	assert.ok(requests.every((r) => r.headers.authorization === `Bearer ${TOKEN}`));
 	assert.ok(requests.every((r) => r.headers[PRACTICE_SCRIPT_PRACTICE_HEADER] === slug));
@@ -267,7 +249,6 @@ void test(
 		assert.ok(review !== undefined && reviews.length === 1);
 		assert.deepEqual(review.limitations, [], log);
 		assert.equal(review.facts?.comments, 5);
-		// The agent read the repository through the host, which kept a receipt of each read.
 		assert.ok(outcome.coverageReached.reads > 0, log);
 		attributed(requests, "every-slot");
 	},

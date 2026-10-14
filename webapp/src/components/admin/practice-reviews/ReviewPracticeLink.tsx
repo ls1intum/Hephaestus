@@ -14,11 +14,7 @@ export interface ReviewPracticeLinkProps {
 	className?: string;
 }
 
-/**
- * Opens the Results list filtered to the practice rather than Practice setup: the reader is
- * asking how the practice behaves, and Practice setup is one press from the counts above that list
- * when the answer is "change it".
- */
+// This link opens practice results; editing the definition belongs to the practice sheet.
 export function ReviewPracticeLink({
 	practiceSlug,
 	practiceName,

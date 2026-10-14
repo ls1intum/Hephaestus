@@ -35,10 +35,8 @@ import org.jspecify.annotations.Nullable;
  */
 public record WorkResolution(List<Work> cleanWork, @Nullable Instant resolvedAt, List<Work> problemWork) {
 
-    /** Clean pieces of work in a row that resolve a piece of feedback. */
     public static final int CLEAN_NEEDED = 3;
 
-    /** No clean work yet. */
     public static final WorkResolution NONE = new WorkResolution(List.of(), null, List.of());
 
     /**
@@ -59,7 +57,6 @@ public record WorkResolution(List<Work> cleanWork, @Nullable Instant resolvedAt,
                     OpportunityBundler.opportunities(practiceResults, horizon).reversed());
         }
 
-        /** How the work has answered feedback prepared at {@code preparedAt}. */
         public WorkResolution resolve(Instant preparedAt) {
             List<Work> clean = new ArrayList<>();
             List<Work> problems = new ArrayList<>();

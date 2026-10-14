@@ -38,7 +38,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/** Claims queued jobs after privacy, budget, frozen-model, and concurrency admission. */
 @Component
 @ConditionalOnWorkerRole
 @ConditionalOnBooleanProperty(RuntimeRole.AGENT_ENABLED_PROPERTY)
@@ -94,7 +93,7 @@ public class ReviewJobClaimService {
                 .description("Time between job submission and its claim")
                 .register(meterRegistry);
     }
-    /** What one claim attempt produced: either a claimed job or the reason there is none. */
+
     sealed interface ClaimAttempt {}
 
     enum ClaimOutcome implements ClaimAttempt {
@@ -219,9 +218,7 @@ public class ReviewJobClaimService {
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setStartedAt(claimedAt);
         job.setExecutionStartedAt(null);
-        // The hold is over — clear its marker so it never outlives the hold it describes. A stale
-        // 'BUDGET' marker would survive onto a later crash-retry requeue, and a cap raise would
-        // then fast-forward a backoff that has nothing to do with the budget.
+        // Clear the budget hold marker so a crash requeue cannot inherit an expired hold.
         job.setHoldReason(null);
         job.setWorkerId(workerId); // owner for cancel routing, orphan recovery, terminal-write fencing
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
@@ -259,7 +256,6 @@ public class ReviewJobClaimService {
         return snapshot;
     }
 
-    /** Revalidates every frozen script model before the attempt starts. */
     private @Nullable Map<ModelKind, FrozenModel> admitPracticeScript(
             ReviewJob job, @Nullable Map<ModelKind, FrozenModel> submitted, LlmAdmissionService admission) {
         if (submitted == null) {
@@ -295,15 +291,8 @@ public class ReviewJobClaimService {
         return admitted.isEmpty() ? null : admitted;
     }
 
-    /**
-     * The budget is re-checked at claim even though submit already gated, because a workspace can
-     * pre-queue jobs faster than the cap updates. It is never re-checked past this point — there is no
-     * mid-execution kill on budget alone.
-     *
-     * <p>Held rather than cancelled: a month rollover or a raised cap clears the block without the job
-     * having failed, so {@code attempt} stays untouched. The age bound is what keeps that from
-     * being unbounded when neither ever happens.
-     */
+    // Queued work can outpace budget updates, so claim must recheck the cap.
+    // Hold without consuming an attempt; a month rollover or raised cap can release it.
     private ClaimAttempt holdOrCancelOverBudget(ReviewJob job, LlmBudgetBlockReason blockReason) {
         Instant now = Instant.now();
         boolean tooOldToHold = job.getSubmittedAt() != null

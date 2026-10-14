@@ -17,11 +17,6 @@ import { type OutcomeScope, type ReviewListTarget, scopeSearch } from "./review-
  */
 export const DELIVERED_STATES = ["DELIVERED"] as const;
 
-/**
- * One row of the breakdown: a location or a reason, in the words and icon of the Feedback table's
- * filter for it, its count, and the table filtered to exactly the rows it counts. A row without a
- * target has no filter that selects exactly it.
- */
 export interface BreakdownRow {
 	key: string;
 	def: StatusDef;
@@ -33,11 +28,6 @@ function isWithholdingReason(reason: string): reason is WithholdingReason {
 	return Object.hasOwn(WITHHOLDING_REASON_DEFS, reason);
 }
 
-/**
- * Delivered feedback by location, in the order and words of the Location filter, each opening the
- * Feedback table filtered to the delivered states, that location and the range. Only the locations
- * that delivered something are rows.
- */
 export function deliveredByLocation(
 	counts: readonly ReasonCount[],
 	scope: OutcomeScope,
@@ -64,13 +54,6 @@ export function deliveredByLocation(
 	});
 }
 
-/**
- * Withheld feedback by reason, in the groups and words of the "Why withheld" filter, each opening
- * the Feedback table filtered to withheld feedback of that group and the range. Feedback an admin
- * rejected is not sent either, as the Feedback tile counts it, and is its own row; withheld feedback
- * whose reason this build does not know is one too, without a link, since no filter selects it
- * alone. Only the rows with a count are drawn.
- */
 export function withheldByReason(
 	reasons: readonly ReasonCount[],
 	feedback: Pick<ReviewFeedbackCounts, "rejected">,

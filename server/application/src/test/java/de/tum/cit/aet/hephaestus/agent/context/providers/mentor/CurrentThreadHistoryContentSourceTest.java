@@ -51,7 +51,7 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("omits legacy assistant text parts that are leaked internal analysis")
+    @DisplayName("omits assistant text that exposes internal analysis")
     void omitsLeakedInternalAnalysisFromAssistantHistory() throws Exception {
         UUID threadId = UUID.randomUUID();
         ChatMessage assistant = message(
@@ -84,27 +84,20 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
                 .put("type", "data-result")
                 .put("id", "named")
                 .putObject("data")
-                .put("practiceResultId", UUID.randomUUID().toString());
+                .put("resultId", UUID.randomUUID().toString());
         parts.addObject()
                 .put("type", "data-result")
                 .put("id", "shown")
                 .putObject("data")
-                .put("practiceResultId", UUID.randomUUID().toString())
+                .put("resultId", UUID.randomUUID().toString())
                 .put("text", "Name the trade-off in the description.");
         parts.addObject()
-                .put("type", "data-result-observation")
+                .put("type", "data-problem")
                 .put("id", "problem")
                 .putObject("data")
-                .put("practiceResultId", UUID.randomUUID().toString())
-                .put("observationId", UUID.randomUUID().toString())
+                .put("resultId", UUID.randomUUID().toString())
+                .put("problemId", UUID.randomUUID().toString())
                 .put("text", "Line 12 retries without a limit.");
-        // Stored before protocol 2: its observationId is the result's id.
-        parts.addObject()
-                .put("type", "data-observation")
-                .put("id", "legacy")
-                .putObject("data")
-                .put("observationId", UUID.randomUUID().toString())
-                .put("text", "Say why in the title.");
         parts.addObject().put("type", "text").put("text", "What made you choose it?");
         when(chatMessageRepository.findContextMessages(1L, 2L, threadId, null)).thenReturn(List.of(assistant));
 
@@ -118,7 +111,7 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
                         .at("/messages/0/text")
                         .asString())
                 .isEqualTo("Let me look.\nName the trade-off in the description.\nLine 12 retries without a limit.\n"
-                        + "Say why in the title.\nWhat made you choose it?");
+                        + "What made you choose it?");
     }
 
     private ChatMessage message(ChatMessage.Role role, String text, Instant createdAt) {

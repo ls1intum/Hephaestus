@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -30,6 +29,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.dao.DataAccessResourceFailureException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -240,15 +240,15 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_reportsRepositoryFailure() {
+    void shouldPropagateDatabaseFailureWithoutCallingItACaptureRefusal() {
+        var failure = new DataAccessResourceFailureException("Database unavailable");
         when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
-                .thenThrow(new RuntimeException("db down"));
+                .thenThrow(failure);
 
         Map<String, byte[]> files = new HashMap<>();
         assertThatThrownBy(() -> files.putAll(provider.capture(request(metadataWithPr()), provider.sourceKinds())
                         .files()))
-                .isInstanceOf(ItemCaptureException.class)
-                .hasMessageContaining("General-review-comment collection failed");
+                .isSameAs(failure);
         assertThat(files).doesNotContainKey(FILE_KEY);
     }
 

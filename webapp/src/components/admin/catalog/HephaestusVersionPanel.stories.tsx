@@ -10,7 +10,6 @@ import { catalogPracticeDefinition } from "./fixtures";
 import { groupVersionFields, practiceVersionFields } from "./hephaestus-version-fields";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
 
-/** A Hephaestus version of a pull request practice, field by field as the panel lists it. */
 function shippedPractice(...overrides: Parameters<typeof catalogPracticeDefinition>) {
 	return practiceVersionFields(
 		catalogPracticeDefinition(...overrides),
@@ -80,7 +79,6 @@ export const UpdateChangesReviewRules: Story = {
 		await expect(canvas.getByText(/would change review rules/u)).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Review Hephaestus update" }));
 		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
-		// Events, sources and roles read back under their own labels, never as a wire id.
 		await expect(canvas.getByText("Merged")).toBeVisible();
 		await expect(canvas.queryByText(/scm\.pull_request\.merged/u)).not.toBeInTheDocument();
 		await expect(

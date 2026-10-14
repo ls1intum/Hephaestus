@@ -8,15 +8,10 @@ import {
 } from "./data-handling-defs";
 
 export interface UnmetTiersProps {
-	/** The member tiers that no model serves. */
 	tiers: readonly DataHandlingTier[];
 	className?: string;
 }
 
-/**
- * The members a needed model misses, with their tiers' icons, on AI models and on a practice's
- * panel alike: one phrase for one fact. A model that misses no one draws nothing.
- */
 export function UnmetTiers({ tiers, className }: UnmetTiersProps) {
 	if (tiers.length === 0) {
 		return null;

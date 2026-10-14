@@ -1,10 +1,6 @@
 import type { AgentBinding, AvailableLlmModel, PracticeScriptSummary } from "@/api/types.gen";
 import { inStoryYear } from "@/stories/story-clock";
 
-/**
- * Whom a binding serves when it stands alone for its purpose, as the server routes it. A set of
- * bindings that routes otherwise states its own `servedTiers`.
- */
 export const SERVED_ALONE = {
 	IN_HOUSE: ["IN_HOUSE", "CLOUD"],
 	CLOUD: ["CLOUD"],
@@ -48,7 +44,6 @@ export const mockAvailableModels: AvailableLlmModel[] = [
 	},
 ];
 
-/** One model per model kind for practice scripts, each on the API that serves it. */
 export const mockDecisionModel: AvailableLlmModel = {
 	dataHandlingTier: "CLOUD",
 	id: 3,
@@ -62,7 +57,6 @@ export const mockDecisionModel: AvailableLlmModel = {
 	per1mOutputUsd: 0.4,
 };
 
-/** A decision model that reasons first, which the picker warns about when it is chosen. */
 export const mockReasoningDecisionModel: AvailableLlmModel = {
 	...mockDecisionModel,
 	id: 4,
@@ -70,7 +64,6 @@ export const mockReasoningDecisionModel: AvailableLlmModel = {
 	reasoningEffort: "LOW",
 };
 
-/** A model with no brand declared, which draws the generic mark. */
 export const mockEmbeddingModel: AvailableLlmModel = {
 	dataHandlingTier: "IN_HOUSE",
 	id: 5,
@@ -81,7 +74,6 @@ export const mockEmbeddingModel: AvailableLlmModel = {
 	pricingMode: "NO_CHARGE",
 };
 
-/** A hosted reranker with no price yet: the picker says how its calls are counted. */
 export const mockRerankModel: AvailableLlmModel = {
 	dataHandlingTier: "CLOUD",
 	id: 6,
@@ -99,14 +91,12 @@ export const mockPracticeScriptModels: AvailableLlmModel[] = [
 	mockRerankModel,
 ];
 
-/** The review that reported each practice's needs, on a fixed day of the story's year. */
 const asOf = {
 	reviewId: "review-completed-1",
 	jobId: "job-completed-1",
 	finishedAt: inStoryYear("10-03T09:00"),
 };
 
-/** Comment quality requires a decision model that In-house members do not get. */
 export const mockCommentQualityNeeds: PracticeScriptSummary = {
 	practiceSlug: "comment-quality",
 	practiceName: "Comment quality",
@@ -126,7 +116,6 @@ export const mockDescribeWhatAndWhyNeeds: PracticeScriptSummary = {
 	needs: [{ slot: "embedding", need: "optional", unmetTiers: [] }],
 };
 
-/** A script whose newest review ran an earlier version: it declares nothing yet. */
 export const mockChangedScriptNeeds: PracticeScriptSummary = {
 	practiceSlug: "small-pull-requests",
 	practiceName: "Small pull requests",

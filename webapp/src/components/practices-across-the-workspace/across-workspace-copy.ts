@@ -5,7 +5,6 @@ import type { InfoLine } from "@/components/common/InfoTip";
 /** The page's short name: its sidebar entry and the first crumb of its levels. */
 export const ACROSS_THE_WORKSPACE = "Across the workspace";
 
-/** One action from each practice row, so one label. */
 export const OPEN_IN_YOUR_PROFILE = "Open in your Practice profile";
 
 /** Delay before the page explains a slow read. */
@@ -55,21 +54,16 @@ export const SLOW_LOAD_NOTE: readonly InfoLine[] = [
 	{ term: "Then:", text: "the page fills in when the counts are ready." },
 ];
 
-/** Keep the counts fresh across brief focus changes. */
 export const ACROSS_WORKSPACE_STALE_MS = 5 * 60 * 1000;
 
-/** The overview failed: the page and the practice groups' levels have nothing to show. */
 export const GROUPS_LOAD_ERROR = "We could not load the practice groups";
 
 /** Digits always: a count of developers sits beside other figures, never in running prose. */
 export const developersText = (n: number): string => count(n, "developer", "developers", true);
 
-/** Under the page's groups: who the counts are about. */
 export const developersInReview = (n: number): string =>
 	`Results for the ${developersText(n)} whose work this workspace reviews.`;
 
-/** Digits always, as {@link developersText}. */
 export const practicesText = (n: number): string => count(n, "practice", "practices", true);
 
-/** A practice or group with every outcome count at zero. */
 export const NO_RESULTS_YET = "No results yet";

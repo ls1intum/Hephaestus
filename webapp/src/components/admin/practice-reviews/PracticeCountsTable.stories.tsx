@@ -113,8 +113,6 @@ export const Default: Story = {
 			within(busiest).queryByRole("button", { name: /^Track/u }),
 		).not.toBeInTheDocument();
 		await expect(within(busiest).queryByRole("link", { name: /^Trace/u })).not.toBeInTheDocument();
-		// 18 + 9 + 4 + 2 results, each outcome out of them; 7 of the 12 pieces of feedback
-		// composed about it were delivered. No percentage, and no (i) speaks of one.
 		await expect(cellsOf(busiest).slice(0, 6)).toEqual([
 			"33",
 			"9 of 33",
@@ -142,8 +140,6 @@ export const Default: Story = {
 		await expect(
 			canvas.getByText(/^Feedback delivered adds up to 16 across the practices, but 14 pieces/u),
 		).toBeVisible();
-		// Nothing is marked, so the ones with the most marked incorrect, then could not determine, lead; the
-		// rest stay busiest first.
 		await expect(
 			within(table)
 				.getAllByRole("row")
@@ -156,7 +152,6 @@ export const Default: Story = {
 			"Tests name the behaviour",
 			"Product language",
 		]);
-		// Below 20 results no practice is marked, whatever its shares.
 		await expect(canvas.queryByText("Often undecided")).not.toBeInTheDocument();
 		// A practice that recorded nothing is not a row, and no line under the table counts it.
 		await expect(canvas.queryByText(/recorded nothing/u)).not.toBeInTheDocument();
@@ -304,11 +299,6 @@ export const LongNamesAndMarkers: Story = {
 	},
 };
 
-/**
- * "Thin controllers" is turned off today. Its counts are history, so the table hides it and says how
- * many it hides; "Show turned-off practices" brings it back. The state is read now, not from when its
- * results were made.
- */
 export const TurnedOffPracticeHidden: Story = {
 	args: {
 		practices: workspacePractices.map((practice) =>

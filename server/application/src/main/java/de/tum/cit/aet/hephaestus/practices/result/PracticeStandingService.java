@@ -44,12 +44,8 @@ import tools.jackson.databind.json.JsonMapper;
 public class PracticeStandingService {
 
     private static final int MAX_FEEDBACK_PER_PRACTICE = 5;
-    /**
-     * Per-opportunity weight decay, newest first. Derived rather than picked: two problem-free pieces of reviewed work
-     * in a row must be enough to acknowledge a fixed lapse, which with weights {@code 1, d, d², d³} (a window of four)
-     * holds exactly when {@code (1 + d) > 4·(d² + d³)}, i.e. {@code d < 0.5}. The effect is symmetric and intended: a
-     * fresh regression shows up as fast as a fresh fix.
-     */
+    // Decay below 0.5 lets two clean opportunities outweigh two problem-bearing ones; regressions carry the same
+    // weight.
     private static final double STANDING_DECAY = 0.4;
 
     private static final int MAX_STRENGTHS_PER_PRACTICE = 3;
@@ -126,7 +122,6 @@ public class PracticeStandingService {
                 .toList();
     }
 
-    /** The visible rows of {@code narrowed}, per practice slug. */
     private static Map<String, List<ResultView>> visibleByPractice(List<ResultView> narrowed, Set<UUID> visible) {
         Map<String, List<ResultView>> byPractice = new LinkedHashMap<>();
         for (ResultView view : narrowed) {
@@ -139,7 +134,6 @@ public class PracticeStandingService {
         return byPractice;
     }
 
-    /** The practices review is admitted for in the workspace today, and their slugs per group slug. */
     private Eligibility eligibility(Long workspaceId) {
         List<Practice> eligiblePractices = practiceRepository.findByWorkspaceId(workspaceId).stream()
                 .filter(practice ->
@@ -162,16 +156,7 @@ public class PracticeStandingService {
 
     private record Eligibility(List<Practice> practices, Map<String, List<String>> practicesByGroup) {}
 
-    /**
-     * Every practice the developer should see, whether or not it has anything to say, as of one edge.
-     *
-     * <p>Exactly the eligible practices: what the workspace currently watches. They belong here even with
-     * nothing to report, because "no result reached this" and "the reviews ran and found nothing" are
-     * different answers a developer cannot otherwise tell apart. A practice switched off for the workspace
-     * is left out even where the developer held a standing on it: the profile shows nothing for a practice
-     * the workspace no longer reviews, so a group whose practices are all off is empty. The admin views read
-     * the results themselves and still show it.
-     */
+    // Include eligible practices without results so absence of review stays distinct from review without a verdict.
     private StandingSnapshot snapshot(
             List<ResultView> rows,
             Set<UUID> visible,
@@ -210,12 +195,7 @@ public class PracticeStandingService {
         return new StandingSnapshot(practices, eligibility.practicesByGroup());
     }
 
-    /**
-     * A practice with nothing to report, carrying WHICH silence it is ({@link StandingScale#rank}
-     * says why the two sort apart).
-     *
-     * <p>No trend either: a direction over evidence that produced no verdict would be a claim about nothing.
-     */
+    // Evidence without a verdict cannot establish a trend direction.
     private PracticeStandingDTO silentStanding(Practice practice, @Nullable PracticeEvidence evidence) {
         boolean exercised = evidence != null && !evidence.withoutVerdict().isEmpty();
         boolean doesNotApplyOnly = evidence != null
@@ -243,7 +223,6 @@ public class PracticeStandingService {
                 doesNotApplyOnly);
     }
 
-    /** One practice response, complete on first construction. */
     private PracticeStandingDTO toStanding(
             PracticeEvidence evidence, PracticeTrend trend, Map<UUID, String> deliveredGuidance, double standingShare) {
         Practice practice = evidence.practice();
@@ -285,21 +264,12 @@ public class PracticeStandingService {
                 .toList();
     }
 
-    /** How many of a practice's newest opportunities its standing is read from. */
     public int standingWindow() {
         return practiceTrendService.standingWindow();
     }
 
-    /**
-     * How positive this practice's recent evidence was, in {@code [0,1]}. The standing label is a rendering of
-     * this number, and the level above consumes the number rather than the label.
-     *
-     * <p>One rule over the newest {@link PracticeTrendService#standingWindow} opportunities, weighted by recency
-     * ({@code PracticeTrend#recentMetShare}). The opportunities are the live runs the trend reads
-     * (current result occupancy). Only a practice that no live run judged reads its requested and backfilled
-     * work instead, by the same rule, so the two populations are never mixed. The binary fallback answers a practice
-     * whose verdicts no opportunity carries, such as one whose newest run on a piece of work reached no verdict.
-     */
+    // Use live opportunities when present; requested and backfilled work are a separate fallback, never a mixed
+    // population.
     private double standingShare(PracticeEvidence evidence, PracticeTrend trend, Instant since) {
         int window = practiceTrendService.standingWindow();
         OptionalDouble live = trend.recentMetShare(window, STANDING_DECAY);
@@ -311,12 +281,6 @@ public class PracticeStandingService {
                 .orElseGet(() -> evidence.problems().isEmpty() ? 1.0 : 0.0);
     }
 
-    /**
-     * One practice's window of results, split by what each one says about the developer.
-     *
-     * <p>Split once, then read by everything downstream: the practice's two lists, the trend's evidence, the
-     * census.
-     */
     private record PracticeEvidence(
             Practice practice, List<ResultView> problems, List<ResultView> strengths, List<ResultView> withoutVerdict) {
         /**
@@ -358,7 +322,6 @@ public class PracticeStandingService {
                     .toList();
         }
 
-        /** Whether this practice has anything to say to the developer. */
         boolean hasStanding() {
             return !problems.isEmpty() || !strengths.isEmpty();
         }
@@ -372,7 +335,6 @@ public class PracticeStandingService {
      */
     public record StandingSnapshot(
             Map<String, PracticeStandingSnapshot> practices, Map<String, List<String>> eligiblePracticesByGroup) {
-        /** The snapshot of someone nothing was read for: no practice at all. */
         public static final StandingSnapshot EMPTY = new StandingSnapshot(Map.of(), Map.of());
 
         /**
@@ -419,12 +381,7 @@ public class PracticeStandingService {
         }
     }
 
-    /**
-     * The lanes whose text this read model's guidance means: the ones that speak about the one result
-     * they are bound to. {@code PRACTICE_PAGE} is excluded because it is feedback about a way of working across several
-     * pieces of work, so it would answer "what did you tell me about this result" with a paragraph that
-     * is explicitly not about it.
-     */
+    // Practice-page feedback covers several items and cannot describe guidance for one result.
     private Map<UUID, String> deliveredGuidanceByResult(Long ws, Set<UUID> ids) {
         if (ids.isEmpty()) return Map.of();
         return jdbc
@@ -457,7 +414,6 @@ public class PracticeStandingService {
         return rankOf(view.result().getSeverity());
     }
 
-    /** Ranks a missing severity after every severity. */
     private static int rankOf(@Nullable Severity severity) {
         return severity == null ? UNRANKED : severity.rank();
     }

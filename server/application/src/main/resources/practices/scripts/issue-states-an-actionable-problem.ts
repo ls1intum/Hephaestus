@@ -1,5 +1,3 @@
-// Reads what the captured issue holds: if its body is empty or only repeats the title, its labels and
-// its type. The review decides from the whole text if a maintainer can see the work and start it.
 import { scm, expectKind } from "../kits/scm/index.ts";
 import { bodyFact, classifyIssue } from "../kits/scm/issue-classification.ts";
 import { DIRECTION_CHARS, oneLine } from "../lib/core/bounded-text.ts";

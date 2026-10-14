@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-/** Usage facts for one authenticated workspace and review job. */
 public interface ScriptUsageRepository extends Repository<ScriptUsage, ScriptUsage.Id> {
     @Query("SELECT u FROM ScriptUsage u, ReviewJob j WHERE j.workspaceId = :workspaceId"
             + " AND j.reviewId = :reviewId AND u.workspaceId = :workspaceId AND u.id.jobId = j.id")

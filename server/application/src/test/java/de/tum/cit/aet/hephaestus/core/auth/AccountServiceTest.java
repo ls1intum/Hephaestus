@@ -37,13 +37,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Unit coverage of {@link AccountService} guard logic ({@code unlinkIdentity}
- * last-identity/ownership rules and {@code adminSetRole} last-admin/self-demotion rules) with all
- * repository/audit collaborators mocked — including disabled identity retention, which the
- * integration test cannot reach. Uses a real {@link AuthEventLogger} over a mock {@link
- * AuthEventWriter} so "did we audit?" is a single {@code write(...)} verification.
- */
 class AccountServiceTest extends BaseUnitTest {
 
     private final AccountRepository accountRepository = mock(AccountRepository.class);

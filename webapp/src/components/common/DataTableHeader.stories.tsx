@@ -77,16 +77,6 @@ function GroupedTable() {
 	);
 }
 
-/**
- * The header of a TanStack table with a grouped column. The group spans its leaves as a `col` header;
- * a leaf with no group spans both header rows instead of leaving an empty cell above itself. Only a
- * leaf sorts, so only a leaf carries `aria-sort`. A numeric leaf is right-aligned, its arrow before
- * the label. The first press sorts in the column's own first direction (`sortDescFirst`), and the
- * next press reverses it.
- *
- * The stories render a small table around the header, since the header needs a live TanStack table;
- * that harness is not the component's API, so this file publishes no Docs page.
- */
 const meta = {
 	parameters: { layout: "padded" },
 	render: () => <GroupedTable />,
@@ -106,7 +96,6 @@ export const GroupedColumns: Story = {
 		const practice = table.getByRole("columnheader", { name: "Practice" });
 		await expect(practice).toHaveAttribute("rowspan", "2");
 		await expect(practice).toHaveAttribute("aria-sort", "none");
-		// Two header rows, and no empty cell left where a leaf spans both.
 		await expect(
 			table
 				.getAllByRole("row")
@@ -120,7 +109,6 @@ export const GroupedColumns: Story = {
 
 		const reviews = table.getByRole("columnheader", { name: "Reviews" });
 		await userEvent.click(within(reviews).getByRole("button", { name: "Reviews" }));
-		// A figure sorts biggest first on the first press, and the next press reverses it.
 		await expect(reviews).toHaveAttribute("aria-sort", "descending");
 		await expect(spend).toHaveAttribute("aria-sort", "none");
 		await expect(table.getAllByRole("row")[2]).toHaveTextContent(/^Comments explain why/u);
@@ -128,7 +116,6 @@ export const GroupedColumns: Story = {
 		await expect(reviews).toHaveAttribute("aria-sort", "ascending");
 
 		await userEvent.click(within(practice).getByRole("button", { name: "Practice" }));
-		// A name sorts from A on the first press.
 		await expect(practice).toHaveAttribute("aria-sort", "ascending");
 	},
 };

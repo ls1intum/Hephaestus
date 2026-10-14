@@ -411,7 +411,6 @@ class GitLabSummaryWriterTest extends BaseUnitTest {
     private static final SummaryContent EXPECTED =
             ScmFeedbackFixtures.summary("/approve once fixed\nSummary text", MARKER);
 
-    /** The exact body {@code postSummary} sends for {@link #EXPECTED}, slash command escaped. */
     private static final String EXACT = GitLabSummaryWriter.escapeSlashCommands(EXPECTED.externalBody());
 
     private static final String BOT = "gid://gitlab/User/1";
@@ -425,10 +424,6 @@ class GitLabSummaryWriterTest extends BaseUnitTest {
         return spec;
     }
 
-    /**
-     * Keyed by response path, so a test that stubs the MR path fails outright if the channel reads
-     * the issue path. The page is read by {@link #BOT}.
-     */
     private ClientGraphQlResponse mockNotesPage(
             String notesPath,
             List<Map<String, Object>> notes,
@@ -470,7 +465,6 @@ class GitLabSummaryWriterTest extends BaseUnitTest {
     private static final String MR_NOTES_PATH = "project.mergeRequest.notes";
     private static final String ISSUE_NOTES_PATH = "project.issue.notes";
 
-    /** A note the authenticated identity wrote. */
     private static Map<String, Object> note(String id, String body) {
         return note(id, body, BOT);
     }
@@ -544,8 +538,6 @@ class GitLabSummaryWriterTest extends BaseUnitTest {
         SummaryLookup result = channel.findExistingSummary(gitlabTarget(), EXPECTED);
 
         assertThat(result.presence()).isEqualTo(LookupPresence.FOUND);
-        // The handle is the note's own global id — exactly what updateSummary passes to UpdateNote
-        // as `id`.
         assertNotNull(result.handle());
         assertThat(result.handle().externalRef()).isEqualTo("gid://gitlab/Note/2");
         assertThat(result.handle().url())

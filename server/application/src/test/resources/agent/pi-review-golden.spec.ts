@@ -27,8 +27,7 @@ import {
 	stageGoldenWorkspace,
 } from "./golden-review-workspace.ts";
 
-// Each child captures the complete prompts and tools for one frozen workspace.
-// A separate process keeps the runner's module-level paths and state local to that scenario.
+// Run each golden capture in its own process; runner paths and state are module-local.
 
 import { codingAgentExports } from "./program-host-runner.ts";
 
@@ -40,7 +39,6 @@ const LIB = nodePath.resolve(
 	"../../../../../../docker/agents/practice-scripts/lib",
 );
 
-// The workspace captures no checkout witness, so a quote of code would be refused; the record is a staged source.
 const recordCitation = {
 	sourceKind: "scm.pull-request.core",
 	sourcePath: "evidence/metadata.json",
@@ -50,7 +48,6 @@ const recordCitation = {
 	quote: JSON.stringify(GOLDEN_RECORD),
 };
 
-/** The program asks one review using the prepared inputs. */
 function preparingProgram(many: boolean): string {
 	const leads = goldenLeads(many).map(({ kind, ...lead }) => ({
 		...lead,
@@ -66,7 +63,6 @@ async run(ctx) {
 `;
 }
 
-/** Stage the workspace, run the runner over it, and return what its review session was told. */
 function runScenario(name: string): Map<string, string> {
 	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-golden-"));
 	try {
@@ -213,7 +209,6 @@ if (scenario !== undefined && scenario !== "") {
 	const capture = (name: string, text: string) =>
 		writeFileSync(nodePath.join(cwd, "captured", name), text);
 	mkdirSync(nodePath.join(cwd, "captured"), { recursive: true });
-	// The workspace stages the change view the runner would derive from a checkout it does not have.
 	const change = new URL("../../../main/resources/agent/pi-change.ts", import.meta.url).href;
 	const derived: unknown = await import(change);
 	assert.ok(typeof derived === "object" && derived !== null);
@@ -429,7 +424,6 @@ if (scenario !== undefined && scenario !== "") {
 							prompts += 1;
 							capture(`prompt-${prompts}.md`, text);
 							if (prompts === 1 && scenario === "nudge") {
-								// The model reads until its turn's remaining work only pays for submitting.
 								for (let call = 1; call <= 4; call += 1) {
 									emit({
 										type: "message_end",

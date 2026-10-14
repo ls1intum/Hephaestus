@@ -26,11 +26,6 @@ export interface WorkspaceGroupLevelProps {
 	focusPracticeSlug?: string;
 }
 
-/**
- * One practice group over Practices across the workspace: each of its practices with how many
- * developers have results in it and how those results came out. The reader's own results stay in
- * their Practice profile, which every row link and the level's footer open.
- */
 export function WorkspaceGroupLevel({
 	nested,
 	path,

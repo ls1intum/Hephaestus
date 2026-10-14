@@ -7,10 +7,7 @@ import type { StatusDefs } from "@/components/common/status-def";
 export type FeedbackSendState = FeedbackSend["state"];
 export type FeedbackSendAction = FeedbackSend["action"];
 
-/**
- * Where one send to the provider stands. A label names the event on the feedback's sheet, under the
- * delivery state, so it says what happened to the send rather than repeating that state.
- */
+// Send labels describe the provider attempt, separate from the feedback's delivery state.
 export const FEEDBACK_SEND_STATE_DEFS: StatusDefs<FeedbackSendState> = {
 	PENDING: {
 		label: "Waiting to be sent",
@@ -39,7 +36,6 @@ export const FEEDBACK_SEND_STATE_DEFS: StatusDefs<FeedbackSendState> = {
 	},
 };
 
-/** What one send did to the provider. */
 export const FEEDBACK_SEND_ACTION_LABELS: Record<FeedbackSendAction, string> = {
 	POST: "Post the copies",
 	RETRACT: "Retract the posted copies",

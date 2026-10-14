@@ -11,13 +11,10 @@ import org.junit.jupiter.api.Test;
 
 class ReviewJobBackoffTest extends BaseUnitTest {
 
-    /** The midpoint: zero jitter, so the base value comes through exactly. */
     private static final RandomGenerator NO_JITTER = fixed(0.5);
 
-    /** The maximum +10% jitter. */
     private static final RandomGenerator MAX_POSITIVE_JITTER = fixed(1.0);
 
-    /** The maximum -10% jitter. */
     private static final RandomGenerator MAX_NEGATIVE_JITTER = fixed(0.0);
 
     private static RandomGenerator fixed(double value) {

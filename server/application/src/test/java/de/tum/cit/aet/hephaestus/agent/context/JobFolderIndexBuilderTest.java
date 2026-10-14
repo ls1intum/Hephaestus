@@ -2,15 +2,11 @@ package de.tum.cit.aet.hephaestus.agent.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
-import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureContribution;
 import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
@@ -28,11 +24,7 @@ class JobFolderIndexBuilderTest extends BaseUnitTest {
     private final SourceKind source = new SourceKind("docs.document.core");
 
     private JobFolderIndexBuilder builder() {
-        var registry = mock(ClasspathSourceCatalogRegistry.class);
-        var catalog = mock(SourceCatalog.class);
-        when(registry.current()).thenReturn(catalog);
-        when(catalog.version()).thenReturn(new SourceContractVersion("2.0.0"));
-        when(registry.catalogDigest()).thenReturn("a".repeat(64));
+        var registry = new ClasspathSourceCatalogRegistry(new JsonMapper(), Clock.systemUTC());
         return new JobFolderIndexBuilder(registry, new JsonMapper(), Clock.systemUTC());
     }
 

@@ -369,8 +369,6 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         workspaceMembershipService.syncWorkspaceMembers(workspace, desiredRoles);
 
-        // Hiding is not a grant: someone the provider no longer lists loses the workspace, hidden
-        // or not.
         assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
                         workspace.getId(), accountId(hiddenUser)))
                 .get()

@@ -23,15 +23,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Read-only query service for workspace lookups.
- *
- * <p>This service provides query methods for finding and listing workspaces without modifying
- * state. All methods are read-only transactions.
- *
- * <p>Workspace-agnostic: This service manages workspaces themselves, operating at the
- * admin/registry level. It answers "which workspaces exist?" not "what data is in a workspace?".
- */
+// Workspace registry lookups span tenants; they must not read data inside a workspace.
 @Service
 @Transactional(readOnly = true)
 @WorkspaceAgnostic("Manages workspaces themselves - operates at admin/registry level")
@@ -47,11 +39,6 @@ public class WorkspaceQueryService {
     private final ConnectionService connectionService;
     private final PublicActivityPolicy publicActivityPolicy;
 
-    /**
-     * Per-kind availability ports — keyed for O(1) lookup when building the providers DTO. Each
-     * vendor adapter contributes one impl; the query service stays kind-agnostic and delegates the
-     * "is this provider exposable to the wizard?" decision back to the adapter.
-     */
     private final Map<IntegrationKind, WorkspaceProviderAvailability> providerAvailability;
 
     private final WorkspaceProperties workspaceProperties;

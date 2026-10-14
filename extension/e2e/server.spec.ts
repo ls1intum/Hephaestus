@@ -36,7 +36,6 @@ const MR6_ITEM_ID = "920113";
 const CHOICE_ITEM_ID = "922110";
 const ALTERNATE_CHOICE_ITEM_ID = "922111";
 
-/** The reader's own feedback page for an item. */
 function feedbackPage(itemId: string, workspaceSlug = "ext-e2e"): string {
 	return `${WEB_APP_URL}/w/${workspaceSlug}/feedback/${itemId}`;
 }
@@ -69,7 +68,6 @@ function otherLoopback(hostname: string): string {
 	return hostname === "localhost" ? "127.0.0.1" : "localhost";
 }
 
-/** Records every request to the server whose address contains `scope`. */
 function recordServerReads(reads: string[], scope = "/practices/") {
 	return (request: Request) => {
 		if (request.url().startsWith(SERVER_URL) && request.url().includes(scope)) {
@@ -138,15 +136,12 @@ test.describe("inline review activity", () => {
 		await providerTab(page, GITLAB_MR);
 		const frame = await openInline(page);
 		await expectWork(frame, TRACE_URL);
-		// Every developer's records, delivery and reviews are the web app's: one link, for this item.
 		const details = `${WEB_APP_URL}/w/ext-e2e/admin/practices/reviews/reviews?itemId=${MR4_ITEM_ID}&detail=item%3A${MR4_ITEM_ID}`;
 		await expectSafeLink(frame.getByRole("link", { name: /^Review details/u }), details);
 		await expect(frame.getByRole("button", { name: /Manage/u })).toHaveCount(0);
 		// Only the line opens; nothing inside it opens further.
 		await expect(frame.locator("[aria-expanded]")).toHaveCount(1);
 
-		// The admin's own latest review is the completed one with their results. The queued and the failed
-		// review of this work record nothing for them, so neither becomes the admin's review status.
 		await expect(line(frame)).toContainText("3 comments for you · reviewed ");
 		await expect(line(frame)).not.toContainText("Review waiting");
 		await expect(line(frame)).not.toContainText("review failed");
@@ -200,7 +195,6 @@ test.describe("inline review activity", () => {
 			{ type: "request-review", tabId, workspaceSlug: "ext-e2e", itemId: MR4_ITEM_ID },
 			{ type: "cancel-review", tabId, workspaceSlug: "ext-e2e", reviewId: QUEUED_REVIEW },
 			{ type: "retry-result-processing", tabId, workspaceSlug: "ext-e2e", reviewId: FAILED_REVIEW },
-			// Admin reads and review changes are the web app's; the extension has no command for them.
 			{ type: "get-review-details", workspaceSlug: "ext-e2e" },
 			{ type: "list-results", workspaceSlug: "ext-e2e", scope: "workspace" },
 			{
@@ -282,7 +276,6 @@ test.describe("inline review activity", () => {
 		context,
 	}) => {
 		const options = await signIn(context, "e2e", { admin: true });
-		// Opening the report asks for the reader's results; the answer is held.
 		const hold = await holdServer(context, /\/practices\/results$/u);
 		const page = await context.newPage();
 		await providerTab(page, GITLAB_MR);
@@ -383,7 +376,6 @@ test.describe("a developer who is not an admin", () => {
 		await providerTab(page, GITLAB_MR6);
 		const frame = await openInline(page);
 		await expect(line(frame)).toContainText("3 comments for you");
-		// The server finds the work from the page's address.
 		expect(
 			readsOf(reads, "/practices/feedback/on-work").map((url) => url.searchParams.get("url")),
 		).toContain(GITLAB_MR6);
@@ -395,10 +387,6 @@ test.describe("a developer who is not an admin", () => {
 			await expect(comments.getByRole("link", { name, exact: true })).toHaveCount(1);
 		}
 		await expect(comments.getByText(/^Explain validation, Keep changes focused · /u)).toBeVisible();
-		// No body reaches the comments, and the partly posted package rests on no result, so its line
-		// note names no practice. (The reader's own results below may name the E2E_ practice: they are
-		// about the work.) Another account's, the practice page's, the conversation's, the failed and the
-		// replaced feedback have no comment here, whatever provider refs they carry.
 		await expect(comments).not.toContainText("E2E_");
 		await expect(frame.locator("body")).not.toContainText("_BODY");
 		const summary = frame.locator(`a[href="${GITLAB_MR6}#note_926001"]`);
@@ -420,13 +408,11 @@ test.describe("a developer who is not an admin", () => {
 		const ownFrame = await openInline(own);
 		await expectWork(ownFrame, feedbackPage(MR6_ITEM_ID));
 		const results = ownFrame.getByRole("region", { name: "Your results" });
-		// One not met result with its one problem, and two met: three rows and one problem line.
 		await expect(results.getByRole("listitem")).toHaveCount(4);
 		await expect(results).toContainText("Not met · 1 problem · Major");
 		await expect(results.getByRole("list", { name: "Problems" })).toHaveText(
 			"Synthetic browser-test problem; no model reviewed this work.",
 		);
-		// Every read names the item the server resolved, never the provider's own number.
 		expect(readsOf(reads, "/members/me")).not.toStrictEqual([]);
 		expect(readsOf(reads, `/practices/items/${MR6_ITEM_ID}/reviews`)).not.toStrictEqual([]);
 		expect(

@@ -32,9 +32,7 @@ export function useWorkspaceAccess() {
 		workspaces,
 		role,
 		isAdmin: !userView && hasMinimumWorkspaceRole(role, "ADMIN"),
-		// The login of the account's identity on this workspace's provider; the sign-in `username`
-		// names whichever linked identity signed in, so it answers only where no membership can.
-		// Undefined while the membership loads, so no page asks for another identity's data first.
+		// Sign-in usernames can name another linked identity; workspace activity needs this provider's login.
 		selfLogin:
 			chromeWorkspaceSlug === undefined || membershipQuery.isError
 				? username

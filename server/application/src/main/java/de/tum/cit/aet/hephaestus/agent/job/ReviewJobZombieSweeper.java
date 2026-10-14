@@ -29,7 +29,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/** Recovers lost workers and times out attempts through fenced, per-job transactions. */
 @ConditionalOnServerRole
 @Component
 @ConditionalOnBooleanProperty(RuntimeRole.AGENT_ENABLED_PROPERTY)
@@ -40,16 +39,12 @@ public class ReviewJobZombieSweeper {
 
     private static final Duration RUNNING_BUFFER = SandboxLayout.RESULT_UPLOAD_GRACE.plusMinutes(5);
 
-    /** Grace before a RUNNING job is judged orphaned, so a (re)started worker can write its first heartbeat. */
+    // Allow startup time for a claimed worker to publish its first heartbeat.
     private static final Duration ORPHAN_STARTUP_GRACE = Duration.ofMinutes(2);
 
-    /**
-     * Must stay well above {@link AgentProperties#WORKER_LEASE_TTL} so a dead worker's jobs are requeued
-     * before its registry row goes.
-     */
+    // Retain registry rows beyond the worker lease so orphan recovery can run before deletion.
     private static final Duration STALE_REGISTRATION_TTL = Duration.ofHours(1);
 
-    /** Timeout applied when a job's frozen snapshot cannot be read. */
     private static final int FALLBACK_TIMEOUT_SECONDS = 600;
 
     private final ReviewJobRepository jobRepository;
@@ -114,9 +109,7 @@ public class ReviewJobZombieSweeper {
             try {
                 ReviewJob reaped = transactionTemplate.execute(status -> reapIfStale(job.getId()));
                 if (reaped != null) {
-                    // The sweeper thread has no ambient trace context; restore the job's own trace ID
-                    // (with a fresh span so no stale scheduler-thread value pairs with it) so the
-                    // terminal event joins the lifecycle it closes.
+                    // Scheduler threads have no job trace context; restore it with a fresh span.
                     MDC.put(StructuredLogKeys.TRACE_ID, reaped.getTraceId());
                     MDC.put(StructuredLogKeys.SPAN_ID, ReviewJobExecutor.randomSpanId());
                     try {
@@ -203,7 +196,7 @@ public class ReviewJobZombieSweeper {
         }
     }
 
-    /** A corrupt snapshot must not prevent terminal recovery. */
+    // Corrupt configuration must not prevent terminal recovery.
     private @Nullable ConfigSnapshot parseSnapshot(ReviewJob job) {
         if (job.getConfigSnapshot() == null) {
             return null;
@@ -229,14 +222,8 @@ public class ReviewJobZombieSweeper {
                         : null);
     }
 
-    /**
-     * Bill a reaped attempt from token counts the caller read BEFORE any requeue of the job (see
-     * {@link ReviewJobRepository#requeueOrphan}, which zeroes the row's accumulators).
-     *
-     * <p><b>Must not throw.</b> Every caller runs it inside the same transaction as the state
-     * transition it accompanies, so an exception here rolls that transition back and the job returns to
-     * RUNNING to fail identically on the next sweep, forever.
-     */
+    // Read counters before requeue clears them.
+    // Accounting must not throw and roll back the terminal transition.
     private void recordUnverifiableUsage(ReviewJob job, @Nullable ReviewJobLlmUsage counts) {
         if (job.getExecutionStartedAt() == null) return;
         ConfigSnapshot snapshot = parseSnapshot(job);

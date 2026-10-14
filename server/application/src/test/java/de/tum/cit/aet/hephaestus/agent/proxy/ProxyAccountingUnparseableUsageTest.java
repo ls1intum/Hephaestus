@@ -41,11 +41,11 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
                 .doesNotThrowAnyException();
 
         assertThat(meterRegistry
-                        .counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB")
+                        .counter("llm.proxy.usage.unparseable", "sourceType", UsageSourceType.REVIEW_JOB.name())
                         .count())
                 .as("a non-zero rate is the only signal that the ledger is under-billing")
                 .isEqualTo(1.0);
-        assertThat(missing("AGENT_JOB"))
+        assertThat(missing(UsageSourceType.REVIEW_JOB.name()))
                 .as("an unreadable body is not also an absent one")
                 .isZero();
         verify(usageAccumulator, never()).accumulate(any(), any());
@@ -87,11 +87,11 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
         accounting.recordUsage(attempt, null, LlmApiProtocol.OPENAI_COMPLETIONS, body);
 
         assertThat(meterRegistry
-                        .counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB")
+                        .counter("llm.proxy.usage.unparseable", "sourceType", UsageSourceType.REVIEW_JOB.name())
                         .count())
                 .as("the counter must mean 'unbilled', not 'a call happened'")
                 .isZero();
-        assertThat(missing("AGENT_JOB")).isZero();
+        assertThat(missing(UsageSourceType.REVIEW_JOB.name())).isZero();
         verify(usageAccumulator).accumulate(attempt, new ProxyTokenUsage(6, 5, 2, 4, 0));
     }
 
@@ -106,7 +106,7 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
         accounting.recordUsage(attempt, null, LlmApiProtocol.OPENAI_COMPLETIONS, body);
 
         assertThat(meterRegistry
-                        .counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB")
+                        .counter("llm.proxy.usage.unparseable", "sourceType", UsageSourceType.REVIEW_JOB.name())
                         .count())
                 .isEqualTo(1.0);
         verify(usageAccumulator, never()).accumulate(any(), any());

@@ -10,13 +10,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/**
- * Per-kind {@link ItemDescriptor} registry, built from constructor-injected beans.
- *
- * <p>Two descriptors for one kind is fatal rather than last-one-wins: the descriptor decides which
- * events exist and which copy capabilities a kind has, so shadowing one with another would make what practices
- * can be bound to depend on bean ordering.
- */
+// Duplicate descriptors must fail: bean order cannot determine a kind's events or delivery capabilities.
 @Component
 public class ItemDescriptorRegistry implements ItemCatalog {
 

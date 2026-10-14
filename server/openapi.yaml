@@ -5059,8 +5059,6 @@ paths:
       - membership
   /workspaces/{workspaceSlug}/members/me:
     get:
-      description: "One representative membership, with the account's effective workspace\
-        \ role."
       operationId: getOwnMembership
       parameters:
       - description: Workspace slug
@@ -13843,8 +13841,6 @@ components:
           type: string
     DeliveredFeedbackPractice:
       type: object
-      description: The practice's authoritative display name and stable workspace
-        slug.
       properties:
         name:
           type: string

@@ -22,10 +22,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.DynamicUpdate;
 import org.jspecify.annotations.Nullable;
 
-/** One account's membership in a workspace. */
 @Entity
 @Table(name = "membership")
 @DynamicUpdate
@@ -47,22 +47,22 @@ public class Membership {
     private Workspace workspace;
 
     @Enumerated(EnumType.STRING)
+    @ColumnDefault("'MEMBER'")
     @Column(name = "role", nullable = false, length = 16)
     private WorkspaceRole role = WorkspaceRole.MEMBER;
 
-    /**
-     * Whether this member is left out of workspace activity lists and totals. Any member of the
-     * workspace can still read their activity by login.
-     */
+    @ColumnDefault("false")
     @Column(name = "hidden", nullable = false)
     private boolean hidden = false;
 
+    @ColumnDefault("false")
     @Column(name = "review_selected", nullable = false)
     private boolean reviewSelected;
 
     @Column(name = "onboarding_seen_revision")
     private @Nullable Long onboardingSeenRevision;
 
+    @ColumnDefault("false")
     @Column(name = "public_activity_seen", nullable = false)
     private boolean publicActivitySeen;
 

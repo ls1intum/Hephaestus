@@ -2,11 +2,6 @@ import type { ReviewRef } from "@/api/types.gen";
 
 import { feedbackOf, type LineageRecords, type LineageResult } from "./lineage-chain";
 
-/**
- * One step of a trace: the work, the review, its results together, one result, one piece of
- * feedback, or the end of the path. The record a trace stands on draws its path strong and the
- * rest muted.
- */
 export type TraceNode =
 	| { kind: "work" }
 	| { kind: "review" }
@@ -18,10 +13,6 @@ export type TraceNode =
 /** A step the address can name as `?focus=`: any step but the review, which a trace of a review stands on. */
 export type TraceFocus = Exclude<TraceNode, { kind: "review" }>;
 
-/**
- * A step as the address writes it, `?focus=`: `work`, `results`, `end`, `result:<id>`,
- * `feedback:<id>`, and `review`.
- */
 export function traceStepKey(node: TraceNode): string {
 	return "id" in node ? `${node.kind}:${node.id}` : node.kind;
 }
@@ -53,10 +44,6 @@ export function sameTraceNode(a: TraceNode | undefined, b: TraceNode | undefined
 	return !("id" in a) || !("id" in b) || a.id === b.id;
 }
 
-/**
- * The review a chain tells: the record it was asked for, or the review that recorded it. A graph of
- * the work over several reviews tells none of them alone.
- */
 export function chainReview(records: LineageRecords): ReviewRef | undefined {
 	const { root, reviews } = records;
 	const byId = (id: string | undefined) => reviews.find((review) => review.id === id);
@@ -85,7 +72,6 @@ export function chainReview(records: LineageRecords): ReviewRef | undefined {
 	}
 }
 
-/** The results the chain's review recorded itself; every result where the chain tells no one review. */
 export function ownResults(records: LineageRecords): LineageResult[] {
 	const review = chainReview(records);
 	return review === undefined
@@ -99,12 +85,6 @@ export interface Traced {
 	feedback: ReadonlySet<string>;
 }
 
-/**
- * The path through `node`: a result and the feedback written from it, a piece of feedback and
- * the results it was written from, a review and what it recorded itself with the feedback written
- * from that. The work is the whole chain, so it dims nothing. The work and the review stay strong
- * on every path, since every path runs through them.
- */
 export function tracedBy(records: LineageRecords, node: TraceNode | undefined): Traced | undefined {
 	switch (node?.kind) {
 		case undefined:

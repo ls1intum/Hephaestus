@@ -20,17 +20,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
-/**
- * Authenticated Slack identity link, against a REAL Postgres. Drives {@link
- * AccountProvisioningService} with a SIMULATED "Sign in with Slack" id_token (a principal carrying
- * {@code sub}=U1 + the verified {@code https://slack.com/team_id}=T1 claim), which is exactly what
- * the OIDC callback hands the provisioner — so the full link path is exercised without a live Slack
- * OAuth round-trip (that is LIVE-only).
- *
- * <p>Asserts the two invariants: (1) linking Slack while signed in attaches exactly one {@code
- * Identity(SLACK, U1, T1) MANUAL_LINK} to the SAME account, creating no new account; (2) an
- * unauthenticated link start (no bound account) fails closed and creates no orphan account.
- */
 class SlackIdentityIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
@@ -68,7 +57,6 @@ class SlackIdentityIntegrationTest extends RealAuthIntegrationTest {
 
         assertThat(linked.identityLinked()).isTrue();
         assertThat(linked.account().getId()).isEqualTo(persistedId(github.getId()));
-        // The link attached to the existing account — it did NOT JIT a new one.
         assertThat(accountRepository.findById(persistedId(github.getId()))).isPresent();
 
         // Exactly one SLACK identity link (subject U1, team T1, MANUAL_LINK) now hangs off the SAME

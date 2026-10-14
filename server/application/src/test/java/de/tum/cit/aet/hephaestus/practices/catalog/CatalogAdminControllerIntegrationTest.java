@@ -34,6 +34,9 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
     @Autowired
     CatalogService catalog;
 
+    @Autowired
+    CatalogCustomizationService customization;
+
     @Test
     @WithAdminUser
     void shouldMoveACatalogPracticeThroughTheGroupRoute() {
@@ -41,14 +44,16 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
         String suffix = UUID.randomUUID().toString();
         String groupSlug = "move-group-" + suffix;
         String practiceSlug = "move-practice-" + suffix;
-        catalog.createGroup(new CatalogGroupInputDTO(groupSlug, "Move group", null, null, null, null));
-        var created = catalog.createPractice(new CatalogPracticeInputDTO(
+        customization.createGroup(new CatalogGroupInputDTO(groupSlug, "Move group", null, null, null, null));
+        customization.createPractice(new CatalogPracticeInputDTO(
                 practiceSlug, "scm.pull_request", null, DefinitionTestFixtures.definition(), null));
 
         var response = client.patch()
                 .uri("/admin/practice-catalog/practices/{slug}/group", practiceSlug)
                 .headers(TestAuthUtils.withCurrentUser())
-                .header("If-Match", EntityTagPrecondition.format(created.etag()))
+                .header(
+                        "If-Match",
+                        EntityTagPrecondition.format(catalog.effectiveCatalog().etag()))
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new MovePracticeRequestDTO(groupSlug, 0))
                 .exchange()
@@ -71,7 +76,7 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
     void shouldRejectAStaleWriteWithoutDisclosingTheCurrentETag() {
         persistUser("admin");
         String slug = "stale-" + UUID.randomUUID();
-        var created = catalog.createPractice(
+        var created = customization.createPractice(
                 new CatalogPracticeInputDTO(slug, "scm.pull_request", null, DefinitionTestFixtures.definition(), null));
 
         client.patch()
@@ -181,7 +186,7 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .findFirst()
                 .orElseThrow();
         var local = DefinitionTestFixtures.withCriteria(source.effective().definition(), "Locally authored criteria.");
-        var current = catalog.updatePractice(
+        var current = customization.updatePractice(
                 source.slug(),
                 new CatalogPracticeInputDTO(
                         source.slug(),

@@ -1,8 +1,4 @@
-/**
- * The host's side of a direct model call of a practice program. A call arrives from a child as the
- * options of one `do*` method. The host keeps only the allowed fields, reserves budget, and calls the
- * proxy under `/practice-script/<slot>` with the job's proxy token and the practice's slug.
- */
+// The host controls credentials, attribution, allowed model options, and budget reservations.
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { APICallError, InvalidResponseDataError, type RerankingModelV4 } from "@ai-sdk/provider";
@@ -26,10 +22,7 @@ const rerankResponseSchema = z.object({
 	results: z.array(z.object({ index: z.int().nonnegative(), relevance_score: z.number() })),
 });
 
-/**
- * The Cohere `/rerank` shape (`results[].index`, `relevance_score`) that Cohere, Jina and vLLM share.
- * `@ai-sdk/cohere` requires the `meta` field that only Cohere returns, so it rejects the others.
- */
+// Jina and vLLM omit Cohere's required meta field; read their shared results[].index/relevance_score shape.
 function cohereRerankModel(
 	baseURL: string,
 	headers: Record<string, string>,
@@ -136,7 +129,6 @@ export function hostModels(
 	return models;
 }
 
-/** The most output a practice script chat call may ask for. */
 export const MAX_OUTPUT_TOKENS = 4096;
 
 /**
@@ -205,7 +197,6 @@ export function modelCall<S extends ModelSlot>(
 ):
 	| { reason: "too-large" }
 	| { reserve: number; run: () => Promise<{ value: SlotAnswer; tokens: number | undefined }> } {
-	// A generic slot indexes the mapped type only: the inferred type of the map is not one.
 	const calls: { [K in ModelSlot]: SlotCall<K> } = MODEL_SLOT_CALLS;
 	const entry = calls[slot];
 	const kept = allowedOptions(slot, options);
@@ -221,7 +212,6 @@ export function modelCall<S extends ModelSlot>(
 	};
 }
 
-/** Why a started call failed. A call that fails after its signal aborts failed at the deadline. */
 function failureOf(signal: AbortSignal, error: unknown): Reason {
 	if (signal.aborted) {
 		return "deadline";
@@ -301,7 +291,6 @@ export class ModelBudget {
 						? answered.tokens
 						: reserve;
 				signal.throwIfAborted();
-				// Settle: give back what the call did not use, take what it used beyond the estimate.
 				this.#left += reserve - tokens;
 				return { value: answered.value, tokens };
 			} catch (error) {

@@ -9,7 +9,6 @@ import { expectGenuinelyDisabled } from "@/test/controls";
 
 import { OwnFeedbackList } from "./OwnFeedbackList";
 
-/** The list with responses a story holds in place of the server. */
 function Answerable({
 	pending = false,
 	...props
@@ -18,7 +17,6 @@ function Answerable({
 	return <OwnFeedbackList {...props} responses={responses} />;
 }
 
-/** The feedback on the work, already rated helpful on the practice page. */
 const ratedHelpful = {
 	...detailFeedback,
 	response: { usefulness: "HELPFUL", resolution: null, comment: null, createdAt: daysBefore(1) },
@@ -35,10 +33,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * One piece of feedback posted on the work as a summary and a line note: where it went, a link to
- * each comment, and the three answers. The comment band stays closed until an answer is pressed.
- */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("On the work")).toBeVisible();
@@ -61,10 +55,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * A press opens the band. Skip records the answer without a comment and keeps the rating the
- * reader gave on the practice page; Send records it with the comment written under it.
- */
 export const RecordsAResponse: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Addressed" }));
@@ -102,7 +92,6 @@ export const DisagreementNeedsAReason: Story = {
 		await expect(field).toHaveAccessibleDescription(
 			/Add your reason so a workspace admin can read it\./u,
 		);
-		// An empty reason does not send.
 		await userEvent.click(canvas.getByRole("button", { name: "Send" }));
 		await expect(canvas.getByRole("textbox", { name: "Why do you disagree?" })).toBeVisible();
 		await userEvent.type(field, "The value is derived, not chosen.");
@@ -116,7 +105,6 @@ export const DisagreementNeedsAReason: Story = {
 	},
 };
 
-/** What the reader already said stands pressed and shown; "Clear response" restores no response. */
 export const ClearResponse: Story = {
 	args: {
 		feedback: [
@@ -170,7 +158,6 @@ export const ResponsePending: Story = {
 	},
 };
 
-/** One review's feedback on the work and on the practice page: each piece is answered on its own. */
 export const SeveralPieces: Story = {
 	args: {
 		feedback: [
@@ -196,7 +183,6 @@ export const ReadOnly: Story = {
 	},
 };
 
-/** No feedback from this review: nothing is drawn, not even an empty list. */
 export const Empty: Story = {
 	args: { feedback: [] },
 	play: async ({ canvasElement }) => {

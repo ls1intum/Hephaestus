@@ -58,11 +58,6 @@ export const Closed: Story = {
 	},
 };
 
-/**
- * Open: at its top, with the stages, the steps' dots, where a path ends, the results and
- * feedback, the connections, the rail and the icons, each sample drawn by the part the trace draws
- * it with, then the terms and three things the trace cannot show.
- */
 export const Open: Story = {
 	args: { open: true },
 	play: async () => {
@@ -88,16 +83,14 @@ export const Open: Story = {
 		}
 		await expect(legend.getByText("You started here")).toBeVisible();
 		await expect(legend.getByText("Merged early")).toBeVisible();
-		await expect(legend.getByText("Marked incorrect")).toBeVisible();
-		for (const end of ["Worked", "Did not arrive", "Answered", "No feedback"]) {
-			await expect(legend.getByText(end)).toBeVisible();
+		for (const end of ["Delivered", "Did not arrive", "Open", "No feedback"]) {
+			await expect(within(legend.getByRole("region", { name: "Where a path ends" })).getByText(end)).toBeVisible();
 		}
 		// Where a piece went, in the tags its row carries.
 		await expect(legend.getByText("On the work")).toBeVisible();
 		await expect(legend.queryByText("On GitHub")).toBeNull();
 		await expect(legend.getByText("Withheld")).toBeVisible();
 		// What an admin may know of an answer: that it was given, never how the developer rated it.
-		await expect(legend.getByText("Answered privately")).toBeVisible();
 		await expect(legend.queryByText("Helpful")).toBeNull();
 		await expect(legend.queryByText(/verdict/iu)).toBeNull();
 		const cannot = legend.getByRole("heading", { name: "What the trace cannot show" });

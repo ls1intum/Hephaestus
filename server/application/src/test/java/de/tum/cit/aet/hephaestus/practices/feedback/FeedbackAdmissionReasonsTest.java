@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackAnchorEligibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackCompositionContextService;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackPreparationService;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackResponseSuppressionFilter;
@@ -120,8 +121,7 @@ class FeedbackAdmissionReasonsTest {
             new PracticePageFeedbackRouter(),
             gate,
             basis,
-            mock(ProblemRepository.class),
-            catalog,
+            new FeedbackAnchorEligibility(mock(ProblemRepository.class), catalog),
             mock(ResultHistoryQuery.class),
             mock(MentorReadinessQuery.class),
             clock);

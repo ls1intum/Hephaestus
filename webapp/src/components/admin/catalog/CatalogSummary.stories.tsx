@@ -19,8 +19,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const NothingToReview: Story = {
-	play: async ({ canvasElement }) => {
-		await expect(canvasElement).toBeEmptyDOMElement();
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("button", { name: "Review changes" })).toBeNull();
+		await expect(canvas.queryByText(/Hephaestus change/u)).toBeNull();
 	},
 };
 

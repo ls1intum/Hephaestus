@@ -32,7 +32,7 @@ const SCOPE = {
 const SCOPE_QUERY = new URLSearchParams(SCOPE).toString();
 
 beforeEach(() => {
-	// jsdom has no IntersectionObserver, and the lists load their next page as their end scrolls into view.
+// jsdom needs an IntersectionObserver stub for paged lists.
 	vi.stubGlobal("IntersectionObserver", ObserverStub);
 	server.use(...reviewHandlers());
 });
@@ -49,7 +49,6 @@ async function sectionNavigation() {
 	);
 }
 
-/** A link's search as the app reads it back. */
 function carriedSearch(link: HTMLAnchorElement) {
 	return parseSearch(new URL(link.href).search);
 }
@@ -66,7 +65,6 @@ function sectionLink(navigation: HTMLElement, name: string) {
 	});
 }
 
-/** A one-row page that holds no row and counts `total`. */
 function countPage(total: number) {
 	return {
 		content: [],
@@ -96,7 +94,6 @@ function countRead(path: string, total: number, counted: URL[]) {
 	});
 }
 
-/** The results count read, failing with a 503 the first time it is asked and answering after. */
 function failingOnceCount(total: number) {
 	let reads = 0;
 	const handler = http.get(
@@ -114,7 +111,6 @@ function failingOnceCount(total: number) {
 	return { handler, count: () => reads };
 }
 
-/** The results count for developer 7, held until `release`; other reads fall through. */
 function heldScopedCount() {
 	const held = deferred();
 	let asked = false;
@@ -155,10 +151,6 @@ describe("practice review routes", () => {
 		});
 	});
 
-	/**
-	 * The shared scope follows the reader to every tab: the developer, practices and groups, the
-	 * range, and the selection. A tab's own facets stay on that tab.
-	 */
 	it.each([
 		["/results", `developerId=7&severity=${encodeURIComponent('["MAJOR"]')}`],
 		["/observations", `developerId=7&severity=${encodeURIComponent('["MAJOR"]')}`],
@@ -202,10 +194,6 @@ describe("practice review routes", () => {
 		}
 	});
 
-	/**
-	 * A practice opens the Results list filtered to it, over the days the overview counted, so
-	 * the counts above that list are the row's own.
-	 */
 	it("opens a practice's sheet from the overview, over the overview's range", async () => {
 		renderRouteAtWithRouter(`${REVIEWS}?range=90d`);
 		const practice = await screen.findByRole<HTMLAnchorElement>(
@@ -278,10 +266,7 @@ describe("practice review page titles", () => {
 		expect(feedback?.searchParams.get("developerId")).toBe("7");
 	});
 
-	/**
-	 * A count read that fails is asked again rather than leaving the tab without its count until the
-	 * page is reloaded; the results table is the large one, whose read is the likeliest to fail.
-	 */
+// Failed counts need their own retry; reloading the page must not be the only recovery.
 	it("asks again for a count that failed, and shows it once it is known", async () => {
 		const reads = failingOnceCount(13_308);
 		server.use(reads.handler);

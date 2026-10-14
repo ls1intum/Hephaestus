@@ -37,7 +37,6 @@ const REPORT: Wire<WorkspaceLlmUsageReport> = {
 	},
 };
 
-/** As the server writes it: a null slug or name is left out of the JSON. */
 const PRACTICE_SCRIPT_ROWS: Wire<LlmUsageByPractice>[] = [
 	{
 		practiceSlug: "comment-quality",

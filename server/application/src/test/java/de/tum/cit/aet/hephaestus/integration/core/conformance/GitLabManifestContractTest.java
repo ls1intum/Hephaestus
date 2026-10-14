@@ -16,14 +16,7 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/**
- * GitLab through the shared acceptance suite.
- *
- * <p>The reason this suite exists in the shape it does: GitLab is opt-in and off by default, so
- * nothing on a normal instance — including CI's Spring contexts — ever validates its declaration.
- * Its manifest is constructed with the stack enabled, which is the only configuration in which the
- * bean exists at all.
- */
+// Construct GitLab manifests with the stack enabled; ordinary Spring contexts leave its optional beans absent.
 class GitLabManifestContractTest extends IntegrationManifestContractTest {
 
     @Test

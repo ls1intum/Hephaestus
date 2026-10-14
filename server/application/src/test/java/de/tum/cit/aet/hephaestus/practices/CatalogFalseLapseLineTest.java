@@ -16,11 +16,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Pins, for each false-lapse or false-credit pattern the criteria decide, the sentence that places the
- * work on the right side of the line. Patterns a practice script caused are pinned by its spec instead.
- * Error handling source contrasts are defined in practices/criteria-cases.json.
- */
+// Script-caused false outcomes belong to script specs; error handling contrasts live in practices/criteria-cases.json.
 class CatalogFalseLapseLineTest extends BaseUnitTest {
 
     private static final Map<String, String> CRITERIA = new HashMap<>();

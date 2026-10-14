@@ -10,7 +10,6 @@ import {
 import { type RailStage, TRACE_STAGE_LABELS } from "./lineage-story";
 import type { TraceBottleneck } from "./trace-bottleneck";
 
-/** The headers of the rail: the four stages, and the results as a part of the review of their own. */
 export type StageKey = RailStage["stage"] | "results";
 
 /** Each header's name, icon and what the stage holds, for the rail and the legend. */

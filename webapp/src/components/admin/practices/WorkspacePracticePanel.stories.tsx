@@ -42,7 +42,6 @@ const ready = (over: Partial<ReadyState> = {}): ReadyState => ({
 	...over,
 });
 
-/** A practice whose script declares these models, the way the practice script guide teaches. */
 const scriptedWith = (models: Parameters<typeof practiceScript>[0]) =>
 	ready({
 		practice: {
@@ -70,7 +69,6 @@ const needs = (over: Partial<PracticeScriptSummary> = {}): PracticeScriptNeedsSt
 	},
 });
 
-/** The text colour of a status tone on this page, read from a probe that leaves no trace. */
 function toneColour(tone: string): string {
 	const probe = document.createElement("span");
 	probe.className = `text-${tone}`;
@@ -132,14 +130,12 @@ export const FromTheCatalog: Story = {
 	play: async () => {
 		// What the badge in the catalog list can only label is spelled out here, in the page it opens.
 		await expectSettledVisible(await screen.findByText(/does not edit your copy/u));
-		// Nothing to reset while the practice matches the catalog.
 		await expect(
 			screen.queryByRole("button", { name: "Reset to catalog" }),
 		).not.toBeInTheDocument();
 	},
 };
 
-/** Edited here, also after declining the catalog's version: the way back stays open. */
 export const EditedHere: Story = {
 	args: {
 		state: ready({
@@ -210,7 +206,6 @@ export const DarkMode: Story = {
 	globals: { theme: "dark" },
 };
 
-/** Opens the script's disclosure, where what it needs sits above its source. */
 async function openScript() {
 	const trigger = await screen.findByRole("button", { name: "Practice script" });
 	await expectSettledVisible(trigger);
@@ -218,7 +213,6 @@ async function openScript() {
 	return trigger;
 }
 
-/** A practice without a practice script has nothing to say about models, so nothing names one. */
 export const PracticeScriptNoScript: Story = {
 	args: { practiceScript: needs() },
 	play: async () => {
@@ -233,14 +227,12 @@ export const PracticeScriptUsesNoModel: Story = {
 	play: async () => {
 		await openScript();
 		await expectSettledVisible(await screen.findByText("It uses no model."));
-		// The needs speak for one review, and the reader can open it.
 		const asOf = screen.getByRole("link", { name: /^As of the review on \d{1,2} \w{3}$/u });
 		await expect(asOf.getAttribute("href")).toMatch(/^\/w\/demo\/admin\/practices\/reviews\?/u);
 		await expect(levelsOpenedBy(asOf)).toStrictEqual([`review:${REVIEW_ID}`]);
 	},
 };
 
-/** An optional model with an assignment for every tier is the quiet case: no badge, no alert. */
 export const PracticeScriptOptionalMet: Story = {
 	args: {
 		state: scriptedWith({ embedding: "optional" }),
@@ -259,12 +251,6 @@ export const PracticeScriptOptionalMet: Story = {
 	},
 };
 
-/**
- * Only a required model that some members have no assignment for stops the script, so only that
- * earns the alert at the top. Each need row names the members no model serves, in the tiers' own
- * words; members who have not made an AI choice are named as such, not by the "Not declared" label.
- * The review model always runs the review, so it has no row.
- */
 export const PracticeScriptRequiredUnmet: Story = {
 	args: {
 		state: scriptedWith({ chat: "required", decision: "required", reranking: "optional" }),
@@ -285,11 +271,9 @@ export const PracticeScriptRequiredUnmet: Story = {
 		await expect(
 			within(alert).getByRole("link", { name: "Assign a decision model" }),
 		).toHaveAttribute("href", "/w/demo/admin/models?purpose=PRACTICE_DECISION");
-		// One state, one tone: the alert wears the colour of the model row's *Needs attention* badge.
 		await expect(getComputedStyle(alert).color).toBe(
 			toneColour(PURPOSE_STATUS_DEFS.NEEDS_ATTENTION.badgeVariant),
 		);
-		// The alert leads the panel: it comes before why the practice matters.
 		await expect(precedes(alert, screen.getByText(/^A clear description lets reviewers/u))).toBe(
 			true,
 		);
@@ -309,7 +293,6 @@ export const PracticeScriptRequiredUnmet: Story = {
 	},
 };
 
-/** A script that calls only the review model has nothing to assign, but it does use a model. */
 export const PracticeScriptUsesOnlyTheReviewModel: Story = {
 	args: {
 		state: scriptedWith({ chat: "required" }),
@@ -327,7 +310,6 @@ export const PracticeScriptUsesOnlyTheReviewModel: Story = {
 	},
 };
 
-/** The settings come first, then how it decides, then the script that runs before it. */
 export const DisclosureOrder: Story = {
 	args: { state: scriptedWith({}), practiceScript: needs() },
 	play: async () => {
@@ -339,7 +321,6 @@ export const DisclosureOrder: Story = {
 	},
 };
 
-/** No review has run this script yet, so there are no needs to show and no review to point at. */
 export const PracticeScriptShownAfterNextReview: Story = {
 	args: { state: scripted, practiceScript: { status: "ready", summary: undefined } },
 	play: async () => {
@@ -351,7 +332,6 @@ export const PracticeScriptShownAfterNextReview: Story = {
 	},
 };
 
-/** The newest review ran an earlier version of the script, so its needs would describe other code. */
 export const PracticeScriptChanged: Story = {
 	args: {
 		state: scripted,
@@ -376,7 +356,6 @@ export const PracticeScriptNeedsLoading: Story = {
 	play: async () => {
 		await openScript();
 		const panel = await settledDrawerPanel();
-		// A skeleton in the rows' shape, so nothing jumps when the needs land.
 		await expect(panel.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
 		await expect(
 			screen.queryByText("Its models show after its next review."),

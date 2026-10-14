@@ -9,22 +9,16 @@ import {
 import type { ReadSourceOption } from "@/api/types.gen";
 import { evidenceSourceDef } from "@/components/practice-vocabulary/evidence-source-defs";
 
-/** The item type's own name for a source, or the vocabulary's where the options do not list it. */
 export function readSourceLabel(source: string, offered: readonly ReadSourceOption[]): string {
 	return (
 		offered.find((option) => option.source === source)?.label ?? evidenceSourceDef(source).label
 	);
 }
 
-/** Whether the source contract can promise a whole capture of this source. */
 export function canReadComplete(option: ReadSourceOption): boolean {
 	return option.needs.includes("COMPLETE");
 }
 
-/**
- * Where in the picture a source belongs: the item itself, the surroundings it has to be read
- * against, or what this workspace already said to the developer.
- */
 export type ReadSourceFamily = "item" | "around" | "history" | "other";
 
 export interface ReadSourceFamilyDef {
@@ -70,10 +64,6 @@ export interface ReadSourceGroup {
 
 const FAMILY_ORDER: ReadSourceFamily[] = ["item", "around", "history", "other"];
 
-/**
- * The item type's sources in family order, keeping the catalog's order within each family and
- * dropping families this item type has no source for.
- */
 export function groupReadSources(sources: readonly ReadSourceOption[]): ReadSourceGroup[] {
 	return FAMILY_ORDER.map((family) => ({
 		family,

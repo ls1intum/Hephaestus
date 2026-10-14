@@ -55,7 +55,6 @@ public record ProxyRouting(
             long directModelTokens,
             long directModelSearchUnits) {
 
-        /** An attempt that makes no direct model calls. */
         public BilledAttempt(
                 UsageSourceType sourceType, UUID sourceId, int number, BigDecimal spentUsd, @Nullable String workerId) {
             this(sourceType, sourceId, number, spentUsd, workerId, 0L, 0L);

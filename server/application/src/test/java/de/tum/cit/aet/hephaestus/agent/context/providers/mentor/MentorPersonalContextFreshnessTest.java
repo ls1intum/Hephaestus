@@ -9,8 +9,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -34,7 +32,6 @@ class MentorPersonalContextFreshnessTest extends BaseUnitTest {
     @ParameterizedTest
     @EnumSource(Source.class)
     void shouldReadChangedProfileForTheNextTurnWithoutReusingFormattedPersonalContent(Source kind) throws Exception {
-        var users = mock(UserRepository.class);
         var queries = mock(MentorContextQueryRepository.class);
         var accounts = mock(AccountSummaryQuery.class);
         var mapper = new ObjectMapper();
@@ -51,13 +48,12 @@ class MentorPersonalContextFreshnessTest extends BaseUnitTest {
                         var workspace = new Workspace();
                         workspace.setWorkspaceSlug("context-freshness");
                         when(workspaces.findById(1L)).thenReturn(Optional.of(workspace));
-                        yield new WorkspaceContentSource(users, workspaces, queries, mapper);
+                        yield new WorkspaceContentSource(accounts, workspaces, queries, mapper);
                     }
                     case AUTHORED_WORK -> new RecentAuthoredWorkContentSource(accounts, queries, mapper);
                 };
-        var original = new User();
-        original.setLogin("PROFILE-BEFORE-ERASURE");
-        when(users.findById(2L)).thenReturn(Optional.of(original));
+        when(accounts.findAllByIds(List.of(2L)))
+                .thenReturn(Map.of(2L, new AccountSummaryQuery.AccountSummary(2, "PROFILE-BEFORE-ERASURE", null)));
         var request = new MentorContextRequest(1L, 2L, UUID.randomUUID(), null);
         var first = new HashMap<String, byte[]>();
         source.contribute(request, first);
@@ -65,23 +61,19 @@ class MentorPersonalContextFreshnessTest extends BaseUnitTest {
         var before = mapper.readTree(first.values().iterator().next());
         assertThat((kind == Source.AUTHORED_WORK
                                 ? before.path("account").path("displayName")
-                                : before.path("user").path(kind == Source.USER ? "name" : "login"))
+                                : before.path("user").path("name"))
                         .asString())
                 .isEqualTo("PROFILE-BEFORE-ERASURE");
 
-        var erased = new User();
-        erased.setLogin("erased-2");
-        if (kind == Source.WORKSPACE) when(users.findById(2L)).thenReturn(Optional.of(erased));
-        else
-            when(accounts.findAllByIds(List.of(2L)))
-                    .thenReturn(Map.of(2L, new AccountSummaryQuery.AccountSummary(2, "erased-2", null)));
+        when(accounts.findAllByIds(List.of(2L)))
+                .thenReturn(Map.of(2L, new AccountSummaryQuery.AccountSummary(2, "erased-2", null)));
         var second = new HashMap<String, byte[]>();
         source.contribute(request, second);
         assertThat(second).hasSize(1);
         var after = mapper.readTree(second.values().iterator().next());
         assertThat((kind == Source.AUTHORED_WORK
                                 ? after.path("account").path("displayName")
-                                : after.path("user").path(kind == Source.USER ? "name" : "login"))
+                                : after.path("user").path("name"))
                         .asString())
                 .isEqualTo("erased-2");
         assertThat(after.toString()).doesNotContain("PROFILE-BEFORE-ERASURE");

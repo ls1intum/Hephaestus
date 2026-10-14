@@ -45,23 +45,11 @@ const PRACTICES: FacetSource = {
 
 const loadMoreResults = fn();
 
-/**
- * Every row a story has to choose from. It travels in the `results` arg because that is the
- * prop the screen reads, and {@link resultPage} narrows it to its first page before the screen
- * sees it — so an arg set in Controls is a pool to filter, not a page already cut.
- */
 const pool = loadedList<ReviewResult>;
 
-/**
- * The route fetches; this screen only draws what it is handed. To keep the facets live in a story
- * without a network, the filtering the server does is applied here — over the query object the route
- * would actually send, so a facet that stopped reaching the request would stop working here too.
- * What the *endpoint* names those parameters is a separate contract, pinned by the route test. A
- * row does not say which group its practice is in, so the Group facet narrows nothing here.
- */
+// Stories filter supplied rows locally because presentational components must not install network handlers.
 const SEVERITY_RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, TRIVIAL: 3 };
 
-/** The server's "Most actionable first" (`PracticeResultRepository.OPERATOR_ORDER`), as a sort key. */
 function actionabilityKey(result: ReviewResult): number {
 	if (result.outcome === "NOT_MET") {
 		return SEVERITY_RANK[result.severity ?? ""] ?? 4;
@@ -69,7 +57,6 @@ function actionabilityKey(result: ReviewResult): number {
 	return result.outcome === "MET" ? 10 : 20;
 }
 
-/** The rows in the order the server would send them for `search`. */
 function inServerOrder(
 	list: PagedListState<ReviewResult>,
 	search: ResultsSearch,
@@ -120,12 +107,8 @@ const meta = {
 		results: pool(reviewResults),
 		groups: GROUPS,
 		practices: PRACTICES,
-		// The facet needs a label per slug; the hover card on a row's practice name needs the record.
 		people: PEOPLE,
 	},
-	// The screen is controlled: with a frozen `search` prop every facet reads as dead, because
-	// `selected` comes back through the same prop the choice was reported on. The rows are recomputed
-	// from that search the way the route's query would be re-run.
 	render: (args) => (
 		<StatefulPatch initial={args.search}>
 			{(search, onSearchChange) => (
@@ -146,11 +129,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * These facets are multi-select, so the popup stays open after a choice; leaving it open would put a
- * second listbox on screen for the next facet and make a bare `findByRole("listbox")` throw. The
- * trigger is captured before the click because choosing an option renames it.
- */
+// Close each multi-select before opening the next; multiple open listboxes make role queries ambiguous.
 async function pickFacet(
 	canvas: StoryContext["canvas"],
 	userEvent: { click: (element: Element) => Promise<void> },
@@ -166,23 +145,13 @@ async function pickFacet(
 
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		await canvas.findByText("13 results.");
-		// Every facet sits in the row, with no toggle to open first.
-		for (const name of [
-			"Group",
-			"Practice",
-			"Outcome",
-			"Severity",
-			"Developer response",
-			"Origin",
-		]) {
+		await canvas.findByText("16 results.");
+		for (const name of ["Group", "Practice", "Outcome", "Severity"]) {
 			canvas.getByRole("combobox", { name });
 		}
 		await expect(canvas.queryByRole("button", { name: /More filters/u })).toBeNull();
 		canvas.getByRole("combobox", { name: "Developer" });
 		canvas.getByRole("button", { name: "Recorded" });
-		// A pull request, a chat thread and a document all reach this list and have to read as one
-		// language, so one row of each work kind is asserted rather than any one row.
 		canvas.getByText("The controller delegates before it does anything else");
 		canvas.getByText("The thread ends without naming what was chosen");
 		canvas.getByText("The runbook opens with the one step that cannot be undone");
@@ -192,9 +161,9 @@ export const Default: Story = {
 export const FilterToOneSeverity: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("13 results.");
+		await canvas.findByText("16 results.");
 		await pickFacet(canvas, userEvent, "Severity", /Major/u);
-		await canvas.findByText("2 results match your filters.");
+		await canvas.findByText("3 results match your filters.");
 		await expect(canvas.queryByText(/leaks the ledger’s table name/u)).not.toBeInTheDocument();
 	},
 };
@@ -202,20 +171,15 @@ export const FilterToOneSeverity: Story = {
 export const FilterToOnePerson: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("13 results.");
+		await canvas.findByText("16 results.");
 		await userEvent.click(canvas.getByRole("combobox", { name: "Developer" }));
 		const listbox = await screen.findByRole("listbox");
 		await userEvent.click(await within(listbox).findByRole("option", { name: /Grace Hopper/u }));
 		await canvas.findByRole("combobox", { name: "Developer: Grace Hopper" });
-		await canvas.findByText("2 results match your filters.");
+		await canvas.findByText("3 results match your filters.");
 	},
 };
 
-/**
- * A result selected elsewhere narrows this list to the review that recorded it, the
- * result among its siblings. The selection is set where a chain starts — the Reviews and Work
- * lists, or a level — so no row here offers a "Select".
- */
 export const NarrowedToTheSelectedResult: Story = {
 	args: {
 		search: {
@@ -244,13 +208,13 @@ export const NarrowedToTheSelectedResult: Story = {
 export const FilteredToNothing: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("13 results.");
+		await canvas.findByText("16 results.");
 		await pickFacet(canvas, userEvent, "Severity", /Critical/u);
-		await pickFacet(canvas, userEvent, "Group", /Testing/u);
+		await pickFacet(canvas, userEvent, "Outcome", /Met/u);
 		await canvas.findByText("No results match these filters");
 		canvas.getByRole("button", { name: "Reset" });
 		await userEvent.click(canvas.getByRole("button", { name: "Clear all filters" }));
-		await canvas.findByText("13 results.");
+		await canvas.findByText("16 results.");
 	},
 };
 
@@ -263,14 +227,12 @@ export const FilteredToNothing: Story = {
 export const SortByActionability: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ args, canvas, userEvent }) => {
-		await canvas.findByText("13 results.");
+		await canvas.findByText("16 results.");
 		await userEvent.click(canvas.getByRole("combobox", { name: /Sort/u }));
 		await userEvent.click(await screen.findByRole("option", { name: "Most actionable first" }));
 		await expect(args.onSearchChange).toHaveBeenLastCalledWith(
 			expect.objectContaining({ order: "ACTIONABILITY" }),
 		);
-		// Out of time order a day would head the rows again each time it came back, so the table keeps
-		// its headed bodies, one per rank of the order, and each row names its own day.
 		const table = canvas.getByRole("table", { name: "Results" });
 		await waitFor(async () =>
 			expect(
@@ -280,7 +242,6 @@ export const SortByActionability: Story = {
 		const headings = [...table.querySelectorAll("th[scope=rowgroup]")].map(
 			(heading) => heading.textContent,
 		);
-		// In the server's order: not met worst first, then met, then the rest.
 		await expect(headings.slice(0, 5)).toStrictEqual([
 			"Not met · Critical",
 			"Not met · Major",
@@ -303,14 +264,12 @@ export const MobileAppliedFilters: Story = {
 		viewport: { defaultViewport: "reflow" },
 	},
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("13 results.");
+		await canvas.findByText("16 results.");
 		await pickFacet(canvas, userEvent, "Severity", /Major/u);
-		await canvas.findByText("2 results match your filters.");
-		// Queried by label rather than by role because whether the `sm:` breakpoint is live depends on
-		// how the runner applies the viewport, while what the pill says and does must hold either way.
+		await canvas.findByText("3 results match your filters.");
 		await canvas.findByTitle("Severity: Major");
 		await userEvent.click(canvas.getByLabelText("Clear severity filter (Major)"));
-		await canvas.findByText("13 results.");
+		await canvas.findByText("16 results.");
 		await expectNoPageOverflow();
 	},
 };
@@ -318,12 +277,10 @@ export const MobileAppliedFilters: Story = {
 export const PickADateRange: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("13 results.");
+		await canvas.findByText("16 results.");
 		await userEvent.click(canvas.getByRole("button", { name: "Recorded" }));
 		const dialog = await screen.findByRole("dialog");
-		// The month is the only `role="grid"` on screen and the day buttons are the only buttons
-		// inside it. Testing Library maps a `<td>` to `cell`, not `gridcell`, whatever role its
-		// ancestor table carries, so the grid is the anchor rather than the cells.
+		// Testing Library exposes calendar td elements as cells even inside a grid.
 		const grid = await within(dialog).findByRole("grid");
 		const days = within(grid).getAllByRole("button");
 		const [rangeStart, rangeEnd] = [days[4], days[10]];
@@ -346,10 +303,6 @@ export const SeverityFacetOpen: Story = {
 	},
 };
 
-/**
- * More results than the first page: the count is the server's, and the next page is asked for
- * when the end of the list scrolls into view.
- */
 export const LoadsMoreAtTheEnd: Story = {
 	args: { results: pool(manyResults(64), { onLoadMore: loadMoreResults }) },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -367,15 +320,11 @@ export const Mobile: Story = {
 		viewport: { defaultViewport: "reflow" },
 	},
 	play: async ({ canvas }) => {
-		await canvas.findByText("13 results.");
+		await canvas.findByText("16 results.");
 		await expectNoPageOverflow();
 	},
 };
 
-/**
- * The error arrives as a prop, so nothing here depends on a request failing at the right moment. A
- * status-less error is the one that reads "check your connection" — see `QueryErrorAlert`.
- */
 export const LoadFailed: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	args: {

@@ -50,32 +50,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Synchronizes GitLab subgroups as teams via GraphQL API.
- *
- * <p>Intentionally NOT @Transactional at the orchestrator level — each phase manages its own
- * transactional boundaries via TransactionTemplate to avoid holding a DB connection during network
- * calls and throttle delays.
- *
- * <p>Uses TransactionTemplate instead of @Transactional because Spring's proxy-based AOP doesn't
- * intercept internal method calls within the same class.
- *
- * <p>Phases:
- *
- * <ol>
- *   <li>A — Fetch the root group and its descendant groups and create Team entities
- *   <li>B — Resolve parent references (two-pass)
- *   <li>C — Set each team's members, in one transaction per team, from both of its sources: the
- *       subgroup's members and invited groups' members ({@link
- *       GitLabGroupMemberResponse#TEAM_RELATIONS}) and the WRITE/TRIAGE collaborators of projects
- *       directly in it on the same instance, such as students. A team whose listing is incomplete
- *       keeps its members.
- *   <li>D — Sync team-repo permissions (repos whose org = subgroup fullPath)
- *   <li>E — Cleanup stale teams (only if the whole graph was listed)
- *   <li>G — Fire {@link TeamMembershipListener} with whether every team's members are current, so
- *       consumers (e.g. workspace) can reconcile against the team graph once it is, and only add
- *       members before that. Covers the gap where subgroup-only users (tutor maintainers) never
- *       appear in organization_membership and would otherwise miss membership.
- * </ol>
+ * Network calls must hold no database connection; use explicit transactions because Spring ignores self-invocation.
+ * Incomplete listings retain memberships; {@link TeamMembershipListener} must know whether reconciliation is complete.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)

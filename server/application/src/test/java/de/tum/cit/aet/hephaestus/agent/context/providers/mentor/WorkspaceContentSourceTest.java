@@ -5,10 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -29,7 +28,7 @@ import tools.jackson.databind.ObjectMapper;
 class WorkspaceContentSourceTest extends BaseUnitTest {
 
     @Mock
-    UserRepository userRepository;
+    AccountSummaryQuery accounts;
 
     @Mock
     WorkspaceRepository workspaceRepository;
@@ -45,10 +44,8 @@ class WorkspaceContentSourceTest extends BaseUnitTest {
 
     @Test
     void writesWorkspaceJson() throws Exception {
-        User user = new User();
-        user.setLogin("octo");
-        user.setName("Octo");
-        when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
+        when(accounts.findAllByIds(List.of(2L)))
+                .thenReturn(Map.of(2L, new AccountSummaryQuery.AccountSummary(2, "Octo", null)));
 
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
@@ -65,6 +62,7 @@ class WorkspaceContentSourceTest extends BaseUnitTest {
         byte[] bytes = files.get("inputs/context/workspace.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
+        assertThat(root.at("/user/name").asString()).isEqualTo("Octo");
         assertThat(root.get("workspace").get("slug").asString()).isEqualTo("acme");
         assertThat(root.get("workspace").get("displayName").asString()).isEqualTo("Acme");
         assertThat(root.get("recentSessions").isArray()).isTrue();

@@ -50,7 +50,6 @@ export interface ResultRowsProps {
 
 const LIST_LABEL = "Results";
 
-/** The heads of the Results table, which every row below fills. */
 export const RESULT_COLUMNS: readonly RecordTableColumn[] = [
 	{ label: "Recorded", className: "w-24 whitespace-nowrap" },
 	{ label: "Result" },
@@ -68,7 +67,6 @@ const RESULT_WORDS: RecordResultsWords = {
 	emptyDescription: "Results appear after a practice review completes.",
 };
 
-/** Results by day, drawn as the Reviews table draws reviews. */
 export function ResultRows({ state, byDay = true }: ResultRowsProps) {
 	const rows = state.status === "ready" ? state.results : [];
 	return (
@@ -104,10 +102,6 @@ export function ResultRows({ state, byDay = true }: ResultRowsProps) {
 	);
 }
 
-/**
- * The rank "Most actionable first" sorts by, in the server's words: not met by severity, then met,
- * then does not apply and could not determine together.
- */
 function actionabilityRank(result: ReviewResult): string {
 	if (result.outcome === "NOT_MET") {
 		return result.severity === null
@@ -120,10 +114,7 @@ function actionabilityRank(result: ReviewResult): string {
 	return `${OUTCOME_DEFS.DOES_NOT_APPLY.label} or ${OUTCOME_DEFS.COULD_NOT_DETERMINE.label.toLowerCase()}`;
 }
 
-/**
- * The server's order cut into its ranks, so the table keeps the headed bodies it has by day. A rank
- * that comes back after another page still joins its heading.
- */
+// Preserve server ranks across pages; a returning rank must join its existing table body.
 export function byActionability(
 	rows: readonly ReviewResult[],
 ): { label: string; rows: ReviewResult[] }[] {
@@ -144,7 +135,6 @@ export interface ResultExceptionsProps {
 	result: Pick<ReviewResult, "currentness" | "markedIncorrectAt">;
 }
 
-/** What went wrong with a result: a claim that is no longer current, or an admin's Incorrect mark. */
 export function ResultExceptions({ result }: ResultExceptionsProps) {
 	if (result.currentness === "CURRENT" && result.markedIncorrectAt === null) {
 		return null;
@@ -159,7 +149,6 @@ export function ResultExceptions({ result }: ResultExceptionsProps) {
 
 export interface ResultRowProps {
 	result: ReviewResult;
-	/** The row names its day, in a table without day headings. */
 	withDay?: boolean;
 }
 
@@ -174,13 +163,6 @@ function costlySeverity(result: ReviewResult) {
 		: undefined;
 }
 
-/**
- * One result, drawn as a review row is: the time and the outcome as an icon, named with the problems
- * a not met result counts, what it says with its practice as text, the item and who it is about;
- * what came of it is the trace's to tell. Badges are kept for what went wrong: a claim that is no
- * longer current, or an Incorrect mark. The whole row opens the result's sheet, and that is its one
- * link; Track and Trace end the row.
- */
 export function ResultRow({ result, withDay = false }: ResultRowProps) {
 	const today = new Date(useNow());
 	const tracked = useTracked({ kind: "result", id: result.id });

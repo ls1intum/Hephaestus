@@ -7,10 +7,18 @@ import static org.assertj.core.api.Assertions.fail;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionResponseDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmittedProblemDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmittedResultDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.ProjectedCitationDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
+import de.tum.cit.aet.hephaestus.practices.spi.ClaimBasis;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmCredentials;
@@ -53,27 +61,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.NullNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Live end-to-end test for the practice-review {@code pi-runner.ts} against a real LLM.
- *
- * <p>Exercises Pi SDK ↔ LLM, the runner's two-attempt loop, watchdog, custom
- * {@code submit_result} tool, the program host with the built-in review, and the admission body the runner emits —
- * all without Docker.
- * The {@code DockerSandboxLiveTest} covers the sandbox SPI separately.
- *
- * <p>Mirrors {@code MentorLiveLlmTest} for the Pi SDK install and the custom provider
- * extension that bends Pi's built-in {@code openai} provider toward the configured endpoint (Pi does not
- * read {@code OPENAI_BASE_URL} natively).
- *
- * <p>Workspace staging differs from the mentor test: the practice runner hardcodes
- * {@code /workspace} as CWD and reads/writes via async fs (read tool) and {@code spawn} (bash
- * tool). Patching every fs entry point in a Node shim is fragile, so we stage at {@code
- * /workspace} directly. The harness runs as root and the directory is cleaned between tests.
- */
+// Pi does not read OPENAI_BASE_URL; the harness must configure its provider extension explicitly.
 @LiveLlmTest
 @Tag("live")
 class PracticeRunnerLiveLlmTest {
@@ -84,7 +74,6 @@ class PracticeRunnerLiveLlmTest {
     private static final Path WORKSPACE =
             Path.of(System.getenv().getOrDefault("PI_RUNNER_CWD", "/workspace")).toAbsolutePath();
 
-    /** The one practice of the run without a criteria case. */
     private static final String PRACTICE = "avoids-insecure-defaults-and-over-broad-permissions";
 
     @BeforeAll
@@ -131,10 +120,8 @@ class PracticeRunnerLiveLlmTest {
     private void runAndVerify(LiveLlmCredentials creds, ProxyStandIn proxy, @Nullable JsonNode scenario)
             throws Exception {
         Map<String, String> environment = stageWorkspace(creds, scenario);
-        // This is a measurement harness, not a delivery test. Keeping the composition request absent
-        // means the runner cannot even prepare feedback, and the runner starts with no ambient credential
-        // before the agent process starts. In particular, a developer's GH_TOKEN/GITHUB_TOKEN is never
-        // exposed to the model's bash tool.
+        // Live measurements run without a composition request or ambient credential to prevent provider feedback
+        // writes.
         assertThat(Files.exists(WORKSPACE.resolve(SandboxLayout.FEEDBACK_COMPOSITION_PATH)))
                 .as("live harness does not request feedback composition")
                 .isFalse();
@@ -181,9 +168,9 @@ class PracticeRunnerLiveLlmTest {
                 .isNotNull();
 
         JsonNode parsed = MAPPER.readTree(rawOutput);
-        assertThat(parsed.path("schemaVersion").asInt())
+        assertThat(parsed.path("contractVersion").asInt())
                 .as("result.json is the admission body")
-                .isEqualTo(2);
+                .isEqualTo(SandboxLayout.PRACTICE_CONTRACT_VERSION);
         JsonNode practiceResults = parsed.path("results");
         assertThat(practiceResults.isArray()).as("results must be a JSON array").isTrue();
         assertThat(practiceResults.size()).as("at least one result emitted").isGreaterThanOrEqualTo(1);
@@ -217,7 +204,7 @@ class PracticeRunnerLiveLlmTest {
                 actualSeverity.put(slug, String.valueOf(severity));
             }
             if ("NOT_MET".equals(candidate.path("outcome").asString())) {
-                assertThat(severity).isIn("CRITICAL", "MAJOR", "MINOR", "INFO");
+                assertThat(severity).isIn("CRITICAL", "MAJOR", "MINOR", "TRIVIAL");
                 assertThat(candidate.path("problems"))
                         .as("a negative locates its problems")
                         .isNotEmpty();
@@ -256,10 +243,6 @@ class PracticeRunnerLiveLlmTest {
         System.out.printf("[practice-live] %d practiceResult(s)%n", practiceResults.size());
     }
 
-    /**
-     * The workspace of the worker's spec for this model. Without a case, one practice reviews the fixture's login
-     * change; a case stages its own change and catalog.
-     */
     private Map<String, String> stageWorkspace(LiveLlmCredentials creds, @Nullable JsonNode scenario) throws Exception {
         PracticeSandboxSpec spec = LiveRunnerWorkspace.adapter()
                 .buildSandboxSpec(LiveRunnerWorkspace.request(creds.model(), "live-test-job-token", Map.of()));
@@ -399,48 +382,57 @@ class PracticeRunnerLiveLlmTest {
          * under the ids the server assigns, every citation indexed, nothing withheld and no line anchorable.
          */
         static ObjectNode admit(JsonNode request) {
-            ObjectNode answer =
-                    MAPPER.createObjectNode().put("schemaVersion", 2).put("admissionDigest", "live-test");
-            ArrayNode admitted = answer.putArray("results");
-            for (JsonNode entry : request.path("results")) {
-                JsonNode candidate = entry.path("candidate");
-                ObjectNode row = admitted.addObject();
-                row.put("practiceResultId", UUID.randomUUID().toString());
-                row.set("practiceSlug", entry.path("practiceSlug"));
-                row.put("outcome", outcomeOf(candidate));
-                row.put("severity", storedSeverity(candidate));
-                row.set("summary", candidate.path("summary"));
-                row.set("explanation", candidate.path("explanation"));
-                row.put("summaryOnly", false);
-                row.put("publicEligible", true);
-                row.set("citations", indexed(candidate.path("citations")));
-                ObjectNode evidence = row.putObject("evidence");
-                candidate
-                        .path("evidence")
-                        .properties()
-                        .forEach(warrant -> evidence.set(warrant.getKey(), warrant.getValue()));
-                row.set("example", candidate.has("example") ? candidate.get("example") : NullNode.getInstance());
-                row.set("coverage", candidate.path("coverage"));
-                ArrayNode observations = row.putArray("observations");
-                int position = 0;
+            var submitted = MAPPER.treeToValue(request, AdmissionRequestDTO.class);
+            var rows = new ArrayList<AdmittedResultDTO>();
+            for (var entry : submitted.results()) {
+                JsonNode candidate = entry.candidate();
+                UUID resultId = UUID.randomUUID();
+                var problems = new ArrayList<AdmittedProblemDTO>();
                 for (JsonNode problem : candidate.path("problems")) {
-                    ObjectNode child = observations.addObject();
-                    child.put("observationId", UUID.randomUUID().toString());
-                    child.put("position", position++);
-                    child.set("severity", problem.path("severity"));
-                    child.set("summary", problem.path("summary"));
-                    child.set("explanation", problem.path("explanation"));
-                    child.set("nextStep", problem.has("nextStep") ? problem.get("nextStep") : NullNode.getInstance());
-                    child.set("basis", problem.path("basis"));
-                    child.set("citations", indexed(problem.path("citations")));
-                    child.put("anchorable", false);
+                    problems.add(new AdmittedProblemDTO(
+                            UUID.randomUUID(),
+                            Severity.valueOf(problem.path("severity").asString()),
+                            problem.path("summary").asString(),
+                            resultId,
+                            problems.size(),
+                            null,
+                            problem.path("explanation").asString(),
+                            projected(problem.path("citations")),
+                            MAPPER.treeToValue(problem.path("basis"), ClaimBasis.class),
+                            problem.has("nextStep") ? problem.path("nextStep").asString() : null,
+                            false));
                 }
+                ObjectNode evidence = (ObjectNode) candidate.path("evidence").deepCopy();
+                evidence.set(
+                        "citations",
+                        MAPPER.valueToTree(projected(candidate.path("evidence").path("citations"))));
+                rows.add(new AdmittedResultDTO(
+                        entry.practiceSlug(),
+                        entry.itemId(),
+                        resultId,
+                        ResultOutcome.valueOf(outcomeOf(candidate)),
+                        candidate.path("summary").asString(),
+                        candidate.path("explanation").asString(),
+                        evidence,
+                        candidate.has("example") ? candidate.get("example") : null,
+                        MAPPER.treeToValue(candidate.path("coverage"), ResultCoverage.class),
+                        problems,
+                        false,
+                        false));
             }
-            answer.putArray("withheld");
-            return answer;
+            return MAPPER.valueToTree(new AdmissionResponseDTO(
+                    SandboxLayout.PRACTICE_CONTRACT_VERSION,
+                    submitted.reviewId(),
+                    submitted.jobId(),
+                    submitted.attempt(),
+                    "live-test",
+                    rows,
+                    List.of(),
+                    null,
+                    null,
+                    false));
         }
 
-        /** As admission records it: the outcome as sent, which must name an {@link ResultOutcome}. */
         private static String outcomeOf(JsonNode candidate) {
             JsonNode outcome = candidate.path("outcome");
             if (!outcome.isString()) {
@@ -449,10 +441,7 @@ class PracticeRunnerLiveLlmTest {
             return ResultOutcome.valueOf(outcome.asString()).name();
         }
 
-        /** The severity admission stores: the one the candidate states, else its worst problem's; none for others. */
         static @Nullable String storedSeverity(JsonNode candidate) {
-            if (candidate.path("severity").isString())
-                return candidate.path("severity").asString();
             Severity worst = null;
             for (JsonNode problem : candidate.path("problems")) {
                 Severity severity = Severity.valueOf(problem.path("severity").asString());
@@ -461,14 +450,24 @@ class PracticeRunnerLiveLlmTest {
             return worst == null ? null : worst.name();
         }
 
-        private static ArrayNode indexed(JsonNode citations) {
-            ArrayNode indexed = MAPPER.createArrayNode();
-            int index = 0;
-            for (JsonNode citation : citations) {
-                indexed.add(
-                        ((ObjectNode) citation.deepCopy()).put("index", index++).put("anchorable", false));
+        private static List<ProjectedCitationDTO> projected(JsonNode citations) {
+            var projected = new ArrayList<ProjectedCitationDTO>();
+            for (JsonNode value : citations) {
+                var citation = MAPPER.treeToValue(value, EvidenceCitation.class);
+                projected.add(new ProjectedCitationDTO(
+                        citation.sourceKind().value(),
+                        citation.sourcePath(),
+                        citation.path(),
+                        citation.side(),
+                        citation.revision(),
+                        citation.startLine(),
+                        citation.endLine(),
+                        citation.quote(),
+                        citation.verification(),
+                        projected.size(),
+                        false));
             }
-            return indexed;
+            return List.copyOf(projected);
         }
 
         private void forward(HttpExchange exchange, LiveLlmCredentials creds) throws IOException {

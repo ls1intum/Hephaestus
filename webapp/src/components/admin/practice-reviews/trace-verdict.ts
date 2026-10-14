@@ -33,9 +33,7 @@ export type TraceEndKind = "delivered" | "lost" | "open" | "none";
 
 export interface TraceEnd {
 	kind: TraceEndKind;
-	/** "Delivered", "Did not arrive", "Open", "No feedback". */
 	label: string;
-	/** What happened, after the label: "it reached the developer on GitHub". */
 	reason: string;
 	/** When the path ended, where the record says. */
 	at?: Date;
@@ -87,21 +85,12 @@ function end(
 // One piece of feedback
 // ------------------------------------------------------------------------------------------------
 
-/**
- * What became of one piece of feedback, in three forms: its end step, a clause for a sentence
- * about several pieces ("was delivered", singular and plural), and a short phrase for a count
- * ("delivered").
- */
 interface FeedbackFate {
 	end: TraceEnd;
 	clause: readonly [singular: string, plural: string];
 	phrase: string;
 }
 
-/**
- * Where a ready piece is about to reach the developer, by its destination: posted on the work,
- * shown on their practice pages, or raised in their next conversation with Heph.
- */
 const READY_FOR: Record<
 	LineageFeedback["destination"],
 	{ end: string; sentence: string; phrase: string }
@@ -126,7 +115,6 @@ const READY_FOR: Record<
 function feedbackFate(feedback: LineageFeedback, item: ItemRef | undefined): FeedbackFate {
 	const at = feedback.deliveredAt ?? undefined;
 	if (feedback.withdrawn) {
-		// A ready piece can be withdrawn too: only a recorded delivery says it was delivered.
 		const delivered = reachedDeveloper(feedback);
 		return {
 			end: end(
@@ -254,10 +242,6 @@ function feedbackSentence(feedback: LineageFeedback, item: ItemRef | undefined):
 	}
 }
 
-// ------------------------------------------------------------------------------------------------
-// Several pieces: a result's, a review's
-// ------------------------------------------------------------------------------------------------
-
 const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
 
 /** "it", "both", "all 5": a count that is every piece there is. */
@@ -313,7 +297,6 @@ const KIND_PHRASE: Record<TraceEndKind, string> = {
 
 const KINDS: readonly TraceEndKind[] = ["delivered", "open", "lost", "none"];
 
-/** "2 were delivered, 3 are still open, and 1 did not arrive": many different ends, counted by kind. */
 function kindsClause(fates: readonly FeedbackFate[]): string {
 	return joinAnd(
 		KINDS.map((kind) => ({ kind, count: fates.filter((fate) => fate.end.kind === kind).length }))
@@ -360,10 +343,6 @@ function endOfMany(fates: readonly FeedbackFate[]): TraceEnd {
 			: [...counts.entries()].map(([phrase, count]) => `${count} ${phrase}`).join(", ");
 	return end(best.end.kind, `${countOf(fates.length, "piece", "pieces")} of feedback: ${reason}`);
 }
-
-// ------------------------------------------------------------------------------------------------
-// A result
-// ------------------------------------------------------------------------------------------------
 
 function isRunning(review: ReviewRef | undefined): boolean {
 	return review?.status === "QUEUED" || review?.status === "RUNNING";
@@ -529,12 +508,6 @@ function reviewVerdict(records: LineageRecords): TraceVerdict {
 // The record in front
 // ------------------------------------------------------------------------------------------------
 
-/**
- * The verdict on the record in front and the end of its path, read from the graph alone: no model
- * writes it, so the same graph always says the same thing. A review, its results step and the
- * work tell the review; a result and a piece of feedback tell themselves. A record the graph
- * does not hold falls back to the review.
- */
 export function traceVerdict(lineage: ReviewLineage, here: TraceNode | undefined): TraceVerdict {
 	const records = lineageRecords(lineage);
 	if (here?.kind === "feedback") {
@@ -559,12 +532,6 @@ export function traceVerdict(lineage: ReviewLineage, here: TraceNode | undefined
 // Work no review started on
 // ------------------------------------------------------------------------------------------------
 
-/**
- * What the trace of work none of whose events started a review says, from its latest event. An
- * event that still waits has not been refused, so the trace says it waits rather than that no
- * review started. A reason is said only where it still holds: "Practice review is turned off" is
- * said while it is off, and once it is on again a refused event says it was off when it happened.
- */
 export function unreviewedVerdict(
 	event: ItemEvent,
 	practicesEnabled: boolean | undefined,

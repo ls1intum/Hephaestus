@@ -43,12 +43,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.StatusAssertions;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * Cross-tenant probes use two workspaces with the same account login and an overlapping member.
- * This keeps authentication valid while distinguishing workspace scoping from organization- or
- * user-based filtering. Detail probes include a successful same-workspace request before the
- * foreign request.
- */
+// Overlapping members and identical account logins distinguish tenancy from authentication and organization filters.
 class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private PracticeModelTestFixtures modelFixtures;

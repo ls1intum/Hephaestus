@@ -51,10 +51,7 @@ public final class TranslatorState {
     /** Final texts of the assistant messages verified this turn, in order; empty texts are not kept. */
     private final List<String> verifiedTexts = new ArrayList<>();
 
-    /**
-     * Links the server admitted this turn and the runner has not emitted yet, one per admission: a link to any other
-     * result, or a second one an admission did not cover, is never shown or stored.
-     */
+    // Each server admission permits one emitted link; unadmitted and duplicate links remain hidden.
     private final Map<UUID, Integer> admittedLinks = new HashMap<>();
 
     private final Map<UUID, CopyWriteFence> feedbackFences = new HashMap<>();
@@ -91,10 +88,8 @@ public final class TranslatorState {
         return shownFeedback.contains(feedbackId);
     }
 
-    /** Problem links the server admitted this turn and the runner has not emitted yet, one per admission. */
     private final Map<UUID, Integer> admittedProblemLinks = new HashMap<>();
 
-    /** The result of each problem whose link was admitted. */
     private final Map<UUID, UUID> problemResults = new HashMap<>();
 
     /** Index in {@link #partsAccumulator} where the unverified assistant message's parts begin. */
@@ -332,7 +327,6 @@ public final class TranslatorState {
         return part;
     }
 
-    /** Admits one link to a result, which the server checked. */
     public synchronized void admitLink(UUID resultId) {
         admittedLinks.merge(resultId, 1, Integer::sum);
     }
@@ -346,7 +340,6 @@ public final class TranslatorState {
         problemResults.put(problemId, resultId);
     }
 
-    /** The result of a problem whose link was admitted, or null. */
     public synchronized @Nullable UUID resultOfLinkedProblem(UUID problemId) {
         return problemResults.get(problemId);
     }

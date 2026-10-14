@@ -75,8 +75,6 @@ export const EveryChoiceIsVisible: Story = {
 		await expect(diff.getByRole("radio", { name: "Optional" })).toBeVisible();
 		await expect(diff.getByRole("radio", { name: "Off" })).toBeVisible();
 
-		// Offered only where the contract can promise a whole capture. Linked work items never can, so
-		// the control is absent rather than present-and-refused on save.
 		await expect(canvas.getAllByRole("checkbox", { name: "Must be captured whole" })).toHaveLength(
 			1,
 		);
@@ -128,8 +126,6 @@ export const ReadsASourceWhole: Story = {
 		],
 	},
 	play: async ({ canvas }) => {
-		// "captured whole", not "nothing is missing anywhere": the claim is about this capture of this
-		// source, which is the only thing completeness is ever measured against.
 		await expect(canvas.getByText("· captured whole")).toBeVisible();
 		await expect(canvas.getByText("Repository files and history")).toBeVisible();
 	},
@@ -166,14 +162,12 @@ export const NothingRequiredYet: Story = {
 	args: { sources: [], invalid: true },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Nothing yet")).toBeVisible();
-		// The invalid state opens the source list, because the fix is not reachable from the summary.
 		await expect(
 			canvas.getByRole("radiogroup", { name: "How Code changes is read" }),
 		).toBeVisible();
 	},
 };
 
-/** Drives `invalid` the way a form does, including re-rendering without changing it. */
 function SubmittedIntoInvalid(args: React.ComponentProps<typeof PracticeReadsEditor>) {
 	const [invalid, setInvalid] = useState(false);
 	const [renders, setRenders] = useState(0);
@@ -204,7 +198,6 @@ export const SubmittingRevealsTheSources: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: "Submit the form" }));
 		await expect(canvas.getByRole("radiogroup", sources)).toBeVisible();
 
-		// Closed again by the author, and it stays closed while the error stands.
 		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
 		await userEvent.click(canvas.getByRole("button", { name: "Type something else" }));
 		await expect(canvas.queryByRole("radiogroup", sources)).toBeNull();

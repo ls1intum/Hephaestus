@@ -1,5 +1,3 @@
-// Tells which changed source files are tests and which are production code, by the path. The review
-// reads from the diff if a test covers the changed behaviour.
 import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
 import { isTestPath, languageOf } from "../kits/scm/languages.ts";
 import { DIRECTION_CHARS, listWithin } from "../lib/core/bounded-text.ts";

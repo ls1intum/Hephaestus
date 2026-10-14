@@ -1,8 +1,3 @@
-// Finds each note by someone other than the author, inline and in the conversation, one lead each, with
-// what the record shows beside it: the author's later reply, the resolution of the thread and who
-// resolved it, the reviewer's own later note, if and how soon the same reviewer approved after it, if
-// the note came after the work merged or closed, and the authored commits after it. The review decides
-// for each note if it asked something of this change and if the author engaged. The script never does.
 import { type ChangeCommit, readCapturedCommits } from "../kits/scm/change.ts";
 import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
 import {
@@ -26,7 +21,6 @@ export const LABELS = {
 	"conversation-comment": "A conversation comment by someone other than the author.",
 };
 
-/** An instant strictly between two others; false when any is missing. */
 function between(
 	at: string | undefined,
 	from: string | undefined,
@@ -35,11 +29,7 @@ function between(
 	return later(at, from) && !later(at, to);
 }
 
-/**
- * The same reviewer's first approval at or after the note, with what came between them: advice posted
- * with an approval reads differently from an approval given after the author answered. Empty when that
- * reviewer did not approve afterwards.
- */
+// Approval alongside advice differs from approval after the author responded.
 function approvalAfter(
 	decisions: readonly ReviewDecision[],
 	reviewer: string | undefined,
@@ -69,7 +59,6 @@ function approvalAfter(
 	return `${String(seconds)}s later; ${commits === null ? "unknown commit count" : `${String(commitsBetween)} commit(s)`} and ${String(notesBetween)} author note(s) between`;
 }
 
-/** One note, as a lead, with the facts that the counts read. */
 interface Note {
 	lead: ReviewLead;
 	bot: boolean;
@@ -98,7 +87,6 @@ export default definePracticeScript({
 			...(inline ?? []).filter((c) => c.author === author),
 			...(general ?? []).filter((c) => c.author === author),
 		];
-		/** The reviewer's next conversation note after `at`, where a settling "thank you" usually sits. */
 		const reviewerNextNote = (reviewer: string | undefined, at: string | undefined) =>
 			(general ?? []).find((c) => c.author === reviewer && later(c.createdAt, at))?.body ?? "";
 
@@ -198,7 +186,7 @@ export default definePracticeScript({
 		const inlineByPeople = inlineNotes.filter((note) => !note.bot).length;
 		const conversationByPeople = conversationNotes.filter((note) => !note.bot).length;
 		const replied = byPeople.filter((note) => note.replied).length;
-		// Without the commit record each note's count is unknown, and so is their sum: never a measured 0.
+		// Without captured commits, reply counts and their sum are unknown, not zero.
 		const committedAfter =
 			capturedCommits === null ? null : byPeople.filter((note) => note.committedOnFile).length;
 		const afterHandOff = byPeople.filter((note) => note.afterHandOff).length;
@@ -224,7 +212,6 @@ export default definePracticeScript({
 			facts: {
 				commentsFileAbsent: inline === null ? 1 : 0,
 				generalCommentsFileAbsent: general === null ? 1 : 0,
-				// An uncaptured record counts nothing: its count is left out, never a measured 0.
 				...(inline === null ? {} : { reviewerComments: inlineByPeople }),
 				...(general === null ? {} : { conversationComments: conversationByPeople }),
 				botComments: notes.length - byPeople.length,

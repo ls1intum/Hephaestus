@@ -12,11 +12,8 @@ public enum AgentPurpose {
     PRACTICE_REVIEW(ModelKind.CHAT),
     /** Interactive mentor turns (web SSE and Slack). */
     MENTOR(ModelKind.CHAT),
-    /** Closed questions that practice scripts ask within a practice review. */
     PRACTICE_DECISION(ModelKind.DECISION),
-    /** Embeddings that practice scripts compute within a practice review. */
     PRACTICE_EMBEDDING(ModelKind.EMBEDDING),
-    /** Reranking that practice scripts do within a practice review. */
     PRACTICE_RERANKING(ModelKind.RERANKING);
 
     private static final List<AgentPurpose> PRACTICE_SCRIPT = Arrays.stream(values())
@@ -29,7 +26,6 @@ public enum AgentPurpose {
         this.kind = kind;
     }
 
-    /** The kind of model that this purpose calls. */
     public ModelKind kind() {
         return kind;
     }
@@ -47,7 +43,6 @@ public enum AgentPurpose {
         return protocol.serves(kind);
     }
 
-    /** Every purpose that a model on {@code protocol} can serve. */
     public static List<AgentPurpose> servedBy(LlmApiProtocol protocol) {
         return Arrays.stream(values())
                 .filter(purpose -> purpose.accepts(protocol))

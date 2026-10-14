@@ -193,7 +193,6 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(usage.totalCalls()).isEqualTo(4);
     }
 
-    /** Reproduces what {@code ReviewJobRepository#requeueOrphan} does to the row, then re-claims it. */
     private void requeueTo(ReviewJob job, int attempt) {
         job.setAttempt(attempt);
         job.setStatus(ReviewJobStatus.RUNNING);

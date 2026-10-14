@@ -80,7 +80,6 @@ describe("nextResolution", () => {
 const workspaceSlug = "acme";
 const feedbackId = "scope-one-concern";
 
-/** One piece of feedback as the wire sends it, carrying whatever response the case starts from. */
 function practicePageFeedback(
 	response?: Partial<Wire<FeedbackResponse>>,
 ): Wire<PracticePageFeedback> {
@@ -109,15 +108,9 @@ function practicePageFeedback(
 	};
 }
 
-/**
- * The hook against the real client: what a press writes is a request body, and the four
- * transitions differ only in that body. `reads` counts the GETs, because reading the cards is
- * what delivers them.
- */
 function renderFeedback(
 	response?: Partial<Wire<FeedbackResponse>>,
 	enabled?: boolean,
-	/** Holds every read after the first open until it settles. */
 	reread?: Promise<void>,
 ) {
 	const written: { method: string; body: unknown }[] = [];
@@ -188,9 +181,6 @@ describe("usePracticePageFeedback", () => {
 			result.current.ratingProps(feedbackId).onRate?.("HELPFUL");
 		});
 
-		// The write has landed and the cards are being read again, still carrying the rating it
-		// replaced: the buttons wait on the pressed rating, so "Saving…" and the comment band sit
-		// under the one the reader chose.
 		await waitFor(() => expect(reads).toHaveLength(2));
 		expect(written).toHaveLength(1);
 		expect(result.current.ratingProps(feedbackId)).toMatchObject({
@@ -203,8 +193,7 @@ describe("usePracticePageFeedback", () => {
 	});
 
 	it("names the control that wrote only once the write outlasts the delay, and clears it when it settles", async () => {
-		// Only the timeouts are faked, and they also move with real time, so the reads and waits
-		// still run; the test jumps them past the delay that keeps a quick write silent.
+		// Advance timeout-only fake timers while network reads and waits use real time.
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
 		try {
 			const reread = deferred();
@@ -281,11 +270,8 @@ describe("usePracticePageFeedback", () => {
 	it("settles empty and asks for nothing while it is not enabled", async () => {
 		const { result, reads } = renderFeedback(undefined, false);
 
-		// A query held back by `enabled` stays pending, which the page would draw as a skeleton
-		// that never resolves; the hook reports it settled instead.
 		expect(result.current.state).toStrictEqual({ status: "ready" });
 		expect(result.current.cards).toStrictEqual([]);
-		// Reading the cards delivers them, so a held-back hook must not read them.
 		await sleep(0);
 		expect(reads).toStrictEqual([]);
 	});
@@ -298,7 +284,6 @@ describe("usePracticePageFeedback", () => {
 			result.current.ratingProps(feedbackId).onRate?.("HELPFUL");
 		});
 
-		// Nothing is left of the response, so the write is the endpoint's delete, not an empty body.
 		await waitFor(() => expect(written).toHaveLength(1));
 		expect(written[0]?.method).toBe("DELETE");
 	});

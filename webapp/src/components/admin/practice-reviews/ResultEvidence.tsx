@@ -12,14 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { hasText } from "@/lib/text";
 
 export interface ResultEvidenceProps {
-	/** The passages one claim cites: a result's own, or one of its problems'. */
 	citations: EvidenceCitation[];
 }
 
-/**
- * The passages behind a result or one of its problems, by source. Non-code coordinates refer to
- * serialized input, not a location a reader can open in the source.
- */
+// Non-code coordinates refer to serialized input, so they cannot identify a location in the source app.
 export function ResultEvidence({ citations }: ResultEvidenceProps) {
 	if (citations.length === 0) {
 		return (
@@ -88,16 +84,11 @@ function EvidenceSourceSection({ group }: { group: EvidenceSourceGroup }) {
 	);
 }
 
-/** The part of a citation that says where its passage sits. */
 type CitationPlace = Pick<
 	EvidenceCitation,
 	"sourceKind" | "path" | "startLine" | "endLine" | "side"
 >;
 
-/**
- * Where a passage sits: a file coordinate for code, the object's name for anything else. None for
- * a citation recorded without a place.
- */
 export function citationLocation(citation: CitationPlace): string | undefined {
 	const { path, startLine, endLine } = citation;
 	if (path === null) {
@@ -108,7 +99,6 @@ export function citationLocation(citation: CitationPlace): string | undefined {
 		: path;
 }
 
-/** Which side of the diff a code passage is on, if the citation names one. */
 export function citationSide(citation: CitationPlace): string | undefined {
 	return evidenceSourceDef(citation.sourceKind).locator === "code" && citation.side !== null
 		? DIFF_SIDE_LABELS[citation.side]

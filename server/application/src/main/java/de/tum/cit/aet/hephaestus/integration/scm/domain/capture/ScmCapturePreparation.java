@@ -2,11 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.capture;
 
 import org.jspecify.annotations.Nullable;
 
-/**
- * One Git preparation per review request. Every source that reads the clone asks here, so the fetch
- * runs once, and a failure is handed to each of them in turn so each still records it for its own
- * source.
- */
+// Share one fetch per request, but record a preparation failure separately for each affected source.
 public final class ScmCapturePreparation {
     private ReviewRepositoryPreparer.@Nullable PreparedReview prepared;
     private @Nullable RuntimeException failure;

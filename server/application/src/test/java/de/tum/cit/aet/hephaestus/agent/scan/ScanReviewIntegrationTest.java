@@ -39,7 +39,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
-/** The existing queue permits serial file jobs and retains their exact terminal processing fence. */
 class ScanReviewIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ReviewJobRepository jobs;

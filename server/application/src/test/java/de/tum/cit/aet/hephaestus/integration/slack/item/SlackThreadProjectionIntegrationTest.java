@@ -37,7 +37,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Database proof for full-thread projection and workspace-scoped candidate discovery. */
 @TestPropertySource(properties = "hephaestus.integration.slack.conversation-ingest.enabled=true")
 class SlackThreadProjectionIntegrationTest extends BaseIntegrationTest {
 
@@ -61,7 +60,6 @@ class SlackThreadProjectionIntegrationTest extends BaseIntegrationTest {
 
     private static final AtomicLong WS_SEQ = new AtomicLong();
 
-    /** A persisted workspace bounds each source projection. */
     @Autowired
     private ConnectionRepository connections;
 
@@ -83,7 +81,6 @@ class SlackThreadProjectionIntegrationTest extends BaseIntegrationTest {
 
     private static final AtomicLong USER_SEQ = new AtomicLong(9_100_000L);
 
-    /** A workspace member a Slack turn can be linked to: {@code slack_message.author_account_id} references it. */
     private long linkedMember(long workspaceId, String login) {
         IdentityProvider provider = identityProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")

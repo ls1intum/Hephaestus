@@ -92,18 +92,18 @@ export function ProblemLevel({ nested, path, problem: state }: ProblemLevelProps
 				) : (
 					<>
 						{hasText(problem.explanation) && (
-							<Section level={4} size="sm" title="Why this was raised">
+							<Section level={3} size="sm" title="Why this was raised">
 								{/* The review writes its explanation in Markdown. */}
 								<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
 									<UntrustedMarkdown>{problem.explanation}</UntrustedMarkdown>
 								</div>
 							</Section>
 						)}
-						<Section level={4} size="sm" title="Evidence">
+						<Section level={3} size="sm" title="Evidence">
 							<ResultEvidence citations={problem.citations} />
 						</Section>
 						{hasText(problem.nextStep) && (
-							<Section level={4} size="sm" title="Next step">
+							<Section level={3} size="sm" title="Next step">
 								<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
 									<UntrustedMarkdown>{problem.nextStep}</UntrustedMarkdown>
 								</div>

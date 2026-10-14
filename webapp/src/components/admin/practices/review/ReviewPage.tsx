@@ -25,11 +25,6 @@ export interface ReviewPageProps {
 	sections: Record<ReviewSectionId, ReactNode>;
 }
 
-/**
- * Tabs, not a stack: only the open section is in the document, so a section's data is fetched when
- * somebody asks for it, and the feedback mode section's sticky summary strip cannot hang over another
- * section's settings.
- */
 export function ReviewPage({ section, onSectionChange, running, sections }: ReviewPageProps) {
 	const active = REVIEW_SECTIONS.find((candidate) => candidate.id === section);
 

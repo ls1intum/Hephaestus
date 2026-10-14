@@ -18,7 +18,7 @@ export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 	const { body } = feedback;
 	const withheld = ADMIN_WITHHELD_TEXT[feedback.destination];
 
-	// A private destination's text is never shown here, even when a caller passes one.
+	// Private-destination text must stay hidden even if the caller supplies it.
 	if (withheld) {
 		return (
 			<Card flush className={className}>

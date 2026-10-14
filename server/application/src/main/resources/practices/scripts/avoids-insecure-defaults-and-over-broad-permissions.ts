@@ -1,6 +1,3 @@
-// Finds the selected code lines that match a pattern of an insecure default, an over-broad permission or
-// an exposed secret, in all languages. Each lead is a candidate: the review decides if it is real and
-// exploitable on a reachable path.
 import { scm } from "../kits/scm/index.ts";
 import {
 	occurrences,
@@ -27,17 +24,12 @@ export const LABELS = {
 };
 type InsecureKind = keyof typeof LABELS;
 
-// Each pattern fires on a selected line. They are tuned to the surface of authentication, transport and
-// secrets that a login or API change touches, where a quick review most often misses an insecure default.
 const PATTERNS: [InsecureKind, RegExp][] = [
-	// A credential-named value interpolated into a URL path or query. Matches ${...} and #{...} (JS,
-	// Ruby, Kotlin) and Swift's \(...) interpolation of a credential-named variable into a path.
 	[
 		"credential-named-value-in-url-path-query",
 		/["'`](?:https?:\/\/|\/)[^"'`\n]*(?:\\\(|[$#]\{)[^"'`\n)}]*\b(?:token|secret|password|api[_-]?key|auth|session|refresh)\w*/iu,
 	],
-	// An omitted kSecAttrAccessible defaults to WhenUnlocked. Whether the effective class, the
-	// synchronization and the backup migration fit the stored secret is the review's decision.
+	// kSecAttrAccessible defaults to WhenUnlocked; the review must judge whether that class fits the secret.
 	["keychain-write", /\bSecItemAdd\b|kSecValueData\b/u],
 	[
 		"logs-credential-named-value-response-body",
@@ -61,7 +53,6 @@ function isComment(t: string): boolean {
 	return t.startsWith("//") || t.startsWith("#") || t.startsWith("*") || t.startsWith("/*");
 }
 
-/** The fact that counts the leads of a kind: `keychain-write` becomes `keychainWrite`. */
 function countFact(kind: InsecureKind): string {
 	return kind.replaceAll(/-(?<letter>[a-z])/gu, (_, letter: string) => letter.toUpperCase());
 }

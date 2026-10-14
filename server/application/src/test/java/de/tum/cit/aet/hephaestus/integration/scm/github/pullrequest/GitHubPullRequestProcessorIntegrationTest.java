@@ -879,10 +879,6 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             return teamRepository.save(synced).getId();
         }
 
-        /**
-         * Pull request {@code number} as a sync reads it, asking for the reviews the DTO test
-         * lists.
-         */
         private GHPullRequest readBySync(int number, int minutesLater) {
             GHPullRequest read = GitHubPullRequestDTOReviewRequestsTest.pullRequestAskingForReviews(number);
             read.setFullDatabaseId(BigInteger.valueOf(FIXTURE_PR_ID + number));

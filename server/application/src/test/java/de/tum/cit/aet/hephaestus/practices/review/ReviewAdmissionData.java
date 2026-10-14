@@ -12,8 +12,10 @@ import de.tum.cit.aet.hephaestus.practices.spi.CitationVerificationStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
 import de.tum.cit.aet.hephaestus.practices.spi.FrozenModel;
 import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.InapplicabilityWarrant;
 import de.tum.cit.aet.hephaestus.practices.spi.IntroducedBasis;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.OpenQuestion;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemCandidate;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadReceiptStatus;
@@ -100,10 +102,9 @@ public class ReviewAdmissionData {
                         review.getId(),
                         scenario.practice().getId(),
                         scenario.item().getId())));
-        jdbc.sql(
-                        "INSERT INTO"
-                                + " review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,submitted_at,available_at,started_at)"
-                                + " VALUES(:id,:review,:ws,'RUNNING',0,'PENDING',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,:at,:at)")
+        jdbc.sql("INSERT INTO"
+            + " review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,submitted_at,available_at,started_at)"
+            + " VALUES(:id,:review,:ws,'RUNNING',0,'PENDING',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,:at,:at)")
                 .param("id", job)
                 .param("review", review.getId())
                 .param("ws", review.getWorkspaceId())
@@ -181,7 +182,21 @@ public class ReviewAdmissionData {
                 outcome,
                 "Recorded result",
                 "The captured work supports this result.",
-                new ResultEvidence(List.of(citation), null, null, List.of()),
+                new ResultEvidence(
+                        List.of(citation),
+                        null,
+                        outcome == ResultOutcome.DOES_NOT_APPLY
+                                ? new InapplicabilityWarrant(
+                                        List.of(source),
+                                        "This practice requires a matching change.",
+                                        "The captured work has no matching change.")
+                                : null,
+                        outcome == ResultOutcome.COULD_NOT_DETERMINE
+                                ? List.of(new OpenQuestion(
+                                        "Does the changed branch cover this case?",
+                                        "A focused execution would settle it.",
+                                        null))
+                                : List.of()),
                 null,
                 new HostCoverage(
                         true,

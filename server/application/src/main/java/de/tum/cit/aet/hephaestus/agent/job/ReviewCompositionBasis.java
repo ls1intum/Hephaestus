@@ -6,6 +6,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -26,7 +27,12 @@ import tools.jackson.databind.JsonNode;
  * whose rows the payload copied, so erasing any of them removes the row before another writer reads it.
  */
 @Entity
-@Table(name = "review_composition_basis")
+@Table(
+        name = "review_composition_basis",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_review_composition_basis_workspace",
+                        columnNames = {"job_id", "workspace_id"}))
 @Getter
 @Setter
 public class ReviewCompositionBasis {

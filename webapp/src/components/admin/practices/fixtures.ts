@@ -13,11 +13,7 @@ import type {
 import { definitionOf, mockScan } from "@/components/admin/practice-editor/fixtures";
 import type { FeedbackMode } from "@/lib/practice-feedback-mode";
 
-/**
- * Real `Date`s, not ISO strings: these go straight to a prop rather than through MSW, and a `Date`
- * is what the generated client's response transformer hands a screen at runtime. A route test
- * serves them as `Wire<T>` JSON instead.
- */
+// Prop fixtures use Dates because they bypass the generated response transformer.
 
 export const mockAdmin: AccountRef = {
 	id: "7",
@@ -74,7 +70,6 @@ export function reviewBatch(overrides: Partial<ReviewBatch> = {}): ReviewBatch {
 	};
 }
 
-/** A feedback mode handed down from the workspace default, or from a group when `source` says so. */
 export function inheritedFeedbackMode(
 	effective: FeedbackMode = "AUTOMATIC",
 	source: "GROUP" | "WORKSPACE" = "WORKSPACE",
@@ -82,7 +77,6 @@ export function inheritedFeedbackMode(
 	return { effective, override: null, source };
 }
 
-/** A feedback mode chosen on the practice or group itself. */
 export function chosenFeedbackMode(
 	effective: FeedbackMode,
 	source: "PRACTICE" | "GROUP" = "PRACTICE",
@@ -90,7 +84,6 @@ export function chosenFeedbackMode(
 	return { effective, override: effective, source };
 }
 
-/** A practice this workspace wrote itself. */
 export const OWN_ORIGIN: CatalogOrigin = {
 	catalogSlug: null,
 	state: "YOURS",
@@ -98,7 +91,6 @@ export const OWN_ORIGIN: CatalogOrigin = {
 	offeredDigest: null,
 };
 
-/** A practice or group from the catalog, in the given state. */
 export function catalogOrigin(
 	catalogSlug: string,
 	state: CatalogOrigin["state"] = "FROM_HEPHAESTUS",
@@ -169,15 +161,10 @@ export function mockPracticeOf({
 	};
 }
 
-/** The model slots a script declares in `meta.models`, each `"required"` or `"optional"`. */
 type PracticeScriptModelSlots = Partial<
 	Record<"chat" | "decision" | "embedding" | "reranking", "required" | "optional">
 >;
 
-/**
- * The contract the practice script guide teaches: `definePracticeScript`, declared models, and a
- * program that prepares leads and lets `ctx.review()` decide.
- */
 export function practiceScript(models: PracticeScriptModelSlots = {}): string {
 	const declared = Object.entries(models).map(([slot, need]) => `${slot}: "${need}"`);
 	return [
@@ -312,8 +299,6 @@ export const mockGroups: PracticeGroup[] = [
 	},
 ];
 
-/** A catalog update to a practice this workspace also edited: base, ours, and the offer. */
-/** The version this workspace adopted, which every release proposal fixture starts from. */
 export const releaseBase = definitionOf({
 	name: "Explain the change",
 	criteria: "Earlier criteria",

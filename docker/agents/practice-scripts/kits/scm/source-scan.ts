@@ -25,7 +25,6 @@ export type SourcePattern = [label: string, test: RegExp];
 export interface ScanHint {
 	file: string;
 	line: number;
-	/** The label of the pattern that matched. */
 	pattern: string;
 	/** The trimmed line, at most 160 characters. */
 	context: string;
@@ -83,7 +82,6 @@ function place(decls: Declaration[] | null, line: number, scope: RegExp | undefi
 	};
 }
 
-/** Scan the lines the change adds, placing each in its declaration as the head tree holds it. */
 export async function scanAddedLines(
 	tree: Pick<FileTree, "read"> | null,
 	diffFiles: ReadonlyMap<string, DiffFile>,
@@ -152,15 +150,11 @@ export async function scanAddedLines(
 	return scan;
 }
 
-/** Matching lines of one pattern label, shown or not. */
 export function countLabel(scan: { counts: ReadonlyMap<string, number> }, label: string): number {
 	return scan.counts.get(label) ?? 0;
 }
 
-/**
- * Says that the rows are a sample when they are, so that nothing read off them — a location, a
- * missing kind — is taken for the whole change.
- */
+// Label sampled rows so readers cannot mistake them for the whole change.
 export function sampleNote(scan: { matched: number; hints: readonly unknown[] }): string[] {
 	const omitted = scan.matched - scan.hints.length;
 	return omitted > 0

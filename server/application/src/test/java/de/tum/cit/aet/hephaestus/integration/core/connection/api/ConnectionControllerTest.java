@@ -59,14 +59,6 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Pure unit tests for {@link ConnectionController}. Exercises the controller directly against
- * mocked collaborators — no Spring context, no MockMvc — so failures point at controller logic, not
- * framework wiring.
- *
- * <p>The arch-test {@code haveSecurityAnnotationIfEndpoint} already covers the
- * {@code @PreAuthorize} wiring; here we verify behaviour.
- */
 class ConnectionControllerTest extends BaseUnitTest {
 
     @Mock
@@ -406,11 +398,6 @@ class ConnectionControllerTest extends BaseUnitTest {
         assertThat(problem.getTitle()).isEqualTo("Resource not found");
     }
 
-    /**
-     * Minimal admin {@link WorkspaceContext} for the given workspace id. The controller only reads
-     * {@code id()}; the filter + {@code @RequireAtLeastWorkspaceAdmin} guard (covered by
-     * integration tests) supply the real context at runtime.
-     */
     private static WorkspaceContext ctx(long workspaceId) {
         return new WorkspaceContext(
                 workspaceId,

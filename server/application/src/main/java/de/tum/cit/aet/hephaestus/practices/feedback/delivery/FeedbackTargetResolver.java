@@ -56,10 +56,11 @@ public class FeedbackTargetResolver {
             return new FeedbackTarget(item, snapshot.integration(), version);
         } catch (ItemCaptureException failure) {
             switch (failure.code()) {
-                case ITEM_REMOVED -> throw new TargetUnavailable(FeedbackStopReason.ITEM_GONE);
+                case ITEM_REMOVED -> throw new TargetUnavailable(FeedbackStopReason.ITEM_GONE, failure);
                 case ITEM_NOT_VISIBLE, CONSENT_WITHHELD ->
-                    throw new TargetUnavailable(FeedbackStopReason.APPROVAL_NO_LONGER_ELIGIBLE);
-                case VERSION_UNAVAILABLE -> throw new TargetUnavailable(FeedbackStopReason.REVIEWED_VERSION_CHANGED);
+                    throw new TargetUnavailable(FeedbackStopReason.APPROVAL_NO_LONGER_ELIGIBLE, failure);
+                case VERSION_UNAVAILABLE ->
+                    throw new TargetUnavailable(FeedbackStopReason.REVIEWED_VERSION_CHANGED, failure);
                 default -> throw failure;
             }
         }
@@ -71,6 +72,11 @@ public class FeedbackTargetResolver {
 
         private TargetUnavailable(FeedbackStopReason reason) {
             super("The feedback item is unavailable.");
+            this.reason = reason;
+        }
+
+        private TargetUnavailable(FeedbackStopReason reason, Throwable cause) {
+            super("The feedback item is unavailable.", cause);
             this.reason = reason;
         }
 

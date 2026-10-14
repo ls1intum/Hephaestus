@@ -1,12 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -32,16 +31,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Materialises {@code inputs/context/workspace.json} for {@link MentorContextRequest}.
- *
- * <p>Port of {@code session.tool.ts} (recent threads + first message preview) plus
- * {@code assigned-work.tool.ts} (open assigned issues + pending review requests with
- * {@code waitingDays}). The workspace-shape lives in this single context so the agent has
- * the per-tenant context it needs in one read.
- *
- * <p>Personal context is read for each turn, not retained in a formatted-content cache.
- */
+// Personal workspace context is read per turn; it must not enter a shared formatted-content cache.
 @Component
 @RequiredArgsConstructor
 public class WorkspaceContentSource implements ContentSource {
@@ -55,7 +45,7 @@ public class WorkspaceContentSource implements ContentSource {
     private static final int MESSAGE_PREVIEW_LENGTH = 200;
     private static final int REVIEW_WAIT_URGENCY_DAYS = 3;
 
-    private final UserRepository userRepository;
+    private final AccountSummaryQuery accounts;
     private final WorkspaceRepository workspaceRepository;
     private final MentorContextQueryRepository queryRepository;
     private final ObjectMapper objectMapper;
@@ -85,15 +75,14 @@ public class WorkspaceContentSource implements ContentSource {
 
     /** Reads the current context; formatted personal copies are not retained between turns. */
     public ObjectNode buildPayload(Long workspaceId, Long developerId) {
-        User user = userRepository
-                .findById(developerId)
-                .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
+        var account = accounts.findAllByIds(List.of(developerId)).get(developerId);
+        if (account == null) throw new EntityNotFoundException("Account", developerId.toString());
         Workspace workspace = workspaceRepository
                 .findById(workspaceId)
                 .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
         ObjectNode root = objectMapper.createObjectNode();
-        root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
+        root.putObject("user").put("name", account.displayName());
 
         ObjectNode workspaceNode = root.putObject("workspace");
         workspaceNode.put("slug", workspace.getWorkspaceSlug());

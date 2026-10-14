@@ -10,13 +10,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/**
- * Reads event coverage straight off the manifests — no probing, no runtime negotiation.
- *
- * <p>We compile every integration in one build, so what an integration can raise is a static fact
- * that a manifest already states. The only thing that varies per workspace is which integrations
- * are connected, and that is a single lookup rather than a capability handshake.
- */
 @Component
 public class DeclaredItemEventCoverage implements ItemEventCoverage {
 

@@ -23,7 +23,6 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Streams mentor output to Slack with bounded buffers and provider receipts. */
 public class SlackStreamingMentorChannel implements MentorChannel {
 
     private static final Logger log = LoggerFactory.getLogger(SlackStreamingMentorChannel.class);
@@ -373,12 +372,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         }
     }
 
-    /**
-     * Open the stream on the first call, append on every later one — serialized on {@link #streamLock} so a late
-     * flush tick and the terminal write can never both call {@code startStream} (exactly one open). {@code streamTs}
-     * is only set after an acknowledged open. Unknown visibility stops the turn without repeating the write.
-     * Throws the {@link SlackSendException} unchanged so callers keep their transient/gone handling.
-     */
+    // Serialize stream opening; only an acknowledged open sets streamTs, and unknown visibility must not cause a
+    // repeated write.
     private void openOrAppend(String text) {
         streamLock.lock();
         try {

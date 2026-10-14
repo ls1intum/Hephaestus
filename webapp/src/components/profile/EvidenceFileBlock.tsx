@@ -22,12 +22,7 @@ interface EvidenceFileBlockProps {
 	location: EvidenceLocation;
 }
 
-/**
- * One quoted citation behind a result or one of its problems. A `code` locator captions the path
- * and lines; an `object` one points into the runner's own context, which the reader cannot open,
- * so it captions the source's name and no numbers. A historical citation that recorded no file is
- * captioned like an object one, since there is no path to show.
- */
+// Non-code locators point into serialized runner input, not coordinates in the source app.
 export function EvidenceFileBlock({ location }: EvidenceFileBlockProps) {
 	const source = evidenceSourceDef(location.sourceKind);
 	const locatedByLine = source.locator === "code" && hasText(location.path);

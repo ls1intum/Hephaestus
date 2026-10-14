@@ -6,7 +6,6 @@ export type Currentness = ResultList["currentness"];
 
 const STALE_NOTE = "The practice or the reviewed work changed after this result.";
 
-/** Shared wording distinguishes an unverifiable result from a changed practice or reviewed work. */
 export const NON_CURRENT = {
 	STALE: {
 		badge: "Historical result",
@@ -41,7 +40,6 @@ export function claimCurrentnessNote(currentness: Currentness): string | undefin
 	return currentness === "CURRENT" ? undefined : NON_CURRENT[currentness].note;
 }
 
-/** Every currentness, in the order a filter offers it. */
 export const CURRENTNESS_VALUES = [
 	"CURRENT",
 	"STALE",

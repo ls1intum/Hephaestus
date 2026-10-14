@@ -20,14 +20,6 @@ import { retryUnlessNotFound } from "@/runtime/tanstack-query/query-defaults";
 
 import { useInvalidateOnSettle } from "./use-invalidate-on-settle";
 
-/**
- * Everything the review's sheet needs, already resolved: the review, the feedback checks it ran,
- * and the cancel action. Its results and feedback are other records: the sheet does not read them.
- *
- * The screen is handed states, not queries. That a running review is re-asked for on a timer, and
- * that the timer stops by itself once the review and its result processing are done, is this
- * module's business alone.
- */
 export interface ReviewController {
 	review: PanelState<{ review: ReviewDetail }>;
 	feedbackChecks: PanelState<{ checks: FeedbackCheck[] }>;
@@ -35,7 +27,6 @@ export interface ReviewController {
 	cancelPending: boolean;
 }
 
-/** A review is still moving while it waits or runs, or while a job's results are processed. */
 function isMoving(review: ReviewDetail): boolean {
 	return (
 		isActiveReview(review.status) ||
@@ -56,16 +47,14 @@ export function useReviewController(workspaceSlug: string, reviewId: string): Re
 	const checksOptions = listReviewFeedbackChecksOptions({ path: { workspaceSlug, reviewId } });
 	const checksQuery = useQuery({ ...checksOptions, retry: retryUnlessNotFound });
 
-	// The checks are written when the results are processed, and the review's row (its counts, which
-	// the lists read) with its results: the review settling is what asks both once more.
+	// Refresh checks and lists after processing finishes; their last polled state can predate the final results.
 	const settled = reviewQuery.data !== undefined && !isMoving(reviewQuery.data);
 	useInvalidateOnSettle(reviewId, reviewQuery.data !== undefined && !settled, [
 		checksOptions.queryKey,
-		// Any read of the review's row, whatever its page size.
 		listReviewsQueryKey({ path: { workspaceSlug }, query: { reviewId } }),
 	]);
 
-	// Cancelling answers the review's summary, not its detail: every read it can move is asked again.
+	// Cancellation returns a summary, so refresh detail rather than treating that answer as complete.
 	const cancelReview = useMutation({
 		...cancelReviewMutation(),
 		onSuccess: () => {

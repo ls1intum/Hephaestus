@@ -29,12 +29,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Read-only instance-admin viewer over the append-only {@code auth_event} log (see {@link
- * AuthEvent}). Guarded by the namespaced {@code app_admin} authority. Surfaces the acting account
- * and the viewed user so administrative actions and user views stay attributable to the
- * administrator.
- */
 @ConditionalOnServerRole
 @RestController
 @RequestMapping("/admin/audit")

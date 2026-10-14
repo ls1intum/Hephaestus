@@ -6,10 +6,6 @@ import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins vendor-neutrality of {@code integration.core.**}. {@code integration.scm.domain.**}
- * belongs to a domain module and is reached through neutral ports.
- */
 class IntegrationCoreVendorNeutralityTest extends HephaestusArchitectureTest {
 
     @Test

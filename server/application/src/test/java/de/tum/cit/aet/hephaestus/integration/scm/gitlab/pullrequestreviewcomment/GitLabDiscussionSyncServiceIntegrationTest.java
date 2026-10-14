@@ -138,8 +138,6 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
             var pr = pullRequests.findById(prId).orElseThrow();
             var author = users.findById(authorId).orElseThrow();
-            // The webhook user may be absent; the source lookup still supplies the
-            // stored author.
             when(userService.findOrCreateUser((GitLabWebhookUser) null, providerId))
                     .thenReturn(author);
             var context =

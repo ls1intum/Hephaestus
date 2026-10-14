@@ -8,12 +8,7 @@ export interface FeedbackModeSourceNoteProps {
 	className?: string;
 }
 
-/**
- * Whether this practice's feedback mode was chosen here or handed down.
- *
- * Both states are named: a reader cannot tell "nobody set this" from "nothing to say". The glyph
- * separates inherited from pinned without relying on the wording alone.
- */
+// Name both local and inherited feedback modes so silence cannot be mistaken for an unset value.
 export function FeedbackModeSourceNote({ source, className }: FeedbackModeSourceNoteProps) {
 	const Icon = source.kind === "inherited" ? CornerDownRight : Pin;
 	return (

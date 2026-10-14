@@ -7,10 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * The producer writes this layout and the reader takes it apart, so the two must agree exactly. These
- * are the assertions that would fail if either side drifted.
- */
 class PracticePageFeedbackBodyTest extends BaseUnitTest {
 
     @ParameterizedTest
@@ -38,7 +34,7 @@ class PracticePageFeedbackBodyTest extends BaseUnitTest {
         assertThat(PracticePageFeedbackBody.nextStepOf(body)).isEqualTo(nextStep.replace('\n', ' '));
     }
 
-    /** A newline in a heading would swallow the rest of the message into the title. */
+    // A newline would let a heading consume the rest of the message.
     @Test
     void collapsesANewlineInTheHeadlineRatherThanLettingItSplitTheBody() {
         String body = PracticePageFeedbackBody.render("Two\nlines", "The message.", "Try this next.");

@@ -15,11 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * The address grammar is the first fence between a browser tab and a workspace's mirrored work:
- * anything it lets through ambiguously could name another project's work, so every rejection here
- * is deliberate.
- */
 class ReviewedWorkUrlsTest extends BaseUnitTest {
 
     @Test

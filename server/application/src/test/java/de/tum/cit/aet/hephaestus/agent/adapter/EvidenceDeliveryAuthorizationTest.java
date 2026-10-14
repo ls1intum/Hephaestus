@@ -9,8 +9,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.context.CitedSourceAccess;
 import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
-import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -23,9 +21,6 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
     void keepsVerifiedDeliveryIndependentOfRuntimeJobRetention() {
         var sources = mock(ClasspathSourceCatalogRegistry.class);
         var access = mock(CitedSourceAccess.class);
-        var catalog = mock(SourceCatalog.class);
-        when(catalog.version()).thenReturn(new SourceContractVersion("2.0.0"));
-        when(sources.current()).thenReturn(catalog);
         var authorization = new EvidenceDeliveryAuthorization(sources, access);
         var result = Result.builder()
                 .id(UUID.randomUUID())

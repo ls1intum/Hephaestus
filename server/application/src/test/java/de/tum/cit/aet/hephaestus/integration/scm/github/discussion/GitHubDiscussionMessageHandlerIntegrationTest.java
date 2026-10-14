@@ -37,29 +37,8 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Note: This test class does NOT use @Transactional because the discussion processing chain calls
- * GitHubUserProcessor.findOrCreate() which uses REQUIRES_NEW propagation. Having @Transactional
- * here would cause connection pool deadlocks under parallel test execution as the test transaction
- * holds a connection while REQUIRES_NEW needs an additional one. We use TransactionTemplate for
- * lazy-loading assertions.
- *
- * <p><b>Fixture Values (discussion.created.json - Discussion #27):</b>
- *
- * <ul>
- *   <li>ID: 9096662
- *   <li>Number: 27
- *   <li>Title: "Fixture discussion thread"
- *   <li>State: open
- *   <li>Locked: false
- *   <li>HTML URL: "https://github.com/HephaestusTest/TestRepository/discussions/27"
- *   <li>Created at: 2025-11-01T23:15:45Z
- *   <li>Updated at: 2025-11-01T23:15:45Z
- *   <li>Comments: 0
- *   <li>Author: FelixTJDietrich (ID: 5898705)
- *   <li>Category: General (ID: "46489461")
- * </ul>
- */
+// REQUIRES_NEW user writes need a free connection; an outer test transaction can deadlock the pool.
+// Use TransactionTemplate only for lazy-loading assertions.
 class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures

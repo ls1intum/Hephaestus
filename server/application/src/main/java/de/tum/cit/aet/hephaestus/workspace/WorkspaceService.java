@@ -28,40 +28,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Central service for workspace management operations.
- *
- * <h2>Responsibilities</h2>
- *
- * <ul>
- *   <li><b>Workspace creation:</b> Creates workspaces with owner membership
- *   <li><b>Slug management:</b> Renames with redirect history via {@link WorkspaceSlugService}
- *   <li><b>Settings delegation:</b> Forwards to {@link WorkspaceSettingsService}
- * </ul>
- *
- * <h2>Related Services</h2>
- *
- * For other workspace operations, use the specialized services:
- *
- * <ul>
- *   <li>{@link WorkspaceQueryService} – Read-only queries and lookups
- *   <li>{@link WorkspaceLifecycleService} – Status transitions (suspend/resume/purge)
- *   <li>{@link de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GitHubLifecycleListener}
- *       – GitHub App installation handling
- *   <li>Repository monitor integration – Repository monitoring configuration
- *   <li>{@link WorkspaceActivationService} – Activation/startup orchestration
- *   <li>SCM team settings – Workspace-scoped team settings
- *   <li>SCM team settings – Team/label associations
- * </ul>
- *
- * <h2>Multi-Tenancy Note</h2>
- *
- * This service is workspace-agnostic: it manages workspaces themselves (the tenant root), not data
- * within workspaces. Methods take workspace slug or {@link WorkspaceContext} as parameters.
- *
- * @see Workspace
- * @see WorkspaceContext
- */
 @Service
 @WorkspaceAgnostic("Manages workspaces themselves - the tenant root, not data within workspaces")
 public class WorkspaceService {

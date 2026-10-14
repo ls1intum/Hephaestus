@@ -137,7 +137,6 @@ void describe("the practice script primitives", () => {
 	});
 });
 
-/** The error of a call that the proxy answered with `statusCode`. */
 const answered = (statusCode: number) =>
 	new APICallError({
 		message: "refused",
@@ -146,7 +145,6 @@ const answered = (statusCode: number) =>
 		statusCode,
 	});
 
-/** A read that the host refuses. */
 async function refused(): Promise<never> {
 	throw new UnratedError("refused");
 }

@@ -260,7 +260,6 @@ function RowContent({ subject }: { subject: WorkSubject }) {
 	);
 }
 
-/** The report on the work's own page, with the reader's results once they open it. */
 function PageContent() {
 	const view = useRememberedView();
 	const { expanded, workspaceSlug, remember, webAppOrigin } = view;

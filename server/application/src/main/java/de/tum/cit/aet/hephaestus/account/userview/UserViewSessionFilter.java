@@ -34,12 +34,7 @@ import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Binds a read-only user view to the normal app. Runs after Spring Security, which admits only an
- * instance administrator's {@code GET} in view mode, and before {@link WorkspaceContextFilter},
- * which reads the view. A route outside {@link #READ_PATHS} is refused before a {@code USER_VIEW}
- * row is written.
- */
+/** Runs after authentication and before {@link WorkspaceContextFilter}; refused routes must not record USER_VIEW success. */
 @Component
 @ConditionalOnServerRole
 @Profile("!specs")

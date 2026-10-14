@@ -112,7 +112,6 @@ class ScmFeedbackFormatterTest extends BaseUnitTest {
         return new ItemRef(1L, 42L, new ItemKind("scm.pull_request"), 99L, null, null);
     }
 
-    /** Every workspace is "team": what the footer's link needs of the workspace. */
     private static WorkspaceSummaryQuery teamWorkspace() {
         WorkspaceSummaryQuery workspaces = mock(WorkspaceSummaryQuery.class);
         when(workspaces.findById(anyLong()))

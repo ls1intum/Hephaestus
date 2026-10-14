@@ -50,24 +50,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
-/**
- * GitLab adapter for {@link LineNoteWriter}. Posts each piece of located feedback as an ordinary
- * merge request comment via {@code CreateMergeRequestNote}, headed by a static link to its file and
- * lines at the reviewed commit. GitLab attaches an ordinary comment to no line, so the link is the
- * location: no diff note is created, resolved, edited or deleted to place it.
- *
- * <p>Each comment carries the copy marker and a hidden correlation tag with its delivery key,
- * and links to the reviewed commit, never to a newer head. Before any create, the merge request's
- * discussions are read completely and the copies of the package are indexed by key; an item with a
- * copy is never posted again. Explicit correction edits the existing authorized copy and preserves
- * its physical marker. Existing diff notes and ordinary comments stay readable as copies. Each
- * create is fenced on its own, so a stop between two comments leaves the second provably unrequested.
- *
- * <p>Every copy includes its copy marker and final correlation tag.
- *
- * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track {@link
- * GitLabGraphQlClientProvider}.
- */
+// Ordinary comments use static links at the reviewed commit; GitLab does not attach them to diff lines.
+// Fence each create separately, and preserve existing copy markers during correction.
 @Component
 @ConditionalOnServerRole
 @OutboundEgressGateway
@@ -76,16 +60,10 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabLineNoteWriter.class);
 
-    /**
-     * GitLab's max page size for the {@code discussions} connection (the GraphQL {@code first} cap
-     * is 100).
-     */
     private static final int DISCUSSIONS_PAGE_SIZE = 100;
 
-    /** Hard ceiling on discussion pages walked per scan; a scan that reaches it proves nothing. */
     private static final int MAX_DISCUSSION_PAGES = 50;
 
-    /** A commit id, the only revision a location link may name. */
     private static final Pattern COMMIT_SHA = Pattern.compile("[0-9a-fA-F]{7,64}");
 
     private final GitLabGraphQlClientProvider gitLabProvider;
@@ -219,11 +197,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         }
     }
 
-    /**
-     * Requests one ordinary merge request comment. It attaches to no line, so no answer can prove a
-     * position was refused before saving: a failure, a missing response or an answer without a note
-     * may still have created one.
-     */
+    // A failed ordinary-note request can still create a comment; it cannot prove rejection before the write.
     private Attempt createLocationComment(
             long scopeId, String mrGlobalId, String body, FeedbackAnchor diff, UUID copyId) {
         ClientGraphQlResponse response;
@@ -262,12 +236,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         return new Attempt(CopyReceipt.attempted(copyId), false);
     }
 
-    /**
-     * The package's copies on the merge request, by delivery key, from a complete scan: a page
-     * budget, a lost cursor, a missing connection or identity, or a discussion with more notes than
-     * one read returns fails the scan instead of passing for absence. A key whose copies do not
-     * verify is kept as a conflict.
-     */
+    // Partial discussions, missing identity, or incomplete pagination cannot prove a copy absent.
     private Map<String, Copy> indexCopies(
             long scopeId, MrCoordinates mr, List<LineNote> items, ItemVersion version, String projectUrl) {
         Map<String, LineNote> expected = new HashMap<>();
@@ -366,12 +335,6 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         }
     }
 
-    /**
-     * Where the note appears when it is a copy of the item, else {@code null}. A copy is the exact
-     * body this writer posts for the item: the ordinary comment linking to its lines at the
-     * reviewed commit; or, posted before that, a diff note at its line on the reviewed commit (this
-     * adapter placed a range at its end line) or the ordinary comment that diff note fell back to.
-     */
     private static @Nullable CopyForm copyForm(
             Map<?, ?> note, String body, LineNote item, ItemVersion version, String projectUrl) {
         FeedbackAnchor diff = item.anchor();
@@ -397,11 +360,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         return lineCopy ? CopyForm.LINE_NOTE : null;
     }
 
-    /**
-     * The items a stopped package does not request: a verified copy the scan found is still
-     * reported as kept, so stopping never loses a copy that is already there; every other item is
-     * reported as never sent.
-     */
+    // Stopping a package must preserve receipts for copies already verified at the provider.
     private static List<CopyReceipt> unrequested(List<LineNote> items, Map<String, Copy> copies) {
         return items.stream()
                 .map(item -> {
@@ -419,17 +378,13 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         return feedbackItems.stream().map(LineNote::copyId).toList();
     }
 
-    /**
-     * The project's web address on the workspace's configured GitLab server: each namespace and
-     * project segment encoded on its own, so the slashes between them stay the path's structure.
-     */
+    // Encode each project segment independently so namespace slashes retain their structure.
     private String projectUrl(long scopeId, MrCoordinates mr) {
         String serverUrl = tokenService.resolveServerUrl(scopeId);
         String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
         return base + "/" + encodedPath(mr.projectPath());
     }
 
-    /** The item's body: slash commands escaped, then the copy marker and the correlation tag. */
     private static String postedBody(LineNote item) {
         String body = GitLabSummaryWriter.escapeSlashCommands(item.body());
         body = body + "\n" + item.writeMarker();
@@ -437,12 +392,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         return body + "\n" + ScmFeedbackFormatter.deliveryTag(key);
     }
 
-    /**
-     * The ordinary comment: a static link to the anchored lines of the file at the reviewed commit,
-     * then the item's body unchanged. The link is location metadata, never part of the feedback
-     * itself; its text names only the lines, so no repository file name reaches the comment's
-     * Markdown outside the encoded address.
-     */
+    // File names stay inside the encoded URL; link text contains only line coordinates.
     private static String locationBody(String projectUrl, String revision, FeedbackAnchor diff, LineNote item) {
         if (diff.endLine() == null)
             return "**[View file]("
@@ -462,7 +412,6 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         return "**[" + label + "](" + link + ")**\n\n" + postedBody(item);
     }
 
-    /** Each segment of a path percent-encoded, so no character of it can end the link. */
     private static String encodedPath(String path) {
         return Arrays.stream(path.split("/", -1))
                 .map(segment ->
@@ -470,16 +419,10 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                 .collect(Collectors.joining("/"));
     }
 
-    /**
-     * The comment a diff note outside the diff fell back to, before every item was posted as one.
-     */
     private static String fallbackBody(FeedbackAnchor diff, LineNote item) {
         return "**`" + diff.path() + ":" + diff.endLine() + "`**\n\n" + postedBody(item);
     }
 
-    /**
-     * A copy of a package item; {@code verified} false when it carries the key but not the item.
-     */
     private record Copy(
             boolean verified,
             String noteId,
@@ -491,7 +434,6 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         }
     }
 
-    /** One create request's outcome, and whether the rest of the package must wait. */
     private record Attempt(CopyReceipt receipt, boolean stop) {}
 
     private static boolean isRateLimitError(Exception e) {

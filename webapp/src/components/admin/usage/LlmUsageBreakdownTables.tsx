@@ -40,13 +40,11 @@ function sumBy<T>(rows: readonly T[], pick: (row: T) => number): number {
 	return rows.reduce((total, row) => total + pick(row), 0);
 }
 
-/** A row of figures, the run count its averages divide by, and its runs with no price. */
 interface PurseFigures extends PurseSpend {
 	runs: number;
 	unpriced: number;
 }
 
-/** A header that spans both header rows, after the purse groups. */
 interface TrailingHead {
 	label: string;
 	className?: string;
@@ -54,16 +52,10 @@ interface TrailingHead {
 
 interface PurseHeaderRowsProps {
 	purses: readonly Purse[];
-	/** The first column's header, which spans both header rows. */
 	leading: string;
 	trailing: readonly TrailingHead[];
 }
 
-/**
- * Two header rows: each purse's name over its own Spend and Avg per run, so one cell holds one
- * figure and the two purses are never read as one sum. A purse's name is a `col` header across both
- * of its columns, as `DataTableHeader` explains.
- */
 function PurseHeaderRows({ purses, leading, trailing }: PurseHeaderRowsProps) {
 	return (
 		<TableHeader>
@@ -114,7 +106,6 @@ function averageOf(figures: PurseFigures, purse: Purse): number | null {
 	return averageSpend(spendOf(figures, purse), figures.runs, figures.unpriced);
 }
 
-/** One precision per average column, its total included, so the decimal points line up. */
 type AverageColumnDigits = Record<Purse, AverageDigits>;
 
 function averageColumnDigits(column: readonly PurseFigures[]): AverageColumnDigits {
@@ -187,7 +178,6 @@ export interface LlmUsageByJobTypeTableProps {
 	purses: readonly Purse[];
 }
 
-/** Five run types at most, so no sorting: the order is the server's. */
 export function LlmUsageByJobTypeTable({ report, purses }: LlmUsageByJobTypeTableProps) {
 	const rows = report?.byJobType;
 	const hasUnpriced = rows?.some((row) => row.unpricedEventCount > 0) === true;
@@ -294,10 +284,7 @@ export function LlmUsageByJobTypeTable({ report, purses }: LlmUsageByJobTypeTabl
 	);
 }
 
-/**
- * The money and the runs with no price are the report's own month totals, never a re-addition of the
- * rows: one run can have usage on two days. The other counts are integers and add up exactly.
- */
+// Use server month totals; a run with usage on two days must still count once.
 function TotalHead() {
 	return (
 		<TableHead scope="row" className={cn(FIRST_COLUMN, TOTAL_CELL)}>
@@ -313,10 +300,6 @@ export interface LlmUsageByDayTableProps {
 	purses: readonly Purse[];
 }
 
-/**
- * 31 days at most, so no sorting or paging: the order is the calendar's. Spend only: a daily
- * average per purse answers no question that the run types do not.
- */
 export function LlmUsageByDayTable({ report, purses }: LlmUsageByDayTableProps) {
 	const rows = report?.byDay;
 	const hasUnpriced = rows?.some((row) => row.unpricedEventCount > 0) === true;

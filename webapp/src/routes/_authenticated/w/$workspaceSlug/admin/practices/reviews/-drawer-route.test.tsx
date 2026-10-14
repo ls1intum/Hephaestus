@@ -14,6 +14,7 @@ import {
 	reviewProblems,
 	reviewRefOf,
 	reviewResults,
+	reviewUsageTwoAttempts,
 	reviews,
 	workspacePractices,
 } from "@/components/admin/practice-reviews/fixtures";
@@ -64,7 +65,7 @@ function instant(url: URL | undefined, name: string): number | undefined {
 }
 
 beforeEach(() => {
-	// jsdom has no IntersectionObserver, and the lists load their next page as their end scrolls into view.
+// jsdom needs an IntersectionObserver stub for paged lists.
 	vi.stubGlobal("IntersectionObserver", ObserverStub);
 	requested.length = 0;
 	server.events.on("request:start", record);
@@ -75,12 +76,10 @@ afterEach(() => {
 	server.events.removeListener("request:start", record);
 });
 
-/** A row's own link, named by what it opens and then by its record: "Open result …, 6 Oct, 14:05". */
 function openRow(kind: string, name: string) {
 	return { name: (accessibleName: string) => accessibleName.startsWith(`Open ${kind} ${name},`) };
 }
 
-/** A result of the fixture with its own summary, which names its row and its level. */
 function summarized(predicate: (result: ReviewResult) => boolean): ReviewResult & {
 	summary: string;
 } {
@@ -120,19 +119,18 @@ describe("practice review levels", () => {
 		screen.getByRole("link", openRow("result", result.summary));
 	});
 
-	/** A problem's row opens the problem over the problems list, and closes back to it. */
-	it("opens a problem over the problems list", async () => {
+	it("opens the result of a problem over the problems list", async () => {
 		const [problem] = reviewProblems;
 		assert(problem);
 		const { router } = renderRouteAtWithRouter(`${REVIEWS}/observations`);
 
 		await userEvent.click(
-			await screen.findByRole("link", openRow("problem", problem.summary), ROUTE_RENDER_WAIT),
+			await screen.findByRole("link", openRow("result", problem.summary), ROUTE_RENDER_WAIT),
 		);
 
 		await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
 		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
-			`problem:${problem.id}`,
+			`result:${problem.resultId}`,
 		]);
 		fireEvent.keyDown(document.body, { key: "Escape" });
 		await waitFor(
@@ -213,7 +211,6 @@ describe("practice review levels", () => {
 		]);
 		await within(sheet).findByRole("heading", { name: "What it is" }, ROUTE_RENDER_WAIT);
 		expect(within(sheet).queryByText(/^Counts /u)).toBeNull();
-		// Its practice versions are its history, read from the practice's own versions.
 		await waitFor(() =>
 			expect(requestsTo(`/practices/${practice.practiceSlug}/versions`)).toHaveLength(1),
 		);
@@ -257,7 +254,6 @@ describe("practice review levels", () => {
 		expect(previous?.searchParams.get("zone")).toBe(browserTimeZone());
 	});
 
-	/** The review time is measured over the reviews the overview counts, from its start until now. */
 	it("asks for the review time over the overview's range", async () => {
 		renderRouteAtWithRouter(`${REVIEWS}?range=7d`);
 		await screen.findByRole("heading", { name: "What the reviews did" }, ROUTE_RENDER_WAIT);
@@ -289,7 +285,6 @@ describe("practice review levels", () => {
 		expect(approvals?.searchParams.get("sort")).toBe("OLDEST");
 		expect(approvals?.searchParams.has("from")).toBe(false);
 		expect(approvals?.searchParams.has("to")).toBe(false);
-		// Failed deliveries are the overview's own counts: no list is read for them.
 		expect(
 			requestsTo("/practices/reviews/feedback").filter((url) =>
 				values(url, "state").includes("FAILED"),
@@ -313,13 +308,18 @@ describe("the facts a sheet reads beyond its record", () => {
 	it("says what a review cost per attempt", async () => {
 		const [review] = reviews;
 		assert(review);
+		server.use(
+			http.get(`*/workspaces/:workspaceSlug/practices/reviews/${review.id}`, () =>
+				HttpResponse.json({ ...reviewDetail(review.id), usage: reviewUsageTwoAttempts }),
+			),
+		);
 		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=review:${review.id}`);
 
 		const sheet = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
 		// Technical is open by default.
 		await within(sheet).findByText("$0.04 over 2 attempts", undefined, ROUTE_RENDER_WAIT);
 		within(sheet).getByText("Attempt 2");
-		expect(requestsTo(`/practices/reviews/${review.id}/usage`)).toHaveLength(1);
+		expect(requestsTo(`/practices/reviews/${review.id}`)).toHaveLength(1);
 	});
 
 	it("says a result came from a review someone requested", async () => {
@@ -340,13 +340,15 @@ describe("the facts a sheet reads beyond its record", () => {
 describe("a new review from a row of the Reviews table", () => {
 	const REQUESTS = "*/workspaces/:workspaceSlug/practices/review-requests";
 
-	/**
-	 * A row's Request review asks for a new review of its item once the reader confirms: the
-	 * same ask the sheet's footer makes. The server is mocked; nothing real is reviewed.
-	 */
 	it("asks for a review of the row's item after the confirmation, and reads the reviews again", async () => {
 		const bodies: unknown[] = [];
+		const completed = reviews.find((review) => review.item.id === reviewItem.id && review.status === "COMPLETE");
+		assert(completed);
 		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/reviews", () => HttpResponse.json({
+				content: [completed], number: 0, size: 25, totalElements: 1, totalPages: 1,
+				numberOfElements: 1, first: true, last: true, empty: false,
+			})),
 			http.post(REQUESTS, async ({ request }) => {
 				bodies.push(await request.json());
 				return HttpResponse.json({
@@ -386,7 +388,6 @@ describe("a new review from a row of the Reviews table", () => {
 });
 
 describe("practices turned off today", () => {
-	/** The practices as they are set up now: "Thin controllers" has its feedback mode at Off. */
 	beforeEach(() => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices", () =>
@@ -463,11 +464,14 @@ describe("practices turned off today", () => {
 		const options = await screen.findByRole("listbox", { name: "Practice options" });
 		await within(options).findByRole("option", { name: /Errors carry their context/u });
 		expect(within(options).queryByRole("option", { name: /Thin controllers/u })).toBeNull();
+		await userEvent.keyboard("{Escape}");
 
 		await userEvent.click(
-			screen.getByRole("switch", { name: "Show turned-off practices (1 hidden)" }),
+			await screen.findByRole("switch", { name: "Show turned-off practices (1 hidden)" }),
 		);
-		await within(options).findByRole("option", { name: /Thin controllers/u });
+		await userEvent.click(screen.getByRole("combobox", { name: "Practice" }));
+		const updated = await screen.findByRole("listbox", { name: "Practice options" });
+		await within(updated).findByRole("option", { name: /Thin controllers/u });
 	});
 });
 
@@ -503,7 +507,6 @@ it("keeps hidden result facts and navigation without restoring its text", async 
 	await waitFor(() => expect(router.state.location.searchStr).not.toContain("detail="));
 });
 
-/** The trace of one review and nothing it recorded yet. */
 function lineageOf(review: ReviewDetail, item = review.item): ReviewLineage {
 	return storyLineage({
 		root: { kind: "REVIEW", id: review.id },
@@ -520,7 +523,6 @@ describe("a review's trace while the review runs", () => {
 	const RUNNING_ID = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
 	const base = reviewDetail(LINEAGE_REVIEW_ID);
 
-	/** The review as its sheet and the trace read it, with the status given. */
 	function reviewAs(id: string, status: ReviewDetail["status"]): ReviewDetail {
 		const active = status === "QUEUED" || status === "RUNNING";
 		return {
@@ -627,10 +629,6 @@ describe("a review's trace while the review runs", () => {
 		}
 	});
 
-	/**
-	 * The trace follows a running review, reads its chain once more when the review stops, since
-	 * feedback can settle after it, and then stops asking.
-	 */
 	it("follows a selected review's trace until it stops, then reads it once more", async () => {
 		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
 		try {
@@ -648,7 +646,7 @@ describe("a review's trace while the review runs", () => {
 			);
 			const reviewReads = requestsTo(`/practices/reviews/${RUNNING_ID}`).length;
 			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-			// The interval is faked, so the waits poll on vitest's own timer rather than on setInterval.
+		// Waits must use Vitest's polling timer while the interval is faked.
 			await vi.waitFor(() =>
 				expect(requestsTo(`/practices/reviews/${RUNNING_ID}`).length).toBeGreaterThan(reviewReads),
 			);

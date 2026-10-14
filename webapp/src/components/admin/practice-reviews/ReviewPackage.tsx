@@ -22,11 +22,7 @@ export interface ReviewPackageProps {
 	defaultExpanded?: boolean;
 }
 
-/**
- * The copies of one piece of feedback, in the order they are written: the summary, then the notes
- * on files and lines, each with where it stands. A private destination's text is never shown here,
- * even when a caller passes copies for it: the destination's own words stand in.
- */
+// Private destinations must hide copy text and counts even when the caller supplies them.
 export function ReviewPackage({ feedback, defaultExpanded = false }: ReviewPackageProps) {
 	if (ADMIN_WITHHELD_TEXT[feedback.destination] !== undefined) {
 		return <FeedbackBody feedback={{ destination: feedback.destination, body: null }} />;
@@ -84,12 +80,10 @@ export function ReviewPackage({ feedback, defaultExpanded = false }: ReviewPacka
 
 type NoteCopy = FeedbackCopy & { kind: "LINE_NOTE" | "FILE_NOTE"; path: string };
 
-/** A note on one file or on lines in it. Either keeps its file; the summary has none. */
 function isNote(copy: FeedbackCopy): copy is NoteCopy {
 	return (copy.kind === "LINE_NOTE" || copy.kind === "FILE_NOTE") && copy.path !== null;
 }
 
-/** "Lines 148–152", "Line 148", or the kind's own name for a note on the whole file. */
 function noteAnchor(note: NoteCopy): string {
 	if (note.kind === "FILE_NOTE" || note.startLine === null) {
 		return FEEDBACK_COPY_KIND_DEFS.FILE_NOTE.label;

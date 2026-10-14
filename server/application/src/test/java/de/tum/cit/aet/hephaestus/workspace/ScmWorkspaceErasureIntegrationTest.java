@@ -46,20 +46,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/**
- * Real-Postgres proof of SCM erase-on-disconnect/purge semantics, and above all of its
- * <b>cross-tenant safety</b>.
- *
- * <p>The SCM mirror is instance-global: {@code repository}, {@code issue}, {@code pull_request} and
- * their children carry no {@code workspace_id} and are genuinely shared between workspaces that
- * monitor the same source repository. An erase that simply deleted "the workspace's repositories"
- * would destroy another tenant's data. A repository two workspaces monitor must survive one of them
- * disconnecting, together with its issues, while a repository only the erased workspace monitored
- * is cascade-deleted with everything hanging off it.
- *
- * <p>Also pins idempotency (the erase is re-runnable) and the retention decisions: another
- * integration's rows and the {@code sync_job} history are NOT erased.
- */
 class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
 
     private static final String SHARED_REPO = "acme/shared";
@@ -293,9 +279,6 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         // The Organization identity row itself is global and survives — never deleted.
         assertThat(organizationRepository.findById(organization.getId())).isPresent();
 
-        // The released organization's single binding slot (workspace_organization_id_key) is now
-        // free
-        // to be bound again.
         bindOrganization(tenantB, organization);
         assertThat(organizationIdOf(tenantB)).isEqualTo(organization.getId());
 
@@ -428,9 +411,6 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         return teamRepository.save(team);
     }
 
-    /**
-     * The workspace's {@code organization_id} FK, read as a column so no lazy proxy is involved.
-     */
     private @Nullable Long organizationIdOf(Workspace workspace) {
         return jdbcTemplate.queryForObject(
                 "SELECT organization_id FROM workspace WHERE id = ?", Long.class, workspace.getId());

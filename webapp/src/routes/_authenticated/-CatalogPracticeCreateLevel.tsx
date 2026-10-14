@@ -20,7 +20,6 @@ import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-ref
 
 export interface CatalogPracticeCreateLevelProps {
 	nested?: boolean;
-	/** Where the level sits, from the host's `levelPathAt`. */
 	path: LevelPath;
 	onDone: () => void;
 }
@@ -42,7 +41,7 @@ export function CatalogPracticeCreateLevel({
 		definitionOptionsQuery.error,
 	);
 	const failed = [catalogQuery, definitionOptionsQuery].filter((read) => read.isError);
-	// A refusal hides the editor even over cached data. Any other failure leaves a loaded draft open.
+	// Denied reads hide cached drafts; transient refresh failures preserve them.
 	const failure = failed.find((read) => !queryErrorIsRetryable(read.error)) ?? failed[0];
 	const refused = failure !== undefined && !queryErrorIsRetryable(failure.error);
 	const retryFailed = () => {

@@ -226,7 +226,6 @@ export const FollowedInTwoWorkspaces: Story = {
 	},
 };
 
-/** A running review is said, and a list row still offers no request. */
 export const ReviewRunning: Story = {
 	args: { activity: "RUNNING" },
 	play: async ({ canvas }) => {

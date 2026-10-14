@@ -1,7 +1,3 @@
-// Finds the print-style calls and the logger calls that the change adds in application code, for
-// each language. It also tells if a bounded search of the checkout finds a logger. The shapes of each
-// language follow the criteria. The review decides from the file if a print is the output of the
-// program, such as a CLI or a script, or a diagnostic that ships.
 import { scm } from "../kits/scm/index.ts";
 import { countLabel, scanOccurrences, type SourcePattern } from "../kits/scm/source-scan.ts";
 import { DIRECTION_CHARS, factsOf, noMatchDirections, oneLine } from "../lib/core/bounded-text.ts";
@@ -17,20 +13,17 @@ const SCRIPTING: Shapes = {
 	logger: [["logger", /\b(?:log|logger)\.(?:trace|debug|info|warn|error|fatal)\s*\(/u]],
 };
 
-// The Apple system log: NSLog and NSLogv write to it, as the os_log family does.
 const APPLE_SYSTEM_LOG: SourcePattern[] = [
 	["os_log", /\bos_log(?:_(?:info|debug|error|fault))?\s*\(/u],
 	["NSLog", /\bNSLogv?\s*\(/u],
 ];
 
-// android.util.Log at any level and whatever its tag, and Timber over it. A bare `Log.` is read by name:
-// the import that makes it android.util.Log is the review's to confirm.
+// A bare Log name does not establish android.util.Log; the review must resolve its import.
 const ANDROID_LOG: SourcePattern[] = [
 	["android.util.Log", /\b(?:android\.util\.)?Log\.(?:v|d|i|w|e|wtf)\s*\(/u],
 	["Timber", /\bTimber\.(?:v|d|i|w|e|wtf)\s*\(/u],
 ];
 
-// language -> the print-style shapes and the logger shapes the criteria list for it.
 const DIAGNOSTICS: Record<string, Shapes> = {
 	swift: {
 		print: [
@@ -77,11 +70,9 @@ const DIAGNOSTICS: Record<string, Shapes> = {
 	},
 };
 
-/** Where a print is the program's output rather than a diagnostic: the criteria's exemptions, by path. */
 const TOOL_PATH =
 	/(?:^|\/)(?:scripts?|tools?|bin|cli|Scripts|fastlane|ci)\/|\.(?:sh|mjs|cjs)$|(?:^|\/)main\.(?:py|ts|js)$|Playground|\.playground\//u;
 
-/** The rows that the script lists, across all languages. */
 const LISTED = 40;
 
 export const LABELS = {
@@ -131,7 +122,6 @@ export default definePracticeScript({
 		const printsInToolPaths = listed.filter(
 			(lead) => lead.label === LABELS["print-call"] && lead.facts?.toolPath === true,
 		).length;
-		// Whether a bounded lexical search of the checkout matches a logger definition, import or native call.
 		const { matches: existing } =
 			tree === null
 				? { matches: [] }

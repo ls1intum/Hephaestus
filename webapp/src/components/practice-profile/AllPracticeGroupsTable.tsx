@@ -30,11 +30,6 @@ export interface AllPracticeGroupsTableProps {
 	groups: GroupRef[];
 	standings: Record<string, PracticeGroupStanding | undefined>;
 	practicesByGroup: Record<string, PracticeStanding[] | undefined>;
-	/**
-	 * What moved in each group since the latest review, one sentence per bullet, keyed by group slug;
-	 * a group without an entry shows only its name. Practices that made the same move arrive as one
-	 * sentence naming them together.
-	 */
 	sentences: Record<string, FeedbackTextSegment[][] | undefined>;
 	/** The table sorts by standing only; any other column leaves the Standing header unsorted. */
 	sort: SortDirection;

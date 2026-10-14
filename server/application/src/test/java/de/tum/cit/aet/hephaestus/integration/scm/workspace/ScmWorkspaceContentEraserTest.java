@@ -31,13 +31,6 @@ import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 
-/**
- * Unit-level contract of the SCM erase choke point: it must delegate the cascade to {@link
- * WorkspaceRepositoryMonitorService#deleteRepositoryIfOrphaned} (never hand-roll a delete), emit
- * the derived-row event BEFORE dropping monitors, refresh the consumer once, and be a no-exception
- * no-op on an already-erased workspace. Cross-tenant survival itself is proven against real
- * Postgres in {@code ScmWorkspaceErasureIntegrationTest} — a mock cannot enforce the orphan guard.
- */
 class ScmWorkspaceContentEraserTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 42L;
@@ -174,9 +167,7 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
 
         eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
 
-        // The organization binding is exclusive (unique organization_id), so a retained link would
-        // squat that organization's single binding slot forever — a disconnect does not purge, so
-        // no other workspace could ever install the same organization.
+        // A retained organization link would occupy its unique binding slot after disconnect.
         assertThat(workspace.getOrganizationId()).isNull();
         // Flushed first, or the guard's COUNT still reads the stale link.
         InOrder order = inOrder(workspaceRepository);

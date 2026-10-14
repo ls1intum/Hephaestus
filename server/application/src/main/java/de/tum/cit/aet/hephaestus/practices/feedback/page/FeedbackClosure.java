@@ -14,7 +14,6 @@ import org.jspecify.annotations.Nullable;
  */
 public record FeedbackClosure(Instant at, FeedbackClosedBy by) {
 
-    /** The first of the three that happened, or {@code null} while none has. */
     public static @Nullable FeedbackClosure of(
             @Nullable Instant resolvedByWorkAt,
             @Nullable Instant resolvedByDeveloperAt,

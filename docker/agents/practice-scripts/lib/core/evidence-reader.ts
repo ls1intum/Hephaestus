@@ -21,15 +21,10 @@ import {
 import type { ReadRequest, ReadValues } from "./ipc.ts";
 import { UnratedError } from "./practice-script.ts";
 
-/** The most of a file one read returns; the rest is cut and the read says so. */
 export const MAX_READ_BYTES = 2 * 1024 * 1024;
-/** The largest captured record a read returns whole. */
 const MAX_RECORD_BYTES = 16 * 1024 * 1024;
-/** The most paths one listing returns. */
 const MAX_LIST_PATHS = 5000;
-/** The most matches one search returns when the program names no bound. */
 const DEFAULT_GREP_RESULTS = 200;
-/** The most lines one citation spans. */
 const MAX_CITED_LINES = 200;
 /** Bytes that tell a binary file: a NUL among the first of them. */
 const BINARY_PROBE_BYTES = 8000;
@@ -47,7 +42,6 @@ export const noReceipts = (): Receipts => ({ reads: 0, truncatedReads: 0, failed
 export interface EvidenceSources {
 	/** The absolute path of the checkout at the pinned head; null without a captured tree. */
 	repo: string | null;
-	/** The pinned head commit of the tree. */
 	headRevision: string | null;
 	/** The workspace path of the captured tree's sourceFile, `<repository>/.git/HEAD`. */
 	treeSourceFile: string;
@@ -69,7 +63,6 @@ const isMissing = (error: unknown) =>
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** Whether a path is in a checkout's Git folder, which holds the clone's configuration, not the work. */
 const inGitFolder = (relative: string) => relative.split(/[\\/]/u).includes(".git");
 
 /** The absolute path of `relative` inside `root`, symlinks resolved; a path that leaves the root is refused. */
@@ -144,7 +137,6 @@ export function changeLines(
 	return quote;
 }
 
-/** Answers the reads of one practice and counts its receipts. */
 export class EvidenceReader {
 	readonly #sources: EvidenceSources;
 	readonly #receipts: Receipts;

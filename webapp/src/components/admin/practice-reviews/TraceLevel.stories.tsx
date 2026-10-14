@@ -141,10 +141,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Everything on: the times, the system info with the facts under where the reader started, every
- * result by practice, and connectors from each result to the feedback written from it.
- */
 export const AllOn: Story = {
 	args: { display: FULL_TRACE_DISPLAY },
 	play: async () => {
@@ -153,14 +149,15 @@ export const AllOn: Story = {
 			await expect(showToggle(panel, name)).toHaveAttribute("aria-pressed", "true");
 		}
 		await expect(panel.querySelector("[data-step-facts]")).toHaveTextContent(/Asked for/u);
-		await expect(panel.querySelector("[data-step-facts]")).toHaveTextContent(/gpt-5\.4-mini/u);
+		await expect(panel.querySelector("[data-step-facts]")).toHaveTextContent(
+			/openai\/gpt-oss-120b/u,
+		);
 		await waitFor(async () => {
 			await expect(panel.querySelectorAll("path[data-connector-line]").length).toBeGreaterThan(0);
 		});
 	},
 };
 
-/** Everything off: the path of the record alone, with no times, facts or connectors. */
 export const AllOff: Story = {
 	args: {
 		display: { times: false, system: false, siblings: false, connections: false },
@@ -175,7 +172,7 @@ export const AllOff: Story = {
 };
 
 /**
- * "Expand all" opens everything folded at once: what came before the review, every step's facts and
+ * "Expand all" opens every step's facts and
  * the legend. "Collapse all" folds them again.
  */
 export const ExpandAll: Story = {
@@ -188,11 +185,9 @@ export const ExpandAll: Story = {
 		await expect(element.querySelectorAll("[data-step-facts]").length).toBeGreaterThan(3);
 		await userEvent.click(panel.getByRole("button", { name: "Collapse all" }));
 		await expect(element.querySelector("[data-step-facts]")).toBeNull();
-		await expect(steps.querySelector('[data-step="before"]')).not.toBeNull();
 	},
 };
 
-/** Started from a piece of feedback, with system info: where it went and when it was delivered under it. */
 export const StartedOnFeedback: Story = {
 	args: {
 		here: { kind: "feedback", id: LINEAGE_FEEDBACK.praise },
@@ -213,10 +208,6 @@ export const OnlyLosses: Story = {
 	},
 };
 
-/**
- * A result opened from the trace: its sheet over the trace, the same as from its row, with no
- * story and no way on. Escape closes it back to the trace.
- */
 export const RecordOverTheTrace: Story = {
 	play: async ({ userEvent }) => {
 		const panel = within(await settledDrawerPanel());
@@ -237,7 +228,6 @@ export const RecordOverTheTrace: Story = {
 	},
 };
 
-/** A scan carried by four runtime jobs that stopped on its budget: a state from the matrix, told as a trace. */
 export const ScanWithManyJobs: Story = {
 	args: {
 		chain: { status: "ready", lineage: lineageStateCase("scan-many-jobs").lineage },
@@ -249,7 +239,6 @@ export const ScanWithManyJobs: Story = {
 	},
 };
 
-/** Every delivery state of feedback: another state from the matrix. */
 export const EveryDeliveryState: Story = {
 	args: {
 		chain: { status: "ready", lineage: lineageStateCase("delivery-states").lineage },
@@ -262,7 +251,6 @@ export const EveryDeliveryState: Story = {
 	},
 };
 
-/** An item none of whose events started a review: its latest event, and why no review started. */
 export const NoReviewStarted: Story = {
 	args: {
 		title: "Define the practice-binding contract",
@@ -292,7 +280,6 @@ export const Loading: Story = {
 	},
 };
 
-/** Nothing was recorded about the record, so there is no trace to tell. */
 export const Empty: Story = {
 	args: { chain: { status: "none" } },
 	play: async () => {
@@ -301,7 +288,6 @@ export const Empty: Story = {
 	},
 };
 
-/** The graph could not be read: the error, with a way to try again. */
 export const LoadError: Story = {
 	args: { chain: { status: "error", error: { status: 500 }, onRetry: fn() } },
 	play: async () => {

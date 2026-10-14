@@ -29,17 +29,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * {@code DELETE /user/identities/{id}} — unlinking a federated identity from the current account.
- *
- * <p>Uses the <b>real</b> {@code RevocationAwareJwtDecoder} + a genuine ES256 cookie-JWT (no mock
- * decoder), mirroring {@code AccountControllerIntegrationTest}. The bearer header path skips CSRF
- * (a pure bearer request carries no auth cookie), so these calls authenticate by token alone.
- *
- * <p>Covers the two safety rules every account-linking UI needs: ownership (you can only unlink
- * your own identity) and last-identity lockout prevention (you cannot remove your only sign-in
- * method).
- */
 class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired

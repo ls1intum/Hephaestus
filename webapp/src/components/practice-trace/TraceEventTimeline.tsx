@@ -6,11 +6,8 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { formatDayTime } from "@/lib/dates";
 
 export interface TraceEventTimelineProps {
-	/** The events on the work, oldest first, as the trace orders them. */
 	events: readonly OwnItemEvent[];
-	/** An event's name in words, as the definition options give it, such as "Marked ready for review". */
 	eventLabel: (name: string) => string;
-	/** The section's name where it sits. */
 	title?: string;
 	description?: string;
 	/** `3` inside a level whose sections sit under its own title. */
@@ -22,7 +19,6 @@ export interface TraceEventTimelineProps {
 	plain?: boolean;
 }
 
-/** The events recorded about one piece of work that explain a review of it, oldest first. */
 export function TraceEventTimeline({
 	events,
 	eventLabel,
@@ -46,7 +42,7 @@ export function TraceEventTimeline({
 			) : (
 				<ol className="min-w-0 space-y-0 border-l pl-4">
 					{events.map((event, index) => (
-						// Events carry no id of their own, and one name can repeat at the same time.
+				// Events have no id, and name/timestamp pairs can repeat.
 						<li
 							key={`${index}-${event.name}-${event.occurredAt.toISOString()}`}
 							className="relative min-w-0 py-2.5"

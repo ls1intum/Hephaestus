@@ -30,7 +30,6 @@ import { ReviewLevel, type ReviewLevelProps, RUNTIME_EXPIRED } from "./ReviewLev
 
 const ready = (review: ReviewDetail): ReviewLevelProps["review"] => ({ status: "ready", review });
 
-/** How each practice's script ran, by the practice it ran for. */
 const SCRIPTS: Record<string, PracticeScriptRun> = {
 	"thin-controllers": reviewPracticeScripts.fromCode,
 	"errors-carry-context": reviewPracticeScripts.withModels,
@@ -45,11 +44,6 @@ const withScripts: ReviewDetail = {
 	})),
 };
 
-/**
- * One review's sheet, and only the review, in the order every record sheet has: a status line,
- * What it is, State and history, the practices it answered, Technical and the actions. Its results,
- * its feedback and when that was read are its trace; the other moments on the work are the work's.
- */
 const meta = {
 	component: ReviewLevel,
 	parameters: { layout: "fullscreen" },
@@ -101,16 +95,13 @@ export const Default: Story = {
 		const history = within(panel.getByRole("list", { name: "History" }));
 		history.getByText("Asked for");
 		history.getByText("Started");
-		// The event that started it is the review's; the other events on the work are the work's.
 		panel.getByText("Started by");
 		panel.getByText(/Marked ready for review/u);
 		panel.getByText("Review ID");
-		// The review alone: no link to another record of Practice reviews.
 		for (const link of panel.queryAllByRole("link")) {
 			await expect(String(link.getAttribute("href"))).not.toMatch(/\/admin\/practices\/reviews/u);
 		}
 		await userEvent.click(panel.getByRole("button", { name: "Request another review" }));
-		// It starts a review, so it asks first.
 		await expect(args.onRequestReview).not.toHaveBeenCalled();
 		const confirm = await screen.findByRole("alertdialog");
 		await userEvent.click(within(confirm).getByRole("button", { name: "Request review" }));
@@ -135,7 +126,6 @@ export const PracticesWithTheirState: Story = {
 	},
 };
 
-/** A running review can be cancelled; another would only be coalesced into it. */
 export const Running: Story = {
 	args: { review: ready(reviewDetailRunning) },
 	play: async () => {
@@ -145,7 +135,6 @@ export const Running: Story = {
 	},
 };
 
-/** Waiting in the queue, before any practice is reached. */
 export const Queued: Story = {
 	args: { review: ready(reviewDetailQueued) },
 	play: async () => {
@@ -157,7 +146,6 @@ export const Queued: Story = {
 	},
 };
 
-/** An attempt stopped and the retry waits for its time: the history says when it is due. */
 export const BackingOff: Story = {
 	args: { review: ready(reviewDetailBackingOff) },
 	play: async () => {
@@ -170,7 +158,6 @@ export const BackingOff: Story = {
 	},
 };
 
-/** A scan is one review that ran many times: its sheet opens its report, and lists every run. */
 export const ScanWithManyRuns: Story = {
 	args: { review: ready(reviewDetailScanManyJobs), onRequestReview: undefined },
 	play: async () => {
@@ -195,7 +182,6 @@ export const RuntimeExpired: Story = {
 	},
 };
 
-/** A review that ran out of time says why it stopped, and what the run printed. */
 export const TimedOut: Story = {
 	args: { review: ready(reviewDetailTimedOut) },
 	play: async () => {
@@ -208,7 +194,6 @@ export const TimedOut: Story = {
 	},
 };
 
-/** The model finished, and processing what it returned failed: the run says so on its own. */
 export const ProcessingFailed: Story = {
 	args: { review: ready(reviewDetailProcessingFailed) },
 	play: async () => {
@@ -217,18 +202,16 @@ export const ProcessingFailed: Story = {
 	},
 };
 
-/** Stopped before it started because the AI budget was used up: the history says so. */
 export const CancelledOnBudget: Story = {
 	args: { review: ready(reviewDetailCancelledOnBudget) },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		within(panel.getByRole("list", { name: "History" })).getByText(
-			"The review budget was used up.",
+			"The scan’s budget was used up.",
 		);
 	},
 };
 
-/** A retried review lists what each attempt cost under Technical, with their total. */
 export const CostPerAttempt: Story = {
 	args: { review: ready({ ...reviewDetailCompleted, usage: reviewUsageTwoAttempts }) },
 	play: async () => {
@@ -247,7 +230,6 @@ export const CostNotKnown: Story = {
 	},
 };
 
-/** The feedback checks the review ran are on the review, not on a piece of its feedback. */
 export const WithFeedbackChecks: Story = {
 	args: {
 		feedbackChecks: { status: "ready", checks: reviewFeedbackChecksOf(reviewDetailCompleted) },
@@ -266,7 +248,6 @@ export const FeedbackChecksLoading: Story = {
 	},
 };
 
-/** A failed read is said, never shown as a review without checks. */
 export const FeedbackChecksFailed: Story = {
 	args: { feedbackChecks: { status: "error", error: { status: 500 }, onRetry: fn() } },
 	play: async () => {
@@ -275,10 +256,6 @@ export const FeedbackChecksFailed: Story = {
 	},
 };
 
-/**
- * Each practice that ran a program says how it ran under Every practice, and the section Practice
- * scripts has the figures.
- */
 export const WithPracticeScripts: Story = {
 	args: { review: ready(withScripts) },
 	play: async () => {
@@ -291,7 +268,6 @@ export const WithPracticeScripts: Story = {
 	},
 };
 
-/** No script ran, so there is no section about scripts. */
 export const WithoutPracticeScripts: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
@@ -299,7 +275,6 @@ export const WithoutPracticeScripts: Story = {
 	},
 };
 
-/** Another review of the same work waits or runs: asking again would only be coalesced into it. */
 export const AnotherReviewActive: Story = {
 	args: { requestBlocked: REQUEST_BLOCKED.active },
 	play: async () => {
@@ -311,7 +286,6 @@ export const AnotherReviewActive: Story = {
 	},
 };
 
-/** Why the last ask started nothing, drawn by the route above the sheet's sections. */
 export const WithRefusal: Story = {
 	args: { requestRefusal: <p role="alert">A review of this work started a minute ago.</p> },
 	play: async () => {
@@ -337,7 +311,6 @@ export const LoadFailed: Story = {
 	},
 };
 
-/** At 390px the practices reflow as a list instead of scrolling a table. */
 export const Reflow: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { disableSnapshot: true } },
 	play: async () => {

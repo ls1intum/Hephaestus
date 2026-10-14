@@ -31,7 +31,7 @@ public class ConsentDecision {
     private @Nullable Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", foreignKey = @ForeignKey(name = "sfk_consent_decision_account"))
+    @JoinColumn(name = "account_id", foreignKey = @ForeignKey(name = "fk_consent_decision_account"))
     private @Nullable Account account;
 
     @Enumerated(EnumType.STRING)
@@ -49,14 +49,7 @@ public class ConsentDecision {
     @Column(name = "notice_version", nullable = false, length = 32)
     private String noticeVersion;
 
-    /**
-     * The organisation the research question named, as it was rendered. Null on every other
-     * purpose, and on a research decision only where the instance ran no study.
-     *
-     * <p>It is here rather than derived from configuration because configuration changes and
-     * evidence may not: after a rename, this is the only record of who the account was actually
-     * asked about.
-     */
+    // Freeze the organization named in the consent prompt; configuration changes cannot alter what was asked.
     @Column(name = "research_organization", length = 255)
     private @Nullable String researchOrganization;
 

@@ -31,7 +31,6 @@ interface PreparationRequest {
 	url: string;
 	token: string;
 	payload: FeedbackPreparationRequest;
-	/** Remaining run safety, capped by the admission response timeout at the caller. */
 	timeoutMs: number;
 }
 

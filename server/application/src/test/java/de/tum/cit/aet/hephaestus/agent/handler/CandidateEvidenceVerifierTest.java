@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,7 +38,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
-import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
@@ -65,7 +63,7 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
     private final ClasspathSourceCatalogRegistry catalogs = mock(ClasspathSourceCatalogRegistry.class);
     private final CitationVerifier domain = mock(CitationVerifier.class);
 
-    private CandidateEvidenceVerifier verifier(String text) {
+    private CandidateEvidenceVerifier verifier() {
         job.setWorkspaceId(1);
         var policy = mock(SourceContract.class);
         when(catalogs.requireSource(SOURCE)).thenReturn(policy);
@@ -75,17 +73,18 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
         when(catalogs.isSourceUsePermitted(SOURCE, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
                 .thenReturn(true);
         when(domain.kinds()).thenReturn(Set.of(KIND));
-        lenient().when(domain.verify(any())).thenReturn(List.of());
-        lenient()
-                .when(files.verificationDirectory(job))
-                .thenReturn(new EvidenceDirectory("inputs/", Path.of("/tmp/citation-test")));
-        lenient().when(files.readText(eq(job), eq("context/body.txt"), any())).thenReturn(Optional.of(text));
         return new CandidateEvidenceVerifier(files, catalogs, List.of(domain));
+    }
+
+    private CandidateEvidenceVerifier verifier(String text) {
+        var verifier = verifier();
+        when(files.readText(eq(job), eq("context/body.txt"), any())).thenReturn(Optional.of(text));
+        return verifier;
     }
 
     private ReviewAssignmentSnapshot assignment() {
         var item = new ItemRef(1, 2, KIND, 20L, null, null);
-        var practice = mock(PinnedPractice.class);
+        var practice = RuntimeReviewTestData.assignment(null, null).practice();
         return new ReviewAssignmentSnapshot(
                 new ReviewAssignmentId(UUID.randomUUID(), 31, 2),
                 item,
@@ -131,6 +130,8 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
     @Test
     void derivesLinesFromTheRegisteredTextBeforeDelegatingToTheDomain() {
         var verifier = verifier(TEXT);
+        when(files.verificationDirectory(job))
+                .thenReturn(new EvidenceDirectory("inputs/", Path.of("/tmp/citation-test")));
         var candidate = candidate();
         verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate, captured(true));
         assertThat(candidate.citations().getFirst().path("startLine").asInt()).isEqualTo(2);
@@ -142,22 +143,27 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
     }
 
     @Test
-    void refusesAnUnregisteredOrAmbiguousQuote() {
-        var verifier = verifier(TEXT);
+    void shouldRefuseAnUnregisteredQuoteBeforeReadingCapturedBytes() {
+        var verifier = verifier();
         assertThatThrownBy(() ->
                         verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate(), captured(false)))
                 .isInstanceOf(CandidateEvidenceVerifier.Unverified.class);
-        var ambiguous = verifier(TEXT + "Exact quote");
-        assertThatThrownBy(() ->
-                        ambiguous.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate(), captured(true)))
+    }
+
+    @Test
+    void shouldRefuseAnAmbiguousQuoteWhenCapturedTextRepeatsIt() {
+        var verifier = verifier(TEXT + "Exact quote");
+        assertThatThrownBy(
+                        () -> verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate(), captured(true)))
                 .isInstanceOf(CandidateEvidenceVerifier.Unverified.class);
     }
 
     @Test
     void keepsTheDomainsVersionRefusalDistinctFromGenericQuoteProof() {
         var verifier = verifier(TEXT);
-        lenient()
-                .when(domain.verify(any()))
+        when(files.verificationDirectory(job))
+                .thenReturn(new EvidenceDirectory("inputs/", Path.of("/tmp/citation-test")));
+        when(domain.verify(any()))
                 .thenReturn(List.of(
                         new CitationRefusal(0, CandidateRefusal.BASIS_REVISION_UNSUPPORTED, "Another pinned version")));
         assertThatThrownBy(
@@ -170,7 +176,7 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
 
     @Test
     void shouldRecordSourceUnavailableWithoutClaimingTheQuoteIsFalse() {
-        var verifier = verifier(TEXT);
+        var verifier = verifier();
         when(files.readText(eq(job), eq("context/body.txt"), any())).thenReturn(Optional.empty());
         assertThatThrownBy(
                         () -> verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate(), captured(true)))
@@ -182,7 +188,7 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
     private Candidate problem(String basis) {
         return CandidateParser.parse(MAPPER.readTree("""
             {"outcome":"NOT_MET","summary":"A document problem","explanation":"The captured words need a change",
-             "citations":[],"problems":[{"key":"document.problem","severity":"MAJOR","summary":"Improve the text",
+             "citations":[],"problems":[{"key":"document-problem","severity":"MAJOR","summary":"Improve the text",
                "explanation":"The words do not meet the criterion","nextStep":"Rewrite the sentence",
                "citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt","path":"document/body",
                  "startLine":2,"endLine":2,"quote":"Exact quote"}],"basis":%s}],"evidence":{},
@@ -194,7 +200,11 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
     void shouldNameAMissingStateWitnessWithoutCallingItAnotherVersion() {
         var verifier = verifier(TEXT);
         assertThatThrownBy(() -> verifier.verifyCandidate(
-                        job, assignment(), ReviewKind.SCAN, problem("{\"type\":\"state\"}"), captured(true)))
+                        job,
+                        assignment(),
+                        ReviewKind.SCAN,
+                        problem("{\"type\":\"state\",\"explanation\":\"The current file contains these words\"}"),
+                        captured(true)))
                 .isInstanceOfSatisfying(
                         CandidateEvidenceVerifier.Unverified.class,
                         refusal -> assertThat(refusal.refusal()).isEqualTo(CandidateRefusal.BASIS_WITNESS_MISSING));
@@ -207,7 +217,8 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
                         job,
                         RuntimeReviewTestData.assignment(5L, null),
                         ReviewKind.ITEM,
-                        problem("{\"type\":\"duty\",\"criterionQuote\":\"Another required duty\"}"),
+                        problem("{\"type\":\"duty\",\"criterionQuote\":\"Another required"
+                                + " duty\",\"event\":0,\"explanation\":\"The document must meet this duty\"}"),
                         captured(true)))
                 .isInstanceOfSatisfying(
                         CandidateEvidenceVerifier.Unverified.class,

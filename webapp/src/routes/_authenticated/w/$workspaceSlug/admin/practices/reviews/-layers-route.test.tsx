@@ -53,19 +53,13 @@ function heldWorkspaceRead(until: Promise<void>) {
 }
 
 const REVIEWS = "/w/acme/admin/practices/reviews";
-/**
- * Real version-4 UUIDs: the lists' schema drops a tracked id that is not one, as the fixtures' are.
- * The fixture's review, result and piece of feedback are served under them.
- */
 const REVIEW = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
 const RESULT_ROW = "9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c";
 const FEEDBACK_ROW = "4c2e8a1b-6d3f-4a5c-9e7b-0f1d2c3b4a5e";
-/** The result of the traced chain that a step opens. */
 const RESULT = LINEAGE_RESULT.cache404;
 const TRACE = `trace:review:${REVIEW}`;
 
 const fixtureReview = reviews.find((review) => review.id === LINEAGE_REVIEW_ID);
-/** The fixture's review, served under `REVIEW`. */
 const servedReview = { ...reviewDetail(LINEAGE_REVIEW_ID), id: REVIEW };
 const ITEM = `item:${reviewItem.id}`;
 const [fixtureResult] = reviewResults;
@@ -85,7 +79,7 @@ function requestsTo(pathname: string): URL[] {
 }
 
 beforeEach(() => {
-	// jsdom has no IntersectionObserver, and the lists load their next page as their end scrolls into view.
+// jsdom needs an IntersectionObserver stub for paged lists.
 	vi.stubGlobal("IntersectionObserver", ObserverStub);
 	forgetTraceDisplay();
 	requested.length = 0;
@@ -308,7 +302,6 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 });
 
 describe("a review's sheet", () => {
-	/** The real route renders the phase boundaries the review's attempt recorded. */
 	it("shows each phase of the run between the boundaries the server sent", async () => {
 		assert(servedReview.runtime);
 		const [job] = servedReview.runtime.jobs;
@@ -344,7 +337,6 @@ describe("a review's sheet", () => {
 		expect(execution.textContent).toContain("Wait to start: 12 seconds · Running: 5 minutes");
 	});
 
-	/** The review names each practice's script run itself: the section needs no read of its own. */
 	it("shows what this review's practice scripts did", async () => {
 		const [practice, ...others] = servedReview.practices;
 		assert(practice);
@@ -383,7 +375,6 @@ describe("the trace and a record over it", () => {
 			{ name: "A cache miss and a permission failure come back as the same 404" },
 			ROUTE_RENDER_WAIT,
 		);
-		// The same sheet as from its row: the result alone, and no way on to another record.
 		expect(within(over).queryByRole("group", { name: "How this came about" })).toBeNull();
 		expectNoRecordLinks(over);
 		within(over).getByRole("button", { name: "Mark as incorrect" });

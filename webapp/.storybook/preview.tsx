@@ -61,8 +61,8 @@ const withRouter: Decorator = (Story, { parameters }) => {
 	const url = initialUrl(parameters.router);
 	const router = createRouter({
 		...ROUTER_SEARCH,
-		routeTree: createRootRoute({ component: () => <Story /> }),
-		history: url === undefined ? undefined : createMemoryHistory({ initialEntries: [url] }),
+		routeTree: createRootRoute({ validateSearch: (search) => search, component: () => <Story /> }),
+		history: createMemoryHistory({ initialEntries: [url ?? "/"] }),
 	});
 	return <RouterProvider router={router} />;
 };

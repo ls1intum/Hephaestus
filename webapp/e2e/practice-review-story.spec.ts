@@ -113,7 +113,6 @@ const lineage = {
 	moreFeedback: 0,
 };
 
-/** The result's own read, for its level. */
 const resultDetail = {
 	id: NOT_MET,
 	agentJobId: REVIEW,

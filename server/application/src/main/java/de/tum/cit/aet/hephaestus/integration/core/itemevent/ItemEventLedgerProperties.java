@@ -4,23 +4,14 @@ import jakarta.validation.constraints.Min;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.validation.annotation.Validated;
 
-/**
- * Tuning for the pending-event reaper.
- *
- * @param pendingRetryAfter how long a refused event waits before being re-offered. The blockers are
- *     operator actions (re-activate a workspace, re-point a binding, wait for a budget month to
- *     roll over), so retrying at human timescales is the point; retrying fast would only multiply
- *     the same refusal.
- * @param pendingLapseAfter how long a event keeps being re-offered before it is retired. A review
- *     of a change nobody has looked at in this long is no longer coaching, and an unbounded queue
- *     would outlive the items in it.
- * @param sweepBatchSize how many events one sweep re-offers, bounding the work a single tick can
- *     hand to the job queue.
- */
+// Pending events depend on operator changes, so fast retries only repeat the refusal.
+// Retirement bounds the queue lifetime; batch size bounds each sweep's queued work.
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.item-event-ledger")
+@NamedInterface(value = "item-events", propagate = false)
 public record ItemEventLedgerProperties(
         @DefaultValue("PT1H") Duration pendingRetryAfter,
         @DefaultValue("P7D") Duration pendingLapseAfter,

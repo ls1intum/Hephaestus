@@ -353,7 +353,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThat(basis.get("other_fields").asString()).isEqualTo("CAPTURE");
             assertThat(basis.get("mirror_synced_at").asString()).isEqualTo("2026-04-10T10:00:00Z");
             assertThat(captured.completeness()).containsEntry(CORE, SourceCompleteness.COMPLETE);
-            // The sync time does not date the admitted words.
             assertThat(captured.observedAt()).doesNotContainKey(CORE);
         }
 
@@ -418,12 +417,9 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         @Test
         void shouldWriteTheHeadChecksOnlyWhenTheyWereObservedForTheReviewedHead() throws Exception {
             String newer = "f".repeat(40);
-            // The mirror moved on after admission; the checks it measured belong to the reviewed
-            // head.
             PullRequest reviewed = pullRequest();
             reviewed.setHeadRefOid(newer);
             reviewed.observeHeadChecks(HEAD, CheckState.FAILURE, true);
-            // The checks of the newer mirror head say nothing about the reviewed one.
             PullRequest moved = pullRequest();
             moved.setHeadRefOid(newer);
             moved.observeHeadChecks(newer, CheckState.SUCCESS, true);

@@ -38,15 +38,10 @@ export const GitLabMergeRequest: Story = {
 	name: "GitLab merge request",
 	args: { item: gitlabMergeRequest },
 	play: async ({ canvas }) => {
-		// GitLab numbers a merge request with a bang; the label is the server's, and follows the forge.
 		canvas.getByText("platform/billing-service · !88");
 	},
 };
 
-/**
- * An issue and a pull request on one forge wear the same glyph, so the label is the whole
- * difference between them.
- */
 export const GitHubIssue: Story = {
 	name: "GitHub issue",
 	args: { item: trackerIssue },
@@ -80,7 +75,6 @@ export const ExternalLink: Story = {
 	},
 };
 
-/** A ref whose review is gone records no provider, so the glyph falls back to the kind's. */
 export const WithoutAProvider: Story = {
 	args: { item: { ...reviewItem, provider: null } },
 };

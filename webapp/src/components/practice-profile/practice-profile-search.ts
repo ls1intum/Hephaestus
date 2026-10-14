@@ -73,10 +73,7 @@ export function reviewLevel(reviewId: string): DetailStackEntry<PracticeProfileD
 	return { kind: "review", id: reviewId };
 }
 
-/**
- * One review's own tab, filters and focus, cleared when another review takes its place: a filter
- * chosen for one review could hide every practice of the next. The reviews list's filters stay.
- */
+/** Clear review-specific tabs, filters, and focus on a review switch so old filters cannot hide the next review. */
 export const REVIEW_SELECTION_CLEARED = {
 	reviewTab: undefined,
 	reviewGroup: undefined,
@@ -125,12 +122,6 @@ export const ALL_PRACTICE_GROUPS_LEVEL: DetailStackEntry<PracticeProfileDetailLe
 	id: "all",
 };
 
-/**
- * The practice level's tabs: the feedback written about the practice, the results of the reviews,
- * and the practice guide. The catalog's words on the practice open the level above them. The choice is
- * the `practiceTab` search param; the feedback leads and is where the level opens, and the level
- * shows the guide only for a practice that has one.
- */
 export const PRACTICE_TABS = ["feedback", "results", "guide"] as const;
 
 export type PracticeTab = (typeof PRACTICE_TABS)[number];
@@ -145,7 +136,6 @@ export interface PracticeGroupDetailSelection {
 	reviewTab?: ReviewTab;
 	reviewGroup?: string;
 	reviewPractice?: string;
-	/** The result a link opened the review at; its row opens on arrival. */
 	reviewResult?: string;
 }
 
@@ -159,12 +149,6 @@ export type FeedbackTab = (typeof FEEDBACK_TABS)[number];
 
 export const DEFAULT_FEEDBACK_TAB: FeedbackTab = "open";
 
-/**
- * What the page itself reads out of the URL: the table's sort, the feedback tab, and the selection
- * inside the open levels — the practice level's tab, and the review levels' filters, tab and focus. A
- * hand-typed value a surface cannot show reads as the default. Which results are open is not
- * here: every one arrives open and closes on its own, and nothing addresses one.
- */
 const practiceProfileFilterSchema = z.object({
 	dir: z
 		.enum(SORT_DIRECTIONS)

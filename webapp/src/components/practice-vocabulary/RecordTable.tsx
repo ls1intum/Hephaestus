@@ -146,10 +146,6 @@ export interface RecordDayTableProps<TRow> extends RecordRowsProps<TRow> {
 	dateOf: (row: TRow) => Date;
 }
 
-/**
- * Records one body per day under its heading, so a row carries the time alone. Reviews,
- * results and feedback are drawn in it, so a record reads alike in every stream.
- */
 export function RecordDayTable<TRow>({ dateOf, rows, ...props }: RecordDayTableProps<TRow>) {
 	const days = groupByDay(rows, dateOf, new Date(useNow()));
 	return <RecordGroupedTable {...props} groups={days} />;

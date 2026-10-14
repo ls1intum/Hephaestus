@@ -41,11 +41,6 @@ type SelectionScope = Pick<
 	"reviewId" | "resultId" | "feedbackId" | "selectedPractice" | "itemId" | "selected"
 >;
 
-/**
- * The record the scope narrows to — the selection, or the same names set as a filter — read from its
- * own record: its name and the record its trace opens. Every tab and the layout read the same
- * queries, so a switch between tabs asks for nothing again.
- */
 export function useReviewSelection(
 	workspaceSlug: string,
 	scope: SelectionScope,
@@ -172,7 +167,6 @@ function useRecordRead(
 	}
 }
 
-/** "Pull request #1423 · Fix the parser", or the name alone where the item has no title. */
 function workName(item: ItemRef): string {
 	return [itemName(item), item.title].filter(hasText).join(" · ");
 }

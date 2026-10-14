@@ -77,7 +77,7 @@ export function PracticeTabsTrigger({
 		<TabsTrigger className={cn(LINE_TAB_SHAPE, "data-active:font-semibold", className)} {...props}>
 			{children}
 			{count !== undefined && (
-				// The space is the tab's accessible name: "Results 3", not "Results3".
+				// Accessible names need a space between the label and count.
 				<>
 					{" "}
 					<span className="font-normal text-muted-foreground tabular-nums">{count}</span>

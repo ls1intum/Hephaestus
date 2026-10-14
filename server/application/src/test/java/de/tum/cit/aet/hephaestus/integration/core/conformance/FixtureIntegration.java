@@ -34,16 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * An integration that reviews an item Hephaestus has never heard of — the standing proof that
- * the review contract is real, not a description of what GitHub happens to do. {@code
- * fixture.widget} exists nowhere in {@code src/main}, so if the framework or the practices module
- * ever grows a dependency on a concrete item kind, the tests built on this fixture stop
- * compiling or stop passing.
- *
- * <p>It borrows an existing integration kind because provider kinds are persisted. The tests use
- * the same item catalog, event coverage, and delivery declarations as shipped adapters.
- */
+// A kind absent from production proves the framework is provider-neutral; persisted integration kinds still use a shipped value.
 final class FixtureIntegration {
 
     /** Borrowed, not invented — see the class javadoc. */
@@ -207,10 +198,7 @@ final class FixtureIntegration {
             }
 
             @Override
-            public void onMessage(Message msg) {
-                // The registry only ever asks whether a key resolves; nothing here dispatches a
-                // message.
-            }
+            public void onMessage(Message msg) {}
         };
     }
 

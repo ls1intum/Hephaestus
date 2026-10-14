@@ -33,10 +33,6 @@ function appliesWhenClause(clause: AppliesWhenClause) {
 	return `The work has ${clause.hasItems ?? ""}`;
 }
 
-/**
- * How a practice is reviewed, read-only: what it reviews, when, about whom, what it reads, who
- * reviews it, and whether scans include it. The editor's own words, so a preview and the form agree.
- */
 export function PracticeDefinitionSummary({
 	kind,
 	definition,

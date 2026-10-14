@@ -118,8 +118,6 @@ export const Default: Story = {
 		// A header row, five practices and the totals; the sixth, not checked, is no row and no line.
 		const practices = within(canvas.getByRole("region", { name: "Practices" }));
 		await expect(practices.getAllByRole("row")).toHaveLength(7);
-		// Queue is one card: the queue now, then the review time of the range under its name; the
-		// reviews stand beside the results, the feedback beside where it went.
 		const queue = within(canvas.getByRole("region", { name: "Queue" }));
 		await expect(
 			canvas.getByRole("region", { name: "Queue" }).querySelectorAll("[data-slot=card]"),
@@ -139,8 +137,6 @@ export const Default: Story = {
 		const delivery = canvas.getByRole("list", { name: "Delivery" }).querySelectorAll(":scope > li");
 		await expect(delivery).toHaveLength(2);
 		await expect(delivery[0]).toHaveTextContent(/^Feedback/u);
-		// Beside it, where the feedback went: by location, by reason, and the share that failed to
-		// deliver over the range, 1 of the 16 pieces sent in the last 30 days.
 		await expect(delivery[1]).toHaveTextContent(/^By location and reason/u);
 		await expect(delivery[1]?.querySelector("[role=group][aria-label=Failures]")).toHaveTextContent(
 			/^Feedback failed to deliver · 1 of 16 sent6 %/u,
@@ -172,8 +168,6 @@ export const Default: Story = {
 		await expect(opens("4 withheld")[1]).toBe("WITHHELD,REJECTED");
 		await expect(opens("1 failed to deliver")[1]).toBe("FAILED");
 		await expect(opens("1 replaced by newer")[1]).toBe("REPLACED");
-		// The Results tile says each outcome in one short form, with marked incorrect as the
-		// quiet last item of the same row; each count opens the Results table filtered to it.
 		const resultsLegend = canvas.getByRole("list", { name: "Results by outcome" });
 		await expect(resultsLegend).toHaveTextContent(
 			"35 met27 not met10 does not apply6 could not determine",
@@ -279,7 +273,6 @@ export const Reflow: Story = {
 	},
 };
 
-/** A course afternoon that needs a look: 30 of the composed pieces were withheld. */
 const COURSE_DAY: ReviewOverview = {
 	...practiceReviewOverview,
 	feedback: {

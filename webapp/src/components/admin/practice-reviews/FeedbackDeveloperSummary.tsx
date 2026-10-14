@@ -34,9 +34,7 @@ import { ReviewListLink } from "./ReviewListLink";
 export interface FeedbackDeveloperSummaryProps {
 	workspaceSlug: string;
 	developerId: string;
-	/** The developer's name; absent until the people or a row of theirs have arrived. */
 	developerName: string | undefined;
-	/** Their feedback counted by location, as `countReviewFeedbackByLocation` returns it. */
 	state: PanelState<{ counts: ReasonCount[] }>;
 }
 
@@ -45,11 +43,6 @@ interface LocationCount {
 	count: number;
 }
 
-/**
- * All the feedback for one developer, whatever the list is filtered to: where it appears, by
- * provider. Every count opens the list filtered to exactly the feedback it counts. Admins see the
- * counts and never the words of private feedback.
- */
 export function FeedbackDeveloperSummary({
 	workspaceSlug,
 	developerId,
@@ -142,7 +135,6 @@ function SummaryBody({
 	);
 }
 
-/** The counted locations in the registry's order; a location the registry does not know is left out. */
 function locationRows(counts: readonly ReasonCount[]): LocationCount[] {
 	return statusValues(FEEDBACK_LOCATION_DEFS).flatMap((location) => {
 		const count = counts.find((row) => row.reason === location)?.count ?? 0;
@@ -183,7 +175,6 @@ function LocationRow({
 	);
 }
 
-/** A count that opens the rows it counts; a zero opens nothing and reads muted. */
 function CountLink({
 	workspaceSlug,
 	count,
@@ -206,7 +197,6 @@ function CountLink({
 	);
 }
 
-/** The Feedback list filtered to this developer and nothing else but `search`. */
 function feedbackTarget(
 	developerId: string,
 	search: Extract<ReviewListTarget, { list: "feedback" }>["search"],

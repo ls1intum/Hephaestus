@@ -18,15 +18,10 @@ import {
 	INVALID_META_PROGRAM,
 } from "./program-host-runner.ts";
 
-// The runner's output files for the server's own tests. One real run, with the Pi SDK mocked, admits a built-in
-// practice through its review session and a custom program's direct result, and fails a program whose meta is invalid.
-// `RunnerOutputAdmissionIntegrationTest` admits these files and records the report on the server. Set
-// UPDATE_RUNNER_OUTPUT=1 to write them again after a change to what the runner writes.
 
 const OUTPUT = nodePath.join(import.meta.dirname, "../practice-results/runner-output");
 const UPDATE = process.env.UPDATE_RUNNER_OUTPUT === "1";
 
-/** The criterion the practices are staged with, as `stagePractices` writes it. */
 const CRITERION = AUTHENTICATION_CRITERION;
 
 const PRACTICES = [
@@ -41,10 +36,7 @@ after(() => {
 });
 stagePractices(cwd, PRACTICES);
 
-/**
- * The golden workspace stages the captured sources under `evidence/`; the server stages them under `context/`
- * (`SandboxLayout.CONTEXT_PREFIX`), and a citation names its sourceFile by that path.
- */
+// Canonical citations must use server context paths; the golden fixture stages the same records under evidence/.
 function toServerContextRoot(): void {
 	renameSync(nodePath.join(cwd, "evidence"), nodePath.join(cwd, "context"));
 	const task = readJsonFile(cwd, "task.json");
@@ -60,7 +52,6 @@ function toServerContextRoot(): void {
 	);
 	const manifest = nodePath.join(cwd, "context/manifest.json");
 	writeFileSync(manifest, readFileSync(manifest, "utf8").replaceAll('"evidence/', '"context/'));
-	// The server writes the record indented, with the description that the golden record leaves out.
 	const golden = readJsonFile(cwd, "context/metadata.json");
 	writeFileSync(
 		nodePath.join(cwd, "context/metadata.json"),
@@ -73,7 +64,6 @@ const change = readFileSync(nodePath.join(cwd, "context/change.json"), "utf8");
 const TITLE_LINE = '  "title": "Add login",';
 const titleLine = record.split("\n").indexOf(TITLE_LINE) + 1;
 
-/** What the built-in practice's review session submits: one problem that rests on a duty the criteria state. */
 const sessionCandidate = {
 	outcome: "NOT_MET",
 	summary: "The pull request asks for no checked() sign-in",
@@ -113,7 +103,6 @@ const exit = await runRunner(
 	{ PI_HOST_SESSION_CANDIDATE: JSON.stringify(sessionCandidate) },
 );
 
-/** The execution report with each duration set to 0: the only part of a run that changes between two runs. */
 function stableReport(): unknown {
 	const report = executionReportSchema.parse(readJsonFile(cwd, "out/practice-scripts.json"));
 	return {
@@ -125,7 +114,6 @@ function stableReport(): unknown {
 	};
 }
 
-/** What the server must hold to admit the run: each practice's program and criteria, and the captured sources. */
 function staged(): unknown {
 	return {
 		criteria: readFileSync(nodePath.join(cwd, "catalog/practices/auth-review.md"), "utf8"),
@@ -169,7 +157,7 @@ void test("the server's runner output fixtures are what this run wrote", () => {
 	}
 });
 
-// `FeedbackCompositionInputsTest` asserts that the server writes exactly these bytes.
+	// FeedbackCompositionInputsTest pins these staged bytes on the server side.
 void test("the runner reads the composition request the server stages", () => {
 	const request: unknown = JSON.parse(
 		readFileSync(nodePath.join(import.meta.dirname, "feedback-composition-request.json"), "utf8"),

@@ -6,15 +6,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Resolves the {@link WorkspaceTeamScope} of a workspace — the single source of truth for team
- * scoping across the team, settings, and workspace activity read paths.
- *
- * <p>Empty when the workspace has no synced organization (user-type workspace, or before first org
- * sync). Callers MUST fail closed on empty and treat the workspace as having no teams: teams only
- * exist after the org sync that populates the provider, so empty means "no teams", never "all
- * teams".
- */
+// An absent synced organization means no teams; callers must never treat an empty scope as unrestricted.
 @Service
 public class WorkspaceTeamScopeResolver {
 

@@ -20,17 +20,11 @@ import { hasText } from "@/lib/text";
 import { type FeedbackResponseControls, isEmptyFeedbackResponse } from "./reviews";
 
 export interface OwnFeedbackListProps {
-	/** The reader's own feedback, each piece with the copies posted of it and their response. */
 	feedback: OwnFeedbackRef[];
 	/** Absent where the reader may not respond, which leaves no response controls. */
 	responses?: FeedbackResponseControls;
 }
 
-/**
- * The reader's own feedback from one review or on one result: where each piece went, the posted
- * copies they can open, and their response to it. A result can be the basis of several pieces of
- * feedback, so each piece is answered on its own.
- */
 export function OwnFeedbackList({ feedback, responses }: OwnFeedbackListProps) {
 	if (feedback.length === 0) {
 		return null;
@@ -55,7 +49,6 @@ export function OwnFeedbackList({ feedback, responses }: OwnFeedbackListProps) {
 	);
 }
 
-/** The copies of one piece the reader can open where they were posted, in the server's order. */
 function CopyLinks({ feedback }: { feedback: OwnFeedbackRef }) {
 	const urls = feedback.copies.flatMap((copy) =>
 		hasText(copy.externalUrl) ? [copy.externalUrl] : [],
@@ -93,24 +86,14 @@ interface FeedbackResponseProps {
 	responses: FeedbackResponseControls;
 }
 
-/**
- * The reader's response to one piece of feedback: the three resolutions, what already stands — the
- * rating given on the feedback card and the comment sent with the response — the comment band a
- * press opens, and "Clear response". Every write carries the response that stands with the change
- * over it, so a new resolution keeps the rating.
- */
 function FeedbackResponse({ feedback, responses }: FeedbackResponseProps) {
-	// The resolution whose comment band is open; recorded only once Send or Skip closes it.
 	const [pendingResolution, setPendingResolution] = useState<FeedbackResolution>();
 	const isPending = responses.pendingResponses.has(feedback.id);
-	// The response being written stands over the recorded one, so the buttons do not jump back and
-	// then forward again when it lands.
+	// Keep the pending response visible until it settles so controls do not jump between old and new answers.
 	const current = responses.responseOf(feedback.id, feedback.response);
 	const shownResolution = pendingResolution ?? current.resolution;
 	const write = (change: FeedbackResponseRequest) =>
 		responses.write(feedback.id, feedback.response, change);
-	// A press opens the band for that choice; the chosen one pressed again withdraws it, comment
-	// and all, and a band still open closes without recording anything.
 	const chooseResolution = (resolution: FeedbackResolution) => {
 		if (pendingResolution === resolution) {
 			setPendingResolution(undefined);
@@ -182,7 +165,7 @@ function FeedbackResponse({ feedback, responses }: FeedbackResponseProps) {
 				</p>
 			)}
 			{pendingResolution === "DISAGREE" && (
-				// The reason is what a disagreement has to carry, so Skip only closes the band.
+	// Disagreement requires a reason; Skip closes the draft without recording it.
 				<ResponseCommentBand
 					key={pendingResolution}
 					name="Why you disagree"

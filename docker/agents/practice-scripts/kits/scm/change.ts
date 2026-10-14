@@ -1,5 +1,3 @@
-/** Read the captured commit metadata. */
-
 import { z } from "zod";
 
 import type { Evidence } from "../../lib/core/practice-script.ts";

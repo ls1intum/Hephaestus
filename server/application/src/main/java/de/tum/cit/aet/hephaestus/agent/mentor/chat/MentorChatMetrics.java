@@ -11,20 +11,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
 
-/**
- * Micrometer instruments for the mentor chat turn pipeline.
- *
- * <p>The naming convention follows the rest of {@code agent/} ({@code agent.job.*},
- * {@code llm.proxy.*}): dot-case Java identifiers that Micrometer's Prometheus renderer
- * transforms to {@code mentor_turn_started_total} etc. ResultOutcome tag values are kept to a fixed
- * enum so cardinality stays bounded.
- *
- * <p>Wired up in {@link MentorChatService}. {@code mentor.turn.started} fires on inbound
- * start before executor submission (so rejected submissions still increment);
- * {@code mentor.turn.completed} fires at every terminal branch with a single
- * {@link ResultOutcome} label. {@code mentor.turn.first_token} runs from the turn being accepted to its
- * first text chunk, tagged by whether the turn found its sandbox warm or had to wait for one to start.
- */
+// Fixed enum tag values keep metric cardinality bounded.
 @Component
 public class MentorChatMetrics {
 

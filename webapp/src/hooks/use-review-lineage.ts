@@ -8,17 +8,9 @@ import { isActiveReview } from "@/components/practice-vocabulary/review-status-d
 import { problemStatusOf } from "@/lib/problem-detail";
 import { retryUnlessNotFound } from "@/runtime/tanstack-query/query-defaults";
 
-/** What a lineage starts from: an item, review, result, problem or feedback, by kind and id. */
 export type ReviewLineageTarget = GetReviewLineageData["query"];
 
-/**
- * How one record came about, for the chain beside its level. Read apart from the record itself, so
- * a failure here costs the reader the chain and not the record.
- *
- * Undefined when there is nothing to trace: a link that names no record, or an item no review
- * recorded anything about (a 404, which asking again answers the same way). Another record or
- * workspace never shows the previous chain: its review would be read under the new key.
- */
+/** Read lineage independently so its failure cannot hide the record itself. */
 export function useReviewLineage(
 	workspaceSlug: string,
 	target: ReviewLineageTarget | undefined,
@@ -32,7 +24,7 @@ export function useReviewLineage(
 		queryFn: target === undefined ? skipToken : options.queryFn,
 		retry: retryUnlessNotFound,
 		refetchInterval: ({ state }) =>
-			state.data?.nodes.some(
+			state.status === "success" && state.data?.nodes.some(
 				(node) => node.review !== null && isActiveReview(node.review.status),
 			) === true
 				? ACTIVE_REVIEW_POLL_MS

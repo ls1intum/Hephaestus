@@ -175,7 +175,6 @@ export const EditReadOnlyApi: Story = {
 			canvas.getByText("Endpoint, API and authentication cannot change. Add a connection instead."),
 		).toBeVisible();
 		await expectGenuinelyDisabled(canvas.getByLabelText("Base URL"));
-		// The same words as beside the provider on AI models.
 		await expect(canvas.getByLabelText("API key")).toHaveAttribute(
 			"placeholder",
 			"Key ends in ab12",

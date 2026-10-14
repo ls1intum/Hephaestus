@@ -19,7 +19,6 @@ export const problemLinkDataSchema = resultLinkDataSchema.extend({
 	problemId: z.uuid(),
 });
 
-/** Every part kind that links feedback, with the check its payload must pass. */
 const FEEDBACK_LINK_SCHEMAS: Record<string, z.ZodType<{ text?: string }> | undefined> = {
 	"data-result": resultLinkDataSchema,
 	"data-problem": problemLinkDataSchema,

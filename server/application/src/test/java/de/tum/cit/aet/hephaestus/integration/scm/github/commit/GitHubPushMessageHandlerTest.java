@@ -99,9 +99,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 new PassThroughTransactionTemplate());
     }
 
-    /**
-     * Feeds the walk the way JGit does: ask which shas are captured, then hand over each commit.
-     */
     private void stubCommitRange(List<CommitDetails> commits) {
         doAnswer(invocation -> {
                     Function<List<String>, Set<String>> captured = invocation.getArgument(3);
@@ -184,10 +181,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         return repo;
     }
 
-    /**
-     * Sets up scope resolution mocks so that the handler considers the scope active. Required for
-     * tests that exercise the local git processing path.
-     */
     private void mockActiveScopeForRepo(String nameWithOwner) {
         when(scopeIdResolver.findScopeIdByRepositoryName(nameWithOwner)).thenReturn(Optional.of(1L));
         when(syncTargetProvider.isScopeActiveForSync(1L)).thenReturn(true);

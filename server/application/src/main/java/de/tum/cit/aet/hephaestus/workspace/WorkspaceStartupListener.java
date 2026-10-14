@@ -17,26 +17,8 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 
 /**
- * Spring lifecycle hook that kicks off workspace provisioning and monitoring once the application
- * is ready. Disabled during tests and OpenAPI spec generation to prevent GitHub API calls.
- *
- * <h2>Startup Sequence</h2>
- *
- * <ol>
- *   <li>Provision workspaces (create from config or load from database)
- *   <li>Publish {@link WorkspacesInitializedEvent} - signals installation consumer can start
- *   <li>Activate workspaces (reconcile GitHub App repositories, then run the full GraphQL sync for
- *       repos, issues, PRs if startup sync is enabled)
- * </ol>
- *
- * <p>Phases 1-3 run on {@code applicationTaskExecutor} so {@link ApplicationReadyEvent} dispatch
- * returns immediately. Without the hop the main thread was blocked on synchronous GitHub-App REST
- * calls for ~7 s after Spring reported "Started Application", delaying readiness for any downstream
- * subscribers and the perceived dev-loop start time.
- *
- * <p>Ordering: {@link Order#value()} is intentionally {@link Ordered#LOWEST_PRECEDENCE}; the NATS
- * consumer's {@code @Order(1)} {@code init()} runs first to establish the connection before {@link
- * WorkspacesInitializedEvent} could fire from the worker thread.
+ * Dispatch activation asynchronously so readiness listeners do not wait for provider calls.
+ * {@link Order#value()} must let the NATS consumer initialize before {@link WorkspacesInitializedEvent} is published.
  */
 @Component
 @Profile("!specs & !test")

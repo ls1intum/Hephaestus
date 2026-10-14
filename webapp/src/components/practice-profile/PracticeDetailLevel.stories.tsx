@@ -60,12 +60,6 @@ function RatedLevel(props: PracticeDetailLevelProps) {
 	return <PracticeDetailLevel {...props} ratingProps={ratingProps} />;
 }
 
-/**
- * The level is always stacked on its group's, so every story mounts it as the second level of a
- * real drawer over a real page. The tab and the stack are the route's in the app; here they are
- * held beside the drawer so a press on a tab, a card or the group name moves the level as it does
- * there. Which results are open is each row's own.
- */
 const meta = {
 	component: PracticeDetailLevel,
 	parameters: { layout: "fullscreen" },
@@ -152,18 +146,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The second-newest result in the fixture feed. */
 const olderSummary = detailReviews[1]?.results[0]?.summary;
 if (!hasText(olderSummary)) {
 	throw new Error("Expected a second review with a summary in the fixture feed.");
 }
 const newestSummary = detailResult.summary ?? "";
 
-/**
- * Opens on the practice's introduction — why it matters, then the picture captioned with what good
- * looks like — over the tabs. The feedback written about the practice leads the rail and is the
- * tab selected, with the results and the guide beside it.
- */
 export const Default: Story = {
 	play: async () => {
 		await expectSettledVisible(await screen.findByRole("heading", { level: 2, name: "Feedback" }));
@@ -202,7 +190,6 @@ export const ResultsTab: Story = {
 		);
 		// Below the top, dismissing returns to the group behind, so the control says Back.
 		await expect(screen.getByRole("button", { name: "Back" })).toBeVisible();
-		// The feed holds every review there is, so the tab can say how many results it opens on.
 		await expect(screen.getByRole("tab", { name: "Results 3" })).toHaveAttribute(
 			"aria-selected",
 			"true",
@@ -236,11 +223,6 @@ export const RequestedReviewClean: Story = {
 	},
 };
 
-/**
- * The practice's one open card and the cards the work resolved, under a heading of the
- * Results tab's rank; a rating opens the comment band. The practice's own words open the
- * level, so no card offers to learn more about it.
- */
 export const FeedbackTab: Story = {
 	args: { tab: "feedback", practice: describedPractice },
 	play: async () => {
@@ -272,11 +254,6 @@ export const FeedbackTab: Story = {
 	},
 };
 
-/**
- * Nothing open and nothing resolved: the same empty block the Results tab draws, and no
- * "Current feedback" or "Resolved feedback" label claims a list of nothing. It says where feedback
- * about a single piece of work is instead.
- */
 export const FeedbackEmpty: Story = {
 	// A practice no feedback was ever written about, so the tab has nothing to list.
 	args: { tab: "feedback", practice: unwrittenAbout },
@@ -293,10 +270,6 @@ export const FeedbackEmpty: Story = {
 	},
 };
 
-/**
- * Feedback was left on the pull request, and no pattern has repeated into a card yet. The empty tab
- * leads to the results, where each review carries the feedback it left.
- */
 export const FeedbackOnTheWorkOnly: Story = {
 	args: { tab: "feedback", feedbackCards: [] },
 	play: async () => {
@@ -310,11 +283,6 @@ export const FeedbackOnTheWorkOnly: Story = {
 	},
 };
 
-/**
- * The practice guide, a tab beside the results and the feedback rather than a disclosure in
- * the introduction: its headings and its figure at the width of the text, under the introduction
- * that stays above every tab.
- */
 export const GuideTab: Story = {
 	args: { tab: "guide" },
 	play: async () => {
@@ -371,10 +339,7 @@ export const WithoutWhereYouStand: Story = {
 	},
 };
 
-/**
- * Earlier reviews are still a press away, so the tab carries no number: a count of the loaded pages
- * alone would be short, and would grow as the reader pressed.
- */
+/** Paged results cannot supply an exact tab count until every page is known. */
 export const MoreToLoad: Story = {
 	args: { tab: "results", feed: { ...readyFeed, hasMore: true } },
 	play: async () => {
@@ -423,7 +388,6 @@ export const Loading: Story = {
 	},
 };
 
-/** Asked for the results, the level loads in the feed's shape instead. */
 export const LoadingResults: Story = {
 	args: { isLoading: true, practice: undefined, tab: "results" },
 	play: async () => {
@@ -441,10 +405,6 @@ export const LoadFailed: Story = {
 	},
 };
 
-/**
- * A practice with no standing that the workspace still describes, such as one reviewed by people:
- * its words and guide stand on their own, with no result, feedback or standing made up for it.
- */
 export const GuidanceOnly: Story = {
 	args: {
 		practice: undefined,
@@ -463,7 +423,6 @@ export const GuidanceOnly: Story = {
 	},
 };
 
-/** A practice the workspace neither reviews nor describes: the level says it cannot find it. */
 export const Missing: Story = {
 	args: {
 		practice: undefined,

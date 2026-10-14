@@ -31,10 +31,6 @@ export const Unverifiable: Story = {
 	},
 };
 
-/**
- * A result on the current practice standard is the norm, and a banner saying so on every result is a line
- * every reader learns to skip — which is what would make the exceptions above invisible.
- */
 export const Current: Story = {
 	args: { currentness: "CURRENT" },
 	play: async ({ canvas }) => {

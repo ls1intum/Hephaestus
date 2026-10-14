@@ -35,31 +35,16 @@ export interface WorkLevelProps {
 	workspaceSlug: string;
 	nested?: boolean;
 	path: LevelPath;
-	/** The item, as its trace names it. */
 	item: PanelState<{ item: ItemRef }>;
-	/** Every event recorded on the item, as its trace has them. */
 	events?: PanelState<{ events: ItemEvent[] }>;
-	/** The words of an event name, from the definition options the route reads. */
 	eventLabel: (name: string) => string;
-	/** What the item's provider reports about it: its state, author, branches, checks and more. */
 	facts?: PanelState<{ facts: ItemFact[] }>;
-	/** Asks for a review of the item; offered only for the kinds a person can ask to have reviewed. */
 	onRequestReview?: () => void;
 	requesting?: boolean;
-	/** Why no review can be asked for now, such as one of this item already running. */
 	requestBlocked?: string;
-	/** Why the last ask about this item started nothing, drawn by the route. */
 	refusal?: ReactNode;
 }
 
-/**
- * One item's sheet, and only the item, in the order every sheet has: the status line (what became
- * of its latest event, how many events started a review, when the latest happened), what it is (its
- * kind, where it lives, the work it belongs to, and what its provider reports), its history — every
- * event recorded on it with how we came to know, what became of it, and why no review started with
- * the setting that would let it through — and its technical facts. Asking for a review is the
- * footer. The reviews of the item are its trace.
- */
 export function WorkLevel({
 	workspaceSlug,
 	nested,
@@ -215,14 +200,12 @@ function latestEvent(events: readonly ItemEvent[]): ItemEvent | undefined {
 	return latest;
 }
 
-/** "3 events, none started a review", "3 events, 1 started a review". */
 function eventsFigure(events: readonly ItemEvent[]): string {
 	const count = events.length === 1 ? "1 event" : `${events.length} events`;
 	const started = events.filter((event) => hasText(event.reviewId)).length;
 	return `${count}, ${started === 0 ? "none" : String(started)} started a review`;
 }
 
-/** A provider's fact, linked where the provider has a page for it. */
 function FactValue({ fact }: { fact: ItemFact }) {
 	const value = hasText(fact.value) ? fact.value : "None";
 	return hasText(fact.url) ? (

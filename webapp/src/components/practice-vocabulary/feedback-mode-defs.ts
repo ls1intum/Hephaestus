@@ -8,10 +8,7 @@ import {
 
 import type { StatusDefs } from "@/components/common/status-def";
 
-/**
- * How a practice's feedback reaches the developer, as a badge. The words live in
- * `@/lib/practice-feedback-mode`; this registry adds the icon and colour.
- */
+// Feedback-mode words are owned by lib/practice-feedback-mode; this registry supplies presentation.
 export const FEEDBACK_MODE_DEFS: StatusDefs<FeedbackMode> = {
 	OFF: {
 		label: FEEDBACK_MODE_LABELS.OFF,

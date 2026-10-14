@@ -65,7 +65,6 @@ public class SlackMessage {
     @Column(name = "author_slack_user_id", length = 32)
     private @Nullable String authorSlackUserId;
 
-    /** Human author account in this workspace, or null for an unresolved sender. */
     @Column(name = "author_account_id")
     private @Nullable Long authorAccountId;
 

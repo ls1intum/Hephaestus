@@ -79,7 +79,6 @@ public interface IntegrationManifest {
             return NONE;
         }
 
-        /** Every event this integration raises, across all kinds. */
         public Set<ItemEventName> allRaisedEvents() {
             return raises.values().stream().flatMap(Set::stream).collect(Collectors.toUnmodifiableSet());
         }

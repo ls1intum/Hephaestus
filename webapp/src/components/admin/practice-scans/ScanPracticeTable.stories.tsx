@@ -30,7 +30,6 @@ export const Default: Story = {
 	},
 };
 
-/** One practice was reviewed under a different method than the scan before. */
 export const MethodChanged: Story = {
 	args: {
 		practices: METHOD_CHANGED_REPORT.practices.map((practice, index) =>
@@ -42,7 +41,6 @@ export const MethodChanged: Story = {
 	},
 };
 
-/** A withheld practice says why, and a listing that did not finish says so. */
 export const WithheldAndIncomplete: Story = {
 	args: {
 		practices: PARTIAL_REPORT.practices.map((practice, index) =>
@@ -57,7 +55,7 @@ export const WithheldAndIncomplete: Story = {
 		),
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Withheld")).toBeVisible();
+		await expect(canvas.getByText("Withheld", { selector: "span" })).toBeVisible();
 		await expect(canvas.getByText("The assigned AI model was unavailable.")).toBeVisible();
 		await expect(canvas.getByText(/Listing incomplete/u)).toBeVisible();
 	},

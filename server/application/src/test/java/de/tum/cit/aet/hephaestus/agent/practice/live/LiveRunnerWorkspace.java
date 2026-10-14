@@ -46,17 +46,11 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * A practice review workspace for the live tests, staged as the sandbox stages it: the files and the variables of the
- * real {@link PracticePiAdapter} spec, the toolkit link that the image makes, a real checkout of the change, and the
- * inputs each admitted practice's program reads. Only paths move: the container's {@code /workspace} and
- * {@code /home/agent} become directories this harness owns.
- */
+// The harness maps container paths to owned directories while preserving the runtime spec and inputs.
 final class LiveRunnerWorkspace {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
-    /** The toolkit that the image copies to {@code /opt/practice-scripts/lib}. */
     static final Path TOOLKIT = Path.of("..", "..", "docker", "agents", "practice-scripts", "lib")
             .toAbsolutePath()
             .normalize();
@@ -66,7 +60,6 @@ final class LiveRunnerWorkspace {
 
     private LiveRunnerWorkspace() {}
 
-    /** The practice adapter with the server's default work per practice and direct model budget. */
     static PracticePiAdapter adapter() {
         return new PracticePiAdapter(
                 new PiRuntimeFactory(MAPPER),
@@ -76,13 +69,11 @@ final class LiveRunnerWorkspace {
                 MAPPER);
     }
 
-    /** The spec the worker would run for this model, with these practice script models bound. */
     static PracticeAgentRequest request(String modelId, String jobToken, Map<ModelKind, FrozenModel> models) {
         return new PracticeAgentRequest(
                 "openai-completions", modelId, 131_072, 4096, null, jobToken, TIMEOUT_SECONDS, models);
     }
 
-    /** Writes every input file of the spec, and links the SDK and the toolkit where the image has them. */
     static void stageSpec(Path workspace, Map<String, byte[]> inputFiles) throws IOException {
         for (Map.Entry<String, byte[]> file : inputFiles.entrySet()) {
             Path target = workspace.resolve(file.getKey());
@@ -91,14 +82,13 @@ final class LiveRunnerWorkspace {
         }
         // ESM resolution walks node_modules upward from the importing file; production binds the SDK there.
         link(workspace.resolve("node_modules"), PiSdkInstallation.SDK_DIR.resolve("node_modules"));
-        // The link the practice runner profile makes before Node starts (PracticeRunnerProfile.setupCommands).
         Path toolkit = workspace.resolve(SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK);
         Files.createDirectories(toolkit.getParent());
         link(toolkit, TOOLKIT);
+        link(workspace.resolve(SandboxLayout.PRACTICE_SCRIPT_KITS_LINK), TOOLKIT.resolveSibling("kits"));
         Files.createDirectories(workspace.resolve(".home"));
     }
 
-    /** The change of the practice script live tests: added comments, which every model slot of the fixture reads. */
     static final Path CART_CHANGE = Path.of("..", "..", "docker", "agents", "practice-scripts", "fixtures")
             .resolve("cart-change.diff")
             .toAbsolutePath()
@@ -109,7 +99,6 @@ final class LiveRunnerWorkspace {
             SandboxLayout.REPO_MOUNT_RELATIVE + ".git/HEAD",
             SandboxLayout.REPO_MOUNT_RELATIVE + ".git/" + GitRepositoryManager.CAPTURED_REFS);
 
-    /** The fixture's {@code LoginService.swift}, added to an empty base. */
     static ObjectNode stageLoginChange(Path workspace) throws IOException, InterruptedException {
         return stageChange(
                 workspace,
@@ -125,7 +114,7 @@ final class LiveRunnerWorkspace {
     static ObjectNode stageCartChange(Path workspace) throws IOException, InterruptedException {
         Map<String, String> base = new LinkedHashMap<>();
         Map<String, String> head = new LinkedHashMap<>();
-        String library = Files.readString(TOOLKIT.resolve("diff-parser.ts"));
+        String library = Files.readString(TOOLKIT.resolveSibling("kits").resolve("scm/diff-parser.ts"));
         base.put("lib/diff-parser.ts", library);
         head.put("lib/diff-parser.ts", library);
         StringBuilder before = new StringBuilder();
@@ -136,7 +125,6 @@ final class LiveRunnerWorkspace {
                 path = line.substring("+++ b/".length());
                 continue;
             }
-            // The other headers name the file and the hunk; the lines below them carry its two sides.
             if (line.startsWith("diff ") || line.startsWith("--- ") || line.startsWith("@@")) continue;
             if (line.startsWith("+")) after.append(line.substring(1)).append('\n');
             else if (line.startsWith("-")) before.append(line.substring(1)).append('\n');
@@ -197,14 +185,12 @@ final class LiveRunnerWorkspace {
         return record;
     }
 
-    /** The repository tree source's identity of the staged checkout: its head and that head's tree. */
     static String treeIdentity(Path workspace) throws IOException, InterruptedException {
         String repo = workspace.resolve(SandboxLayout.REPO_MOUNT_RELATIVE).toString();
         return git(workspace, "-C", repo, "rev-parse", "HEAD").strip() + ":"
                 + git(workspace, "-C", repo, "rev-parse", "HEAD^{tree}").strip();
     }
 
-    /** What {@link #stageChange} captured, by path, with the source that captured each. */
     static Map<String, String> capturedFiles() {
         Map<String, String> artifacts = new LinkedHashMap<>();
         artifacts.put(SandboxLayout.CONTEXT_PREFIX + "metadata.json", "scm.pull-request.core");
@@ -214,7 +200,6 @@ final class LiveRunnerWorkspace {
         return artifacts;
     }
 
-    /** The folder index of these artifacts, every source available, as {@code JobFolderIndex} serializes one. */
     static ObjectNode manifest(Path workspace, Map<String, String> files) throws IOException {
         var snapshot = EvidenceSnapshotFixtures.snapshot(MAPPER);
         var sources = new LinkedHashMap<String, ObjectNode>();
@@ -236,7 +221,6 @@ final class LiveRunnerWorkspace {
         }
     }
 
-    /** The practice catalog of one practice, as the catalog injector stages it. */
     static void stagePractice(Path workspace, String slug, String name, String criteria, long revisionId)
             throws IOException {
         Path practices = workspace.resolve(SandboxLayout.PRACTICES_PREFIX);

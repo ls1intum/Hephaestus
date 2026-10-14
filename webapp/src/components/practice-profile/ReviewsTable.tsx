@@ -33,7 +33,6 @@ import { hasText } from "@/lib/text";
 import { REVIEWS_OF_YOUR_WORK } from "./practice-profile-search";
 
 export interface ReviewsTableProps {
-	/** Newest first, as the wire orders them. */
 	reviews: ProfileReview[];
 	/**
 	 * Whether a filter narrows the list: the newest row is then not the latest review, and an empty
@@ -42,9 +41,7 @@ export interface ReviewsTableProps {
 	filtered: boolean;
 	onOpenReview: (reviewId: string) => void;
 	openReviewId?: string;
-	/** Asks for a review of an item; offered only on item reviews, and absent where none may be asked. */
 	onReviewNow?: (itemId: string) => void;
-	/** The item an ask is in flight about; its rows say so rather than invite a second. */
 	requesting?: string;
 	/** Each review's position among the reviews of its item, when every review is loaded. */
 	positions?: Map<string, number>;
@@ -59,7 +56,6 @@ const COLUMNS: readonly ReviewColumn[] = [
 /** The moment a review is listed at: when it finished, or when it was asked for while it runs. */
 const reviewedAt = ({ review }: ProfileReview): Date => review.completedAt ?? review.createdAt;
 
-/** The reader's own review, as the list phrases it, from its results about them. */
 function sawOf({ review, results }: ProfileReview): ReviewSaw {
 	const counts: ReviewResultCounts = { met: 0, notMet: 0, doesNotApply: 0, couldNotDetermine: 0 };
 	for (const { outcome } of results) {
@@ -82,10 +78,6 @@ function sawOf({ review, results }: ProfileReview): ReviewSaw {
 	};
 }
 
-/**
- * The reviews that recorded something about the reader's own work, one body per day under its
- * heading, so a row carries the time alone.
- */
 export function ReviewsTable({
 	reviews,
 	filtered,
@@ -198,18 +190,10 @@ function ReviewRow({
 	);
 }
 
-/**
- * The row's own control under the pointer or focus, in the primary ground: a press anywhere else on
- * the row opens the review, and the accent is spent on one control per surface, never on a row.
- */
 const ROW_ACTION_PRESSED =
 	"hover:bg-primary hover:text-primary-foreground focus-visible:bg-primary focus-visible:text-primary-foreground dark:hover:bg-primary dark:hover:text-primary-foreground";
 
-/**
- * The feedback this review left on the work, linked where its first copy was posted. Feedback the
- * provider cannot address stays a count: a link that scrolls nowhere is a promise the row did not
- * keep.
- */
+// Link only provider-addressable copies; an unaddressable copy remains a count.
 function FeedbackOnTheWork({ entry }: { entry: ProfileReview }) {
 	const { item } = entry.review;
 	const onWork = entry.feedback.filter(

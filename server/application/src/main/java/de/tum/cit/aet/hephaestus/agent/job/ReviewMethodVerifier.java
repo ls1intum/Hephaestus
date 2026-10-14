@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 
-/** Owns the non-secret judgment options that must match before a pinned method executes. */
 @Component
 @RequiredArgsConstructor
 public class ReviewMethodVerifier {

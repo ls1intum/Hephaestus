@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 import { cn } from "cn";
 
-/** The two kinds of table a stage of the trace holds: the review's results, its feedback. */
 export type TraceTableKind = "results" | "feedback";
 
 /**

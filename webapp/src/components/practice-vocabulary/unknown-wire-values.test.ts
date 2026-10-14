@@ -11,11 +11,7 @@ import { mockDocumentItemType } from "@/mocks/fixtures/practice";
 
 import { evidenceSourceDef } from "./evidence-source-defs";
 
-/**
- * The server's vocabularies are open: a kind of work, an event or a read source
- * can reach this build before it has words for them. Each helper below must still answer in words,
- * and none of them may hand the reader the id it was given.
- */
+// Provider vocabularies can reach the client before labels do; unknown values must not become misleading copy.
 describe("a value this build has no words for", () => {
 	const unknownKind = "tracker.ticket";
 

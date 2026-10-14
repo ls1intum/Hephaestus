@@ -32,7 +32,6 @@ const CHANGE = parseDiff(
 	].join("\n"),
 );
 
-/** A checkout and a context folder, with a reader over them. */
 async function captures(t: TestContext) {
 	const root = await mkdtemp(path.join(tmpdir(), "evidence-reader-"));
 	t.after(async () => rm(root, { recursive: true, force: true }));
@@ -75,7 +74,6 @@ async function captures(t: TestContext) {
 	};
 }
 
-/** Rejects with an `UnratedError` of `reason`. */
 async function unrated(promise: Promise<unknown>, reason: string, message?: RegExp): Promise<void> {
 	await assert.rejects(promise, (error: unknown) => {
 		assert.ok(error instanceof UnratedError, String(error));
@@ -182,7 +180,6 @@ void describe("reads of the head tree", () => {
 			text: "export class Cart {\n  // increment the item count by one\n  count += 1;\n}\n",
 			truncated: false,
 		});
-		// Empty text is a file that holds nothing, never an absent one.
 		assert.deepEqual(await read("empty.txt"), { status: "FOUND", text: "", truncated: false });
 		assert.deepEqual(await read("logo.png"), { status: "BINARY" });
 		assert.deepEqual(await read("src/absent.ts"), { status: "ABSENT" });
@@ -202,7 +199,6 @@ void describe("reads of the head tree", () => {
 
 	void test("a read that fails is unavailable and counted as failed, never an absent file", async (t) => {
 		const { reader, repo, receipts } = await captures(t);
-		// A link to itself cannot be resolved: the read fails, and the file is not proved absent.
 		await symlink("loop.txt", path.join(repo, "loop.txt"));
 		await unrated(reader.answer({ op: "read", path: "loop.txt" }), "refused");
 		assert.deepEqual(receipts, { reads: 1, truncatedReads: 0, failedReads: 1 });
@@ -400,7 +396,6 @@ void describe("citations", () => {
 				quote: '  "pr_number": 7,',
 			},
 		);
-		// A citation is not a read of new evidence: it quotes what a read already reached.
 		assert.deepEqual(receipts, noReceipts() satisfies Receipts);
 	});
 

@@ -1,5 +1,3 @@
-// Finds each authored commit subject in the commit record, with its shapes: bare, repeated or cut off.
-// A shape is a place to check, not a lapse.
 import { readCapturedCommits } from "../kits/scm/change.ts";
 import { describeCommitCount, subjectFacts, subjectLeads } from "../kits/scm/commit-subjects.ts";
 import { scm, expectKind } from "../kits/scm/index.ts";

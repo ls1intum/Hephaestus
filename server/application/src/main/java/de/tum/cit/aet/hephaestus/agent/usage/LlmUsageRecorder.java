@@ -75,10 +75,7 @@ public class LlmUsageRecorder {
         }
     }
 
-    /**
-     * A rate the frozen price is missing cannot be charged, so the whole event stops being priced. No price has a
-     * rate for search units, so a priced sample with search units is never charged.
-     */
+    // Missing rates leave the whole event unpriced; search units require their own rate.
     private static boolean isPricedWithARateMissing(LlmUsageSample sample, LlmPriceSnapshot price) {
         return (price.pricingState() == UsagePricingState.PRICED
                 && ((sample.inputTokens() > 0 && price.per1mInputUsd() == null)

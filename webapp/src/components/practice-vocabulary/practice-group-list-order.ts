@@ -32,11 +32,6 @@ export function sortByStanding<T>(
 	);
 }
 
-/**
- * The groups by standing; a group the standings did not report reads as not observed, and ties keep
- * the order the groups arrived in, which is the catalog's. Takes the developer-safe group reference,
- * so a profile sorts without the admin-only group record.
- */
 export function sortPracticeGroups<TGroup extends Pick<GroupRef, "slug">>(
 	groups: readonly TGroup[],
 	standings: Record<string, PracticeGroupStanding | undefined>,

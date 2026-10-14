@@ -2,17 +2,21 @@ package de.tum.cit.aet.hephaestus.integration.core.itemevent;
 
 import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@NamedInterface(value = "item-events", propagate = false)
 @RequiredArgsConstructor
 @Transactional
 public class ItemEventService {
@@ -20,6 +24,14 @@ public class ItemEventService {
     private final ItemRepository items;
     private final ApplicationEventPublisher publisher;
     private final Clock clock;
+
+    @Transactional(readOnly = true)
+    public Optional<ItemEventView> find(long workspaceId, UUID eventId) {
+        return repository
+                .findByIdAndWorkspaceId(eventId, workspaceId)
+                .map(event -> new ItemEventView(
+                        new ItemEventName(event.getName()), event.getItemVersion(), event.getState()));
+    }
 
     public UUID record(ItemEventInput input) {
         var item = items.findByIdAndWorkspaceId(input.itemId(), input.workspaceId())

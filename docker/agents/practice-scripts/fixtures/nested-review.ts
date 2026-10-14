@@ -1,5 +1,3 @@
-// While its review runs, the program sends a second review request past `ctx.review`, as forged code
-// can. The host refuses it: one review of a practice runs at a time.
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 const FORGED_ID = 1_000_000;

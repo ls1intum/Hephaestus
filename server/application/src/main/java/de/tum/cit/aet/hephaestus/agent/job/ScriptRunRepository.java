@@ -30,7 +30,6 @@ public interface ScriptRunRepository extends JpaRepository<ScriptRun, ScriptRun.
     List<ScriptRun> findByWorkspaceIdAndJobIdAndAttempt(
             @Param("workspaceId") long workspaceId, @Param("jobId") UUID jobId, @Param("attempt") int attempt);
 
-    /** What the proxy counted for the practice script calls of one attempt of the job, by practice and model kind. */
     @Query("""
         SELECT u FROM ScriptUsage u
         WHERE u.workspaceId = :workspaceId AND u.id.jobId = :jobId AND u.id.attempt = :attempt
@@ -38,7 +37,6 @@ public interface ScriptRunRepository extends JpaRepository<ScriptRun, ScriptRun.
     List<ScriptUsage> findUsageByWorkspaceIdAndJobIdAndAttempt(
             @Param("workspaceId") long workspaceId, @Param("jobId") UUID jobId, @Param("attempt") int attempt);
 
-    /** The current names of the workspace's practices with these slugs. */
     @Query(value = """
         SELECT p.id AS "id", p.slug AS "slug", v.name AS "name"
         FROM practice p
@@ -55,7 +53,6 @@ public interface ScriptRunRepository extends JpaRepository<ScriptRun, ScriptRun.
         String getName();
     }
 
-    /** Of these practice versions of the workspace, the ones that hold a practice script. */
     @Query(value = """
         SELECT r.id
         FROM practice_version r
@@ -115,11 +112,9 @@ public interface ScriptRunRepository extends JpaRepository<ScriptRun, ScriptRun.
         @Nullable
         Instant getFinishedAt();
 
-        /** The run's models as stored JSON. */
         @Nullable
         String getModels();
 
-        /** Whether the run's revision held today's script; false when there is no run. */
         boolean getCurrent();
     }
 }

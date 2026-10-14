@@ -34,7 +34,6 @@ interface ProfileReviewsRequest {
 	workspaceSlug: string;
 	/** True while a level that shows the list is open; a closed drawer reads nothing. */
 	listOpen: boolean;
-	/** The open review level's review id, if any. */
 	reviewId?: string;
 	itemKind?: string;
 	since?: ReviewTimeframe;
@@ -43,15 +42,10 @@ interface ProfileReviewsRequest {
 /** The open review, with its results, the reader's feedback from it and what they may see of its trace. */
 export type ProfileReviewOpenState = PanelState<{ detail: ProfileReviewDetail }>;
 
-/** A review that may still record something, so its level asks again until it stops. */
 function isActive(review: ReviewRef | undefined): boolean {
 	return review?.status === "QUEUED" || review?.status === "RUNNING";
 }
 
-/**
- * The two review levels' data: the reviews that recorded something about the reader's own work,
- * and the one open over it, which carries the reader's own trace of its item.
- */
 export function usePracticeProfileReviews({
 	workspaceSlug,
 	listOpen,
@@ -72,7 +66,6 @@ export function usePracticeProfileReviews({
 		...listOptions,
 		...pagedModelParams,
 		enabled: listOpen,
-		// A review is listed once it records something about the reader, which no ask here announces.
 		refetchInterval: PRACTICE_PROFILE_POLL_MS,
 	});
 	useQueryReadRefusal(listOptions.queryKey, reviewsQuery.isError, reviewsQuery.error);
@@ -91,19 +84,16 @@ export function usePracticeProfileReviews({
 	const active = isActive(reviewQuery.data?.review);
 
 	const list: ReviewFeedState = listOpen ? reviewFeedState(reviewsQuery) : EMPTY_REVIEW_FEED;
-	// The list polls only every minute, so it can predate the open review's final results; the
-	// review stopping is what asks it once more.
+	// Refresh the slower-polled list when an open review ends so its final results appear.
 	useInvalidateOnSettle(reviewId, active, [
 		listOwnReviewsInfiniteQueryKey({ path: { workspaceSlug } }),
 	]);
 
-	// The open review's head explains a refusal about its own item; a row anywhere else gets a toast.
 	const openItemId = reviewQuery.data?.review.item.id;
 	const request = useRequestPracticeReview(workspaceSlug, {
 		showsInline: (itemId) => reviewId !== undefined && itemId === openItemId,
 	});
-	// A refusal is said on the review it was asked from and on no other; leaving the level forgets
-	// it, so it never comes back on a later visit.
+	// Refusals belong to the active review level; clear them on leaving it.
 	const [visited, setVisited] = useState(reviewId);
 	if (visited !== reviewId) {
 		setVisited(reviewId);
@@ -117,14 +107,13 @@ export function usePracticeProfileReviews({
 
 	return {
 		list,
-		// Counted only over every review there is; a page or a filter would count short.
+	// Exact positions require every review; filters or partial pages would undercount.
 		positions:
 			list.status === "ready" && !list.hasMore && !hasText(itemKind) && since === undefined
 				? reviewPositionsOnItem(list.reviews.map(({ review }) => review))
 				: undefined,
 		open,
 		onReviewNow: request.ask,
-		/** The item an ask is in flight about. */
 		requesting: request.asking,
 		refusal: request.refusal?.outcome,
 	};

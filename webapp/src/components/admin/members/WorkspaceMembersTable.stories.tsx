@@ -67,7 +67,6 @@ export const Default: Story = {
 	},
 };
 
-/** One account with a GitHub and a GitLab identity is one member row that lists both logins. */
 export const MultiProviderAccount: Story = {
 	args: { members: workspaceMemberRows([multiProviderMember], mockTeams) },
 	play: async ({ canvas }) => {
@@ -113,7 +112,6 @@ export const MemberWhoLeft: Story = {
 	},
 };
 
-/** An admin picks another role; the change targets the member's account. */
 export const ChangeRole: Story = {
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Role of Bob Smith" }));
@@ -122,7 +120,6 @@ export const ChangeRole: Story = {
 	},
 };
 
-/** Only the member whose role change is in flight waits. */
 export const RoleChangePending: Story = {
 	args: { pendingRoleAccountId: unclaimedMember.account.id },
 	play: async ({ canvas }) => {
@@ -131,7 +128,6 @@ export const RoleChangePending: Story = {
 	},
 };
 
-/** A team lists provider logins, so the filter finds the account through either identity. */
 export const FilteredByTeam: Story = {
 	args: {
 		view: { q: "", team: "3", sort: "name", desc: false, page: 0, size: 10 },
@@ -142,7 +138,6 @@ export const FilteredByTeam: Story = {
 	},
 };
 
-/** 200% zoom on a laptop: the toolbar's search, filter and columns do not fit one row, so they wrap. */
 export const AtTwoHundredPercentZoom: Story = {
 	parameters: { viewport: { defaultViewport: "zoom200" } },
 	play: expectNoPageOverflow,
@@ -165,7 +160,6 @@ export const Empty: Story = {
 	},
 };
 
-/** Without admin controls, roles read as words and nothing can be changed. */
 export const ReadOnly: Story = {
 	args: { onRoleChange: undefined, onToggleHidden: undefined },
 	play: async ({ canvas }) => {

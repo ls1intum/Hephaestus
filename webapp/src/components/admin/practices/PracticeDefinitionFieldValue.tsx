@@ -13,10 +13,6 @@ export interface PracticeDefinitionFieldValueProps {
 	field: PracticeDefinitionField;
 }
 
-/**
- * One field of one version of a definition, for comparing versions side by side: text as written,
- * and the guidance's visual and guide drawn under its words.
- */
 export function PracticeDefinitionFieldValue({
 	definition,
 	field,

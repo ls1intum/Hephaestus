@@ -17,11 +17,9 @@ import { z } from "zod";
 
 import { isJsonObject } from "./json.ts";
 
-/** The error of a script whose default export is not a `definePracticeScript` definition. */
 export const NOT_A_DEFINITION_ERROR =
 	"The script's default export is not a practice script. Write it with definePracticeScript.";
 
-/** A practice slug as the server writes it: `SandboxLayout.PRACTICE_SLUG`, anchored. */
 export const PRACTICE_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
 /**
@@ -53,7 +51,6 @@ export const MODEL_SLOT_CAPS = {
 const needSchema = z.enum(["required", "optional"]);
 export type Need = z.infer<typeof needSchema>;
 
-/** Why something was not rated or not reached. Never "nothing found". */
 export const REASONS = [
 	"unavailable",
 	"budget",
@@ -74,13 +71,11 @@ const line = (max: number) =>
 		.max(max)
 		.refine((text) => !/[\r\n]/u.test(text), "must be one line");
 
-/** A practice program's `meta`: the direct models it needs, and nothing else. */
 export const metaSchema = z.strictObject({
 	models: z.partialRecord(modelSlotSchema, needSchema).optional(),
 });
 export type ParsedMeta = z.infer<typeof metaSchema>;
 
-/** Parse a program's `meta`, or say why it is not one. */
 export function parseMeta(meta: unknown): { meta: ParsedMeta } | { error: string } {
 	const parsed = metaSchema.safeParse(meta);
 	if (!parsed.success) {
@@ -92,7 +87,6 @@ export function parseMeta(meta: unknown): { meta: ParsedMeta } | { error: string
 	return { meta: parsed.data };
 }
 
-/** The longest fact text, and the longest direction or lead label, that a review input carries. */
 export const FACT_CHARS = 200;
 export const DIRECTION_CHARS = 300;
 
@@ -119,14 +113,9 @@ const boundModelSchema = z.strictObject({
 	modelId: z.string().min(1),
 	reasoningEffort: z.string().optional(),
 });
-/**
- * The models the server bound for this job, as `practice-script-models.json` holds them: one entry
- * per slot that has a model. A slot without an entry has no model.
- */
 export const boundModelsSchema = z.partialRecord(modelSlotSchema, boundModelSchema);
 export type BoundModels = z.infer<typeof boundModelsSchema>;
 
-/** The provider model of each slot, its call options, and what a call returns. */
 interface SlotTypes {
 	chat: {
 		model: LanguageModelV4;
@@ -150,10 +139,8 @@ interface SlotTypes {
 	};
 }
 
-/** The provider model of each slot: in the host, in a program's process, and in `ctx.models`. */
 export type SlotModels = { [S in ModelSlot]: SlotTypes[S]["model"] };
 
-/** What one slot's model returned, named by its slot. */
 export type SlotAnswer<S extends ModelSlot = ModelSlot> = {
 	[K in S]: { slot: K; result: SlotTypes[K]["result"] };
 }[S];
@@ -180,7 +167,6 @@ export interface SlotCall<S extends ModelSlot> {
 	) => Promise<{ value: SlotAnswer; tokens: number | undefined }>;
 }
 
-/** The entries of a list, or the keys of a record. */
 function size(value: unknown): number {
 	if (Array.isArray(value)) {
 		return value.length;
@@ -259,7 +245,6 @@ function isRerankingCall(options: Record<string, unknown>): options is CallOptio
 		: documents.type === "object" && documents.values.every(isJsonObject);
 }
 
-/** How the host calls each slot's model for a program. */
 export const MODEL_SLOT_CALLS = {
 	chat: {
 		options: [
@@ -364,7 +349,6 @@ const previousCitationSchema = z.strictObject({
 	side: z.enum(["OLD", "NEW"]).optional(),
 	revision: version.optional(),
 });
-/** How much feedback one destination may carry in a run. */
 const destinationBoundsSchema = z.strictObject({
 	enabled: z.boolean(),
 	maxPieces: z.int().min(0).max(10),
@@ -465,7 +449,6 @@ export const CANDIDATE_LIMITS = {
 	maxCount: 1_000_000,
 } as const;
 
-/** Why a candidate is refused, in the order the rules apply: the first failing rule names it. */
 export const CANDIDATE_REFUSALS = [
 	"malformed_candidate",
 	"outcome_problem_mismatch",
@@ -501,13 +484,11 @@ export type SearchWarrant = z.infer<typeof searchShape>;
 export type InapplicabilityWarrant = z.infer<typeof inapplicabilityShape>;
 /** A real semantic question the evidence leaves open, located where it can be. */
 export type OpenQuestion = z.infer<typeof openQuestionShape>;
-/** One place of the work that shows the practice done well. */
 export type Example = z.infer<typeof exampleShape>;
 /** Why a problem is this work's: the indices name the problem's own citations. */
 export type ClaimBasis = z.infer<typeof basisShape>;
 export type Problem = z.infer<typeof problemShape>;
 export const OMISSION_REASONS = ["selection", "truncated", ...REASONS, "cancelled"] as const;
-/** What a program or a review did not cover, and why. */
 export type Omission = z.infer<typeof omissionShape>;
 export type Completeness =
 	| { complete: true; omitted?: never }
@@ -708,10 +689,7 @@ const coverageShape = z.discriminatedUnion("source", [
 	}),
 ]);
 
-/**
- * Every key that any outcome may carry. A candidate is read against it first, so that a key in the
- * wrong outcome is named by its outcome rule, not as an unknown key.
- */
+// Check outcome rules before reporting an outcome-specific field as an unknown key.
 const supersetShape = z.strictObject({
 	outcome: z.enum(OUTCOMES),
 	summary: line(CANDIDATE_LIMITS.summaryChars),
@@ -857,7 +835,6 @@ function issueText(error: z.ZodError): string {
 	return where === "" ? issue.message : `${where}: ${issue.message}`;
 }
 
-/** The JSON size of a value, or undefined when it is not JSON. */
 function jsonBytes(value: unknown): number | undefined {
 	try {
 		const text: unknown = JSON.stringify(value);
@@ -867,7 +844,6 @@ function jsonBytes(value: unknown): number | undefined {
 	}
 }
 
-/** The warrants each outcome may carry, and what a refusal says about a wrong one. */
 const WARRANT_RULES: Readonly<
 	Record<Outcome, { holds: (evidence: Superset["evidence"]) => boolean; message: string }>
 > = {
@@ -891,7 +867,6 @@ const WARRANT_RULES: Readonly<
 	},
 };
 
-/** The first outcome rule the candidate breaks, before its coverage is read. */
 function outcomeRefusal(
 	sent: Superset,
 	problems: NonEmpty<NonNullable<Superset["problems"]>[number]> | undefined,
@@ -920,7 +895,6 @@ function outcomeRefusal(
 	return undefined;
 }
 
-/** The first rule about the example and the problems that the candidate breaks. */
 function problemRefusal(sent: Superset, resolve?: ResolveCitationIdentity): Refusal | undefined {
 	const { example, outcome } = sent;
 	const problems = sent.problems ?? [];
@@ -950,7 +924,6 @@ function problemRefusal(sent: Superset, resolve?: ResolveCitationIdentity): Refu
 		: refuse("duplicate_problem_key", "two problems share a key");
 }
 
-/** The candidate of its outcome, once every rule holds; undefined when the outcome's parts are not there. */
 function candidateOf(sent: Superset, coverage: Coverage): Candidate | undefined {
 	const { outcome, summary, explanation, example } = sent;
 	const { search, inapplicability, openQuestions } = sent.evidence;
@@ -1022,7 +995,6 @@ export function parseCandidate(
 		return after;
 	}
 	const candidate = candidateOf(sent, coverage);
-	// Each outcome's parts are there once the rules hold; a value that reaches here broke none of them.
 	return candidate === undefined
 		? refuse("malformed_candidate", "the candidate matches no outcome")
 		: { ok: true, candidate };
@@ -1152,7 +1124,6 @@ export const executionEntrySchema = z
 		),
 		status: z.enum(RUN_STATUSES),
 		stopReason: z.enum(STOP_REASONS).nullable(),
-		// 500 code points, as `errorLine` cuts it and the server reads it.
 		error: z
 			.string()
 			.min(1)

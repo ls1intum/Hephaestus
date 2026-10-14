@@ -37,7 +37,6 @@ describe("scan baseline vocabulary", () => {
 		expect(baselineDef("ABSENT", "REPAIRED")).toBe(NOW_MET_DEF);
 		expect(baselineDef("ABSENT", "REPAIRED").label).toBe("Now met");
 		expect(baselineDef("ABSENT", null).label).toBe("Absent");
-		// A reason on a problem that is still there changes nothing.
 		expect(baselineDef("UNCHANGED", "REPAIRED").label).toBe("Unchanged");
 	});
 

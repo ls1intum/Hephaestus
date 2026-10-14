@@ -17,7 +17,6 @@ const GITLAB_ITEM = {
 	removedAt: null,
 } satisfies ItemRef;
 
-/** The reader's latest own review of the item: finished, at one commit. */
 export const OWN_TRACE: OwnItemTrace = {
 	item: GITLAB_ITEM,
 	review: {
@@ -133,7 +132,6 @@ export const DOES_NOT_APPLY_ROW: ResultRow = {
 	summary: "The change does not alter a public interface.",
 };
 
-/** A result whose evidence can no longer be shown, so the list names none of its problems. */
 export const HISTORICAL_ROW: ResultRow = {
 	...NOT_MET_ROW,
 	id: "1a2b3c4d-0000-4000-8000-000000000004",

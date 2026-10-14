@@ -40,7 +40,6 @@ describe("reviewedByProblem", () => {
 		expect(reviewedByProblem({ ...draft, limits: [limit, limit] })?.message).toBe(
 			"Describe each limit once.",
 		);
-		// Nobody saves no limits, so a draft limit does not hold the save back.
 		expect(
 			reviewedByProblem({ ...draft, by: "NOBODY", limits: [limitWithText(" ")] }),
 		).toBeUndefined();

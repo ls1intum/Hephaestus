@@ -7,7 +7,6 @@ import {
 	runBundled,
 } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
-/** A file whose added lines are numbered from 1, with no hunk context. */
 function added(file: string, lines: string[]): [string, DiffFile] {
 	return [
 		file,
@@ -20,7 +19,6 @@ function added(file: string, lines: string[]): [string, DiffFile] {
 	];
 }
 
-/** One hunk from new-side line `start`: `+` lines are added, the rest is context. */
 function hunk(file: string, start: number, lines: string[]): [string, DiffFile] {
 	const addedLines = new Map<number, string>();
 	for (const [index, line] of lines.entries()) {
@@ -62,7 +60,6 @@ const movies = [
 	"if let first = items.first {",
 ];
 
-/** The lead of one Swift line that spells a crash operator. */
 function crash(file: string, line: number, operators: string, inPreview = false) {
 	return {
 		at: { file, line },

@@ -11,14 +11,9 @@ import { pageHead } from "@/lib/page-title";
 import { useAuth } from "@/runtime/auth/AuthContext";
 import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
 
-/** A workspace item id: a positive decimal. */
 const ITEM_ID = /^[1-9]\d{0,18}$/u;
 
-/**
- * The address every comment Hephaestus posts on reviewed work ends with, so it is a contract with
- * comments already out there: `itemId` is the workspace's item id, and the page shows only the
- * reader's own reviews of the item.
- */
+// Provider comments link here by workspace item id; a provider number cannot identify the item.
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/feedback/$itemId")({
 	remountDeps: ({ params }) => params,
 	loader: ({ params: { itemId } }) => {
@@ -32,7 +27,6 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/feedback/
 });
 
 function ItemFeedbackRoute() {
-	// A user view reads the developer's feedback and answers nothing on their behalf.
 	const readOnly = useAuth().userView !== undefined;
 	const { workspaceSlug } = Route.useParams();
 	const { itemId } = Route.useLoaderData();

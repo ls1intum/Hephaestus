@@ -35,7 +35,6 @@ type Story = StoryObj<typeof meta>;
 export const Ready: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("heading", { name: "AI usage" })).toBeVisible();
-		// One section per heading, in reading order: the tiles, then each breakdown.
 		await expect(
 			canvas.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
 		).toStrictEqual(["Spend this month", "By run type", "By day"]);

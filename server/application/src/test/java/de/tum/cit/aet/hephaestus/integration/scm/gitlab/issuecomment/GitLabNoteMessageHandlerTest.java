@@ -210,9 +210,6 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
             handler.onMessage(mockMessage(event));
 
-            // The same rows at the same times as the discussion sync makes, and the note's own GID
-            // so a
-            // later sync finds them; live, so an approval note is the approval itself.
             verify(reviewReconciler)
                     .recordSystemNote(
                             eq(mergeRequest),

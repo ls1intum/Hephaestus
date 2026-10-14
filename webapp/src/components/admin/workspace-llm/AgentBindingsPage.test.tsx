@@ -73,7 +73,6 @@ type Scope = ReturnType<typeof within<typeof queries>>;
 
 const UNCHOSEN_ROW = "Members who have not chosen";
 
-/** The purpose's row, opened if it is closed: a closed row holds no forms. */
 function purposeRegion(purpose: string): Scope {
 	const trigger = screen.getByRole("button", { name: purpose });
 	if (trigger.getAttribute("aria-expanded") !== "true") {
@@ -312,7 +311,6 @@ describe("AgentBindingsPage rows", () => {
 		expect(expanded("Decision model")).toBe("false");
 		fireEvent.click(screen.getByRole("button", { name: "Needs arrive" }));
 		expect(expanded("Decision model")).toBe("true");
-		// Decided once: the reader's close holds while the same needs come back.
 		fireEvent.click(screen.getByRole("button", { name: "Decision model" }));
 		fireEvent.click(screen.getByRole("button", { name: "Needs arrive" }));
 		expect(expanded("Decision model")).toBe("false");

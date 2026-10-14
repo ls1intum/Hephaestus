@@ -62,10 +62,6 @@ export const AwaitingConfirmation: Story = {
 	},
 };
 
-/**
- * A workspace with no priced reviews yet has nothing to forecast from, and a $0.00 there would
- * invite exactly the unconsidered spend this screen exists to prevent.
- */
 export const CostUnknown: Story = {
 	args: { batches: [batch({ estimatedCostUsd: null })] },
 	play: async ({ canvas }) => {
@@ -89,10 +85,6 @@ export const Running: Story = {
 	},
 };
 
-/**
- * Work the review could not read is not work it measured and found nothing in; folding the two
- * together would leave a baseline in which the two absences are indistinguishable.
- */
 export const SomeCouldNotBeRead: Story = {
 	args: {
 		batches: [batch({ status: "RUNNING", submittedCount: 40, skippedCount: 12, failedCount: 3 })],
@@ -126,7 +118,6 @@ export const PausedOnBudget: Story = {
 	},
 };
 
-/** A schedule's own batches belong to the schedule, so they never surface as past work here. */
 export const ScheduleBatchesStayWithTheirSchedule: Story = {
 	args: { batches: [batch({ origin: "SCHEDULE", status: "RUNNING", scheduleId: "s-1" })] },
 	play: async ({ canvas }) => {
@@ -169,10 +160,6 @@ export const Loading: Story = {
 	},
 };
 
-/**
- * The failure is about this list, not about the review. Read as "stopped", it costs a second review
- * confirmed over the same stretch of history — twice the spend.
- */
 export const Error: Story = {
 	args: { isError: true },
 	play: async ({ canvas }) => {

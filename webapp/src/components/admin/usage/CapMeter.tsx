@@ -6,12 +6,7 @@ import { formatCapUsd, formatCostUsd } from "@/lib/money";
 
 import { BUDGET_WARN_PERCENT } from "./usage-utils";
 
-/**
- * Whether a cap's use is worth naming, and how: `null` means "just a number". A past month is never a
- * state: caps are compared against *today's* limits, so a finished month can be over one without
- * anything being held back. The meter's tone never carries the state alone; every caller badges it
- * beside the bar (SC 1.4.1).
- */
+// Caps compare current limits; a past month cannot establish the current cap state.
 export function capState(
 	percent: number | undefined,
 	paused: boolean,

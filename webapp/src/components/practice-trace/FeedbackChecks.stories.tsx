@@ -62,7 +62,6 @@ export const Allowed: Story = {
 	},
 };
 
-/** An earlier check that passed and a later one that stopped: the heading answers for the stop. */
 export const PassedThenStopped: Story = {
 	args: { checks: [{ ...allowedCheck, stage: "COMPOSITION" }, outOfScopeCheck] },
 	play: async ({ canvas }) => {

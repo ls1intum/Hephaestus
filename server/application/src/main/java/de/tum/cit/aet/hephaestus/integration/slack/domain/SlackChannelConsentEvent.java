@@ -62,7 +62,6 @@ public class SlackChannelConsentEvent {
     @Column(name = "to_state", nullable = false, length = 16)
     private ConsentState toState;
 
-    /** Authenticated admin account, or null for a system transition or an erased actor. */
     @Column(name = "actor_account_id")
     private @Nullable Long actorAccountId;
 

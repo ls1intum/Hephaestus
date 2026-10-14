@@ -17,7 +17,6 @@ import java.util.Optional;
  * installation-minted tokens that require kind-specific minting.
  */
 public interface ScmTokenSource {
-    /** The SCM kind this token source represents. */
     IntegrationKind kind();
 
     /**

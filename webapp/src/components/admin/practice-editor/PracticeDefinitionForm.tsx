@@ -70,7 +70,7 @@ import { itemTypeFor, orderedItemTypes } from "./review-settings";
 
 const PRACTICE_SCRIPT_GUIDE_URL = "https://docs.hephaestus.build/admin/practice-scripts";
 
-/** The About select's value for a practice about the work itself: a `Select` must hold a string. */
+// Base UI Select requires a string value even when About names no developer.
 const ABOUT_THE_WORK = "__work__";
 
 export interface PracticeDefinitionGroupOption {
@@ -196,7 +196,6 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		});
 	};
 
-	// Only on create: the kind of an existing practice never changes.
 	const selectKind = (next: PracticeItemTypeOption) => {
 		if (next.kind === draft.kind) {
 			return;
@@ -217,7 +216,6 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		revealScript: () => setShowScript(true),
 	});
 	const valid = errors.summary.length === 0;
-	// Nothing is marked invalid until a submit is refused.
 	const shown = refusals > 0 ? errors : undefined;
 	const fieldError = (fieldId: string) => shown?.byField[fieldId];
 
@@ -235,7 +233,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		const submission = props.onSubmit(
 			definitionOfDraft(draft, itemType, definitionOptions.sourceContract),
 		);
-		// After the submit, not before: `track` needs the promise the submit returns.
+		// track requires the promise returned by submit.
 		unsavedChanges.track(submission);
 	};
 
@@ -716,10 +714,7 @@ interface AboutFieldProps {
 	error?: string;
 }
 
-/**
- * Whose work the result is about, or the work itself. A saved role the item type no longer offers
- * stays listed and named as such, so it is changed rather than silently replaced.
- */
+// Keep unsupported saved roles visible so the author can explicitly replace them.
 function AboutField({ itemType, about, onChange, error }: AboutFieldProps) {
 	const roles: AboutRole[] =
 		about === null || itemType.aboutRoles.includes(about)
@@ -778,10 +773,6 @@ interface CollapsibleSectionProps {
 	children: ReactNode;
 }
 
-/**
- * A section of the form most authors skip: its title and what it holds, then its fields, unframed like
- * the sections around it. A control that needs a frame, such as the code editor, draws its own.
- */
 function CollapsibleSection({
 	title,
 	subtitle,

@@ -20,11 +20,7 @@ export interface ScanPracticeTableProps {
 	practices: readonly ScanPracticeReport[];
 }
 
-/**
- * Each practice the scan pinned, with where it stands, whether it can be compared with the scan
- * before, and its own pair counts. A practice whose listing did not finish says so: its totals are
- * what the scan reached, not every file.
- */
+// Incomplete listings count only files reached, so their totals cannot describe the repository.
 export function ScanPracticeTable({ practices }: ScanPracticeTableProps) {
 	if (practices.length === 0) {
 		return <p className="text-sm text-muted-foreground">This scan reached no practice.</p>;

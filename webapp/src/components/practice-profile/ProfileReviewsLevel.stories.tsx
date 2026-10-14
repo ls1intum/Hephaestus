@@ -66,12 +66,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Newest first under a heading per day. A row leads with the practices that were Not met, by
- * name, and under it counts the practices that were met, did not apply, or could not be
- * determined. "Request review" is offered on every review of an item, and feedback is linked where
- * the provider's comment can be addressed and counted elsewhere.
- */
 export const Default: Story = {
 	play: async ({ args }) => {
 		const panel = await settledDrawerPanel();
@@ -92,8 +86,6 @@ export const Default: Story = {
 			"href",
 			openProfileReview.feedback[0]?.copies[0]?.externalUrl,
 		);
-		// Feedback with no copy the provider can address is counted; feedback for the practice page
-		// is not feedback on the work.
 		await expect(screen.getByText("one piece of feedback")).toBeVisible();
 
 		const asks = screen.getAllByRole("button", { name: /^Request review: /u });
@@ -105,7 +97,6 @@ export const Default: Story = {
 		await userEvent.click(firstAsk);
 		await expect(args.onReviewNow).toHaveBeenCalledWith(openItem.id);
 
-		// The row's link names the item as well as the time, so two rows of one day read apart.
 		const [newest] = screen.getAllByRole("button", {
 			name: new RegExp(`^Open review of ${openItem.label}, `, "u"),
 		});
@@ -194,7 +185,6 @@ export const EarlierReviewsFailed: Story = {
 	},
 };
 
-/** An ask in flight shows on every row of that item, and only there. */
 export const AskingForAReview: Story = {
 	args: { requesting: openItem.id },
 	play: async () => {

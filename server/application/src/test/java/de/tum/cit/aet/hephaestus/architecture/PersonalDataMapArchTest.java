@@ -79,7 +79,10 @@ class PersonalDataMapArchTest {
             "llm_model_price",
             "llm_model_workspace_grant",
             "login_provider",
+            "item", // Technical source references; personal proof is stored in the mapped result tables.
             "practice",
+            "practice_version",
+            "review_batch_target",
             "catalog_entry",
             "practice_group",
             "review_scope_repository",

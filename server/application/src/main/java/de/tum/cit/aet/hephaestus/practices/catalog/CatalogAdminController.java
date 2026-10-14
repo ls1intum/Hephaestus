@@ -48,7 +48,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @ConditionalOnServerRole
 public class CatalogAdminController {
     private final CatalogService catalog;
-    private final CatalogReleaseService releases;
+    private final CatalogCustomizationService customization;
     private final PracticeDefinitionOptionsService options;
 
     @GetMapping
@@ -84,7 +84,7 @@ public class CatalogAdminController {
                         .path("/{slug}")
                         .buildAndExpand(input.slug())
                         .toUri())
-                .body(catalog.practiceView(catalog.createPractice(input)));
+                .body(catalog.practiceView(customization.createPractice(input)));
     }
 
     @PutMapping("/practices/{slug}")
@@ -94,7 +94,7 @@ public class CatalogAdminController {
             @PathVariable String slug,
             @RequestBody @Valid CatalogPracticeInputDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        return catalog.practiceView(catalog.updatePractice(slug, input, precondition(ifMatch)));
+        return catalog.practiceView(customization.updatePractice(slug, input, precondition(ifMatch)));
     }
 
     @PostMapping("/groups")
@@ -105,7 +105,7 @@ public class CatalogAdminController {
                         .path("/{slug}")
                         .buildAndExpand(input.slug())
                         .toUri())
-                .body(catalog.groupView(catalog.createGroup(input)));
+                .body(catalog.groupView(customization.createGroup(input)));
     }
 
     @PutMapping("/groups/{slug}")
@@ -115,13 +115,13 @@ public class CatalogAdminController {
             @PathVariable String slug,
             @RequestBody @Valid CatalogGroupInputDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        return catalog.groupView(catalog.updateGroup(slug, input, precondition(ifMatch)));
+        return catalog.groupView(customization.updateGroup(slug, input, precondition(ifMatch)));
     }
 
     @GetMapping("/practices/{slug}/release")
     @Operation(operationId = "getCatalogPracticeRelease")
     public CatalogPracticeReleaseProposalDTO release(@PathVariable String slug) {
-        return releases.proposal(slug);
+        return catalog.proposal(slug);
     }
 
     @PutMapping("/practices/{slug}/release")
@@ -131,7 +131,7 @@ public class CatalogAdminController {
             @PathVariable String slug,
             @RequestBody @Valid AcceptPracticeReleaseRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        return catalog.practiceView(releases.accept(slug, input.asMap(), precondition(ifMatch)));
+        return catalog.practiceView(customization.applyRelease(slug, input.asMap(), precondition(ifMatch)));
     }
 
     @DeleteMapping("/practices/{slug}/release")
@@ -139,7 +139,8 @@ public class CatalogAdminController {
     @Operation(operationId = "declineCatalogPracticeRelease")
     public CatalogPracticeDTO decline(
             @PathVariable String slug, @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        return catalog.practiceView(releases.decline(slug, precondition(ifMatch)));
+        customization.acknowledge(CatalogEntryType.PRACTICE, slug, precondition(ifMatch));
+        return catalog.practiceView(catalog.practice(slug));
     }
 
     @PatchMapping("/practices/{slug}/status")
@@ -149,7 +150,7 @@ public class CatalogAdminController {
             @PathVariable String slug,
             @RequestBody @Valid SetCatalogStatusRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        catalog.setExcluded(CatalogEntryType.PRACTICE, slug, input.excluded(), precondition(ifMatch));
+        customization.setExcluded(CatalogEntryType.PRACTICE, slug, input.excluded(), precondition(ifMatch));
         return catalog.practiceView(catalog.practice(slug));
     }
 
@@ -158,7 +159,7 @@ public class CatalogAdminController {
     @Operation(operationId = "resetCatalogPractice")
     public CatalogPracticeDTO practiceReset(
             @PathVariable String slug, @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        catalog.reset(CatalogEntryType.PRACTICE, slug, precondition(ifMatch));
+        customization.reset(CatalogEntryType.PRACTICE, slug, precondition(ifMatch));
         return catalog.practiceView(catalog.practice(slug));
     }
 
@@ -167,7 +168,7 @@ public class CatalogAdminController {
     @Operation(operationId = "acknowledgeCatalogPractice")
     public CatalogPracticeDTO practiceAcknowledge(
             @PathVariable String slug, @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        catalog.acknowledge(CatalogEntryType.PRACTICE, slug, precondition(ifMatch));
+        customization.acknowledge(CatalogEntryType.PRACTICE, slug, precondition(ifMatch));
         return catalog.practiceView(catalog.practice(slug));
     }
 
@@ -178,7 +179,7 @@ public class CatalogAdminController {
             @PathVariable String slug,
             @RequestBody @Valid SetCatalogStatusRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        catalog.setExcluded(CatalogEntryType.GROUP, slug, input.excluded(), precondition(ifMatch));
+        customization.setExcluded(CatalogEntryType.GROUP, slug, input.excluded(), precondition(ifMatch));
         return catalog.view();
     }
 
@@ -187,7 +188,7 @@ public class CatalogAdminController {
     @Operation(operationId = "resetCatalogGroup")
     public CatalogGroupDTO groupReset(
             @PathVariable String slug, @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        catalog.reset(CatalogEntryType.GROUP, slug, precondition(ifMatch));
+        customization.reset(CatalogEntryType.GROUP, slug, precondition(ifMatch));
         return catalog.groupView(catalog.group(slug));
     }
 
@@ -196,7 +197,7 @@ public class CatalogAdminController {
     @Operation(operationId = "acknowledgeCatalogGroup")
     public CatalogGroupDTO groupAcknowledge(
             @PathVariable String slug, @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        catalog.acknowledge(CatalogEntryType.GROUP, slug, precondition(ifMatch));
+        customization.acknowledge(CatalogEntryType.GROUP, slug, precondition(ifMatch));
         return catalog.groupView(catalog.group(slug));
     }
 
@@ -206,7 +207,7 @@ public class CatalogAdminController {
     public CatalogDTO reorderPractices(
             @RequestBody @Valid ReorderPracticesRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        catalog.reorder(CatalogEntryType.PRACTICE, input.slugs(), precondition(ifMatch));
+        customization.reorder(CatalogEntryType.PRACTICE, input.slugs(), precondition(ifMatch));
         return catalog.view();
     }
 
@@ -216,7 +217,7 @@ public class CatalogAdminController {
     public CatalogDTO reorderGroups(
             @RequestBody @Valid ReorderPracticeGroupsRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        catalog.reorder(CatalogEntryType.GROUP, input.slugs(), precondition(ifMatch));
+        customization.reorder(CatalogEntryType.GROUP, input.slugs(), precondition(ifMatch));
         return catalog.view();
     }
 
@@ -227,7 +228,7 @@ public class CatalogAdminController {
             @PathVariable String slug,
             @RequestBody @Valid MovePracticeRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        catalog.move(slug, input.groupSlug(), input.position(), precondition(ifMatch));
+        customization.move(slug, input.groupSlug(), input.position(), precondition(ifMatch));
         return catalog.view();
     }
 
@@ -235,7 +236,7 @@ public class CatalogAdminController {
     @AuditExempt(reason = "Order changes presentation only")
     @Operation(operationId = "resetCatalogOrder")
     public CatalogDTO resetOrder(@RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        catalog.resetOrder(precondition(ifMatch));
+        customization.resetOrder(precondition(ifMatch));
         return catalog.view();
     }
 

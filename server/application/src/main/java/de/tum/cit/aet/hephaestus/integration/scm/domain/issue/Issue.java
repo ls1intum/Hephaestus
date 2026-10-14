@@ -98,24 +98,8 @@ public class Issue extends BaseGitServiceEntity {
      */
     private @Nullable Instant lastSyncAt;
 
-    /**
-     * Tombstone: when set, this issue/pull request no longer exists upstream.
-     *
-     * <p>Written by the {@code RECONCILIATION} deletion sweep (which set-differences the full
-     * upstream number set against the local rows) and by the {@code issues.transferred} webhook. A
-     * tombstone rather than a row deletion because the workspace item index retains this mirror's
-     * source id and activity events retain their target id. Keeping the row keeps those historical
-     * references resolvable.
-     *
-     * <p>Deliberately reversible: the sweep infers deletion from <em>absence</em> from a listing,
-     * which is fallible in a way an explicit webhook event is not. {@code upsertCore} clears this
-     * back to {@code null}, so an item that reappears upstream — or one a faulty sweep tombstoned —
-     * is resurrected by the next ordinary sync with no operator intervention. That is why a pending
-     * item event re-offered while this is set is held rather than retired.
-     *
-     * <p>Which surfaces filter and which deliberately do not, and why there is no entity-level
-     * {@code @SQLRestriction}, is decided in ADR 0024 § which reads honour a drift tombstone.
-     */
+    // Retain source ids for item and activity references. Sync can clear a tombstone when an item reappears.
+    // Read-specific filtering is defined in ADR 0024.
     @Column(name = "deleted_at")
     private @Nullable Instant deletedAt;
 

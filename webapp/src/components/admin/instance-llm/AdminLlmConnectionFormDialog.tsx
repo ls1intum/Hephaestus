@@ -209,7 +209,6 @@ function AdminLlmConnectionFormDialogContent({
 		});
 	};
 
-	// A failed test that is not only a missing model list is a fault, in the server's words.
 	let failure = probeError;
 	if (probeResult !== null && !probeResult.reachable && !listsNoModels(apiProtocol, probeResult)) {
 		failure = probeResult.message ?? "The provider did not answer.";
@@ -299,10 +298,7 @@ interface ProbeFoundProps {
 	probeResult: LlmProbeResult | null;
 }
 
-/**
- * What a test that is no fault found: the models, or that an endpoint for practice scripts lists none. The
- * status region around it announces it, so it takes no alert role of its own.
- */
+// The enclosing status region announces this result; another alert role would announce it twice.
 function ProbeFound({ apiProtocol, probeResult }: ProbeFoundProps) {
 	if (probeResult?.reachable === true) {
 		return (

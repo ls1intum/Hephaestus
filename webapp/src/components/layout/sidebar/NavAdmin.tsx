@@ -64,9 +64,6 @@ export function NavAdmin({
 		matchRoute({ to: "/w/$workspaceSlug/admin/practices/scans", fuzzy: true }),
 	);
 	const onSection = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/practices", fuzzy: true }));
-	// The catalogue is what is left when none of the other three claimed the route, so it needs no
-	// match of its own. `review` and `reviews` do not collide — the router matches whole segments —
-	// but the section landing link is a prefix of all four, so it cannot be the test for any of them.
 	const onCatalog = onSection && !onReview && !onReviews && !onScans;
 
 	const onIntegrationsScm = Boolean(

@@ -13,7 +13,6 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Checks the canonical workspace identity before a provider mirror is read. */
 @Component
 @RequiredArgsConstructor
 public class ScmItemAccess {

@@ -73,12 +73,7 @@ function Result({ row }: { row: ResultRow }) {
 	);
 }
 
-/**
- * The reader's own results on this work, as the review concluded them — each practice, its
- * outcome and one sentence, and under a result that is not met the one line of each problem. Why,
- * where each problem is and the evidence behind it are the web app's to show; here nothing opens
- * further.
- */
+// Problem locations and evidence stay in the web app; this list has no expanded detail.
 export function ResultList({ results, onRetry }: ResultListProps) {
 	const heading = useId();
 	let body;

@@ -1,10 +1,3 @@
-// Finds each color expression that the change adds inside SwiftUI view types, under the first shape
-// that its text shows. For a named asset color, it reads from the colorset if the color has a dark
-// appearance. A shape is spelling, not a type: `.green` given to `foregroundStyle` is SwiftUI's
-// standard color, `Color(.green)` converts UIKit's fixed `UIColor.green`, and a name that the app
-// defines is what its definition says. Only the shapes whose spelling fixes the kind are counted as
-// literal or adaptive. The review classifies the rest, and reads the role of each color from the
-// modifier chain.
 import { scm, type FileTree } from "../kits/scm/index.ts";
 import {
 	countLabel,
@@ -18,8 +11,6 @@ import { definePracticeScript, type ReviewLead } from "../lib/core/practice-scri
 
 const SWIFTUI_VIEW = /\b(?:View|App|Scene)\b/u;
 
-// The first pattern that matches a line gives its kind, so the order runs from the shapes whose
-// spelling fixes the kind to those whose spelling does not.
 const COLORS: readonly SourcePattern[] = [
 	[
 		"fixed-components",
@@ -27,7 +18,6 @@ const COLORS: readonly SourcePattern[] = [
 	],
 	["literal-white-or-black", /\b(?:UI)?Color\.(?:white|black)\b|[:(,]\s*\.(?:white|black)\b/u],
 	["uikit-color", /\bUIColor\s*\.\s*[a-z]\w*|\bColor\s*\(\s*uiColor:\s*\.[a-z]\w*/u],
-	// `Color(_:bundle:)`: the bundle is optional, and without one the app's main bundle is searched.
 	["named-asset", /\bColor\s*\(\s*"[^"]+"\s*(?:\)|,\s*bundle\s*:)/u],
 	["color-from-a-value", /\bColor\s*\(\s*\.[a-z]\w*/u],
 	["semantic-style", /\.(?:primary|secondary|tertiary|quaternary)\b/u],
@@ -40,7 +30,6 @@ const COLORS: readonly SourcePattern[] = [
 	],
 ];
 
-/** The shapes whose spelling leaves the kind open: a type or a definition decides it. */
 const TO_CLASSIFY = [
 	"uikit-color",
 	"color-from-a-value",
@@ -48,7 +37,6 @@ const TO_CLASSIFY = [
 	"color-modifier-member",
 ] as const;
 
-/** Whether a colorset carries a dark appearance; "unknown" when it cannot be read as one. */
 type DarkAppearance = boolean | "unknown";
 
 function darkAppearanceOf(source: string): DarkAppearance {
@@ -61,8 +49,7 @@ function darkAppearanceOf(source: string): DarkAppearance {
 	if (!isJsonObject(parsed) || !Array.isArray(parsed.colors) || parsed.colors.length === 0) {
 		return "unknown";
 	}
-	// Every entry is read before a missing dark appearance is a fact: one entry of another shape could
-	// be the dark one.
+	// Validate every colorset entry before treating missing dark appearance as a fact.
 	let dark = false;
 	for (const entry of parsed.colors) {
 		if (!isJsonObject(entry)) {
@@ -92,7 +79,6 @@ function darkAppearanceOf(source: string): DarkAppearance {
 	return dark;
 }
 
-/** The bundle a `Color("name", bundle:)` names, or null for the main bundle it searches without one. */
 function bundleOf(context: string): string | null {
 	const bundle = /Color\s*\(\s*"[^"]+"\s*,\s*bundle\s*:\s*(?<bundle>[^,)]+(?:\([^)]*\))?)/u.exec(
 		context,
@@ -102,13 +88,10 @@ function bundleOf(context: string): string | null {
 		: bundle.trim();
 }
 
-/** How many colorsets of the checkout are read; a name beyond them is unknown. */
 const COLORSETS_READ = 200;
 
 interface AssetColors {
-	/** Listed colorset paths by color name, read or not. */
 	paths: Map<string, string[]>;
-	/** The appearances of the colorsets read, by path. */
 	read: Map<string, DarkAppearance>;
 	listing: "complete" | "truncated" | "unavailable";
 }
@@ -122,11 +105,6 @@ function colorNameOf(file: string): string {
 	);
 }
 
-/**
- * The appearance of a named color, from its one colorset: the only one of exactly that name, else the
- * only one whose name differs in case alone. Two candidates anywhere in the checkout, or one not read,
- * leave it unknown, since nothing here says which target's catalog the view uses.
- */
 function appearanceOf({ paths, read, listing }: AssetColors, name: string): DarkAppearance {
 	if (listing !== "complete") {
 		return "unknown";
@@ -142,16 +120,13 @@ function appearanceOf({ paths, read, listing }: AssetColors, name: string): Dark
 }
 
 async function assetColors(tree: FileTree | null): Promise<AssetColors> {
-	let all: readonly string[] = [];
+	const listed = await tree
+		?.list("**/*.xcassets/**/*.colorset/Contents.json")
+		.catch(() => undefined);
+	const all = listed?.paths ?? [];
 	let listing: AssetColors["listing"] = "unavailable";
-	try {
-		const listed = await tree?.list("**/*.xcassets/**/*.colorset/Contents.json");
-		all = listed?.paths ?? [];
-		if (listed !== undefined) {
-			listing = listed.truncated ? "truncated" : "complete";
-		}
-	} catch {
-		// no readable checkout: no colorset read
+	if (listed !== undefined) {
+		listing = listed.truncated ? "truncated" : "complete";
 	}
 	const paths = new Map<string, string[]>();
 	for (const file of all) {
@@ -159,9 +134,7 @@ async function assetColors(tree: FileTree | null): Promise<AssetColors> {
 		paths.set(name, [...(paths.get(name) ?? []), file]);
 	}
 	const read = new Map<string, DarkAppearance>();
-	// A cut listing leaves every appearance unknown (appearanceOf), so nothing is read for it.
 	for (const file of listing === "complete" ? all.slice(0, COLORSETS_READ) : []) {
-		// An unreadable colorset is not a fact about its appearances.
 		const source = await tree?.read(file).catch(() => null);
 		read.set(file, source?.status === "FOUND" ? darkAppearanceOf(source.text) : "unknown");
 	}
@@ -208,7 +181,6 @@ export default definePracticeScript({
 				/Color\s*\(\s*"(?<name>[^"]+)"/u.exec(hint.context)?.groups?.name ??
 				/Color\s*\(\s*\.(?<name>\w+)/u.exec(hint.context)?.groups?.name ??
 				"";
-			// Which catalog another bundle, such as a package's `.module`, holds is not read here.
 			const bundle = hint.pattern === "named-asset" ? bundleOf(hint.context) : null;
 			return {
 				...hint,

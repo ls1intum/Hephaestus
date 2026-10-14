@@ -6,12 +6,10 @@ import type { AgentPurpose } from "@/components/practice-vocabulary/agent-purpos
 
 export interface PracticeScriptModelLinkProps {
 	workspaceSlug: string;
-	/** The purpose AI models opens and scrolls to. */
 	purpose: AgentPurpose;
 	children: ReactNode;
 }
 
-/** The way to a practice script's missing or failing model: its purpose on AI models. */
 export function PracticeScriptModelLink({
 	workspaceSlug,
 	purpose,

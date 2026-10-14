@@ -2,12 +2,11 @@ package de.tum.cit.aet.hephaestus.integration.core.itemevent;
 
 import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Component;
 
-/**
- * Records submission and execution refusals without exposing the integration-core metric catalog.
- */
 @Component
+@NamedInterface(value = "item-events", propagate = false)
 public class PracticeReviewRefusalMetrics {
 
     private final MeterRegistry registry;

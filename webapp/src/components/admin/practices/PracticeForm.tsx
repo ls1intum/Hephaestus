@@ -43,7 +43,6 @@ interface PracticeFormEditProps {
 	onSubmit: (request: UpdatePracticeRequest, groupSlug: string | null) => void | Promise<void>;
 	isPending: boolean;
 	definitionOptions: PracticeDefinitionOptions;
-	/** Above the fields, such as a save refused because the practice changed meanwhile. */
 	notice?: ReactNode;
 }
 
@@ -56,7 +55,6 @@ interface PracticeFormHostProps {
 export type PracticeFormProps = (PracticeFormCreateProps | PracticeFormEditProps) &
 	PracticeFormHostProps;
 
-/** The value the shared editor starts from for a practice this workspace already has. */
 function asDefinitionValue(practice: Practice, version: PracticeVersion): PracticeDefinitionValue {
 	return {
 		slug: practice.slug,
@@ -81,8 +79,7 @@ export function PracticeForm(props: PracticeFormProps) {
 			definitionOptions={definitionOptions}
 			cancelAction={cancel}
 			practiceScriptModelsLink={modelsLink(workspaceSlug)}
-			// Passes the host's return through untouched: a `void` from `onSubmit` must stay `void`,
-			// because the unsaved-changes guard reads only a promise as a save it can wait for.
+			// Preserve a void return; the unsaved-changes guard tracks only an actual save promise.
 			onSubmit={({ slug, kind, groupSlug, definition }): void | Promise<void> =>
 				onSubmit({ slug, kind, groupSlug, definition, position: null })
 			}
@@ -90,7 +87,6 @@ export function PracticeForm(props: PracticeFormProps) {
 	);
 }
 
-/** The AI models page, as the element the editor renders its words into. */
 function modelsLink(workspaceSlug: string) {
 	return <Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />;
 }
@@ -106,8 +102,7 @@ function EditPracticeForm({
 	onSubmit,
 	notice,
 }: PracticeFormEditProps & PracticeFormHostProps) {
-	// The draft is seeded from this version, so a save is pinned to it: a newer version arriving in
-	// the background must refuse the save, not let this draft silently replace it.
+	// Pin saves to the version that seeded the draft so background refreshes cannot overwrite newer edits.
 	const [seeded] = useState(practice.currentVersion);
 	return (
 		<PracticeDefinitionForm

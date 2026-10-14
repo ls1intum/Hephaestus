@@ -18,11 +18,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Integration-side implementation of {@link GitProviderRegistry}. Resolves {@link IdentityProvider}
- * namespaces by provider type and canonical server origin. Account provisioning binds the provider
- * id to the verified native user and workspace key without importing integration persistence.
- */
 @Component
 public class RegistrationToGitProviderResolver implements GitProviderRegistry {
 

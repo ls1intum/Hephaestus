@@ -32,10 +32,6 @@ const PRACTICES: FacetSource = {
 	isError: false,
 };
 
-/**
- * One problem per row under the shared scope, with the tab's own facets. The rows
- * are what the route loaded; which rows a filter selects is the route test's to prove.
- */
 const meta = {
 	component: ProblemsListPage,
 	parameters: {

@@ -134,8 +134,6 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
                     return;
                 }
             } catch (InstallationNotFoundException e) {
-                // Installation no longer exists on GitHub - do NOT create workspace for deleted
-                // installation
                 log.info(
                         "Installation no longer exists on GitHub, skipping workspace creation: installationId={}",
                         installationId);

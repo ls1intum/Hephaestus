@@ -34,13 +34,7 @@ import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Integration tests for {@link GitLabIssueCommentProcessor#processFromSync} covering Gap 8 (GitLab
- * sync audit): {@code issue_comment.updated_at} must persist verbatim and never fall back to {@code
- * created_at}. When a subsequent sync returns a distinct {@code updatedAt}, the processor must fire
- * a {@link ScmDomainEvent.CommentUpdated} carrying {@code "updatedAt"} in {@code changedFields} —
- * downstream profile views rely on this divergence to detect edits.
- */
+// Preserve updated_at independently of created_at so edits remain detectable after sync.
 @DisplayName("GitLab Issue Comment Processor — sync path")
 class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 

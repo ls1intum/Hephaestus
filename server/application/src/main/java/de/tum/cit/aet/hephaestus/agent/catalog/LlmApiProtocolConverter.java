@@ -4,11 +4,7 @@ import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Maps an {@link LlmApiProtocol} onto the {@code api_protocol} column as its {@link
- * LlmApiProtocol#wire()} value. Auto-applied, so no connection column can persist the constant name.
- * A value that no constant names fails the read instead of reaching the proxy.
- */
+/** Persists {@link LlmApiProtocol#wire()}, never constant names; unknown stored values must fail the read. */
 @Converter(autoApply = true)
 public class LlmApiProtocolConverter implements AttributeConverter<LlmApiProtocol, String> {
 

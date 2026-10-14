@@ -22,7 +22,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/** Final rows used to test SCM projection independently of review execution. */
 public final class ScmReviewFixtures {
     private final JdbcTemplate jdbc;
     private final ItemWriter items;

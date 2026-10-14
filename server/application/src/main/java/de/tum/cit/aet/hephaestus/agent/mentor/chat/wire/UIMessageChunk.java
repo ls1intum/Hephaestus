@@ -277,7 +277,6 @@ public sealed interface UIMessageChunk {
         }
     }
 
-    /** The stored link parts of a reply, read by what they name. */
     final class LinkParts {
 
         private LinkParts() {}
@@ -302,7 +301,6 @@ public sealed interface UIMessageChunk {
             return shown;
         }
 
-        /** The result a stored link part names, or null for any other part. */
         public static @Nullable UUID resultOf(JsonNode part) {
             String type = part.path("type").asString("");
             JsonNode data = part.path("data");
@@ -320,7 +318,6 @@ public sealed interface UIMessageChunk {
             }
         }
 
-        /** The problem a stored link part names: only a {@link DataProblem} names one. */
         public static @Nullable UUID problemOf(JsonNode part) {
             if (!DataProblem.PART_TYPE.equals(part.path("type").asString(""))) return null;
             try {

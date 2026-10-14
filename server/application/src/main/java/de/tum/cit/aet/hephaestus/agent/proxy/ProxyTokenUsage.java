@@ -57,10 +57,7 @@ public record ProxyTokenUsage(
         };
     }
 
-    /**
-     * Jina and vLLM report a total or a prompt count in {@code usage}. Cohere reports none and bills search units in
-     * {@code meta.billed_units.search_units}. A provider can also report neither.
-     */
+    // Cohere reports rerank search units; Jina and vLLM can report token usage. Neither is guaranteed.
     private static @Nullable ProxyTokenUsage rerankUsage(@Nullable JsonNode usage, JsonNode billedUnits) {
         Integer total = usage == null ? null : optionalCount(usage, "total_tokens");
         Integer counted = total != null || usage == null ? total : optionalCount(usage, "prompt_tokens");
@@ -71,7 +68,7 @@ public record ProxyTokenUsage(
         return new ProxyTokenUsage(counted == null ? 0 : counted, 0, 0, 0, 0, searchUnits == null ? 0 : searchUnits);
     }
 
-    /** Cohere's schema types billed units as numbers, so a whole number written as {@code 1.0} is accepted too. */
+    // Cohere number fields permit integer values written as 1.0.
     private static @Nullable Integer searchUnits(JsonNode billedUnits) {
         JsonNode value = billedUnits.get("search_units");
         if (value == null || value.isNull()) {

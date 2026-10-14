@@ -3,10 +3,6 @@ package de.tum.cit.aet.hephaestus.workspace.authorization;
 import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import org.springframework.stereotype.Component;
 
-/**
- * Custom Spring Security expressions for workspace authorization. Used in @PreAuthorize annotations
- * on controller methods.
- */
 @Component("workspaceSecure")
 public class WorkspaceSecurityExpressions {
 

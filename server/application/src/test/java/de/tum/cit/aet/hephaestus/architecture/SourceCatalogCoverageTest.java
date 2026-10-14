@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
-/** The catalog and the collectors must describe the same world, in both directions. */
 @Tag("architecture")
 class SourceCatalogCoverageTest {
 
@@ -39,7 +38,6 @@ class SourceCatalogCoverageTest {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    /** Reads the constants a collector declares, without building its bean graph. */
     private static Set<SourceKind> declaredKinds(Class<?> type) {
         return Arrays.stream(type.getDeclaredFields())
                 .filter(field -> Modifier.isStatic(field.getModifiers()))

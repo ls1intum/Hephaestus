@@ -28,7 +28,6 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-/** Builds the manifest from source-owned captures without interpreting domain records. */
 @Component
 public class JobFolderIndexBuilder {
     private final ClasspathSourceCatalogRegistry catalogs;

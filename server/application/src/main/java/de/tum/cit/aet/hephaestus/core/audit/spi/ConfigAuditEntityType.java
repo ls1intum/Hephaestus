@@ -1,16 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.audit.spi;
 
-/**
- * The kind of admin-configurable resource a {@code config_audit_event} row describes.
- *
- * <p>Mirrored by the {@code ck_config_audit_event_entity_type} CHECK constraint; {@code
- * ConfigAuditImmutabilityIntegrationTest} reads {@code pg_constraint} on the migrated schema and
- * fails if the two drift. Widening is a changeset that drops and re-adds the constraint.
- *
- * <p>Values marked historical are no longer written but must stay: the table is append-only, so
- * rewriting an old row to the current spelling is the exact mutation the immutability trigger
- * refuses.
- */
+/** Enum values must match the database CHECK; retained append-only audit rows still require removed resource kinds. */
 public enum ConfigAuditEntityType {
     PRACTICE_REVIEW_SETTINGS,
     /** Which model, with what limits, runs practice reviews / the mentor for a workspace. */

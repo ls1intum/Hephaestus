@@ -1,12 +1,8 @@
-/**
- * AI SDK model objects inside the child process of a script. Only the `do*` call crosses to the
- * runner, which holds the credential: the AI SDK's loop, output parsing and tools run in the child.
- */
+// Credentials stay with the host; the child runs the SDK loop, output parsing, and tools.
 import { customProvider } from "ai";
 
 import { MODEL_SLOT_CAPS, type ModelSlot, type SlotAnswer, type SlotModels } from "./contract.ts";
 
-/** Sends one model call to the runner and settles with what the runner's model answered. */
 type ModelCall = (
 	slot: ModelSlot,
 	options: unknown,
@@ -77,7 +73,6 @@ export function ipcModels(
 			specificationVersion: "v4",
 			provider,
 			modelId: available.embedding,
-			// `embedMany` splits its values into calls of this size, so no call is too large.
 			maxEmbeddingsPerCall: MODEL_SLOT_CAPS.embedding,
 			supportsParallelCalls: true,
 			doEmbed: async (options) => result("embedding", options),

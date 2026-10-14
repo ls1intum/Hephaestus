@@ -146,7 +146,6 @@ const SYNTAX: Record<string, Syntax> = {
 		],
 	},
 };
-/** Whether the language has a syntax row, so a script can say "unknown" rather than guess. */
 export function hasDeclarationSyntax(language: string | null): boolean {
 	return language !== null && language in SYNTAX;
 }
@@ -155,7 +154,6 @@ function startsWith(source: string, i: number, token: string): boolean {
 	return source.startsWith(token, i);
 }
 
-/** The hashes a raw literal opens with (`#"…"#`), then whether the spec's opener follows them. */
 function opensAt(source: string, i: number, spec: StringSyntax): number | null {
 	let hashes = 0;
 	if (spec.hashPrefixed === true) {
@@ -192,7 +190,6 @@ function interpolationOpener(spec: StringSyntax, hashes: number, raw: string): s
 	return spec.interpolation[0];
 }
 
-/** Index just past the string literal that opens at `i`, or `source.length` when it never closes. */
 function skipString(source: string, from: number, spec: StringSyntax, all: StringSyntax[]): number {
 	const hashes = opensAt(source, from, spec) ?? 0;
 	const raw = "#".repeat(hashes);
@@ -222,7 +219,6 @@ function skipString(source: string, from: number, spec: StringSyntax, all: Strin
 	return i;
 }
 
-/** Index just past the bracket that closes an interpolation whose body starts at `i`; nested strings are skipped. */
 function skipBalanced(
 	source: string,
 	from: number,
@@ -248,7 +244,6 @@ function skipBalanced(
 	return i;
 }
 
-/** The brace events of the source, with comments and strings removed: `{`/`}` with their line. */
 function braceEvents(source: string, syntax: Syntax): { brace: "{" | "}"; line: number }[] {
 	const events: { brace: "{" | "}"; line: number }[] = [];
 	let line = 1;
@@ -442,7 +437,6 @@ export async function declarationsOf(
 	}
 }
 
-/** A full-line comment: `//`, `/*` or a doc-comment `*` in the brace languages, `#` in Python and Ruby. */
 export function isCommentLine(content: string, language: string): boolean {
 	const trimmed = content.trimStart();
 	if (language === "python" || language === "ruby") {

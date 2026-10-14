@@ -7,13 +7,7 @@ export interface CatalogOriginProps {
 	kind: "practice" | "group";
 }
 
-/**
- * What the badge says, and the sentence that goes with it. The badge sits inside accordion headers
- * and list rows, where a focusable control cannot nest, so only the label travels there. The
- * sentence is written out where the thing is opened, the practice's panel and the group's edit
- * dialog, where it is read rather than hovered. A practice or group written here has no catalog to
- * relate to, so it says nothing.
- */
+// Badges sit inside other controls; keep explanatory actions outside the badge.
 function describeOrigin({ origin, kind }: CatalogOriginProps) {
 	const noun = kind === "practice" ? "practice" : "group";
 	switch (origin.state) {
@@ -50,7 +44,6 @@ function describeOrigin({ origin, kind }: CatalogOriginProps) {
 	}
 }
 
-/** Whether a reset to the catalog would change anything: the catalog still offers a different version. */
 export function canResetToCatalog(origin: CatalogOrigin): boolean {
 	return origin.state === "EDITED_HERE" || origin.state === "UPDATE_WAITING";
 }
@@ -70,10 +63,6 @@ export function CatalogOriginBadge({
 	);
 }
 
-/**
- * The badge's label as a heading and its explanation in full. Renders nothing for a practice or
- * group written here. `action` sits under the explanation, such as the way to reset it.
- */
 export function CatalogOriginNote({
 	action,
 	...props

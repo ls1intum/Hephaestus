@@ -7,11 +7,7 @@ import type { StatusDefs } from "@/components/common/status-def";
 export type FeedbackDecisionAction = FeedbackDecision["action"];
 export type FeedbackDecisionReason = NonNullable<FeedbackDecision["reasonCode"]>;
 
-/**
- * A workspace admin's decision about one piece of feedback. Decisions append: a withdrawal or a
- * restore never erases a copy that was already posted, and approval cannot change after the first
- * write starts.
- */
+// Decisions append to history; withdrawal and restoration cannot erase a posted copy.
 export const FEEDBACK_DECISION_DEFS: StatusDefs<FeedbackDecisionAction> = {
 	APPROVE: {
 		label: "Approved",
@@ -41,10 +37,7 @@ export const FEEDBACK_DECISION_DEFS: StatusDefs<FeedbackDecisionAction> = {
 	},
 };
 
-/**
- * Why an admin rejected or withdrew feedback. Keyed on the wire union, so a reason the server adds
- * fails the build here rather than reaching an admin as a constant name.
- */
+// Cover the generated reason union so added reasons cannot reach admins as raw codes.
 const FEEDBACK_DECISION_REASON_LABELS: Record<FeedbackDecisionReason, string> = {
 	INCORRECT: "Incorrect",
 	MISSING_CONTEXT: "Missing important context",
@@ -54,7 +47,6 @@ const FEEDBACK_DECISION_REASON_LABELS: Record<FeedbackDecisionReason, string> = 
 	OTHER: "Something else",
 };
 
-/** The reasons in the order an admin is offered them. */
 export const FEEDBACK_DECISION_REASONS = (
 	[
 		"INCORRECT",

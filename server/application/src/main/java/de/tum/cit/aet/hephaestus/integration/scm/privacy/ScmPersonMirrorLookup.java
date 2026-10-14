@@ -30,7 +30,7 @@ public class ScmPersonMirrorLookup implements ProviderPersonLookup {
             if (nativeId <= 0 || !Long.toString(nativeId).equals(identity.subject())) throw new NumberFormatException();
         } catch (NumberFormatException e) {
             throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "An SCM identity requires a canonical native numeric user id");
+                    HttpStatus.BAD_REQUEST, "An SCM identity requires a canonical native numeric user id", e);
         }
         return users.findByNativeIdAndProviderId(nativeId, identity.providerId()).map(user -> user.getId()).stream()
                 .toList();

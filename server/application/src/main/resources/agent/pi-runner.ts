@@ -214,7 +214,6 @@ function submittedList(value: unknown): { items: unknown[] } | { error: string }
 	try {
 		return { items: listOrItem(JSON.parse(value)) };
 	} catch (error) {
-		// Where the parse stopped, shown: resending the same text cannot fix a fault nobody located.
 		const at = /position (?<position>\d+)/u.exec(errorText(error))?.groups?.position;
 		const near =
 			at === undefined
@@ -249,7 +248,6 @@ interface PracticeIndexEntry {
 	group?: string;
 	readsSources: string[];
 	exhaustiveSources: string[];
-	/** What the practice version is about, shown to the review on the work as explanatory context. */
 	name: string;
 	whyItMatters?: string;
 	knownLimitations: string[];
@@ -270,13 +268,11 @@ interface TaskEnvelope {
 	pullRequestNumber: unknown;
 }
 
-/** How much feedback this run may compose for one destination. */
 interface DestinationBounds {
 	enabled: boolean;
 	maxPieces: number;
 }
 
-/** Where an ON_WORK note may be placed on this item. */
 type CopyForm = "LINE_NOTE" | "FILE_NOTE";
 
 /** The task-declared composition request, once its bounds have been clamped to what this run may do. */
@@ -286,13 +282,11 @@ interface CompositionRequest {
 	minDistinctItems: number;
 }
 
-/** One citation as admission projected it: its index, its coordinates and whether a note may sit on it. */
 interface AdmittedCitation {
 	index: number;
 	[key: string]: unknown;
 }
 
-/** One admitted problem: a problem of a NOT_MET result, under its own id, with its own citations. */
 interface AdmittedChild {
 	problemId: string;
 	citations: AdmittedCitation[];
@@ -327,7 +321,6 @@ function isAdmittedChild(value: unknown): value is AdmittedChild {
 	);
 }
 
-/** Project the canonical admission DTO to the composer's evidence references. */
 function admittedResultOf(value: unknown): AdmittedResult {
 	if (
 		!isRecord(value) ||
@@ -372,7 +365,6 @@ function isAdmittedResult(value: unknown): value is AdmittedResult {
 		value.citations.every(isAdmittedCitation) &&
 		Array.isArray(value.problems) &&
 		value.problems.every(isAdmittedChild) &&
-		// Problems are the problems of a NOT_MET result, and only of one.
 		(value.outcome === "NOT_MET") === value.problems.length > 0
 	);
 }
@@ -404,9 +396,7 @@ const WATCHDOG_PATH = outputPath(OUTPUT, "watchdog-killed.json");
 const USAGE_PATH = outputPath(OUTPUT, "usage.json");
 const RUNNER_DEBUG_PATH = outputPath(OUTPUT, "runner-debug.json");
 const PRACTICE_COVERAGE_PATH = outputPath(OUTPUT, "practice-coverage.json");
-/** SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE: how the program of each admitted practice ran. */
 const PRACTICE_SCRIPT_REPORT_PATH = outputPath(OUTPUT, "practice-scripts.json");
-/** SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE: the direct models the server bound; absent when none may be called. */
 const PRACTICE_SCRIPT_MODELS_PATH = `${CWD}/practice-script-models.json`;
 /** Each review's whole input, for the session to read beyond its bounded section; never composition's. */
 const REVIEW_INPUT_ROOT = "work/review-input";
@@ -432,7 +422,6 @@ const AGENT_BUDGET_MS = positiveIntegerEnv("AGENT_BUDGET_MS");
 const AGENT_DIR = requiredEnv("PI_CODING_AGENT_DIR");
 const LLM_PROXY_URL = requiredEnv("LLM_PROXY_URL");
 const LLM_PROXY_TOKEN = requiredEnv("LLM_PROXY_TOKEN");
-/** The tokens all direct model calls of this attempt may spend together: the proxy's direct-call cap. */
 const DIRECT_MODEL_TOKENS = positiveIntegerEnv("PI_DIRECT_MODEL_TOKENS");
 /** Practices a turn carries at once; a catalog group larger than this is split. */
 const PRACTICES_PER_TURN = hasText(process.env.PI_PRACTICE_BATCH_SIZE)
@@ -626,7 +615,6 @@ interface TurnTrace {
  * ceiling, or a loop guard fired.
  */
 type StopReason = "budget" | "stall" | "safety" | "loop";
-/** Why a review that a stopped turn cut short gives no result. */
 const UNRATED_BY_STOP: Readonly<Record<StopReason, UnratedReason>> = {
 	budget: "budget",
 	safety: "deadline",
@@ -659,14 +647,10 @@ let currentTurn: TurnTrace | null = null;
 
 /** How much of a refusal reason the trace keeps: the kind of failure, not the whole excerpt. */
 const TRACE_REASON_CHARS = 140;
-/** The final result of each practice whose program returned one, by slug: what admission is asked to admit. */
 const reviewState = new Map<string, Candidate>();
-/** How the program of each admitted practice ran, by slug. A practice missing here was not reached. */
 const executions = new Map<string, ProgramOutcome>();
-/** Why a practice that no program reached was not reached, when the run ends before it. */
 let unreachedReason: "deadline" | "budget" | "error" = "deadline";
 
-/** Slugs in the order the server sorts them: by UTF-16 code unit, as Java compares strings. */
 function compareSlugs(a: string, b: string): number {
 	if (a === b) {
 		return 0;
@@ -674,7 +658,6 @@ function compareSlugs(a: string, b: string): number {
 	return a < b ? -1 : 1;
 }
 
-/** The admission request: one entry for each practice with a final result, sorted by slug. */
 const assignedInputs = new Map<string, PracticeInputs>();
 const assignmentReceipts = new Map<string, readonly ReadReceipt[]>();
 function admissionRequest() {
@@ -756,8 +739,7 @@ const citationSchema = {
 	required: ["sourceKind", "sourcePath", "path", "startLine"],
 	properties: {
 		sourceKind: { type: "string", enum: availableSourceKindValues },
-		// Membership is checked when the result is submitted (validateEvidenceSources): a large capture
-		// enumerated here produces a declaration the SDK's schema compiler cannot compile.
+		// Validate source membership at submission; large enums can exceed the SDK schema compiler's capacity.
 		sourcePath: {
 			type: "string",
 			minLength: 1,
@@ -964,13 +946,8 @@ function persistReviewState() {
 	writeFileSync(REVIEW_STATE_PATH, JSON.stringify(admissionRequest(), null, 2));
 }
 
-/**
- * This attempt continues an admitted review: it runs no program, and submits no result of its own. Known before
- * anything runs, so that a failure even before the first practice reports no program of its own.
- */
 const continuing = existsSync(CONTINUATION_PATH);
 
-/** The admission request as this run's result; a continuing writer's holds none, since it submitted none. */
 function maybeWriteResultFile(): boolean {
 	if (!continuing && reviewState.size === 0) {
 		return false;
@@ -979,7 +956,6 @@ function maybeWriteResultFile(): boolean {
 	return true;
 }
 
-/** The program each admitted practice runs: its staged custom program, or the built-in. */
 function programOf(slug: string): PracticeProgram {
 	const file = nodePath.join(INPUT_PATHS.practiceScripts, `${slug}.ts`);
 	return existsSync(file)
@@ -987,7 +963,6 @@ function programOf(slug: string): PracticeProgram {
 		: { script: null };
 }
 
-/** One entry for each admitted practice: how its program ran, or that none reached it. */
 function persistExecutionReport(): void {
 	const entries = practiceIndex.map(
 		({ slug }) =>
@@ -1015,7 +990,6 @@ function finalizeOutput(): void {
 	if (compositionAdmitted) {
 		persist(FEEDBACK_PATH, persistComposedFeedback);
 	}
-	// A continuing writer runs no program: its earlier attempt reported them.
 	if (!continuing) {
 		persist(PRACTICE_SCRIPT_REPORT_PATH, persistExecutionReport);
 	}
@@ -1031,7 +1005,6 @@ function hasPersistedReviewState(): boolean {
 	return reviewState.size > 0;
 }
 
-/** A checked result, and what the check changed about its citations, for the session to see. */
 interface Validated {
 	candidate: Candidate;
 	notes: string[];
@@ -1060,7 +1033,6 @@ function orchestratorWithPaths(text: string): string {
 	);
 }
 
-/** What a MET with incomplete coverage is told: which reads fell short, and what it may submit instead. */
 function incompleteCoverageText(coverage: Coverage): string {
 	const omitted = coverage.complete
 		? []
@@ -1075,11 +1047,6 @@ function incompleteCoverageText(coverage: Coverage): string {
 	);
 }
 
-/**
- * Check a submitted result for the session's one practice the way admission will: its shape, its sources, its
- * search and inapplicability scope, its quotes against the sourceFiles, and its rules with the coverage the host
- * measured. Each repair is noted.
- */
 function validateDomainBasis(
 	submission: NormalizedSubmission,
 	assignment: PracticeInputs | undefined,
@@ -1102,7 +1069,6 @@ function validateConversationAttribution(
 	submission: NormalizedSubmission,
 	assignment: PracticeInputs | undefined,
 ): void {
-	// The frozen attribution selects a person; a problem cannot name another participant's words as theirs.
 	const thread = `${CWD}/${CONVERSATION_THREAD}`;
 	if (
 		submission.outcome === "NOT_MET" &&
@@ -1132,8 +1098,6 @@ function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Val
 		sourceFileSources.get(sourceFile),
 	);
 	const citations = submissionCitations(submission);
-	// The manifest says which source staged a source file; a citation that names the sourceFile under
-	// another source kind is read as the manifest reads it, and the correction is echoed back.
 	const assignmentScope = assignedInputs.get(slug)?.scope;
 	if (assignmentScope?.kind === "SCAN") {
 		const contextPaths = practiceIndex.find((practice) => practice.slug === slug)?.contextPaths;
@@ -1144,8 +1108,6 @@ function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Val
 	}
 
 	for (const citation of citations) {
-		// A quote of a staged record (description.md, comments.json) named as its path under the pinned
-		// change is a quote of that record: the sourceFile is the path.
 		const stagedAtPath = sourceFileSources.get(citation.path);
 		if (stagedAtPath !== undefined && citation.sourcePath !== citation.path) {
 			notes.push(
@@ -1188,8 +1150,6 @@ function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Val
 	const scan = assignment?.scope.kind === "SCAN";
 	validateDomainBasis(submission, assignment);
 
-	// A practice that reads the change grounds a decision of nothing in it, unless another practice's
-	// result already consulted it; a practice judging comments or history alone owes the change nothing.
 	if (
 		(submission.outcome === "DOES_NOT_APPLY" || submission.outcome === "COULD_NOT_DETERMINE") &&
 		!scan &&
@@ -1292,7 +1252,6 @@ function excerptOf(text: string): string {
 	return JSON.stringify(text.length > 160 ? `${text.slice(0, 160)}…` : text);
 }
 
-/** Whether a submission cites the change or names it among the sources its warrants consulted. */
 function readTheChange(submission: NormalizedSubmission): boolean {
 	if (submissionCitations(submission).some((citation) => citation.sourceKind === DIFF_SOURCE)) {
 		return true;
@@ -1304,7 +1263,6 @@ function readTheChange(submission: NormalizedSubmission): boolean {
 	return consulted.includes(DIFF_SOURCE);
 }
 
-/** Whether a final result cites the change or names it among the sources its warrants consulted. */
 function candidateReadTheChange(candidate: Candidate): boolean {
 	const cited = [
 		...candidate.citations,
@@ -1325,7 +1283,6 @@ function candidateReadTheChange(candidate: Candidate): boolean {
 /** What a repository read returns for a file that is not text: git's own rule, a NUL in the opening bytes. */
 const BINARY = Symbol("binary");
 
-/** Select the capture's logical text, not a serialized metadata record that mentions it. */
 function capturedText(citation: Citation): string | null {
 	const matches = capturedTexts.filter(
 		(entry) =>
@@ -1392,7 +1349,6 @@ function asText(bytes: Buffer): string | typeof BINARY {
 	return bytes.subarray(0, 8000).includes(0) ? BINARY : bytes.toString("utf8");
 }
 
-/** The sourceFile index, not the task's primary checkout, determines which repository a citation reads. */
 function citationRepository(citation: Citation): string {
 	const match = /^repos\/(?<repository>[A-Za-z0-9_-]+)\/\.git\/HEAD$/u.exec(citation.sourcePath);
 	if (!match?.groups || typeof match.groups.repository !== "string") {
@@ -1435,7 +1391,6 @@ function readCheckoutFile(path: string, repository: string): string | typeof BIN
 }
 
 /** A draft disposition; its practice slug is its stable reference within this review. */
-/** What one submission did to the review call's draft result. */
 type Recorded =
 	| (({ kind: "stored" } | { kind: "revised" }) & {
 			slug: string;
@@ -1445,7 +1400,6 @@ type Recorded =
 	| { kind: "duplicate"; slug: string }
 	| { kind: "refused"; slug: string; reason: string };
 
-/** Set once the final results have gone to admission; no result is accepted after it. */
 let measurementClosed = false;
 
 /** Calls of the recording tools one turn may make before recording anything; past it, the turn ends. */
@@ -1470,14 +1424,12 @@ async function refusal<T>(toolCallId: string, text: string): Promise<AgentToolRe
 	throw new Error(text);
 }
 
-/** The tools a turn exists to call: what it records with them is what it owes. */
 const RECORDING_TOOLS: ReadonlySet<string> = new Set([
 	"submit_result",
 	"report_feedback",
 	"report_review",
 ]);
 
-/** The tool the composition turn under way records with: the review on the work, or the private destinations. */
 let composerTool: "report_review" | "report_feedback" = "report_feedback";
 
 /** The text of a tool result as the model reads it; empty when the result carries none. */
@@ -1500,11 +1452,6 @@ function firstLine(text: string): string {
 /** The session the turn events belong to, once it exists; what the loop bound aborts. */
 let activeSession: AgentSession | null = null;
 
-/**
- * What the turn in flight still owes and how it is told to record it; set and cleared with its trace.
- * Measuring owes one result per practice, composition one decision per NOT_MET practice.
- * `endsWhenPaid` marks a turn that exists only to pay what it owes, so it ends once nothing is owed.
- */
 interface TurnDemand {
 	owed: () => number;
 	nudge: string;
@@ -1512,18 +1459,12 @@ interface TurnDemand {
 }
 let turnDemand: TurnDemand | null = null;
 
-/**
- * Output tokens the model spends per result it submits, averaged over its submitting messages: what a
- * turn must keep back to submit what it owes. The prior is a slow open model's pace until the session
- * has submitted once.
- */
 let tokensPerProblem = 1500;
 /** Output tokens of the last assistant message, when that message carries a recording call. */
 let recordingMessageTokens = 0;
 /** When the session last showed any sign of life; what the stall watchdog reads. */
 let lastEventAt = Date.now();
 
-/** How many results a submit_result call carried, stored, duplicate or refused alike. */
 function problemsIn(result: unknown): number {
 	const details = isRecord(result) ? result.details : undefined;
 	if (!isRecord(details)) {
@@ -1663,11 +1604,8 @@ const refusedItems = new Map<string, { reason: string; resent: number }>();
 /** An identical refused item sent this many times more ends the turn: the circuit breaker. */
 const IDENTICAL_REFUSAL_ABORT = 2;
 
-/** The session tools whose answers are evidence reads the host keeps receipts of. */
 const READ_TOOLS: ReadonlySet<string> = new Set(["read", "grep", "find", "ls"]);
-/** The most feedback an omission names; the count says how many there are. */
 const OMISSION_ITEMS = CANDIDATE_LIMITS.omissionItems;
-/** A tool error that proves the session asked for a path that does not exist; every other error is a failed read. */
 const ABSENT_PATH = /\bENOENT\b|^Path not found: /u;
 
 /**
@@ -1676,12 +1614,9 @@ const ABSENT_PATH = /\bENOENT\b|^Path not found: /u;
  */
 interface SessionReads {
 	reads: number;
-	/** Files whose last read was cut at the tool's limit, and not read on to their end since. */
 	cutFiles: Set<string>;
-	/** Searches and listings cut at their limit. */
 	cutSearches: string[];
 	failed: string[];
-	/** The arguments of each read in flight, by call. */
 	pending: Map<string, unknown>;
 }
 
@@ -1689,7 +1624,6 @@ function newSessionReads(): SessionReads {
 	return { reads: 0, cutFiles: new Set(), cutSearches: [], failed: [], pending: new Map() };
 }
 
-/** Keep the receipt of one read the session made, directly or from a codemode script. */
 function noteSessionRead(reads: SessionReads, event: AgentSessionEvent): void {
 	if (event.type === "tool_execution_start" && READ_TOOLS.has(event.toolName)) {
 		reads.pending.set(event.toolCallId, event.args);
@@ -1733,7 +1667,6 @@ function noteSessionRead(reads: SessionReads, event: AgentSessionEvent): void {
 	}
 }
 
-/** The host's receipts of a session's reads, as a report counts them. */
 function sessionReceipts(reads: SessionReads): Receipts {
 	return {
 		reads: reads.reads,
@@ -1742,7 +1675,6 @@ function sessionReceipts(reads: SessionReads): Receipts {
 	};
 }
 
-/** What a session's reads covered: complete only when no read was cut short or failed. */
 function sessionCoverage(
 	reads: SessionReads,
 	reader?: EvidenceReader,
@@ -1807,11 +1739,7 @@ function sessionCoverage(
 			};
 }
 
-/**
- * The one review in flight: the practice it reviews, its private draft result, and what its session's
- * reads reached. A submission goes to this draft only; it becomes the practice's result only when the
- * program returns it.
- */
+// Each review owns its draft; only the script's final return becomes a candidate.
 interface ActiveReview {
 	slug: string;
 	draft: Candidate | null;
@@ -1886,7 +1814,6 @@ function record(raw: unknown): Recorded {
 	};
 }
 
-/** The results submitted so far, for the review's notes; read back after a compaction. */
 function persistRecordedNotes(): void {
 	try {
 		mkdirSync(nodePath.dirname(NOTES_PATH), { recursive: true });
@@ -1896,7 +1823,6 @@ function persistRecordedNotes(): void {
 	}
 }
 
-/** One line for each result: the final ones and the open review's draft, or of the given practices only. */
 function recordedSoFar(only?: readonly string[]): string {
 	const results = new Map(reviewState);
 	if (activeReview?.draft != null) {
@@ -1948,13 +1874,9 @@ function logRefusal(slug: string, reason: string): void {
 /** The practices the current session asked about; a recorded result for one of them is what it owes. */
 let currentTurnSlugs: readonly string[] = [];
 
-/**
- * The one practice the measuring session in flight assesses, or null outside measurement. Each review gets
- * a session of its own, and its result is bound to that practice.
- */
+// Each measuring session may submit only its assigned practice's result.
 let activePractice: string | null = null;
 
-/** The given practices, by default the session's, that still owe the open review a result. */
 function owedPractices(slugs: readonly string[] = currentTurnSlugs): string[] {
 	const review = activeReview;
 	return review === null || review.draft !== null || blockedPractices.has(review.slug)
@@ -1962,7 +1884,6 @@ function owedPractices(slugs: readonly string[] = currentTurnSlugs): string[] {
 		: slugs.filter((slug) => slug === review.slug);
 }
 
-/** JSON Schema keywords that refuse; what they say is applied per piece instead. */
 const RULE_KEYWORDS = new Set([
 	"required",
 	"additionalProperties",
@@ -1975,10 +1896,7 @@ const RULE_KEYWORDS = new Set([
 	"maximum",
 ]);
 
-/**
- * Pi validates a whole tool call before execution. For a tool that takes a batch of independent feedback, keep shape
- * hints here and let the tool validate each piece, so one invalid piece does not discard the rest of the batch.
- */
+// Batch tools validate each piece independently; whole-call validation would discard valid siblings.
 function documentedShape(schema: unknown): unknown {
 	if (Array.isArray(schema)) {
 		return schema.map(documentedShape);
@@ -1987,8 +1905,6 @@ function documentedShape(schema: unknown): unknown {
 		return schema;
 	}
 	const out: Record<string, unknown> = {};
-	// Container types go, so a list may arrive serialized and each piece is answered on its own; scalar
-	// types stay, because they tell the model what a value is.
 	const structural = schema.type === "object" || schema.type === "array";
 	const noted = (note: string) => {
 		const description = typeof out.description === "string" ? out.description : "";
@@ -2085,7 +2001,6 @@ function buildSubmitResultTool() {
 					details: { inserted: 0, revised: 0, duplicates: 0, refused: 0 },
 				};
 			}
-			// The result is a typed value, never a second JSON document to parse or repair.
 			if (!isRecord(params) || Array.isArray(params)) {
 				const reason = "the arguments must be one result object";
 				logRefusal("(not an object)", reason);
@@ -2121,13 +2036,9 @@ function buildSubmitResultTool() {
 				duplicates: outcome.kind === "duplicate" ? 1 : 0,
 				refused: outcome.kind === "refused" ? 1 : 0,
 			};
-			// A call that stored nothing is an error the session must correct — a resend of what is already
-			// submitted included, or it reads as success and is sent again.
 			if (stored === 0) {
 				return refusal(toolCallId, text);
 			}
-			// The session owes nothing more once its practice has a result; ending the run here spares the
-			// wrap-up calls a session otherwise makes after its last submission.
 			return { content: [{ type: "text", text }], details, terminate: true };
 		},
 	});
@@ -2147,10 +2058,6 @@ function accumulateUsage(prev: UsageReport | null, curr: UsageReport): void {
 	usageTotals.totalCalls += Math.max(0, curr.totalCalls - (prev?.totalCalls ?? 0));
 }
 
-/**
- * Derive the change view from the captured checkout and the pinned range, before any program runs. A capture
- * that fails here fails the review: an empty change is never what a failed capture reads as.
- */
 function deriveChangeView(): void {
 	const change = readChange(INPUT_PATHS.contextRoot);
 	if (change !== null) {
@@ -2163,7 +2070,6 @@ function deriveChangeView(): void {
 	}
 }
 
-/** The captured change, parsed from the derived view; null when this work has none. */
 function capturedChange(): { base: string; head: string; files: Map<string, DiffFile> } | null {
 	const change = readChange(INPUT_PATHS.contextRoot);
 	const view = `${CWD}/${CHANGE_ROOT}/diff.patch`;
@@ -2173,7 +2079,6 @@ function capturedChange(): { base: string; head: string; files: Map<string, Diff
 	return { ...change, files: parseDiff(readFileSync(view, "utf8")) };
 }
 
-/** What the programs of this review read: the pinned checkout, the change and the captured records. */
 function captureSources(): EvidenceSources {
 	const repository = INPUT_PATHS.repositoryRoot;
 	const checkout = existsSync(`${repository}/.git`) ? repository : null;
@@ -2202,7 +2107,6 @@ function sourcesForPractice(slug: string, sources: EvidenceSources): EvidenceSou
 	return { ...sources, permittedPaths: new Set([assigned, ...contextPaths]) };
 }
 
-/** The files a program of `kind` reads: the pinned tree and the change of a pull request, and none otherwise. */
 function jobFiles(kind: string): JobFiles | null {
 	const sources = capturedChange();
 	const repository = INPUT_PATHS.repositoryRoot;
@@ -2217,7 +2121,6 @@ function jobFiles(kind: string): JobFiles | null {
 	return { head: { revision: head }, change: sources };
 }
 
-/** The direct models the server bound for this job; none when it staged none or they do not parse. */
 function readBoundModels(): BoundModels {
 	if (!existsSync(PRACTICE_SCRIPT_MODELS_PATH)) {
 		return {};
@@ -2275,13 +2178,8 @@ const PERSIST_DISCIPLINE =
 	`Submit the outcome the evidence supports, MET, NOT_MET, DOES_NOT_APPLY, or COULD_NOT_DETERMINE; there is no quota. ` +
 	`Use tools only from this point onward; no planning prose.`;
 
-/** What a turn is told once its remaining work only pays for submitting what it owes. */
 const RECORD_NUDGE = `This turn has the work left to write its result and no more. Stop exploring. Submit what the inspected evidence supports for this session's practice with submit_result. ${PERSIST_DISCIPLINE}`;
 
-/**
- * The one request a review session gets when it ended on its own with its practice's result unsubmitted. It goes
- * to the same session, which still holds what it read, and leaves a collection gap unsubmitted.
- */
 function recordOnceMoreText(slug: string): string {
 	return (
 		`## Not recorded\nThis session ended without a result for ${slug}: text outside a ` +
@@ -2380,10 +2278,8 @@ const PRACTICE_PAGE_SUPPORT_PATH = `${CWD}/work/composition/in-app-support.json`
 let practicePageSupport: PracticePageSupport | null = null;
 let conversationEligibility: ConversationEligibility | null = null;
 
-/** The open private destinations each NOT_MET practice is routed to; null until admission routed them. */
 let routedDestinations: ReadonlyMap<string, readonly PrivateDestination[]> | null = null;
 
-/** Whether the server's read after admission routes the practice's NOT_MET result to the destination. */
 function routedTo(destination: PrivateDestination, practiceSlug: string): boolean {
 	if (destination === "PRACTICE_PAGE") {
 		return (
@@ -2409,7 +2305,6 @@ function routedTo(destination: PrivateDestination, practiceSlug: string): boolea
 	);
 }
 
-/** Why the server routes none of the practice's NOT_MET results to the destination, in its own words. */
 function destinationRefusal(destination: PrivateDestination, practiceSlug: string): string {
 	if (destination === "PRACTICE_PAGE") {
 		const decision =
@@ -2448,12 +2343,10 @@ function isFeedbackAction(value: unknown): value is FeedbackAction {
 	return ACTIONS.some((action) => action === value);
 }
 
-/** A string the model sent, or nothing — used for every optional free-text field on a feedback piece. */
 function optionalString(value: unknown): string | undefined {
 	return typeof value === "string" ? value : undefined;
 }
 
-/** The notes a CONVERSATION piece carries TO the mentor. Kept in step with ConversationBrief by Java. */
 interface ConversationNotes {
 	situation?: string;
 	capability?: string;
@@ -2481,7 +2374,6 @@ interface FeedbackPieceOf<Basis> extends ComposedFeedbackPiece {
 type ReadFeedbackPiece = FeedbackPieceOf<string[]>;
 type FeedbackPiece = FeedbackPieceOf<EvidenceRef[]>;
 
-/** The prepared text preserves the guidance fields within the worker DTO's text bound. */
 function feedbackBody(piece: Pick<FeedbackPiece, "title" | "body" | "nextStep" | "notes">): string {
 	const sections = [piece.title, piece.body, piece.nextStep];
 	for (const [field, label] of [
@@ -2499,7 +2391,6 @@ function feedbackBody(piece: Pick<FeedbackPiece, "title" | "body" | "nextStep" |
 	return sections.filter(hasText).join("\n\n");
 }
 
-/** The admitted fields the server resolves references against: enough to reference one, never enough to author one. */
 interface LeanCitation {
 	index: number;
 	sourceKind: unknown;
@@ -2563,16 +2454,10 @@ const composedFeedback: ComposedFeedback = {
 	preparation: null,
 };
 
-/**
- * Admission assigns result and problem IDs and anchor eligibility. Populate this captured array in place
- * because the composer tool is created before admission.
- */
+// Populate in place because the composer tool captures this array before admission supplies ids.
 const admittedResults: AdmittedResult[] = [];
 
-/**
- * The staged composition request, or null when the server staged none or opened no destination. A request
- * that breaks the contract fails the run: composing without it would silently drop every delivery.
- */
+// A malformed composition request must fail the run; guessing destinations can disclose private feedback.
 function loadCompositionRequest(): CompositionRequest | null {
 	if (!existsSync(COMPOSITION_REQUEST_PATH)) {
 		return null;
@@ -2587,8 +2472,6 @@ function loadCompositionRequest(): CompositionRequest | null {
 	}
 	const request = parsed.data;
 	const closed: DestinationBounds = { enabled: false, maxPieces: 0 };
-	// Spelled out rather than folded into the DESTINATIONS loop, so that Record<Destination, …> is what makes
-	// every destination present: adding one to DESTINATIONS then fails to compile until it is bounded here.
 	const destinations: Record<Destination, DestinationBounds> = {
 		ON_WORK: request.destinations.ON_WORK ?? closed,
 		PRACTICE_PAGE: request.destinations.PRACTICE_PAGE ?? closed,
@@ -2704,7 +2587,6 @@ function leanCitation(citation: AdmittedCitation): LeanCitation {
 	};
 }
 
-// Inline location requires a problem's citation inside the current diff.
 function leanResults(results: readonly AdmittedResult[]): LeanResult[] {
 	return results.map((result) => ({
 		resultId: result.resultId,
@@ -2714,14 +2596,12 @@ function leanResults(results: readonly AdmittedResult[]): LeanResult[] {
 		problems: result.problems.map((problem) => ({
 			problemId: problem.problemId,
 			severity: problem.severity,
-			// The server places a line note only on a problem that admission marked anchorable.
 			anchorable: problem.anchorable,
 			citations: problem.citations.map(leanCitation),
 		})),
 	}));
 }
 
-/** The admitted results by resultId: what an id the composer names is resolved against. */
 function resultsById(results: readonly AdmittedResult[]): Map<string, AdmittedResult> {
 	return new Map(results.map((result) => [result.resultId, result]));
 }
@@ -2737,7 +2617,6 @@ function persistComposedFeedback(): void {
 						`supersedes '${supersedesThreadKey}', which this envelope does not list as staged`,
 		);
 	}
-	// The server reads at most 30 feedback. Keep deliverable feedback ahead of WITHHOLD records.
 	const feedback = composedFeedback.feedback.toSorted(
 		(a, b) => Number(a.action === "WITHHOLD") - Number(b.action === "WITHHOLD"),
 	);
@@ -2745,14 +2624,12 @@ function persistComposedFeedback(): void {
 }
 
 // The composer references admitted results and problems; it cannot author verdicts, citations, or locations.
-/** What report_feedback reports back: a refusal stores nothing and names no destination. */
 interface ReportFeedbackDetails {
 	stored: number;
 	destination?: Destination;
 	total?: number;
 }
 
-/** A piece the tool did not store, with the reason the session is told. */
 function skipped(text: string): { stored: boolean; text: string } {
 	return { stored: false, text };
 }
@@ -2764,8 +2641,6 @@ function buildFeedbackTool(
 	preparedTargets: PreparedFeedbackTarget[],
 	deliveredPractices: ReadonlySet<string>,
 ) {
-	// The reader resolves supersession against the envelope's copy of this list and drops any piece
-	// naming a thread outside it, so the vocabulary is recorded here, where it is decided.
 	composedFeedback.preparedTargets = preparedTargets;
 	const enabledDestinations = PRIVATE_DESTINATIONS.filter(
 		(destination) => request.destinations[destination].enabled,
@@ -2776,14 +2651,13 @@ function buildFeedbackTool(
 	};
 	const seen = new Set<string>();
 
-	/** One piece stored, or the reason it was not. */
 	const store = (value: unknown): { stored: boolean; text: string } => {
 		const read = readFeedbackPiece(value, practiceSlugs, results);
 		if (typeof read === "string") {
 			return { stored: false, text: read };
 		}
 		const piece = read;
-		// Built per call: the tool is defined before admission fills the results it reads.
+		// Read current admitted results per call; the tool exists before admission fills them.
 		const admitted = resultsById(results);
 		const bounds = request.destinations[piece.destination];
 		if (!bounds.enabled) {
@@ -2807,14 +2681,12 @@ function buildFeedbackTool(
 		if (rejection !== null) {
 			return skipped(rejection);
 		}
-		// The server's routing decides the destinations a practice may reach; a withholding elsewhere decides nothing.
 		if (!(routedDestinations?.get(piece.practiceSlug) ?? []).includes(piece.destination)) {
 			return skipped(
 				`${piece.destination} cannot carry feedback about ${piece.practiceSlug} this run ` +
 					`(${destinationRefusal(piece.destination, piece.practiceSlug)}); write no piece for it there, not even a WITHHOLD. Skipped.`,
 			);
 		}
-		// PRACTICE_PAGE pattern feedback requires NOT_MET results on distinct pieces of work.
 		if (piece.destination === "PRACTICE_PAGE" && delivers) {
 			const pieces = negativePiecesOfWork(piece.practiceSlug);
 			if (pieces < request.minDistinctItems) {
@@ -2849,7 +2721,6 @@ function buildFeedbackTool(
 			"its own, with the reason, and a skipped piece can be sent again corrected without re-sending the " +
 			"stored ones. This is an intervention, not a measurement: it takes no outcome, severity or " +
 			"confidence, and no citation you typed yourself.",
-		// See documentedShape: validate feedback per piece, not per tool call.
 		parameters: {
 			type: "object",
 			required: ["feedback"],
@@ -3001,8 +2872,6 @@ function buildFeedbackTool(
 				persistComposedFeedback();
 			}
 			const text = outcomes.map((outcome, index) => `#${index + 1}: ${outcome.text}`).join("\n");
-			// A call that stored nothing is an error the session must correct — the reasons are in it;
-			// one that stored some of what it sent is an answer, with the skips named per piece.
 			if (stored === 0) {
 				return refusal(toolCallId, text);
 			}
@@ -3019,16 +2888,12 @@ interface ReportReviewDetails {
 	stored: number;
 }
 
-/**
- * Once final, the tool refuses every call: one response can carry several calls after the final one. A completed
- * compaction takes the opening reference out of view, and the next turn restores it before a review is accepted.
- */
+// A completed response can contain more calls; final composition must reject all subsequent writes.
 interface PublicReviewState {
 	final: boolean;
 	reviewContext: "LOST" | "RESTORING" | "HELD";
 }
 
-/** The public results the review may rest on, by resultId, each with its problems' citations. */
 function reviewableById(
 	reviewable: readonly Record<string, unknown>[],
 ): Map<string, ReviewedResult> {
@@ -3052,10 +2917,6 @@ function reviewableById(
 
 const REVIEW_FINAL = "The review on this work is final; this composition accepts nothing more.";
 
-/**
- * Reads the review against only the NOT_MET results admission marked publicEligible and their problems, and the
- * statements shown as already said.
- */
 function buildReviewTool(
 	lineNotes: boolean,
 	restable: ReadonlyMap<string, ReviewedResult>,
@@ -3133,7 +2994,6 @@ function buildReviewTool(
 	});
 }
 
-/** The NOT_MET results the review may rest on that it neither says nor withholds. */
 function undecidedByReview(reviewable: readonly Record<string, unknown>[]): string[] {
 	const decided = decidedByReview(composedFeedback.review);
 	return reviewable
@@ -3150,7 +3010,6 @@ function finishReviewText(undecided: readonly string[]): string {
 	return `${owed}\nStore the final review with one report_review call. A review that says nothing is still one final report_review call. No prose outside the calls.`;
 }
 
-/** Explanatory context on each practice the review's results were measured against, from the staged index. */
 function practiceContext(results: readonly Record<string, unknown>[]): ReviewPractice[] {
 	const slugs = new Set(results.map((result) => String(result.practiceSlug)));
 	return practiceIndex
@@ -3164,7 +3023,6 @@ function practiceContext(results: readonly Record<string, unknown>[]): ReviewPra
 		}));
 }
 
-/** Match ComposedFeedbackPiece bounds so the model can correct a piece before server admission. */
 const FEEDBACK_TEXT_BOUNDS = {
 	title: 255,
 	body: 8000,
@@ -3212,7 +3070,6 @@ function vocabularyWord<T extends string>(
 	return match ?? `${field} must be one of ${vocabulary.join(", ")} (received '${value}')`;
 }
 
-/** Enforce text length here; validateFeedback handles destination-specific required fields. */
 function boundedText(
 	value: unknown,
 	field: keyof typeof FEEDBACK_TEXT_BOUNDS,
@@ -3288,8 +3145,6 @@ function readFeedbackPiece(
 		return "the complete feedback text must be at most 8000 characters; shorten it and send it again";
 	}
 
-	// One id sent bare is the list of one; the reader drops a piece that cites nothing, so admitting an
-	// empty list here would tell the session it succeeded and then deliver nothing.
 	const basedOn = listOrSingle(value.basedOn).filter(
 		(reference): reference is string => typeof reference === "string" && reference.trim() !== "",
 	);
@@ -3374,10 +3229,6 @@ const THIS_WORK = ((): string | undefined => {
 })();
 
 // Enforce snapshot-dependent constraints here for fast model correction; Java rechecks them.
-/**
- * Count the distinct pieces of work the server's PRACTICE_PAGE support read selected for the practice. Two occurrences on
- * one piece of work are one piece, as the server counts it (PracticePageFeedbackRouter.supportsPattern).
- */
 function negativePiecesOfWork(practiceSlug: string): number {
 	if (practicePageSupport?.state !== "COMPLETE") {
 		return 0;
@@ -3390,7 +3241,6 @@ function negativePiecesOfWork(practiceSlug: string): number {
 	).size;
 }
 
-/** The CONVERSATION destination: notes to the mentor, and nothing that would be read out. */
 function validateConversationPiece(piece: ReadFeedbackPiece): string | null {
 	if (hasText(piece.body) || hasText(piece.nextStep)) {
 		return "CONVERSATION takes notes{situation,capability,evidenceSummary,inConversationLearning}, not body/nextStep - nothing for this destination is read out; skipped.";
@@ -3409,10 +3259,7 @@ function validateConversationPiece(piece: ReadFeedbackPiece): string | null {
 	return null;
 }
 
-/**
- * The PRACTICE_PAGE destination: a body about a pattern across work, never a quote of this work. Every quote of a result the piece
- * rests on counts, its own and its problems', whichever of its ids the piece names.
- */
+// Practice-page feedback describes a pattern across work, not a quotation of this item.
 function validatePracticePagePiece(
 	piece: ReadFeedbackPiece,
 	named: ReadonlyMap<string, { result: AdmittedResult }>,
@@ -3508,7 +3355,6 @@ function normalizeQuotedText(value: string): string {
 		.toLowerCase();
 }
 
-/** A citation by its coordinates: its quote and verification digests stay in the full admission record on disk. */
 function coordinatesOf(citation: unknown): unknown {
 	if (!isRecord(citation)) {
 		return citation;
@@ -3517,11 +3363,6 @@ function coordinatesOf(citation: unknown): unknown {
 	return coordinates;
 }
 
-/**
- * One admitted result as the private composer sees it, with its problems nested: every citation by its
- * coordinates only. An abstention keeps the limit it recorded and its id; its summary and rationale may assert more
- * than it decided.
- */
 function composerView(result: AdmittedResult): Record<string, unknown> {
 	const citations = result.citations.map(coordinatesOf);
 	if (result.outcome !== "NOT_MET" && result.outcome !== "MET") {
@@ -3563,11 +3404,7 @@ function stagedBlock(label: string, file: string, limit = COMPOSITION_BLOCK_LIMI
 		: `### ${label}\n\`\`\`json\n${text}\n\`\`\`\n`;
 }
 
-/**
- * The complete staged criteria of each practice with a NOT_MET result: feedback addresses the standard that was
- * assessed. The measuring leads and source directives belong to assessment and stay out. Each is shown whole, named
- * with where to read it when too large, or named as not staged or not readable; never cut.
- */
+// Composition receives criteria, but not measuring leads or source directions that could initiate another assessment.
 function notMetCriteria(
 	results: readonly AdmittedResult[],
 	limit = COMPOSITION_BLOCK_LIMIT,
@@ -3745,7 +3582,6 @@ const ADMISSION_ATTEMPTS = 4;
 // one attempt may take minutes; the cap only bounds a server that went silent without closing.
 const ADMISSION_ATTEMPT_TIMEOUT_MS = 10 * 60_000;
 
-/** The problem `detail` of an HTTP refusal; the raw body never reaches an error message. */
 async function answerText(response: Response): Promise<string> {
 	const problem: unknown = await response.json().catch(() => null);
 	const detail = isRecord(problem) ? problem.detail : null;
@@ -3825,7 +3661,6 @@ async function admitResults() {
 	);
 }
 
-/** Submit the complete feedback proposal under the owned review attempt. */
 async function prepareComposedFeedback(safety: ReturnType<typeof scheduleDeadline>): Promise<void> {
 	if (admissionDigest === null || safety.expired()) {
 		return;
@@ -3895,8 +3730,7 @@ async function prepareComposedFeedback(safety: ReturnType<typeof scheduleDeadlin
 		composedFeedback.preparation = result.receipt;
 		persistComposedFeedback();
 	}
-	// An unavailable acknowledgement may follow a committed preparation. The server reconciles the
-	// unchanged terminal package against that immutable preparation; it never authorizes another writer.
+	// An acknowledgement can be lost after preparation commits; reconcile the unchanged immutable package.
 	console.error(`[pi-runner] feedback preparation: ${result.state}`);
 }
 
@@ -3930,11 +3764,7 @@ function acceptAdmission(admitted: unknown): Record<string, unknown> {
 	return admitted;
 }
 
-/**
- * A private destination composes only what the server's read after admission routes to it. Without a complete read the destination
- * closes for this run: a refusal is the policy's answer, anything else is feedback that could not be composed. A destination
- * no NOT_MET practice is routed to closes as decided. Other destinations go on, and preparation still routes what is written.
- */
+// Private composition requires a complete server routing read; missing routing closes the destination.
 function closeUnroutedPrivateDestinations(request: CompositionRequest): void {
 	const notMet = notMetPractices(admittedResults);
 	for (const destination of PRIVATE_DESTINATIONS) {
@@ -3965,7 +3795,6 @@ function closeUnroutedPrivateDestinations(request: CompositionRequest): void {
 	);
 }
 
-/** The NOT_MET practices private composition owes a decision on: those routed to an open destination, once routed. */
 function privatelyComposable(): string[] {
 	const notMet = notMetPractices(admittedResults);
 	const routed = routedDestinations;
@@ -4299,7 +4128,6 @@ function criteriaFileOf(slug: string): string | null {
 	return existsSync(file) ? readFileSync(file, "utf8") : null;
 }
 
-/** The input a program prepared for this review, as its bounded section; empty for a review without one. */
 function preparedSectionOf(slug: string, section: string): string {
 	const shown = section.trim();
 	return shown
@@ -4334,11 +4162,7 @@ function assessmentOpening(brief: string): string {
 	return `${prompt}\n\n${brief}\n\n`;
 }
 
-/**
- * The task and the brief, when the context no longer holds them; nothing otherwise. A measuring session sees only
- * its own practice's draft: other practices' results are not its context. The composer records no problem, so
- * it gets the task and the brief alone.
- */
+// Restore only the current practice's draft after compaction; other drafts are outside its context.
 function openingIfNeeded(brief: string, composing = false): string {
 	if (openingInContext) {
 		return "";
@@ -4351,10 +4175,6 @@ function openingIfNeeded(brief: string, composing = false): string {
 			}`;
 }
 
-/**
- * Separate single-result examples with this review's sourceFile paths. Alternative outcomes keep the call
- * shape consistent with one practice per session without making an outcome the expected one.
- */
 const RESULT_EXAMPLE = (() => {
 	const context = taskEnvelope.paths.contextRoot;
 	const example = [
@@ -4442,11 +4262,6 @@ The arguments are one complete result object for this session's practice, not a 
 ${example.map((result) => `\`\`\`json\n${JSON.stringify(result, null, 1)}\n\`\`\``).join("\n\n")}`;
 })();
 
-/**
- * A turn of one practice, after the opening when the context does not hold it: its whole criterion first, then
- * the generic illustrations when the context does not hold them, the input its program prepared, and the task. Its
- * work budget is not stated: told its call budget up front, an open model read less and missed more not-met practices.
- */
 function practiceTurnText(heading: string, slug: string, brief: string, prepared: string): string {
 	const illustrations = openingInContext ? "" : `\n\n${RESULT_EXAMPLE}`;
 	return `${openingIfNeeded(brief)}${heading}
@@ -4456,7 +4271,6 @@ ${criteriaOf([slug])}${illustrations}${preparedSectionOf(slug, prepared)}
 Submit one result for ${slug} with submit_result: the outcome its criterion above decides through its applicability, Judge and Defer, as the evidence supports it, DOES_NOT_APPLY and COULD_NOT_DETERMINE included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session submits and corrects only this practice's result.`;
 }
 
-/** The practices with an admitted NOT_MET result: what the composer has a decision to record on. */
 function notMetPractices(results: readonly { practiceSlug: string; outcome: Outcome }[]): string[] {
 	return [
 		...new Set(
@@ -4465,15 +4279,10 @@ function notMetPractices(results: readonly { practiceSlug: string; outcome: Outc
 	].toSorted();
 }
 
-/**
- * Composition's budget: a piece per NOT_MET practice, but never more than a full turn's worth — the
- * destinations cap what it can write, so work beyond that is a loop, not more feedback.
- */
 function compositionBudget(notMet: number): Work {
 	return turnBudget(Math.min(Math.max(1, notMet), PRACTICES_PER_TURN), PER_PRACTICE_WORK);
 }
 
-/** Private decision obligation: a stored piece or withholding may fold several practices in. */
 function undecidedPrivatePractices(): string[] {
 	const practiceOf = new Map(
 		admittedResults.map((result) => [result.resultId, result.practiceSlug]),
@@ -4574,7 +4383,6 @@ ${finishCompositionText(notMet, request)}`,
 }
 
 function finishCompositionText(notMet: readonly string[], request: CompositionRequest): string {
-	// The destinations as they stand: a retry that does not know a destination is full writes feedback that is skipped.
 	const room = PRIVATE_DESTINATIONS.filter(
 		(destination) => request.destinations[destination].enabled,
 	)
@@ -4774,8 +4582,6 @@ async function main() {
 		});
 
 	const allSlugs = loadPracticeSlugs();
-	// A continuing writer runs no program and derives no change.
-	// A continuing writer evaluates no practice, so it reports no coverage of its own.
 	if (!continuing) {
 		practiceCoverageLedger = new PracticeCoverageLedger(PRACTICE_COVERAGE_PATH, allSlugs);
 		deriveChangeView();
@@ -4909,19 +4715,9 @@ async function main() {
 	const inputReader = new InputReader({ practicesDir: INPUT_PATHS.practiceScripts });
 	const boundModels = readBoundModels();
 	const directBudget = new ModelBudget(DIRECT_MODEL_TOKENS, MODEL_CONCURRENCY);
-	/** A review session that did not stop: the run ends with it, and no later session starts. */
 	let sessionStopFailure: Error | null = null;
-	/** Every program's execution ends with the measuring window: at its end, or when the attempt is cancelled. */
 	const measuringEnded = new AbortController();
 
-	/**
-	 * One scope — a catalog group's turn, or the practices no turn reached — under the one work budget its
-	 * practice count earns, whatever the scopes before it spent. Each practice's program runs in turn; each review
-	 * it asks for opens a fresh session that receives the task, the brief, the practice's complete criteria and the
-	 * program's prepared input, and submits only that practice's result. Once the budget, the safety line or a stall
-	 * ends the scope, its remaining practices are not reached. Returns why the runner ended it, or null when every
-	 * program ended on its own.
-	 */
 	async function runScope(
 		label: string,
 		heading: string,
@@ -4947,7 +4743,6 @@ async function main() {
 		// Native events may stop a turn while awaited work settles or another session opens.
 		const stoppedBy = () => trace.stoppedBy;
 		const pastSafety = () => safety.expired() || Date.now() >= measureEnd;
-		/** The model, not the runner, a provider error or the safety line, ended the session with its result owed. */
 		const endedUnrecorded = (slug: string) =>
 			owedPractices([slug]).length > 0 &&
 			stoppedBy() === null &&
@@ -4976,11 +4771,6 @@ async function main() {
 				},
 			});
 		}
-		/**
-		 * Asks a session that ended on its own with its result owed to submit it, once, in the session that holds
-		 * what it read and within this scope's budget; a fresh session would read it all again. A second ending on
-		 * its own closes the review.
-		 */
 		async function askOnceMore(session: AgentSession, text: () => string, slug: string) {
 			if (
 				!endedUnrecorded(slug) ||
@@ -5005,7 +4795,6 @@ async function main() {
 				);
 			}
 		}
-		/** Why a review that ended without a result gives none: never a statement about the work. */
 		function noResultReason(slug: string, signal: AbortSignal): UnratedReason {
 			if (signal.aborted) {
 				return abortReasonOf(signal);
@@ -5093,7 +4882,6 @@ async function main() {
 			activeReview = review;
 			activePractice = slug;
 			currentTurnSlugs = [slug];
-			// The nudge names the session's practice, so a later session may be told again.
 			trace.askedToRecord = false;
 			let opened: Awaited<ReturnType<typeof openSession>>;
 			try {
@@ -5112,8 +4900,6 @@ async function main() {
 					noteSessionRead(review.reads, event);
 				}
 			});
-			// A mixed batch can keep Pi running after this practice submits. Finish its tools and native
-			// boundary first; a refused correction still gets its answer before the draft is final here.
 			const { finishTurn } = opened.session.agent;
 			let unresolvedRefusal = false;
 			opened.session.agent.finishTurn = async (turn, finishSignal) => {
@@ -5154,7 +4940,6 @@ async function main() {
 				reads.failedReads += receipts.failedReads + domainReads.failedReads;
 				activeReview = null;
 				activePractice = null;
-				// A session that does not stop leaves nothing safe to start after it: the run ends.
 				sessionStopFailure ??= closed;
 			}
 			if (sessionStopFailure !== null) {
@@ -5169,7 +4954,6 @@ async function main() {
 				`the review session of ${slug} ended without a result`,
 			);
 		}
-		/** Run one practice's program to its final result, or to why it has none. */
 		async function runProgram(slug: string, practiceHeading: string): Promise<void> {
 			const program = programOf(slug);
 			const read = await inputReader.read(slug).catch((error: unknown) => ({
@@ -5200,7 +4984,6 @@ async function main() {
 			const programReads = noReceipts();
 			const sessionReads = noReceipts();
 			const stopped = new AbortController();
-			// The safety line stops the program as it stops the session; a scope that ends first clears the timer.
 			const safetyTimer = setTimeout(
 				() => {
 					stopped.abort(new UnratedError("deadline", "the run is near its safety ceiling"));
@@ -5301,7 +5084,6 @@ async function main() {
 				break;
 			}
 		}
-		// A practice whose program ran has its outcome; one that no program reached is run now.
 		const unfinished = allSlugs.filter(
 			(slug) => !executions.has(slug) && !blockedPractices.has(slug),
 		);
@@ -5317,7 +5099,6 @@ async function main() {
 		}
 	} finally {
 		measuring = false;
-		// No program runs past this point: one still running would only be stopped at its deadline.
 		measuringEnded.abort(new UnratedError("deadline", "measuring ended"));
 		const measureDurationMs = Date.now() - startMs;
 		measureUsage = extractUsageFromSession({}, streamUsage);
@@ -5363,7 +5144,7 @@ async function main() {
 	}
 
 	measurementClosed = true;
-	// Prepared review input serves measurement only. Composition never receives it, and from here it cannot read it.
+			// Prepared review input serves measurement only; composition must not receive it.
 	rmSync(`${CWD}/${REVIEW_INPUT_ROOT}`, { recursive: true, force: true });
 	await admitResults();
 	if (compositionRequest) {
@@ -5407,8 +5188,6 @@ async function main() {
 				);
 			});
 			try {
-				// A review on the work is owed only for a public NOT_MET result. MET results and
-				// abstentions alone have nothing to say there, and open no session.
 				const reviewable = publicResults(admittedResults);
 				if (compositionRequest.destinations.ON_WORK.enabled && reviewable.length > 0) {
 					await composeReview(compositionRequest, reviewable, notReached, safety);
@@ -5506,10 +5285,7 @@ async function main() {
 		process.exit(0);
 	}
 
-	/**
-	 * The review on the work, in a fresh session of its own whose only tool stores the whole review, with every input
-	 * inline. Private history is not staged into it, and it can read nothing else from the workspace.
-	 */
+			// Public composition receives admitted public results in a fresh session without private history.
 	async function composeReview(
 		request: CompositionRequest,
 		reviewable: readonly Record<string, unknown>[],
@@ -5571,7 +5347,6 @@ async function main() {
 		const restable = reviewableById(reviewable);
 		const state: PublicReviewState = { final: false, reviewContext: "LOST" };
 		const practices = practiceContext(reviewable);
-		/** The opening turn, whole: what a compaction removed. */
 		const restore = () => {
 			state.reviewContext = "RESTORING";
 			return text;
@@ -5613,8 +5388,6 @@ async function main() {
 			if (event.type === "compaction_end" && !event.aborted && !hasText(event.errorMessage)) {
 				state.reviewContext = "LOST";
 			} else if (event.type === "turn_start" && state.reviewContext === "RESTORING") {
-				// Pi begins the next model turn after the current tool batch has ended: only then can the model read
-				// the reference that a refusal restored.
 				state.reviewContext = "HELD";
 			}
 		});
@@ -5652,7 +5425,6 @@ async function main() {
 			lineNotes,
 			stagedCriteria: criteriaFileOf,
 		});
-		// The composition owes one final review, whatever it decides: a review that withholds every result is final only when sent.
 		const owed = () => (state.final ? 0 : Math.max(1, undecidedByReview(reviewable).length));
 		const budget = compositionBudget(owed());
 		let started = false;
@@ -5718,8 +5490,6 @@ async function main() {
 				try {
 					await Promise.race([
 						(async () => {
-							// Decided when the prompt is prepared, which may compact: a prompt that follows a compaction
-							// carries the reference again.
 							const prepared = await prepareTurnText(
 								reviewSession,
 								() =>
@@ -5770,11 +5540,7 @@ async function main() {
 		}
 	}
 
-	/**
-	 * The private destinations, in a fresh session opened after measurement ended: it receives the task, the brief, the
-	 * admitted results with their problems and the person's authorized history, reads with the evidence tools, and records only
-	 * with report_feedback. No measuring transcript is in its context.
-	 */
+			// Private composition starts after measurement in a fresh session with server-routed support.
 	async function composePrivately(
 		request: CompositionRequest,
 		safety: ReturnType<typeof scheduleDeadline>,
@@ -5800,7 +5566,6 @@ async function main() {
 		});
 		await privateLoader.reload();
 		composerTool = "report_feedback";
-		// A destination closed after admission (closeUnroutedPrivateDestinations) leaves only the destinations still open.
 		{
 			currentTurnSlugs = [];
 			const opened = await openSession(

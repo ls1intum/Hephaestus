@@ -26,7 +26,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Replays the released prefix, writes released rows, and applies the one atomic 1.0 cutover. */
 @Tag("database")
 class PracticeV1CutoverMigrationTest {
     private static final String BRANCH_FILE = "1791486276211_changelog.xml";
@@ -282,6 +281,24 @@ class PracticeV1CutoverMigrationTest {
                 .isInstanceOfSatisfying(
                         SQLException.class,
                         error -> assertThat(error.getSQLState()).isEqualTo("55000"));
+        execute(
+                database,
+                "UPDATE review_batch SET status='PAUSED',pause_reason='PAUSED_BY_ADMIN'"
+                        + " WHERE id='00000000-0000-0000-0000-000000992273'");
+        assertThat(column(
+                        database,
+                        "SELECT status || '|' || pause_reason FROM review_batch"
+                                + " WHERE id='00000000-0000-0000-0000-000000992273'"))
+                .containsExactly("PAUSED|PAUSED_BY_ADMIN");
+        assertThat(column(database, "SELECT count(*)::text FROM feedback_copy WHERE readback IS NOT NULL"))
+                .containsExactly("0");
+        assertThatThrownBy(() -> execute(
+                        database,
+                        "UPDATE feedback_copy SET readback='NOT_A_READBACK' WHERE"
+                                + " id='00000000-0000-0000-0000-000000992171'"))
+                .isInstanceOfSatisfying(
+                        SQLException.class,
+                        error -> assertThat(error.getSQLState()).isEqualTo("23514"));
         assertThat(column(
                         database,
                         "SELECT state || '|' || external_ref FROM feedback_copy WHERE"

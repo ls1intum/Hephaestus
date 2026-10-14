@@ -9,7 +9,6 @@ import { hasText } from "@/lib/text";
 
 import { PracticeFigure } from "./PracticeFigure";
 
-/** The practice's guidance as it loads; its picture and guide may each be absent once in. */
 export type PracticeGuidanceState = PanelState<PracticeGuidanceDto>;
 
 export interface PracticeIntroProps {

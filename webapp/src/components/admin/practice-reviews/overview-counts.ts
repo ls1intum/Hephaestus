@@ -21,13 +21,6 @@ export function overviewCount(
 		: overview;
 }
 
-/**
- * Feedback composed in `scope` whose delivery failed, out of the feedback sent in it — delivered,
- * delivery unconfirmed, or failed: the overview's own counts for the range on screen, so the Delivery
- * card and the Feedback tile beside it cannot disagree, and the count opens the list filtered to
- * exactly that state. A package of which only some copies posted is delivered; its copy counts say
- * which copies failed.
- */
 export function deliveryFailures(
 	scope: OutcomeScope,
 	overview: ReviewOverviewState,
@@ -48,10 +41,6 @@ export function deliveryFailures(
 	};
 }
 
-/**
- * The reviews of the range that finished, complete, partial or failed, as the Reviews tile counts
- * them, and the Reviews table filtered to exactly those.
- */
 export function finishedInRange(
 	overview: ReviewOverviewState,
 	scope: OutcomeScope,

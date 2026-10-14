@@ -21,16 +21,10 @@ import { hasText } from "@/lib/text";
 export interface PracticeStandings {
 	/** The groups the practice profile shows, in catalog order: those with a practice in them. */
 	groups: GroupRef[];
-	/**
-	 * The groups of reviewed practices with no standing to show. The table lists none of them; the
-	 * all-groups table folds them with the groups not observed yet, and a link to one opens a level
-	 * that says so.
-	 */
 	emptyGroups: GroupRef[];
 	/** The developer's standing in each group, keyed by group slug. */
 	groupStandings: Record<string, PracticeGroupStanding>;
 	practiceStandings: PracticeStanding[];
-	/** Every practice Hephaestus reviews in the workspace, with its name and words, standing or not. */
 	reviewedPractices: ReviewedPractice[];
 	practicesByGroup: Record<string, PracticeStanding[] | undefined>;
 	/** The three queries as one: the page shows them together, so they load and fail as one. */
@@ -50,10 +44,6 @@ function groupPracticeStandings(
 	return byGroup;
 }
 
-/**
- * The groups of the practices Hephaestus reviews, once each, in the catalog's order the list keeps.
- * A practice in no group adds none.
- */
 export function groupsOfReviewedPractices(practices: ReviewedPractice[]): GroupRef[] {
 	const groups = new Map<string, GroupRef>();
 	for (const { group } of practices) {
@@ -87,7 +77,6 @@ export function partitionGroupsByPractices(
  * standing on every practice — as the practice profile and the drawer over it read them.
  */
 export function usePracticeStandings(workspaceSlug: string): PracticeStandings {
-	// The member's view of the catalog: the practices Hephaestus reviews, each with its group.
 	const reviewedQuery = useQuery(listReviewedPracticesOptions({ path: { workspaceSlug } }));
 	const groupStandingsQuery = useQuery(getOwnGroupStandingsOptions({ path: { workspaceSlug } }));
 	const standingsQuery = useQuery(getOwnPracticeStandingsOptions({ path: { workspaceSlug } }));

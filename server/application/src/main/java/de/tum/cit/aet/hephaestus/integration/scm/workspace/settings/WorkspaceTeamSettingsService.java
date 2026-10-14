@@ -21,21 +21,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service for managing workspace-scoped team settings.
- *
- * <p>Provides business logic for:
- *
- * <ul>
- *   <li>Team visibility (hidden) settings per workspace
- *   <li>Repository contribution visibility settings per workspace
- *   <li>Label filters for teams per workspace
- * </ul>
- *
- * @see WorkspaceTeamSettings
- * @see WorkspaceTeamRepositorySettings
- * @see WorkspaceTeamLabelFilter
- */
 @Service
 public class WorkspaceTeamSettingsService {
 
@@ -340,7 +325,6 @@ public class WorkspaceTeamSettingsService {
         Team team = teamOpt.get();
         Label label = labelOpt.get();
 
-        // Check if filter already exists
         WorkspaceTeamLabelFilter.Id filterId = new WorkspaceTeamLabelFilter.Id(workspace.getId(), teamId, labelId);
         if (labelFilterRepository.existsById(filterId)) {
             log.debug(

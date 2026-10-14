@@ -9,7 +9,6 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Reads each work kind through its own native persistence query. */
 @Component
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor

@@ -2,16 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
 
-/**
- * The one scale both a practice standing and the group standing above it are read off.
- *
- * <p>Both answer "what share of this was positive?" and differ only in what they average: a practice averages
- * its recent opportunities, a group averages its practices. One classification keeps the two levels from
- * applying different bars.
- *
- * <p>The thresholds are asymmetric on purpose. {@code STRENGTH} is a claim about the developer and needs a
- * majority well past the middle; {@code DEVELOPING} only points at where attention would pay off.
- */
+// STRENGTH needs a clear majority; DEVELOPING identifies where attention could help.
 public final class StandingScale {
 
     /**

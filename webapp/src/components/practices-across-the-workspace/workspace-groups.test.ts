@@ -19,7 +19,6 @@ describe("groupsOf", () => {
 	});
 
 	it("joins a group's practices even when another group comes between them", () => {
-		// Acting, Communicating, then Acting again.
 		const practices = [0, 2, 1].flatMap((index) =>
 			ACROSS_WORKSPACE.practices.slice(index, index + 1),
 		);

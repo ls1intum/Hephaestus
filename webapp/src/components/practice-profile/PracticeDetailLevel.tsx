@@ -75,7 +75,6 @@ export interface PracticeDetailLevelProps {
 	 */
 	tab: PracticeTab;
 	onTabChange?: (tab: PracticeTab) => void;
-	/** The reviews of the practice's group; the level shows this practice's results in them. */
 	feed?: ReviewFeedState;
 	/** The developer's practice feedback; the level shows the cards written about this practice. */
 	feedbackCards?: PracticeFeedbackCardEntry[];
@@ -111,16 +110,8 @@ const NO_CARDS: PracticeFeedbackCardEntry[] = [];
 
 const NO_WORDS = { whyItMatters: null, whatGoodLooksLike: null };
 
-/** The required words for a practice that the workspace reviews by hand or not at all. */
 const GUIDANCE_ONLY = "This practice offers guidance without automated review.";
 
-/**
- * One practice as the level over its group: the practice's introduction, then its tabs — the
- * feedback written about it, which the level opens on, the results of the reviews of the reader's work,
- * and the practice guide when the practice has one. It is the deepest level, so it is the one that
- * carries the results — the newest open once the reader turns to them and every earlier one a
- * press away, each opening and closing on its own.
- */
 export function PracticeDetailLevel({
 	nested,
 	path,
@@ -140,8 +131,6 @@ export function PracticeDetailLevel({
 	onRetry,
 	neverApplied = false,
 }: PracticeDetailLevelProps) {
-	// The feed holds every review of the group; the level shows only the reviews that reached this
-	// practice, and only this practice's results in each.
 	const reviews =
 		feed.status === "ready" && practice
 			? feed.reviews
@@ -155,11 +144,7 @@ export function PracticeDetailLevel({
 		? feedbackCardsOf(feedbackCards, practice.slug)
 		: { open: undefined, resolved: [] };
 	const feedbackCount = (feedback.open ? 1 : 0) + feedback.resolved.length;
-	// What each tab counts is what it can show. The feedback cards arrive in one piece, so that
-	// count is always known; the results are paged, so a number taken from the loaded pages
-	// would be short while earlier reviews are still a press away, and would grow under the reader
-	// as they press. An unnumbered tab says less and nothing wrong, so the count waits for the last
-	// page.
+	// Feedback arrives whole; paged results cannot supply an exact tab count.
 	const counts: Partial<Record<PracticeTab, number>> = {
 		results:
 			feed.status === "ready" && !feed.hasMore
@@ -301,13 +286,12 @@ export function PracticeDetailLevel({
 			</>
 		);
 	} else if (guidance.status === "ready") {
-		// No standing, yet the workspace describes the practice: it offers guidance and no results.
 		body = (
 			<>
 				<p className="max-w-2xl text-sm">{GUIDANCE_ONLY}</p>
 				<PracticeIntro practice={described ?? NO_WORDS} guidance={guidance} />
 				{guide && (
-					// `h3`: the guide's own headings are `h4`, and the outline may not skip a level.
+					// The guide uses h4 headings; its parent must be h3 to preserve the outline.
 					<Section size="lg" level={3} title="Practice guide">
 						<PracticeGuideMarkdown guide={guide} />
 					</Section>

@@ -17,7 +17,6 @@ export interface PracticeScriptTraceLineProps {
 	workspaceSlug: string;
 	practiceSlug: string;
 	practiceName: string;
-	/** The review the script ran in, which *Details* opens. */
 	reviewId: string;
 	run: PracticeScriptRun;
 	/**
@@ -30,11 +29,6 @@ export interface PracticeScriptTraceLineProps {
 	details?: boolean;
 }
 
-/**
- * How the practice's script ran in the review, in one muted line: how it ended, the one change that
- * would help it, and *Details*, which opens the review's *Practice scripts* section. The links name
- * the practice for a screen reader, which lists every row's links together.
- */
 export function PracticeScriptTraceLine({
 	workspaceSlug,
 	practiceSlug,

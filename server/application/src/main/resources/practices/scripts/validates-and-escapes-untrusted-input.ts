@@ -1,27 +1,16 @@
-// Finds each added line with a dangerous operation (a sink) that has an untrusted input (a source)
-// within a small window of added lines in the same file. The review traces if the source reaches the
-// sink without validation or escaping. Each language adds rows to the source and sink tables.
 import { isCommentLine } from "../kits/scm/declarations.ts";
 import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
 import { languageOf } from "../kits/scm/languages.ts";
 import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
-/** A label -> pattern table row. The label is a fact of the lead, so it is rendered verbatim. */
 type PatternRows = [string, RegExp][];
 
-/**
- * `all` is checked for every file whatever its language; `byLanguage` refines it for the languages
- * that have their own surfaces. Splitting the two apart makes "there are always cross-language rows"
- * a fact the type carries, instead of one key of a string-indexed record that reads as optional.
- */
 interface PatternTable {
 	all: PatternRows;
 	byLanguage: Record<string, PatternRows>;
 }
 
-// Sources of untrusted input (request/CLI/env/file/stdin). Cross-language patterns live under "all" and are
-// checked for every file; language-specific rows refine the common web/runtime surfaces.
 const SOURCES: PatternTable = {
 	all: [
 		["request/req param", /\b(?:request|req)\b\s*[.[]/iu],
@@ -84,8 +73,6 @@ const SOURCES: PatternTable = {
 	},
 };
 
-// Sinks: dangerous operations that must receive validated/escaped input (SQL, command/eval, markup, path,
-// templating, deserialization). Cross-language rows under "all"; language rows refine.
 const SINKS: PatternTable = {
 	all: [
 		[
@@ -101,8 +88,7 @@ const SINKS: PatternTable = {
 			"deserialize",
 			/\b(?:pickle\.loads|yaml\.load\b|Marshal\.load|unserialize|JSON\.parse|deserialize)\s*\(/iu,
 		],
-		// A render call, not the word: SwiftUI's `.renderingMode(.template)` is a native image mode, and
-		// `Handlebars.compile(` or `jinja2.Template(` only builds a template that a later call renders.
+		// Template compilation does not render; SwiftUI renderingMode(.template) is an image mode.
 		[
 			"template render",
 			/\b(?:render(?:_template(?:_string)?)?|Mustache\.render|ejs\.render)\s*\(/u,
@@ -149,19 +135,16 @@ const SINKS: PatternTable = {
 	},
 };
 
-// Sources and sinks co-occurring within this many added lines are surfaced as a candidate flow.
 const WINDOW = 25;
 
 export const LABELS = {
 	"source-near-sink": `An added line with a dangerous operation (a sink) and an untrusted input (a source) at most ${String(WINDOW)} added lines away.`,
 };
 
-/** JavaScript shares TypeScript's surfaces; the lib names the two apart. */
 function rowsLanguage(lang: string | null): string | null {
 	return lang === "javascript" ? "typescript" : lang;
 }
 
-/** Cross-language rows first, then the rows for this file's language (none when it is unrecognised). */
 function rowsFor(table: PatternTable, lang: string | null): PatternRows {
 	return [...table.all, ...(lang === null ? [] : (table.byLanguage[lang] ?? []))];
 }
@@ -190,7 +173,6 @@ export default definePracticeScript({
 			const sourceRows = rowsFor(SOURCES, rowsLanguage(lang));
 			const sinkRows = rowsFor(SINKS, rowsLanguage(lang));
 
-			// Collect source / sink positions on ADDED lines only.
 			const srcLines: { line: number; label: string }[] = [];
 			const sinkLines: { line: number; label: string }[] = [];
 			for (const [line, content] of df.addedLines) {
@@ -211,7 +193,6 @@ export default definePracticeScript({
 				continue;
 			}
 
-			// Each sink that has a source within WINDOW lines is a flow to trace.
 			for (const sink of sinkLines) {
 				const near = srcLines.find((s) => Math.abs(s.line - sink.line) <= WINDOW);
 				if (!near) {

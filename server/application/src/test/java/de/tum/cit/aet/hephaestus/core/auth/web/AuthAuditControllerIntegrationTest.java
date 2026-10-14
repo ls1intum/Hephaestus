@@ -18,17 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * {@code GET /admin/audit} — the read-only instance-admin audit viewer against the <b>real</b>
- * security chain (genuine cookie-JWT, no mock decoder), mirroring {@code
- * AccountAdminRoleIntegrationTest}.
- *
- * <p>Asserts (a) the {@code app_admin} authority gate (a plain user is 403'd), (b) that seeded
- * events are surfaced newest-first with the attribution fields intact, and (c) that the {@code
- * eventType} filter narrows the result. Events are seeded directly through the repository so the
- * test exercises the VIEWER deterministically (the audit write path swallows failures by design).
- * Requires Docker, like every {@code @Tag("integration")}.
- */
 class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired

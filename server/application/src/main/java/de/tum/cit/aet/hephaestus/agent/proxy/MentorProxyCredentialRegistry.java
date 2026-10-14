@@ -18,16 +18,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Registers proxy credentials for mentor sandboxes. Authentication returns a revocation-fenced
- * session handle; each model call resolves the route and its current turn's spend separately.
- *
- * <p>A session can outlive several turns. The caller holds the per-sandbox lock while a turn's
- * {@link MentorTurnMeter} is bound. Unbinding removes that turn's usage target, so late calls cannot
- * charge a later turn. The meter serves the budget gate; the durable billing record is the turn's
- * {@code chat_message} row.
- *
- * <p>Sandbox disposal revokes the credential. A bounded cache expires credentials after {@link #TTL}
- * without extending their lifetime on access.
+ * Bind each {@link MentorTurnMeter} under the sandbox lock; unbinding must prevent late calls from charging a later turn.
+ * Disposal revokes the credential, and access must not extend its fixed lifetime.
  */
 @Component
 public class MentorProxyCredentialRegistry {

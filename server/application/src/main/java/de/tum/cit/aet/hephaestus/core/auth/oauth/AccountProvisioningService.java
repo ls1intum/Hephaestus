@@ -26,14 +26,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Resolves (or just-in-time creates) the {@link Account} for a federated login, and attaches {@link
- * Identity}s.
- *
- * <p><strong>nOAuth defence:</strong> lookup is always {@code (provider, subject)} via {@link
- * IdentityRepository#findActiveByProviderSubject}. Email is captured for forensics only, never used
- * to resolve an account.
- */
+/** Resolve accounts by {@link IdentityRepository#findActiveByProviderSubject}; email is contact data, never ownership proof. */
 @ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("Account provisioning is user-scoped, keyed by (provider, subject)")
@@ -249,25 +242,13 @@ public class AccountProvisioningService {
         }
     }
 
-    /**
-     * Resolve the {@code git_provider} row id for a login registration: look up the instance-scoped
-     * {@code login_provider} row (this module owns it), then let the integration-side registry
-     * upsert the provider row from its {@code (type, baseUrl)} — keeping the IdentityProvider
-     * entity out of auth.
-     */
     private LoginProvider requireLoginProvider(String registrationId) {
         return loginProviderRepository
                 .findByRegistrationId(registrationId)
                 .orElseThrow(() -> new IllegalArgumentException("unknown login registrationId: " + registrationId));
     }
 
-    /**
-     * Idempotent, promote-only instance-admin bootstrap: if the resolved login is on the {@code
-     * hephaestus.auth.bootstrap-admins} allowlist and the account is not already APP_ADMIN, promote
-     * it. Runs inside the login transaction so the role is committed before the JWT is minted (so
-     * {@code admin} lands on the first token, not the second). Never demotes — demotion stays a
-     * deliberate {@code /admin/users} action.
-     */
+    // Bootstrap promotion commits before JWT issuance; demotion requires an explicit admin action.
     private Account promoteIfBootstrapAdmin(
             Account account, String registrationId, String subject, @Nullable String login) {
         if (account.getAppRole() != Account.AppRole.APP_ADMIN
@@ -287,10 +268,6 @@ public class AccountProvisioningService {
         return account;
     }
 
-    /**
-     * Git login the user authenticated with — the value matched by {@code provider:@username}
-     * entries.
-     */
     private static @Nullable String loginOf(OAuth2User principal) {
         return stringAttr(principal, "login", "preferred_username", "username");
     }
@@ -309,14 +286,7 @@ public class AccountProvisioningService {
         return (name != null && !name.isBlank()) ? name : "user-" + subject;
     }
 
-    /**
-     * The multi-instance IdP tenant id, or {@code null} for single-tenant IdPs (GitHub/GitLab,
-     * which emit no team claim). "Sign in with Slack" (OIDC) surfaces the workspace as the {@code
-     * https://slack.com/team_id} claim (flat) or a nested {@code team.id} — check both. Outline
-     * rides the flat {@code team_id} attribute ({@code OutlineAuthInfoUserService} flattens {@code
-     * data.team.id} onto it). Kept general: any future multi-tenant IdP that emits a {@code
-     * team_id}/{@code tenant_id} claim keys correctly without a special case.
-     */
+    // Slack identifies its tenant by a flat claim or nested team.id; Outline uses flattened team_id.
     private static @Nullable String teamIdOf(OAuth2User principal) {
         String flat = stringAttr(principal, "https://slack.com/team_id", "team_id", "tenant_id", "tid");
         if (flat != null) {

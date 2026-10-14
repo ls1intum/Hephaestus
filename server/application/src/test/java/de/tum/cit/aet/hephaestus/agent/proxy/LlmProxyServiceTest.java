@@ -496,7 +496,6 @@ class LlmProxyServiceTest extends BaseUnitTest {
             verifyNoInteractions(resolver);
         }
 
-        /** 502 from the blocked target proves the call passed op validation and reached the credential. */
         @Test
         void shouldAcceptChatCompletionsOnTheDecisionSlotWhenItsModelIsAChatCompletionsModel() {
             var routing = practiceScriptRouting(ModelKind.DECISION, "openai-completions");
@@ -576,7 +575,6 @@ class LlmProxyServiceTest extends BaseUnitTest {
             verifyNoInteractions(resolver);
         }
 
-        /** 402, not 429: a rate limit also answers 429, and the runner must not report it as a budget. */
         @Test
         void shouldRefuseWithPaymentRequiredWhenTheDirectModelCapIsSpent() {
             var routing = practiceScriptRouting(ModelKind.EMBEDDING, "openai-embeddings");
@@ -619,7 +617,6 @@ class LlmProxyServiceTest extends BaseUnitTest {
             assertThat(blocked("openai-completions", "practice_script_attempt")).isZero();
         }
 
-        /** 502 from the unresolved credential proves the call at the bound passed validation. */
         @ParameterizedTest
         @CsvSource({
             "DECISION,openai-decisions,/internal/llm/practice-script/decision/decisions,questions,64",
@@ -949,7 +946,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
             proxyStream("{\"usage\":{\"prompt_tokens\":1,\"prompt_tokens_details\":{\"cached_tokens\":2}}}");
 
             assertThat(streamingMeterRegistry
-                            .counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB")
+                            .counter("llm.proxy.usage.unparseable", "sourceType", UsageSourceType.REVIEW_JOB.name())
                             .count())
                     .isEqualTo(1.0);
             assertThat(missingUsage())
@@ -960,7 +957,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
 
         private double missingUsage() {
             return streamingMeterRegistry
-                    .counter("llm.proxy.usage.missing", "sourceType", "AGENT_JOB")
+                    .counter("llm.proxy.usage.missing", "sourceType", UsageSourceType.REVIEW_JOB.name())
                     .count();
         }
 

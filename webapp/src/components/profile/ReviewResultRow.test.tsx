@@ -38,7 +38,6 @@ const citation = (path: string): EvidenceCitation => ({
 	verification: null,
 });
 
-/** A quote of the pull request itself, which folds with every other quote of it in one list. */
 const core = (quote: string): EvidenceCitation => ({
 	...citation("inputs/context/metadata.json"),
 	sourceKind: "scm.pull-request.core",
@@ -50,7 +49,7 @@ const NO_EVIDENCE = { citations: [], openQuestions: [], search: null, inapplicab
 
 describe("ReviewResultRow", () => {
 	it("keeps a diff pair that could not fold as two blocks, each with its own key", () => {
-		// A key collision is only ever reported on the console, so the diagnostic is the assertion.
+		// React reports key collisions only through console diagnostics.
 		using keyWarning = vi.spyOn(console, "error").mockReturnValue(undefined);
 		renderOpen({
 			result: {

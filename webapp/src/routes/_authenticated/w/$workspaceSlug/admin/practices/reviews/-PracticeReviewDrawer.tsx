@@ -171,7 +171,6 @@ interface LevelReadProps {
 	path: LevelPath;
 }
 
-/** A refusal said on the sheet that asked, with its way out: every reader here is an admin. */
 function RequestRefusal({
 	workspaceSlug,
 	refusal,
@@ -191,17 +190,12 @@ function RequestRefusal({
 	);
 }
 
-/**
- * An event's name in the words the practice editor offers it, from the definition options: one
- * source for the trace, the review sheet and the item sheet.
- */
 function useEventLabel(workspaceSlug: string): (name: string) => string {
 	const options = useQuery(getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } })).data;
 	const events = options?.itemTypes.flatMap((type) => type.events) ?? [];
 	return (name) => eventLabel(name, events);
 }
 
-/** The name a practice goes by now: its current version's. */
 function practiceName(practice: Practice): string | undefined {
 	return practice.currentVersion.definition?.name ?? practice.currentVersion.name ?? undefined;
 }
@@ -210,7 +204,6 @@ function practiceName(practice: Practice): string | undefined {
 // The trace
 // ------------------------------------------------------------------------------------------------
 
-/** The record a trace marks "You started here": the one it was opened for. A practice's is its newest result. */
 function hereOf(record: RecordRef, newestResult: string | undefined): TraceNode | undefined {
 	switch (record.kind) {
 		case "review": {
@@ -223,7 +216,6 @@ function hereOf(record: RecordRef, newestResult: string | undefined): TraceNode 
 		case "feedback": {
 			return { kind: record.kind, id: record.id };
 		}
-		// A problem's step is its result's: the trace draws results, and the problem's sheet opens over it.
 		case "problem": {
 			return undefined;
 		}
@@ -293,7 +285,6 @@ function traceTitle(
 	}
 }
 
-/** The latest event recorded on the item, the one a trace of an item no review started shows. */
 function latestEvent(trace: ItemTrace): ItemEvent | undefined {
 	let latest: ItemEvent | undefined;
 	for (const event of trace.events) {
@@ -304,11 +295,7 @@ function latestEvent(trace: ItemTrace): ItemEvent | undefined {
 	return latest;
 }
 
-/**
- * An item as recorded, read before its chain: a chain is asked for only where one of its reviews
- * exists, so the trace of an item no review started never asks for a chain it does not have. Any
- * other record asks for its chain at once.
- */
+// Items with no review have no lineage graph; use their latest recorded event instead.
 function useRecordedItem(workspaceSlug: string, record: RecordRef) {
 	const itemId = record.kind === "item" ? record.id : undefined;
 	const traceOptions = getItemTraceOptions({ path: { workspaceSlug, itemId: itemId ?? "" } });
@@ -321,13 +308,6 @@ function useRecordedItem(workspaceSlug: string, record: RecordRef) {
 	return { itemId, traced, askChain };
 }
 
-/**
- * One record's trace. A practice's trace is the story of its newest result, narrowed to the
- * practice; an item no review started has no chain, and shows its latest event. The filter is the
- * reader's while the trace is open; what it shows on top of its steps is the reader's in this
- * browser, for every trace. It marks the record it was opened for, and the mark stays there while
- * other records open over it.
- */
 function TraceLevelRead({
 	workspaceSlug,
 	nested,
@@ -388,8 +368,6 @@ function TraceLevelRead({
 	}
 
 	const ready = chain.status === "ready" ? chain.lineage : undefined;
-	// The review the trace tells, read as its sheet reads it: one source for its times, model,
-	// status and first read, and the cache the sheet over the trace shares.
 	const reviewId = ready?.nodes.find((node) => node.kind === "REVIEW")?.review?.id;
 	const reviewOptions = getReviewOptions({ path: { workspaceSlug, reviewId: reviewId ?? "" } });
 	const reviewQuery = useQuery({
@@ -408,8 +386,7 @@ function TraceLevelRead({
 		query: target ?? { kind: "REVIEW" },
 	});
 	const key = hashKey(lineageOptions.queryKey);
-	// Feedback can settle after the review stops running. Read its final chain once more, only for
-	// the same selected workspace, target and review.
+	// Feedback can settle after execution; refresh the same selected chain once when its review ends.
 	const settled = current !== undefined && !isActiveReview(current.status);
 	const previous = useRef<{ key: string; reviewId: string; settled: boolean } | undefined>(
 		undefined,
@@ -476,7 +453,6 @@ function ReviewLevelRead({
 	const request = useRequestPracticeReview(workspaceSlug, { showsInline: () => true });
 	const item = controller.review.status === "ready" ? controller.review.review.item : undefined;
 	const requestable = item !== undefined && REVIEWABLE_ON_DEMAND.has(item.kind);
-	// The trace is this review's answers, so another review of the item is asked for by the list.
 	const activeOptions = listReviewsOptions({
 		path: { workspaceSlug },
 		query: { itemId: item?.id, status: ["QUEUED", "RUNNING"], size: 1 },
@@ -494,7 +470,6 @@ function ReviewLevelRead({
 			eventLabel={labelEvent}
 			onRequestReview={requestable ? () => request.ask(item.id) : undefined}
 			requestingReview={request.asking !== undefined}
-			// Another ask while a review of this item waits or runs would only be coalesced into it.
 			requestBlocked={otherActive ? REQUEST_BLOCKED.active : undefined}
 			requestRefusal={
 				request.refusal && (
@@ -514,7 +489,6 @@ function ResultLevelRead({
 	return <ResultLevel {...props} {...controller} />;
 }
 
-/** One problem: its own detail, which names its parent result for the marks on it. */
 function ProblemLevelRead({
 	problemId,
 	workspaceSlug,
@@ -575,11 +549,6 @@ function FeedbackLevelRead({
 	return <FeedbackLevel {...props} {...controller} queue={queue} />;
 }
 
-/**
- * One item: what was recorded about it, every event on it, and the facts its provider reports. The
- * trace is read again while one of its reviews is queued or running, since a settled review moves
- * its events.
- */
 function ItemLevelRead({ workspaceSlug, itemId, ...props }: LevelReadProps & { itemId: string }) {
 	const labelEvent = useEventLabel(workspaceSlug);
 	const traceQuery = useQuery({
@@ -611,7 +580,6 @@ function ItemLevelRead({ workspaceSlug, itemId, ...props }: LevelReadProps & { i
 					: undefined
 			}
 			requesting={request.asking !== undefined}
-			// Another ask while a review of this item runs would only be coalesced into it.
 			requestBlocked={reviewing(traceQuery.data) ? REQUEST_BLOCKED.active : undefined}
 			refusal={
 				request.refusal && (
@@ -667,7 +635,6 @@ function PracticeLevelRead({
 	);
 }
 
-/** A review of the item is queued or running. */
 function reviewing(trace: ItemTrace | undefined): boolean {
 	return trace?.reviews.some((review) => isActiveReview(review.status)) === true;
 }

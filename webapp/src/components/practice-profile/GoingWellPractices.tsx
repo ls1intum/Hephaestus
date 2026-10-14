@@ -15,25 +15,15 @@ import { hasText } from "@/lib/text";
 import { practiceLevel, REVIEW_SELECTION_CLEARED, reviewLevel } from "./practice-profile-search";
 
 export interface GoingWellPracticesProps {
-	/**
-	 * The practices the reader keeps meeting, each with the recent results that show it, as the
-	 * overview carries them. The server picks them; nothing here judges what goes well.
-	 */
+	/** The server selects positive claims and their support; the component adds no assessment. */
 	practices: GoingWellPractice[];
 	state: LoadState;
 }
 
 const TITLE = "Going well";
 
-/** Two entries' worth of skeleton: a claim about the reader's work shows only once it is in. */
 const SKELETON_ENTRIES = 2;
 
-/**
- * The practices that go well in the reader's work, each named by a link to its own level, with the
- * workspace's sentence for it and the results that show it, each a link into its review. A practice
- * whose workspace wrote no sentence shows its name and its results alone: the page never writes
- * praise of its own.
- */
 export function GoingWellPractices({ practices, state }: GoingWellPracticesProps) {
 	let body: ReactNode;
 	if (state.status === "error") {
@@ -127,10 +117,6 @@ function GoingWellEntry({ practice }: { practice: GoingWellPractice }) {
 	);
 }
 
-/**
- * One result that shows the practice, by the item it was recorded on in the provider's own noun:
- * "Pull request #22". It opens the review that recorded it, at that result.
- */
 function EvidenceLink({ evidence }: { evidence: GoingWellEvidence }) {
 	const { item } = evidence;
 	return (

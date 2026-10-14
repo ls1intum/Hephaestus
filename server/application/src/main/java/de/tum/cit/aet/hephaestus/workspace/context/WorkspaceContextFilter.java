@@ -224,17 +224,10 @@ public class WorkspaceContextFilter implements Filter {
         }
     }
 
-    /**
-     * Roles and eligible actor ids from one membership read, shared by authorization and identity
-     * pinning.
-     */
     private record MembershipResolution(Set<WorkspaceRole> roles, Set<Long> memberUserIds) {
         static final MembershipResolution EMPTY = new MembershipResolution(Set.of(), Set.of());
     }
 
-    /**
-     * Chooses the member actor that speaks for the account here, independently of role strength.
-     */
     private Optional<ActorProfile> resolveWorkspaceIdentity(
             Workspace workspace, List<ActorProfile> users, Set<Long> memberUserIds) {
         List<ActorProfile> members = users.stream()

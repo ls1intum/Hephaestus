@@ -19,19 +19,11 @@ import { familyCount, resultSlots, slotsTotal } from "./review-outcomes";
 export interface PracticeResultsSummaryProps {
 	workspaceSlug: string;
 	practiceSlug: string;
-	/** The practice's name as the workspace defines it; absent until the practices are read. */
 	practiceName: string | undefined;
-	/** "Since 7 Sep": the days every count covers, which are the list's own. */
 	rangeLabel: string;
-	/** The practice's counts in those days; absent when it recorded nothing there. */
 	counts: PanelState<{ counts?: ReviewPracticeCounts; stale: boolean }>;
 }
 
-/**
- * The one practice the Results list is filtered to, as plain counts above its rows: its
- * results by verdict, how many an admin marked incorrect, and how much feedback citing it was
- * delivered. Its definition is edited in Practice setup, which is the one link here.
- */
 export function PracticeResultsSummary({
 	workspaceSlug,
 	practiceSlug,
@@ -92,7 +84,7 @@ function Figures({ state }: { state: PracticeResultsSummaryProps["counts"] }) {
 			/>
 		);
 	}
-	// Another range's figures, standing in while this one loads, say nothing about this one.
+	// Cached figures from another date range cannot describe this range.
 	if (state.status === "loading" || (state.stale && state.counts === undefined)) {
 		return (
 			<div aria-hidden className="flex gap-6">
@@ -112,7 +104,6 @@ function Figures({ state }: { state: PracticeResultsSummaryProps["counts"] }) {
 	const { results, resultsMarkedIncorrect, feedback } = state.counts;
 	const verdicts = resultSlots(results);
 	const total = slotsTotal(verdicts);
-	// Replaced feedback is left out, as in the Practices table.
 	const feedbackTotal = feedbackComposed(feedback);
 	return (
 		<dl

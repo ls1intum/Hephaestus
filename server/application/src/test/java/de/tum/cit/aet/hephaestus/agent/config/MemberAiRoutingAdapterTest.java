@@ -374,7 +374,6 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
                 .isEmpty();
     }
 
-    /** With no review model, no review runs for those members, and the review purpose reports that gap. */
     @Test
     void shouldJudgeMembersAtTheirOwnCeilingWhenNoReviewModelServesThem() {
         when(preferences.forDeveloper(1L, null)).thenReturn(new MemberAiPreferences.Decision(true, null));
@@ -475,7 +474,6 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
             @Nullable DataHandlingTier slot,
             @Nullable DataHandlingTier route) {}
 
-    /** Reviews, decisions, then the slot and the route of an in-house member and of a cloud member. */
     static Stream<Arguments> assignments() {
         var none = Set.<DataHandlingTier>of();
         var inHouse = Set.of(DataHandlingTier.IN_HOUSE);

@@ -86,7 +86,6 @@ describe("Practices across the workspace", () => {
 			.find((row) => row.textContent.startsWith("Packaging work for review"));
 		expect(packaging?.textContent).toContain("5 practices");
 		expect(packaging?.textContent).toContain("Met 43");
-		// A practice in no group has no row.
 		expect(screen.queryByText("Sign your commits")).toBeNull();
 		expect(overviewReads()).toHaveLength(1);
 		expect(profileReads()).toStrictEqual([]);
@@ -117,8 +116,6 @@ describe("Practices across the workspace", () => {
 			.find((row) => row.textContent.startsWith("Keep the diff reviewable in one sitting"));
 		expect(diff?.textContent).toContain("21 developers");
 		expect(diff?.textContent).toContain("Not met 9");
-		// The level asks for nothing of its own, and none of the reader's reads: the page's one read
-		// carries every practice.
 		expect(overviewReads()).toHaveLength(1);
 		expect(profileReads()).toStrictEqual([]);
 

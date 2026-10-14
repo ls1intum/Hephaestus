@@ -1,21 +1,15 @@
-/**
- * The workspace of the golden prompt test: one review of one practice of a pull request, staged as the server
- * stages it. The complete captured prompts and tools are asserted against `golden-prompts/`.
- */
 import { mkdirSync, writeFileSync } from "node:fs";
 import nodePath from "node:path";
 
 export const AUTHENTICATION_CRITERION = "Added authentication calls use checked(), not insecure().";
 export const AUTHENTICATION_PRACTICE = `# Uses secure authentication\n\n## Standard\n${AUTHENTICATION_CRITERION}\n`;
 
-/** Labels for the prepared review input. */
 export const LEAD_LABELS = {
 	"insecure-call": "An added call to insecure(); check whether a checked() call guards it.",
 	"auth-helper": "The repository's authentication helper that the change could call instead.",
 	"review-record": "The pull request record that names the change's intent.",
 } as const;
 
-/** One lead of the prepared input, by its label's key. */
 export interface GoldenLead {
 	at:
 		| { change: string; line: number }
@@ -25,7 +19,6 @@ export interface GoldenLead {
 	facts?: Record<string, string | number | boolean>;
 }
 
-/** The leads of the prepared input: three, or those three and sixty more, which no section holds whole. */
 export function goldenLeads(many: boolean): GoldenLead[] {
 	return [
 		{ at: { change: "src/Auth.java", line: 10 }, kind: "insecure-call", facts: { guarded: false } },
@@ -47,7 +40,6 @@ export const GOLDEN_UNRATED = [
 	{ what: "added calls in generated files", count: 2, reason: "too-large" as const },
 ];
 
-/** The record of the reviewed pull request, complete, as `metadata.json` holds it on one line. */
 export const GOLDEN_RECORD = {
 	basis: { admission_fields: [], other_fields: "CAPTURE" },
 	pr_number: 3,
@@ -67,7 +59,6 @@ export const GOLDEN_RECORD = {
 	assignees: [],
 };
 
-/** Captured inputs shared by the runner prompt tests. */
 export const GOLDEN_INPUTS = {
 	contractVersion: 3,
 	kind: "scm.pull_request",
@@ -94,13 +85,8 @@ export const GOLDEN_INPUTS = {
 	previous: null,
 };
 
-/** Where the staged programs and their inputs live, as `task.json#practiceScripts` names it. */
 export const PRACTICES_DIR = "work/practice-scripts/practices";
 
-/**
- * Stage the review workspace under `cwd`. `schemaVersion` is the task contract the runner reads; `orchestrator`
- * is the staged system prompt.
- */
 export function stageGoldenWorkspace(
 	cwd: string,
 	schemaVersion: number,
@@ -116,7 +102,6 @@ export function stageGoldenWorkspace(
 		"evidence/change.json",
 		JSON.stringify({ base_sha: "b".repeat(40), head_sha: "a".repeat(40) }),
 	);
-	// The change view the runner derives from the checkout before any practice is reviewed.
 	write(
 		"work/change/diff.patch",
 		"diff --git a/src/Auth.java b/src/Auth.java\n--- a/src/Auth.java\n+++ b/src/Auth.java\n@@ -10,0 +10,1 @@\n[L10] + insecure();\n",

@@ -20,13 +20,11 @@ import { daysBefore } from "@/stories/story-clock";
 
 import { ReviewResultRow } from "./ReviewResultRow";
 
-/** The row with responses a story holds in place of the server. */
 function Answerable(props: ComponentProps<typeof ReviewResultRow>) {
 	const responses = useStoryFeedbackResponses();
 	return <ReviewResultRow {...props} responses={responses} />;
 }
 
-/** Everything a result in full can carry, so every block has something to show. */
 const strength: ResultDetail = {
 	...metWithExample,
 	id: "00000000-0000-0000-0000-000000000101",
@@ -70,7 +68,6 @@ const strength: ResultDetail = {
 	feedback: [detailFeedback],
 };
 
-/** One row per outcome, as a list carries them: nothing to open. */
 const outcomes: ResultList[] = [
 	{ ...listedResult(detailResult), problems: [], summary: "The exception is caught and discarded" },
 	{
@@ -107,25 +104,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * A result in full, open on arrival as every row of a practice level is, with every block under
- * its own label: why it was noted, the evidence with every quote shown, and the feedback it was the
- * basis of with the reader's response. The practice under the summary is the grey pill every
- * practice surface names a practice with.
- */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		const row = canvas.getByRole("button", { name: /The reasoning is recorded/u });
 		await expect(row).toHaveAttribute("aria-expanded", "true");
 		await expect(canvas.getByText("Explain significant decisions")).toBeVisible();
 		await expect(canvas.getByText("Met")).toBeVisible();
-		// The day belongs to the review's card, which names it once above these rows.
 		await expect(canvas.queryByText(formatDay(strength.recordedAt))).toBeNull();
-		// The labels, in the order the reader needs them.
 		const labels = ["Why it was noted", "Evidence", "Feedback", "Your response"];
 		const positions = labels.map((label) => canvas.getByText(label).getBoundingClientRect().top);
 		await expect([...positions].sort((a, b) => a - b)).toStrictEqual(positions);
-		// Every quote is shown, with nothing to unfold.
 		await expect(
 			canvas.getByText("private static final Duration TIMEOUT = Duration.ofSeconds(90);"),
 		).toBeVisible();
@@ -136,10 +124,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * A result as a review's list carries it: the verdict and its problems' summaries, without the
- * proof or the feedback, which the review's card lists once for all its results.
- */
 export const ListedResult: Story = {
 	args: { result: listedResult(detailResult) },
 	play: async ({ canvas }) => {
@@ -195,10 +179,6 @@ export const MetWithoutSummary: Story = {
 	},
 };
 
-/**
- * Nothing to open: the outcome line alone, and the row is no control — the chip is the one button,
- * the way a keyboard reaches its sentence. Nothing ranks a not met result.
- */
 export const EveryOutcome: Story = {
 	render: (args) => (
 		<>
@@ -223,7 +203,6 @@ export const EveryOutcome: Story = {
 	},
 };
 
-/** The chip explains its outcome on hover with the registry's sentence. */
 export const OutcomeExplained: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.hover(canvas.getByText("Met"));
@@ -233,10 +212,6 @@ export const OutcomeExplained: Story = {
 	},
 };
 
-/**
- * At 320px the summary takes the line, and the outcome and the badges — here the origin of a
- * result an event did not start — wrap under it.
- */
 export const MobileReflow: Story = {
 	args: {
 		result: { ...strength, outcome: "NOT_MET", severity: "MAJOR", origin: "BACKFILL" },
@@ -261,27 +236,19 @@ export const SearchedAndFoundNothing: Story = {
 		await expect(
 			canvas.getByText("a test exercising the new caching branch of the loader"),
 		).toBeVisible();
-		// The sources are named as the registry names them, never by their wire kind.
 		await expect(
 			canvas.getByText("The code changes and Files and history in the repository"),
 		).toBeVisible();
-		// The boundary says how far the search reached, so the term says the same.
 		await expect(canvas.getByText("How far it reached:")).toBeVisible();
 		await expect(
 			canvas.getByText(/^every test file the diff touches/u, { selector: "p" }),
 		).toBeVisible();
-		// The reviewer writes Markdown: what it quotes is code, not a line of stray backticks.
 		const explanation = canvas.getByText(/^The branch is new in this change/u, { selector: "p" });
 		await expect(within(explanation).getByText("loadFromCache").tagName).toBe("CODE");
 		await expect(canvas.queryByText(/`/u)).toBeNull();
 	},
 };
 
-/**
- * Not met, with three problems. The head counts them, and each problem opens with what is wrong,
- * then why in the reviewer's words, where, and what to change. Neither the result nor a problem
- * shows its severity: the reader's own view never ranks their work.
- */
 export const NotMetWithProblems: Story = {
 	args: { result: detailResult },
 	play: async ({ canvas }) => {
@@ -294,7 +261,6 @@ export const NotMetWithProblems: Story = {
 		await expect(
 			within(items[0] ?? problems).getByText("The caching change hides inside the package move"),
 		).toBeVisible();
-		// The explanation is the reviewer's Markdown: a class name it quotes is code.
 		await expect(within(problems).getByText("PracticeCatalogLoader").tagName).toBe("CODE");
 		await expect(
 			within(problems).getByText("Move the class in one commit and add the cache in the next."),
@@ -302,7 +268,6 @@ export const NotMetWithProblems: Story = {
 		for (const label of ["Critical", "Major", "Minor", "Trivial"]) {
 			await expect(canvas.queryByText(label)).toBeNull();
 		}
-		// A problem's place in the diff is quoted under it, not under the result.
 		await expect(
 			within(problems).getByText(
 				'@Cacheable(cacheNames = "practice-catalog", key = "#workspaceId")',

@@ -7,13 +7,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Looks up a workspace's review defaults by id, for the callers that hold an id rather than the entity.
- *
- * <p>A workspace deleted between the read that produced the id and this one resolves to
- * {@link WorkspaceReviewDefaults#UNSET} rather than throwing: every caller is already deciding what to do
- * with results, and failing that decision over a race is worse than answering with defaults.
- */
+/** A workspace deleted between reads resolves to {@link WorkspaceReviewDefaults#UNSET}. */
 @Service
 @RequiredArgsConstructor
 public class WorkspaceReviewDefaultsProvider {

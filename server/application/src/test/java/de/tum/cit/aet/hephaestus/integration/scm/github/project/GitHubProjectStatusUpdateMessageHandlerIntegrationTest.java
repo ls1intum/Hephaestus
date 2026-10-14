@@ -24,12 +24,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Integration tests for GitHubProjectStatusUpdateMessageHandler.
- *
- * <p>Verifies persistence, field-level correctness, domain event publishing, and edge case handling
- * for status update webhook events.
- */
 class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // Fixture values from projects_v2_status_update.created.json

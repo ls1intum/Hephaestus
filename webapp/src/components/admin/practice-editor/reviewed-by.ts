@@ -26,11 +26,7 @@ export const MAX_REASON_LENGTH = 500;
 
 const LIMIT_CODE = /^[A-Z][A-Z0-9_]{2,63}$/u;
 
-/**
- * Derived from the text, never random: the server digests code and description together, and that
- * digest decides whether a change changed how the practice is reviewed. Retyping the same sentence
- * must yield the same code.
- */
+// Codes must be deterministic because the server digests them with the reason text.
 export function limitCodeFor(description: string): string {
 	const slug = description
 		.toUpperCase()
@@ -40,7 +36,6 @@ export function limitCodeFor(description: string): string {
 	return LIMIT_CODE.test(slug) ? slug : `LIMIT_${fnv1a(description)}`;
 }
 
-/** Deterministic, non-cryptographic fallback for text that cannot form a legal code. */
 function fnv1a(input: string) {
 	let hash = 0x81_1c_9d_c5;
 	for (let index = 0; index < input.length; index += 1) {
@@ -52,15 +47,11 @@ function fnv1a(input: string) {
 	return hash.toString(16).toUpperCase().padStart(8, "0");
 }
 
-/** A limit or reason whose text is being written: the code follows the text. */
 export function limitWithText(description: string): ReviewLimit {
 	return { code: limitCodeFor(description), description };
 }
 
-/**
- * Reviewed by while it is being edited. The human reason and the limits stay in the draft whichever
- * choice is made, so choosing back restores them; only the save decides what is kept.
- */
+/** Keep reasons and limits across draft choices; discard incompatible fields only on save. */
 export interface ReviewedByDraft {
 	by: ReviewedByKind;
 	humanReason: ReviewLimit;
@@ -75,7 +66,6 @@ export function reviewedByDraftOf(reviewedBy: ReviewedBy): ReviewedByDraft {
 	};
 }
 
-/** What the draft saves as: a reason only for people, limits only for an automated review. */
 export function reviewedByOf(draft: ReviewedByDraft): ReviewedBy {
 	return {
 		by: draft.by,

@@ -4,10 +4,6 @@ import { expect } from "storybook/test";
 import { eventLabel, ownItemTrace } from "./fixtures";
 import { TraceEventTimeline } from "./TraceEventTimeline";
 
-/**
- * The events recorded about one piece of work that explain a review of it, oldest first, each in
- * the words the definition options give its name.
- */
 const meta = {
 	component: TraceEventTimeline,
 	parameters: { layout: "padded" },
@@ -22,7 +18,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Each event by its words, never by its wire name. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Marked ready for review")).toBeVisible();
@@ -31,7 +26,6 @@ export const Default: Story = {
 	},
 };
 
-/** Inside a level: its own heading level, and each time as a day and a time with no tooltip stop. */
 export const PlainInALevel: Story = {
 	args: { title: "Why it ran", level: 3, plain: true },
 	play: async ({ canvas }) => {
@@ -40,7 +34,6 @@ export const PlainInALevel: Story = {
 	},
 };
 
-/** Nothing was ever recorded, so no practice was ever asked a question about this work. */
 export const NothingRecorded: Story = {
 	args: { events: [] },
 	play: async ({ canvas }) => {

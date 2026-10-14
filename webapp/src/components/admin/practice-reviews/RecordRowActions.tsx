@@ -63,7 +63,6 @@ export interface RecordRowActionsProps {
 	record: RecordRef;
 	/** The review the record came from, where the row knows it: tracking narrows to it at once. */
 	reviewId?: string;
-	/** The result a problem row belongs to: tracking a problem tracks its result. */
 	resultId?: string;
 	/** The record, after "Track" and "Trace" in the accessible names, so every row's pair differs. */
 	name: string;

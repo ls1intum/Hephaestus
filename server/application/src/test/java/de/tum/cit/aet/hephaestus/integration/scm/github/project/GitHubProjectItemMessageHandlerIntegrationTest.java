@@ -24,13 +24,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Integration tests for GitHubProjectItemMessageHandler.
- *
- * <p>Tests verify that the handler correctly processes project item events (create, edit, archive,
- * restore, convert, reorder, delete) using JSON fixtures parsed directly into DTOs for complete
- * isolation.
- */
 class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // Fixture values from projects_v2_item.created.json
@@ -190,9 +183,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             assertThat(i.isArchived()).isTrue();
         });
 
-        // Verify domain events: processArchived() calls process() first (Updated since item
-        // exists),
-        // then publishes ProjectItemArchived
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class))
                 .hasSize(1);
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemArchived.class))
@@ -342,9 +332,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             assertThat(i.isArchived()).isFalse();
         });
 
-        // Verify domain events: processRestored() calls process() first (Updated since item
-        // exists),
-        // then publishes ProjectItemRestored
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class))
                 .hasSize(1);
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemRestored.class))
@@ -376,9 +363,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             assertThat(i.isArchived()).isFalse();
         });
 
-        // Verify domain events: processConverted() calls process() first (Updated since item
-        // exists),
-        // then publishes ProjectItemConverted
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class))
                 .hasSize(1);
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemConverted.class))
@@ -409,9 +393,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             assertThat(i.isArchived()).isFalse();
         });
 
-        // Verify domain events: processReordered() calls process() first (Updated since item
-        // exists),
-        // then publishes ProjectItemReordered
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class))
                 .hasSize(1);
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemReordered.class))

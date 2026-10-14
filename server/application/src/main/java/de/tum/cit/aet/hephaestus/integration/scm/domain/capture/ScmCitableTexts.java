@@ -30,7 +30,6 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Records the exact staged text that the runtime may use to verify a quote. */
 public final class ScmCitableTexts {
     private static final int MAX_TEXT_BYTES = 2 * 1024 * 1024;
 

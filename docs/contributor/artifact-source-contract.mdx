@@ -391,7 +391,8 @@ Run commands from the repository root.
    Recalculate the digest after any subsequent catalog edit.
 4. Set `ClasspathSourceCatalogRegistry.CURRENT_VERSION_VALUE` to the new version.
    The registry derives current resource paths and the runtime digest from this value.
-   It accepts only the current contract; keep published resources unchanged for verification.
+   It accepts only the current contract.
+   Keep published resources unchanged for verification.
 5. Update current-version documentation and fixtures without changing historical contract resources.
    Cover the new catalog, its pinned digest, and rejection of unsupported versions in the registry tests.
    Cover an explicit practice upgrade in the practice-version and review-digest tests.

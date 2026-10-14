@@ -95,7 +95,6 @@ export interface PracticeScriptDefinition<M extends ModelNeeds> {
 	run: (ctx: PracticeScriptContext<M>) => Promise<Candidate>;
 }
 
-/** Whether a module's default export is a definition: `meta` and `run`, as `definePracticeScript` takes them. */
 export function isPracticeScriptDefinition(
 	value: unknown,
 ): value is PracticeScriptDefinition<ModelNeeds> {
@@ -139,7 +138,6 @@ export async function readRecordJson(
 	}
 }
 
-/** The reason a failed model call leaves its items unrated. */
 export function reasonOf(error: unknown): UnratedReason {
 	if (error instanceof UnratedError) {
 		return error.reason;
@@ -187,7 +185,6 @@ export async function step<T>(
 	}
 }
 
-/** A closed vocabulary for one kind of item. */
 export interface QuestionSet<I> {
 	/** e.g. "comment kind" */
 	name: string;
@@ -196,7 +193,6 @@ export interface QuestionSet<I> {
 	question: string;
 	/** Value → definition. Values are lead-kind shaped: `restates-code`. */
 	values: Record<string, string>;
-	/** The item as the model reads it. */
 	render: (item: I) => string;
 }
 

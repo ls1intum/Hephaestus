@@ -15,7 +15,6 @@ const base: PurposeStatusInput = {
 describe("purposeStatus", () => {
 	it("says nothing about a model for practice scripts that no practice uses, whatever it assigns", () => {
 		expect(purposeStatus({ ...base, used: false })).toBeNull();
-		// An assignment that serves nobody is no gap: the row's cells show it as not used.
 		expect(
 			purposeStatus({ ...base, used: false, bindings: [ready], served: [false, false] }),
 		).toBeNull();
@@ -41,7 +40,6 @@ describe("purposeStatus", () => {
 			purposeStatus({ ...base, bindings: [ready], served: [true, true], requiredNeedUnmet: true }),
 		).toBe("NEEDS_ATTENTION");
 		expect(purposeStatus({ ...base, off: true, requiredNeedUnmet: true })).toBe("OFF");
-		// A model switched off on purpose is a choice, not a fault.
 		expect(purposeStatus({ ...base, bindings: [{ enabled: false, ready: false }] })).toBe(
 			"NOT_SET",
 		);

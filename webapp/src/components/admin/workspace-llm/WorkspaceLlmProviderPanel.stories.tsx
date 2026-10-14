@@ -54,10 +54,6 @@ function columnLeft(region: HTMLElement, column: string): number {
 	return within(region).getByRole("columnheader", { name: column }).getBoundingClientRect().left;
 }
 
-/**
- * The workspace's own providers on AI models, below the assignments. The route owns every request,
- * so this panel only draws what it is handed and reports what the admin asked for.
- */
 const meta = {
 	component: WorkspaceLlmProviderPanel,
 	parameters: { layout: "fullscreen" },
@@ -83,10 +79,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * One section. Each provider is a heading with what it speaks, its key and its actions, and its
- * models one bordered table: no card around the table, and no box inside it.
- */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("heading", { name: "Your providers" })).toBeVisible();
@@ -105,7 +97,6 @@ export const Default: Story = {
 		await expect(
 			embeddingsProvider.getByRole("button", { name: "Add model to On-prem embeddings" }),
 		).toBeVisible();
-		// The server keeps a provider that still has models, so its Disconnect says why it is off.
 		const keeps = chat.getByRole("button", { name: "Disconnect My OpenAI account" });
 		await expect(keeps).toBeDisabled();
 		await expect(keeps).toHaveAccessibleDescription("To disconnect, delete its models first.");
@@ -116,7 +107,6 @@ export const Default: Story = {
 		await expect(
 			embeddingsProvider.queryByText("To disconnect, delete its models first."),
 		).toBeNull();
-		// Stacked tables keep their columns in the same places, an empty one too.
 		for (const column of ["Data handling", "Price", "Status", "Actions"]) {
 			await expect(
 				columnLeft(canvas.getByRole("region", { name: "On-prem embeddings" }), column),
@@ -125,7 +115,6 @@ export const Default: Story = {
 	},
 };
 
-/** A provider turned off wears the registry's badge, and none of its models reads as ready. */
 export const ProviderOff: Story = {
 	args: {
 		state: {
@@ -144,7 +133,6 @@ export const ProviderOff: Story = {
 	},
 };
 
-/** No provider yet: the section keeps its heading, and the empty state names any API, not one. */
 export const Empty: Story = {
 	args: { state: { status: "ready", connections: [], models: [] } },
 	play: async ({ canvas }) => {
@@ -154,7 +142,6 @@ export const Empty: Story = {
 	},
 };
 
-/** A provider's shape while the providers load, under the section's own heading, so the page below does not jump. */
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async ({ canvas }) => {
@@ -173,7 +160,6 @@ export const LoadFailed: Story = {
 	},
 };
 
-/** The instance stopped new providers: existing ones stay editable, and nothing offers to add one. */
 export const RegistrationBlocked: Story = {
 	args: { registrationAllowed: false },
 	play: async ({ canvas }) => {
@@ -184,10 +170,6 @@ export const RegistrationBlocked: Story = {
 	},
 };
 
-/**
- * A embeddings endpoint often serves no model list, so its failed test is no fault; a chat endpoint
- * that fails the same way is one.
- */
 export const TestResults: Story = {
 	args: {
 		testResults: new Map([

@@ -91,7 +91,6 @@ import { capitalise, hasText } from "@/lib/text";
 import { BudgetExhaustedAlert } from "./BudgetExhaustedAlert";
 import { ModelPicker, type ModelSelection, PROVIDER_PANEL_ID } from "./ModelPicker";
 
-/** One tier editor on the page: a purpose's assignment for one data-handling tier. */
 export interface BindingTarget {
 	purpose: AgentPurpose;
 	tier: DataHandlingTier;
@@ -101,12 +100,10 @@ export function bindingTargetKey({ purpose, tier }: BindingTarget): string {
 	return `${purpose}:${tier}`;
 }
 
-/** Which write a row is waiting on, so its own button can say so. */
 export type BindingWrite = "SAVE" | "CLEAR";
 
 interface PurposeGroup {
 	title: string;
-	/** The group's rule, the first sentence of its description. */
 	rule: string;
 	purposes: AgentPurpose[];
 }
@@ -123,7 +120,6 @@ const PRACTICE_SCRIPT_GROUP: PurposeGroup = {
 	purposes: PRACTICE_SCRIPT_PURPOSES,
 };
 
-/** One column of a purpose row: the members who gave one answer, and which model serves them. */
 interface TierColumn {
 	/**
 	 * The tier under which the server reports these members as served: their AI choice's ceiling,
@@ -155,10 +151,6 @@ function tierColumns(aiChoiceRequired: boolean): readonly TierColumn[] {
 		: TIER_COLUMNS;
 }
 
-/**
- * One template for the header and every row of a card, so the tier columns line up. The status
- * column fits the longest status label.
- */
 const ROW_GRID = {
 	2: "md:grid-cols-[minmax(11rem,1fr)_repeat(2,minmax(0,1fr))_12rem]",
 	3: "md:grid-cols-[minmax(11rem,1fr)_repeat(3,minmax(0,1fr))_12rem]",
@@ -168,10 +160,7 @@ function rowGrid(aiChoiceRequired: boolean): string {
 	return ROW_GRID[aiChoiceRequired ? 2 : 3];
 }
 
-/**
- * The binding that serves one column's members, as the server routed it. Routing is the server's
- * rule, sent as each binding's `servedTiers`, so the page never derives it.
- */
+// Routing comes from server servedTiers; the page must not derive privacy routes.
 function servingBinding(
 	own: readonly AgentBinding[],
 	tier: DataHandlingTier,
@@ -179,17 +168,13 @@ function servingBinding(
 	return own.find((binding) => binding.servedTiers.includes(tier));
 }
 
-/**
- * An assignment for practice scripts that could run but serves none of its own tier's members: the server
- * serves a script no looser than the review model of the same members.
- */
+// A direct script model cannot serve members beyond their review model's privacy tier.
 function servesNoneOfItsTier(binding: AgentBinding): boolean {
 	return (
 		binding.enabled && binding.ready && !binding.servedTiers.includes(binding.dataHandlingTier)
 	);
 }
 
-/** A long list of practices folds after this many, behind "Show all". */
 const USED_BY_PREVIEW = 5;
 
 const UNCHOSEN_ROW_TITLE = capitalise(UNCHOSEN_MEMBERS);
@@ -269,10 +254,8 @@ export interface AgentBindingsPageProps {
 	/** The workspace's own providers, below the models. A picker with nothing to offer links to it. */
 	providerPanel?: ReactElement;
 	usage?: WorkspaceLlmUsageReport;
-	/** The purpose a link asked for: its row opens and scrolls into view. */
 	focusPurpose?: AgentPurpose;
 	refreshFailure?: RefreshFailure;
-	/** The reader closed the row a link opened, so the link can open it again. */
 	onFocusPurposeClosed?: () => void;
 	/** Rows with a save or clear in flight, keyed by {@link bindingTargetKey}. */
 	pendingWrites: ReadonlyMap<string, BindingWrite>;
@@ -362,7 +345,6 @@ export function AgentBindingsPage({
 	);
 }
 
-/** The tier columns' names, once per card above its rows. The cells carry the same words for a screen reader. */
 function TierHeader({ aiChoiceRequired }: { aiChoiceRequired: boolean }) {
 	return (
 		<div
@@ -385,10 +367,6 @@ function TierHeader({ aiChoiceRequired }: { aiChoiceRequired: boolean }) {
 	);
 }
 
-/**
- * Rows per group, so the skeleton holds the height the accordions will take. The group rules and
- * the tier columns are known before any data, so they show as they will stay.
- */
 function PurposeGroupsSkeleton({ aiChoiceRequired }: { aiChoiceRequired: boolean }) {
 	const columns = tierColumns(aiChoiceRequired);
 	return (
@@ -435,7 +413,6 @@ interface UsedBy {
 	unmetTiers: DataHandlingTier[];
 }
 
-/** One tier column of a row: the model its members get, if any. */
 interface TierCell {
 	column: TierColumn;
 	binding?: AgentBinding;
@@ -458,19 +435,13 @@ interface PurposeView {
 	 * purpose for practice scripts until the needs are in.
 	 */
 	usedBy?: UsedBy[];
-	/** The practices whose required model some members do not get. */
 	unmet: UsedBy[];
 }
 
-/**
- * An unmet required need makes its row `NEEDS_ATTENTION`, so the note about it takes that status's
- * tone and icon: the row's badge and the note say one state.
- */
 const { badgeVariant: UNMET_NEED_TONE, icon: UnmetNeedIcon } = PURPOSE_STATUS_DEFS.NEEDS_ATTENTION;
 
 const unmetRequired = (entry: UsedBy) => entry.need === "required" && entry.unmetTiers.length > 0;
 
-/** Unmet first, then required, then by name: the practice to fix leads the list. */
 function usedByOrder(a: UsedBy, b: UsedBy): number {
 	return (
 		Number(unmetRequired(b)) - Number(unmetRequired(a)) ||
@@ -479,10 +450,6 @@ function usedByOrder(a: UsedBy, b: UsedBy): number {
 	);
 }
 
-/**
- * The purpose whose binding serves a script's model slot. A script's chat slot is the review model,
- * which is not a model for practice scripts, so no row lists it.
- */
 const SLOT_PURPOSES: Record<PracticeScriptNeed["slot"], AgentPurpose> = {
 	chat: "PRACTICE_REVIEW",
 	decision: "PRACTICE_DECISION",
@@ -519,12 +486,10 @@ function purposeView(
 	{ bindings, availableModels, practicesEnabled, aiChoiceRequired, needs }: PurposeViewInput,
 ): PurposeView {
 	const own = bindings.filter((binding) => binding.purpose === purpose);
-	// Every purpose but Heph runs inside a practice review, so their switch turns it off too.
 	const off = purpose !== "MENTOR" && !practicesEnabled;
 	const practiceScript = isPracticeScriptPurpose(purpose);
 	const usedBy = practiceScript && needs !== undefined ? usedByOf(purpose, needs) : undefined;
 	const unmet = off ? [] : (usedBy ?? []).filter(unmetRequired);
-	// While practice reviews are off no column is served, whatever the row binds.
 	const cells = tierColumns(aiChoiceRequired).map((column) => {
 		const binding = off ? undefined : servingBinding(own, column.tier);
 		const assigned = own.find(
@@ -555,7 +520,6 @@ function purposeView(
 	};
 }
 
-/** Open at mount: a row that needs the admin, or the review model nobody has assigned yet. */
 function opensAtMount(view: PurposeView): boolean {
 	return (
 		view.status === "NEEDS_ATTENTION" ||
@@ -587,10 +551,9 @@ function PurposeGroups({
 			const view = views.get(purpose);
 			return view !== undefined && opensAtMount(view);
 		});
-	// Decided once: a row that opens or closes under the admin after each save would lose their place.
+	// Decide initial expansion once so saving does not move the admin's place.
 	const [open, setOpen] = useState<AgentPurpose[]>(() => openingNow(AGENT_PURPOSES));
-	// The rows for practice scripts are judged by the needs, which can arrive after the page, so they decide
-	// once when the needs first arrive.
+	// Needs load separately; decide expansion once on their first arrival.
 	const [needsJudged, setNeedsJudged] = useState(needs !== undefined);
 	if (needs !== undefined && !needsJudged) {
 		setNeedsJudged(true);
@@ -785,7 +748,6 @@ function CellModel({ model }: { model: AvailableLlmModel | undefined }) {
 interface PurposeRowProps extends RowProps {
 	view: PurposeView;
 	workspaceSlug: string;
-	/** A link opened this row: it keeps the accent's rail on its leading edge. */
 	linked: boolean;
 	rowRef?: (node: HTMLElement | null) => void;
 }
@@ -808,7 +770,6 @@ function PurposeRow({
 	const baseId = useId();
 	const { purpose, bindings, off, status, cells, usedBy, unmet } = view;
 	const { title, description } = AGENT_PURPOSE_DEFS[purpose];
-	// The server names the purposes each model's protocol can serve.
 	const servingModels = availableModels.filter((model) => model.purposes.includes(purpose));
 	const practiceScript = isPracticeScriptPurpose(purpose);
 	const usedById = `${baseId}-used-by`;
@@ -825,7 +786,6 @@ function PurposeRow({
 			{linked && <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-mentor" />}
 			<AccordionTrigger
 				headingLevel={3}
-				// The title alone names the row and the region it opens; the cells describe it.
 				aria-label={title}
 				aria-describedby={describedBy}
 				className="items-center gap-3 px-4 py-3 hover:no-underline"
@@ -876,7 +836,7 @@ function PurposeRow({
 			<AccordionContent className="flex flex-col gap-6 px-4 pt-2 pb-6 [&_p:not(:last-child)]:mb-0">
 				<p className="max-w-2xl text-muted-foreground">{description}</p>
 				{unmet.length > 0 && (
-					// Static page content, so no live role: opening the row must not announce it as news.
+					// Static content must not announce itself as new when an accordion opens.
 					<Alert variant={UNMET_NEED_TONE} role="note">
 						<UnmetNeedIcon aria-hidden />
 						<AlertDescription>{unmetNeedSentence(purpose, unmet)}</AlertDescription>
@@ -890,8 +850,7 @@ function PurposeRow({
 						const target: BindingTarget = { purpose, tier };
 						const key = bindingTargetKey(target);
 						const binding = bindings.find((candidate) => candidate.dataHandlingTier === tier);
-						// Once members must choose, the editor for members who have not chosen serves
-						// no one; it stays only while it still holds an assignment to clear.
+						// Keep an unused assignment editable so the admin can clear it.
 						if (tier === "UNDECLARED" && aiChoiceRequired && binding === undefined) {
 							return null;
 						}
@@ -923,11 +882,6 @@ function PurposeRow({
 	);
 }
 
-/**
- * How many practices miss a required model, and for which members: "2 practices need a decision
- * model for In-house members." The server judges the members once per model, so every practice in
- * `unmet` misses the same ones. Their names are in *Used by* below.
- */
 function unmetNeedSentence(purpose: AgentPurpose, unmet: UsedBy[]): string {
 	const { withArticle } = AGENT_PURPOSE_DEFS[purpose];
 	const members = tierMembersPhrase(unmet[0]?.unmetTiers ?? []);
@@ -989,16 +943,12 @@ function UsedByList({ usedBy, workspaceSlug }: { usedBy: UsedBy[]; workspaceSlug
 	);
 }
 
-/** The ids of the descriptions on screen, for `aria-describedby`; undefined when none is. */
 function idsShown(entries: readonly (readonly [id: string, shown: boolean])[]): string | undefined {
 	const ids = entries.filter(([, shown]) => shown).map(([id]) => id);
 	return ids.length > 0 ? ids.join(" ") : undefined;
 }
 
-/**
- * A refusal is about the model it refused, so it shows only while that model is still the choice:
- * picking another one takes it away, and the next save asks again.
- */
+// A refusal belongs to the rejected model; changing the model must clear that refusal.
 function refusalOf(
 	saveError: string | undefined,
 	submitted: ModelSelection | null,
@@ -1018,7 +968,6 @@ interface BindingRowProps {
 	availableModels: AvailableLlmModel[];
 	aiChoiceRequired: boolean;
 	ownProviderAllowed: boolean;
-	/** While practice reviews are off no row serves anyone, so none claims to be ready. */
 	practiceReviewsOff: boolean;
 	/**
 	 * A Cloud assignment for practice scripts that Cloud members do not get: their reviews run on an In-house
@@ -1058,7 +1007,6 @@ function BindingRow({
 	const noModels = !availableModels.some(
 		(model) => pickerTier === undefined || model.dataHandlingTier === pickerTier,
 	);
-	// With no model of a model kind for practice scripts at all, the picker itself says what to connect.
 	const pickerExplainsEmpty = isPracticeScriptPurpose(purpose) && availableModels.length === 0;
 	const boundModel = modelOf(binding, availableModels);
 	// A bound model whose facts were re-declared has dropped out of this row: the picker still names
@@ -1081,7 +1029,6 @@ function BindingRow({
 	const [showAdvanced, setShowAdvanced] = useState(false);
 	// Only Heph may reach the internet; the server rejects the flag for every other purpose.
 	const internetConfigurable = purpose === "MENTOR";
-	// A model for practice scripts is called inside a practice review, under that review's limits.
 	const hasRunLimits = purpose === "PRACTICE_REVIEW" || purpose === "MENTOR";
 	const [submitAttempt, setSubmitAttempt] = useState(0);
 
@@ -1291,11 +1238,6 @@ interface TierEditorHeadingProps {
 	readiness: BindingReadiness | null;
 }
 
-/**
- * A declared row wears its tier's icon and words, the same ones a developer's card shows. The row
- * for members who have not chosen names those members only: *Not declared* is a model's tier, not
- * an answer a member gave.
- */
 function TierEditorHeading({ id, tier, aiChoiceRequired, readiness }: TierEditorHeadingProps) {
 	const undeclared = tier === "UNDECLARED";
 	const { label, icon: TierIcon } = DATA_HANDLING_DEFS[tier];
@@ -1317,7 +1259,6 @@ function TierEditorHeading({ id, tier, aiChoiceRequired, readiness }: TierEditor
 
 interface ModelHintProps {
 	id: string;
-	/** A bound model whose declared tier no longer fits the row. */
 	movedModel?: AvailableLlmModel;
 	noModels: boolean;
 	undeclared: boolean;
@@ -1326,7 +1267,6 @@ interface ModelHintProps {
 	ownProviderAllowed: boolean;
 }
 
-/** Why the row's picker cannot offer what the row needs, and who can do something about it. */
 function ModelHint({
 	id,
 	movedModel,
@@ -1376,12 +1316,10 @@ function ModelHint({
 interface RowActionsProps {
 	bound: boolean;
 	pendingWrite?: BindingWrite;
-	/** The row's name for a screen reader, since every row repeats the same buttons. */
 	forRow: ReactNode;
 	onClear: () => void;
 }
 
-/** The pending write's own button says what it waits on; both stay frozen until it lands. */
 function RowActions({ bound, pendingWrite, forRow, onClear }: RowActionsProps) {
 	const pending = pendingWrite !== undefined;
 	return (

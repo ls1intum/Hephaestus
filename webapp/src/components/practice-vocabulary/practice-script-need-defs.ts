@@ -6,10 +6,7 @@ import type { StatusDef } from "@/components/common/status-def";
 
 export type PracticeScriptNeedKind = PracticeScriptNeed["need"];
 
-/**
- * A model without which a practice's script does not run. An optional model is the
- * normal case and draws nothing, so only the required one has words, an icon and a tone.
- */
+// Optional models do not block a script; reserve need warnings for required models.
 export const PRACTICE_SCRIPT_REQUIRED_DEF: StatusDef = {
 	label: "Required",
 	icon: AsteriskIcon,
@@ -17,7 +14,6 @@ export const PRACTICE_SCRIPT_REQUIRED_DEF: StatusDef = {
 	description: "Without this model the practice script does not run.",
 };
 
-/** The badge a need wears, or null for an optional one, which wears none. */
 export function practiceScriptNeedBadge(need: PracticeScriptNeedKind): StatusDef | null {
 	return need === "required" ? PRACTICE_SCRIPT_REQUIRED_DEF : null;
 }

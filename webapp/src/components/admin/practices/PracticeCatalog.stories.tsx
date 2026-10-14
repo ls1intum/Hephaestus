@@ -30,7 +30,6 @@ if (
 	throw new Error("The shared practice fixtures no longer cover two groups and three practices");
 }
 
-/** A practice with its current version's definition changed, as the server would serve it. */
 function withDefinition(practice: Practice, definition: Partial<PracticeDefinition>): Practice {
 	return {
 		...practice,
@@ -198,7 +197,6 @@ export const WithCatalogProvenance: Story = {
 	},
 };
 
-/** A group edited here can go back to the catalog's details; one that matches cannot. */
 export const GroupResetToCatalog: Story = {
 	args: {
 		groups: [
@@ -223,7 +221,6 @@ export const GroupResetToCatalog: Story = {
 	},
 };
 
-/** A practice people or nobody review says so in its row; Heph, the default, goes unsaid. */
 export const ReviewedByPeople: Story = {
 	args: {
 		practices: [

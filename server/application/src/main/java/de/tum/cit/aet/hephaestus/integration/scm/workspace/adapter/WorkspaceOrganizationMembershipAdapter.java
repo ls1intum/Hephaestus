@@ -24,13 +24,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Adapts organization membership events from integration.scm to workspace member syncing.
- *
- * <p>This implements the {@link OrganizationMembershipListener} SPI defined by integration.scm,
- * allowing the workspace module to react to organization membership changes without integration.scm
- * needing to know about workspace concepts.
- */
 @Component
 public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembershipListener {
 
@@ -99,11 +92,7 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         }
     }
 
-    /**
-     * One person's membership changed: only their workspace membership follows, from what the
-     * stored roster and teams grant them now. Nobody else is re-read, so a one-person event cannot
-     * remove anyone else.
-     */
+    // A one-person roster event must not remove other workspace members.
     private void syncWorkspaceFromOrganization(MembershipChangedEvent event, String action) {
         Optional<Workspace> workspaceOpt = findWorkspace(event.organizationId(), event.organizationLogin());
         Optional<Organization> organization = organizationRepository.findById(event.organizationId());
@@ -140,7 +129,6 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         }
     }
 
-    /** The role the organization's roster or one of its teams grants {@code userId} now, if any. */
     private Membership.@Nullable WorkspaceRole currentGrant(Organization organization, Long userId) {
         Optional<Membership.WorkspaceRole> rosterRole = organizationMembershipRepository
                 .findByOrganizationIdAndUserId(organization.getId(), userId)
@@ -158,11 +146,7 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
                 : null;
     }
 
-    /**
-     * The workspace this organization's roster is for, while its active connection is on the
-     * organization's instance: the one linked to the row, or else the one unlinked workspace at the
-     * same path. A queued event after a disconnect or a switch of instance reaches none.
-     */
+    // Disconnected or re-bound organization events cannot grant workspace membership.
     private Optional<Workspace> findWorkspace(Long organizationId, String organizationLogin) {
         Optional<Long> organizationProvider = organizationRepository
                 .findById(organizationId)
@@ -198,7 +182,6 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
     int reconcileWorkspaceMembers(Workspace workspace, Long organizationId, boolean rosterComplete) {
         Long workspaceId = workspace.getId();
 
-        // Get organization memberships and map to workspace roles
         List<OrganizationMembership> orgMemberships =
                 organizationMembershipRepository.findByOrganizationId(organizationId);
 
@@ -224,7 +207,6 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         // An owner stays owner whether or not the provider still lists them.
         workspaceMembershipService.syncWorkspaceMembers(workspace, desiredRoles);
 
-        // Update sync timestamp
         workspace.setMembersSyncedAt(Instant.now());
         workspaceRepository.save(workspace);
 

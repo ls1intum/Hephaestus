@@ -77,11 +77,6 @@ function closureOf(feedback: PracticePageFeedback):
 	}
 }
 
-/**
- * One piece of feedback from the wire as a card. Each result it rests on arrives named and linked,
- * so the strip shows exactly what the wire says about it, and the developer's current response
- * rides on the card, so resolving it needs no second query.
- */
 export function toFeedbackCard(
 	feedback: PracticePageFeedback,
 	groups: GroupRef[],

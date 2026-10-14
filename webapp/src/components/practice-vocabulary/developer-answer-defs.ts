@@ -3,12 +3,7 @@ import { MessageSquareIcon, MessageSquareWarningIcon } from "lucide-react";
 import type { FeedbackResponse } from "@/api/types.gen";
 import type { StatusDefs } from "@/components/common/status-def";
 
-/**
- * What a workspace admin reads of a developer's response to one piece of feedback: that they
- * answered, and whether they disagree, with the reason they wrote for admins. A response is the
- * developer's, never an admin mark; the developer's own words for it are `feedback-usefulness-defs`
- * and `feedback-resolution-defs`, which speak to them as "you".
- */
+// Admins may read a disagreement reason; usefulness and private notes remain the developer's.
 export type DeveloperAnswer = "ANSWERED" | "DISAGREED";
 
 export const DEVELOPER_ANSWER_DEFS: StatusDefs<DeveloperAnswer> = {
@@ -27,7 +22,6 @@ export const DEVELOPER_ANSWER_DEFS: StatusDefs<DeveloperAnswer> = {
 	},
 };
 
-/** The answer that stands on one piece of feedback, or none for a cleared or absent response. */
 export function developerAnswer(response: FeedbackResponse | null): DeveloperAnswer | undefined {
 	if (response === null || response.createdAt === null) {
 		return undefined;

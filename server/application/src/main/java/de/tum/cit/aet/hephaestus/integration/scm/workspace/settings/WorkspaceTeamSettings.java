@@ -21,30 +21,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-/**
- * Workspace-scoped settings for a team.
- *
- * <p>This entity stores Hephaestus-specific team settings that are scoped to a particular
- * workspace, enabling different configurations for the same team across multiple workspaces.
- *
- * <h2>Composite Primary Key</h2>
- *
- * Uses {@link Id} as an embedded composite key of (workspaceId, teamId), ensuring:
- *
- * <ul>
- *   <li>A team can have different settings per workspace
- *   <li>Each team has exactly one settings record per workspace
- * </ul>
- *
- * <h2>Settings</h2>
- *
- * <ul>
- *   <li><b>hidden:</b> Controls whether the team is hidden from workspace activity
- * </ul>
- *
- * @see Workspace
- * @see Team
- */
 @Entity
 @Table(name = "workspace_team_settings")
 @Getter
@@ -54,12 +30,10 @@ import lombok.ToString;
 @ToString
 public class WorkspaceTeamSettings {
 
-    /** Composite primary key (workspaceId, teamId) */
     @EmbeddedId
     @EqualsAndHashCode.Include
     private Id id = new Id();
 
-    /** The workspace these settings belong to */
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("workspaceId")
     @JoinColumn(
@@ -69,35 +43,21 @@ public class WorkspaceTeamSettings {
     @ToString.Exclude
     private Workspace workspace;
 
-    /** The team these settings apply to */
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("teamId")
     @JoinColumn(name = "team_id", nullable = false, foreignKey = @ForeignKey(name = "fk_workspace_team_settings_team"))
     @ToString.Exclude
     private Team team;
 
-    /** Whether the team is hidden: a hidden team is not offered as a Workspace activity filter. */
     @Column(name = "hidden", nullable = false)
     private boolean hidden = false;
 
-    /**
-     * Creates a new WorkspaceTeamSettings for the given workspace and team.
-     *
-     * @param workspace the workspace these settings belong to
-     * @param team the team these settings apply to
-     */
     public WorkspaceTeamSettings(Workspace workspace, Team team) {
         this.workspace = workspace;
         this.team = team;
         this.id = new Id(workspace.getId(), team.getId());
     }
 
-    /**
-     * Composite primary key for workspace team settings.
-     *
-     * <p>Ensures a team can have at most one settings record per workspace. Both fields are
-     * populated via {@code @MapsId} from the entity relationships.
-     */
     @Embeddable
     @Getter
     @Setter

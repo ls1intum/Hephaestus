@@ -138,10 +138,6 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * A mentor turn has no {@code review_job} row, so it needs a meter of its own: a route the gate finds
-     * nothing to charge against spends without limit for the whole length of a turn.
-     */
     @Nested
     @DisplayName("a mentor turn is bounded by its own completed calls, exactly like a job attempt")
     class AMentorTurn {
@@ -223,10 +219,6 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * The routing carries the tokens and search units of the attempt's direct model calls, on every slot and for every
-     * practice together. Each has its own limit: neither is converted into the other.
-     */
     @Nested
     class DirectModelCap {
 

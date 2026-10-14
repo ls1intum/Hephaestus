@@ -54,10 +54,6 @@ export const Empty: Story = {
 	},
 };
 
-/**
- * The window offered must never exceed what the server accepts, or the admin's first attempt is a
- * 400 explaining a rule the form should have expressed.
- */
 export const WeeklyOffersAFullWeek: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: /How often/u }));
@@ -67,7 +63,6 @@ export const WeeklyOffersAFullWeek: Story = {
 	},
 };
 
-/** A repository is scanned as a whole, so it asks for a budget and no window. */
 export const RepositoryScanNeedsABudget: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: /Kind of work/u }));
@@ -128,10 +123,6 @@ export const Paused: Story = {
 	},
 };
 
-/**
- * The combination that can contradict itself: a paused schedule must not promise a first check
- * "within the hour", so the whole line is written out rather than matched a clause at a time.
- */
 export const PausedBeforeItEverRan: Story = {
 	args: { schedules: [schedule({ enabled: false, lastRunAt: null })] },
 	play: async ({ canvas }) => {
@@ -143,7 +134,6 @@ export const PausedBeforeItEverRan: Story = {
 	},
 };
 
-/** Editing offers the same pause and resume as the row, so a paused schedule can always resume. */
 export const EditAndResume: Story = {
 	args: { schedules: [schedule({ enabled: false })] },
 	play: async ({ args, canvas, userEvent }) => {
@@ -223,8 +213,6 @@ export const Error: Story = {
 	args: { isError: true },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/could not load recurring checks/iu)).toBeVisible();
-		// The failure is about this screen, not the workspace: read as "stopped", it costs a second
-		// check scheduled over the same work.
 		await expect(canvas.getByText(/keep running/iu)).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Retry" })).toBeVisible();
 	},

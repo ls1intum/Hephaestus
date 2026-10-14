@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogCustomizationService;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogLock;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
 import de.tum.cit.aet.hephaestus.practices.catalog.EffectiveCatalog;
@@ -149,7 +150,7 @@ public class PracticeReleaseService {
                 .orElseThrow(() -> new EntityNotFoundException("Practice group", slug));
         if (group.getCatalogSlug() == null) throw new EntityNotFoundException("Catalog group", slug);
         var offer = catalog.group(group.getCatalogSlug());
-        CatalogService.require(precondition, groupResetTag(ctx, slug));
+        CatalogCustomizationService.require(precondition, groupResetTag(ctx, slug));
         var before = PracticeGroupSnapshot.of(group);
         var definition = offer.effective();
         group.setName(definition.name());

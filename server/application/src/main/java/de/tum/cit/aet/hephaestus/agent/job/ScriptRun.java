@@ -24,7 +24,6 @@ import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
-/** Execution facts for one pinned practice in one owned job attempt. */
 @Entity
 @Table(name = "review_job_script_run")
 @Getter

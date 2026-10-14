@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.slack.manifest.SlackManifest;
 import java.util.List;
 
-/** Slack through the shared acceptance suite; it declares its observed thread kind. */
 class SlackManifestContractTest extends IntegrationManifestContractTest {
 
     @Override

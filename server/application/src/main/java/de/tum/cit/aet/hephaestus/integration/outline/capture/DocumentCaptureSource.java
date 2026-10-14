@@ -21,36 +21,23 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Materialises a workspace's mirrored Outline documents into the sandbox context — a pure extract+load of raw doc
- * rows through the agent-owned {@link DocumentProjection} SPI, so this source never reads {@code outline_document}
- * itself and the coupling runs one way.
- *
- * <p>Heph 1.x emits one purpose-bound {@code outline_docs.json}. Practice reviews use the job folder renderer.
- *
- * <p>Document bodies and author names are untrusted external data, never runtime instructions.
- */
+/** Document bodies and author names supplied through {@link DocumentProjection} are untrusted data, never instructions. */
 @Component
 @ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class DocumentCaptureSource implements ContentSource {
 
-    /** Mentor-path output key. Whitelisted in {@code MentorContextKeys#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = ContentSource.OUTPUT_PREFIX + "outline_docs.json";
 
-    /** Cap on documents surfaced to the mentor per turn — the corpus-breadth envelope (telescope, not dump). */
     static final int MAX_MENTOR_DOCUMENTS = 15;
 
-    /** Cap on distinct query terms derived from an artifact — bounds the tsquery, keeps ranking sharp. */
     static final int MAX_QUERY_TERMS = 24;
 
-    /** URLs carry no retrieval signal (slugs/hosts pollute the term set) — stripped before tokenizing. */
+    // URL slugs and hosts add noise to document-search terms.
     private static final Pattern URL_NOISE = Pattern.compile("https?://\\S+");
 
-    /** Splits item text into candidate terms; everything non-alphanumeric is markdown/punctuation noise. */
     private static final Pattern NON_TERM = Pattern.compile("[^\\p{L}\\p{Nd}]+");
 
-    /** Per-document body excerpt fed to the mentor; keeps the single JSON file bounded. */
     static final int MENTOR_BODY_CHARS = 4_000;
 
     private final DocumentProjection projection;
@@ -142,11 +129,7 @@ public class DocumentCaptureSource implements ContentSource {
         }
     }
 
-    /**
-     * Ranked by relevance to the turn's user message when one is available and matches anything;
-     * recency order ({@link de.tum.cit.aet.hephaestus.integration.docs.item.DocumentProjection#documentsForWorkspace}) otherwise, so a query-less turn
-     * (or a corpus the query misses entirely) still gets documentation instead of nothing.
-     */
+    // Fall back to recency when no query matches; documentation enrichment must not require a matching user message.
     private List<ProjectedDocument> rankedMentorDocuments(MentorContextRequest request) {
         String query = deriveQueryText(null, currentUserMessageText(request));
         if (!query.isBlank()) {

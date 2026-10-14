@@ -130,9 +130,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         ConfigAuditEvent row = reviewSettingsRowFor(workspace);
         assertThat(row.getActorAccountId()).isEqualTo(accountId);
-        // The token carries app_admin exactly as the elevated case does; only the membership
-        // differs,
-        // so this proves the filter's own branch condition and not merely a token's authorities.
         assertThat(row.isElevatedViaInstanceAdmin()).isFalse();
         assertThat(elevationEventsFor(accountId))
                 .as("no elevation marker for the account this test signed in as")
@@ -421,10 +418,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void narrowingToOneResourceIsWhatMakesAPerResourceHistoryPossible() {
-        // The entity_id predicate is otherwise unexercised: transposed to `<>` the suite stays
-        // green,
-        // while the per-resource history the column exists to serve returns everything but the
-        // resource.
         Workspace workspace = setupWorkspace("audit-entity");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
 
@@ -442,11 +435,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void repeatingAFilterParameterWidensItRatherThanReplacingIt() {
-        // The question a change trail is opened for is usually disjunctive ("did anyone touch
-        // either of
-        // these?"), so repeated values must union. The values bind as a text[] matched with =
-        // ANY(...), which a
-        // single-value test cannot distinguish from plain equality.
         Workspace workspace = setupWorkspace("audit-multi");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
         createConnection(workspace, "primary");
@@ -462,11 +450,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void newestRowsComeFirstEvenWhenTwoShareAnInstant() {
-        // The rows are forced onto one instant: the recorder's clock has microsecond precision, so
-        // two
-        // ordinary writes never tie and the id tie-break in ORDER BY occurred_at DESC, id DESC —
-        // the
-        // thing that makes paging deterministic — would go unexercised.
+        // Equal timestamps exercise the id tie-break; normal writes rarely share a microsecond.
         Workspace workspace = setupWorkspace("audit-order");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 46));
@@ -610,10 +594,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return Objects.requireNonNull(account.getId(), "the account must be persisted");
     }
 
-    /**
-     * A second producer, of a different entity type and action, so the filter matrix proves each
-     * predicate narrows.
-     */
     private void createConnection(Workspace workspace, String slug) {
         webTestClient
                 .post()

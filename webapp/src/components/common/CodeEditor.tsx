@@ -21,9 +21,7 @@ self.MonacoEnvironment = {
 	},
 };
 loader.config({ monaco });
-// The editor holds one file without the modules it imports, so a type check would mark every import,
-// such as a practice script's `../lib/practice-script.ts`, as an error. Syntax errors still show.
-// Monaco keeps these options per language, so they apply to every TypeScript model.
+// The editor has no imported modules; check syntax without reporting unresolved imports.
 monaco.typescript.typescriptDefaults.setDiagnosticsOptions({
 	...monaco.typescript.typescriptDefaults.getDiagnosticsOptions(),
 	noSemanticValidation: true,

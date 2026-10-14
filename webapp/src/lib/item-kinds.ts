@@ -18,11 +18,7 @@ export type ItemKindIcon = ComponentType<{
 	"aria-hidden"?: boolean;
 }>;
 
-/**
- * Item kinds are an open vocabulary — a `<domain>.<kind>` string named by the owning server
- * module, so the generated client types one as `string`. These are the kinds the UI can name;
- * anything else is still listed rather than dropped, as "Other work" and never by its wire id.
- */
+// Item kinds form an open wire vocabulary; unknown domain kinds need a neutral presentation.
 export const ITEM_KIND = {
 	pullRequest: "scm.pull_request",
 	pullRequestReview: "scm.pull_request_review",
@@ -35,10 +31,8 @@ export const ITEM_KIND = {
 
 export type KnownItemKind = (typeof ITEM_KIND)[keyof typeof ITEM_KIND];
 
-/** The kinds in the one order every list of them keeps: the order `ITEM_KIND` declares. */
 export const ITEM_KIND_VALUES = Object.values(ITEM_KIND);
 
-/** Where a kind sorts among the others; a kind this build does not know sorts after them all. */
 export function itemKindRank(kind: string): number {
 	return isKnownItemKind(kind) ? ITEM_KIND_VALUES.indexOf(kind) : ITEM_KIND_VALUES.length;
 }
@@ -47,7 +41,6 @@ export function isKnownItemKind(kind: string | null | undefined): kind is KnownI
 	return ITEM_KIND_VALUES.some((known) => known === kind);
 }
 
-/** The provider an item lives at, as the wire names it on `ItemRef`. */
 export type ItemProvider = NonNullable<ItemRef["provider"]>;
 
 interface Noun {
@@ -160,10 +153,7 @@ const ITEM_KIND_ICONS: Record<KnownItemKind, ItemKindIcon> = {
 	[ITEM_KIND.document]: FileTextIcon,
 };
 
-/**
- * A kind this build has never heard of gets the neutral page icon rather than a hole, and never
- * borrows the icon of a kind it is not.
- */
+/** Unknown kinds get a neutral icon; they must not borrow another kind's meaning. */
 export function itemKindIcon(kind: string | undefined): ItemKindIcon {
 	return hasText(kind) && isKnownItemKind(kind) ? ITEM_KIND_ICONS[kind] : FileTextIcon;
 }

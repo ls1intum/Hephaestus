@@ -1,5 +1,3 @@
-// Finds each state declaration and each state wiring that the change adds to Swift files, with the
-// type that encloses it. The review applies the four rules of the practice to each lead.
 import { scm } from "../kits/scm/index.ts";
 import { sampleNote, scanOccurrences, type SourcePattern } from "../kits/scm/source-scan.ts";
 import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
@@ -7,7 +5,6 @@ import { definePracticeScript, type ReviewLead } from "../lib/core/practice-scri
 
 const SWIFTUI_VIEW = /\b(?:View|App|Scene)\b/u;
 
-// The first pattern that matches a line gives its kind.
 const STATE_DECLARATIONS: readonly SourcePattern[] = [
 	["state-creating-an-object", /@State(?:Object)?\b[^=]*=\s*[A-Z][A-Za-z0-9_]*\s*\(/u],
 	["state-property", /@State\b/u],

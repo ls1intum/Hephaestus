@@ -228,10 +228,6 @@ function TimeFigures({ timing, during }: { timing: ReviewTiming; during: string 
 	);
 }
 
-/**
- * The range's figures in one line: the reviews that finished, a link to them, and, when there are
- * any, the pieces of feedback lost to the merge and the reviews that finished after it.
- */
 function RangeFigures({
 	workspaceSlug,
 	timing,

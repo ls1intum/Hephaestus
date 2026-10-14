@@ -69,7 +69,6 @@ import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { useSearchState } from "@/lib/search-params";
 
-/** `?purpose=` opens that purpose's row and scrolls to it; a fix link elsewhere points here. */
 const modelsSearchSchema = z.object({
 	purpose: z.enum(AGENT_PURPOSES).optional().catch(undefined),
 });
@@ -86,7 +85,6 @@ const AGENT_WRITE_MUTATION_KEY = ["workspaceWriteAgent"];
 const isDataHandlingTier = (value: unknown): value is DataHandlingTier =>
 	typeof value === "string" && DATA_HANDLING_TIERS.some((tier) => tier === value);
 
-/** Both writes name the row they are about, so the pending set keys on it. */
 interface BindingClear {
 	target: BindingTarget;
 }
@@ -122,7 +120,6 @@ function ModelsContainer() {
 	const { purpose: focusPurpose } = Route.useSearch();
 	const setSearch = useSearchState();
 	const queryClient = useQueryClient();
-	// One key for each write, so the row can say which one it waits on.
 	const saveKey = [...AGENT_WRITE_MUTATION_KEY, workspaceSlug, "save"];
 	const clearKey = [...AGENT_WRITE_MUTATION_KEY, workspaceSlug, "clear"];
 
@@ -187,8 +184,6 @@ function ModelsContainer() {
 		}
 	};
 
-	// Readiness per AI choice lives on the member setup, which decides whether Heph is in the
-	// navigation. Which members a practice's required model misses follows the bindings too.
 	const invalidateBindings = async () =>
 		Promise.all([
 			queryClient.invalidateQueries({ queryKey: listAgentsQueryKey({ path: { workspaceSlug } }) }),
@@ -208,8 +203,7 @@ function ModelsContainer() {
 	const setSaveError = (target: BindingTarget, error: string | undefined) =>
 		setSaveErrors((current) => ({ ...current, [bindingTargetKey(target)]: error }));
 
-	// A write changes whom its siblings serve too, so the row waits for the whole set to come back
-	// before it reseeds; the PUT's answer alone would mix new and old `servedTiers`.
+	// A binding write changes sibling routes; wait for the whole set before reseeding forms.
 	const saveBinding = useMutation({
 		mutationKey: saveKey,
 		mutationFn: async ({ target, body }: BindingSave) => {
@@ -277,11 +271,12 @@ function ModelsContainer() {
 		...[...savingTargets].map((key) => [key, "SAVE"] as const),
 	]);
 
-	const pageState: LoadState = blockingFailure
-		? { status: "error", error: blockingFailure.error, onRetry: retryFailed }
-		: loaded
-			? { status: "ready" }
-			: { status: "loading" };
+	let pageState: LoadState = { status: "loading" };
+	if (blockingFailure) {
+		pageState = { status: "error", error: blockingFailure.error, onRetry: retryFailed };
+	} else if (loaded) {
+		pageState = { status: "ready" };
+	}
 	const refreshFailure: RefreshFailure | undefined =
 		!blockingFailure && failedQueries.length > 0
 			? {
@@ -331,8 +326,7 @@ function ModelsContainer() {
 	);
 }
 
-// Each write is filed under a shared prefix so one cache lookup answers "is this row busy": a row
-// stays disabled until *its own* write settles, not until whichever write settles first.
+// Key pending writes by row so concurrent requests cannot clear another row's busy state.
 const PROBE_MUTATION_KEY = ["workspaceProbeLlmConnection"];
 const MODEL_WRITE_MUTATION_KEY = ["workspaceWriteLlmModel"];
 const CONNECTION_WRITE_MUTATION_KEY = ["workspaceWriteLlmConnection"];
@@ -342,14 +336,9 @@ const idOf = (variables: unknown) => pathNumber(variables, "id");
 interface WorkspaceProvidersProps {
 	workspaceSlug: string;
 	ownProviderAllowed: boolean;
-	/** A provider or model write can change which assignments are ready. */
 	onWrite: () => Promise<unknown>;
 }
 
-/**
- * The workspace's own providers and models. Every write also refreshes the models the pickers
- * offer above, so a model added here can be assigned without a reload.
- */
 function WorkspaceProviders({
 	workspaceSlug,
 	ownProviderAllowed,
@@ -391,7 +380,9 @@ function WorkspaceProviders({
 		(loaded ? undefined : failedReads[0]);
 	const retryPending = failedReads.some((read) => read.isFetching);
 	const retryFailedReads = () => {
-		for (const read of failedReads) void read.refetch();
+		for (const read of failedReads) {
+			void read.refetch();
+		}
 	};
 	if (
 		blockingFailure !== undefined &&
@@ -416,7 +407,6 @@ function WorkspaceProviders({
 			queryClient.invalidateQueries({
 				queryKey: workspaceListAvailableLlmModelsQueryKey({ path }),
 			}),
-			// Whether the workspace's own provider is in use this month follows its connections and models.
 			queryClient.invalidateQueries({ queryKey: getLlmUsageReportQueryKey({ path }) }),
 			onWrite(),
 		]);
@@ -527,17 +517,17 @@ function WorkspaceProviders({
 				onRetry={refreshFailure.onRetry}
 			/>
 		);
-	const providersState: ProviderPanelState =
-		blockingFailure !== undefined
-			? { status: "error", error: blockingFailure.error, onRetry: retryFailedReads }
-			: !loaded
-				? { status: "loading" }
-				: {
-						status: "ready",
-						connections,
-						models: modelsQuery.data ?? [],
-						refreshFailure: formOpen ? undefined : refreshFailure,
-					};
+	let providersState: ProviderPanelState = { status: "loading" };
+	if (blockingFailure !== undefined) {
+		providersState = { status: "error", error: blockingFailure.error, onRetry: retryFailedReads };
+	} else if (loaded) {
+		providersState = {
+			status: "ready",
+			connections,
+			models: modelsQuery.data ?? [],
+			refreshFailure: formOpen ? undefined : refreshFailure,
+		};
+	}
 
 	return (
 		<>

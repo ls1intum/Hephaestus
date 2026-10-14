@@ -68,16 +68,8 @@ export interface OpenInStackOptions {
 }
 
 /**
- * The stack after opening `key` over `stack`, both in wire form, and whether it grew by one level.
- *
- * A surface whose levels link to each other — feedback to its result and back — is a graph, so
- * a level can link to one already open below it. Appending would be a repeat the schema drops, and the
- * link would do nothing; closing down to that level is what the reader meant. A full stack swaps its
- * top level instead, so the link still opens what it names.
- *
- * Only a level that grew the stack is a push: {@link import("./use-detail-stack").useDetailStack}
- * dismisses a pushed level by going back, and going back from a shortened or swapped stack would
- * re-open what the link just closed.
+ * Reopen an existing level by shortening the stack; replace the top when the stack is full.
+ * Only a stack that grows uses push history, so Back cannot reopen levels the link just closed.
  */
 export function openInStack(
 	stack: readonly string[],

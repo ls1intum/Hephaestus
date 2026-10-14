@@ -270,7 +270,7 @@ function renderTwoWorkspaces() {
 			HttpResponse.json([workspaceListItem("acme"), workspaceListItem("beta", { id: 2 })]),
 		),
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
+			HttpResponse.json(ownMembership("ADMIN")),
 		),
 		http.get("*/workspaces/:workspaceSlug/connections/catalog", () => HttpResponse.json([])),
 		http.get("*/workspaces/:workspaceSlug/activity/public-hidden-count", () =>

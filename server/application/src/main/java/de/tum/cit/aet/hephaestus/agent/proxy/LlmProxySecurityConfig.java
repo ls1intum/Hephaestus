@@ -33,26 +33,8 @@ import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * The sandbox gateway's three chains. The first two are ordered ahead of every application chain
- * because they claim a request by the connector it arrived on rather than by its path; the third
- * matches by path and only has to precede the chains that would otherwise serve
- * {@code /internal/llm/**}:
- *
- * <ol>
- *   <li>the sandbox capabilities on the gateway connector, authenticated by a proxy-scoped bearer
- *       credential, authorized by its {@link WorkerJwtIssuer#LLM_PROXY_SCOPE}, and rate-limited per authenticated
- *       principal. One job credential reaches every capability, the practice programs' direct model calls
- *       included: they run in the same process as the review;
- *   <li>everything else on the gateway connector, denied and answered {@code 404} so the connector
- *       admits to no route a sandbox is not meant to call;
- *   <li>the capability paths on every other connector, denied the same way, so they exist only where
- *       sandboxes reach them.
- * </ol>
- *
- * <p>Gated on the worker/sandbox capability rather than the practice-job feature flag, because
- * disabling practice reviews must not break mentor turns.
- */
+// Match the gateway connector before application chains; capability paths must exist only on that connector.
+// Gate on sandbox support so disabling practice reviews cannot disable mentor turns.
 @Configuration
 @ConditionalOnWorkerRole
 class LlmProxySecurityConfig {

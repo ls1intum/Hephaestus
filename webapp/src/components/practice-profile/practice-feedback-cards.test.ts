@@ -31,13 +31,11 @@ const pullRequest = (n: number): ItemRef => ({
 	removedAt: null,
 });
 
-/** The result a piece of work was recorded in, by its review. */
 const recorded = (n: number) => ({
 	resultId: `0b9c6f0e-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`,
 	reviewId: `5d1e2a3b-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`,
 });
 
-/** One clean piece of work on the wire: the ref the card links and the day it was recorded. */
 const cleanWork = (n: number, recordedAt: string): PracticePageCleanWork => ({
 	...recorded(n),
 	item: pullRequest(n),

@@ -1,9 +1,3 @@
-/**
- * Runs the real runner over a staged pull request review with several admitted practices, the Pi SDK mocked, the
- * change view staged, and the admission answered. The runner reads /workspace at module scope, so each run is a
- * child process that enters this file with `PI_HOST_SCENARIO` set. What the mocks saw goes to `captured/`. A mocked
- * session submits {@link SESSION_CANDIDATE}, or the JSON in `PI_HOST_SESSION_CANDIDATE` when that is set.
- */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -80,20 +74,14 @@ export function codingAgentExports(
 	};
 }
 
-/** What the mocked review session of a practice does: submit a result, end without one, or never end. */
 export type SessionBehaviour = "submit" | "silent" | "hang";
 
-/** One admitted practice: its custom program (none for the built-in), and whether its inputs are staged. */
 export interface StagedPractice {
 	slug: string;
 	program?: string;
 	inputs?: boolean;
 }
 
-/**
- * The result the mocked session submits: a negative result on the pull request record. The workspace captures no
- * checkout witness, so a quote of code would be refused before admission.
- */
 export const SESSION_CANDIDATE = {
 	outcome: "NOT_MET",
 	summary: "Added authentication call is insecure",
@@ -126,11 +114,6 @@ export const SESSION_CANDIDATE = {
 	evidence: {},
 };
 
-/**
- * The source of a custom program that returns a code-only result with no review: the work's record cited, and
- * claimed coverage. `before` runs first in `run(ctx)`, with `generateText` and `step` in scope, and may set
- * `note`, which the summary carries.
- */
 export function directProgram(before = ""): string {
 	return `import { definePracticeScript, generateText, step } from "../lib/core/practice-script.ts";
 export default definePracticeScript({
@@ -157,7 +140,6 @@ export default definePracticeScript({
 `;
 }
 
-/** Stage the review under `cwd`: the golden pull request, with the given practices admitted in one catalog group. */
 export function stagePractices(cwd: string, practices: readonly StagedPractice[]): void {
 	stageGoldenWorkspace(
 		cwd,
@@ -203,16 +185,12 @@ export function stagePractices(cwd: string, practices: readonly StagedPractice[]
 	}
 }
 
-/** How one runner process ended, and what it wrote to stderr. */
 export interface RunnerExit {
 	status: number | null;
 	stderr: string;
 }
 
-/**
- * Run the runner over `cwd` in a child process. The test process stays free to answer requests while it runs,
- * so a proxy stand-in in it can serve the runner's direct model calls.
- */
+// Run in a child process so the test process can keep answering proxy requests.
 export async function runRunner(
 	cwd: string,
 	sessions: Record<string, SessionBehaviour>,
@@ -254,12 +232,10 @@ export async function runRunner(
 const parseJson = (text: string): unknown => JSON.parse(text);
 const hasText = (value: string | undefined): value is string => value !== undefined && value !== "";
 
-/** A JSON file the runner or a mock wrote under `cwd`. */
 export function readJsonFile(cwd: string, file: string): unknown {
 	return parseJson(readFileSync(nodePath.join(cwd, file), "utf8"));
 }
 
-/** A field of a parsed JSON value; undefined when the value is not an object. */
 export function field(value: unknown, key: string): unknown {
 	if (typeof value !== "object" || value === null) {
 		return undefined;
@@ -268,7 +244,6 @@ export function field(value: unknown, key: string): unknown {
 	return found;
 }
 
-/** The lines the mocks appended to `captured/<name>.jsonl`, parsed. */
 export function capturedLines(cwd: string, name: string): unknown[] {
 	const file = nodePath.join(cwd, "captured", `${name}.jsonl`);
 	return existsSync(file)
@@ -347,7 +322,6 @@ if (scenario !== undefined && scenario !== "") {
 				};
 				const submit = options.customTools.find((tool) => tool.name === "submit_result");
 				assert.ok(submit, "submit_result is registered");
-				/** The practice of this session, as its first turn names it; a later turn need not repeat it. */
 				let sessionSlug: string | undefined;
 				return {
 					extensionsResult: { errors: [] },
@@ -394,7 +368,6 @@ if (scenario !== undefined && scenario !== "") {
 							if (behaviour === "hang") {
 								await Promise.withResolvers<never>().promise;
 							}
-							// The model reads the record and answers, as a native call the proxy bounds.
 							emit({
 								type: "tool_execution_start",
 								toolCallId: `read-${session}`,

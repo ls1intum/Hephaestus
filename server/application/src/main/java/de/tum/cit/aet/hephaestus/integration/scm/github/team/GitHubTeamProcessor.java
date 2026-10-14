@@ -199,9 +199,7 @@ public class GitHubTeamProcessor {
             Team team, String orgLogin, GitHubTeamEventDTO.GitHubTeamDTO dto, ProcessingContext context) {
         String teamSlug = dto.slug() != null ? dto.slug() : dto.name();
 
-        // Find the team that has the conflicting slug. Provider-scoped: the rename below is
-        // destructive,
-        // and only a team on this provider can actually contend for the slug.
+        // Only teams on the same provider can contend for this slug.
         Optional<Team> conflicting = teamRepository.findByOrganizationIgnoreCaseAndSlugAndProviderId(
                 orgLogin, teamSlug, Objects.requireNonNull(context.providerId()));
         if (conflicting.isEmpty()) {

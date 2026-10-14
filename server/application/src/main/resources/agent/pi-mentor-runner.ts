@@ -49,11 +49,7 @@ import { isRecord } from "./pi-text.ts";
 /** The Pi SDK module, resolved from `<workspace>/node_modules` by bare specifier at runtime. */
 type PiSdk = typeof PiSdkModule;
 
-// Pi SDK is loaded lazily so the protocol layer (framing, JSON-RPC delivery, fetch_context
-// callback plumbing) can be exercised in test environments without an LLM proxy. Set
-// `MENTOR_RUNNER_PROTOCOL_ONLY=1` to swap the SDK-backed runtime for `createStubRuntime`, which
-// satisfies the same `MentorRuntime` contract and emits deterministic events sufficient for
-// protocol tests. Production builds never set this.
+// Load Pi lazily so protocol tests do not need an LLM binding.
 const PROTOCOL_ONLY = process.env.MENTOR_RUNNER_PROTOCOL_ONLY === "1";
 
 // PROTOCOL_ONLY swaps the Pi SDK for a deterministic stub. Catching a config drift that flips
@@ -198,7 +194,7 @@ function writeFrame(frame: MentorOutboundFrame) {
 	process.stdout.write(`${JSON.stringify(frame)}\n`);
 }
 
-/** Pause delivery when stdout backs up past this size; prevents OOM under slow SSE consumers. */
+// Bound stdout buffering because a slow SSE consumer can exhaust memory.
 const STDOUT_BACKPRESSURE_THRESHOLD_BYTES = 256 * 1024;
 
 function sendResult(id: JsonRpcId | undefined, result: MentorResult) {
@@ -269,7 +265,6 @@ interface FetchContextDetails {
 
 type FetchContextToolResult = AgentToolResult<FetchContextDetails>;
 
-/** One in-flight server callback (`fetch_context`, `link_result`, `link_problem`), keyed by its JSON-RPC id in `ThreadState`. */
 interface PendingCallback {
 	resolve: (result: unknown) => void;
 	reject: (reason: Error) => void;
@@ -332,8 +327,7 @@ let systemPrompt: string | null = null;
 let runtimeInitFailure: { err: unknown; at: number } | null = null;
 const RUNTIME_INIT_COOLDOWN_MS = 30_000;
 
-// Serialised delivery chain — every stdin frame AND watchdog rebind appends here so callers
-// cannot race `runtime.switchSession` against each other.
+	// Serialize stdin delivery and watchdog rebinding so switchSession calls cannot race.
 let sendQueue = Promise.resolve();
 
 // The tail of the chain is not a useful handle for any caller here —
@@ -656,11 +650,6 @@ async function askServer(
 	return { threadId, result: await promise };
 }
 
-/**
- * What a link names. A result is a practice's verdict on one piece of reviewed work; a problem is one located
- * problem of a `NOT_MET` result. Each has its own tool, callback and event, so the server never has to tell the two
- * ids apart.
- */
 interface LinkTool {
 	name: "link_result" | "link_problem" | "show_feedback";
 	label: string;
@@ -754,8 +743,6 @@ function defineLinkTool(sdk: PiSdk, link: LinkTool) {
 			if (!linkedId || !text) {
 				throw new Error(`${name}: ${idKey} and text are required`);
 			}
-			// The server decides which result or problem a reply may show feedback about: nothing is shown or
-			// reported as shown until it admits this one, and a refusal fails the call.
 			const { threadId, result } = await askServer(
 				(thread, id) => link.request(thread, id, linkedId),
 				linkedId,
@@ -763,7 +750,6 @@ function defineLinkTool(sdk: PiSdk, link: LinkTool) {
 			if (signal?.aborted === true) {
 				throw new Error(`${name}: the turn was stopped, so nothing was shown`);
 			}
-			// Only an answer admitting this very id is an admission.
 			if (!isRecord(result) || result[idKey] !== linkedId) {
 				throw new Error(`${name}: nothing was shown, the server did not admit ${noun} ${linkedId}`);
 			}
@@ -1229,11 +1215,7 @@ async function handleShutdown(id: JsonRpcId | undefined) {
 	exitWhenDrained(0);
 }
 
-// Max characters of context surfaced to the LLM per fetch_context call. Context JSONs
-// occasionally balloon (e.g. `results_history.json` for a heavy reviewer); without a cap, a single
-// tool call can blow the model's context window. 200 K chars ≈ 50 K tokens at ~4 chars/token —
-// comfortably below the configured model's context window. Counted in JS string length (UTF-16 code
-// feedback), not bytes; context JSONs are ASCII-dominant so the variance is small.
+// Bound each context read so a large history cannot crowd the system prompt out of the model window.
 const FETCH_CONTEXT_MAX_CHARS = 200_000;
 
 /**
@@ -1472,11 +1454,6 @@ function rejectPendingCallbacks(state: ThreadState, reason: string) {
 	}
 }
 
-/**
- * The delivery table. `satisfies Record<MentorMethod, MethodHandler>` is the contract check: a
- * method declared in pi-mentor-protocol.ts with no handler here — or a handler whose signature has
- * drifted — fails the build rather than answering Java with method_not_found at runtime.
- */
 const METHODS = {
 	hello: handleHello,
 	open_thread: handleOpenThread,
@@ -1664,8 +1641,6 @@ function start() {
 		enqueue(async () => {
 			let frame: unknown;
 			try {
-				// The only place untrusted bytes become values. `delivery` takes `unknown` and
-				// narrows structurally from here, so nothing downstream trusts the shape.
 				frame = JSON.parse(line);
 			} catch (error) {
 				log(`parse error: ${errorText(error)} (line len=${line.length})`);
@@ -1680,7 +1655,6 @@ function start() {
 	});
 
 	process.stdin.on("data", (chunk) => splitter(chunk));
-	// EOF routes through the delivery queue so SIGTERM and EOF run the same teardown.
 	process.stdin.on("end", () => {
 		log("stdin EOF — shutting down");
 		enqueue(async () => handleShutdown(undefined));

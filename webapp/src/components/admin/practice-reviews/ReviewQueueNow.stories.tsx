@@ -75,7 +75,7 @@ export const Idle: Story = {
  * marked. The first three in line each open their review, and the rest are one link away.
  */
 export const Busy: Story = {
-	args: { state: { status: "ready", queue: busyReviewQueue } },
+	args: { state: { status: "ready", queue: { ...busyReviewQueue, waiting: 5, heldForBudget: 0 } } },
 	play: async ({ canvas }) => {
 		const now = canvas.getByRole("region", { name: "The queue" });
 		await expect(figuresOf(canvas)).toEqual([
@@ -87,8 +87,8 @@ export const Busy: Story = {
 		// Waiting and running open the Reviews table filtered to them, whatever the range.
 		const opens = (name: string) =>
 			new URL(canvas.getByRole<HTMLAnchorElement>("link", { name }).href).searchParams;
-		// Waiting opens exactly the reviews it counts, without those on hold.
-		await expect(opens("5 reviews waiting").getAll("status")).toStrictEqual(["WAITING"]);
+		// Waiting is a count; running opens its matching reviews.
+		await expect(canvas.queryByRole("link", { name: "5 reviews waiting" })).toBeNull();
 		await expect(opens("2 reviews running").getAll("status")).toStrictEqual(["RUNNING"]);
 		await expect(opens("2 reviews running").get("from")).toBeNull();
 		// A figure's number is black whether it is a link or not; its label is muted.
@@ -119,11 +119,11 @@ export const Busy: Story = {
 		await expect(lefts(2).size).toBe(1);
 		// A queued review opens its sheet over the page.
 		await expect(levelsOpenedBy(canvas.getByRole("link", { name: "#1423" }))).toEqual([
-			"review:queue-run-1",
+			"review:0c0c0c0c-0000-4000-8000-000000000001",
 		]);
 		const all = canvas.getByRole("link", { name: "See all 7" });
 		const search = new URL(all.getAttribute("href") ?? "", "http://x").searchParams;
-		await expect(search.getAll("status")).toStrictEqual(["RUNNING", "WAITING", "ON_HOLD"]);
+		await expect(search.getAll("status")).toStrictEqual(["RUNNING", "QUEUED"]);
 		await expect(now.querySelector(".lucide-triangle-alert")).toBeNull();
 	},
 };
@@ -141,6 +141,7 @@ export const LongWait: Story = {
 				running: 1,
 				activeWorkers: 1,
 				waiting: 2,
+				heldForBudget: 0,
 				oldestWaitingSince: minutesBefore(45),
 				head: [
 					reviewQueueHead.runningLong,
@@ -170,6 +171,7 @@ export const WaitBelowMark: Story = {
 			queue: {
 				...busyReviewQueue,
 				waiting: 2,
+				heldForBudget: 0,
 				oldestWaitingSince: minutesBefore(15),
 			},
 		},
@@ -206,8 +208,7 @@ export const OnHold: Story = {
 		await expect(figureValue(canvas, "held")).toHaveTextContent("Needs a look: 1");
 		// Nothing runs until an admin acts: broken, so red.
 		await expect(figureValue(canvas, "held")?.querySelector(".text-destructive")).not.toBeNull();
-		const held = canvas.getByRole<HTMLAnchorElement>("link", { name: "1 review on hold" });
-		await expect(new URL(held.href).searchParams.getAll("status")).toStrictEqual(["ON_HOLD"]);
+		await expect(canvas.queryByRole("link", { name: "1 review on hold" })).toBeNull();
 		await expect(rowsOf(canvas)).toHaveLength(1);
 		await expect(rowsOf(canvas)[0]).toHaveTextContent("#1431Alan TuringOn hold42 min");
 	},
@@ -277,6 +278,6 @@ export const Dark: Story = {
 	},
 	globals: { theme: "dark" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("link", { name: "See all 8" })).toBeVisible();
+		await expect(canvas.getByRole("link", { name: "See all 7" })).toBeVisible();
 	},
 };

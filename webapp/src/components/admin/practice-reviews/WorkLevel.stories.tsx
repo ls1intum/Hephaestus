@@ -6,6 +6,7 @@ import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
 
+import { levelsOpenedBy } from "@/test/detail-stack";
 import {
 	itemEventsOf,
 	mergedPullRequestFacts,
@@ -17,19 +18,12 @@ import {
 } from "./fixtures";
 import { SHEET_SECTIONS } from "./RecordSheet";
 import { itemLevel } from "./review-levels";
+
 import { WorkLevel } from "./WorkLevel";
 
 const retryItem = fn();
-/** The pull request's events: one started its review, one waited out a cooldown, one was blocked. */
 const reviewItemEvents = itemEventsOf(reviewDetailCompleted);
 
-/**
- * One item's sheet, in the order every record sheet has: a status line (what became of its latest
- * event, how many events started a review, the latest), What it is (kind, where it lives, the work
- * it belongs to, and what its provider reports), its history — every event on the item with how we
- * came to know, what became of it, why no review started and the setting that would let it
- * through — Technical (closed) and asking for a review as the footer.
- */
 const meta = {
 	component: WorkLevel,
 	parameters: { layout: "fullscreen" },
@@ -55,10 +49,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Every event on the pull request, oldest first, with what became of each, and what its provider
- * reports about it.
- */
 export const WithEvents: Story = {
 	play: async ({ args, userEvent }) => {
 		const panelElement = await settledDrawerPanel();
@@ -71,20 +61,17 @@ export const WithEvents: Story = {
 		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(
 			`${reviewItemEvents.length} events, 1 started a review`,
 		);
-		// Why an event started no review, with the setting that would let it through.
 		history.getByText(/The assigned AI model was unavailable\./u);
 		await expect(history.getByRole("link", { name: "Open AI models" })).toHaveAttribute(
 			"href",
 			expect.stringContaining("/admin/models"),
 		);
-		// What the provider reports, linked where it has a page.
 		panel.getByText("feature/retry-service → main");
-		await expect(panel.getByRole("link", { name: "Failing" })).toHaveAttribute(
+		await expect(panel.getByRole("link", { name: /^Failing\b/u })).toHaveAttribute(
 			"href",
 			expect.stringContaining("/checks"),
 		);
 		await userEvent.click(panel.getByRole("button", { name: "Request review" }));
-		// It starts a review, so it asks first.
 		await expect(args.onRequestReview).not.toHaveBeenCalled();
 		const confirm = await screen.findByRole("alertdialog");
 		await userEvent.click(within(confirm).getByRole("button", { name: "Request review" }));
@@ -92,7 +79,6 @@ export const WithEvents: Story = {
 	},
 };
 
-/** While a review of the item is queued or running, the footer says so and asks nothing. */
 export const RequestBlockedWhileRunning: Story = {
 	args: { requestBlocked: "A review of this work is already queued or running." },
 	play: async ({ args, userEvent }) => {
@@ -104,7 +90,6 @@ export const RequestBlockedWhileRunning: Story = {
 	},
 };
 
-/** An issue reports only what its provider has for it: no branches, size or checks. */
 export const IssueFacts: Story = {
 	args: {
 		item: { status: "ready", item: trackerIssue },
@@ -119,7 +104,6 @@ export const IssueFacts: Story = {
 	},
 };
 
-/** A pull request review is its own item, and links to the pull request it belongs to. */
 export const PartOfAPullRequest: Story = {
 	args: {
 		item: { status: "ready", item: pullRequestReviewItem },
@@ -129,15 +113,13 @@ export const PartOfAPullRequest: Story = {
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		await expect(panel.getByRole("link", { name: "Open the work it belongs to" })).toHaveAttribute(
-			"href",
-			expect.stringContaining(`item%3A${reviewItem.id}`),
-		);
+		await expect(
+			levelsOpenedBy(panel.getByRole("link", { name: "Open the work it belongs to" })),
+		).toEqual(["item:42"]);
 		await expect(panel.queryByRole("button", { name: "Request review" })).toBeNull();
 	},
 };
 
-/** No event was recorded on the item: the history says so instead of an empty list. */
 export const NoEvents: Story = {
 	args: { events: { status: "ready", events: [] } },
 	play: async () => {
@@ -148,7 +130,6 @@ export const NoEvents: Story = {
 	},
 };
 
-/** What the provider reports could not be read: the events still stand. */
 export const ProviderFactsFailed: Story = {
 	args: { facts: { status: "error", error: new Error("Network down"), onRetry: fn() } },
 	play: async () => {
@@ -158,7 +139,6 @@ export const ProviderFactsFailed: Story = {
 	},
 };
 
-/** While the item is read, the sheet's shape stands in for it. */
 export const Loading: Story = {
 	args: {
 		item: { status: "loading" },
@@ -171,7 +151,6 @@ export const Loading: Story = {
 	},
 };
 
-/** The item could not be read: the sheet says so and offers to try again. */
 export const LoadFailed: Story = {
 	args: { item: { status: "error", error: new Error("Network down"), onRetry: retryItem } },
 	play: async ({ userEvent }) => {

@@ -36,11 +36,6 @@ import { EvidenceFileBlock } from "./EvidenceFileBlock";
 import { OwnFeedbackList } from "./OwnFeedbackList";
 import { type FeedbackResponseControls, resultSummary } from "./reviews";
 
-/**
- * The reviewer's own words about this result, in the Markdown it writes them in: a file, a
- * field or a value it quotes comes back as code rather than as a line of stray backticks. The
- * same restricted rendering the feedback card's body gets, so the two never drift apart.
- */
 function ReviewerText({ children }: { children: string }) {
 	return (
 		<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm text-pretty")}>
@@ -55,7 +50,6 @@ interface DetailSectionProps {
 	children: ReactNode;
 }
 
-/** A section of the open row: its label in the muted kicker, then what it carries. */
 function DetailSection({ label, className, children }: DetailSectionProps) {
 	return (
 		<div className={cn("flex min-w-0 flex-col gap-1", className)}>
@@ -95,16 +89,10 @@ function isResultDetail(result: ResultList | ResultDetail): result is ResultDeta
 	return "explanation" in result;
 }
 
-/**
- * What the review wrote about the work, in the order the open row shows it: why, the problems, the
- * questions it left open, an example, what it checked, and the result's own evidence. A result as
- * a list carries its problems' summaries and nothing else.
- */
 function reasonsOf(result: ResultList | ResultDetail) {
 	const detail = isResultDetail(result) ? result : undefined;
 	return {
 		explanation: detail?.explanation,
-		// In the review's order: the server sends them by position.
 		problems: result.problems,
 		openQuestions: detail?.evidence?.openQuestions ?? NO_OPEN_QUESTIONS,
 		example: detail?.example ?? null,
@@ -126,7 +114,6 @@ function hasReasons(reasons: ResultReasons): boolean {
 	);
 }
 
-/** Each section of what the review wrote, under its own label; one it did not write is left out. */
 function ReasonSections({ reasons }: { reasons: ResultReasons }) {
 	return (
 		<>
@@ -164,12 +151,6 @@ function ReasonSections({ reasons }: { reasons: ResultReasons }) {
 	);
 }
 
-/**
- * One result as a row of its review's card: the verdict on its head, and, open, the problems behind
- * it, the questions the review left open, an example from the work, and the feedback it was the
- * basis of. The outcome is what the reader acts on, so the severity of the result and of each
- * problem stays in the workspace's admin console rather than ranking the reader's own work here.
- */
 export function ReviewResultRow({
 	result,
 	defaultOpen = true,
@@ -186,18 +167,11 @@ export function ReviewResultRow({
 	const hasWorkLine = rendersContent(work);
 	const hasBody =
 		markedIncorrect || note !== undefined || hasReasons(reasons) || feedback.length > 0;
-	// The summary is the row's anchor and the heaviest text in it; the practice under it is the pill
-	// every practice surface names a practice with. A result with no words of its own — a met one
-	// may have none — is named by its practice, and the pill would only repeat it.
 	const summary = resultSummary(result);
 	const showPill = showPracticeName && summary !== result.practiceName;
 
-	// At the reflow width the summary takes the whole line and the outcome and the badges sit under
-	// it, at the right, wrapping among themselves when even that line is too narrow; from `sm` up
-	// they share the line with the summary.
 	const headLineClassName = cn(
 		"flex w-full min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5 px-4 pt-2.5",
-		// The work line below is the same block's second line, so the padding closes under it.
 		hasWorkLine ? "pb-1" : "pb-2.5",
 	);
 	const headLine = (
@@ -233,8 +207,7 @@ export function ReviewResultRow({
 		</>
 	);
 
-	// A row with nothing under its head line is not a control: a button that opens nothing would
-	// still take focus and a pointer.
+	// A row with no expandable detail must not create an empty focusable control.
 	if (!hasBody) {
 		return (
 			<li>
@@ -282,10 +255,6 @@ export function ReviewResultRow({
 	);
 }
 
-/**
- * Muted terms with the reviewer's words for each. A definition list, so a term and what the review
- * wrote for it reach a screen reader as one pair rather than as two sentences in a row.
- */
 function TermList({ pairs }: { pairs: EvidenceCheck[] }) {
 	return (
 		<dl className="grid min-w-0 grid-cols-1 gap-x-3 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
@@ -301,14 +270,12 @@ function TermList({ pairs }: { pairs: EvidenceCheck[] }) {
 	);
 }
 
-/** Quoted places as their blocks, in the order the reviewer cited them. */
 function EvidenceBlocks({ locations }: { locations: EvidenceLocation[] }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-2">
 			{locations.map((location) => (
 				<EvidenceFileBlock
-					// A diff pair only folds when both sides carry a quote, so a side with none leaves two
-					// citations of the same lines apart: the side and the missing quote tell them apart.
+					// Fold a diff pair only when both sides retain quotes; missing quotes carry distinct evidence limits.
 					key={`${location.sourceKind}-${location.path ?? ""}-${location.commit ?? ""}-${location.startLine ?? ""}-${location.side ?? ""}-${location.snippet === undefined}`}
 					location={location}
 				/>
@@ -317,23 +284,13 @@ function EvidenceBlocks({ locations }: { locations: EvidenceLocation[] }) {
 	);
 }
 
-/**
- * The blocks of what one problem, open question or example cites. Each list folds on its own, so
- * a quote never joins the block of another problem.
- */
 function CitationBlocks({ citations }: { citations: EvidenceCitation[] }) {
 	const locations = toEvidenceLocations(citations);
 	return locations.length > 0 ? <EvidenceBlocks locations={locations} /> : null;
 }
 
-/** One item of a list inside the open row: a block on the row's ground, so items stay apart. */
 const ITEM_CLASS = "flex min-w-0 flex-col gap-1.5 rounded-xl border bg-background p-3";
 
-/**
- * The problems behind a result that is not met, in the review's order: what is wrong, and — on a
- * result in full — why, where, and what to change. No problem carries its severity here, for the
- * reason the row gives.
- */
 function ProblemList({ problems }: { problems: (ProblemSummary | Problem)[] }) {
 	return (
 		<ol aria-label="Problems" className="flex min-w-0 flex-col gap-2">
@@ -355,10 +312,7 @@ function ProblemList({ problems }: { problems: (ProblemSummary | Problem)[] }) {
 	);
 }
 
-/**
- * What the review could not settle, each with what would settle it. An open question makes no
- * claim about the work and is never feedback, so it reads as a question and nothing more.
- */
+// Open questions describe uncertainty, so they cannot become feedback claims.
 function OpenQuestionList({ questions }: { questions: OpenQuestion[] }) {
 	return (
 		<ul aria-label="Open questions" className="flex min-w-0 flex-col gap-2">
@@ -373,11 +327,7 @@ function OpenQuestionList({ questions }: { questions: OpenQuestion[] }) {
 	);
 }
 
-/**
- * One place in the work the review points at, with its note on it. It is evidence about the work
- * on the neutral ground every other block has: never praise, and never in a status colour that
- * would read as a grade.
- */
+// An example is evidence about the work, not praise of its author.
 function ExampleFromTheWork({ example }: { example: ResultExample }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-1.5">

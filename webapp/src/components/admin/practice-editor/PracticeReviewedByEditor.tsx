@@ -38,7 +38,6 @@ export interface PracticeReviewedByEditorProps {
 	 */
 	cleared: readonly string[];
 	error?: string;
-	/** The control the error points at, so the message is drawn beside the field it names. */
 	errorFocusId?: string;
 	disabled?: boolean;
 }
@@ -50,10 +49,7 @@ function joinPhrases(phrases: readonly string[]): string {
 	return `${phrases.slice(0, -1).join(", ")} and ${phrases.at(-1) ?? ""}`;
 }
 
-/**
- * Who reviews the practice. Separate from feedback mode: a practice that people review records no
- * automated result whatever its feedback mode, and a practice whose feedback is off is still reviewed.
- */
+// Reviewed by controls result production; feedback mode controls delivery.
 export function PracticeReviewedByEditor({
 	value,
 	onChange,

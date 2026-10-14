@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-/** Resolves an item and the caller's review permissions from its provider URL. */
 @ConditionalOnServerRole
 @WorkspaceScopedController
 @RequestMapping("/practices/review-context")

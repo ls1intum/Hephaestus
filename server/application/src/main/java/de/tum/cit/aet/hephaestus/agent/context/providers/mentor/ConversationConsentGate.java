@@ -7,23 +7,7 @@ import java.util.Set;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Fail-closed consent gate + untrusted-content quarantine shared by every mentor content source that can surface
- * {@code chat.conversation_thread}-derived (Slack) content into a mentor turn. Such content may have been LLM-composed
- * over the raw messages of a Slack thread's participants, so it may only reach the mentor while that thread's
- * source channel consent is still {@code ACTIVE} — the exact gate the Slack projection applies on the raw
- * message read.
- *
- * <p>The thread → channel → consent linkage is owned by {@code integration.slack}; this gate reads it only
- * through the chat-domain {@link ConversationSourceLiveness} SPI (implemented by {@code integration.slack}), so
- * the dependency runs one way and the agent carries no raw SQL against {@code slack_*} tables.
- *
- * <p><strong>Erasure (GDPR "erase the copies").</strong> On channel uninstall/erase the Slack module flips consent
- * to {@code REVOKED} and hard-deletes the derived results/feedback through the practices-owned
- * {@code practices.spi.ConversationFeedbackErasure} port. This gate remains the fail-closed safety net for the
- * window between a consent change and the physical erase, and for any derived row a purge has not yet reached
- * (the {@code practiceResult}/{@code feedback} rows carry no FK back to {@code slack_thread}).
- */
+/** Derived conversation content requires live source consent through {@link ConversationSourceLiveness}, including during erasure. */
 @Component
 @ConditionalOnCaptureRole
 public class ConversationConsentGate {

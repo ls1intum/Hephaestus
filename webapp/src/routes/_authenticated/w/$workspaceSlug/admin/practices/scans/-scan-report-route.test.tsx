@@ -22,7 +22,7 @@ import {
 	type WireProblem,
 } from "./-scan-wire";
 
-// Mounting the real route pulls in the whole admin layout and its lazy modules.
+// Route mounting loads the admin layout and lazy modules; allow time for the first render.
 vi.setConfig({ testTimeout: 20_000 });
 
 const REPORT_URL = `/w/acme/admin/practices/scans/${SCAN_ID}`;
@@ -67,7 +67,6 @@ function serveReport({ scan, report = (current) => wireReport(current), problems
 	return reads;
 }
 
-/** The value a figure in the counts shows, read by its label. */
 function figure(counts: HTMLElement, label: string): string | null | undefined {
 	const term = within(counts).getByText(label, { selector: "dt" });
 	return term.nextElementSibling?.textContent;
@@ -88,14 +87,12 @@ describe("scan report route", () => {
 
 			renderRouteAtWithRouter(REPORT_URL);
 			await screen.findByRole("heading", { name: "ls1intum/hephaestus" }, ROUTE_RENDER_WAIT);
-			// Still listing files, so the progress names no total and no percentage.
 			screen.getByText(/1 practice and file pairs finished so far/u);
 			expect(screen.queryByText(/%/u)).toBeNull();
 			const first = reads.report;
 
 			await vi.advanceTimersByTimeAsync(SCAN_POLL_MS);
 			await vi.waitFor(() => expect(reads.report).toBeGreaterThan(first));
-			// A refetch keeps the loaded report on screen: no skeleton in its place.
 			screen.getByRole("heading", { name: "ls1intum/hephaestus" });
 
 			status = "COMPLETE";
@@ -164,12 +161,10 @@ describe("scan report route", () => {
 		const text = rows.map((row) => row.textContent);
 		expect(text[2]).toContain("Withheld");
 		expect(text[2]).toContain("The assigned AI model was unavailable.");
-		// A reason code this page has no words for is never shown as the code.
 		expect(text[3]).toContain("Not reviewed");
 		expect(text[3]).toContain("The scan ended before this file was reviewed.");
 		expect(files.textContent).not.toContain("SOMETHING_THE_PAGE_DOES_NOT_KNOW");
 		expect(files.textContent).not.toContain("MODEL_UNAVAILABLE");
-		// The earlier result is earlier evidence, not this scan's verdict.
 		expect(text[3]).toContain("Earlier evidence, not from this scan");
 		expect(text[4]).toContain("Removed");
 	});
@@ -194,7 +189,6 @@ describe("scan report route", () => {
 		const absent = await screen.findByRole("table", { name: "Problems in this scan" });
 		await within(absent).findByText("The upload ignores the server refusal.");
 		expect(within(absent).queryByText("A failed upload is logged and then ignored.")).toBeNull();
-		// A proved repair reads Now met; the other absence says it proves nothing.
 		within(absent).getByText("Now met");
 		within(absent).getByText(/That alone does not prove a fix\./u);
 
@@ -262,7 +256,6 @@ describe("scan report route", () => {
 	});
 });
 
-/** Object URLs and the link press of a download, recorded instead of performed. */
 function captureDownloads() {
 	const created: Blob[] = [];
 	const revoked: string[] = [];
@@ -283,7 +276,7 @@ function captureDownloads() {
 }
 
 describe("scan report SARIF export", () => {
-	// jsdom has no object URLs; each case stands them in and puts back whatever was there.
+	// jsdom needs object-URL stubs; restore them after each case.
 	const originals = {
 		createObjectURL: Object.getOwnPropertyDescriptor(URL, "createObjectURL"),
 		revokeObjectURL: Object.getOwnPropertyDescriptor(URL, "revokeObjectURL"),
@@ -355,7 +348,6 @@ describe("scan report SARIF export", () => {
 		screen.getByText("This scan's details are past their retention.");
 		expect(downloads).toHaveLength(0);
 		screen.getByRole("heading", { name: "ls1intum/hephaestus" });
-		// The control is back and can be pressed again.
 		expect(screen.getByRole("button", { name: "Export SARIF" })).toHaveProperty("disabled", false);
 	});
 });

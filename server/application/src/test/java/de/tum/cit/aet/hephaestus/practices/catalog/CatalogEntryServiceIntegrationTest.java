@@ -18,14 +18,17 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
     CatalogService catalog;
 
     @Autowired
+    CatalogCustomizationService customization;
+
+    @Autowired
     CatalogEntryRepository entries;
 
     @Test
     void shouldKeepKindInItsColumnWithoutDuplicatingAuthoredContent() {
         String slug = "local-" + UUID.randomUUID();
         var definition = DefinitionTestFixtures.definition();
-        var created =
-                catalog.createPractice(new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 2));
+        var created = customization.createPractice(
+                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 2));
         var row = entries.findById(new CatalogEntry.Id(CatalogEntryType.PRACTICE, slug))
                 .orElseThrow();
         assertThat(row.getKind()).isEqualTo(new ItemKind("scm.pull_request"));
@@ -33,7 +36,7 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(Objects.requireNonNull(row.getDefinition()).has("kind")).isFalse();
         assertThat(row.getKind()).isEqualTo(created.kind());
         assertThat(created.effective().definition()).isEqualTo(definition);
-        assertThatThrownBy(() -> catalog.updatePractice(
+        assertThatThrownBy(() -> customization.updatePractice(
                         slug,
                         new CatalogPracticeInputDTO(slug, "scm.issue", null, definition, 2),
                         EntityTagPrecondition.parse(EntityTagPrecondition.format(created.etag()))))
@@ -44,16 +47,16 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
     void shouldRestoreExclusionWithoutLosingTheAuthoredDefinition() {
         String slug = "exclude-" + UUID.randomUUID();
         var definition = DefinitionTestFixtures.definition();
-        var created =
-                catalog.createPractice(new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 0));
-        catalog.setExcluded(
+        var created = customization.createPractice(
+                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 0));
+        customization.setExcluded(
                 CatalogEntryType.PRACTICE,
                 slug,
                 true,
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(created.etag())));
         var excluded = catalog.practice(slug);
         assertThat(excluded.offered()).isFalse();
-        catalog.setExcluded(
+        customization.setExcluded(
                 CatalogEntryType.PRACTICE,
                 slug,
                 false,
@@ -69,7 +72,7 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
                 .findFirst()
                 .orElseThrow();
         var local = DefinitionTestFixtures.rename(shipped.effective().definition(), "Local catalog name");
-        var changed = catalog.updatePractice(
+        var changed = customization.updatePractice(
                 shipped.slug(),
                 new CatalogPracticeInputDTO(
                         shipped.slug(),
@@ -78,19 +81,19 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
                         local,
                         7),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(shipped.etag())));
-        catalog.setExcluded(
+        customization.setExcluded(
                 CatalogEntryType.PRACTICE,
                 shipped.slug(),
                 true,
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(changed.etag())));
         var excluded = catalog.practice(shipped.slug());
-        catalog.acknowledge(
+        customization.acknowledge(
                 CatalogEntryType.PRACTICE,
                 shipped.slug(),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(excluded.etag())));
         var declined = catalog.practice(shipped.slug());
         assertThat(declined.effective().definition()).isEqualTo(local);
-        catalog.reset(
+        customization.reset(
                 CatalogEntryType.PRACTICE,
                 shipped.slug(),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(declined.etag())));
@@ -103,7 +106,7 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(row.getDefinition()).isNull();
         assertThat(row.getBase()).isNull();
         assertThat(row.getKind()).isNull();
-        catalog.setExcluded(
+        customization.setExcluded(
                 CatalogEntryType.PRACTICE,
                 shipped.slug(),
                 false,
@@ -115,20 +118,21 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
     void shouldRejectAnOldEtagAfterTheDefinitionChangesAndIsRestored() {
         String slug = "stale-" + UUID.randomUUID();
         var definition = DefinitionTestFixtures.definition();
-        var first = catalog.createPractice(new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 0));
-        var edited = catalog.updatePractice(
+        var first = customization.createPractice(
+                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 0));
+        var edited = customization.updatePractice(
                 slug,
                 new CatalogPracticeInputDTO(
                         slug, "scm.pull_request", null, DefinitionTestFixtures.rename(definition, "Edited name"), 0),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(first.etag())));
-        var restored = catalog.updatePractice(
+        var restored = customization.updatePractice(
                 slug,
                 new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 0),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(edited.etag())));
         assertThat(restored.effective()).isEqualTo(first.effective());
         assertThat(restored.base()).isEqualTo(first.base());
         assertThat(restored.etag()).isNotEqualTo(first.etag());
-        assertThatThrownBy(() -> catalog.setExcluded(
+        assertThatThrownBy(() -> customization.setExcluded(
                         CatalogEntryType.PRACTICE,
                         slug,
                         true,

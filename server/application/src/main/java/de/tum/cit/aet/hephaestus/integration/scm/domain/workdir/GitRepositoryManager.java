@@ -462,7 +462,6 @@ public class GitRepositoryManager {
         return List.copyOf(changes);
     }
 
-    /** Captures regular files at one commit without history or author attribution. */
     public GitTreeSnapshot readScanSnapshot(RepositoryKey repository, String sha) {
         if (!isEnabled()) throw new IllegalStateException("Repository capture is disabled");
         if (!ObjectId.isId(sha)) throw new GitOperationException("Invalid scan commit", new IOException());

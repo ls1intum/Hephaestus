@@ -134,6 +134,7 @@
 					"description": "Whether a practice bound to one of this source's item kinds reads it unless its author says otherwise. The starting evidence of a kind, stated by the sources themselves rather than by a per-kind list somewhere that has to be edited when a kind is added."
 				},
 				"citation": {
+					"description": "Requirements for the side and version named by a citation to this source.",
 					"type": "object",
 					"additionalProperties": false,
 					"required": ["side", "revision"],

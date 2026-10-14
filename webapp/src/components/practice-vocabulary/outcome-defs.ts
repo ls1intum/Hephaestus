@@ -31,24 +31,15 @@ export const OUTCOME_DEFS: StatusDefs<Outcome> = {
 	},
 };
 
-/** "3 not met results": a count of results with one outcome, as a list facet or a count cell says it. */
 export function outcomeCountNoun(outcome: Outcome, count: number): string {
 	const label = OUTCOME_DEFS[outcome].label.toLowerCase();
 	return `${label} ${count === 1 ? "result" : "results"}`;
 }
 
-/**
- * "3 problems": the problems under a not met result. Every problem is at a place in the work, so
- * the count is the number of rows and needs no other word.
- */
 export function problemCount(count: number): string {
 	return `${count} ${count === 1 ? "problem" : "problems"}`;
 }
 
-/**
- * The outcome as a result's head line says it: "Not met · 3 problems" when its problems are known,
- * and the outcome's own word otherwise.
- */
 export function resultVerdict(outcome: Outcome, problems: number | undefined): string {
 	const { label } = OUTCOME_DEFS[outcome];
 	return outcome === "NOT_MET" && problems !== undefined && problems > 0

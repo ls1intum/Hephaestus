@@ -24,10 +24,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Ordered after the step-up gate, so a refused confirmation never leaves a {@code USER_VIEW}
- * success behind.
- */
+// The step-up gate must run first so a refused confirmation cannot leave a USER_VIEW success.
 @ConditionalOnServerRole
 @Configuration(proxyBeanMethods = false)
 public class UserViewAuthorizationConfig {
@@ -64,10 +61,7 @@ public class UserViewAuthorizationConfig {
         return interceptor;
     }
 
-    /**
-     * Spring has already converted the {@code accountId} path variable by the time the advisor
-     * runs.
-     */
+    // Spring converts the accountId path variable before this advisor runs.
     private static long viewedAccountId(MethodInvocation invocation) {
         Parameter[] parameters = invocation.getMethod().getParameters();
         for (int i = 0; i < parameters.length; i++) {

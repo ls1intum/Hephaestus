@@ -27,10 +27,6 @@ const ROWS: ComparisonRow[] = [
 	row("testing", "Testing your changes", "4 practices", outcomes([10, 17, 2, 4])),
 ];
 
-/**
- * One table for practice groups and for practices: the caller decides the subject cell, what the
- * count column counts and the row link.
- */
 const meta = {
 	component: WorkspaceComparisonTable,
 	tags: ["autodocs"],
@@ -49,7 +45,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Each row with its count and its results; a row with none says so instead of four zeros. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("table", { name: "All practice groups" })).toBeVisible();
@@ -66,7 +61,6 @@ export const Default: Story = {
 	},
 };
 
-/** The row the reader came from in their Practice profile, marked in words as well. */
 export const Marked: Story = {
 	args: { markedKey: "failure" },
 	play: async ({ canvas }) => {

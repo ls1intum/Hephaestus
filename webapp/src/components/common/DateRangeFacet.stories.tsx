@@ -27,8 +27,6 @@ export const StartOnly: Story = {
 	args: { value: { from: new Date(2026, 6, 1) } },
 	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("From 1 Jul 2026")).toBeVisible();
-		// The applied range is in the accessible name too, so the control reads the same to a screen
-		// reader as it looks: "Recorded: From 1 Jul 2026".
 		canvas.getByRole("button", { name: "Recorded: From 1 Jul 2026" });
 	},
 };

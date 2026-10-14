@@ -3,14 +3,13 @@ import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	getPracticeQueryKey,
+	getPracticeGuidanceOptions,
 	getPracticeDefinitionOptionsQueryKey,
 	listPracticeGroupsQueryKey,
 	listPracticesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
-import { mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
+import { definitionOf, mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
 
-import { getPracticeGuidanceOptions } from "@/api/@tanstack/react-query.gen";
-import { definitionOf } from "@/components/admin/practice-editor/fixtures";
 import type {
 	AdoptablePractice,
 	PracticeAdoptionPreview,
@@ -72,10 +71,6 @@ function summary(
 	};
 }
 
-/**
- * The preview as it stands, then as it stands after someone else changed it — the shape a stale 409 is
- * about. A handler is where setup is allowed to branch; a test body is not.
- */
 function planChangedAfterTheFirstRead() {
 	let reads = 0;
 	return http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () => {
@@ -92,7 +87,6 @@ function planChangedAfterTheFirstRead() {
 	});
 }
 
-/** The preview once, and then nothing: the refresh a 409 asks for is itself allowed to fail. */
 function planUnreadableAfterTheFirstRead() {
 	let reads = 0;
 	return http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () => {
@@ -329,8 +323,6 @@ describe("catalog adoption over practice setup", () => {
 		// `role="alert"` announces the change without pulling focus off the action.
 		const changed = await screen.findByRole("alert");
 		expect(changed.textContent).toContain("The catalog changed while you were reading");
-		// The rule is what a stale 409 is about, so open the disclosure that holds it and check the panel
-		// is showing the refetched one rather than the plan that was just rejected.
 		fireEvent.click(await screen.findByRole("button", { name: "How it decides" }));
 		await screen.findByText("Updated review rule that must be reviewed.");
 	});
@@ -365,7 +357,6 @@ describe("catalog adoption over practice setup", () => {
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([]),
 			),
-			// Someone else added it: the preview read after the refusal says so.
 			http.get(
 				"*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug",
 				() => HttpResponse.json(preview),
@@ -421,7 +412,6 @@ describe("catalog adoption over practice setup", () => {
 		fireEvent.click(within(details).getByRole("radio", { name: "Required" }));
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
 
-		// One request: the kind and the whole definition, the group beside it and never inside it.
 		await waitFor(() => expect(created).toHaveBeenCalledOnce(), ROUTE_RENDER_WAIT);
 		expect(created.mock.lastCall?.[0]).toMatchObject({
 			slug: "explain-the-change",

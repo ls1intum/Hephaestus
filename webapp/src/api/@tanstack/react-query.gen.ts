@@ -3324,8 +3324,6 @@ export const getOwnMembershipQueryKey = (options: Options<GetOwnMembershipData>)
 
 /**
  * Get your workspace membership
- *
- * One representative membership, with the account's effective workspace role.
  */
 export const getOwnMembershipOptions = (options: Options<GetOwnMembershipData>) => queryOptions<GetOwnMembershipResponse, DefaultError, GetOwnMembershipResponse, ReturnType<typeof getOwnMembershipQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

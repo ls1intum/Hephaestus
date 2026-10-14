@@ -77,13 +77,7 @@ class ProxyRoutingService {
                 null);
     }
 
-    /**
-     * Routes a practice script call to the model of its slot. Its in-flight spend also counts the attempt's
-     * other models for practice scripts, because none of them is in the ledger before the attempt ends. Only spend
-     * from the same purse counts, since each purse has its own cap.
-     *
-     * @return empty when no model of that kind is bound for this job
-     */
+    // Include all direct models' in-flight spend until their ledger rows exist; only the same funding source counts.
     private Optional<ProxyRouting> practiceScriptRouting(ReviewJob job, ConfigSnapshot snapshot, ModelKind slot) {
         FrozenModel model = slot == ModelKind.CHAT ? snapshot.model() : snapshot.practiceScriptSlot(slot);
         if (model == null) {
@@ -131,7 +125,6 @@ class ProxyRoutingService {
                 slot == null ? null : model.dataHandlingTier());
     }
 
-    /** Priced per kind like the ledger rows that the attempt ends with, not once per practice. */
     private static BigDecimal practiceScriptSpentUsd(
             ReviewJob job,
             ConfigSnapshot snapshot,
@@ -173,11 +166,7 @@ class ProxyRoutingService {
                 .orElse(null);
     }
 
-    /**
-     * Priced at the rates frozen onto the row at admission, so what the gate judges an attempt on
-     * cannot drift from what the ledger will charge it. Reasoning tokens are deliberately absent from
-     * the arguments: they are already counted inside the output bucket.
-     */
+    // Budget gates use frozen rates; reasoning tokens are already included in output.
     private static BigDecimal spentSoFarUsd(ReviewJob job, ConfigSnapshot snapshot) {
         LlmPriceSnapshot price = snapshot.model().priceSnapshot();
         if (price == null) {

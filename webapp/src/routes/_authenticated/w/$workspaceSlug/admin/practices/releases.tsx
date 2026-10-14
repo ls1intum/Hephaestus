@@ -44,7 +44,6 @@ function PracticeReleaseInbox() {
 	const refresh = async (practiceSlug: string) => {
 		const path = { workspaceSlug, practiceSlug };
 		await Promise.all([
-			// Accepting saves a new version; declining changes where the practice stands with the catalog.
 			queryClient.invalidateQueries({ queryKey: getPracticeQueryKey({ path }) }),
 			queryClient.invalidateQueries({ queryKey: listPracticeVersionsQueryKey({ path }) }),
 			queryClient.invalidateQueries({
@@ -53,7 +52,6 @@ function PracticeReleaseInbox() {
 			queryClient.invalidateQueries({
 				queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
 			}),
-			// An accepted update can change a practice script, which makes the needs on record stale.
 			queryClient.invalidateQueries({
 				queryKey: listPracticeScriptNeedsQueryKey({ path: { workspaceSlug } }),
 			}),

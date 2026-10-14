@@ -28,13 +28,8 @@ import org.hibernate.type.StandardBasicTypes;
  */
 public final class MonitoredRepositoryScope implements FunctionContributor {
 
-    /** The JPQL function this class contributes to Hibernate. */
     public static final String FUNCTION = "monitor_covers_repository";
 
-    /**
-     * The provider a workspace's SCM connection is registered under, joined from {@code
-     * monitor_connection}.
-     */
     private static final String SOURCE_PROVIDER =
             " FROM connection monitor_connection JOIN identity_provider monitor_provider ON monitor_provider.type = monitor_connection.kind AND monitor_provider.server_url = COALESCE(monitor_connection.config ->> 'serverUrl', CASE monitor_connection.kind WHEN 'GITHUB' THEN '"
                     + PersonSourceNamespace.GITHUB_DEFAULT_URL

@@ -29,7 +29,6 @@ import { listsNoModels, UNLISTED_MODELS } from "@/lib/llm-api-protocol-labels";
 
 import { WorkspaceLlmModelsTable } from "./WorkspaceLlmModelsTable";
 
-/** What the last test of one connection came back with. */
 export type ProviderTestResult =
 	| { status: "answered"; result: WorkspaceLlmProbeResult }
 	| { status: "failed"; message: string };
@@ -47,18 +46,13 @@ export interface WorkspaceLlmProviderPanelProps {
 	 * panel: providers already connected stay listed and editable.
 	 */
 	registrationAllowed: boolean;
-	/** The last test of each connection, by connection id. */
 	testResults: ReadonlyMap<number, ProviderTestResult>;
-	/** Connections with a test in flight. */
 	testingConnectionIds: ReadonlySet<number>;
-	/** Connections with an edit or a disconnect in flight. */
 	writingConnectionIds: ReadonlySet<number>;
-	/** Models with an edit or a delete in flight. */
 	writingModelIds: ReadonlySet<number>;
 	onAddConnection: () => void;
 	onEditConnection: (connection: WorkspaceLlmConnection) => void;
 	onTestConnection: (connection: WorkspaceLlmConnection) => void;
-	/** Called once the admin confirmed. */
 	onDisconnect: (connection: WorkspaceLlmConnection) => void;
 	onAddModel: (connection: WorkspaceLlmConnection) => void;
 	onEditModel: (model: WorkspaceLlmModel) => void;
@@ -96,7 +90,6 @@ const TITLE = "Your providers";
 const DESCRIPTION =
 	"Connect a provider account to run models on your own key. Its usage is billed to that account.";
 
-/** One provider's shape while the providers load: its heading, its facts and its models table. */
 function ProviderPanelSkeleton() {
 	return (
 		<div className="space-y-3" aria-busy="true">
@@ -109,11 +102,6 @@ function ProviderPanelSkeleton() {
 	);
 }
 
-/**
- * The workspace's own AI providers and their models, on AI models below the assignments. One
- * section, each provider a heading with its facts and actions, and its models one bordered table:
- * no card around a table around an empty box.
- */
 export function WorkspaceLlmProviderPanel({
 	state,
 	registrationAllowed,
@@ -130,7 +118,9 @@ export function WorkspaceLlmProviderPanel({
 	onDeleteModel,
 }: WorkspaceLlmProviderPanelProps) {
 	const [disconnecting, setDisconnecting] = useState<WorkspaceLlmConnection | null>(null);
-	if (state.status === "error" && disconnecting !== null) setDisconnecting(null);
+	if (state.status === "error" && disconnecting !== null) {
+		setDisconnecting(null);
+	}
 	const connections = state.status === "ready" ? state.connections : [];
 
 	return (
@@ -138,7 +128,6 @@ export function WorkspaceLlmProviderPanel({
 			title={TITLE}
 			description={DESCRIPTION}
 			className="space-y-6"
-			// With no provider yet, the empty state below holds the one way to add one.
 			actions={
 				registrationAllowed && connections.length > 0 ? (
 					<Button size="sm" variant="outline" onClick={onAddConnection}>
@@ -260,7 +249,6 @@ function ProviderSection({
 	onDeleteModel,
 }: ProviderSectionProps) {
 	const outcome = test && testOutcome(test, connection);
-	// The server refuses to disconnect a provider that still has models.
 	const keepsModels = models.length > 0;
 	const keepsModelsId = useId();
 	return (
@@ -274,9 +262,7 @@ function ProviderSection({
 					<span>{apiKeyLine(connection)}</span>
 				</span>
 			}
-			// Repeated per provider these would otherwise be identical names with nothing tying them to
-			// one (SC 2.4.6); each opens with the button's own visible text so speech control still
-			// matches (SC 2.5.3).
+			// Accessible action names must identify the provider and begin with the visible button label (WCAG 2.4.6, 2.5.3).
 			actions={
 				<div className="flex flex-col gap-1 sm:items-end">
 					<div className="flex flex-wrap items-center gap-2">

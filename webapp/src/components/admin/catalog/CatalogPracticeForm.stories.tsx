@@ -88,7 +88,6 @@ export const Edit: Story = {
 	args: { mode: "edit", practice },
 };
 
-/** About the person who merged, reviewed only when a Swift file changed. */
 export const MergerWithAppliesWhen: Story = {
 	args: {
 		mode: "edit",
@@ -222,8 +221,8 @@ export const RefreshFailed: Story = {
 		await expectPanelContentInset(await settledDrawerPanel());
 		await expect(screen.getByText("We could not refresh the practice editor")).toBeVisible();
 		await expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
-		await expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue(
-			practice.definition?.name,
+		await expect(screen.getByRole("textbox", { name: "Name *" })).toHaveValue(
+			practice.definition.name,
 		);
 	},
 };

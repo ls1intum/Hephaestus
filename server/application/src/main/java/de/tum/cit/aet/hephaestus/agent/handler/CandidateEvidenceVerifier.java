@@ -27,7 +27,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Generic capture checks followed by the item owner's side, revision and change-basis checks. */
 @Component
 class CandidateEvidenceVerifier {
     private final JobEvidenceFiles files;
@@ -49,7 +48,11 @@ class CandidateEvidenceVerifier {
         private final transient @Nullable ObjectNode failure;
 
         Unverified(CandidateRefusal refusal, String reason, @Nullable ObjectNode failure) {
-            super(reason, null, false, false);
+            this(refusal, reason, failure, null);
+        }
+
+        Unverified(CandidateRefusal refusal, String reason, @Nullable ObjectNode failure, @Nullable Throwable cause) {
+            super(reason, cause, false, false);
             this.refusal = refusal;
             this.failure = failure;
         }
@@ -86,7 +89,8 @@ class CandidateEvidenceVerifier {
                 throw new Unverified(
                         CandidateRefusal.MALFORMED_CANDIDATE,
                         "The cited source is not in the source catalog",
-                        citation);
+                        citation,
+                        unknownSource);
             }
             if (!contract.appliesTo(assignment.item().kind().value())
                     || !catalogs.isSourceUsePermitted(source, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)) {
@@ -110,7 +114,8 @@ class CandidateEvidenceVerifier {
                 throw new Unverified(
                         CandidateRefusal.SOURCE_UNAVAILABLE,
                         "The cited source was not captured at this path",
-                        citation);
+                        citation,
+                        unavailable);
             }
             String path = citation.path("path").asString();
             CitationSide side = citation.has("side")

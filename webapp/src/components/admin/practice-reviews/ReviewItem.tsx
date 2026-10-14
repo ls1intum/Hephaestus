@@ -4,7 +4,6 @@ import { InlineLink } from "@/components/common/InlineLink";
 import { reviewedWorkIcon } from "@/components/icons/reviewed-work-icon";
 import { hasText } from "@/lib/text";
 
-/** The repository and the item, when a repository is recorded: `ls1intum/Hephaestus · #1423`. */
 function qualifiedLabel(item: ItemRef): string {
 	return [item.container, item.label].filter(hasText).join(" · ");
 }
@@ -35,10 +34,6 @@ export function ReviewItemLabel({ item, className }: ReviewItemProps) {
 	);
 }
 
-/**
- * The anchor contains the label and nothing else, so a hover affordance can never reach text that is
- * not the link's name. A caller that wants the item's title renders it outside.
- */
 export function ReviewItemLink({ item, className }: ReviewItemProps) {
 	if (item === undefined || !hasText(item.url)) {
 		return <ReviewItemLabel item={item} className={className} />;

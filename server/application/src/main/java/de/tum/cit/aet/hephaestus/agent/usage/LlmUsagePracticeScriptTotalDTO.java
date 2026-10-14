@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import org.jspecify.annotations.NonNull;
 
-/** A month's spend on models for practice scripts, read from the ledger, inside {@link WorkspaceLlmUsageReportDTO}. */
 @Schema(
         description = "The decision, embedding and reranking calls of finished reviews this month, in total. calls, "
                 + "inputTokens, outputTokens and both costs equal the sums of the byPractice entries. reviews and "

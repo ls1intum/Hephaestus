@@ -25,27 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/**
- * Regression coverage for the GDPR Art. 17 hard-delete sweeper ({@link AccountHardDeleteSweeper}).
- *
- * <p>The sweeper is the enforcement half of {@code AccountService.softDelete}: an account sits in
- * {@link Account.Status#DELETING} during the recovery window and, once {@code deleted_at} is older
- * than {@code hephaestus.auth.delete-cooldown}, its personal/auth child rows are purged and the row
- * is flipped to the terminal {@link Account.Status#DELETED} with PII cleared. This test pins that
- * contract against <b>observable database state</b> so a regression in the selection query, the
- * child-row deletes, the PII clearing, or the status flip fails the build.
- *
- * <h2>Time control</h2>
- *
- * The production {@code clock} bean ({@code Clock.systemUTC()}) is used as-is; we never override
- * it. Instead each fixture sets {@code deleted_at} relative to the very clock the sweeper reads
- * (autowired below), and fixtures use the bound cooldown value.
- */
+// Set deletion times relative to the production clock and bound cooldown; overriding the clock would change selection.
 class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
 
-    /**
-     * Tombstone left on display_name (see {@code AccountHardDeleteSweeper.TOMBSTONE_DISPLAY_NAME}).
-     */
     private static final String TOMBSTONE_DISPLAY_NAME = "deleted-account";
 
     @Autowired
@@ -85,8 +67,6 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void sweepNow_pastCooldown_purgesChildrenClearsPiiAndFlipsToDeleted() {
-        // Arrange: an account soft-deleted well before the cutoff, with one row in every child
-        // table.
         Account account = newAccount("Ada Lovelace", "ada@example.com");
         Long id = persistedId(account.getId());
         seedChildRows(id);
@@ -392,11 +372,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         accountRepository.save(account);
     }
 
-    /**
-     * Observable child-row counts in fixed order: account_feature, identity, issued_jwt,
-     * account_export. Read straight from the database (not the persistence context) so the
-     * sweeper's JDBC deletes are reflected.
-     */
+    // Read JDBC deletion results from the database rather than the persistence context.
     private List<Integer> childRowCounts(Long accountId) {
         return List.of(
                 count("account_feature", accountId),

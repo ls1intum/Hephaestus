@@ -31,9 +31,7 @@ export interface ScanProblemTableProps {
 	state: ScanListState<ScanReportProblem>;
 	filter: ProblemBaselineState | undefined;
 	onFilterChange: (filter: ProblemBaselineState | undefined) => void;
-	/** How many problems compare each way with the scan before; the filters say them. */
 	changes: ProblemChanges;
-	/** Pairs that have no result in this scan: withheld or not reviewed. */
 	pairsWithoutResult: number;
 }
 
@@ -67,11 +65,7 @@ function citationText(entry: ScanReportProblem): string {
 		: `${path}:${citation.startLine}–${citation.endLine}`;
 }
 
-/**
- * The problems the scan recorded, and the earlier scan's problems it no longer recorded. An absent
- * problem is a fix only where the file was reviewed again under the same standard and method; every
- * other absence says that it proves nothing.
- */
+// Absence proves a fix only after another review under the same standard and method.
 export function ScanProblemTable({
 	state,
 	filter,
@@ -126,7 +120,7 @@ function ScanProblemResults({
 			return (
 				<EmptyState
 					icon={<SearchXIcon />}
-					headingLevel={3}
+					headingLevel={2}
 					title="No problems match these filters."
 				/>
 			);
@@ -134,7 +128,7 @@ function ScanProblemResults({
 		return (
 			<EmptyState
 				icon={<CircleCheckIcon />}
-				headingLevel={3}
+				headingLevel={2}
 				title="This scan recorded no problems."
 				description={
 					pairsWithoutResult > 0

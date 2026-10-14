@@ -31,7 +31,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The reviews the feed carries, newest first; nothing offers earlier ones when there are none. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("list", { name: "Reviews" })).toBeVisible();
@@ -39,7 +38,6 @@ export const Default: Story = {
 	},
 };
 
-/** Earlier reviews exist, so the timeline continues past the last card. */
 export const LoadMore: Story = {
 	args: { feed: { ...readyFeed, hasMore: true } },
 	play: async ({ canvas, userEvent }) => {
@@ -52,7 +50,6 @@ export const LoadMore: Story = {
 	},
 };
 
-/** A review card's skeleton stands in for the next page. */
 export const LoadingMore: Story = {
 	args: { feed: { ...readyFeed, hasMore: true, isLoadingMore: true } },
 	play: async ({ canvas }) => {
@@ -64,7 +61,6 @@ export const LoadingMore: Story = {
 	},
 };
 
-/** A failed page keeps the reviews already read. */
 export const LoadMoreFailed: Story = {
 	args: { feed: { ...readyFeed, hasMore: true, loadMoreError: new Error("network") } },
 	play: async ({ canvas, userEvent }) => {
@@ -75,7 +71,6 @@ export const LoadMoreFailed: Story = {
 	},
 };
 
-/** One block per review card the feed will show, in a region marked busy until they land. */
 export const Loading: Story = {
 	args: { feed: { status: "loading" } },
 	play: async ({ canvas }) => {
@@ -87,10 +82,6 @@ export const Loading: Story = {
 	},
 };
 
-/**
- * Nothing has reached this surface and nothing earlier is left to read: the empty state, in the
- * surface's own words, instead of a rail with no reviews on it.
- */
 export const NoReviews: Story = {
 	args: { feed: { ...readyFeed, reviews: [] } },
 	play: async ({ canvas }) => {
@@ -99,7 +90,6 @@ export const NoReviews: Story = {
 	},
 };
 
-/** A narrowing hid every review: the way back out sits under the empty state. */
 export const NarrowedToNothing: Story = {
 	args: {
 		feed: { ...readyFeed, reviews: [] },
@@ -108,10 +98,7 @@ export const NarrowedToNothing: Story = {
 	},
 };
 
-/**
- * A narrowing emptied the pages read so far while earlier ones remain: the feed does not yet know
- * that nothing matches, so it says only what it has read and reads the earlier pages by itself.
- */
+/** Empty loaded pages cannot prove a filtered feed empty while earlier pages remain. */
 export const NarrowedToNothingSoFar: Story = {
 	args: {
 		feed: { ...readyFeed, hasMore: true },
@@ -131,7 +118,6 @@ export const NarrowedToNothingSoFar: Story = {
 
 const retryRefresh = fn();
 
-/** A refresh failed: the reviews already read stay, under a warning that they may be out of date. */
 export const RefreshFailed: Story = {
 	args: {
 		feed: {
@@ -147,7 +133,6 @@ export const RefreshFailed: Story = {
 	},
 };
 
-/** A refresh failed on a feed that had nothing yet: the warning stays, beside the empty state. */
 export const RefreshFailedWhileEmpty: Story = {
 	args: {
 		feed: {
@@ -163,7 +148,6 @@ export const RefreshFailedWhileEmpty: Story = {
 	},
 };
 
-/** The feed could not be read: the error says which feed, and its retry asks for it again. */
 export const Failed: Story = {
 	args: { feed: { status: "error", error: new Error("network"), onRetry: fn() } },
 	play: async ({ args, canvas, userEvent }) => {

@@ -515,11 +515,7 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @WithAdminUser
     @DisplayName("another tenant's job id, laundered through the admin's OWN connection, is still a 404")
     void crossTenantJobViaOwnConnection_returns404AndDoesNotCancel() {
-        // The cancel path resolves the job by (jobId, workspaceId) rather than via the connection,
-        // so it
-        // needs its own cross-tenant probe: a valid connection the caller genuinely owns, paired
-        // with a
-        // job id belonging to another tenant.
+        // Cancellation resolves jobs independently of connections, so it needs its own cross-workspace check.
         ensureAdminMembership(workspace);
 
         webTestClient
@@ -549,13 +545,7 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .exchange();
     }
 
-    /**
-     * Takes an explicit bearer token (rather than reading {@code TestAuthUtils.withCurrentUser()}
-     * at call time) so it can be invoked from a background {@link Thread}: {@code
-     * SecurityContextHolder}'s default strategy is a plain (non-inheritable) {@code ThreadLocal},
-     * so a child thread sees no authentication unless the token is captured on the test thread and
-     * passed in explicitly.
-     */
+    // SecurityContextHolder does not inherit into background threads; pass a token captured on the test thread.
     private WebTestClient.ResponseSpec triggerRequest(String bearerToken) {
         return triggerRequest(bearerToken, SyncJobType.RECONCILIATION);
     }

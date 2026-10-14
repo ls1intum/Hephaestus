@@ -15,6 +15,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 @Entity
@@ -54,7 +55,7 @@ public class ItemEvent {
     private Instant occurredAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "found_by", nullable = false)
+    @Column(name = "found_by", nullable = false, length = 16)
     private FoundBy foundBy;
 
     @Nullable
@@ -66,7 +67,8 @@ public class ItemEvent {
     private Long requestedById;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "state", nullable = false)
+    @ColumnDefault("'RECORDED'")
+    @Column(name = "state", nullable = false, length = 16)
     private ItemEventState state;
 
     @Nullable

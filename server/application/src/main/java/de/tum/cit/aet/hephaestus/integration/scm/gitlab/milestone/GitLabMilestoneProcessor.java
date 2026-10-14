@@ -113,8 +113,7 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
 
         Milestone milestone = existingOpt.orElseGet(Milestone::new);
 
-        // Handle nativeId: group milestones use deterministic ID to avoid (provider_id, native_id)
-        // collisions
+        // Group milestone ids must not collide with project milestone ids on the same provider.
         if (isNew) {
             if (dto.groupMilestone()) {
                 milestone.setNativeId(generateDeterministicMilestoneId(repository.getId(), dto.iid()));

@@ -90,13 +90,6 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-/**
- * A workspace on a course subgroup whose students hold access through the parent group, and whose
- * tutors are listed only by a team subgroup. GitLab is stood in for at the HTTP boundary: the real
- * {@code GetGroup}, {@code GetGroupDescendants} and {@code GetGroupMembers} documents are sent and
- * recorded JSON answers parsed; the rows, the workspace roster, review eligibility and review
- * coverage behind them are real.
- */
 class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest {
 
     private static final String GITLAB_URL = "https://gitlab.lrz.de";
@@ -660,10 +653,6 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         return team;
     }
 
-    /**
-     * One team sync of the course group and its subgroup team-1, whose members GitLab lists as
-     * given.
-     */
     private void answerTeamSync(String courseMembers, String teamOneMembers) {
         answer("GetGroup " + COURSE, """
             {"data":{"group":{%s,"parent":null}}}

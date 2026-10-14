@@ -6,7 +6,6 @@ import type {
 	ReviewedBy,
 } from "@/api/types.gen";
 
-/** The review settings of a definition: when it reviews, whose work it is about and what it reads. */
 type ReviewFields = Pick<PracticeDefinition, "reviewOn" | "about" | "reads" | "appliesWhen">;
 
 const SOURCE_CONTRACT = "2.0.0";
@@ -66,7 +65,6 @@ export const mockIssueReviewFields = {
 	},
 } satisfies ReviewFields;
 
-/** A source with every need on offer and no citation coordinates; the catalog's common case. */
 function readSource(source: string, label: string): ReadSourceOption {
 	return {
 		source,
@@ -76,7 +74,7 @@ function readSource(source: string, label: string): ReadSourceOption {
 	};
 }
 
-/** Shared read sources must match the source contract's catalog.json; practice.test.ts checks them. */
+// Source fixtures must match catalog.json; practice.test.ts enforces the contract.
 const relatedWorkSource = readSource("workspace.project-inventory", "Related workspace work");
 const outlineDocumentsSource = readSource("outline.documents", "Outline documents");
 const resultHistorySource = readSource(
@@ -317,7 +315,7 @@ export const mockPracticeDefinitionOptions = {
 	],
 } satisfies PracticeDefinitionOptions;
 
-/** Looked up by kind rather than indexed, so an item type added above cannot repoint a story. */
+// Look up kinds by name so adding one cannot repoint a fixture by array position.
 function itemTypeOf(kind: string): PracticeItemTypeOption {
 	const itemType = mockPracticeDefinitionOptions.itemTypes.find(
 		(candidate) => candidate.kind === kind,

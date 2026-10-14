@@ -5,14 +5,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -24,7 +23,7 @@ import tools.jackson.databind.ObjectMapper;
 class RecentAuthoredWorkContentSourceTest extends BaseUnitTest {
 
     @Mock
-    UserRepository userRepository;
+    AccountSummaryQuery accounts;
 
     @Mock
     MentorContextQueryRepository queryRepository;
@@ -36,10 +35,9 @@ class RecentAuthoredWorkContentSourceTest extends BaseUnitTest {
     RecentAuthoredWorkContentSource source;
 
     @Test
-    void shouldPublishMergedPullRequestResourceUsingItsArtifactId() {
-        User user = new User();
-        user.setLogin("student");
-        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+    void shouldPublishMergedPullRequestResourcesUsingItsSourceId() {
+        when(accounts.findAllByIds(List.of(2L)))
+                .thenReturn(Map.of(2L, new AccountSummaryQuery.AccountSummary(2, "Student", null)));
         PullRequest merged = new PullRequest();
         merged.setId(4009553323L);
         merged.setNumber(9);

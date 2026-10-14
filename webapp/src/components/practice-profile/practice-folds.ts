@@ -40,7 +40,6 @@ export const NOT_OBSERVED_YET = {
 	groupDescription: `No review has observed a practice of these groups in your work ${WINDOW}, or the practice did not apply to it. Open a group to see why.`,
 } as const;
 
-/** Every result in the look-back found that the practice did not apply to the work. */
 export const isNeverApplied = (practice: PracticeStanding): boolean =>
 	practice.standing === "NO_OPPORTUNITY" && practice.doesNotApplyOnly;
 

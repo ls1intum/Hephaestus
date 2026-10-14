@@ -12,7 +12,6 @@ import {
 } from "./contract.ts";
 import { isJsonObject } from "./json.ts";
 
-/** The parsed candidate, or a failure that names the refusal. */
 function accepted(value: unknown) {
 	const parsed = parseCandidate(value);
 	assert.ok(parsed.ok, parsed.ok ? "" : `${parsed.reasonCode}: ${parsed.message}`);
@@ -74,7 +73,6 @@ function problem(line: number, fields: Record<string, unknown> = {}): Record<str
 	};
 }
 
-/** A complete NOT_MET result with two problems, an example and claimed coverage. */
 function notMet(): Record<string, unknown> {
 	return {
 		outcome: "NOT_MET",
@@ -146,7 +144,6 @@ const problemsOf = (value: Record<string, unknown>): Record<string, unknown>[] =
 const evidenceOf = (value: Record<string, unknown>): Record<string, unknown> =>
 	isJsonObject(value.evidence) ? value.evidence : {};
 
-/** For each refusal code, a base result and the one change that breaks only that rule. */
 const BREACHES: Record<CandidateRefusal, [keyof typeof BASES, Breach]> = {
 	malformed_candidate: ["notMet", (v) => Object.assign(v, { extra: true })],
 	outcome_problem_mismatch: ["met", (v) => Object.assign(v, { problems: [problem(20)] })],
@@ -354,7 +351,6 @@ void describe("the candidate bounds", () => {
 		value.citations = quotes;
 		const over = Buffer.byteLength(JSON.stringify(value)) - CANDIDATE_LIMITS.candidateBytes;
 		assert.ok(over > 0 && over < CANDIDATE_LIMITS.quoteChars, `${over} bytes over`);
-		// Cut the last quote so that the candidate holds exactly the bound.
 		quotes[quotes.length - 1] = citation(32, "q".repeat(CANDIDATE_LIMITS.quoteChars - over));
 		assert.equal(Buffer.byteLength(JSON.stringify(value)), CANDIDATE_LIMITS.candidateBytes);
 		accepted(value);
@@ -411,7 +407,6 @@ void describe("the program's meta", () => {
 	});
 });
 
-/** Review options with one prepared context value, of exactly `bytes` bytes as JSON. */
 function sized(bytes: number) {
 	const overhead = Buffer.byteLength(JSON.stringify({ context: [{ label: "Data", value: "" }] }));
 	return { context: [{ label: "Data", value: "v".repeat(bytes - overhead) }] };

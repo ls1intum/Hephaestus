@@ -47,8 +47,6 @@ function FeedbackListRoute() {
 	});
 	useQueryReadRefusal(listOptions.queryKey, feedbackQueryResult.isError, feedbackQueryResult.error);
 	const { groups, practices, people } = useReviewScopeSources(workspaceSlug);
-	// Everything addressed to the developer filtered to, whatever else is filtered: the summary is
-	// about the person, and its counts open the list narrowed to them alone.
 	const developerCountsQuery = useQuery({
 		...countReviewFeedbackByLocationOptions({
 			path: { workspaceSlug },

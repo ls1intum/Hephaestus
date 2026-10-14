@@ -42,23 +42,18 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * The practice script spend of a month, split by practice. Every money figure below is written out by hand, so
- * a wrong weight, a lost remainder, or a row from the wrong month, workspace, or ledger source shows as a
- * changed number rather than as a total that still happens to add up.
- */
+// Expected costs are independent constants; recomputing weights here would hide lost remainders.
 class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private PracticeVersionService runtimePracticeVersions;
 
-    /** A closed month, so no fixture depends on the wall clock. */
+    // Use a closed month so budget fixtures do not depend on the wall clock.
     private static final YearMonth MONTH = YearMonth.of(2026, 3);
 
     private static final String COMMENTS = "comment-quality";
     private static final String TESTS = "test-coverage";
     private static final String RETIRED = "retired-practice";
 
-    /** $2 per 1M input and $8 per 1M output tokens, from the shared models. */
     private static final LlmPriceSnapshot INSTANCE_DECISION = new LlmPriceSnapshot(
             UsageFundingSource.INSTANCE,
             UsagePricingState.PRICED,
@@ -69,7 +64,6 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
             null,
             null);
 
-    /** A rate at which one input token costs a third of $0.00001: shares that do not end at the ledger scale. */
     private static final LlmPriceSnapshot OWN_DECISION = new LlmPriceSnapshot(
             UsageFundingSource.WORKSPACE,
             UsagePricingState.PRICED,
@@ -233,7 +227,6 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
                         .mapToLong(LlmUsageByPracticeDTO::calls)
                         .sum())
                 .isEqualTo(total.calls());
-        // The review counts once per practice above, and once here.
         assertThat(report.byPractice().stream()
                         .mapToLong(LlmUsageByPracticeDTO::unpricedEventCount)
                         .sum())
@@ -283,7 +276,6 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(report.practiceScriptTotal().ownProviderTotalCostUsd()).isEqualByComparingTo("0.00001");
     }
 
-    /** A month holds the rows from its first instant up to, not including, the first instant of the next. */
     @Test
     @WithAdminUser
     void shouldCountALedgerRowInTheMonthItsInstantFallsInWhenItLiesOnABoundary() {
@@ -324,7 +316,6 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(report.practiceScriptTotal().reviews()).isEqualTo(2);
     }
 
-    /** One review is one review, however many practice script rows it has; one unpriced row drops it whole. */
     @Test
     void shouldCountAReviewOnceWhenItsPracticeScriptRowsCarryItsJobId() {
         Workspace workspace = workspace("usage-by-practice-mean");
@@ -554,7 +545,6 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         jobRepository.saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job));
     }
 
-    /** {@code count} proxied calls of one practice, which together used these tokens. */
     private void calls(ReviewJob job, String kind, String practice, long input, long output, int count) {
         transactionTemplate.executeWithoutResult(tx -> {
             for (int call = 0; call < count; call++) {
@@ -602,7 +592,6 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         ledger(workspace, job, attempt, sourceType, price, input, output, calls, occurredAt);
     }
 
-    /** One ledger row as the attempt's terminal write appends it, priced by {@code price}. */
     private void ledger(
             Workspace workspace,
             ReviewJob job,

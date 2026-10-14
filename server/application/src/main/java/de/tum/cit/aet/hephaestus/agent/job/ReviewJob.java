@@ -30,7 +30,6 @@ import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
-/** One leased execution attempt for a durable practice review. */
 @Entity
 @Table(
         name = "review_job",
@@ -184,7 +183,6 @@ public class ReviewJob {
         }
     }
 
-    /** Generates an unpredictable credential for a sandbox session. */
     public static String generateJobToken() {
         byte[] bytes = new byte[TOKEN_BYTES];
         SECURE_RANDOM.nextBytes(bytes);

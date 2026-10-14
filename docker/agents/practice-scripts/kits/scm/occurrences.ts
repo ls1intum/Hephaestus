@@ -29,7 +29,6 @@ export interface OccurrencePattern {
 
 const positions = new WeakMap<Occurrence, { start: number; end: number; pattern: number }>();
 
-/** Prefer the first pattern for one expression while preserving separate matches on the same line. */
 export function distinctOccurrences(found: readonly Occurrence[]): readonly Occurrence[] {
 	const kept: Occurrence[] = [];
 	const byLine = new Map<string, Occurrence[]>();
@@ -69,7 +68,6 @@ export function distinctOccurrences(found: readonly Occurrence[]): readonly Occu
 	);
 }
 
-/** A consuming call or subscript includes its balanced argument span. */
 function consumingExtent(source: string, start: number, end: number): number {
 	const opener = source[end - 1];
 	if (opener !== "(" && opener !== "[") {

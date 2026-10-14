@@ -24,10 +24,6 @@ const workspace = {
 	displayName: "Engineering",
 	practicesEnabled: true,
 };
-/**
- * One unclaimed account with a GitHub and a GitLab identity. Its account id is not its provider
- * login, so a view keyed on the login would select nobody.
- */
 const sam: Wire<UserViewAccount> = {
 	accountId: "11",
 	providerLogin: "never-signed-in",
@@ -42,7 +38,6 @@ const sam: Wire<UserViewAccount> = {
 		],
 	},
 };
-/** One full page of view-as accounts, as the server pages them. */
 function usersPage(content: Wire<UserViewAccount>[]): Wire<PageResponseDtoUserViewAccount> {
 	const sort = { empty: true, sorted: false, unsorted: true };
 	return {
@@ -99,7 +94,6 @@ describe("view as user entry", () => {
 			}),
 		);
 		renderRouteAt("/admin/workspaces/engineering/users");
-		// Two identities, one account: one row to view.
 		await expect(
 			screen.findAllByRole("button", { name: /^View as user/u }, ROUTE_RENDER_WAIT),
 		).resolves.toHaveLength(1);

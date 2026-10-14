@@ -31,7 +31,6 @@ const TESTING: GroupRef = {
 	color: "red",
 };
 
-/** Met, not met, does not apply, could not determine. */
 export const outcomes = ([met, notMet, doesNotApply, couldNotDetermine]: [
 	number,
 	number,
@@ -39,7 +38,6 @@ export const outcomes = ([met, notMet, doesNotApply, couldNotDetermine]: [
 	number,
 ]): OutcomeVector => ({ met, notMet, doesNotApply, couldNotDetermine });
 
-/** No result yet. */
 export const NO_OUTCOMES: OutcomeVector = outcomes([0, 0, 0, 0]);
 
 const tile = (
@@ -50,7 +48,6 @@ const tile = (
 	counts: OutcomeVector,
 ): PracticeWorkspaceTile => ({ practiceSlug, practiceName, group, developers, outcomes: counts });
 
-/** Packaging's five practices, one with no result yet. */
 const PACKAGING_TILES: PracticeWorkspaceTile[] = [
 	tile(
 		PACKAGING,
@@ -83,7 +80,6 @@ const PACKAGING_TILES: PracticeWorkspaceTile[] = [
 	tile(PACKAGING, "keep-history-clean", "Keep the history readable", 18, outcomes([15, 4, 3, 0])),
 ];
 
-/** The workspace as the server sends it: practices in their order, each naming its group. */
 export const ACROSS_WORKSPACE: PracticeWorkspaceOverview = {
 	developers: 28,
 	practices: [
@@ -110,20 +106,16 @@ export const ACROSS_WORKSPACE: PracticeWorkspaceOverview = {
 		),
 		...PACKAGING_TILES,
 		tile(TESTING, "test-the-change", "Add tests for the change", 24, outcomes([10, 17, 2, 4])),
-		// A practice in no group is not listed: the page shows practices inside their group.
 		tile(null, "sign-commits", "Sign your commits", 9, outcomes([9, 0, 0, 0])),
 	],
 };
 
-/** The group the slide in stories open, with its practices. */
 export const PACKAGING_GROUP: WorkspaceGroup = { ...PACKAGING, practices: PACKAGING_TILES };
 
-/** More practices than the group's level holds, so its body has to scroll to its end. */
 export const MANY_PRACTICES: PracticeWorkspaceTile[] = Array.from({ length: 24 }, (_, index) =>
 	tile(PACKAGING, `practice-${index + 1}`, `Practice ${index + 1}`, 12, outcomes([8, 5, 1, 0])),
 );
 
-/** Practices set up, but no review has produced a result yet. */
 export const NO_RESULTS_WORKSPACE: PracticeWorkspaceOverview = {
 	...ACROSS_WORKSPACE,
 	practices: ACROSS_WORKSPACE.practices.map((each) => ({

@@ -41,15 +41,12 @@ export interface ProfileReviewsLevelProps {
 	onOpenReview: (reviewId: string) => void;
 	/** The review whose level is open over this one. */
 	openReviewId?: string;
-	/** The item kind the list is narrowed to, or `undefined` for all of it. */
 	kind?: string;
 	onKindChange: (kind: string | undefined) => void;
 	/** How far back the list reaches, or `undefined` for every review. */
 	since?: ReviewTimeframe;
 	onSinceChange: (since: ReviewTimeframe | undefined) => void;
-	/** Asks for a review of an item; absent where the reader may not ask. */
 	onReviewNow?: (itemId: string) => void;
-	/** The item an ask is in flight about. */
 	requesting?: string;
 }
 

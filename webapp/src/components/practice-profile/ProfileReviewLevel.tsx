@@ -49,39 +49,29 @@ import {
 	type ReviewTab,
 } from "./practice-profile-search";
 
-/**
- * One review of the reader's own work: its results about them, the feedback it gave them, and the
- * events recorded on the item that explain it, all in one read.
- */
 export type ProfileReviewDetailState = PanelState<{ detail: ProfileReviewDetail }>;
 
 export interface ProfileReviewLevelProps {
 	nested?: boolean;
 	path: LevelPath;
 	state: ProfileReviewDetailState;
-	/** The review's position among the reviews of its item, when every review is known. */
 	positionOnWork?: number;
-	/** The group a practice is filed under, for the icon and colour its name is drawn in. */
 	groupOf: (practiceSlug: string) => GroupRef | undefined;
 	onOpenPractice: (practiceSlug: string) => void;
 	tab: ReviewTab;
 	onTabChange: (tab: ReviewTab) => void;
 	filters: ReviewPracticeFilters;
 	onFiltersChange: (filters: ReviewPracticeFilters) => void;
-	/** The result a link opened the review at; its row opens on arrival. */
 	focusResultId?: string;
 	/**
 	 * One result in full, with its problems, open questions and evidence, which the route reads when
 	 * its row opens. Without it a row shows the result's list facts alone.
 	 */
 	renderResult?: (resultId: string) => ReactNode;
-	/** An event's name in words, such as "Marked ready for review". */
 	eventLabel: (name: string) => string;
 	/** The reader's responses to the feedback this review gave them; absent where they may not respond. */
 	responses?: FeedbackResponseControls;
-	/** Asks for a review of the item; absent where the reader may not ask. */
 	onReviewNow?: (itemId: string) => void;
-	/** The item an ask is in flight about. */
 	requesting?: string;
 	/**
 	 * Why the last ask from this level started nothing, drawn by the route with the fix only an
@@ -118,10 +108,6 @@ function earlierReviewLink(reviewId: string) {
 	);
 }
 
-/**
- * One review of the reader's work as the level over the list: what it reviewed, when, the feedback
- * it gave the reader, and each practice's result about them.
- */
 export function ProfileReviewLevel({
 	nested,
 	path,
@@ -245,7 +231,6 @@ interface ReviewHeadProps {
 	refusal?: ReactNode;
 }
 
-/** What the review looked at and what a reader can do about the item. */
 function ReviewHead({
 	path,
 	detail,
@@ -260,7 +245,6 @@ function ReviewHead({
 	const at = review?.completedAt ?? review?.createdAt;
 	const ItemIcon = reviewedWorkIcon(item?.kind, item?.provider ?? undefined);
 	const isRequesting = item !== undefined && requesting === item.id;
-	// Only an item review can be asked for again; a scan is an admin's.
 	const canAsk = review?.kind === "ITEM" && onReviewNow !== undefined;
 
 	return (

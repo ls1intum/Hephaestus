@@ -29,7 +29,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
-/** Posts and reconciles one summary using the exact connected GitLab project. */
 @Component
 @ConditionalOnServerRole
 @OutboundEgressGateway
@@ -38,10 +37,7 @@ public class GitLabSummaryWriter implements SummaryWriter {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabSummaryWriter.class);
 
-    /**
-     * A GitLab quick action at the start of a line, which GitLab would run when the note is posted.
-     * Every note this adapter writes escapes them into inline code.
-     */
+    // GitLab executes line-leading quick actions; escape them in every posted note.
     private static final Pattern GITLAB_SLASH_COMMAND = Pattern.compile(
             "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|milestone|estimate|spend|award|subscribe|unsubscribe|todo|done|wip|draft|ready|due|remove_due_date|weight|epic|copy_metadata|move|confidential|shrug|tableflip)\\b)",
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
@@ -128,10 +124,6 @@ public class GitLabSummaryWriter implements SummaryWriter {
         return new SummaryHandle(noteId, response.field("createNote.note.url").getValue());
     }
 
-    /**
-     * The subject is a merge request ({@code path!iid}) or an issue ({@code path#iid}); both post
-     * via the same generic createNote mutation, and only the noteable gid resolution differs.
-     */
     private String resolveNoteable(long scopeId, String subject) {
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
             throw new FeedbackDeliveryException("The GitLab rate limit is critical for scope " + scopeId);
@@ -227,13 +219,9 @@ public class GitLabSummaryWriter implements SummaryWriter {
                 new SummaryHandle(noteId, response.field("updateNote.note.url").getValue()));
     }
 
-    /** GitLab caps a connection page at 100. */
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
 
-    /**
-     * Our cap, not GitLab's: an unscanned tail answers {@code UNKNOWN}, so recovery retries rather
-     * than reposts.
-     */
+    // An unscanned tail is UNKNOWN; recovery must read again rather than repost.
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_BUDGET = 3;
 
     /**
@@ -338,18 +326,11 @@ public class GitLabSummaryWriter implements SummaryWriter {
         return SummaryLookup.unknown();
     }
 
-    /**
-     * An issue subject is {@code "project/path#iid"}; a merge request is {@code
-     * "project/path!iid"}.
-     */
     private static boolean isIssueSubject(String subjectExternalId) {
         return subjectExternalId != null && subjectExternalId.lastIndexOf('#') > subjectExternalId.lastIndexOf('!');
     }
 
-    /**
-     * Conservative NOT_FOUND heuristic: GitLab signals a deleted note only via a free-text mutation
-     * error.
-     */
+    // GitLab reports deleted notes through free-text mutation errors.
     private static boolean looksGone(List<String> errors) {
         return errors.stream()
                 .filter(Objects::nonNull)

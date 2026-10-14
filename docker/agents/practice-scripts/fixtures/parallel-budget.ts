@@ -1,4 +1,3 @@
-// Four calls at once against an attempt budget that holds two reservations: two run, two are refused.
 import { definePracticeScript, generateText, step } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({

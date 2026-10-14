@@ -99,14 +99,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Polls the {@code review_job} table for {@code QUEUED} work: the queue IS the table, so a QUEUED
- * insert is the enqueue. Claim runs synchronously on the poll thread; execution is handed to the
- * {@code sandboxExecutor} so the poll thread is never blocked by a running sandbox.
- *
- * <p>Claim and terminal write each get their own short transaction; execution runs between them with
- * no transaction and no DB connection held.
- */
+// Claim and terminal writes use short transactions; sandbox execution must hold no database connection.
 @Component
 @ConditionalOnWorkerRole
 @ConditionalOnBooleanProperty(RuntimeRole.AGENT_ENABLED_PROPERTY)
@@ -135,11 +128,7 @@ public class ReviewJobExecutor {
             .multiplier(2)
             .build();
 
-    /**
-     * Any failure of the pool-rejection requeue is worth another try: one statement, no side effect to
-     * undo, and not landing it strands a job until the zombie sweeper notices. Runs on the poll thread,
-     * so full exhaustion parks polling for the summed delay.
-     */
+    // A failed requeue strands the claim until recovery; this side-effect-free write can be retried.
     private static final RetryPolicy REQUEUE_REJECTED_CLAIM_POLICY = RetryPolicy.builder()
             .includes(Exception.class)
             .maxRetries(2)
@@ -174,14 +163,12 @@ public class ReviewJobExecutor {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private volatile @Nullable Thread pollThread;
     private final Phaser inFlight = new Phaser(1); // 1 = the executor itself; deregistered on stop
-    /** Scopes drain and hub-initiated cancels to this worker's own jobs; also its free-capacity signal. */
     private final Set<UUID> localRunningJobs = ConcurrentHashMap.newKeySet();
 
     private final Optional<WorkerCapacityState> capacityState;
-    /** Null only when the worker role is off; stamped on claimed jobs to fence terminal writes. */
+    // Worker identity fences terminal writes; it is absent when the worker role is disabled.
     private final @Nullable String workerId;
 
-    /** Stages a writer continuing an admitted review; without it such an attempt fails as unrecoverable. */
     private @Nullable ReviewCompositionContinuation compositionContinuation;
 
     @Autowired(required = false)
@@ -303,7 +290,7 @@ public class ReviewJobExecutor {
         }
     }
 
-    /** One envelope for all container stops of a drain, not one per job. */
+    // Share one cleanup deadline across all containers in a drain.
     private static final Duration DRAIN_CLEANUP_TIMEOUT = Duration.ofSeconds(30);
 
     /**
@@ -354,13 +341,8 @@ public class ReviewJobExecutor {
                 && recovery.recover(jobId, workerId, job.getAttempt(), reason) != ReviewJobRecovery.Outcome.NONE;
     }
 
-    /**
-     * Stops the settled jobs' containers concurrently under one deadline. Platform threads, because
-     * docker-java's blocking I/O pins a virtual thread; a pool of their own, because the sandbox pool's
-     * threads are the ones still waiting on these containers. A stop blocked in native I/O may ignore
-     * the interrupt and finish after this returns; custody has already been settled, and daemon
-     * threads allow shutdown to continue.
-     */
+    // docker-java blocking I/O pins virtual threads; use a separate platform-thread pool.
+    // Native stops may ignore interruption; settled custody and daemon threads permit shutdown.
     private boolean stopContainers(List<UUID> jobIds, Duration timeout) {
         if (jobIds.isEmpty()) return true;
         List<Callable<Object>> stops = jobIds.stream()
@@ -478,15 +460,11 @@ public class ReviewJobExecutor {
         return Math.min(free, agentProperties.claimBatchSize());
     }
 
-    /** Only ever narrows {@link #computeCapacity()}: an unknown executor type imposes no bound. */
     private int sandboxExecutorConcurrency() {
         return sandboxExecutor instanceof ThreadPoolTaskExecutor pool ? pool.getMaxPoolSize() : Integer.MAX_VALUE;
     }
 
-    /**
-     * ±10% jitter, because replicas sharing one {@code pollInterval} would otherwise stay synchronized
-     * and land every poll in the same instant, amplifying claim contention exactly when work exists.
-     */
+    // Jitter prevents replicas from polling together and amplifying claim contention.
     private void sleepPollInterval() {
         try {
             double jitterMultiplier = 0.9 + (ThreadLocalRandom.current().nextDouble() * 0.2);
@@ -554,16 +532,8 @@ public class ReviewJobExecutor {
         }
     }
 
-    /**
-     * Undo a claim the sandbox executor couldn't accept: RUNNING → QUEUED, ownership cleared,
-     * {@code attempt} left untouched — the job never started executing, so this must not burn its
-     * retry budget.
-     *
-     * <p>If every attempt fails the row is deliberately left RUNNING under this worker's id (capacity
-     * and local tracking are still released). The same sustained DB outage also breaks
-     * {@link WorkerLivenessReporter}'s heartbeat, so {@link ReviewJobZombieSweeper} reclaims the row
-     * through the normal dead-worker path once connectivity returns.
-     */
+    // Pool rejection must not consume an execution attempt.
+    // If requeue fails, retain RUNNING ownership for dead-worker recovery rather than rerunning provider work.
     private void requeueRejectedClaim(UUID jobId) {
         try {
             requeueRetries.execute(named("Requeue of rejected claim " + jobId, () -> {
@@ -582,11 +552,6 @@ public class ReviewJobExecutor {
         }
     }
 
-    /**
-     * A template that WARNs once per failed attempt. Without the listener a retried write is silent
-     * until it gives up, so an operator cannot tell a database that wobbled from one that never
-     * wobbled.
-     */
     private static RetryTemplate retryTemplate(RetryPolicy policy) {
         RetryTemplate template = new RetryTemplate(policy);
         template.setRetryListener(new RetryListener() {
@@ -607,7 +572,6 @@ public class ReviewJobExecutor {
         return template;
     }
 
-    /** Names a unit of work so the retry log says which write is failing. */
     private static <R> Retryable<R> named(String name, Supplier<@Nullable R> work) {
         return new Retryable<>() {
             @Override
@@ -622,7 +586,6 @@ public class ReviewJobExecutor {
         };
     }
 
-    /** Runs on the sandbox executor, not the poll thread. */
     private void runClaimedJob(UUID jobId, ReviewJobClaimService.ClaimResult claim) {
         ReviewJob job = claim.job();
         var executionSpan = jobTelemetry.startExecution(job);
@@ -639,7 +602,6 @@ public class ReviewJobExecutor {
         String metricOutcome = "unknown";
         ReviewJobStatus recordedTerminal = null;
         boolean sandboxExecutionStarted = false;
-        // The stage belongs to this run, including failures before input preparation begins.
         var preparationStage = new AtomicReference<>(PreparationFailure.Stage.RUN_SETUP);
         PreparedJobInputs stagedInputs = null;
         try {
@@ -737,7 +699,7 @@ public class ReviewJobExecutor {
             String metricOutcome, @Nullable ReviewJobStatus terminal) {}
 
     private ExecutionOutcome persistEvidenceRefusal(UUID jobId, ReviewJob job, InsufficientEvidenceException e) {
-        // The evidence it carries was never staged for an attempt, so nothing else releases it.
+        // This evidence was not staged; no attempt owns its cleanup.
         try (PreparedJobInputs refused = e.preparedInputs()) {
             persistRefusedEvidence(jobId, job.getAttempt(), refused);
             ObjectNode output = objectMapper.createObjectNode().put("outcome", "INSUFFICIENT_EVIDENCE");
@@ -818,12 +780,9 @@ public class ReviewJobExecutor {
                 .record(duration);
     }
 
-    /**
-     * Prepared inputs stay available through execution and admission; the caller releases them on every outcome.
-     */
+    // The caller owns prepared-input cleanup through execution and admission, on every outcome.
     private record PreparedSandbox(SandboxSpec spec, PreparedJobInputs stagedInputs) {}
 
-    /** No provider execution happens here, so no LLM cost accrues if this throws. */
     private PreparedSandbox prepareSandboxSpec(
             UUID jobId, ReviewJob job, ConfigSnapshot snapshot, AtomicReference<PreparationFailure.Stage> stage) {
         stage.set(PreparationFailure.Stage.INPUTS);
@@ -897,10 +856,7 @@ public class ReviewJobExecutor {
                 preparedInputs.automatedReviewReadinessReport());
     }
 
-    /**
-     * Deliberately not best-effort: a result that cannot be tied to the inputs that produced it
-     * is unfixable evaluation data, so a failed write fails the run before any LLM cost accrues.
-     */
+    // Persist provenance before provider execution; results without their original input identity cannot be admitted.
     private void persistProvenanceDigests(
             UUID jobId,
             @Nullable String promptDigest,
@@ -926,7 +882,6 @@ public class ReviewJobExecutor {
         log.debug("Provenance digests: jobId={}, prompt={}, inputs={}", jobId, promptDigest, inputsDigest);
     }
 
-    /** The manifest and admitted practices as the sandbox sees them, and the core of the work it staged. */
     private static Map<String, byte[]> snapshotMetadata(Map<String, byte[]> scaffolding, Map<String, Path> paths) {
         var metadata = new HashMap<>(scaffolding);
         for (String path : List.of(
@@ -946,10 +901,6 @@ public class ReviewJobExecutor {
         return metadata;
     }
 
-    /**
-     * {@code practices} is what the model was asked, the readiness report what was ready, and
-     * {@code answeredPractices} the ready practices an earlier completed review had already answered on the same code.
-     */
     private @Nullable JsonNode capture(
             Map<String, byte[]> inputFiles, @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport) {
         byte[] manifest = inputFiles.get(SandboxLayout.MANIFEST_PATH);
@@ -1017,17 +968,13 @@ public class ReviewJobExecutor {
         return false;
     }
 
-    /** Reads the counts itself, so this overload is safe only on terminal (non-requeue) paths. */
+    // Read counters here only on terminal paths; requeue clears them.
     private void billTerminatedJob(ReviewJob job, String reason) {
         billTerminatedJob(
                 job, reason, jobRepository.findLlmUsageById(job.getId()).orElse(null));
     }
 
-    /**
-     * {@code counts} MUST be read BEFORE any requeue of this job: {@link
-     * ReviewJobRepository#requeueOrphan} zeroes the row's token accumulators, so a caller that requeues
-     * first would bill zero and silently drop this attempt's spend.
-     */
+    // Read usage before requeue clears accumulators, or this attempt would be billed as zero.
     private void billTerminatedJob(ReviewJob job, String reason, @Nullable ReviewJobLlmUsage counts) {
         ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         LlmPriceSnapshot price = terminalPriceOrUnpriced(snapshot);
@@ -1045,13 +992,6 @@ public class ReviewJobExecutor {
         }
     }
 
-    /**
-     * @param sandboxExecutionStarted whether provider execution may have started; only then can an
-     *     unverifiable usage event be truthful
-     * @param preparation where preparation stopped, when the sandbox never started; the row then records its fixed
-     *     message instead of the failure's own, and the closed stage and kind reach telemetry
-     * @return the {@code agent.job.execution.duration} outcome tag
-     */
     private FailureOutcome handleExecutionFailure(
             UUID jobId,
             ReviewJob job,
@@ -1138,10 +1078,6 @@ public class ReviewJobExecutor {
                 || e instanceof IOException;
     }
 
-    /**
-     * Which unreachable service this exit names, or null when the exit says something about the work.
-     * The name is what the usage ledger records the attempt under.
-     */
     private static @Nullable String unreachableReason(int exitCode) {
         if (exitCode == SandboxLayout.EXIT_SERVER_UNREACHABLE) {
             return "server-unreachable";
@@ -1152,15 +1088,7 @@ public class ReviewJobExecutor {
         return null;
     }
 
-    /**
-     * Hands the job back to the queue for another attempt, billing what this attempt already spent.
-     * The usage read happens inside the same transaction and before the requeue, which zeroes the
-     * accumulators — a later read would bill zero.
-     *
-     * @param bill whether provider work happened at all — nothing accrues before the sandbox starts
-     * @return whether the job is queued again; false means the retry cap is spent or the fence is
-     *     lost, and the caller owns the terminal outcome
-     */
+    // Bill within the requeue transaction before it clears usage counters.
     private boolean requeueForAnotherAttempt(ReviewJob job, boolean bill) {
         if (workerId == null) return false;
         Boolean updated = transactionTemplate.execute(status -> recovery.retryUnadmitted(job, workerId, bill));
@@ -1177,13 +1105,7 @@ public class ReviewJobExecutor {
         capacityState.ifPresent(WorkerCapacityState::releaseReview);
     }
 
-    /**
-     * Fenced on {@code worker_id}: if the job was orphan-requeued to a sibling, this worker's late
-     * write no-ops instead of clobbering the sibling's run. Unfenced only when no worker identity
-     * exists, where there are no siblings to fence against.
-     *
-     * @return rows updated (0 if no longer RUNNING or no longer owned by this worker)
-     */
+    // Fence late terminal writes on worker ownership so they cannot overwrite a sibling's attempt.
     private int transitionTerminal(UUID jobId, ReviewJobStatus status, Instant now, @Nullable String error) {
         return workerId != null
                 ? jobRepository.transitionStatusOwnedBy(
@@ -1191,10 +1113,7 @@ public class ReviewJobExecutor {
                 : jobRepository.transitionStatus(jobId, status, now, error, Set.of(ReviewJobStatus.RUNNING));
     }
 
-    /**
-     * A failed runner can leave a local draft. Only results already admitted by this server
-     * allow its remaining output to continue through delivery.
-     */
+    // A failed runner's draft can reach delivery only through results the server already admitted.
     private ReviewJobStatus determineTerminalStatus(
             SandboxResult sandboxResult, AgentResult agentResult, ReviewJob job) {
         if (sandboxResult.timedOut()) {
@@ -1233,17 +1152,8 @@ public class ReviewJobExecutor {
         return ReviewJobStatus.FAILED;
     }
 
-    /**
-     * The accounting write for provider work that has ALREADY happened, re-attempted while the failure
-     * is one the database may recover from.
-     *
-     * <p>Giving up deliberately leaves the row RUNNING: the provider work is already done and paid for,
-     * so re-running would charge for it twice. {@link ReviewJobZombieSweeper} terminalises the row
-     * instead and books the proxy-recorded spend.
-     *
-     * @return the committed terminal status, or {@code null} when ownership was lost and the caller
-     *     must not deliver.
-     */
+    // Retain RUNNING state if accounting cannot commit; rerunning completed provider work would bill it twice.
+    // The sweeper ends the attempt and records proxy usage.
     private @Nullable ReviewJobStatus persistTerminalState(
             UUID jobId, AgentResult agentResult, SandboxResult sandboxResult) {
         JsonNode output = objectMapper.valueToTree(agentResult.output());
@@ -1293,8 +1203,7 @@ public class ReviewJobExecutor {
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(freshJob.getConfigSnapshot(), objectMapper);
             LlmPriceSnapshot price = admittedPrice(snapshot);
 
-            // The whole result or none of it: a claim stripped of the text it rested on would be a different
-            // claim than the runner made.
+            // Admitted claims require their complete supporting text.
             freshJob.setOutput(
                     storable ? output : objectMapper.createObjectNode().put("resultNotStored", UNSTORABLE_TEXT));
             freshJob.setExitCode(sandboxResult.exitCode());
@@ -1339,11 +1248,7 @@ public class ReviewJobExecutor {
             "The runner returned a result with text the database cannot store, so the result was not kept.";
     private static final String UNSTORABLE_TEXT = "The text contains a NUL character or an unpaired surrogate.";
 
-    /**
-     * Whether every string value and object key of this tree is text jsonb can represent: no decoded NUL, and
-     * well-formed UTF-16. The six characters of an escape written as text are ordinary text and pass. Numbers and
-     * other storage limits are not judged here.
-     */
+    // jsonb rejects decoded NUL and malformed UTF-16 in values and keys; literal escape text remains valid.
     private static boolean textRepresentableInJsonb(JsonNode node) {
         if (node.isString()) return StorableText.isStorable(node.asString());
         if (node.isObject()) {
@@ -1380,11 +1285,7 @@ public class ReviewJobExecutor {
         return LlmPriceSnapshot.unpricedInstance();
     }
 
-    /**
-     * Unlike {@link #admittedPrice}, this must NEVER throw: an exception here would roll back the very
-     * transition that marks the job terminal, resurrecting a job that has already run (and can loop).
-     * A missing price is billed UNPRICED, matching {@link ReviewJobZombieSweeper}'s reaper.
-     */
+    // Price lookup must not throw and roll back a completed attempt; unavailable rates stay UNPRICED.
     private LlmPriceSnapshot terminalPriceOrUnpriced(ConfigSnapshot snapshot) {
         LlmPriceSnapshot price = snapshot.model().priceSnapshot();
         return price != null ? price : LlmPriceSnapshot.unpricedInstance();

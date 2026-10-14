@@ -27,7 +27,6 @@ import { LlmConnectionApi } from "./LlmConnectionApi";
 import type { WorkspaceOption } from "./workspace-options";
 
 export interface AdminLlmModelsSectionProps {
-	/** Its API is named under the heading, because it decides which purposes the models can serve. */
 	connection: Pick<LlmConnection, "displayName" | "apiProtocol" | "purposes" | "enabled">;
 	workspaceOptions: WorkspaceOption[];
 	models: LlmModel[];

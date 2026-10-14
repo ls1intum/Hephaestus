@@ -107,7 +107,6 @@ void test("private feedback rests on a problem of its own practice, named by its
 		/must name the NOT_MET result of the primary practice 'acceptance-criteria' or one of its problems/u,
 	);
 	assert.equal(validateFeedbackEvidence("issue-outcome", basedOn, results), null);
-	// An problem stands for its result: it is what the piece rests on, and it decides the practice.
 	assert.equal(validateFeedbackEvidence("issue-outcome", ["no-closing-note"], results), null);
 	const missing = validateFeedbackEvidence("issue-outcome", ["missing"], results) ?? "";
 	assert.match(missing, /does not name an admitted result or problem/u);
@@ -129,7 +128,6 @@ void test("every id a text or piece names is written as the reference it resolve
 			{ resultId: "result-2" },
 		],
 	);
-	// Only checked ids reach this point: an id that names nothing is a defect, never dropped.
 	assert.throws(() => evidenceRefs(["elsewhere"], named), /elsewhere names no admitted result/u);
 });
 
@@ -160,7 +158,6 @@ void test("the routing read after admission is one decision per NOT_MET result, 
 		},
 	);
 	for (const malformed of [
-		// One NOT_MET result left without a decision, a MET result routed, a decision twice.
 		{ state: "COMPLETE", readAt, results: routes.slice(0, 1) },
 		{
 			state: "COMPLETE",
@@ -168,7 +165,6 @@ void test("the routing read after admission is one decision per NOT_MET result, 
 			results: [...routes, { resultId: "r-3", decision: "ADMIT" }],
 		},
 		{ state: "COMPLETE", readAt, results: [...routes, routes[0]] },
-		// The retired per-problem shape is no routing at all.
 		{
 			state: "COMPLETE",
 			readAt,
@@ -366,7 +362,6 @@ void test("negatives that quote the same line may take separate remedies or one 
 				inline: [
 					{
 						...shared,
-						// The note sits on swallowed-callback, so it rests on that problem as well as its result.
 						basedOn: [
 							{ resultId: "swallowed" },
 							{ resultId: "unfinished" },
@@ -391,10 +386,6 @@ const diffCitation = (line: number) => ({
 	anchorable: true,
 });
 
-/**
- * One result per practice; each NOT_MET result holds its problems, and only a problem's citations can carry a
- * line note.
- */
 const results = new Map<string, ReviewedResult>([
 	[
 		"colors",
@@ -521,7 +512,6 @@ void test("a review with only line notes is a whole review: no summary is requir
 		problemId: "colors-fill",
 		citationIndex: 0,
 	});
-	// The server places a note only on a problem its basedOn names: the anchor's problem joins the result.
 	assert.deepEqual(read.review.inline[0].basedOn, [
 		{ resultId: "colors" },
 		{ resultId: "colors", problemId: "colors-fill" },
@@ -546,7 +536,6 @@ void test("a stored review is the wire shape: every basedOn a list of references
 		reviewContext,
 	);
 	assert.ok("review" in read, JSON.stringify(read));
-	// What feedback.json holds is the JSON text of the stored review, not the object in memory.
 	const text = JSON.stringify({ review: read.review });
 	const written: unknown = JSON.parse(text);
 	assert.deepEqual(written, {
@@ -624,10 +613,8 @@ void test("an anchor is a line of this change cited by a problem the note rests 
 	assert.match(errors, /inline #1: anchor names colors-fill, which this note's basedOn does not/u);
 	assert.match(errors, /inline #2: citation 0 of description-steps is not a line of this change/u);
 	assert.match(errors, /inline #3: colors-fill has no citation 7/u);
-	// A result's own citations never anchor: the note names the problem whose citation it sits on.
 	assert.match(errors, /inline #4: anchor names colors, which is a result/u);
 	assert.match(errors, /inline #5: anchor names elsewhere, which is not a problem/u);
-	// Naming the problem itself rests the note on it, as naming its result does.
 	assert.ok(
 		"review" in
 			readReview(
@@ -675,7 +662,6 @@ void test("a part may rest only on admitted NOT_MET results or their problems, n
 		errorsOf({ summary: { body: "A sentence.", basedOn: ["unsure"] } }).join("\n"),
 		/basedOn names unsure, which is not a NOT_MET result or one of its problems/u,
 	);
-	// The review on the work never acknowledges a MET result: a summary or a note resting on one is refused.
 	const acknowledged = {
 		decisions: [raise("colors"), below("handoff"), below("why"), below("description")],
 		summary: {
@@ -708,7 +694,6 @@ void test("a NOT_MET result is raised or withheld whole, and only a NOT_MET resu
 		}).join("\n"),
 		/why is withheld as BELOW_BAR, and a text speaks about it/u,
 	);
-	// A withheld result stays unsaid through every one of its problems.
 	assert.match(
 		errorsOf({
 			decisions: [below("why")],
@@ -720,7 +705,6 @@ void test("a NOT_MET result is raised or withheld whole, and only a NOT_MET resu
 		errorsOf({ decisions: [below("preview")] }).join("\n"),
 		/preview is not a NOT_MET result/u,
 	);
-	// The decision is the result's: a problem's id is named back to its result.
 	assert.match(
 		errorsOf({ decisions: [below("why-reason")] }).join("\n"),
 		/why-reason is a problem of why; a decision names its result's resultId/u,
@@ -897,7 +881,6 @@ const admitted = [
 ];
 
 void test("the review composition sees only the NOT_MET results admission marked eligible, and those whole", () => {
-	// A public MET result is never acknowledged on the work, so the review composition never sees it.
 	const shown = publicResults([
 		...admitted,
 		{
@@ -918,7 +901,6 @@ void test("the review composition sees only the NOT_MET results admission marked
 		shown[0]?.explanation,
 		"The authored description names the screen and nothing about why.",
 	);
-	// Every citation keeps its quoted lines and coordinates, the problems' and the example's too; only digests go.
 	assert.deepEqual(shown[0].problems, [
 		{
 			problemId: "current-reason",
@@ -1034,15 +1016,12 @@ void test("the review composition sees only the NOT_MET results admission marked
 	// The work is named before anything the review may rest on.
 	const record = turn.indexOf("Add the login screen.");
 	assert.ok(record !== -1 && record < turn.indexOf('"resultId": "current"'), turn);
-	// The whole standard of the NOT_MET practice comes before its result; a private practice's criteria are not read.
 	assert.deepEqual(read, ["describe-what-and-why"]);
 	const standard = turn.indexOf(`\`\`\`markdown\n${describeCriteria}\n\`\`\``);
 	assert.ok(record < standard && standard < turn.indexOf('"resultId": "current"'), turn);
-	// Nothing offers recognition: no MET result, no index of one, and no tool to read one.
 	assert.doesNotMatch(turn, /"resultId": "named"|recognition|read_practice/u);
 	// How to write ends the opening turn, after every reference it relies on.
 	assert.ok(turn.endsWith(WRITE_CONTRACT), turn);
-	// The concern carries its result with its problems nested, each by its own id.
 	assert.match(turn, /"resultId": "current"/u);
 	assert.match(turn, /"problemId": "current-reason"/u);
 	assert.doesNotMatch(turn, /"id":/u);
@@ -1431,18 +1410,15 @@ void test("the native schema requires complete decisions and each text's fields 
 		{ ...quiet, decisions: [{ resultId: "handoff" }] },
 		{ ...quiet, decisions: [{ problemId: "handoff", disposition: "BELOW_BAR" }] },
 		{ ...quiet, decisions: [below("preview"), ...quiet.decisions.slice(1)] },
-		// A decision names the result, never one of its problems.
 		{ ...quiet, decisions: [below("colors-fill"), ...quiet.decisions.slice(1)] },
 		{ ...quiet, summary: { body: "Say why." } },
 		{ ...quiet, summary: { body: "Say why.", basedOn: [] } },
 		{ ...quiet, summary: { body: "Say why.", basedOn: ["why", 42] } },
 		{ ...quiet, summary: { body: "Say why.", basedOn: ["elsewhere"] } },
 		{ ...quiet, summary: { body: "Say why.", basedOn: ["unsure"] } },
-		// A MET result is never acknowledged on the work: the schema offers no MET id to rest on.
 		{ ...quiet, summary: { body: "The preview helps.", basedOn: ["preview"] } },
 		{ ...quiet, summary: { body: "x".repeat(REVIEW_LIMITS.summaryChars + 1), basedOn: ["why"] } },
 		{ ...quiet, inline: [{ body: "Adapt.", basedOn: ["colors"] }] },
-		// A note sits on a problem's citation: neither a result nor a problem without a line takes one.
 		{
 			...quiet,
 			inline: [
@@ -1547,7 +1523,6 @@ assert.throws(() => validate(outgoing.parameters, { ...quiet, summary: {} }));
 });
 
 void test("report_review exists only with a NOT_MET result to rest on, and work without lines accepts no notes", () => {
-	// With only MET results, or only abstentions, no review on the work is composed.
 	for (const id of ["preview", "unsure"]) {
 		assert.throws(
 			() => reviewToolParameters(new Map([...results].filter(([key]) => key === id)), true, []),
@@ -1647,9 +1622,7 @@ void test("summary-only support refuses a whole inline body while allowing its s
 	);
 });
 
-// --- The whole review: decisions and witnesses -----------------------------------------------------
 
-/** Every problem decided: two raised and spoken about, two withheld. */
 const wholeReview = (summaryBasedOn: string[]) => ({
 	summary: { body: "Say why.", basedOn: summaryBasedOn },
 	inline: [
@@ -1762,8 +1735,6 @@ void test("a withholding that says the advice was given names a statement that m
 		).join("\n"),
 		/github:review-comment:8, which is not a statement shown under what was already said/u,
 	);
-	// A human reviewer's request and Hephaestus's own delivered comment can each stand as the advice. The witness is
-	// checked and not stored: the stored decision is its result and reason.
 	for (const witness of [
 		"github:review-comment:7",
 		"feedback:00000000-0000-4000-8000-000000000001",
@@ -2083,7 +2054,6 @@ void test("the opening carries each NOT_MET practice's whole criteria once, and 
 		return slug === "engages-with-review" ? ENGAGEMENT_CRITERIA : `Whole criteria of ${slug}.`;
 	};
 
-	// Every NOT_MET practice's criterion opens the review, once and whole; a MET practice's is never read.
 	assert.ok(!reviewable.some((result) => result.resultId === "routine"));
 	const opening = notMetReference(reviewable, staged);
 	assert.deepEqual(read, ["engages-with-review", "describe-what-and-why"]);
@@ -2129,7 +2099,6 @@ void test("a missing, unreadable, empty or blank criterion is shown as such and 
 			problems: [],
 		},
 	]);
-	// Only the public NOT_MET result of a practice with both outcomes is shown; a private result never is.
 	assert.deepEqual(
 		reviewable.map((result) => result.resultId),
 		["held"],

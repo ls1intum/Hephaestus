@@ -83,7 +83,6 @@ export const ForConversation: Story = {
 	},
 };
 
-/** Feedback for the developer's own practice pages is private in the same way. */
 export const ForPracticePage: Story = {
 	args: { feedback: { body, destination: "PRACTICE_PAGE" } },
 	play: async ({ canvas }) => {

@@ -28,7 +28,6 @@ function line(value: unknown): unknown {
 	return Number.isSafeInteger(coordinate) ? coordinate : value;
 }
 
-/** A list as sent, decoded: a JSON-encoded list is the list, and one object sent alone is a list of it. */
 function list(value: unknown): unknown {
 	const decoded = container(value, "array");
 	if (Array.isArray(decoded)) {
@@ -38,12 +37,10 @@ function list(value: unknown): unknown {
 	return isRecord(single) && !Array.isArray(single) ? [single] : value;
 }
 
-/** An object as sent, decoded from a JSON-encoded object. */
 function object(value: unknown): unknown {
 	return container(value, "object");
 }
 
-/** One citation's transport repaired: its line coordinates read as numbers, its text fields checked as text. */
 function citation(value: unknown, where: string): unknown {
 	const fields = object(value);
 	if (!isRecord(fields) || Array.isArray(fields)) {
@@ -74,7 +71,6 @@ function citations(value: unknown, where: string): unknown {
 	return Array.isArray(listed) ? listed.map((item: unknown) => citation(item, where)) : listed;
 }
 
-/** A citation index as sent: an integer, or the digits of one. */
 function index(value: unknown): unknown {
 	return typeof value === "string" && /^\d+$/u.test(value.trim()) ? Number(value.trim()) : value;
 }

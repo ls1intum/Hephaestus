@@ -4,7 +4,6 @@ import { test } from "node:test";
 import { UnratedError, type Evidence } from "../../lib/core/practice-script.ts";
 import { readProjectInventory, repositoryIssues } from "./context.ts";
 
-/** Evidence that holds the given records, and fails the read of any name in `failing`. */
 function evidence(
 	records: Record<string, string>,
 	failing: readonly string[] = [],

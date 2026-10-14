@@ -1,4 +1,3 @@
-/** Read-only tools for an agent inside a practice program, over the pinned head tree. */
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
@@ -9,7 +8,6 @@ const MAX_ENTRIES = 200;
 const MAX_MATCHES = 50;
 const MAX_MATCH_CHARS = 300;
 
-/** The tools over a tree: each read goes through the host, which keeps its receipt. */
 export function evidenceTools(tree: FileTree | null): ToolSet {
 	if (tree === null) {
 		return {};
@@ -23,7 +21,7 @@ export function evidenceTools(tree: FileTree | null): ToolSet {
 				endLine: z.int().min(1).optional(),
 			}),
 			execute: async ({ path, startLine = 1, endLine }) => {
-				// Only the lines shown are read, so the receipt claims no more than the model saw.
+				// Receipts cover only the lines shown to the model.
 				const maxLines = Math.max(
 					1,
 					Math.min(endLine ?? Infinity, startLine + MAX_LINES - 1) - startLine + 1,

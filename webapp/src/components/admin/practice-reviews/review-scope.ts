@@ -1,15 +1,8 @@
 import type { KnownItemKind } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
 
-/** The tabs under Practice reviews, each of which keeps the shared scope in its URL. */
 export type ReviewTab = "overview" | "reviews" | "results" | "problems" | "feedback";
 
-/**
- * The narrowing that follows the reader from tab to tab: one developer, a set of practices and
- * groups, a range of days, a kind of item, and the selection — the item, the review, the result,
- * the problem or the feedback a list was opened for (`review-selection.ts`). Every tab names the
- * developer `developerId`: feedback has one developer, as a result does.
- */
 export interface ReviewScope {
 	developerId?: string;
 	groupSlug?: string[];
@@ -21,7 +14,6 @@ export interface ReviewScope {
 	reviewId?: string;
 	resultId?: string;
 	problemId?: string;
-	/** A tracked piece of feedback; its review is `reviewId`. */
 	feedbackId?: string;
 	/** A tracked practice: every list narrows to it, whatever the practice filter holds. */
 	selectedPractice?: string;
@@ -29,7 +21,6 @@ export interface ReviewScope {
 	selected?: true;
 }
 
-/** The scope as a tab's URL holds it: the same names. */
 export type ReviewScopeSearch = ReviewScope;
 
 /** One part of the scope, as the toolbar shows it. */
@@ -81,7 +72,6 @@ export function readScope(search: ReviewScopeSearch): ReviewScope {
 	};
 }
 
-/** The search that a link to another tab carries: the scope of the tab the reader is on, and nothing else. */
 export function carriedScope(previous: ReviewScopeSearch): ReviewScopeSearch {
 	// Only the keys with a value, so a link does not spell out every empty one.
 	return Object.fromEntries(

@@ -19,7 +19,6 @@ import { andList } from "@/lib/text";
 export type FeedbackCopyKind = FeedbackCopy["kind"];
 export type FeedbackCopyState = FeedbackCopy["state"];
 
-/** The form one copy of a piece of feedback takes where it appears. */
 export const FEEDBACK_COPY_KIND_DEFS: StatusDefs<FeedbackCopyKind> = {
 	SUMMARY: {
 		label: "Summary",
@@ -47,10 +46,7 @@ export const FEEDBACK_COPY_KIND_DEFS: StatusDefs<FeedbackCopyKind> = {
 	},
 };
 
-/**
- * Where one copy stands. A copy that started writing but never confirmed is not repeated: the
- * provider is checked first, so an uncertain write never becomes a second comment.
- */
+// Unconfirmed writes require provider readback before another write can be attempted.
 export const FEEDBACK_COPY_STATE_DEFS: StatusDefs<FeedbackCopyState> = {
 	PLANNED: {
 		label: "Planned",
@@ -91,7 +87,6 @@ export const FEEDBACK_COPY_STATE_DEFS: StatusDefs<FeedbackCopyState> = {
 	},
 };
 
-/** Counts per state, in the order a reader scans a package: what landed, then what did not. */
 const COUNT_ORDER = [
 	["posted", "posted"],
 	["writeStarted", "writing"],
@@ -101,17 +96,12 @@ const COUNT_ORDER = [
 	["retracted", "retracted"],
 ] as const satisfies readonly (readonly [keyof FeedbackCopyCounts, string])[];
 
-/**
- * The copy counts as one phrase: "1 posted · 2 failed". Empty when the package has no copies,
- * so a caller never prints a false "0 posted".
- */
 export function copyCountsSentence(counts: FeedbackCopyCounts): string {
 	return COUNT_ORDER.filter(([key]) => counts[key] > 0)
 		.map(([key, word]) => `${counts[key]} ${word}`)
 		.join(" · ");
 }
 
-/** Whether some copies landed and others did not: a partial package, which no single state names. */
 export function isPartialPackage(counts: FeedbackCopyCounts): boolean {
 	return (
 		counts.posted > 0 && counts.failed + counts.withheld + counts.planned + counts.writeStarted > 0
@@ -125,7 +115,6 @@ const KIND_NOUNS: Record<FeedbackCopyKind, [singular: string, plural: string]> =
 	CHAT_TURN: ["conversation turn", "conversation turns"],
 };
 
-/** "a summary and 2 line notes": the kinds a package carries, for a sentence. */
 export function copyKindsPhrase(copies: readonly Pick<FeedbackCopy, "kind">[]): string {
 	const counts = new Map<FeedbackCopyKind, number>();
 	for (const { kind } of copies) {

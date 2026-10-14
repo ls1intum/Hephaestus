@@ -1,3 +1,4 @@
+import { ownMembership } from "@/mocks/fixtures/workspaces";
 import { QueryClient } from "@tanstack/react-query";
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -92,7 +93,7 @@ function serveTwoWorkspaces(state: AcmeState) {
 		http.get("*/workspaces/acme", () => HttpResponse.json(ACME)),
 		http.get("*/workspaces/beta", () => HttpResponse.json(BETA)),
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
+			HttpResponse.json(ownMembership("ADMIN")),
 		),
 		http.get("*/workspaces/:workspaceSlug/connections/catalog", () => HttpResponse.json([])),
 		http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json([])),

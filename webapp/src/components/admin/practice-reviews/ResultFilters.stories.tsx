@@ -10,7 +10,6 @@ import { clearedScope } from "./review-scope";
 import type { ResultsSearch } from "./review-search";
 import { STORY_GROUPS, STORY_PEOPLE, STORY_PRACTICES } from "./story-scope-sources";
 
-/** The facets a search always names, each unset. */
 const UNFILTERED = {
 	outcome: undefined,
 	severity: undefined,
@@ -32,8 +31,6 @@ const meta = {
 		people: STORY_PEOPLE,
 		total: 12,
 	},
-	// Controlled: `selected` on every facet comes back through the same `search` the choice is
-	// reported on, so a frozen value would leave the whole toolbar looking dead.
 	render: (args) => (
 		<StatefulPatch<ResultsSearch> initial={args.search}>
 			{(search, patch) => (
@@ -61,7 +58,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Nothing set: no Reset, and the count is the whole list rather than what survived a filter. */
 export const Unfiltered: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByText("12 results.");
@@ -80,7 +76,6 @@ export const FilteredCountReadsDifferently: Story = {
 	},
 };
 
-/** Severity and disagreement sit in the row with the other facets, with no toggle to open first. */
 export const ReportsAChosenSeverity: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await expect(canvas.queryByRole("button", { name: /More filters/u })).toBeNull();
@@ -112,7 +107,6 @@ export const SortIsNotAFilter: Story = {
 	},
 };
 
-/** The catalogue is still on its way, so the facet is disabled rather than offering nothing. */
 export const WhileTheCatalogueLoads: Story = {
 	args: {
 		groups: { options: [], isLoading: true, isError: false },
@@ -135,7 +129,6 @@ export const TheCatalogueCouldNotBeLoaded: Story = {
 	},
 };
 
-/** Below `sm` the facet chips collapse to a count, so the applied values need their own pill row. */
 export const Mobile: Story = {
 	args: {
 		search: { ...UNFILTERED, severity: ["MAJOR"] },
@@ -161,9 +154,6 @@ export const UnassessedStatuses: Story = {
 	},
 };
 
-/**
- * Outcome is what every row's badge says, so it is the facet a count on the overview links to.
- */
 export const ReportsAChosenOutcome: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Outcome" }));
@@ -173,7 +163,6 @@ export const ReportsAChosenOutcome: Story = {
 	},
 };
 
-/** Arriving from an outcome count, the applied outcome reads as a pill at every width. */
 export const AnOutcomeFromTheOverview: Story = {
 	args: {
 		search: {
@@ -217,10 +206,6 @@ export const OnlyResultsMarkedIncorrect: Story = {
 	},
 };
 
-/**
- * A developer's disagreement is read off the result's feedback. Choosing one side filters by it, and
- * choosing both is no filter at all.
- */
 export const ReportsAChosenDisagreement: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Disagreement" }));
@@ -230,7 +215,6 @@ export const ReportsAChosenDisagreement: Story = {
 	},
 };
 
-/** An applied disagreement is a filter like any other: a pill below `sm`, and something Reset clears. */
 export const ADisagreementOnAPhone: Story = {
 	args: { search: { ...UNFILTERED, disagreed: false }, total: 2 },
 	parameters: { chromatic: { viewports: [320] }, viewport: { defaultViewport: "reflow" } },
@@ -243,7 +227,6 @@ export const ADisagreementOnAPhone: Story = {
 	},
 };
 
-/** A facet the address already sets shows its value in its own control, in the row. */
 export const SetFacetShowsItsValue: Story = {
 	args: { search: { ...UNFILTERED, severity: ["MAJOR"] }, total: 2 },
 	play: async ({ canvas }) => {
@@ -290,7 +273,6 @@ export const ScopeCarriedFromAnotherTab: Story = {
 	},
 };
 
-/** A chosen group narrows the practices on offer to the practices in it. */
 export const AGroupNarrowsThePractices: Story = {
 	args: { search: { ...UNFILTERED, groupSlug: [practiceGroups[0]?.slug ?? ""] } },
 	play: async ({ canvas, userEvent }) => {
@@ -304,10 +286,6 @@ export const AGroupNarrowsThePractices: Story = {
 	},
 };
 
-/**
- * "Thin controllers" is turned off today, so the Practice facet leaves it out until the reader turns
- * on "Show turned-off practices" inside it. The same switch sits above the overview's Practices table.
- */
 export const TurnedOffPracticesHidden: Story = {
 	args: {
 		practices: {
@@ -321,9 +299,12 @@ export const TurnedOffPracticesHidden: Story = {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Practice" }));
 		const options = await screen.findByRole("listbox", { name: "Practice options" });
 		await expect(within(options).queryByRole("option", { name: /Thin controllers/u })).toBeNull();
-		const show = screen.getByRole("switch", { name: "Show turned-off practices (1 hidden)" });
+		await userEvent.keyboard("{Escape}");
+		const show = await screen.findByRole("switch", { name: "Show turned-off practices (1 hidden)" });
 		await userEvent.click(show);
-		await within(options).findByRole("option", { name: /Thin controllers/u });
+		await userEvent.click(canvas.getByRole("combobox", { name: "Practice" }));
+		const updated = await screen.findByRole("listbox", { name: "Practice options" });
+		await within(updated).findByRole("option", { name: /Thin controllers/u });
 	},
 };
 

@@ -23,9 +23,9 @@ interface DuplicatePair {
 	identicalLines: number;
 }
 
-/** Fewer lines than this is a guard, an assignment or a modifier chain, not a copied block. */
+// Short assignment and modifier sequences are too common to establish duplication.
 export const MIN_RUN_LINES = 5;
-/** More differing names than this across a run is parallel code, not a copy with names changed. */
+// Many differing names indicate parallel structure rather than copied knowledge.
 const MAX_DIFFERING_NAMES = 6;
 
 const STRING = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/gu;
@@ -49,7 +49,6 @@ function shaped(line: number, text: string, language: string): ShapedLine | null
 	return { line, text: trimmed, shape, identifiers };
 }
 
-/** A line whose shape is nearly all punctuation — `}`, `)`, `],` — anchors no run on its own. */
 function bare(shape: string): boolean {
 	return shape.replaceAll(/[^A-Za-z]/gu, "").length === 0;
 }
@@ -62,7 +61,6 @@ function shapedLines(file: DiffFile): ShapedLine[] {
 		.filter((line): line is ShapedLine => line !== null);
 }
 
-/** Whether two shaped lines are consecutive added lines, so a run is one block and not two hunks. */
 function consecutive(lines: ShapedLine[], index: number): boolean {
 	const previous = lines[index - 1];
 	const current = lines[index];
@@ -121,7 +119,6 @@ function within(span: DuplicatePair["a"], seen: DuplicatePair["a"]): boolean {
 	);
 }
 
-/** The longest run of same-shaped lines from two starts, or null when the names differ too much. */
 function extend(
 	files: { path: string; lines: ShapedLine[] }[],
 	first: { file: number; index: number },
@@ -132,7 +129,7 @@ function extend(
 	if (fa === undefined || fb === undefined) {
 		return null;
 	}
-	// The same file: a run must not overlap itself.
+	// A duplicate must not overlap its own source span.
 	if (first.file === second.file && Math.abs(first.index - second.index) < MIN_RUN_LINES) {
 		return null;
 	}

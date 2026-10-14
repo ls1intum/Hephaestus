@@ -146,9 +146,8 @@ export const Default: Story = {
 		await expect(widths[3]).toBeGreaterThan((widths[1] ?? 0) * 10);
 		// Every review recorded its execution start, so no unsplit run is drawn or explained.
 		await expect(canvas.queryByText(/not split/u)).toBeNull();
-		const late = canvas.getByRole("link", { name: "9 reviews finished after the merge" });
-		await expect(late).toHaveAttribute("href", expect.stringContaining("finishedAfterMerge=true"));
-		await expect(canvas.getAllByRole("link")).toHaveLength(2);
+		await expect(figureOf(canvas, "late")).toHaveTextContent("9");
+		await expect(canvas.getAllByRole("link")).toHaveLength(1);
 	},
 };
 
@@ -171,9 +170,9 @@ export const FinishedInTheRange: Story = {
 		);
 		await expect(link.pathname).toBe("/w/demo/admin/practices/reviews/runs");
 		await expect(link.searchParams.getAll("status")).toStrictEqual([
-			"COMPLETED",
+			"COMPLETE",
+			"PARTIAL",
 			"FAILED",
-			"TIMED_OUT",
 		]);
 		await expect(link.searchParams.get("from")).toBe("2026-09-10");
 		await expect(await infoOf(canvas)).toContain(
@@ -219,7 +218,7 @@ export const SlowQueue: Story = {
 
 /**
  * Two of the five the merge itself started, so they could only finish after it. The figure counts
- * all five, the rows its link opens, and the (i) says how many of them the merge started.
+ * all five, and the (i) says how many of them the merge started.
  */
 export const FinishedAfterMerge: Story = {
 	args: {
@@ -234,9 +233,7 @@ export const FinishedAfterMerge: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByRole("link", { name: "5 reviews finished after the merge" }),
-		).toHaveAttribute("href", expect.stringContaining("finishedAfterMerge=true"));
+		await expect(canvas.queryByRole("link", { name: /finished after the merge/u })).toBeNull();
 		await expect(figureOf(canvas, "late")).toHaveTextContent("5");
 		// Said in the (i), for every reader rather than a screen reader alone.
 		await expect(await infoOf(canvas)).toContain("2 of them were started by the merge.");
@@ -260,7 +257,7 @@ export const CommentsLostToMerge: Story = {
 		await expect(lost).toHaveTextContent("21");
 		await expect(lost).not.toHaveClass("text-warning");
 		await expect(lost).not.toHaveClass("text-destructive");
-		canvas.getByRole("link", { name: "9 reviews finished after the merge" });
+		await expect(figureOf(canvas, "late")).toHaveTextContent("9");
 	},
 };
 
@@ -414,8 +411,6 @@ export const Narrow: Story = {
 export const Dark: Story = {
 	globals: { theme: "dark" },
 	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByRole("link", { name: "9 reviews finished after the merge" }),
-		).toBeVisible();
+		await expect(figureOf(canvas, "late")).toHaveTextContent("9");
 	},
 };

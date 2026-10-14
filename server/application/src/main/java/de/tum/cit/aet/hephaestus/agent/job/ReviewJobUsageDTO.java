@@ -9,7 +9,6 @@ import java.util.Objects;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** What a job spent on the model, attempt by attempt, and in total. */
 @Schema(description = "The model usage and cost of a job, per attempt and in total")
 public record ReviewJobUsageDTO(
         @NonNull @Schema(description = "One entry per attempt with recorded usage, first attempt first")

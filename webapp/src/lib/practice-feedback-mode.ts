@@ -52,7 +52,6 @@ export function feedbackModeSourceSentence(source: FeedbackModeSource): string {
 	return source.kind === "inherited" ? `Follows ${source.from}` : "Set for this practice";
 }
 
-/** The rollup's three counts, keyed by the mode they count. */
 export function feedbackModeCounts(
 	rollup: Pick<FeedbackModeRollup, "off" | "approveFirst" | "automatic">,
 ): Record<FeedbackMode, number> {

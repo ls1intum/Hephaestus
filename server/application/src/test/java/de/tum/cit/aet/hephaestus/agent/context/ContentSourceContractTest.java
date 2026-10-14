@@ -17,16 +17,6 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Enforces the {@link ContentSource} contract (ADR: integration content = EXTRACT+LOAD of raw native
- * objects only; no practice-dependent Transform in a connector). A connector that names a practice or
- * pre-renders a result is, by definition, code in the wrong layer — this test makes that structural.
- *
- * <p>Scope: the SCM-side sources under {@code agent.context.providers} (the mentor content sources under
- * {@code providers.mentor} are core-native projections, out of scope). A connector that computes
- * practice-shaped features from the mounted worktree (as {@code TestPresenceContentSource} /
- * {@code BranchGraphContentSource} would) is the Transform-in-the-wrong-layer this test forbids.
- */
 class ContentSourceContractTest extends BaseUnitTest {
 
     private static final Path PROVIDERS_DIR = resolveDir(

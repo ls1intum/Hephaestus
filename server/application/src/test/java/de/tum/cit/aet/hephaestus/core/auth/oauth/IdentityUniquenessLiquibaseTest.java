@@ -21,20 +21,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/**
- * Proves the {@code uq_identity_provider_subject_team} guarantee that the JIT first-login race
- * relies on, against the REAL Liquibase schema. The normal test profile uses Hibernate {@code
- * ddl-auto: create}, which emits a plain {@code UNIQUE(provider_id, subject, team_id)} — and SQL
- * treats {@code NULL} values as DISTINCT, so under ddl-auto two login identities with the same
- * {@code (provider, subject)} and a NULL {@code team_id} would NOT collide. Production instead uses
- * {@code CREATE UNIQUE INDEX ... (provider_id, subject, COALESCE(team_id, ''))}, which collapses
- * NULL teams to a single key.
- *
- * <p>That difference is load-bearing: it is the index violation that makes {@link
- * AccountProvisioningService}'s concurrent-first-login loser read-after-conflict and return the
- * winner instead of minting a duplicate account. A unit/ddl-auto test cannot see it, so this
- * raw-JDBC test runs {@code db/master.xml} and asserts the index semantics directly.
- */
+// Hibernate uniqueness treats NULL teams as distinct; only the released expression index proves identity convergence.
 @Tag("database")
 class IdentityUniquenessLiquibaseTest {
 
@@ -45,9 +32,6 @@ class IdentityUniquenessLiquibaseTest {
 
     @BeforeAll
     static void startAndMigrate() throws Exception {
-        // The classic Liquibase parser validates against the bundled XSD; some long-standing
-        // attributes trip strict offline validation in this bare harness though SpringLiquibase
-        // accepts them at real boot. We are proving index behaviour, not XSD conformance.
         System.setProperty("liquibase.validateXmlChangelogFiles", "false");
         try (Connection connection = newConnection()) {
             Database database =
@@ -86,10 +70,6 @@ class IdentityUniquenessLiquibaseTest {
             long gitlab = insertGitProvider(c, "GITLAB", "https://multi-provider-gl.example");
             long account = insertAccount(c, "Multi");
 
-            // The same subject string under two different providers are two distinct identities —
-            // the
-            // provider is part of the key, so this must NOT collide. (Schema-level nOAuth
-            // separation.)
             assertThatCode(() -> {
                         insertIdentity(c, account, github, "shared-subject", null);
                         insertIdentity(c, account, gitlab, "shared-subject", null);

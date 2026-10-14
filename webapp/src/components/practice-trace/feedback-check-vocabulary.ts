@@ -14,7 +14,6 @@ export const FEEDBACK_CHECK_STAGE_LABELS = {
 	EGRESS: "Final send",
 } satisfies Record<Stage, string>;
 
-/** Each fact the check read, as a question its yes or no answers. */
 export const FEEDBACK_CHECK_FACT_LABELS = {
 	inScope: "In review scope",
 	evidenceAllowed: "Evidence may be shown",

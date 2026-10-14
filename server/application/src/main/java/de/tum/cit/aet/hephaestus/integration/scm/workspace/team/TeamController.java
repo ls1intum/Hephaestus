@@ -20,10 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-/**
- * Controller for managing teams within a workspace. Teams are synchronized from the GitHub
- * organization and can be configured to filter workspace activity.
- */
 @WorkspaceScopedController
 @RequestMapping("/team")
 @Tag(name = "Teams", description = "Team management within workspace")

@@ -15,7 +15,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Combines staged SCM proof and retains each source's cleanup ownership. */
 final class ScmCaptureContributions {
     private ScmCaptureContributions() {}
 

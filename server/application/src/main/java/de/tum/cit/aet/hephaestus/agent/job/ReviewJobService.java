@@ -27,7 +27,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
-/** Enqueues one bounded invocation of the review's already pinned assignments. */
 @Service
 @ConditionalOnServerRole
 @RequiredArgsConstructor

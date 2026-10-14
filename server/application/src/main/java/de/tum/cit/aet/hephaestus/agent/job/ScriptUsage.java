@@ -51,14 +51,11 @@ public class ScriptUsage {
     @Column(name = "workspace_id", nullable = false)
     private long workspaceId;
 
-    /**
-     * The data handling tier of the model that served the calls, as the attempt froze it. Null when the attempt
-     * froze no tier for that model.
-     */
     @Enumerated(EnumType.STRING)
     @Column(name = "data_handling_tier", length = 24)
     private @Nullable DataHandlingTier dataHandlingTier;
 
+    @ColumnDefault("0")
     @Column(name = "calls", nullable = false)
     private int calls;
 
@@ -66,10 +63,11 @@ public class ScriptUsage {
     @Column(name = "reported_calls", nullable = false)
     private int reportedCalls;
 
-    /** The prompt tokens without the cache reads and writes, as the review's own counters keep them. */
+    @ColumnDefault("0")
     @Column(name = "input_tokens", nullable = false)
     private long inputTokens;
 
+    @ColumnDefault("0")
     @Column(name = "output_tokens", nullable = false)
     private long outputTokens;
 
@@ -81,7 +79,7 @@ public class ScriptUsage {
     @Column(name = "cache_write_tokens", nullable = false)
     private long cacheWriteTokens;
 
-    /** What Cohere reranking calls billed instead of tokens. */
+    // Cohere reranking bills search units instead of tokens.
     @ColumnDefault("0")
     @Column(name = "search_units", nullable = false)
     private long searchUnits;
@@ -120,7 +118,6 @@ public class ScriptUsage {
         @Column(name = "model_kind", nullable = false, length = 16)
         private ModelKind modelKind;
 
-        /** The practice whose practice script made the calls, as the runner named it on each call. */
         @Column(name = "practice_id", nullable = false)
         private long practiceId;
     }

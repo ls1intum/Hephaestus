@@ -70,7 +70,6 @@ export const Default: Story = {
 	},
 };
 
-/** No connection has models: every Delete is on, and no line explains a block. */
 export const NothingKeepsModels: Story = {
 	args: { modelCounts: {} },
 	play: async ({ canvas }) => {

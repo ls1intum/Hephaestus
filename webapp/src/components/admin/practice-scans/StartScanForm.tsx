@@ -35,7 +35,6 @@ import { hasText } from "@/lib/text";
 
 import { repositoryName, shortVersion } from "./scan-display";
 
-/** A practice that can be scanned: Hephaestus reviews it, and it is included in scans. */
 export interface ScanPracticeOption {
 	slug: string;
 	name: string;
@@ -70,7 +69,6 @@ export interface StartScanFormProps {
 	options: StartScanOptions;
 	pending: boolean;
 	refusal?: StartScanRefusal;
-	/** The repository version the next start expects, once the server said the head moved. */
 	expectedVersion?: string;
 	/** What leaving without starting does; the host owns it, because only the host knows where back is. */
 	cancel: ReactNode;
@@ -84,7 +82,6 @@ export interface StartScanFormProps {
 export const DEFAULT_SCAN_BUDGET_USD = "10";
 const BUDGET_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d{1,4})?$/u;
 
-/** The server’s budget rule, said before the request: a decimal from 0.0001 to 100000 USD. */
 export function budgetError(value: string): string | undefined {
 	const trimmed = value.trim();
 	if (!BUDGET_PATTERN.test(trimmed)) {
@@ -111,10 +108,6 @@ function StartScanHeader({ nested }: { nested?: boolean }) {
 	);
 }
 
-/**
- * The start form as a guarded drawer level over the scans list. It renders its own loading and error
- * states, because the repositories and practices it offers are read when it opens.
- */
 export function StartScanForm(props: StartScanFormProps) {
 	const { options, nested, workspaceSlug } = props;
 	if (options.status === "loading") {

@@ -566,15 +566,10 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         return ScmFeedbackFixtures.line(ScmFeedbackFixtures.anchor("src/Foo.java", 10, null), body, MARKER, key);
     }
 
-    /** The exact body the channel posts for {@code item}, as its own copy would read back. */
     private static String posted(LineNote item) {
         return item.body() + "\n" + item.writeMarker() + "\n<!-- hephaestus-diff-note-ck=" + item.writeKey() + " -->";
     }
 
-    /**
-     * The ordinary comment the channel posts for a single-line {@code item} on {@code
-     * src/Foo.java}.
-     */
     private static String located(LineNote item) {
         return "**[View code at line 10]("
                 + SERVER
@@ -604,7 +599,6 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         return spec;
     }
 
-    /** Stubs one complete page of discussions read by the identity {@code currentUserId}. */
     private void stubDiscussions(List<Map<String, Object>> discussions, @Nullable String currentUserId) {
         GraphQlClient.RequestSpec spec = discussionsSpec();
         ClientGraphQlResponse response = discussionsResponse(discussions, false, null, currentUserId);
@@ -631,7 +625,6 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         return response;
     }
 
-    /** A createNote answer: the payload's {@code note}, explicitly null when {@code created} is. */
     private static ClientGraphQlResponse createResponse(@Nullable Map<String, Object> created, List<String> errors) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("note", created);
@@ -683,7 +676,6 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
                 new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project!42", REVIEWED);
     }
 
-    /** Records what each create request carried; accepts the first {@code acceptOnly} records. */
     private static final class RecordingFence implements CopyWriteFence {
 
         final List<List<String>> attempts = new ArrayList<>();

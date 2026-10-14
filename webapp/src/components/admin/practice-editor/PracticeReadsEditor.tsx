@@ -21,10 +21,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { canReadComplete, groupReadSources } from "./reads-presentation";
 import { type ReadChoice, readNeedOf, withReadNeed } from "./review-settings";
 
-/**
- * COMPLETE is deliberately not a segment here: it is REQUIRED plus one further claim, and it is
- * offered as that claim — see {@link CompleteCapture}.
- */
+// Complete adds an absence claim to Required; it is not a separate capture need.
 const READ_CHOICE_OPTIONS = [
 	{
 		value: "REQUIRED",
@@ -36,8 +33,7 @@ const READ_CHOICE_OPTIONS = [
 		label: "Optional",
 		selected: "bg-secondary text-secondary-foreground hover:bg-secondary",
 	},
-	// Off is the answer on most sources, so it is marked rather than shouted: a filled pill on the
-	// majority would hide the few that are on.
+	// Keep Off visually quiet so active sources remain visible.
 	{ value: "NOT_USED", label: "Off", selected: "bg-muted text-foreground hover:bg-muted" },
 ] satisfies {
 	value: SegmentedChoice;
@@ -52,9 +48,7 @@ function segmentOf(choice: ReadChoice): SegmentedChoice {
 }
 
 export interface PracticeReadsEditorProps {
-	/** The sources this kind of item can read, from the definition options. */
 	readSources: readonly ReadSourceOption[];
-	/** What the review reads. */
 	sources: readonly PracticeReadSource[];
 	onChange: (sources: PracticeReadSource[]) => void;
 	/** Prefix for control ids, so a form-level error can send focus to the control that failed. */
@@ -66,7 +60,6 @@ export interface PracticeReadsEditorProps {
 	errorId?: string;
 }
 
-/** What the review reads: collapsed, the answer is the chips; open, a source is one line. */
 export function PracticeReadsEditor({
 	readSources,
 	sources,
@@ -77,12 +70,9 @@ export function PracticeReadsEditor({
 	invalid = false,
 	errorId,
 }: PracticeReadsEditorProps) {
-	// Open from the start when the reads are already invalid: such a form never crosses the
-	// transition below, and the fix is not reachable from the collapsed summary.
+	// Invalid initial reads must open immediately; they cannot cross the validation transition.
 	const [open, setOpen] = useState(invalid);
-	// On the transition into invalid, not on the flag, which stays true while the author fixes it —
-	// an editor re-opening under the caret on every keystroke would be unusable.
-	// https://react.dev/learn/you-might-not-need-an-effect
+	// Open only when validation becomes invalid; reopening on each keystroke interrupts edits.
 	const [lastInvalid, setLastInvalid] = useState(invalid);
 	if (invalid !== lastInvalid) {
 		setLastInvalid(invalid);
@@ -259,13 +249,7 @@ interface CompleteCaptureProps {
 	onChoiceChange: (choice: ReadChoice) => void;
 }
 
-/**
- * The Complete need, named by what it lets the review do and what it costs. Completeness is measured
- * against one capture of one source, so the claim never reaches beyond that source.
- *
- * Absent — not present-and-unselectable — where the source contract can never promise a whole
- * capture, since choosing it there is a request the server refuses.
- */
+// Completeness describes one captured source; offer it only where the source contract guarantees a whole capture.
 function CompleteCapture({
 	option,
 	choice,

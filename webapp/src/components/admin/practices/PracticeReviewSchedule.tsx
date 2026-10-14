@@ -50,10 +50,6 @@ export interface PracticeReviewScheduleProps {
 	onDelete: (schedule: ReviewSchedule) => void;
 }
 
-/**
- * Pull requests and issues are checked again over the last few days. A repository is scanned as a
- * whole, so it takes a scan budget instead of a window.
- */
 const ITEM_KINDS = [ITEM_KIND.pullRequest, ITEM_KIND.issue, ITEM_KIND.repository] as const;
 
 const ITEM_KIND_ITEMS = ITEM_KINDS.map((kind) => ({
@@ -70,12 +66,6 @@ const CADENCES: { value: Cadence; label: string }[] = [
 	{ value: "WEEKLY", label: "Every week" },
 ];
 
-/**
- * The same ceiling the server enforces, offered here so an admin picks from what is allowed instead
- * of discovering the rule through a 400. A recurring check's results are counted alongside reviews
- * that work itself started, and that only holds while its window is "the last few days" — anything
- * longer is a stretch of history somebody chose, which a review of past work is for.
- */
 const LOOKBACK_CEILING: Record<Cadence, number> = { DAILY: 2, WEEKLY: 7 };
 
 const lookbackItems = (cadence: Cadence) =>
@@ -84,7 +74,6 @@ const lookbackItems = (cadence: Cadence) =>
 		return { value: String(days), label: days === 1 ? "The last day" : `The last ${days} days` };
 	});
 
-/** The server's budget grammar: a plain decimal with at most four places. */
 const BUDGET_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d{1,4})?$/u;
 
 function budgetError(text: string): string | null {
@@ -107,10 +96,6 @@ const describeSchedule = (schedule: ReviewSchedule) => {
 	return `${every}, covering ${window}`;
 };
 
-/**
- * `RelativeTime` does not fit: it renders a tooltip trigger, and this is one clause of a plain
- * sentence.
- */
 const formatMoment = (value: Date | null) => {
 	const date = asDate(value);
 	return date ? format(date, "d MMM yyyy, HH:mm") : undefined;
@@ -235,7 +220,6 @@ function ScheduleRow({
 	const nextRun = formatMoment(schedule.nextRunAt);
 	const lastRun = formatMoment(schedule.lastRunAt);
 
-	// A paused schedule must not promise a first check "within the hour".
 	let nextCheck = "Paused, so nothing is being checked.";
 	if (schedule.enabled) {
 		nextCheck = hasText(nextRun)
@@ -302,10 +286,6 @@ function ScheduleRow({
 	);
 }
 
-/**
- * One form for adding and editing. An edit keeps the kind, which the server treats as the schedule's
- * identity, and offers the on/off choice, so pausing and resuming is reachable from both places.
- */
 function ScheduleForm({
 	kinds,
 	initial,
@@ -334,8 +314,7 @@ function ScheduleForm({
 	const showBudgetError = budgetTouched && budgetProblem !== null;
 	const chosenKind = itemKindNoun(itemKind, 2);
 
-	// Switching to a tighter cadence can invalidate the chosen window, so the cadence owns it rather
-	// than leaving a value the server would refuse.
+	// A tighter cadence can invalidate the window; reset it to a server-accepted value.
 	const changeCadence = (next: Cadence) => {
 		setCadence(next);
 		setLookbackDays(String(LOOKBACK_CEILING[next]));

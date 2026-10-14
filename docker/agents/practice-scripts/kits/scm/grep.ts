@@ -20,7 +20,6 @@ export interface GrepOptions {
 
 const GLOB_GREP_BATCH_SIZE = 256;
 
-/** One `grep -Z -n` line: the file name, a NUL, then `<line>:<content>`. */
 function parseGrepLine(line: string, dir: string): GrepMatch | null {
 	const separator = line.indexOf("\0");
 	const { lineNumber, content } =

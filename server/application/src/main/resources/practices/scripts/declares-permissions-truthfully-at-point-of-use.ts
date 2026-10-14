@@ -1,9 +1,3 @@
-// Finds the permission-related references and the authorization requests that the change adds in Swift
-// files, and the usage-description keys in the change or in the first plist and project files of the
-// checkout, each with its path. A reference names a type or call to inspect. It does not show that the
-// change requests restricted access. A key in some file does not show that the target declares it, and
-// a key that is not found does not show that the target does not declare it. The review reads the
-// target, the actual API and the description.
 import { scm, expectKind, requireChange, type FileTree } from "../kits/scm/index.ts";
 import {
 	countLabel,
@@ -20,10 +14,6 @@ import {
 } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
-// reference kind -> [a permission-related type or call to inspect, usage keys that may declare its access].
-// A match is a place to look, not access: a type named in a signature or conformance requests nothing,
-// the system photo picker needs no library permission, and an image picker reaches the camera only when
-// the camera is its source.
 const PERMISSION_REFERENCES: readonly [string, RegExp, string[]][] = [
 	[
 		"Location",
@@ -83,12 +73,10 @@ const REQUEST: readonly SourcePattern[] = [
 	]),
 ];
 
-/** The lead kind of a reference: `PhotoLibrary` becomes `permission-reference-photo-library`. */
 function referenceKind(kind: string): string {
 	return `permission-reference-${kind.replaceAll(/(?<=[a-z])(?=[A-Z])/gu, "-").toLowerCase()}`;
 }
 
-/** The lead kind of each pattern label of the scan. */
 const KIND_OF_LABEL = new Map<string, string>([
 	["authorization request", "authorization-request"],
 	...PERMISSION_REFERENCES.map(([kind]): [string, string] => [
@@ -112,13 +100,9 @@ const LABEL_OF = new Map<string, string>(Object.entries(LABELS));
 
 const USAGE_KEY = /\b(?<key>NS\w+UsageDescription)\b/gu;
 
-/**
- * The references that get a direction each. A section has 10 directions, and the other directions take
- * at most 4 of them.
- */
+// Reserve four of the ten direction slots for other context.
 const REFERENCE_LINES = 5;
 
-/** How many plist/project files of the checkout are read for keys. */
 const PROJECT_FILES_READ = 20;
 
 interface CheckoutKeys {
@@ -126,7 +110,6 @@ interface CheckoutKeys {
 	filesFound: number;
 	filesRead: number;
 	unreadable: number;
-	/** Whether a listing was cut, so more project files may exist than were found. */
 	listingCut: boolean;
 }
 
@@ -137,7 +120,6 @@ const PROJECT_FILES = [
 	"**/*.xcodeproj/project.pbxproj",
 ];
 
-/** The usage keys in the checkout's project files; null when the checkout was not captured. */
 async function usageKeysInCheckout(tree: FileTree | null): Promise<CheckoutKeys | null> {
 	if (tree === null) {
 		return null;
@@ -191,7 +173,6 @@ export default definePracticeScript({
 				? []
 				: [{ at: { change: hint.file, line: hint.line }, label, facts: factsOf(hint.flags) }];
 		});
-		// Usage keys the change itself adds, in any file.
 		const keysInChange = new Map<string, string>();
 		for (const [file, df] of change) {
 			if (!/Info\.plist$|project\.ya?ml$|project\.pbxproj$/u.test(file)) {

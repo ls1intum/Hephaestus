@@ -18,7 +18,6 @@ import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 
 const SEVERITY_OPTIONS = statusFacetOptions(SEVERITY_DEFS);
 
-/** The facets this list owns, cleared: what the toolbar's Reset clears. */
 export function clearedProblemFacets(): Partial<ProblemsSearch> {
 	return {
 		severity: undefined,
@@ -29,7 +28,6 @@ export function clearedProblemFacets(): Partial<ProblemsSearch> {
 	};
 }
 
-/** Every filter on this list, the shared scope included: what the empty list's button clears. */
 export function clearedProblemFilters(): Partial<ProblemsSearch> {
 	return { ...clearedProblemFacets(), ...clearedScope() };
 }
@@ -48,18 +46,14 @@ export function hasProblemFilter(search: ProblemsSearch): boolean {
 
 export interface ProblemFiltersProps {
 	search: ProblemsSearch;
-	/** Reports one changed facet. The caller sends the reader back to page one. */
 	onPatch: (patch: Partial<ProblemsSearch>) => void;
-	/** Clears this list's own facets. The shared scope stays. */
 	onReset: () => void;
-	/** Clears the shared scope, on this tab and every tab after it. */
 	onClearScope: () => void;
 	groups: FacetSource;
 	practices: FacetSource<PracticeFacetOption>;
 	people: ReviewPeople;
 	total: number | undefined;
 	record?: ScopeRecordFilter;
-	/** The name of the developer `developerId` identifies, while that filter is on. */
 	subjectName?: string;
 }
 

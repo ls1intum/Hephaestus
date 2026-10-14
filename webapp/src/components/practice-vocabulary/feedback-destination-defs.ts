@@ -6,13 +6,6 @@ import type { StatusDefs } from "@/components/common/status-def";
 
 export type FeedbackDestination = ReviewFeedback["destination"];
 
-/**
- * **Where** a piece of feedback goes. One of the two delivery axes, and never the same cell as the
- * other one: the destination answers "where", the delivery state answers "what happened".
- *
- * <p>The labels are parallel prepositional phrases so each reads as English inside a sentence —
- * "delivered on the work", "raised in conversation".
- */
 export const FEEDBACK_DESTINATION_DEFS: StatusDefs<FeedbackDestination> = {
 	ON_WORK: {
 		label: "On the work",
@@ -36,12 +29,7 @@ export const FEEDBACK_DESTINATION_DEFS: StatusDefs<FeedbackDestination> = {
 	},
 };
 
-/**
- * What an admin is told in place of the text for the destinations whose text the server withholds
- * from every admin surface. Absent text there is private, not missing, so it must never read as
- * "nothing was composed"; the conversation may also hold no notes at all, which an admin cannot
- * tell apart, so its words allow for that.
- */
+// Private destination text is withheld; its absence must not be presented as missing evidence.
 export const ADMIN_WITHHELD_TEXT: Partial<
 	Record<FeedbackDestination, { title: string; detail: string }>
 > = {
@@ -57,7 +45,6 @@ export const ADMIN_WITHHELD_TEXT: Partial<
 	},
 };
 
-/** The destinations in the developer's own voice, for the surfaces that list their own feedback. */
 export const OWN_FEEDBACK_DESTINATION_LABELS: Record<FeedbackDestination, string> = {
 	ON_WORK: "On your work",
 	CONVERSATION: "In your conversation with Heph",

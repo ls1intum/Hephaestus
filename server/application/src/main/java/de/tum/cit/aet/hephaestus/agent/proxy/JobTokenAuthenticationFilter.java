@@ -18,7 +18,6 @@ import org.springframework.security.oauth2.server.resource.web.authentication.Be
 import org.springframework.security.web.authentication.AuthenticationFilter;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
-/** Stateless authentication through Spring Security's bearer converter and provider lifecycle. */
 public final class JobTokenAuthenticationFilter extends AuthenticationFilter {
     static final String PRACTICE_SCRIPT_PATH = "/internal/llm/practice-script/";
     private static final String RUNTIME_PATH = "/internal/llm/runtime/";

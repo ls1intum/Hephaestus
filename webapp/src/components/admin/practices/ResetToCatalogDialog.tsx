@@ -30,7 +30,6 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 
-/** What a reset replaces: this workspace's version beside the one the catalog offers now. */
 export type ResetComparison =
 	| { kind: "practice"; current: PracticeDefinition; offered: PracticeDefinition }
 	| { kind: "group"; current: GroupDefinition; offered: GroupDefinition };
@@ -40,11 +39,9 @@ export type ResetToCatalogState = PanelState<{ comparison: ResetComparison }>;
 export interface ResetToCatalogDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	/** The practice's or group's name, as the reader knows it here. */
 	name: string;
 	state: ResetToCatalogState;
 	pending: boolean;
-	/** The last reset was refused because the comparison changed; the state now holds the new one. */
 	stale: boolean;
 	onConfirm: () => void;
 }
@@ -79,11 +76,6 @@ function differences(comparison: ResetComparison): Difference[] {
 	}));
 }
 
-/**
- * A reset is never an implicit overwrite: the reader sees each field that changes, theirs beside
- * the catalog's, before anything is replaced. A practice keeps its history, because the catalog's
- * definition is saved as a new version.
- */
 export function ResetToCatalogDialog({
 	open,
 	onOpenChange,

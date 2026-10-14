@@ -4,10 +4,6 @@ import { expect } from "storybook/test";
 import { DATA_HANDLING_TIERS } from "./data-handling-defs";
 import { DataHandlingMark } from "./DataHandlingMark";
 
-/**
- * A model's tier beside its name: the tier's own icon, muted, with its name for a screen reader.
- * The same icon heads the tier columns on AI models, so a reader learns it once.
- */
 const meta = {
 	component: DataHandlingMark,
 	parameters: { layout: "centered" },
@@ -18,7 +14,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Beside a model's name, the icon alone shows; a screen reader hears the tier. */
 export const BesideAModel: Story = {
 	render: (args) => (
 		<span className="flex items-center gap-2 text-sm">
@@ -32,7 +27,6 @@ export const BesideAModel: Story = {
 	},
 };
 
-/** Every tier with its name on screen, for a list of the members a need misses. */
 export const EveryTier: Story = {
 	args: { label: "visible" },
 	render: (args) => (

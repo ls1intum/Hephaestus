@@ -1,11 +1,3 @@
-/**
- * One practice group's practices and the reviews that reached one of them, as the detail levels
- * show them: the standings of the group the practice-profile fixtures open, one result in full with
- * its problems and its feedback, and three reviews on the same practice. Beside them, one result
- * per shape the row draws differently: a search the row shows under "What was checked", open
- * questions on a result that could not be determined, and an example from the work on a result
- * that is met.
- */
 import type {
 	EvidenceCitation,
 	ItemRef,
@@ -24,11 +16,6 @@ import { packagingGroup, practicesByGroup, pullRequest } from "./practice-profil
 
 const packagingPractices = practicesByGroup[packagingGroup.slug] ?? [];
 
-/**
- * What the detail level shows and the profile's list does not: each practice's prose, and the
- * trend of the one the reviews below reviewed. The practices themselves come from
- * `practicesByGroup`, so the group has one practice list across the story fixtures.
- */
 const detailDepth: Record<string, Partial<PracticeStanding>> = {
 	"scope-one-reviewable-change": {
 		whyItMatters:
@@ -72,7 +59,6 @@ export const detailPractices: PracticeStanding[] = packagingPractices.map((pract
 	...detailDepth[practice.slug],
 }));
 
-/** The practice the reviews below reviewed, as the practice level opens it. */
 export const focusedChanges: PracticeStanding = detailPractice("scope-one-reviewable-change");
 
 /** The group's practice no feedback card names: a level with nothing to list. */
@@ -88,10 +74,8 @@ function detailPractice(slug: string): PracticeStanding {
 	return practice;
 }
 
-/** The pull request the reviews below reviewed. */
 const pullRequest902: ItemRef = pullRequest(902);
 
-/** A review of an item, started by an event on it and complete. */
 export function reviewRef(
 	id: string,
 	item: ItemRef,
@@ -111,7 +95,6 @@ export function reviewRef(
 	};
 }
 
-/** A citation with nothing recorded beyond what the case names. */
 function cited(
 	fields: Partial<EvidenceCitation> & Pick<EvidenceCitation, "sourceKind">,
 ): EvidenceCitation {
@@ -128,14 +111,12 @@ function cited(
 	};
 }
 
-/** A problem with no basis, key or next step unless the case names one. */
 function problem(
 	fields: Pick<Problem, "id" | "resultId" | "position" | "severity" | "summary"> & Partial<Problem>,
 ): Problem {
 	return { key: null, explanation: null, citations: [], basis: null, nextStep: null, ...fields };
 }
 
-/** A piece of the reader's feedback, delivered on the work with the copies the case names. */
 export function ownFeedback(id: string, fields: Partial<OwnFeedbackRef> = {}): OwnFeedbackRef {
 	return {
 		id,
@@ -148,7 +129,6 @@ export function ownFeedback(id: string, fields: Partial<OwnFeedbackRef> = {}): O
 	};
 }
 
-/** A result as a list carries it: its facts and its problems' summaries, without its proof. */
 export function listedResult(result: ResultDetail): ResultList {
 	return {
 		id: result.id,
@@ -168,7 +148,6 @@ export function listedResult(result: ResultDetail): ResultList {
 	};
 }
 
-/** A result on the practice level's own practice, recorded by an event, before the case adds its own. */
 function recorded(
 	fields: Pick<ResultDetail, "id" | "reviewId" | "item" | "outcome" | "recordedAt"> &
 		Partial<ResultDetail>,
@@ -228,7 +207,6 @@ const pullRequestItself: EvidenceCitation[] = [
 const DETAIL_REVIEW = "00000000-0000-0000-0000-000000000101";
 const DETAIL_RESULT = "00000000-0000-0000-0000-000000000102";
 
-/** The feedback the newest review delivered on the pull request: a summary and one line note. */
 export const detailFeedback: OwnFeedbackRef = ownFeedback("00000000-0000-0000-0000-000000000103", {
 	copies: [
 		{
@@ -246,10 +224,6 @@ export const detailFeedback: OwnFeedbackRef = ownFeedback("00000000-0000-0000-00
 	],
 });
 
-/**
- * Not met, with three problems, each at its own place in the diff. The result's own citations are
- * the pull request's title and body, which no single problem owns.
- */
 export const detailResult: ResultDetail = recorded({
 	id: DETAIL_RESULT,
 	reviewId: DETAIL_REVIEW,
@@ -326,7 +300,6 @@ export const detailResult: ResultDetail = recorded({
 	feedback: [detailFeedback],
 });
 
-/** Met, and the review wrote no summary for it: the row names the practice instead. */
 export const metWithoutSummary: ResultDetail = recorded({
 	id: "00000000-0000-0000-0000-000000000104",
 	reviewId: DETAIL_REVIEW,
@@ -455,10 +428,6 @@ export const searchedAndFoundNothing: ResultDetail = recorded({
 	},
 });
 
-/**
- * The review could not settle the practice: two questions stayed open, each with what would settle
- * it, and one with the place it was asked about.
- */
 export const undeterminedResult: ResultDetail = recorded({
 	...onThatPullRequest,
 	id: "00000000-0000-0000-0000-000000000171",
@@ -492,7 +461,6 @@ export const undeterminedResult: ResultDetail = recorded({
 	},
 });
 
-/** Met, with the one place in the work the review points at as it reads. */
 export const metWithExample: ResultDetail = recorded({
 	...onThatPullRequest,
 	id: "00000000-0000-0000-0000-000000000181",

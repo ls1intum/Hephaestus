@@ -21,11 +21,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * Unit tests for {@link RegistrationToGitProviderResolver}, the {@code GitProviderRegistry} SPI
- * impl: given a login provider's {@code (type, baseUrl)}, it upserts the {@code git_provider} row
- * keyed on the canonical server-url origin (scheme + host + explicit non-default port).
- */
 @Tag("unit")
 class RegistrationToGitProviderResolverTest {
 

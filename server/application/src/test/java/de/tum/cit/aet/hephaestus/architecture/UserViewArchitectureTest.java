@@ -16,12 +16,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-/**
- * A user view discloses one account's private content to an instance administrator. Every
- * controller mounted under {@code /user-view} is therefore workspace-scoped, instance-admin only and
- * read-only, and every handler addressed at an account carries {@link UserViewRead}, whose advisor records
- * the view from the {@code accountId} it finds in the path.
- */
 class UserViewArchitectureTest extends HephaestusArchitectureTest {
 
     @Test

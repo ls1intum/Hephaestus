@@ -47,7 +47,6 @@ type ScopeOptionState<TOption> =
 	| { status: "error"; error: unknown; onRetry: () => void }
 	| { status: "ready"; options: TOption[] };
 
-/** A monitored repository, by the item id the review scope stores and the name a reader knows. */
 export interface RepositoryOption {
 	itemId: string;
 	name: string;

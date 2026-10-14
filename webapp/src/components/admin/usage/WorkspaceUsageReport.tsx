@@ -161,7 +161,6 @@ export function WorkspaceUsageReport({
 
 			<Section
 				title={isCurrentMonth ? "Spend this month" : `Spend in ${formatMonthLabel(month)}`}
-				// Only the own provider's cap is the workspace's to set, and only once that purse is in use.
 				actions={
 					isCurrentMonth && usesOwnProvider ? (
 						<Button variant="outline" size="sm" onClick={onEditOwnProviderCap}>
@@ -297,11 +296,9 @@ interface PurseTileProps {
 	spendUsd: number;
 	capUsd: number | undefined;
 	titleFx: FxConversion | null;
-	/** The meter's accessible name, distinct per purse. */
 	meterLabel: string;
 	paused: boolean;
 	state: CapState | null;
-	/** Some of this purse's calls have no price, so its cap cannot be checked. */
 	unpriced: boolean;
 }
 
@@ -310,7 +307,6 @@ const NO_LIMIT_SET: Record<Purse, string> = {
 	OWN_PROVIDER: "No cap set",
 };
 
-/** One purse's spend this month against its own limit. The two tiles are never summed. */
 function PurseTile({
 	purse,
 	spendUsd,
@@ -321,8 +317,6 @@ function PurseTile({
 	state,
 	unpriced,
 }: PurseTileProps) {
-	// The workspace's own provider bills it whether or not it has a cap; the shared budget's line says
-	// who set it.
 	const showsDescription = purse === "OWN_PROVIDER" || capUsd != null;
 	return (
 		<StatTile

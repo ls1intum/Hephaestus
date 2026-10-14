@@ -28,8 +28,6 @@ describe("practice review search", () => {
 			to: "2026-08-01",
 		});
 
-		// A filter the toolbar cannot show would be applied with nothing on screen saying so and no way
-		// to clear it short of a full reset, so every value the toolbar does not offer goes.
 		expect(feedback).toMatchObject({ state: ["DELIVERED"], destination: ["ON_WORK"] });
 		expect(feedback.location).toBeUndefined();
 		expect(feedback.from).toBeUndefined();
@@ -60,12 +58,9 @@ describe("practice review search", () => {
 		});
 		const query = reviewsQuery(search, 25);
 
-		// The same half-open rule the other lists use, so a date pasted between the screens selects the
-		// same days on each.
 		expect(query.from?.getDate()).toBe(1);
 		expect(query.from?.getHours()).toBe(0);
 		expect(query.to?.getDate()).toBe(4);
-		// Both filters travel: the statuses must not be dropped once a range is picked.
 		expect(query.status).toStrictEqual(["COMPLETE", "FAILED"]);
 	});
 

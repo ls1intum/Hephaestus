@@ -26,18 +26,6 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * nOAuth defence against a REAL Postgres: the mock-based {@link AccountProvisioningServiceTest}
- * stubs {@code findActiveByProviderSubject}, so it cannot prove the persisted data keys on
- * (provider, subject) rather than email. Two identities sharing one verified email must resolve to
- * DISTINCT accounts — email is contact metadata, never a join key.
- *
- * <p>PeopleRegistryIntegrationTest proves concurrent roster/claim convergence at the exact identity
- * key. These tests also prove that enclosing provisioning rollback removes a newly claimed account.
- *
- * @see <a href="https://www.descope.com/blog/post/noauth">nOAuth: account takeover via email
- *     merging</a>
- */
 class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired

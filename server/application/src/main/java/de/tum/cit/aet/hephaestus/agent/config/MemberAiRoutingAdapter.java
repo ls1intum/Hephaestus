@@ -22,12 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * The one home of the routing rule: a developer's {@link AiChoice} is the loosest
- * {@link DataHandlingTier} they accept, so any ready binding at or under that ceiling may serve them
- * and the loosest of those is picked. Nothing ever routes a chosen member to a looser tier or to the
- * {@code UNDECLARED} slot, which serves only members who have not chosen where the choice is optional.
- */
+// A chosen AI tier is a ceiling; UNDECLARED serves only members without a choice where choice is optional.
 @Service
 @RequiredArgsConstructor
 public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
@@ -42,7 +37,6 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
         return route(workspaceId, purpose, developerId);
     }
 
-    /** Selects one permitted route shared by all frozen review subjects. */
     @Transactional(readOnly = true)
     public Optional<WorkspaceAgentBinding> bindingForPeople(
             long workspaceId, AgentPurpose purpose, List<@Nullable Long> people) {
@@ -77,10 +71,7 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
                 : Optional.of(people.stream().allMatch(Objects::isNull) ? ordered.getFirst() : ordered.getLast());
     }
 
-    /**
-     * {@link #practiceScriptBinding} calls this instead of {@link #binding}: a call to another transactional method of
-     * this bean skips its proxy.
-     */
+    // Self-invocation bypasses Spring's transactional proxy; route within the caller's transaction.
     private Optional<WorkspaceAgentBinding> route(long workspaceId, AgentPurpose purpose, @Nullable Long developerId) {
         if (developerId == null) {
             if (!preferences.forDeveloper(workspaceId, null).permitsAi()) return Optional.empty();
@@ -162,7 +153,6 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
         return served;
     }
 
-    /** The member tiers that can exist in the workspace, in the order {@link #unservedTiers} names them. */
     private static List<DataHandlingTier> memberTiers(boolean choiceOptional) {
         return choiceOptional
                 ? List.of(DataHandlingTier.IN_HOUSE, DataHandlingTier.CLOUD, DataHandlingTier.UNDECLARED)
@@ -173,10 +163,7 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
         return !preferences.forDeveloper(workspaceId, null).choiceRequired();
     }
 
-    /**
-     * The binding that serves each member tier, from the purpose's rows. {@code reviewRows} caps a chosen tier at
-     * the tier of the review binding that serves it; it is empty for a purpose that the review does not cap.
-     */
+    // Direct-model routes cannot exceed the tier permitted by the review route.
     private Map<DataHandlingTier, WorkspaceAgentBinding> serving(
             List<WorkspaceAgentBinding> rows, List<WorkspaceAgentBinding> reviewRows, boolean choiceOptional) {
         var serving = new EnumMap<DataHandlingTier, WorkspaceAgentBinding>(DataHandlingTier.class);
@@ -283,7 +270,6 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
         return binding.isEnabled() && models.isAvailable(binding);
     }
 
-    /** A binding of the {@code UNDECLARED} slot serves while it is ready and its model is still undeclared. */
     private boolean servesUndeclared(WorkspaceAgentBinding binding) {
         return ready(binding) && currentTier(binding) == DataHandlingTier.UNDECLARED;
     }

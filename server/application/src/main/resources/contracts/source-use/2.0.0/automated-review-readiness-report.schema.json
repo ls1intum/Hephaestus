@@ -24,7 +24,8 @@
 		},
 		"itemKind": {
 			"type": "string",
-			"pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"
+			"pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+			"description": "Kind of the item whose captured evidence this report checks."
 		},
 		"manifestCapturedAt": {
 			"type": "string",

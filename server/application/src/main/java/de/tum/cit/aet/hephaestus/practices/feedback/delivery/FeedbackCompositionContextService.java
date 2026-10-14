@@ -2,14 +2,11 @@ package de.tum.cit.aet.hephaestus.practices.feedback.delivery;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
-import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationEligibility;
@@ -53,8 +50,7 @@ public class FeedbackCompositionContextService {
     private final PracticePageFeedbackRouter pageRouter;
     private final FeedbackGate gate;
     private final FeedbackBasisRepository basis;
-    private final ProblemRepository problems;
-    private final ItemCatalog catalog;
+    private final FeedbackAnchorEligibility anchors;
     private final ResultHistoryQuery history;
     private final MentorReadinessQuery mentor;
     private final Clock clock;
@@ -215,7 +211,7 @@ public class FeedbackCompositionContextService {
         if (!mentor.isReady(review.workspaceId()))
             return new ConversationAdmission(
                     ConversationDecision.MENTOR_UNAVAILABLE, FeedbackStopReason.RECIPIENT_UNAVAILABLE);
-        if (hasInlineAnchor(review, result))
+        if (anchors.hasInlineAnchor(review, result))
             return new ConversationAdmission(ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW);
         if (basis.hasConfirmedOnWork(review.workspaceId(), developer, result.getId()))
             return new ConversationAdmission(
@@ -232,29 +228,6 @@ public class FeedbackCompositionContextService {
                         .filter(JsonNode::isString)
                         .map(JsonNode::asString)
                         .orElse(null);
-    }
-
-    private boolean hasInlineAnchor(ReviewSnapshot review, Result result) {
-        if (review.practices().stream()
-                        .noneMatch(p -> p.practiceId() == result.getPracticeId()
-                                && p.definition().lineNotes())
-                || catalog.descriptorFor(review.item().kind())
-                        .filter(d -> d.copyCapabilities().contains(CopyCapability.LINE_NOTE))
-                        .isEmpty()) return false;
-        var citations = new ArrayList<JsonNode>();
-        var evidence = result.getEvidence();
-        if (evidence != null) evidence.path("citations").forEach(citations::add);
-        problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(review.workspaceId(), result.getId())
-                .forEach(problem -> problem.getCitations().forEach(citations::add));
-        return citations.stream()
-                .anyMatch(c ->
-                        "VERIFIED".equals(c.path("verification").path("status").asString())
-                                && c.path("path").isString()
-                                && !c.path("path").asString().isBlank()
-                                && c.path("startLine").isIntegralNumber()
-                                && c.path("startLine").asInt() > 0
-                                && ("OLD".equals(c.path("side").asString())
-                                        || "NEW".equals(c.path("side").asString())));
     }
 
     private static FeedbackCompositionContext complete(

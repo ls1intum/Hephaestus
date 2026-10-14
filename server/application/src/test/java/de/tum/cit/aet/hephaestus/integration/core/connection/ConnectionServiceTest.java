@@ -54,12 +54,6 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/**
- * State-machine contract for {@link ConnectionService#transition}. Exercises the legal path (one
- * audit row, state mutated), the rejection path (no audit row, state untouched), the same-state
- * no-op, and the UNINSTALLED credential purge. {@link IntegrationStateTest} covers the pure {@code
- * canTransitionTo} predicate; this test covers the service that enforces it.
- */
 @Tag("unit")
 class ConnectionServiceTest extends BaseUnitTest {
 
@@ -465,8 +459,6 @@ class ConnectionServiceTest extends BaseUnitTest {
 
         assertThatThrownBy(() -> service.disconnect(connection, disconnectRequest(), strategy))
                 .isInstanceOf(ConnectionBusyException.class)
-                // The 409 names the job and promises a retry, because the fence already asked it to
-                // stop.
                 .hasMessageContaining("active sync job 99")
                 .hasMessageContaining("Disconnect again");
 
@@ -493,12 +485,7 @@ class ConnectionServiceTest extends BaseUnitTest {
         verify(connectionRepository, never()).save(any());
     }
 
-    /**
-     * The unauthenticated webhook hot path: the subscription id from the delivery body selects
-     * which stored secret the HMAC is checked against. Contract: exactly one indexed lookup (never
-     * a scan over the connected fleet — {@code /webhooks/**} is exempt from the auth rate limiter),
-     * a forged id resolves to nothing, and a delivery can never select another workspace's secret.
-     */
+    // Webhooks bypass the auth limiter; resolve one subscription by its indexed id without scanning stored secrets.
     @Nested
     class FindOutlineSubscription {
 
@@ -564,8 +551,6 @@ class ConnectionServiceTest extends BaseUnitTest {
 
         @Test
         void aDeliveryForWorkspaceANeverSelectsWorkspaceBsSecret() {
-            // The query is keyed on the subscription id, so B's row is simply not in the result
-            // set.
             when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-a"))
                     .thenReturn(List.of(projection(1L, "secret-a")));
             when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b"))

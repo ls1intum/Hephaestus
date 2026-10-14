@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Generic parent reviews for tests of runtime leases and retention, without executing a practice. */
 public final class RuntimeJobTestData {
     private RuntimeJobTestData() {}
 

@@ -125,7 +125,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // Activity writes carry the event identity and its context through the SPI.
                     "ActivityEventService.record",
                     "ActivityRecorder.record",
-                    // The frozen seven-argument decision binds actor, action, explanation and approved digest.
                     "FeedbackStore.decide",
                     "FeedbackStoreService.decide",
                     "FeedbackDecisionService.decide",

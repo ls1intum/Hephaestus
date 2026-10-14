@@ -13,10 +13,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-/**
- * No production class, field or method is named with a word the product vocabulary retired for a result, so
- * the code cannot keep a concept alive that the copy and the API no longer have.
- */
 class PracticeVocabularyArchitectureTest extends HephaestusArchitectureTest {
 
     private static final Pattern RETIRED_OBSERVATION_WORDS =

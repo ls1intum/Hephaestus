@@ -3,12 +3,7 @@ import { z } from "zod";
 /** The frame viewport stops growing here; its natural document scrolls beyond it. */
 export const MAX_FRAME_HEIGHT = 4000;
 
-/**
- * The collapsed report's height, the same in every state — loading, signed out, not followed, no
- * results, twenty — so the page, which can read the frame's size, learns nothing from it. Only
- * the reader's own expansion changes it, which the frame keeps with the worker: nothing the page
- * passes to the frame can open it.
- */
+// A fixed collapsed height prevents the provider page from inferring report state.
 export const REPORT_ROW_HEIGHT = 48;
 
 /**

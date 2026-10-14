@@ -21,9 +21,7 @@ public interface ItemEventCoverage {
      */
     Set<ItemEventName> compiledCoverage();
 
-    /** Every event some integration <em>connected to this workspace</em> declares it raises. */
     Set<ItemEventName> connectedCoverage(long workspaceId);
 
-    /** Which integrations declare they raise this event. Empty means nothing does. */
     Set<IntegrationKind> raisedBy(ItemEventName event);
 }

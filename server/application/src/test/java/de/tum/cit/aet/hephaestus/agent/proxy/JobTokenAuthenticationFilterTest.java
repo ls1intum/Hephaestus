@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -75,7 +76,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
                 new MentorProxyCredentialRegistry.Route(
                         "openai-responses", "https://models.example/v1", null, null, null, null));
         var meter = spy(new MentorTurnMeter(UUID.randomUUID(), LlmPriceSnapshot.unpricedInstance()));
-        doThrow(new IllegalStateException("Pricing unavailable")).when(meter).spentUsd();
+        var pricingFailure = new IllegalStateException("Pricing unavailable");
+        doThrow(pricingFailure).when(meter).spentUsd();
         assertThat(registry.bindTurn(session, meter)).isTrue();
         var authFilter = new JobTokenAuthenticationFilter(jobs, verifier, registry, "worker-1");
         var response = new MockHttpServletResponse();
@@ -89,6 +91,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         var sessionIdentity = Objects.requireNonNull(
                 ((JobTokenAuthentication) principal.get()).getPrincipal().mentor());
         assertThat(sessionIdentity.sessionId()).isEqualTo(session);
+        assertThatThrownBy(() -> registry.resolve(sessionIdentity)).isSameAs(pricingFailure);
         verifyNoInteractions(jobs, verifier);
     }
 

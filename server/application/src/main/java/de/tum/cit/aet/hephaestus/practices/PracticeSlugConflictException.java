@@ -4,7 +4,6 @@ import java.io.Serial;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
-/** Thrown when attempting to create a practice with a slug that already exists in the workspace. */
 @ResponseStatus(HttpStatus.CONFLICT)
 public class PracticeSlugConflictException extends RuntimeException {
 

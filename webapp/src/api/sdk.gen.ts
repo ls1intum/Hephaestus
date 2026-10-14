@@ -1782,8 +1782,6 @@ export const assignMemberRole = <ThrowOnError extends boolean = false>(options: 
 
 /**
  * Get your workspace membership
- *
- * One representative membership, with the account's effective workspace role.
  */
 export const getOwnMembership = <ThrowOnError extends boolean = false>(options: Options<GetOwnMembershipData, ThrowOnError>): RequestResult<GetOwnMembershipResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetOwnMembershipResponses, unknown, ThrowOnError>({
     responseTransformer: getOwnMembershipResponseTransformer,

@@ -52,7 +52,7 @@ export const Item: Story = {
 			status: "ready",
 			name: "Pull request #1423 · Member-facing review activity: say why a practice stayed quiet",
 		},
-		trace: { kind: "item", id: "pull-request:1423" },
+		trace: { kind: "item", id: "42" },
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText(
@@ -64,7 +64,6 @@ export const Item: Story = {
 	},
 };
 
-/** A result is named by its own summary; its trace stands on it. */
 export const Result: Story = {
 	args: {
 		kind: "result",

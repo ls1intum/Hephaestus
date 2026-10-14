@@ -19,17 +19,11 @@ export interface BulkProgress {
 	total: number;
 }
 
-/**
- * Every write here invalidates the rollup and the practice list rather than patching them: the
- * inheritance chain is resolved server-side, and a client predicting what a group feedback mode does to the
- * practices inheriting it would be a second implementation of that chain. The group response carries
- * the group and nothing else.
- */
+// Feedback-mode inheritance is server-owned; invalidate its projections rather than predict the chain locally.
 export function usePracticeFeedbackModeMutations(workspaceSlug: string) {
 	const queryClient = useQueryClient();
 	const [bulk, setBulk] = useState<BulkProgress | null>(null);
-	// A ref rather than the state above: the mutation's callbacks close over the render that created
-	// them and would keep reading `null` for the whole run.
+	// Mutation callbacks capture render state; a ref exposes the current bulk-write state.
 	const bulkRunning = useRef(false);
 	const groupMutationKey = ["practice-feedback-mode", workspaceSlug, "groups"] as const;
 	const practiceMutationKey = ["practice-feedback-mode", workspaceSlug, "practices"] as const;
@@ -67,8 +61,7 @@ export function usePracticeFeedbackModeMutations(workspaceSlug: string) {
 		...filedUnder(practiceMutationKey, setPracticeFeedbackModeMutation()),
 		onError: (error) =>
 			toast.error("We could not change the practice", { description: problemDetailOf(error) }),
-		// One write, one refetch — except inside a bulk run, which settles once at the end rather than
-		// refetching the list and the rollup after every PATCH in it.
+		// Bulk writes share one final refetch instead of refetching after each member write.
 		onSettled: () => {
 			if (!bulkRunning.current) {
 				invalidateResolved();

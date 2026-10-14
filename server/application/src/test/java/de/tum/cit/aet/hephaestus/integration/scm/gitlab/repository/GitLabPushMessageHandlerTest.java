@@ -527,10 +527,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
                 "push", "refs/heads/main", "before", "after", "after", projectInfo.id(), projectInfo, 1, null);
     }
 
-    /**
-     * A repository in an active scope with local git enabled: the handler walks default-branch
-     * pushes.
-     */
     private Repository activeLocalGitRepository(GitLabPushEventDTO.ProjectInfo projectInfo) {
         Repository repo = TestEntities.repository(42L, "org/proj", "main");
         repo.setProvider(gitLabProvider);

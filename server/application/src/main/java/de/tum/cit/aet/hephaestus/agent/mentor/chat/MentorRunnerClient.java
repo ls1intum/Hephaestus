@@ -350,12 +350,8 @@ public final class MentorRunnerClient implements AutoCloseable {
         }
     }
 
-    /**
-     * The runner asks before its {@code link_result} or {@code link_problem} tool reports success or emits the
-     * link, so the server, not the model, decides which result or problem a reply may show feedback about. A refusal
-     * is one message whatever the reason, so the answer never tells an id that does not exist from one that belongs
-     * to someone else.
-     */
+    // Authorize links before the runner emits them.
+    // Refusals must not distinguish nonexistent ids from another developer's records.
     private void handleLink(JsonNode frame, LinkKind kind) {
         JsonNode idNode = frame.get("id");
         JsonNode params = frame.path("params");
@@ -410,7 +406,6 @@ public final class MentorRunnerClient implements AutoCloseable {
     /** Server-callback request from the runner. */
     public record FetchContextRequest(UUID threadId, String path) {}
 
-    /** What a link names: a practice result, or one located problem of a result. */
     public enum LinkKind {
         RESULT("link_result", "resultId"),
         PROBLEM("link_problem", "problemId"),
@@ -433,7 +428,6 @@ public final class MentorRunnerClient implements AutoCloseable {
         }
     }
 
-    /** The runner's request to show feedback about one result or problem; the handler answers whether it may. */
     public record LinkRequest(UUID threadId, LinkKind kind, UUID linkedId) {}
 
     static final String LINK_REFUSED =

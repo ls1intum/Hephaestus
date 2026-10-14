@@ -1,5 +1,3 @@
-/** The parsed change, as `diff-parser.ts` reads a unified diff. */
-
 export interface DiffFile {
 	path: string;
 	addedLines: Map<number, string>;

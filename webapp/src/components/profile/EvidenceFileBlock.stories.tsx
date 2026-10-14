@@ -46,10 +46,6 @@ export const Default: Story = {
 		},
 	},
 };
-/**
- * Citations that recorded only their place: a code source still names its path and lines, and a
- * historical one that recorded no file is named by its source alone. Neither shows an empty quote.
- */
 export const PlaceWithoutQuote: Story = {
 	args: {
 		location: {
@@ -143,11 +139,6 @@ export const CodeSourceKeepsItsLines: Story = {
 	},
 };
 
-/**
- * One changed line, cited from both sides of the diff: one block naming the file, with what the
- * line was above what it became. The caption names no line range, because each side sits at its
- * own coordinates in its own commit and the block shows both.
- */
 export const OneChangedLine: Story = {
 	args: {
 		location: {

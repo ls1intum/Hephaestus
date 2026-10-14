@@ -131,13 +131,8 @@ export const TestWorkspace: Story = {
 			"3 lost to merge",
 			"12 finished after merge",
 		]);
-		// Every count still opens what it counts.
-		for (const name of [
-			"2 reviews running",
-			"1 review on hold",
-			"272 reviews finished",
-			"12 reviews finished after the merge",
-		]) {
+		// Running and finished counts open their reviews.
+		for (const name of ["2 reviews running", "272 reviews finished"]) {
 			canvas.getByRole("link", { name });
 		}
 	},

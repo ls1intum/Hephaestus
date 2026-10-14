@@ -415,12 +415,10 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         return ScmFeedbackFixtures.line(ScmFeedbackFixtures.anchor("src/Foo.java", 10, null), body, MARKER, key);
     }
 
-    /** The exact body the channel posts for {@code item}. */
     private static String posted(LineNote item) {
         return item.body() + "\n\n" + item.writeMarker() + "\n" + ckTag(String.valueOf(item.writeKey()));
     }
 
-    /** The first comment the viewer's own review left for {@code item} at the reviewed commit. */
     private static Map<String, Object> authored(LineNote item) {
         Map<String, Object> comment = new HashMap<>();
         comment.put("id", "RC_" + item.writeKey());
@@ -451,9 +449,6 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
     }
 
-    /**
-     * Stubs {@code pages} empty pages of review threads; the last one reports more after it or not.
-     */
     private void stubReviewThreadPages(int pages, boolean moreAfterLast) {
         GraphQlClient.RequestSpec spec = mock(GraphQlClient.RequestSpec.class);
         when(client.documentName("GetPullRequestReviewThreads")).thenReturn(spec);
@@ -466,9 +461,6 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         when(spec.execute()).thenAnswer(invocation -> next.next());
     }
 
-    /**
-     * Stubs GetPullRequestReviewThreads to return a single complete page of the given thread nodes.
-     */
     private void stubReviewThreads(List<Map<String, Object>> nodes) {
         stubReviewThreadsPage(threadsPage(nodes, false, null));
     }
@@ -494,9 +486,6 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         return response;
     }
 
-    /**
-     * Stubs AddPullRequestReviewWithThreads to return the given review id + returned comment nodes.
-     */
     private GraphQlClient.RequestSpec stubAddReview(String reviewId, List<Map<String, Object>> commentNodes) {
         GraphQlClient.RequestSpec spec = mock(GraphQlClient.RequestSpec.class);
         when(client.documentName("AddPullRequestReviewWithThreads")).thenReturn(spec);
@@ -510,7 +499,6 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         return spec;
     }
 
-    /** Captures the {@code threads} variable of a stubbed review request. */
     private static ThreadsCaptor captureThreads(GraphQlClient.RequestSpec spec) {
         ThreadsCaptor captor = new ThreadsCaptor();
         when(spec.variable(any(), any())).thenAnswer(inv -> {
@@ -522,7 +510,6 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         return captor;
     }
 
-    /** Stubs AddPullRequestReviewWithThreads to return a non-empty {@code errors} list. */
     private void stubAddReviewWithErrors() {
         GraphQlClient.RequestSpec spec = mock(GraphQlClient.RequestSpec.class);
         when(client.documentName("AddPullRequestReviewWithThreads")).thenReturn(spec);
@@ -541,7 +528,6 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         lenient().when(field.getValue()).thenReturn(value);
     }
 
-    /** Builds a reviewThreads node whose first comment is {@code firstComment}. */
     private static Map<String, Object> thread(
             String threadId, String firstCommentId, Map<String, Object> firstComment) {
         firstComment.put("id", firstCommentId);
@@ -577,7 +563,6 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
                 new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", COMMIT);
     }
 
-    /** Mutable holder for capturing the {@code threads} mutation variable. */
     private static final class ThreadsCaptor {
 
         private @Nullable Object value;
@@ -592,7 +577,6 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         }
     }
 
-    /** Records which delivery keys each create request carried. */
     private static final class RecordingFence implements CopyWriteFence {
 
         final List<List<String>> attempts = new ArrayList<>();

@@ -68,11 +68,7 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
     @Column(name = "purpose", nullable = false, length = 32)
     private AgentPurpose purpose;
 
-    /**
-     * The slot this row fills: the bound model's derived tier must equal it, except that the
-     * {@code UNDECLARED} slot accepts any model. {@code UNDECLARED} is the slot for members with
-     * no choice, and does not override an explicit member choice.
-     */
+    // UNDECLARED serves members without a choice; it must not override an explicit privacy tier.
     @Enumerated(EnumType.STRING)
     @ColumnDefault("'UNDECLARED'")
     @Column(name = "data_handling_tier", nullable = false, length = 24)

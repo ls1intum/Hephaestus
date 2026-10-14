@@ -15,7 +15,6 @@ await test("the exporter protocol fixture conforms to the official SARIF 2.1.0 s
 	assert.ok(record(official));
 	assert.equal(official.$schema, "http://json-schema.org/draft-04/schema#");
 	assert.ok(typeof official.id === "string");
-	// This schema uses the shared draft-04/draft-07 assertion vocabulary. Only its root metadata differs.
 	const { id, $schema: _meta, ...assertions } = official;
 	const schema = { ...assertions, $id: id, $schema: "http://json-schema.org/draft-07/schema#" };
 	const ajv = new Ajv({ allErrors: true, strict: false, formats: fullFormats });

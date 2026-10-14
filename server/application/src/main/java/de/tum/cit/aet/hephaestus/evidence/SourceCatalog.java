@@ -21,13 +21,12 @@ public final class SourceCatalog {
             @JsonProperty("version") SourceContractVersion version,
             @JsonProperty("sources") List<SourceContract> sources) {
         Objects.requireNonNull(version, "version");
-        sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
-        if (sources.isEmpty()) {
+        this.sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
+        if (this.sources.isEmpty()) {
             throw new IllegalArgumentException("Source catalog must contain sources");
         }
         this.version = version;
-        this.sources = sources;
-        this.index = Map.copyOf(indexSources(sources));
+        this.index = Map.copyOf(indexSources(this.sources));
     }
 
     @JsonProperty("version")

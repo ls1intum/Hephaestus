@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 import java.util.Set;
 
-/** Versioned semantics for one logical evidence source. */
 public record SourceContract(
         SourceKind kind,
         String displayName,

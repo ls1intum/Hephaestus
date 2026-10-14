@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogCustomizationService;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
@@ -22,6 +23,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     CatalogService catalog;
+
+    @Autowired
+    CatalogCustomizationService customization;
 
     @Autowired
     PracticeReviewDigest digest;
@@ -54,7 +58,7 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
         var offeredDefinition = DefinitionTestFixtures.withCriteria(
                 DefinitionTestFixtures.rename(recordedDefinition, "Accepted catalog name"),
                 "Each change states its purpose and its verified result.");
-        catalog.updatePractice(
+        customization.updatePractice(
                 source.slug(),
                 new CatalogPracticeInputDTO(
                         source.slug(),
@@ -107,7 +111,7 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
         var existing = service.getPractice(WorkspaceContext.fromWorkspace(workspace, Set.of(), null), source.slug());
         var first = existing.getCurrentVersion();
         var changed = DefinitionTestFixtures.rename(source.effective().definition(), "Updated catalog name");
-        catalog.updatePractice(
+        customization.updatePractice(
                 source.slug(),
                 new CatalogPracticeInputDTO(
                         source.slug(),

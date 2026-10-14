@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
-/** Chat-domain source access. */
 public interface ConversationCandidateSource {
     /**
      * Threads on an {@code ACTIVE} channel that have grown past their review watermark and have at least
@@ -22,7 +21,6 @@ public interface ConversationCandidateSource {
      */
     Optional<ConversationThreadCandidate> candidateById(long workspaceId, long threadId);
 
-    /** Count of non-tombstoned turns in the thread (root + replies). */
     long liveTurnCount(long workspaceId, String channelId, String threadTs);
 
     /**
@@ -31,6 +29,5 @@ public interface ConversationCandidateSource {
      */
     long liveTurnCountSince(long workspaceId, String channelId, String threadTs, @Nullable String watermark);
 
-    /** Advance the thread's {@code last_reviewed_ts} watermark to {@code lastTs}. */
     void markReviewed(long workspaceId, long threadId, String lastTs);
 }

@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Resolves linked SCM identities from the current provider mirror and its immutable native key. */
 @Service
 public class AuthenticatedGitProviderUserService {
 
@@ -33,7 +32,6 @@ public class AuthenticatedGitProviderUserService {
         this.accountIdentityQuery = accountIdentityQuery;
     }
 
-    /** Resolves the first linked GitHub/GitLab identity. */
     @Transactional
     public Optional<User> resolveCurrentUser() {
         for (IdentityView link : activeLinksForCurrentAccount()) {
@@ -87,7 +85,6 @@ public class AuthenticatedGitProviderUserService {
                 .orElseGet(List::of);
     }
 
-    /** Returns the current profile matching the verified provider key. */
     private User resolveUser(IdentityView link) {
         IdentityProvider provider = gitProviderRepository
                 .findById(link.providerId())

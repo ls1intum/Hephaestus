@@ -22,11 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * What each practice's script needs. A script declares its models only when it runs, so the needs
- * come from the newest run that reported them, and only while that run's script is still the practice's
- * script. Whether a need is met comes from today's routing, so binding a model shows at once.
- */
+// Script needs come only from the newest report for the current script; availability uses current routing.
 @Service
 @RequiredArgsConstructor
 class PracticeNeedsAdapter implements PracticeScriptSummaries {

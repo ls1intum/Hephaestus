@@ -29,7 +29,6 @@ export const CancelRunningReview: Story = {
 	},
 };
 
-/** The cancel request is in flight: the button says so and takes no second press. */
 export const Cancelling: Story = {
 	args: { isCancelling: true },
 	play: async ({ canvas }) => {

@@ -151,7 +151,6 @@ public class ResultAdmissionService {
         return response(job, false);
     }
 
-    /** Builds a writer input while the original proof and this capture's privacy fence are held. */
     public AdmissionResponseDTO capturedAdmissionResponse(ReviewJob job) {
         return response(job, true);
     }

@@ -7,10 +7,7 @@ import type {
 	resultLinkDataSchema,
 } from "@/lib/chat-validation";
 
-/**
- * Mirrors the server's `UIMessageChunk.DataResult`, `DataProblem` and `DataMentorStatus`; read them
- * through `shownFeedbackText` and `mentorStatus`, which check the payload.
- */
+// UI chunk payloads cross a trust boundary; read them through the shared validators.
 export interface CustomUIDataTypes {
 	[name: string]: unknown;
 	result: z.infer<typeof resultLinkDataSchema>;

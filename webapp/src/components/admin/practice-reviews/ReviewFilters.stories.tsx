@@ -8,14 +8,6 @@ import { clearedScope } from "./review-scope";
 import { clearedReviewFacets, ReviewFilters } from "./ReviewFilters";
 import { STORY_GROUPS, STORY_PEOPLE, STORY_PRACTICES } from "./story-scope-sources";
 
-/**
- * The toolbar above the Reviews list: a status, a created-on window, and the count of what they
- * matched. It owns no data — it reports a patch and is handed the total, so the number beside it
- * always describes the answer on screen rather than the request in flight.
- *
- * The status options wear the same badges the rows do. A dropdown of plain words would make choosing
- * a filter an act of memory: matching a word here to a tag there.
- */
 const meta = {
 	component: ReviewFilters,
 	parameters: { layout: "padded", chromatic: { viewports: [320, 1440] } },
@@ -30,7 +22,6 @@ const meta = {
 		people: STORY_PEOPLE,
 		total: 7,
 	},
-	// Controlled, so a frozen `search` would leave every control inert while nothing looks broken.
 	render: (args) => (
 		<StatefulPatch initial={args.search}>
 			{(search, onPatch) => (
@@ -58,7 +49,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Nothing chosen: the count says how many reviews exist, and there is nothing to reset. */
 export const Unfiltered: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByText("7 reviews.");
@@ -66,7 +56,6 @@ export const Unfiltered: Story = {
 	},
 };
 
-/** Chosen: the count says what survived, and Reset appears to undo all of it at once. */
 export const Filtered: Story = {
 	args: {
 		search: { status: ["COMPLETE"], from: "2026-07-28", to: "2026-07-29" },
@@ -79,7 +68,6 @@ export const Filtered: Story = {
 	},
 };
 
-/** One row is still "matches", not "match": the verb agrees with the count, not with the noun. */
 export const OneMatch: Story = {
 	args: { search: { status: ["FAILED"] }, total: 1 },
 	play: async ({ canvas }) => {
@@ -98,11 +86,6 @@ export const CountNotInYet: Story = {
 	},
 };
 
-/**
- * Choosing statuses reports the facet the reader changed, and only that: sending them back to page
- * one is the route's job, because it owns the URL. Statuses add up rather than one replacing the
- * other.
- */
 export const ChoosingStatuses: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		const trigger = canvas.getByRole("combobox", { name: "Status" });
@@ -113,16 +96,10 @@ export const ChoosingStatuses: Story = {
 		await userEvent.click(within(listbox).getByRole("option", { name: /Partial/u }));
 		await expect(args.onPatch).toHaveBeenLastCalledWith({ status: ["FAILED", "PARTIAL"] });
 		await userEvent.click(trigger);
-		// Wait for the popup to finish leaving: a listbox caught mid-exit has already been detached
-		// from the label that names it, which the accessibility check would audit.
 		await waitFor(async () => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
 	},
 };
 
-/**
- * Reset clears the list's own facets and keeps the shared scope, here the range, for the next tab.
- * "Clear scope" clears the range.
- */
 export const ResettingKeepsTheScope: Story = {
 	args: {
 		search: { status: ["FAILED"], from: "2026-07-28", to: "2026-07-29" },
@@ -146,10 +123,6 @@ export const ResettingKeepsTheScope: Story = {
 	},
 };
 
-/**
- * A selected review narrows this list too. The selection shows once, above every tab, so the toolbar
- * draws no pill for it; "Clear scope" still clears it with the rest.
- */
 export const SelectionApplies: Story = {
 	args: {
 		search: {
@@ -166,7 +139,6 @@ export const SelectionApplies: Story = {
 	},
 };
 
-/** A developer and a practice from another tab narrow the reviews to those that recorded a result about them. */
 export const ScopeCarriedFromAnotherTab: Story = {
 	args: {
 		search: {
@@ -185,7 +157,6 @@ export const ScopeCarriedFromAnotherTab: Story = {
 	},
 };
 
-/** The bar's controls, in the order the reader tabs through them: every control is a button. */
 function controlsOf(group: HTMLElement) {
 	return Array.from(
 		group.querySelectorAll("button"),
@@ -193,11 +164,6 @@ function controlsOf(group: HTMLElement) {
 	);
 }
 
-/**
- * The bar has the order every tab shares. The scope's developer, group, practice and date come
- * first, in their own group, because they apply to every tab; the layout moves that group above the
- * tabs. Then the list's own Status, and the count on the right.
- */
 export const SharedOrder: Story = {
 	play: async ({ canvas }) => {
 		const scope = canvas.getByRole("group", { name: "Applies to every tab" });

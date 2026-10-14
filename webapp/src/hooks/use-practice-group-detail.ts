@@ -17,7 +17,6 @@ import {
 import { useFeedbackResponseWrite } from "@/hooks/use-feedback-response-write";
 import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
 
-/** Reviews per page of the feed; also the skeleton's row count while the first page loads. */
 export const REVIEW_PAGE_SIZE = 10;
 
 export interface PracticeGroupDetailRequest {
@@ -31,7 +30,6 @@ export interface PracticeGroupDetailRequest {
 	 * the open practice is found among all of them.
 	 */
 	practiceStandings: PracticeStanding[];
-	/** Every practice Hephaestus reviews, for the name and words of an open practice with no standing. */
 	reviewedPractices: ReviewedPractice[];
 }
 
@@ -47,7 +45,6 @@ export interface PracticeGroupDetail {
 	practice?: PracticeStanding;
 	/** The open practice's name and words when it has no standing to carry them. */
 	described?: ReviewedPractice;
-	/** The reviews of the open practice's group; the practice level keeps its own results. */
 	feed: ReviewFeedState;
 	/** The open practice's guidance; loading while no practice is open. */
 	guidance: PracticeGuidanceState;
@@ -55,12 +52,6 @@ export interface PracticeGroupDetail {
 	responses?: FeedbackResponseControls;
 }
 
-/**
- * The open detail levels' data: the group level's practices, read off the standings the page
- * already holds, and the practice level's guidance, the reviews of its group and the responses
- * written on them. Each query is gated on its level actually being open, so a closed drawer costs
- * nothing and the group level never fetches what it does not show.
- */
 export function usePracticeGroupDetail({
 	workspaceSlug,
 	groupSlug,
@@ -72,7 +63,6 @@ export function usePracticeGroupDetail({
 		practiceSlug === undefined
 			? undefined
 			: practiceStandings.find((candidate) => candidate.slug === practiceSlug);
-	// Reviews are listed per group, so a practice opened on its own reads them through its own group.
 	const feedGroupSlug = groupSlug ?? practice?.groupSlug ?? undefined;
 	const practiceOpen = practiceSlug !== undefined && feedGroupSlug !== undefined;
 

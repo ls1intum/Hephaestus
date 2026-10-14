@@ -130,7 +130,7 @@ public class Review {
 
     @Default
     @JdbcTypeCode(SqlTypes.JSON)
-    @ColumnDefault("'{}'::jsonb")
+    @ColumnDefault("'{}'")
     @Column(name = "checks", nullable = false, columnDefinition = "jsonb")
     private JsonNode checks = JsonNodeFactory.instance.objectNode();
 }

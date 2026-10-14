@@ -95,8 +95,6 @@ class OpportunityBundlerTest {
     @ParameterizedTest(name = "{0} decided pieces of work leave {1} to go")
     @CsvSource({"0, 8", "2, 6", "4, 4", "6, 2", "8, 0"})
     void shouldCountWhatTheCurrentBundleLacksBeforeThePreviousOne(int decided, int missing) {
-        // The previous bundle fills only once the current one is full, so two pieces of work are six short of a
-        // comparison, not four.
         ResultView[] practiceResults = new ResultView[decided];
         for (int index = 0; index < decided; index++) {
             practiceResults[index] =
@@ -124,8 +122,6 @@ class OpportunityBundlerTest {
 
     @Test
     void shouldNotLetAVerdictlessRunSupersedeAnEarlierVerdictOnTheSameArtifact() {
-        // Same artifact, later run found nothing to judge. The latest run still wins — a re-review that says
-        // the practice no longer applies here must not leave the old problem standing.
         var prior = judged(1, UUID.randomUUID(), "2026-08-10T09:00:00Z", ResultOutcome.NOT_MET);
         prior.result().end(ResultEndReason.REPLACED, Instant.parse("2026-08-11T09:00:00Z"));
         OpportunityBundler.Bundles result = bundle(prior, noVerdict(1, UUID.randomUUID(), "2026-08-11T09:00:00Z"));

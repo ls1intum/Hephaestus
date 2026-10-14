@@ -54,13 +54,6 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/**
- * The ADR-0017 account-status gate in {@link HephaestusAuthSuccessHandler}: a SUSPENDED / DELETING
- * / DELETED account that re-authenticates gets NO cookie (see that class's onAuthenticationSuccess
- * for the full threat model). The decoder + JwtPrincipalFactory enforce the same invariant as
- * defence-in- depth, but this handler is where the login decision is made, so it must hold here
- * independently.
- */
 class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
 
     private static final Instant NOW = Instant.parse("2026-06-01T00:00:00Z");

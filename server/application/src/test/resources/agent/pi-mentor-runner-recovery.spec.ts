@@ -270,14 +270,12 @@ function eventOf(frame: Json): WireEvent | undefined {
 const isResult = (id: string) => (frame: Json) => frame.id === id && "result" in frame;
 const isEvent = (type: string) => (frame: Json) => eventOf(frame)?.type === type;
 
-/** A model reply that calls `link_problem` for `problemId`. */
 const linkReply = (problemId: string): Reply => ({
 	tool: "link_problem",
 	arguments: { problemId, text: "Who approved !9 before it merged?" },
 	promptTokens: 3000,
 });
 
-/** A model reply that calls `link_result` for `resultId`. */
 const linkResultReply = (resultId: string): Reply => ({
 	tool: "link_result",
 	arguments: { resultId, text: "The review found the description leaves out why." },
@@ -831,7 +829,6 @@ void test("link_problem shows nothing until the server admits that problem", asy
 		id: refused.id,
 		error: { code: -32_602, message: "Nothing was shown: that is not a problem of theirs." },
 	});
-	// An answer that does not admit this very problem admits nothing.
 	const unanswered = await runner.next((frame) => frame.method === "link_problem");
 	runner.send({ jsonrpc: "2.0", id: unanswered.id, result: null });
 	const admitted = await runner.next((frame) => frame.method === "link_problem");
@@ -874,7 +871,6 @@ void test("link_result shows nothing until the server admits that result by its 
 		id: refused.id,
 		error: { code: -32_602, message: "Nothing was shown: that is not a result of theirs." },
 	});
-	// An answer that admits the same id as a problem does not admit the result.
 	const crossed = await runner.next((frame) => frame.method === "link_result");
 	runner.send({ jsonrpc: "2.0", id: crossed.id, result: { problemId: owned } });
 	const admitted = await runner.next((frame) => frame.method === "link_result");
@@ -1018,11 +1014,6 @@ void test("a link the server admits only after Stop is neither shown nor reporte
 	assert.ok(!typesOf(runner).includes("link_problem"));
 });
 
-/**
- * The question fetches a merge request's detail, then a small result detail, and the reply that asks for the
- * second crosses the working trigger, so Pi compacts between the two tool batches. What the turn read before that
- * stays verbatim, not only in the summary: the question, and the reviewer's and the student's comments told apart.
- */
 void test("a compaction during a turn keeps its question and the comments it fetched", async (t) => {
 	const question = "What did the tutor ask on !10, and did I answer it?";
 	const reviewer =

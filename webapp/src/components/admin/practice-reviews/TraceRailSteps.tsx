@@ -42,7 +42,6 @@ function WorkStep({ item, here }: { item: ItemRef | undefined; here: boolean }) 
 
 type FeedbackItem = Extract<RailItem, { kind: "feedback" }>;
 
-/** Where the bottleneck line's stage falls on the rail: a review's own losses sit with its results. */
 function bottleneckHeader(
 	stage: TraceBottleneck["stage"],
 	kind: TraceBottleneck["kind"],
@@ -149,7 +148,6 @@ function stageSummary(
 	return undefined;
 }
 
-/** One stage of the rail under its header: Started by, Review, Feedback, Effect. */
 export function StageSteps({
 	stage,
 	first,
@@ -169,7 +167,6 @@ export function StageSteps({
 	const step = (item: RailItem) => (
 		<RailStep key={item.key} {...props} item={item} previous={previousAt(item)} />
 	);
-	// Pieces one after another share one table.
 	const runs: (RailItem | { kind: "table"; key: string; items: FeedbackItem[] })[] = [];
 	for (const item of stage.items) {
 		const last = runs.at(-1);
@@ -279,7 +276,6 @@ function RailStep(props: RailStepProps) {
 			);
 		}
 		case "end": {
-			// The stage draws it itself, from the verdict.
 			return null;
 		}
 	}
@@ -337,7 +333,6 @@ function EndStep({ end, previous }: { end: TraceEnd; previous: Date | undefined 
 	);
 }
 
-/** What started the review: an event on the work, a request, a schedule or a backfill. */
 function StartStep({
 	item,
 	previous,
@@ -359,7 +354,6 @@ function StartStep({
 	);
 }
 
-/** The review: how it stands, why it ran, and with system info its model. */
 function ReviewStep({
 	lineage,
 	at,
@@ -382,7 +376,6 @@ function ReviewStep({
 			</Step>
 		);
 	}
-	// The detail the page read speaks for this review only.
 	const own = detail?.id === review.id ? detail : undefined;
 	const state = reviewStepState(review, own);
 	const origin = REVIEW_ORIGIN_DEFS[review.origin];

@@ -24,7 +24,6 @@ import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-ref
 export interface CatalogGroupEditLevelProps {
 	groupSlug: string;
 	nested?: boolean;
-	/** Where the level sits, from the host's `levelPathAt`. */
 	path: LevelPath;
 	onDone: () => void;
 }
@@ -43,7 +42,7 @@ export function CatalogGroupEditLevel({
 	};
 
 	let body: ReactNode;
-	// A refusal hides the editor even over cached data. Any other failure leaves a loaded draft open.
+	// Denied reads hide cached drafts; transient refresh failures preserve them.
 	if (
 		groupQuery.data !== undefined &&
 		(!groupQuery.isError || queryErrorIsRetryable(groupQuery.error))

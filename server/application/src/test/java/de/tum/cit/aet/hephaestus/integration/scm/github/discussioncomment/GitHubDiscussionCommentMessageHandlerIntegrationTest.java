@@ -29,18 +29,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Integration tests for GitHubDiscussionCommentMessageHandler.
- *
- * <p>Tests the full webhook handling flow using JSON fixtures parsed directly into DTOs for
- * complete isolation. The comment handler processes the parent discussion first (via
- * GitHubDiscussionProcessor.process()) before processing the comment itself, so no manual
- * Discussion setup is needed.
- *
- * <p>Note: This test class does NOT use @Transactional because the processing chain calls
- * GitHubUserProcessor.findOrCreate() which uses REQUIRES_NEW propagation. Having @Transactional
- * here would cause connection pool deadlocks.
- */
+// REQUIRES_NEW user writes need a free connection; an outer test transaction can deadlock the pool.
 class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     private static final Long FIXTURE_ORG_ID = 215361191L;

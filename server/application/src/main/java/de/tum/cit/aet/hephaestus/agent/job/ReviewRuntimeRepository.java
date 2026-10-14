@@ -23,7 +23,6 @@ import org.springframework.jdbc.support.SqlArrayValue;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Owns scoped runtime rows and ledger aggregates; product facts come through the product ports. */
 @Repository
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor

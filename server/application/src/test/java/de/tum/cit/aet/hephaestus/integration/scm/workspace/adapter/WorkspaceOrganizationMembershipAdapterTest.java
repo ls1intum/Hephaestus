@@ -25,10 +25,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * A roster reaches the workspace linked to its organization row, or the one unlinked workspace on
- * its instance.
- */
 class WorkspaceOrganizationMembershipAdapterTest extends BaseUnitTest {
 
     private static final String GROUP = "course/intro";

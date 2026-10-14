@@ -5,15 +5,10 @@ import { LLM_API_PROTOCOL_LABELS } from "@/lib/llm-api-protocol-labels";
 import { andList } from "@/lib/text";
 
 export interface LlmConnectionApiProps {
-	/** The server names the purposes its API can serve. */
 	connection: Pick<LlmConnection, "apiProtocol" | "purposes">;
 }
 
-/**
- * The API a connection speaks, with the mark of each kind of model it can serve, so a connection
- * named by its admin still says what it is for. Both consoles show it under a connection's name.
- * The marks are one picture; a screen reader hears the kinds once, as a phrase.
- */
+// Both consoles share these marks; screen readers need one phrase for the model kinds.
 export function LlmConnectionApi({ connection: { apiProtocol, purposes } }: LlmConnectionApiProps) {
 	return (
 		<span className="inline-flex min-w-0 items-center gap-2">

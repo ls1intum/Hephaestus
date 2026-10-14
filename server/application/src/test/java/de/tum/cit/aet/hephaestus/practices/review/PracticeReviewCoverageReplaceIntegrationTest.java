@@ -120,7 +120,7 @@ class PracticeReviewCoverageReplaceIntegrationTest extends BaseIntegrationTest {
                 .param("ws", scenario.workspace().getId())
                 .param("id", scenario.account().getId())
                 .update();
-        jdbc.sql("UPDATE account SET ai_choice='NO_AI' WHERE id=:id")
+        jdbc.sql("UPDATE account SET ai_choice='NO_AI',ai_choice_at=now() WHERE id=:id")
                 .param("id", scenario.account().getId())
                 .update();
         assertThat(coverage.eligibleAccountIds(scenario.workspace().getId())).isEmpty();

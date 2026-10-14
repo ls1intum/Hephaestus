@@ -136,7 +136,6 @@ export const Revoked: Story = {
 	},
 };
 
-/** Members who opted out are a first-class fact, with a keyboard-reachable tooltip. */
 export const WithOptOuts: Story = {
 	args: { channel: { ...channel, optedOutMemberCount: 3 } },
 	play: async ({ canvas }) => {

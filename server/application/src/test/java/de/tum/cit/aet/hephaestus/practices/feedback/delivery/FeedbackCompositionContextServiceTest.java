@@ -91,8 +91,7 @@ class FeedbackCompositionContextServiceTest {
             new PracticePageFeedbackRouter(),
             gate,
             basis,
-            mock(ProblemRepository.class),
-            catalog,
+            new FeedbackAnchorEligibility(mock(ProblemRepository.class), catalog),
             history,
             mentor,
             Clock.fixed(now, ZoneOffset.UTC));
@@ -229,24 +228,33 @@ class FeedbackCompositionContextServiceTest {
     @Test
     void shouldDistinguishUnavailableMentorConfirmedOnWorkAndBackfill() {
         when(mentor.isReady(1)).thenReturn(false);
-        assertThat(service.conversationDecision(snapshot, current)).isEqualTo(ConversationDecision.MENTOR_UNAVAILABLE);
+        assertThat(service.conversationDecision(snapshot, current))
+                .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
+                        ConversationDecision.MENTOR_UNAVAILABLE, FeedbackStopReason.RECIPIENT_UNAVAILABLE));
         when(mentor.isReady(1)).thenReturn(true);
         when(basis.hasConfirmedOnWork(1, 7, current.getId())).thenReturn(true);
         assertThat(service.conversationDecision(snapshot, current))
-                .isEqualTo(ConversationDecision.ALREADY_DELIVERED_ON_WORK);
+                .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
+                        ConversationDecision.ALREADY_DELIVERED_ON_WORK, FeedbackStopReason.NOTHING_NEW));
         when(snapshot.origin()).thenReturn(ReviewOrigin.BACKFILL);
-        assertThat(service.conversationDecision(snapshot, current)).isEqualTo(ConversationDecision.BACKFILL_QUIET);
+        assertThat(service.conversationDecision(snapshot, current))
+                .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
+                        ConversationDecision.BACKFILL_QUIET, FeedbackStopReason.BACKFILL_QUIET));
     }
 
     @Test
     void shouldKeepFeedbackOffReviewerAndNaturalAnchorReasonsDistinct() {
         when(gate.mode(current)).thenReturn(FeedbackMode.OFF);
-        assertThat(service.conversationDecision(snapshot, current)).isEqualTo(ConversationDecision.FEEDBACK_OFF);
+        assertThat(service.conversationDecision(snapshot, current))
+                .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
+                        ConversationDecision.FEEDBACK_OFF, FeedbackStopReason.FEEDBACK_OFF));
         when(gate.mode(current)).thenReturn(FeedbackMode.AUTOMATIC);
         when(versions.findByIdAndWorkspaceId(8L, 1L))
                 .thenReturn(Optional.of(TestEntities.practiceVersion(
                         8, 1, new JsonMapper().readTree("{\"about\":\"REVIEWER\"}"), "v6:" + "a".repeat(64))));
-        assertThat(service.conversationDecision(snapshot, current)).isEqualTo(ConversationDecision.REVIEWER_DEFERRED);
+        assertThat(service.conversationDecision(snapshot, current))
+                .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
+                        ConversationDecision.REVIEWER_DEFERRED, FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE));
         when(versions.findByIdAndWorkspaceId(8L, 1L)).thenReturn(Optional.of(version));
         when(definition.lineNotes()).thenReturn(true);
         var descriptor = mock(ItemDescriptor.class);
@@ -254,10 +262,12 @@ class FeedbackCompositionContextServiceTest {
         when(catalog.descriptorFor(item.kind())).thenReturn(Optional.of(descriptor));
         var anchored =
                 current.toBuilder().evidence(new JsonMapper().readTree("""
-            {"citations":[{"path":"src/Work.java","startLine":3,"side":"NEW",
-              "verification":{"status":"VERIFIED"}}]}
-            """)).build();
-        assertThat(service.conversationDecision(snapshot, anchored)).isEqualTo(ConversationDecision.HAS_INLINE_ANCHOR);
+                    {"citations":[{"path":"src/Work.java","startLine":3,"side":"NEW",
+                      "verification":{"status":"VERIFIED"}}]}
+                    """)).build();
+        assertThat(service.conversationDecision(snapshot, anchored))
+                .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
+                        ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW));
     }
 
     @Test

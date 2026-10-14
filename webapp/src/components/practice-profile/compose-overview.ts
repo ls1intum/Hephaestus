@@ -1,17 +1,3 @@
-/**
- * The practice profile's sentences, composed from the changes the server reports, for the "All
- * practice groups" table, the group level's table and the latest-review chip. Everything here is
- * deterministic prose over structured events; no model writes any of it.
- *
- * Which event a practice is shown by is the precedence in
- * `docs/contributor/practice-review-glossary.mdx` § Practice profile overview. How a count is
- * written is `feedback-text.ts`'s. The rest are rules rather than wording choices:
- *
- * 1. Subjects that made the same move are one sentence, whichever surface says it: a column of
- *    sentences repeating one predicate reads as more news than there is.
- * 2. A standing or a trend is named with the registry's own label, verbatim, so the prose and the
- *    badges say the same words.
- */
 import type {
 	GoingWellPractice,
 	ItemRef,
@@ -33,7 +19,6 @@ import { capitalise, hasText } from "@/lib/text";
 
 type OverviewInput = Pick<PracticeProfileOverview, "latestReview" | "changes" | "goingWell">;
 
-/** The overview with nothing in it: what the page composes before the first review. */
 export const EMPTY_OVERVIEW: OverviewInput = { changes: [], goingWell: [], latestReview: null };
 
 export interface ComposedOverview {
@@ -147,11 +132,7 @@ const subjectKey = (event: ProfileEvent) => `${event.level}:${event.slug}`;
 const isGood = (event: ProfileEvent) => event.kind === "resolved";
 const isSlip = (event: ProfileEvent) => event.kind === "down" || event.kind === "reset";
 
-/**
- * One event per subject within a block. The good block (held, resolved) and the change block
- * dedupe separately, so a practice may hold and have its trend turn; it may not hold and slip,
- * and it may not move up and down in the same review.
- */
+// Deduplicate held/resolved and changed events separately so one practice can appear in both.
 function dedupe<E extends ProfileEvent>(events: E[]): E[] {
 	const best = new Map<string, E>();
 	for (const event of events) {
@@ -350,14 +331,6 @@ const groupSlugsOf = (overview: OverviewInput): string[] => [
 const transitionKey = (event: ChangeEvent): string =>
 	[event.kind, ...predicate(event).map(segmentKey)].join("\u0000");
 
-/**
- * What happened in the group since the latest review, for the "All practice groups" table to list as
- * bullets in precedence order. Practices that made the same move are one bullet — their pills
- * listed, then what happened said once. The group's own move rides on that bullet as a tail when
- * practices in it made the same move, and is a bullet of its own only when none did; either way
- * the row already names the group, so the sentence says "the group". Nothing when nothing changed,
- * so the row shows only its badge.
- */
 function composeGroupSentences(changes: ProfileChange[]): FeedbackTextSegment[][] | undefined {
 	const deduped = changeEventsOf(changes);
 	if (deduped.length === 0) {
@@ -433,10 +406,6 @@ function composePracticeSentences(
 	return sentences;
 }
 
-/**
- * What the page itself shows from one overview: the latest-review chip, the practices going well
- * and the table's sentences.
- */
 export function composeOverview(overview: OverviewInput): ComposedOverview {
 	return {
 		latestReview: overview.latestReview ?? undefined,

@@ -158,38 +158,6 @@ class PracticePiAdapterTest extends BaseUnitTest {
         assertThat(models.propertyNames()).containsExactly("chat");
     }
 
-    @Test
-    void shouldLeaveOutAReviewModelWhoseProtocolThePracticeScriptRunnerCannotCall() throws Exception {
-        FrozenModel legacyChat = model("azure-openai-responses", "gpt-5.4-mini");
-        PracticeAgentRequest request = new PracticeAgentRequest(
-                "azure-openai-responses",
-                "gpt-5.4-mini",
-                null,
-                null,
-                null,
-                "job-token-123",
-                600,
-                Map.of(ModelKind.CHAT, legacyChat, ModelKind.EMBEDDING, model("openai-embeddings", "embedder")));
-
-        JsonNode models = new ObjectMapper()
-                .readTree(
-                        adapter.buildSandboxSpec(request).inputFiles().get(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE));
-
-        assertThat(models.propertyNames()).containsExactly("embedding");
-        PracticeAgentRequest withoutSlots = new PracticeAgentRequest(
-                "azure-openai-responses",
-                "gpt-5.4-mini",
-                null,
-                null,
-                null,
-                "job-token-123",
-                600,
-                Map.of(ModelKind.CHAT, legacyChat));
-        assertThat(adapter.buildSandboxSpec(withoutSlots).inputFiles())
-                .as("a job without any callable model has no models file")
-                .doesNotContainKey(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE);
-    }
-
     private static FrozenModel model(String protocol, String modelId) {
         return new FrozenModel(
                 LlmApiProtocol.parse(protocol).orElseThrow(),

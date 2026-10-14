@@ -43,13 +43,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Disconnect through the lifecycle service and admin endpoint, with real PostgreSQL erasure. The
- * provider-failure case controls the upstream boundary. Triggers make the disconnect fail with a
- * genuine SQL error, either while erasing or only at commit, after every statement has succeeded.
- * The workspace purge's strict teardown is driven directly inside a purge-shaped transaction that
- * erases the mirror first.
- */
 class ConnectionDisconnectErasureIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String BLOCK = "test_block_disconnect";

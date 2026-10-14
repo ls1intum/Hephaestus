@@ -16,12 +16,6 @@ import type { TraceNode } from "./review-trace";
 import { ReviewLineageGraph } from "./ReviewLineageGraph";
 import { DEFAULT_TRACE_DISPLAY } from "./trace-display";
 
-/**
- * The rail tells only what is true of the review, whatever the reader stands on: it starts where
- * the review started, a result keeps its number and a piece its letter in every trace, and the mark
- * of where the reader started never moves.
- */
-
 afterEach(cleanup);
 
 const whole = lineageRecords(wholeReview);
@@ -81,7 +75,6 @@ describe("the rail's start", () => {
 	});
 });
 
-/** Each result's number in the story of a chain, with its id. */
 function numbersOf(lineage: typeof wholeReview) {
 	return storyResults(lineageRecords(lineage), undefined).numbered.map(
 		({ result, number }) => `${number}:${result.id}`,

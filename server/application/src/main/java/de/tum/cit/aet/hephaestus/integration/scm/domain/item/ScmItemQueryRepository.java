@@ -14,40 +14,36 @@ public interface ScmItemQueryRepository extends Repository<Item, Long> {
     @Query(value = """
         WITH selected AS (SELECT * FROM item WHERE workspace_id=:workspaceId AND id IN (:ids))
         SELECT idx.id,
-          CASE idx.kind WHEN :repositoryKind THEN repository.name_with_owner
-            WHEN :fileKind THEN idx.path WHEN :reviewKind THEN 'Review of '||work.title
+          CASE idx.kind WHEN :#{#kinds.repository()} THEN repository.name_with_owner
+            WHEN :#{#kinds.file()} THEN idx.path WHEN :#{#kinds.review()} THEN 'Review of '||work.title
             ELSE work.title END AS title,
-          CASE idx.kind WHEN :repositoryKind THEN 'repository' WHEN :fileKind THEN 'file'
-            WHEN :reviewKind THEN 'review' WHEN :issueKind THEN 'issue'
+          CASE idx.kind WHEN :#{#kinds.repository()} THEN 'repository' WHEN :#{#kinds.file()} THEN 'file'
+            WHEN :#{#kinds.review()} THEN 'review' WHEN :#{#kinds.issue()} THEN 'issue'
             ELSE CASE provider.type WHEN 'GITLAB' THEN 'merge request' ELSE 'pull request' END END AS noun,
           work.number, repository.name_with_owner AS container, provider.type AS provider_type,
           CASE WHEN idx.removed_at IS NOT NULL OR work.deleted_at IS NOT NULL THEN NULL
-            WHEN idx.kind=:repositoryKind THEN repository.html_url
-            WHEN idx.kind=:fileKind THEN NULL
-            WHEN idx.kind=:reviewKind THEN review.html_url
+            WHEN idx.kind=:#{#kinds.repository()} THEN repository.html_url
+            WHEN idx.kind=:#{#kinds.file()} THEN NULL
+            WHEN idx.kind=:#{#kinds.review()} THEN review.html_url
             ELSE work.html_url END AS url
         FROM selected idx
         LEFT JOIN item holder ON holder.workspace_id=idx.workspace_id AND holder.id=idx.parent_id
-        LEFT JOIN pull_request_review review ON idx.kind=:reviewKind AND review.id=idx.source_id
-        LEFT JOIN issue work ON work.id=CASE WHEN idx.kind=:reviewKind THEN review.pull_request_id
-          WHEN idx.kind IN (:issueKind,:pullKind) THEN idx.source_id END
-        JOIN repository ON repository.id=CASE idx.kind WHEN :repositoryKind THEN idx.source_id
-          WHEN :fileKind THEN holder.source_id ELSE work.repository_id END
+        LEFT JOIN pull_request_review review ON idx.kind=:#{#kinds.review()} AND review.id=idx.source_id
+        LEFT JOIN issue work ON work.id=CASE WHEN idx.kind=:#{#kinds.review()} THEN review.pull_request_id
+          WHEN idx.kind IN (:#{#kinds.issue()},:#{#kinds.pullRequest()}) THEN idx.source_id END
+        JOIN repository ON repository.id=CASE idx.kind WHEN :#{#kinds.repository()} THEN idx.source_id
+          WHEN :#{#kinds.file()} THEN holder.source_id ELSE work.repository_id END
         JOIN identity_provider provider ON provider.id=repository.provider_id
         WHERE provider.type IN ('GITHUB','GITLAB') AND (
-          (idx.kind=:issueKind AND work.issue_type='ISSUE')
-          OR (idx.kind=:pullKind AND work.issue_type='PULL_REQUEST')
-          OR (idx.kind=:reviewKind AND holder.kind=:pullKind AND holder.source_id=review.pull_request_id)
-          OR idx.kind=:repositoryKind OR (idx.kind=:fileKind AND holder.kind=:repositoryKind))
+          (idx.kind=:#{#kinds.issue()} AND work.issue_type='ISSUE')
+          OR (idx.kind=:#{#kinds.pullRequest()} AND work.issue_type='PULL_REQUEST')
+          OR (idx.kind=:#{#kinds.review()} AND holder.kind=:#{#kinds.pullRequest()} AND holder.source_id=review.pull_request_id)
+          OR idx.kind=:#{#kinds.repository()} OR (idx.kind=:#{#kinds.file()} AND holder.kind=:#{#kinds.repository()}))
         """, nativeQuery = true)
     List<LabelRow> labels(
-            @Param("workspaceId") long workspaceId,
-            @Param("ids") List<Long> ids,
-            @Param("repositoryKind") String repositoryKind,
-            @Param("fileKind") String fileKind,
-            @Param("reviewKind") String reviewKind,
-            @Param("pullKind") String pullKind,
-            @Param("issueKind") String issueKind);
+            @Param("workspaceId") long workspaceId, @Param("ids") List<Long> ids, @Param("kinds") KindNames kinds);
+
+    record KindNames(String repository, String file, String review, String pullRequest, String issue) {}
 
     @Query(value = """
                 SELECT i.id, work.id AS pull_id, work.issue_type, work.is_merged, work.merged_at, work.repository_id,

@@ -67,7 +67,6 @@ export const AppliesWhen: Story = {
 	},
 };
 
-/** People review it, so the saved reason is the answer and nothing automated is listed. */
 export const ReviewedByPeople: Story = {
 	args: {
 		kind: "scm.issue",
@@ -109,7 +108,6 @@ export const ReviewedByNobody: Story = {
 	},
 };
 
-/** A practice about the work names no developer, and a request is its only way in. */
 export const AboutTheWorkOnRequestOnly: Story = {
 	args: { definition: definitionOf({ about: null, reviewOn: { events: [], state: {} } }) },
 	play: async ({ canvas }) => {
@@ -118,7 +116,6 @@ export const AboutTheWorkOnRequestOnly: Story = {
 	},
 };
 
-/** A kind the instance no longer offers still reads, named from this build's vocabulary. */
 export const WithoutOptions: Story = {
 	args: { itemType: undefined },
 	play: async ({ canvas }) => {

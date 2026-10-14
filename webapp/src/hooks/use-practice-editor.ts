@@ -43,7 +43,6 @@ export function usePracticeEditor(workspaceSlug: string): PracticeEditor {
 	const update = useMutation({
 		...updatePracticeMutation(),
 		scope,
-		// A stale version is the host's to explain: it keeps the draft and offers the newest version.
 		onError: (error) => {
 			if (problemStatusOf(error) !== 409) {
 				toast.error("We could not save the practice", { description: problemDetailOf(error) });
@@ -103,7 +102,6 @@ export function usePracticeEditor(workspaceSlug: string): PracticeEditor {
 				toast.success("Practice saved");
 				return placed;
 			} catch (error) {
-				// The new version exists whatever happened to the move, so the caches show it.
 				await store(updated);
 				throw error;
 			}

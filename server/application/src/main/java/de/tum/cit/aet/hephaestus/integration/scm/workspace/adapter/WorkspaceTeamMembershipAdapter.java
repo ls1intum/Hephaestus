@@ -16,19 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Adapts team membership sync events from integration.scm to workspace member reconciliation.
- *
- * <p>Implements the {@link TeamMembershipListener} SPI defined by integration.scm so that the
- * workspace module can react to team membership changes without integration.scm needing to know
- * about workspace concepts.
- *
- * <p>This closes the gap where GitLab subgroup-only users (e.g. tutor maintainers on a single
- * subgroup) populate {@code team_membership} via the team sync but never appear in {@code
- * organization_membership}. {@link WorkspaceOrganizationMembershipAdapter} counts them from {@code
- * team_membership}; this adapter applies each team sync, so they gain and lose the workspace with
- * their teams rather than at the next roster sync.
- */
+// Subgroup-only members can lack organization membership; workspace reconciliation must include team membership.
 @Component
 public class WorkspaceTeamMembershipAdapter implements TeamMembershipListener {
 

@@ -16,17 +16,10 @@ import {
 } from "./lineage-chain";
 import { chainReview, ownResults, type TraceNode } from "./review-trace";
 
-/**
- * How the review ran, in the words of its step: "Review complete", "Review failed". The review's
- * own read adds what the graph does not hold: why it stopped and which practices it withheld.
- */
 export interface ReviewStepState {
 	def: StatusDef;
-	/** "Review complete". */
 	title: string;
-	/** One line under it, where the review recorded why it stopped. */
 	note?: string;
-	/** Why an empty result step is empty. */
 	assessedNothing: string;
 }
 
@@ -51,8 +44,7 @@ export function reviewStepState(
 		def,
 		title: `Review ${def.label.toLowerCase()}`,
 		note: stopReason === null ? undefined : REVIEW_STOP_REASON_SENTENCES[stopReason],
-		// A withheld practice records its reason and no result, so an empty step says that and
-		// never reads as a review that looked and saw nothing.
+		// Withheld practices have reasons, not results; an empty result list must preserve that distinction.
 		assessedNothing:
 			withheld > 0
 				? `${countOf(withheld, "practice was", "practices were")} withheld with a recorded reason, so no result stands for ${withheld === 1 ? "it" : "them"}.`
@@ -70,11 +62,6 @@ export const TRACE_STAGE_LABELS: Record<TraceStage, string> = {
 	effect: "Effect",
 };
 
-/**
- * One step on the rail. What started the review heads it: the event on the work, or the review's
- * origin where no event did. The review and its results are the review stage. The feedback and the
- * line of siblings are the feedback stage. The end of the record's path is the effect.
- */
 export type RailItem =
 	| {
 			kind: "start";
@@ -107,16 +94,10 @@ export interface StorySiblings {
 }
 
 export interface StoryRailOptions {
-	/** The event that started the review, from the review's own read. */
 	startedBy?: ItemEvent | null;
 	siblings?: StorySiblings;
 }
 
-/**
- * The rail's steps by stage. `feedback` is what the story tells in full, in the order it is given;
- * `siblings`, where any, is the one line that counts the rest. The graph records no time a piece of
- * feedback was written, so a piece steps at its delivery or at no time.
- */
 export function storyRail(
 	records: LineageRecords,
 	feedback: readonly LineageFeedback[],
@@ -171,7 +152,6 @@ function earliest(times: readonly Date[]): Date | undefined {
 	return first;
 }
 
-/** A result another review recorded: one this review did not ask again, since that one had answered. */
 export function answeredEarlier(
 	result: Pick<LineageResult, "reviewId">,
 	review: ReviewRef | undefined,
@@ -179,13 +159,7 @@ export function answeredEarlier(
 	return review !== undefined && result.reviewId !== review.id;
 }
 
-/**
- * The story around the record the reader came from. A review or the work tells the whole review. A
- * result tells the feedback written from it, and a piece of feedback tells itself; every other piece
- * is a sibling, behind one line.
- */
 export interface StoryFocus {
-	/** The pieces the story tells in full, by letter. */
 	shown: LineageFeedback[];
 	/** The rest of the review's pieces, behind "N other pieces of feedback". */
 	siblings: LineageFeedback[];
@@ -208,11 +182,7 @@ export function storyFeedback(
 	};
 }
 
-/**
- * The results numbered as everywhere on the chain, with the one the reader came from apart.
- * The numbers come from the whole chain, `full`, so a filter hides results but never renumbers
- * them.
- */
+// Filters hide results without renumbering them.
 export function storyResults(
 	records: Pick<LineageRecords, "results">,
 	here: TraceNode | undefined,
@@ -225,15 +195,11 @@ export function storyResults(
 	return { numbered, self };
 }
 
-/**
- * The order of the feedback letters. The graph records no time a piece was written, so the order
- * rests on the id alone: a piece keeps its letter in every trace of its review.
- */
+// Stable ids determine letters because the graph records no composition timestamp.
 function letterOrder(a: LineageFeedback, b: LineageFeedback): number {
 	return a.id.localeCompare(b.id, "en");
 }
 
-/** The feedback letter, "A" to "Z" and then "AA". */
 export function feedbackLetters(feedback: readonly LineageFeedback[]): Map<string, string> {
 	const byLetter = [...feedback].sort(letterOrder);
 	return new Map(byLetter.map((entry, index) => [entry.id, letterAt(index)]));
@@ -244,7 +210,6 @@ function letterAt(index: number): string {
 	return index < 26 ? letter : `${letterAt(Math.floor(index / 26) - 1)}${letter}`;
 }
 
-/** The results a piece of feedback rests on that the chain lists, by number. */
 export function sourcesOf(
 	feedback: Pick<LineageFeedback, "basis">,
 	numbered: readonly NumberedResult[],

@@ -2,13 +2,6 @@ import type { ReviewFeedbackCounts, ReviewOverview, ReviewPracticeCounts } from 
 
 import { familyCount, resultSlots, slotsTotal } from "./review-outcomes";
 
-/**
- * The Practices table's totals row: the overview's own figures, the ones the Reviews, Results
- * and Feedback tiles above show, so the table and the tiles cannot disagree. The result columns
- * add up across the practices by construction, since every result is of one practice. Feedback
- * delivered does not: a piece of feedback about two practices counts in the row of each, and a piece
- * bound to no result counts in none, so the rows can add up to more or less than the pieces.
- */
 export interface PracticeTotals {
 	results: number;
 	notMet: number;
@@ -21,7 +14,6 @@ export interface PracticeTotals {
 	feedbackComposed: number;
 	/** What the Feedback delivered column adds up to over every practice, hidden or shown. */
 	feedbackDeliveredInRows: number;
-	/** The practices of the range the table's filters hide, and their results. */
 	hidden: { practices: number; results: number };
 }
 

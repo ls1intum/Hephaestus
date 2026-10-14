@@ -82,7 +82,7 @@ public class Feedback {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Default
-    @ColumnDefault("'{}'::jsonb")
+    @ColumnDefault("'{}'")
     @Column(name = "checks", nullable = false, columnDefinition = "jsonb")
     private Map<FeedbackCheckStage, FeedbackChecks> checks = Map.of();
 

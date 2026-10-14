@@ -25,10 +25,6 @@ export function workspaceListItem(
 	};
 }
 
-/**
- * The body of `GET /workspaces/:slug/members/me` for the signed-in fixture account (`currentUser`,
- * id 42), as the wire carries it.
- */
 export function ownMembership(
 	role: WorkspaceMembership["role"] = "MEMBER",
 	overrides: Partial<Wire<WorkspaceMembership>> = {},

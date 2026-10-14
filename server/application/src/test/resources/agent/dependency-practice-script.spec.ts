@@ -37,7 +37,6 @@ void test("an XcodeGen project.yml edit lists its changed package lines without 
 			],
 		]),
 	});
-	// The url may be unchanged and merely re-added beside the new bound: nothing here says the package is new.
 	assert.deepEqual(
 		(result.leads ?? []).map((lead) => [keyOf(lead.label), lead.at, lead.facts?.side]),
 		[
@@ -146,7 +145,6 @@ void test("raw manifest lines beyond the lead cap are counted but reported as no
 	assert.equal(result.facts.unpairedManifestLines, 45);
 	assert.equal(result.facts.rawLinesListed, 37);
 	assert.equal(raw.length, 37);
-	// The 37th sourceFile line, lib-36, is the last one listed.
 	assert.deepEqual(raw.at(-1)?.at, { change: "pom.xml", line: 46, side: "NEW" });
 });
 
@@ -157,7 +155,6 @@ void test("metadata lines shaped like dependencies stay candidates with their co
 			["Cargo.toml", diffFile("Cargo.toml", ['rust-version = "1.80"'], ['rust-version = "1.78"'])],
 		]),
 	});
-	// An engines entry and a toolchain floor: the delta is real, the dependency identity is not established.
 	assert.deepEqual(
 		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label), lead.facts]),
 		[

@@ -15,7 +15,6 @@ export function itemKindHint(kind: string): string | undefined {
 	return ITEM_KIND_HINTS[kind];
 }
 
-/** The kinds a practice list can be narrowed to: the kinds a practice reviews on an event. */
 const FILTERABLE_ITEM_KINDS = [
 	ITEM_KIND.pullRequest,
 	ITEM_KIND.pullRequestReview,

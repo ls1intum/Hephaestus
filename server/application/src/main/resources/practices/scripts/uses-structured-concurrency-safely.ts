@@ -1,6 +1,3 @@
-// Finds each concurrency construct that the change adds to Swift files, with the type that encloses
-// it, and the lines of the project files that name a default actor isolation. The review decides
-// from the checkout whether the work must outlive the view and where each mutation runs.
 import { scm, type FileTree } from "../kits/scm/index.ts";
 import {
 	countLabel,
@@ -13,7 +10,6 @@ import { definePracticeScript, type ReviewLead } from "../lib/core/practice-scri
 
 const SWIFTUI_VIEW = /\b(?:View|App|Scene)\b/u;
 
-// The first pattern that matches a line gives its kind.
 const CONCURRENCY: readonly SourcePattern[] = [
 	["detached-task", /\bTask\.detached\b/u],
 	["stored-task-handle", /(?:let|var)\s+\w+\s*(?::\s*Task<[^>]*>)?\s*=\s*Task\s*[{(]/u],
@@ -28,7 +24,6 @@ const CONCURRENCY: readonly SourcePattern[] = [
 	["await", /\bawait\b/u],
 ];
 
-/** Text naming a default actor isolation: an Xcode build setting or a SwiftPM target setting. */
 const DEFAULT_ISOLATION = /SWIFT_DEFAULT_ACTOR_ISOLATION\s*[:=]|defaultIsolation\s*\(/u;
 
 const PROJECT_FILES = [
@@ -38,11 +33,7 @@ const PROJECT_FILES = [
 	"**/Package.swift",
 ];
 
-/**
- * The lines of the first few project files that name a default actor isolation. The setting belongs
- * to one target or SwiftPM module and build configuration, and a line can be commented out. Thus, a
- * line found here is a place to read, not the isolation of a changed type.
- */
+// Actor-isolation settings belong to one target and configuration; partial project text cannot establish a repository-wide default.
 async function defaultIsolationLines(
 	tree: FileTree | null,
 ): Promise<{ file: string; line: number }[]> {

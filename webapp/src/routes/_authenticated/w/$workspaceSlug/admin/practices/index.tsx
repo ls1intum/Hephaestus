@@ -177,7 +177,6 @@ function workspacePracticeAt(query: LevelQuery) {
 	return tagged?.kind === "practice" ? tagged.data : undefined;
 }
 
-/** A group's details as an update replaces them, with `patch` applied. */
 function groupDetails(
 	group: PracticeGroup,
 	patch: Partial<UpdatePracticeGroupRequest>,
@@ -186,7 +185,6 @@ function groupDetails(
 	return { name, description, icon, color, shownToDevelopers, ...patch };
 }
 
-/** What a reset compares: one practice or one group, by slug. */
 interface ResetTarget {
 	kind: "practice" | "group";
 	slug: string;
@@ -262,8 +260,6 @@ function PracticeCatalogRoute() {
 	const [staleLevelKey, setStaleLevelKey] = useState<string | null>(null);
 	const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
 	const [resetStale, setResetStale] = useState(false);
-	// The edit level whose save was refused because a newer version exists, and how many times a
-	// reader has loaded the newest version into the editor.
 	const [conflictSlug, setConflictSlug] = useState<string | null>(null);
 	const [editorGeneration, setEditorGeneration] = useState(0);
 	const catalog = usePracticeCatalogMutations(workspaceSlug);
@@ -296,14 +292,11 @@ function PracticeCatalogRoute() {
 		select: parseAdoptablePractices,
 		enabled: library === true,
 	});
-	// What each practice script needs is read only on a practice's own level.
 	const practiceScriptNeedsQuery = useQuery({
 		...listPracticeScriptNeedsOptions({ path: { workspaceSlug } }),
 		enabled: detailStack.some((entry) => entry.kind === "practice"),
 	});
-	// `useQueries` cannot correlate a result with the entry that produced it, so each payload is
-	// tagged: without it every read is a union, and a mis-ordered stack is a runtime `undefined.name`
-	// rather than a type error.
+	// Tag query payloads because useQueries cannot correlate a union result with its source entry.
 	const levelQueries = useQueries({
 		queries: detailStack.map((entry) => levelQueryOptions(workspaceSlug, entry)),
 	});
@@ -354,7 +347,6 @@ function PracticeCatalogRoute() {
 	/** The groups the editor offers. A hidden group still holds practices but is not a destination. */
 	const editableGroups = groupsQuery.data?.filter((group) => group.shownToDevelopers);
 
-	// A reset compares this workspace's version with the catalog's offer before anything changes.
 	const resetGroup = groupsQuery.data?.find(
 		(group) => resetTarget?.kind === "group" && group.slug === resetTarget.slug,
 	);
@@ -518,7 +510,6 @@ function PracticeCatalogRoute() {
 				toast.error("We could not add the practice. Try again.");
 				return;
 			}
-			// The preview this add was pinned to no longer holds: read what holds now.
 			const refreshed = await query.refetch();
 			const current = practiceAdoptionAt(refreshed);
 			if (current?.availability === "ADOPTED") {
@@ -790,7 +781,6 @@ function PracticeCatalogRoute() {
 					}
 					throw error;
 				}
-				// A changed script makes the needs on record stale.
 				void queryClient.invalidateQueries({
 					queryKey: listPracticeScriptNeedsQueryKey({ path: { workspaceSlug } }),
 				});

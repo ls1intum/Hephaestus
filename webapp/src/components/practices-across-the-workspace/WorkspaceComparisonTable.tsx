@@ -52,10 +52,6 @@ export interface WorkspaceComparisonTableProps {
 	empty: { title: string; description: string };
 }
 
-/**
- * Practice groups or practices, each with its count and its results, in the practice table frame.
- * Every row is listed with no paging, as the Practice profile lists them.
- */
 export function WorkspaceComparisonTable({
 	"aria-label": label,
 	subjectHead,
@@ -70,7 +66,6 @@ export function WorkspaceComparisonTable({
 		<PracticeTableFrame
 			aria-label={label}
 			columns={4}
-			// On a phone a row stacks as PracticeTable's do, so the counts never scroll out of sight.
 			tableClassName={STACKED}
 			head={
 				<>
@@ -116,17 +111,17 @@ export function WorkspaceComparisonTable({
 					<TableCell>
 						<span className="flex items-center gap-2">
 							<Skeleton className="size-4 shrink-0 rounded-full" />
-							<Skeleton className="h-4 w-48" />
+							<Skeleton className="h-5 w-48" />
 						</span>
 					</TableCell>
 					<TableCell>
-						<Skeleton className="h-4 w-24" />
+						<Skeleton className="h-5 w-24" />
 					</TableCell>
 					<TableCell className="align-top whitespace-normal @max-[38rem]:basis-full">
 						<OutcomeCountsSkeleton />
 					</TableCell>
 					<TableCell>
-						<Skeleton className="ml-auto h-4 w-24" />
+						<Skeleton className="ml-auto h-5 w-24" />
 					</TableCell>
 				</>
 			}

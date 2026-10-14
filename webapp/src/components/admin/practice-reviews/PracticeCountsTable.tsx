@@ -129,24 +129,6 @@ const TABLE_LABELS: Record<PracticeSort, string> = {
 const STACKED_FULL_WIDTH =
 	"@max-2xl:[&>td]:col-span-2! @max-2xl:[&>td]:col-start-1! @max-2xl:[&>td]:row-span-1!";
 
-/**
- * Each practice the reviews checked in the range: its number of results, then each outcome as
- * "19 of 89", out of that practice's results, so the reader can judge the share without a
- * percentage to compare, and the feedback delivered out of the feedback composed about it
- * (`feedbackComposed`). Each column's (i) says how its count is reached. By default the
- * practices that need a look lead, each with one marker: one that mostly does not apply here costs
- * reviews and tells nobody much, and one that is often undecided may lack the evidence it needs
- * (`review-attention-thresholds.ts`). The most results marked incorrect, then could not determine,
- * follow, then the rest busiest first; the reader can sort the whole table busiest first, and the
- * choice is kept in the URL with the filters. It is drawn as the Reviews table is, without the
- * days: a practice's row opens its sheet, and as an overview, not a stream, it has no Track or
- * Trace. Practices are ranked by volume; people never are (ADR 0045).
- *
- * A practice that is turned off today is hidden until the reader asks for it: its counts are history
- * that no new review adds to. A Group filter narrows the rows to the chosen groups. The foot of the
- * table holds the totals of every practice, the figures of the tiles above (`practice-totals.ts`),
- * and a line under it says what the filters hide and why Feedback delivered adds up differently.
- */
 export function PracticeCountsTable({ state, practices, filter }: PracticeCountsTableProps) {
 	const [ownGroups, setOwnGroups] = useState<string[]>([]);
 	const [ownShowTurnedOff, setOwnShowTurnedOff] = useState(false);

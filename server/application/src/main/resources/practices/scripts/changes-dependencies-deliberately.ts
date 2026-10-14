@@ -1,19 +1,3 @@
-// Finds the changed lines of dependency manifests, for the review to judge if each dependency edit was
-// deliberate: an intended add, remove or bump with a fitting constraint. A careless edit loosens a pin,
-// drops a version, or leaves no lockfile. A table of manifests, keyed by the file name, covers all
-// ecosystems. To add an ecosystem, add a row.
-//
-// The table reads changed lines, not manifest sections, so a match is a candidate dependency line. A
-// package.json `engines` entry or a Cargo `[package]` `rust-version` has the shape of a dependency line
-// too, and only the section around it tells which it is. An added line and a removed line with the same
-// name are a pair, and the lead kind tells the constraint delta between them:
-//   only-added    the name matches only on an added line (new, or moved or reformatted)
-//   only-removed  the name matches only on a removed line (dropped, or moved or reformatted)
-//   pin-loosened  an exact or narrower constraint became a range, a caret or a tilde
-//   pin-dropped   a version constraint was present and is now absent
-//   bumped        the same constraint shape with a different version
-// A manifest that spreads one dependency over several lines (Maven, XcodeGen) gets no such kind. Its
-// changed dependency lines are raw-manifest-line leads.
 import { scm, expectKind, requireChange, type DiffFile, type FileTree } from "../kits/scm/index.ts";
 import { DIRECTION_CHARS, factsOf, oneLine } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
@@ -34,22 +18,14 @@ export const LABELS = {
 };
 type DependencyKind = keyof typeof LABELS;
 
-// ecosystem key -> how to recognise its manifest + lockfile, and how to read a "name => constraint" line.
 interface Ecosystem {
-	// manifest basename test (lowercased)
 	isManifest: (base: string) => boolean;
-	// lockfile basenames this ecosystem writes
 	lockfiles: string[];
-	// extract { name, constraint } from a single manifest line, or null if it lacks a dependency line's shape.
 	parse: (line: string) => { name: string; constraint: string } | null;
-	// For a manifest that spreads one dependency over several lines: the changed lines to surface raw,
-	// in place of parse().
 	dependencyLine?: RegExp;
 }
 
-// A constraint is "loose" if it admits more than one version: range operators, caret, tilde, wildcard, or empty.
 const LOOSE = /(?:^$|[\^~*]|>=|<=|>|<|\.x\b|\bx\b|\|\||\s-\s|,)/u;
-// A constraint is "exact" if it pins a single version: leading ==, =, or a bare semver-ish token.
 const EXACT = /^(?:==?|v)?\d/u;
 
 function isLoose(c: string): boolean {
@@ -63,23 +39,14 @@ function isLoose(c: string): boolean {
 	return LOOSE.test(t);
 }
 
-// A package.json string value LOOKS like a dependency constraint (semver/range/protocol) rather than a
-// script body, an `engines`/`exports`/`resolutions`/`config` value, etc. The per-line JSON parser cannot
-// see which object block a line sits in, so this shape guard keeps `"build": "tsc"` or `"./dist": "..."`
-// out of the dependency tally. A bare "*"/"x"/"latest" and the npm pseudo-protocols (workspace:/npm:/
-// file:/link:/git/http) are real dependency specifiers and are admitted.
 const VERSIONISH =
 	/^(?:[\^~>=<* v]|\d|x\b|latest$|workspace:|npm:|file:|link:|git[+:]|https?:|github:|gitlab:|bitbucket:)/iu;
 function isVersionish(c: string): boolean {
 	return VERSIONISH.test(c.trim());
 }
 
-// --- per-ecosystem line parsers (kept deliberately small + tolerant; the review reads full context) ---
-
-// JSON "name": "constraint"  (package.json dependency blocks)
 const reJsonDep = /^\s*"(?<name>[^"]+)"\s*:\s*"(?<constraint>[^"]*)"\s*,?\s*$/u;
-// Well-known package.json scalar keys that are NOT dependencies — skip so we don't emit a lead for the
-// package's own name/version/etc. Generic to npm manifests, not repo-specific.
+// Package metadata scalar keys are not dependency declarations.
 const NPM_NON_DEP_KEYS = new Set([
 	"name",
 	"version",
@@ -96,23 +63,16 @@ const NPM_NON_DEP_KEYS = new Set([
 	"packagemanager",
 	"bin",
 ]);
-// TOML name = "constraint"  or  name = { version = "constraint" }
 const reTomlDep =
 	/^\s*(?<name>[A-Za-z0-9_.-]+)\s*=\s*(?:"(?<quoted>[^"]*)"|\{[^}]*version\s*=\s*"(?<table>[^"]*)"[^}]*\})/u;
-// requirements.txt  name==1.2.3 / name>=1,<2 / name
 const reReqDep = /^\s*(?<name>[A-Za-z0-9_.\-[\]]+)\s*(?<constraint>(?:[<>=!~]=?|@)\S.*)?$/u;
-// Gemfile  gem "name", "~> 1.2"
 const reGemDep = /^\s*gem\s+["'](?<name>[^"']+)["']\s*(?:,\s*["'](?<constraint>[^"']*)["'])?/u;
-// Gradle  implementation("group:name:1.2.3")  or  implementation 'group:name:1.2.3'
 const reGradleDep = /["'](?<coordinate>[\w.-]+:[\w.-]+):(?<constraint>[^"']*)["']/u;
-// Swift PM  .package(url: "...", from: "1.2.3") / exact: "1.2.3" / "1.0.0"..."2.0.0"
 const reSwiftPkg =
 	/\.package\(\s*url:\s*["'](?<url>[^"']+)["'][^)]*?(?:from:\s*["'](?<from>[^"']+)["']|exact:\s*["'](?<exact>[^"']+)["']|["'](?<low>[^"']+)["']\s*\.\.[.<]\s*["'](?<high>[^"']+)["'])/u;
-// go.mod  require module v1.2.3  (single-line or block-body line)
 const reGoMod =
 	/^\s*(?:require\s+)?(?<name>[\w./-]+\.[\w./-]+\/\S+|[\w.-]+\/\S+)\s+(?<version>v\d\S*)/u;
 
-/** A Swift PM constraint as one word: `from:`, `exact:`, a range, or nothing when the package pins none. */
 function swiftConstraint(
 	fromVersion: string | undefined,
 	exactVersion: string | undefined,
@@ -131,9 +91,6 @@ function swiftConstraint(
 	return "";
 }
 
-// Cargo.toml and pyproject.toml read dependency lines identically. The two version groups are the two
-// arms of an alternation — `name = "1.2"` fills the first, `name = { version = "1.2" }` the second, and
-// an inline table with no version key (`name = { features = [...] }`) fills neither.
 function parseTomlDependency(line: string): { name: string; constraint: string } | null {
 	const [, name, quotedVersion, tableVersion] = reTomlDep.exec(line) ?? [];
 	if (name === undefined) {
@@ -147,19 +104,14 @@ const ECOSYSTEMS: Ecosystem[] = [
 		isManifest: (b) => b === "package.json",
 		lockfiles: ["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "npm-shrinkwrap.json"],
 		parse: (line) => {
-			// The value group matches empty (`"dep": ""`); the key group cannot, so its absence means the
-			// line is not a `"key": "value"` pair at all.
 			const [, name, constraint = ""] = reJsonDep.exec(line) ?? [];
 			if (name === undefined) {
 				return null;
 			}
-			// Skip the package's own scalar fields (name/version/etc.) so we only surface dependency-block edits.
 			if (NPM_NON_DEP_KEYS.has(name.toLowerCase())) {
 				return null;
 			}
-			// Only the changed lines are captured, not the base file, so a line's enclosing block is unknown:
-			// scripts, engines and dependencies share the `"key": "value"` shape. A value that is no version
-			// specifier, such as `"build": "tsc"`, is not a candidate.
+			// Changed lines carry no enclosing block; only dependency-shaped values can identify candidates.
 			if (!isVersionish(constraint)) {
 				return null;
 			}
@@ -167,13 +119,11 @@ const ECOSYSTEMS: Ecosystem[] = [
 		},
 	},
 	{
-		// Rust Cargo
 		isManifest: (b) => b === "cargo.toml",
 		lockfiles: ["Cargo.lock"],
 		parse: parseTomlDependency,
 	},
 	{
-		// Python requirements
 		isManifest: (b) => b === "requirements.txt" || b.endsWith(".requirements.txt"),
 		lockfiles: ["requirements.lock", "Pipfile.lock", "poetry.lock", "uv.lock"],
 		parse: (line) => {
@@ -181,8 +131,7 @@ const ECOSYSTEMS: Ecosystem[] = [
 			if (t === "" || t.startsWith("#") || t.startsWith("-")) {
 				return null;
 			}
-			// A bare `numpy` line has no constraint group at all — that absence is the PIN_DROPPED signal
-			// this script exists to surface, so it becomes "" rather than dropping the dependency.
+			// A bare requirements entry is a dependency without a pin, not an absent dependency.
 			const [, name, constraint = ""] = reReqDep.exec(t) ?? [];
 			if (name === undefined) {
 				return null;
@@ -191,17 +140,15 @@ const ECOSYSTEMS: Ecosystem[] = [
 		},
 	},
 	{
-		// Python pyproject (PEP 621 / poetry tables)
 		isManifest: (b) => b === "pyproject.toml",
 		lockfiles: ["poetry.lock", "uv.lock", "pdm.lock"],
 		parse: parseTomlDependency,
 	},
 	{
-		// Ruby Bundler
 		isManifest: (b) => b === "gemfile",
 		lockfiles: ["Gemfile.lock"],
 		parse: (line) => {
-			// `gem "puma"` carries no constraint group — an absent pin, not an absent dependency.
+			// A Gemfile entry without a version is an unpinned dependency.
 			const [, name, constraint = ""] = reGemDep.exec(line) ?? [];
 			if (name === undefined) {
 				return null;
@@ -210,21 +157,15 @@ const ECOSYSTEMS: Ecosystem[] = [
 		},
 	},
 	{
-		// Maven and XcodeGen spread one dependency over several lines — an artifactId and its version, a
-		// url and its bound — and a diff carries only the lines that changed, so the unchanged half may sit
-		// outside it. No added, removed or pin label is read from such a subset.
 		isManifest: (b) => b === "pom.xml",
 		lockfiles: [],
 		parse: () => null,
 		dependencyLine: /<(?:artifactId|version)>/u,
 	},
 	{
-		// Gradle (Groovy or Kotlin DSL)
 		isManifest: (b) => b === "build.gradle" || b === "build.gradle.kts",
 		lockfiles: ["gradle.lockfile"],
 		parse: (line) => {
-			// The version group matches empty for a trailing-colon coordinate (`"g:a:"`); the coordinate
-			// group cannot be empty.
 			const [, coordinate, constraint = ""] = reGradleDep.exec(line) ?? [];
 			if (coordinate === undefined) {
 				return null;
@@ -233,12 +174,9 @@ const ECOSYSTEMS: Ecosystem[] = [
 		},
 	},
 	{
-		// Swift Package Manager
 		isManifest: (b) => b === "package.swift",
 		lockfiles: ["Package.resolved"],
 		parse: (line) => {
-			// The url group is required; the three constraint forms are alternatives, so at most one of
-			// them is present on any given line and the range form always yields BOTH of its bounds.
 			const [, url, fromVersion, exactVersion, rangeLow, rangeHigh] = reSwiftPkg.exec(line) ?? [];
 			if (url === undefined) {
 				return null;
@@ -248,14 +186,11 @@ const ECOSYSTEMS: Ecosystem[] = [
 					.split("/")
 					.pop()
 					?.replace(/\.git$/u, "") ?? url;
-			// from: => caret-like (loose), exact: => exact, range => loose
 			const constraint = swiftConstraint(fromVersion, exactVersion, rangeLow, rangeHigh);
 			return { name, constraint };
 		},
 	},
 	{
-		// XcodeGen project.yml: a package is declared under `packages:` as a url line followed by a
-		// constraint line, so it is read as Maven is.
 		isManifest: (b) => b === "project.yml" || b === "project.yaml",
 		lockfiles: ["Package.resolved"],
 		parse: () => null,
@@ -263,11 +198,9 @@ const ECOSYSTEMS: Ecosystem[] = [
 			/^\s*(?:url|from|exactVersion|majorVersion|minorVersion|branch|revision):\s*\S/u,
 	},
 	{
-		// Go modules
 		isManifest: (b) => b === "go.mod",
 		lockfiles: ["go.sum"],
 		parse: (line) => {
-			// Both groups are required: a go.mod require line without a `v…` version is not matched at all.
 			const [, name, version] = reGoMod.exec(line) ?? [];
 			if (name === undefined || version === undefined) {
 				return null;
@@ -281,7 +214,6 @@ function basenameLower(path: string): string {
 	return (path.split("/").pop() ?? path).toLowerCase();
 }
 
-// Escape a dependency name for safe embedding in a RegExp (names can contain ., -, /, @ and similar).
 function escapeRegExp(s: string): string {
 	return s.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
 }
@@ -291,13 +223,9 @@ function ecosystemFor(path: string): Ecosystem | null {
 	return ECOSYSTEMS.find((e) => e.isManifest(base)) ?? null;
 }
 
-// Classify the constraint delta for a dependency present on both sides (added + removed for same name).
 function classifyDelta(oldC: string, newC: string): DependencyKind {
 	const o = oldC.trim();
 	const n = newC.trim();
-	// Identical constraint text on both sides means the -X/+X pair differs only by whitespace/newline (e.g. a
-	// trailing-newline reflow): there is no version change, so surface a neutral no-change fact rather than a
-	// phantom version bump. `unchanged` is informational only and is never counted toward the bump tally.
 	if (o === n) {
 		return "unchanged";
 	}
@@ -312,7 +240,6 @@ function classifyDelta(oldC: string, newC: string): DependencyKind {
 	return "bumped";
 }
 
-// Collect { name -> constraint } from added/removed manifest lines for a single ecosystem file.
 function collectDeps(df: DiffFile, eco: Ecosystem, side: "added" | "removed"): Map<string, string> {
 	const out = new Map<string, string>();
 	const lines = side === "added" ? df.addedLines : df.removedLines;
@@ -325,7 +252,6 @@ function collectDeps(df: DiffFile, eco: Ecosystem, side: "added" | "removed"): M
 	return out;
 }
 
-/** How many captured paths a direction names before it only counts the rest. */
 const PATHS_NAMED = 5;
 
 function namedPaths(paths: readonly string[]): string {
@@ -333,10 +259,6 @@ function namedPaths(paths: readonly string[]): string {
 	return paths.length > PATHS_NAMED ? `${named} and ${paths.length - PATHS_NAMED} more` : named;
 }
 
-/**
- * The paths of the checkout whose file name is one of `names`, and whether that list is the whole
- * answer: it is not when the tree was not captured or a listing was cut.
- */
 async function checkoutPaths(
 	tree: FileTree | null,
 	names: ReadonlySet<string>,
@@ -354,7 +276,6 @@ async function checkoutPaths(
 	return { paths: found, complete };
 }
 
-/** What the review is told about lockfiles: where they are, or what is known of their absence. */
 function lockfileDirections(
 	checkout: { paths: string[]; complete: boolean },
 	touched: ReadonlySet<string>,
@@ -394,8 +315,7 @@ export default definePracticeScript({
 		let bumped = 0;
 		let unpairedManifestLines = 0;
 
-		// Where the checkout holds a file with a lockfile's name. A path anywhere in the repository is not
-		// evidence that it belongs to a changed manifest; the paths are reported for the review to relate.
+		// A lockfile elsewhere in the checkout does not prove it belongs to this manifest.
 		const allLockfileNames = new Set(
 			ECOSYSTEMS.flatMap((e) => e.lockfiles.map((l) => l.toLowerCase())),
 		);
@@ -431,9 +351,6 @@ export default definePracticeScript({
 			const added = collectDeps(df, eco, "added");
 			const removed = collectDeps(df, eco, "removed");
 
-			// helper to find the diff line for a dependency name on a given side (for lead location). Match on a
-			// quote/word/coordinate boundary, not a bare substring, so a prefix-sharing sibling (react vs
-			// react-dom, or a scoped name appearing inside another package's URL) doesn't grab the wrong line.
 			const lineFor = (name: string, side: "added" | "removed"): number => {
 				const lines = side === "added" ? df.addedLines : df.removedLines;
 				const bounded = new RegExp(`(?:^|[^\\w.\\-/])${escapeRegExp(name)}(?:[^\\w.\\-/]|$)`, "u");
@@ -442,8 +359,6 @@ export default definePracticeScript({
 						return ln;
 					}
 				}
-				// Fallback: a constructed key (e.g. a Gradle group:name coordinate) may not survive the boundary
-				// test against the raw line — keep the substring scan so the lead still lands on a real line.
 				for (const [ln, content] of lines) {
 					if (content.includes(name)) {
 						return ln;
@@ -471,9 +386,7 @@ export default definePracticeScript({
 						pinsLoosened += 1;
 					} else if (kind === "pin-dropped") {
 						pinsDropped += 1;
-					} else if (kind === "unchanged") {
-						// whitespace/newline-only line pair — not a version change, count nothing
-					} else {
+					} else if (kind !== "unchanged") {
 						bumped += 1;
 					}
 				}

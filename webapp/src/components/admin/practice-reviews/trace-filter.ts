@@ -29,7 +29,6 @@ export function parseTraceFilter(value: string): TraceFilter {
 		: ALL_STEPS;
 }
 
-/** The practices a trace can be narrowed to: those its results answered, by name. */
 export function tracePractices(lineage: ReviewLineage): { slug: string; name: string }[] {
 	const practices = new Map<string, string>();
 	for (const result of lineageRecords(lineage).results) {
@@ -45,16 +44,6 @@ export function hiddenByFilter(filter: TraceFilter): string {
 	return filter.kind === "losses" ? "Nothing lost on this path." : "Hidden by the filter.";
 }
 
-/**
- * The graph a filter leaves. The item, the reviews and the record the graph was asked for stay on
- * every one, so the rail still reads from its start. A result keeps its problems.
- *
- * - Only feedback: every piece of feedback, and no result.
- * - Only losses: feedback whose path ends lost (withheld, rejected, replaced, failed, withdrawn),
- *   and the not-met results that led to no feedback, with the results the lost feedback was
- *   written from. Feedback still on its way is not lost yet.
- * - One practice: its results, and the feedback written from any of them.
- */
 export function filteredLineage(lineage: ReviewLineage, filter: TraceFilter): ReviewLineage {
 	if (filter.kind === "all") {
 		return lineage;
@@ -88,7 +77,6 @@ export function filteredLineage(lineage: ReviewLineage, filter: TraceFilter): Re
 
 const ids = (entries: readonly { id: string }[]) => new Set(entries.map((entry) => entry.id));
 
-/** The ids of the results and the feedback a filter keeps. */
 function kept(
 	records: LineageRecords,
 	filter: Exclude<TraceFilter, { kind: "all" }>,

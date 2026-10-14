@@ -59,7 +59,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The section's result rows, without the problems listed inside a row. */
 function resultRows(section: HTMLElement) {
 	return within(section)
 		.getAllByRole("listitem")
@@ -164,11 +163,12 @@ export const Opened: Story = {
 			/^Summary commentDescriptive merge request, Small, focused changes · \d+ min\. ago$/u,
 		);
 		// Posted while the rest of its feedback failed: no practice is claimed for it.
-		await expect(within(comments).getByText("Feedback")).toBeVisible();
+		await expect(within(comments).getAllByRole("listitem")[2]).toHaveTextContent(
+			/^src\/login\/login\.css:4 · no link recordedFeedback · \d+ min\. ago$/u,
+		);
 		const results = canvas.getByRole("region", { name: "Your results" });
 		await expect(resultRows(results)).toHaveLength(5);
 		await expect(within(results).getByText("Not met · 2 problems · Major")).toBeVisible();
-		// Evidence the web app can no longer show: no problem is named, and no count is claimed.
 		await expect(within(results).getByText(/^Not met · Minor/u)).toBeVisible();
 		await expect(within(results).getByText("Met", { exact: true })).toBeVisible();
 		await expect(within(results).getByText("Does not apply", { exact: true })).toBeVisible();
@@ -228,7 +228,6 @@ export const ReviewStatusUnavailable: Story = {
 	},
 };
 
-/** Comments and no result: the empty section would say nothing, so there is none. */
 export const CommentsWithoutResults: Story = {
 	args: {
 		expanded: true,
@@ -277,10 +276,7 @@ export const ResultsFailed: Story = {
 	},
 };
 
-/**
- * A result that is not met names each of its problems in one line, in the review's order. Nothing
- * opens further: where each problem is, and why, are the web app's.
- */
+/** Problem details stay in the web app; the report lists summaries without expansion. */
 export const ProblemsUnderAResult: Story = {
 	args: {
 		expanded: true,
@@ -311,7 +307,6 @@ export const ManyResults: Story = {
 	},
 };
 
-/** The reader's latest own review is running. */
 export const ReviewRunning: Story = {
 	args: { activity: "RUNNING", expanded: true },
 	play: async ({ canvas }) => {
@@ -322,7 +317,7 @@ export const ReviewRunning: Story = {
 	},
 };
 
-/** A review that could not finish every practice is named as incomplete, and nothing more is claimed. */
+/** Incomplete reviews must not imply a verdict for practices they did not finish. */
 export const ReviewIncomplete: Story = {
 	args: {
 		expanded: true,
@@ -339,7 +334,6 @@ export const ReviewIncomplete: Story = {
 	},
 };
 
-/** A review that failed recorded no result: the report says so and dates no review. */
 export const ReviewFailed: Story = {
 	args: {
 		expanded: true,
@@ -359,7 +353,6 @@ export const ReviewFailed: Story = {
 	},
 };
 
-/** A met result with no summary still names its practice and outcome. */
 export const MetWithoutSummary: Story = {
 	args: {
 		expanded: true,
@@ -375,10 +368,7 @@ export const MetWithoutSummary: Story = {
 	},
 };
 
-/**
- * A workspace admin sees what a developer sees: their own comments and results. Every
- * developer's records, delivery and reviews are the web app's, one link away — not a panel in the page.
- */
+/** Admins see only their own results here; Review details opens all developers' records in the web app. */
 export const WorkspaceAdmin: Story = {
 	args: { state: ADMIN_ON_GITHUB, expanded: true },
 	play: async ({ canvas }) => {

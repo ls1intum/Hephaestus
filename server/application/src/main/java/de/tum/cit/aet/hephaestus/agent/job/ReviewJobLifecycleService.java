@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/** Cancels submitted review jobs and records spend before stopping their containers. */
 @Service
 public class ReviewJobLifecycleService {
 
@@ -95,7 +94,6 @@ public class ReviewJobLifecycleService {
                 jobId, Instant.now(), null, ReviewJobCancellationReason.CANCELLED_BY_REQUESTER, ACTIVE_STATUSES);
     }
 
-    /** The status-transition CAS + races, run inside {@link #transactionTemplate}. */
     private CancelOutcome cancelTransition(Long workspaceId, UUID jobId) {
         ReviewJob job = requireJob(workspaceId, jobId);
 
@@ -131,11 +129,7 @@ public class ReviewJobLifecycleService {
         return new CancelOutcome(fresh, true);
     }
 
-    /**
-     * Appends the attempt's ledger rows only once the job crossed {@code execution_started_at}. A non-null
-     * {@code worker_id} proves only that a worker claimed the row, and preparation before that boundary
-     * cannot incur provider usage — booking it would make the workspace's month unverifiable for free.
-     */
+    // A claim alone proves no provider usage; accounting begins at execution_started_at.
     private void recordUsageIfStarted(Long workspaceId, ReviewJob job) {
         if (job.getExecutionStartedAt() == null) {
             return;

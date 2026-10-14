@@ -32,7 +32,6 @@ export type ReviewListTarget =
 export interface OutcomeSlot {
 	key: string;
 	def: StatusDef;
-	/** The count's noun for this count: "met result", "not met results", "delivered". */
 	label: string;
 	count: number;
 	target?: ReviewListTarget;
@@ -57,7 +56,6 @@ export interface OutcomeScope {
 export const OUTCOME_LEGEND_LABELS = {
 	reviews: "Reviews by outcome",
 	results: "Results by outcome",
-	/** The counts that overlap the results' outcomes, listed apart from them. */
 	checkedResults: "Results checked by an admin",
 	/** The reviews of the range without an outcome yet, listed apart from the outcomes. */
 	openReviews: "Reviews not finished yet",
@@ -90,11 +88,7 @@ export function reviewSlots(counts: ReviewStatusCounts, scope?: OutcomeScope): O
 	}));
 }
 
-/**
- * The statuses of a review that finished: it ran to an end, whole or partial. A cancelled review
- * ended without finishing, so the queue's "finished" and the failure share leave it out, as the
- * server does.
- */
+// Cancelled reviews ended without finishing; exclude them from finished-review and failure-share counts.
 export const FINISHED_REVIEW_STATUSES = [
 	"COMPLETE",
 	"PARTIAL",
@@ -112,10 +106,6 @@ export function finishedCount(counts: ReviewStatusCounts): number {
 	return counts.complete + counts.partial + counts.failed;
 }
 
-/**
- * The four outcomes that partition results: the two outcomes of an assessment, then the two
- * ways of not reaching one, each in its registry's count noun.
- */
 export function resultSlots(counts: ReviewResultCounts, scope?: OutcomeScope): OutcomeSlot[] {
 	const search = scope && scopeSearch(scope, "results");
 	return [
@@ -146,10 +136,6 @@ export function resultSlots(counts: ReviewResultCounts, scope?: OutcomeScope): O
 	];
 }
 
-/**
- * Results an admin marked incorrect. They overlap the partition — an incorrect met result is
- * still a met result — so this count is listed beside the mix, never added into it.
- */
 export function markedIncorrectSlot(count: number, scope?: OutcomeScope): OutcomeSlot {
 	return {
 		key: "markedIncorrect",
@@ -203,12 +189,6 @@ export function feedbackSlots(counts: ReviewFeedbackCounts, scope?: OutcomeScope
 	}));
 }
 
-/**
- * Feedback by delivery family as the overview counts it: replaced feedback is no loss, so it leaves
- * the withheld count and stands apart in a neutral word, and withheld itself is neutral too, since
- * most of it is the review working as meant. Why it was withheld is the By destination and reason
- * card's.
- */
 export function overviewFeedbackSlots(
 	counts: ReviewFeedbackCounts,
 	scope?: OutcomeScope,
@@ -250,10 +230,6 @@ export function rangeScope(from: Date, nowMs: number): OutcomeScope {
 	return { from: toDayParam(from), to: toDayParam(new Date(nowMs)) };
 }
 
-/**
- * The list search a scope stands for, which every count's link starts from so it matches its count:
- * the days and the practice, and on the Feedback list the developer.
- */
 export function scopeSearch(
 	scope: OutcomeScope,
 	list: ReviewListTarget["list"],

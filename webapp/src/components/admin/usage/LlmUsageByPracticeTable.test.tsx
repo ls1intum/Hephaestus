@@ -10,10 +10,7 @@ import {
 } from "./fixtures";
 import { LlmUsageByPracticeTable } from "./LlmUsageByPracticeTable";
 
-/**
- * Deliberately inconsistent with its own rows, which is the only way to see which numbers the footer
- * is made of: the rows come to $0.37, 20 reviews and 426 calls.
- */
+// Deliberately inconsistent totals prove the footer uses the server's aggregate.
 const report = {
 	byPractice: [commentQualityUsage, notAttributedUsage],
 	practiceScriptTotal: {
@@ -31,14 +28,12 @@ function table(): HTMLElement {
 	return screen.getByRole("table", { name: "Spend on models for practice scripts, by practice" });
 }
 
-/** Each cell's rendered text. */
 function cellsOf(name: RegExp): (string | null)[] {
 	return within(within(table()).getByRole("row", { name }))
 		.getAllByRole("cell")
 		.map((cell) => cell.textContent);
 }
 
-/** The practice column, top to bottom. */
 function practiceOrder(): (string | null)[] {
 	return within(table())
 		.getAllByRole("row")
@@ -60,8 +55,6 @@ describe("models for practice scripts by practice", () => {
 	it("averages spend over reviews, not calls", () => {
 		render(<LlmUsageByPracticeTable report={report} purses={["SHARED"]} />);
 
-		// $0.36 over 18 reviews; over its 412 calls it would read $0.0009. Three decimals, because
-		// *Not attributed* averages half a cent in the same column.
 		expect(cellsOf(/^Comments explain why/u)[3]).toBe("$0.020");
 	});
 
@@ -110,7 +103,6 @@ describe("models for practice scripts by practice", () => {
 			"Issues state the expected behaviour",
 			"Not attributed",
 		]);
-		// Each purse names its own Spend, so the two sort buttons are told apart.
 		const sharedSpend = within(table()).getByRole("columnheader", {
 			name: "Spend (Shared models)",
 		});

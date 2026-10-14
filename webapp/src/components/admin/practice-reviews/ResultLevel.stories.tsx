@@ -40,7 +40,6 @@ function mark(
 	};
 }
 
-/** Marked incorrect two hours ago, after an earlier mark that was removed. */
 const markedIncorrect: ReviewResultDetail = {
 	...reviewResultDetail,
 	disagreements: [],
@@ -62,7 +61,6 @@ const markedIncorrect: ReviewResultDetail = {
 	],
 };
 
-/** Accepted yesterday: the result is right, and nothing about its feedback changed. */
 const markedAccepted: ReviewResultDetail = {
 	...reviewResultDetail,
 	disagreements: [],
@@ -77,15 +75,6 @@ const markedAccepted: ReviewResultDetail = {
 	],
 };
 
-/**
- * One result's sheet, over the list it was opened from or over a trace, in the order every
- * record sheet has: a status line, What it is, State and history (recorded, disagreed with, marked,
- * mark removed, no longer current), the explanation, the problems it located, the questions it
- * left open and the evidence, Technical and the actions. It links to no other record; its trace
- * tells where it came from and what it led to. Its decisions — mark it incorrect or accepted, or
- * remove a mark — are the footer, behind a popover that will not submit without a reason, because
- * a mark without one is not something the developer could read.
- */
 const meta = {
 	component: ResultLevel,
 	parameters: { layout: "fullscreen" },
@@ -118,8 +107,6 @@ export const Default: Story = {
 				level: 2,
 			}),
 		).toBeVisible();
-		// The sheet is the result alone: no story, and no link to another record. The work links
-		// out to its provider.
 		await expect(
 			panel.queryByRole("group", { name: "How this came about" }),
 		).not.toBeInTheDocument();
@@ -136,20 +123,15 @@ export const Default: Story = {
 			SHEET_SECTIONS.technical,
 		]);
 		panel.getByRole("heading", { name: "Why this was raised", level: 4 });
-		// The outcome carries its problem count. The result's severity sits beside it, and the worst
-		// problem carries the same one.
 		await expect(panel.getByText("Not met · 3 problems")).toBeVisible();
 		await expect(panel.getAllByText("Major")).toHaveLength(2);
-		// The evidence is read as passages, never as the stored record it came from.
 		await expect(panel.queryByText(/citations/u)).not.toBeInTheDocument();
-		// Unmarked, it offers both marks, and no removal.
 		await expect(panel.getByRole("button", { name: "Mark incorrect" })).toBeEnabled();
 		await expect(panel.getByRole("button", { name: "Mark accepted" })).toBeEnabled();
 		await expect(panel.queryByRole("button", { name: "Remove mark" })).not.toBeInTheDocument();
 	},
 };
 
-/** A result from a review someone requested says so among what it is. */
 export const ByHand: Story = {
 	args: { result: ready({ ...reviewResultDetail, origin: "REQUEST" }) },
 	play: async () => {
@@ -160,10 +142,6 @@ export const ByHand: Story = {
 	},
 };
 
-/**
- * The explanation renders as Markdown, as on the developer's own row: a file or a value the review
- * quotes is code, not text between backticks.
- */
 export const MarkdownExplanation: Story = {
 	args: {
 		result: ready({
@@ -181,15 +159,9 @@ export const MarkdownExplanation: Story = {
 	},
 };
 
-/**
- * Each problem in display order, with its own severity, its explanation as Markdown, the passages
- * that place it and its next step. The example the review recorded belongs to the developer's own
- * pages, so the sheet says nothing of it.
- */
 export const Problems: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		// The list's own items, not the passages listed inside each of them.
 		const rows = [...panel.getByRole("list", { name: "Problems" }).children].filter(
 			(row): row is HTMLElement => row instanceof HTMLElement,
 		);
@@ -212,9 +184,7 @@ export const Problems: Story = {
 				"Fetch the row first, then check the grant, and answer 403 when the caller may not read it.",
 			),
 		).toBeVisible();
-		// A problem without a next step does not draw an empty one.
 		await expect(second.queryByText("Next step")).not.toBeInTheDocument();
-		// The result's own passage stands apart from its problems'.
 		const evidence = within(panel.getByRole("region", { name: "Evidence" }));
 		evidence.getByText("Do we lose the difference between 'gone' and 'not yours' here?");
 		await expect(panel.queryByText("Example from this work")).not.toBeInTheDocument();
@@ -223,10 +193,6 @@ export const Problems: Story = {
 	},
 };
 
-/**
- * A review that could not decide names what it could not settle, what would settle it and where the
- * question arose. Open questions are not feedback, and there is no problem to list.
- */
 export const OpenQuestions: Story = {
 	args: { result: ready(resultDetail("22222222-5555-5555-5555-555555555555")) },
 	play: async () => {
@@ -240,28 +206,23 @@ export const OpenQuestions: Story = {
 		questions.getByText(
 			"Would settle it: A link to the discussion or incident that chose this order.",
 		);
-		// A document is not a file, so its location is its name, without a line.
 		questions.getByText("Runbook: restoring a workspace from backup", { selector: "code" });
-		// The second question arose nowhere in particular, so it names no place.
 		await expect(questions.getAllByText(/^At/u)).toHaveLength(1);
 		await expect(panel.queryByRole("list", { name: "Problems" })).not.toBeInTheDocument();
 		await expect(panel.queryByText(/problems?$/u)).not.toBeInTheDocument();
 	},
 };
 
-/** A not met result with one problem says so in the singular. */
 export const OneProblem: Story = {
 	args: { result: ready(resultDetail("88888888-8888-8888-8888-888888888888")) },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByText("Not met · 1 problem")).toBeVisible();
 		await expect(panel.getAllByText("Trivial").length).toBeGreaterThan(0);
-		// Its only passage is the problem's, so the sheet draws no empty evidence section of its own.
 		await expect(panel.queryByRole("region", { name: "Evidence" })).not.toBeInTheDocument();
 	},
 };
 
-/** A met result has no problems, so its own passages are the whole of its evidence. */
 export const Met: Story = {
 	args: { result: ready(resultDetail("55555555-5555-5555-5555-555555555555")) },
 	play: async () => {
@@ -311,7 +272,6 @@ export const Disagreed: Story = {
 	},
 };
 
-/** A result that is no longer current says so in its status line and in its history. */
 export const NoLongerCurrent: Story = {
 	args: {
 		result: ready({
@@ -329,7 +289,6 @@ export const NoLongerCurrent: Story = {
 	},
 };
 
-/** The server hides the evidence: the sheet says so, and never that nothing was quoted. */
 export const EvidenceHidden: Story = {
 	args: {
 		result: ready({
@@ -369,7 +328,6 @@ export const MarkIncorrect: Story = {
 	},
 };
 
-/** A refused change keeps the form open with the reason the admin wrote, ready for another try. */
 export const MarkIncorrectFails: Story = {
 	args: {
 		onMark: fn(async () => {
@@ -403,7 +361,6 @@ export const MarkedIncorrect: Story = {
 	play: async () => {
 		const panelElement = await settledDrawerPanel();
 		const panel = within(panelElement);
-		// The header says it under the title, where its standing goes, and only there.
 		const [chip, ...others] = panel.getAllByText("Marked incorrect", {
 			selector: "[data-sheet-status] *",
 		});
@@ -418,7 +375,6 @@ export const MarkedIncorrect: Story = {
 		await expect(panel.getByRole("button", { name: "Remove mark" })).toBeEnabled();
 		await expect(panel.queryByRole("button", { name: "Mark incorrect" })).not.toBeInTheDocument();
 		await expect(panel.queryByRole("button", { name: "Mark accepted" })).not.toBeInTheDocument();
-		// Oldest first: recorded, the earlier mark and its removal, then the one in force.
 		const history = within(panel.getByRole("list", { name: "History" }));
 		await expect(history.getAllByRole("listitem").map((entry) => entry.textContent)).toEqual([
 			expect.stringMatching(/^Recorded/u),
@@ -429,7 +385,6 @@ export const MarkedIncorrect: Story = {
 	},
 };
 
-/** Removing the mark is the same popover the other way round, and names the mark it removes. */
 export const RemoveIncorrectMark: Story = {
 	args: { result: ready(markedIncorrect) },
 	parameters: { chromatic: { disableSnapshot: true } },
@@ -452,7 +407,6 @@ export const RemoveIncorrectMark: Story = {
 	},
 };
 
-/** Accepted, the result can still be marked incorrect, and the acceptance can be removed. */
 export const MarkedAccepted: Story = {
 	args: { result: ready(markedAccepted) },
 	play: async ({ args, userEvent }) => {
@@ -470,7 +424,6 @@ export const MarkedAccepted: Story = {
 	},
 };
 
-/** While the server decides, the footer's controls show it is working and take no second press. */
 export const Marking: Story = {
 	args: { isMarking: true },
 	play: async () => {
@@ -495,10 +448,6 @@ export const Loading: Story = {
 	},
 };
 
-/**
- * The error arrives as a prop, so nothing here depends on a request failing at the right moment. A
- * status-less error is the one that reads "check your connection" — see `QueryErrorAlert`.
- */
 export const LoadFailed: Story = {
 	args: {
 		result: {
@@ -510,7 +459,6 @@ export const LoadFailed: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByText("We could not load this result")).toBeVisible();
-		// With no record to name it, the level is named for what it is.
 		await expect(screen.getByRole("dialog")).toHaveAccessibleName("Result");
 		await expect(panel.queryByRole("button", { name: "Mark incorrect" })).not.toBeInTheDocument();
 		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();

@@ -50,8 +50,16 @@ class ReviewAttemptsContentSourceTest extends BaseUnitTest {
     void shouldParseOnlyExplicitItemResourceKeys() {
         assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/issue/21.json"))
                 .contains(new ReviewAttemptsContentSource.ItemSelection(new ItemKind("scm.issue"), 21));
-        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/pull-request/42.json"))
+        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/pull_request/42.json"))
                 .contains(new ReviewAttemptsContentSource.ItemSelection(new ItemKind("scm.pull_request"), 42));
         assertThat(ReviewAttemptsContentSource.selectionOf("../issue/21.json")).isEmpty();
+        assertThat(ReviewAttemptsContentSource.selectionOf(
+                        "inputs/context/review_attempts/issue/9223372036854775807.json"))
+                .contains(new ReviewAttemptsContentSource.ItemSelection(new ItemKind("scm.issue"), Long.MAX_VALUE));
+        assertThat(ReviewAttemptsContentSource.selectionOf(
+                        "inputs/context/review_attempts/issue/9223372036854775808.json"))
+                .isEmpty();
+        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/issue/0.json"))
+                .isEmpty();
     }
 }

@@ -20,7 +20,6 @@ export const Criteria: Story = {
 	},
 };
 
-/** No script means the built-in review, said in words rather than left blank. */
 export const BuiltInScript: Story = {
 	args: { field: "SCRIPT" },
 	play: async ({ canvas }) => {

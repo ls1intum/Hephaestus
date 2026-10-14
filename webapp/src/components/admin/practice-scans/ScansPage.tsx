@@ -29,7 +29,6 @@ export type ScansListState =
 export interface ScansPageProps {
 	workspaceSlug: string;
 	scans: ScansListState;
-	/** The start form’s level, drawn over the list by the route. */
 	children?: ReactNode;
 }
 
@@ -44,10 +43,7 @@ function StartScanLink({ className }: { className?: string }) {
 	);
 }
 
-/**
- * The workspace’s scans. A failed load keeps the error and its Retry in place of the table, never a
- * table of zeros: a zero would say a scan reviewed nothing, which nobody knows yet.
- */
+// A failed read supplies no counts; show the error rather than zero-valued scan rows.
 export function ScansPage({ workspaceSlug, scans, children }: ScansPageProps) {
 	let body: ReactNode;
 	if (scans.status === "error") {

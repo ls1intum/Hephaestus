@@ -49,11 +49,6 @@ export const FormattedReply: Story = {
 	},
 };
 
-/**
- * Feedback Heph gave about a result, or about one problem in it, renders in place with the reply's
- * markdown, and is copied with the prose around it. A link stored before links carried their
- * feedback shows nothing.
- */
 export const ReplyWithFeedback: Story = {
 	args: { message: REPLY_WITH_FEEDBACK },
 	play: async ({ args, canvas, userEvent }) => {

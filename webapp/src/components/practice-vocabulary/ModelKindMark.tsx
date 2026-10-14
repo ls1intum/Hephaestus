@@ -3,9 +3,7 @@ import { cn } from "cn";
 import { AGENT_PURPOSE_DEFS, type AgentPurpose } from "./agent-purpose-defs";
 
 const TILE = {
-	/** Inline, beside text or in a table cell. */
 	sm: "size-5 rounded-sm",
-	/** The leading mark of a list row. */
 	md: "size-8 rounded-md",
 };
 
@@ -29,12 +27,7 @@ export interface ModelKindMarkProps {
 	className?: string;
 }
 
-/**
- * Which kind of model something is: the kind's tinted glyph on a neutral tile. The ground stays
- * neutral, because a tinted ground means a practice group and a tinted badge means a status. The
- * name is always there, visible or for a screen reader, so the colour never carries the kind
- * alone.
- */
+// Keep the tile neutral: a tinted ground identifies a practice group, not a model kind.
 export function ModelKindMark({
 	purpose,
 	size = "sm",

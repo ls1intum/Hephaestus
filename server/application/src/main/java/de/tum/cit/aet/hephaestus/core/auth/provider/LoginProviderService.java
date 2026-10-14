@@ -29,25 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Owns the instance-scoped {@link LoginProvider} table: seeds the env-configured defaults on first
- * boot, is the single read path for building login {@code ClientRegistration}s, and backs the
- * instance-admin CRUD.
- *
- * <p>Seeding is idempotent and promote-once: a provider is created from {@code
- * hephaestus.auth.login- providers.*} only when it does not already exist, so env becomes the
- * <em>seed</em>, never the live source — an admin can edit or disable a seeded provider afterwards
- * and the env value won't clobber it on the next boot. Each entry is keyed by a stable,
- * operator-chosen {@code registrationId} (e.g. {@code github}, {@code gitlab}, {@code gitlab-lrz})
- * so {@code Identity}s and the admin allowlist keep resolving across reboots; multiple providers
- * per instance seed in one boot (one per {@code (type, baseUrl)} SCM instance).
- *
- * <p>Every mutation evicts the {@link LoginProviderClientRegistrationRepository} cache so an
- * admin's edit/enable/disable takes effect immediately rather than after the 60s TTL.
- *
- * <p>The three admin mutations write to the instance-scoped {@code auth_event} trail; env seeding
- * does not, having no authenticated principal behind it.
- */
+// Environment configuration seeds missing providers only; it must not overwrite later administrator changes.
 @ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("Login providers are instance-global, not workspace-scoped")
@@ -67,8 +49,6 @@ public class LoginProviderService {
     // probe.
     static final String OUTLINE_SCOPES = "read";
     private static final String GITHUB_COM = "https://github.com";
-    // The single Slack instance. Canonical origin the seeded identity_provider +
-    // SlackMentorIdentityResolver key on.
     private static final String SLACK_COM = "https://slack.com";
 
     private static final Logger log = LoggerFactory.getLogger(LoginProviderService.class);
@@ -224,11 +204,7 @@ public class LoginProviderService {
         log.info("auth.login-provider: admin deleted '{}'", registrationId);
     }
 
-    /**
-     * Record an admin login-provider mutation on the {@code auth_event} trail. {@code changed}
-     * carries the field names a PATCH touched — never their values, so no secret can reach the
-     * trail.
-     */
+    // Audit changed field names only; provider values can contain credentials.
     private void audit(AuthEvent.EventType type, LoginProvider provider, @Nullable List<String> changed) {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("registrationId", provider.getRegistrationId());
@@ -339,13 +315,7 @@ public class LoginProviderService {
         });
     }
 
-    /**
-     * The env var that feeds a shipped seed slot's field, so a misconfiguration diagnostic names
-     * the knob the operator actually sets ({@code OUTLINE_OAUTH_CLIENT_SECRET}), not an abstract
-     * property path. Slots the operator declared themselves (e.g. {@code gitlab-lrz}) have no fixed
-     * env var — fall back to the canonical property path, which is always correct. Keep in sync
-     * with {@code application.yml}'s {@code hephaestus.auth.login-providers} block.
-     */
+    // Keep shipped environment names aligned with application.yml for operator diagnostics.
     private static final Map<String, String> SHIPPED_SLOT_ENV_PREFIX = Map.of(
             "github", "GITHUB_OAUTH", "gitlab", "GITLAB_OAUTH", "slack", "SLACK_OAUTH", "outline", "OUTLINE_OAUTH");
 
@@ -390,11 +360,7 @@ public class LoginProviderService {
         return saved;
     }
 
-    /**
-     * GitHub login is github.com only (GHE login is out of scope; the registration builder
-     * hardcodes github.com endpoints). For GitLab and Outline (self-hosted instances), validate the
-     * supplied base URL (HTTPS + SSRF guard).
-     */
+    // GitHub login endpoints are fixed to github.com; self-hosted GitLab and Outline origins require SSRF validation.
     private String resolveBaseUrl(LoginProvider.ProviderType type, @Nullable String baseUrl) {
         if (type == LoginProvider.ProviderType.GITHUB) {
             return GITHUB_COM;
@@ -437,13 +403,7 @@ public class LoginProviderService {
         };
     }
 
-    /**
-     * GitLab and Outline use the plain OAuth2 flow (userInfo = /api/v4/user resp. /api/auth.info);
-     * an {@code openid} scope flips Spring to the OIDC path and 500s the callback (no jwkSetUri is
-     * configured — Outline is not an OIDC provider at all). Reject it with an actionable 422 so an
-     * admin editing the provider can't silently brick sign-in. See GITLAB_SCOPES / OUTLINE_SCOPES +
-     * ADR 0017.
-     */
+    // openid selects Spring's OIDC path; GitLab and Outline registrations require plain OAuth2.
     private static String sanitizeScopesOrThrow(LoginProvider.ProviderType type, String scopes) {
         String trimmed = scopes.trim();
         if (type == LoginProvider.ProviderType.GITLAB || type == LoginProvider.ProviderType.OUTLINE) {
@@ -463,15 +423,7 @@ public class LoginProviderService {
         return trimmed;
     }
 
-    /**
-     * The lockout guard, counting only providers that can actually sign someone in. A link-only
-     * provider ({@link LoginProvider.ProviderType#isLinkOnly()} — Slack, Outline) is BY
-     * CONSTRUCTION never a sign-in method: it is filtered off the login picker and rejected at flow
-     * begin. Counting it here would (a) refuse to remove the sole Outline provider on an instance
-     * that has one, and (b) worse, let an admin delete the last REAL sign-in provider as long as a
-     * link-only one remained — the guard would see a non-empty "enabled" list and wave it through.
-     * Both fall out once the count is sign-in-capable only.
-     */
+    // Link-only providers cannot prevent lockout; count only providers that can start a sign-in.
     private void requireNotLastEnabled(String registrationId, String verb) {
         List<LoginProvider> enabled = repository.findByEnabledTrueOrderByDisplayNameAsc().stream()
                 .filter(p -> p.getType() != null && !p.getType().isLinkOnly())

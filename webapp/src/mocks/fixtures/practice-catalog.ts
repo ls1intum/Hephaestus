@@ -13,11 +13,7 @@ if (group === undefined || practice === undefined) {
 }
 const { definition } = practice;
 
-/**
- * A real bundled practice as the server serves it: the catalog's own words, with the document
- * preamble composed into the criteria. JSON widens the enum values to `string`, so the settings
- * that are not text are spelled out here.
- */
+// Validate imported catalog JSON before it reaches typed prop fixtures.
 export const realPracticeDefinition = {
 	name: definition.name,
 	reviewOn: { events: definition.reviewOn.events, state: {} },

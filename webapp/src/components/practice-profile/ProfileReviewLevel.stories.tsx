@@ -19,13 +19,11 @@ const { review } = detail;
 
 const loaded = { status: "ready", detail } satisfies ProfileReviewDetailState;
 
-/** The result a link opens the review at: the second, so the first is not open by chance. */
 const [unfocused, focused] = detail.results;
 if (!unfocused || !focused) {
 	throw new Error("The review carries a second result");
 }
 
-/** The same review with `fields` in place of its own. */
 const readyWith = (fields: Partial<typeof detail>): ProfileReviewDetailState => ({
 	status: "ready",
 	detail: { ...detail, ...fields },
@@ -100,10 +98,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The review's results about the reader, one row per practice, under the feedback it gave them. The
- * head names the item, the time and how the review came about, and offers to ask again.
- */
 export const Default: Story = {
 	play: async ({ args }) => {
 		const panel = await settledReviewPanel();
@@ -119,7 +113,6 @@ export const Default: Story = {
 			screen.getByRole("tab", { name: `What we noticed ${detail.trace.events.length}` }),
 		).toBeVisible();
 
-		// The feedback it gave the reader, linked where it was posted.
 		await expect(screen.getByRole("list", { name: "Your feedback" })).toBeVisible();
 
 		const table = within(practiceTable());
@@ -132,10 +125,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Opened at one result from a link, such as a piece of work under "Going well": its row opens on
- * arrival, and the others wait for a press.
- */
 export const OpenedAtAResult: Story = {
 	args: {
 		focusResultId: focused.id,
@@ -149,7 +138,6 @@ export const OpenedAtAResult: Story = {
 	},
 };
 
-/** The events recorded on the item, oldest first, in words. */
 export const WhatWeNoticed: Story = {
 	args: {
 		tab: "noticed",
@@ -175,7 +163,6 @@ export const AskingForAReview: Story = {
 	},
 };
 
-/** A review the reader may not ask for again has no button for it. */
 export const WithoutAsking: Story = {
 	args: { onReviewNow: undefined },
 	play: async () => {
@@ -220,7 +207,6 @@ export const RunningWithNothingRecorded: Story = {
 	},
 };
 
-/** An item with no title is named by its label, never by a blank heading. */
 export const UntitledItem: Story = {
 	args: { state: readyWith({ review: { ...review, item: { ...review.item, title: null } } }) },
 	play: async () => {

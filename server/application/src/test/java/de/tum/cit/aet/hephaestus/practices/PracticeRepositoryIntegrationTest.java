@@ -24,7 +24,7 @@ class PracticeRepositoryIntegrationTest extends AbstractWorkspaceIntegrationTest
     PracticeVersionRepository versionRows;
 
     private Practice create(String suffix) {
-        var owner = persistUser("version-owner");
+        var owner = persistUser("version-owner-" + suffix);
         var workspace = createWorkspace("version-" + suffix, "Versions", "version-org", AccountType.ORG, owner);
         return versions.create(new PracticeVersionService.NewPractice(
                 workspace,
@@ -49,7 +49,8 @@ class PracticeRepositoryIntegrationTest extends AbstractWorkspaceIntegrationTest
         var practiceIds = List.of(Objects.requireNonNull(own.getId()), Objects.requireNonNull(foreign.getId()));
         long firstVersionId = Objects.requireNonNull(first.getId());
         long latestVersionId = Objects.requireNonNull(latest.getId());
-        long foreignVersionId = Objects.requireNonNull(foreign.getCurrentVersion().getId());
+        long foreignVersionId =
+                Objects.requireNonNull(foreign.getCurrentVersion().getId());
         var versionIds = List.of(firstVersionId, latestVersionId, foreignVersionId);
 
         assertThat(versionRows.findByWorkspaceIdAndIdIn(workspaceId, versionIds))

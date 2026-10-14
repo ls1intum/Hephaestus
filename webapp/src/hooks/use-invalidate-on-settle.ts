@@ -1,11 +1,7 @@
 import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
-/**
- * Reads `queryKeys` once more when `subject` stops being active. A list that polls only while its
- * parent is active would otherwise keep the page it read before the parent's final answer. A
- * subject that was settled when it was first seen, or a switch to another subject, reads nothing.
- */
+/** Refresh when polling stops so the list includes the parent's final recorded state. */
 export function useInvalidateOnSettle(
 	subject: string | undefined,
 	active: boolean,

@@ -20,7 +20,6 @@ export interface WorkspacePracticeDefinitionProps {
 	 * says the feedback mode, so it is said once.
 	 */
 	showStanding?: boolean;
-	/** The way back to the catalog's version, under where the practice came from. */
 	resetAction?: ReactNode;
 	/** A notice under the feedback mode, such as the members a practice script does not run for. */
 	notice?: ReactNode;
@@ -28,12 +27,6 @@ export interface WorkspacePracticeDefinitionProps {
 	practiceScript?: ReactNode;
 }
 
-/**
- * A workspace practice's current version, read-only: where it came from, its feedback mode, and the
- * {@link PracticeDefinitionPreview} the catalog drawer uses. Practice setup's panel and the practice
- * sheet of Practice reviews both show it, so a practice reads the same in both places; changing it
- * is Practice setup's form.
- */
 export function WorkspacePracticeDefinition({
 	practice,
 	definitionOptions,

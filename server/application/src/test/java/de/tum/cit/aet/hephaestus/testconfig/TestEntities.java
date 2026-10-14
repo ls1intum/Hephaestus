@@ -124,7 +124,6 @@ public final class TestEntities {
         return provider;
     }
 
-    /** An {@link ReviewJob} with no fields set (mutate as needed). */
     public static ReviewJob reviewJob() {
         return new ReviewJob();
     }

@@ -17,14 +17,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Materialises {@code inputs/context/user.json} for {@link MentorContextRequest}.
- *
- * <p>The provider does NOT decide whether a piece of data is relevant — the agent does, given the
- * full week/last-week numbers and a small set of pre-generated insight strings.
- *
- * <p>Personal context is read for each turn, not retained in a formatted-content cache.
- */
+// Read personal context for each turn; a formatted cache could retain stale personal data.
 @Component
 @RequiredArgsConstructor
 public class UserContentSource implements ContentSource {

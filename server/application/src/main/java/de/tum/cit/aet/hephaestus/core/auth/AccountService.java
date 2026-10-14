@@ -23,11 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Account read + lifecycle operations behind the {@code /user} and {@code /admin/users}
- * controllers. Owns the data-layer access so the controllers stay thin and never touch a repository
- * directly (enforced by {@code ArchitectureTest.controllersDoNotAccessRepositories}).
- */
 @ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("Account operations are user/system-scoped, not workspace-scoped")

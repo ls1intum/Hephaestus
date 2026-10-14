@@ -15,11 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
-/**
- * Pins GitLab's disconnect wiring. Disconnect is GitLab's ONLY erase trigger (a PAT has no
- * vendor-side uninstall signal), so a regression here means GitLab-mirrored data becomes unerasable
- * short of manual SQL.
- */
+// A GitLab PAT has no provider uninstall event; disconnect must erase the mirrored content.
 class GitLabConnectionStrategyTest extends BaseUnitTest {
 
     @Mock

@@ -42,8 +42,6 @@ class PracticeTrendTest {
                         clean(3L, "2026-05-03T09:00:00Z"))
                 .cleanWork();
 
-        // The verdictless piece neither breaks the run nor counts: two clean, two applicable, since the older clean
-        // one.
         assertThat(cleanWork.count()).isEqualTo(2);
         assertThat(cleanWork.decidedWork()).isEqualTo(2);
         assertThat(cleanWork.since()).isEqualTo(Instant.parse("2026-05-01T09:00:00Z"));

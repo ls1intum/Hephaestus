@@ -78,7 +78,6 @@ class WorkerJwtTest extends BaseUnitTest {
         assertThat(jwt.expiresAt()).isEqualTo(deadline);
     }
 
-    /** The job has one credential: its practice programs' direct model calls use the review's own scope. */
     @Test
     void shouldCarryOnlyTheProxyScopeWhenIssuedUntilADeadline() {
         Instant deadline = Instant.now().plusSeconds(600);

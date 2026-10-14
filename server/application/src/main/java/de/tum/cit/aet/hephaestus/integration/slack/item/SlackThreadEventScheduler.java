@@ -58,6 +58,7 @@ public class SlackThreadEventScheduler {
 
     @Scheduled(cron = "0 */5 * * * *")
     @SchedulerLock(name = "conversation-thread-review", lockAtMostFor = "PT10M", lockAtLeastFor = "PT30S")
+    @WorkspaceAgnostic("Discovers Slack thread candidates globally and records each event with its workspace")
     public void sweep() {
         sweepNow();
     }

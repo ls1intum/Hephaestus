@@ -72,7 +72,6 @@ describe("WorkspaceLlmConnectionFormDialog", () => {
 			await screen.findByRole("option", { name: "Rerank API (Cohere-compatible)" }),
 		);
 		screen.getByText("Choose a provider that reports token usage, or set No metered API cost.");
-		// OpenAI serves no rerank API, so its address is gone and the admin names the endpoint.
 		expect(screen.getByLabelText<HTMLInputElement>("Base URL").value).toBe("");
 		fireEvent.change(screen.getByLabelText("Base URL"), {
 			target: { value: "https://rerank.example.test/v1" },

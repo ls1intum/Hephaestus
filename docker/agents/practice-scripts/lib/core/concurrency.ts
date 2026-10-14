@@ -1,4 +1,3 @@
-/** Model calls in flight across all scripts, and the packs of one `classify` in flight. */
 export const MODEL_CONCURRENCY = 4;
 
 /**

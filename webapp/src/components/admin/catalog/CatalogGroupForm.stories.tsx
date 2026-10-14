@@ -16,10 +16,6 @@ import { catalogGroup } from "./fixtures";
 
 const group = catalogGroup();
 
-/**
- * A level of the instance catalog's drawer stack, so the catalog stays on screen while a group is
- * written — and so these stories exercise the surface people actually get.
- */
 const meta = {
 	component: CatalogGroupForm,
 	parameters: { layout: "fullscreen", chromatic: { viewports: [1440] } },
@@ -62,8 +58,6 @@ export const Edit: Story = { args: { mode: "edit", group } };
 
 export const HephaestusUpdateAvailable: Story = {
 	play: async () => {
-		// The same banner as the practice editor's, and the same way to get it wrong: rendered beside
-		// `DrawerBody` instead of inside it, it lands on the unpadded panel.
 		await expectPanelContentInset(await settledDrawerPanel());
 	},
 	args: {
@@ -82,7 +76,6 @@ export const HephaestusUpdateAvailable: Story = {
 	},
 };
 
-/** A read behind the form failed to refresh. The draft stays open beside the retry. */
 export const RefreshFailed: Story = {
 	args: {
 		mode: "edit",
@@ -106,6 +99,7 @@ export const RefreshFailed: Story = {
 export const StaleEdit: Story = {
 	args: { mode: "edit", group, conflict: true, onContinueWithDraft: fn() },
 	play: async () => {
+		await settledDrawerPanel();
 		await expect(screen.getByText("This group changed while you were editing")).toBeVisible();
 		await expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
 	},

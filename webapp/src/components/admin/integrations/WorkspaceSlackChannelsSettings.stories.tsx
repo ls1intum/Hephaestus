@@ -125,7 +125,6 @@ export const WithOptOuts: Story = {
 			return row;
 		};
 		within(rowFor("team-standup")).getByText("2");
-		// 0 is rendered as a fact members can trust rather than blanked out.
 		within(rowFor("team-intro")).getByText("0");
 	},
 };

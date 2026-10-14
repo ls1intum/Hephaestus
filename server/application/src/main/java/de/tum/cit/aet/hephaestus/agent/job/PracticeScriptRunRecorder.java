@@ -29,11 +29,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Records what each admitted practice's program did in one attempt, from the runner's
- * {@link SandboxLayout#PRACTICE_SCRIPT_REPORT_FILE}: its own script when the job admitted it at a revision that holds
- * one, else the built-in review.
- */
 @Component
 @ConditionalOnWorkerRole
 @RequiredArgsConstructor

@@ -506,11 +506,12 @@ public class ScanQueryService {
 
     private List<ProblemRow> problemRows(
             Review review, ProblemFilter filter, @Nullable ScanReportCursor after, int limit) {
+        var next = after;
         var frozen = reports.recorded(review);
         var pinned = frozen.practices().stream().collect(Collectors.toMap(p -> Long.parseLong(p.practiceId()), p -> p));
         var output = new ArrayList<ProblemRow>();
         while (output.size() < limit) {
-            var keys = membershipQuery.problems(review, after, 256, filter);
+            var keys = membershipQuery.problems(review, next, 256, filter);
             if (keys.isEmpty()) break;
             var rows = results
                     .findByWorkspaceIdAndIdIn(
@@ -555,7 +556,7 @@ public class ScanQueryService {
                 if (output.size() == limit) break;
             }
             if (keys.size() < 256) break;
-            after = keys.getLast().cursor();
+            next = keys.getLast().cursor();
         }
         return List.copyOf(output);
     }

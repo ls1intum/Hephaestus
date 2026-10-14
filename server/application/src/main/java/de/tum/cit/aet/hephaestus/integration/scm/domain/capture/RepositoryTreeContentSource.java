@@ -33,7 +33,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class RepositoryTreeContentSource {
 
-    /** The captured repository checkout, cited by the HEAD witness it was pinned at. */
     public static final SourceKind KIND = new SourceKind("scm.repository.tree");
 
     public Set<SourceKind> sourceKinds() {

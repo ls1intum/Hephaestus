@@ -245,11 +245,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
                 Objects.requireNonNull(reloaded(comment).getIssue()).getId());
     }
 
-    /**
-     * GitHub numbers issues and pull requests in one space per repository: a stored pull request is
-     * the parent of a comment on its number, even beside an issue row with that number and a
-     * different native id.
-     */
+    // GitHub shares issue and pull-request numbers; the stored pull request determines a comment's canonical parent.
     @Nested
     class CanonicalPullRequestParent {
 

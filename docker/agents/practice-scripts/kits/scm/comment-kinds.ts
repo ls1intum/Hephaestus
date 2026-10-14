@@ -20,7 +20,6 @@ export interface AddedComment {
 
 const AROUND = 6;
 
-/** Each run of added comment lines in a hand-written source file, with the added code around it. */
 export function addedComments(change: ReadonlyMap<string, DiffFile>): AddedComment[] {
 	const found: AddedComment[] = [];
 	for (const [path, file] of change) {
@@ -66,7 +65,6 @@ export function addedComments(change: ReadonlyMap<string, DiffFile>): AddedComme
 	return found;
 }
 
-/** The kinds a comment can be. A practice decides in code which kinds deserve a look. */
 export const commentKinds: QuestionSet<AddedComment> = {
 	name: "comment kind",
 	noun: "added code comment with the code around it",

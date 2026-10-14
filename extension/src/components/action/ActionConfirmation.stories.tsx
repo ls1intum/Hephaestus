@@ -135,7 +135,6 @@ export const Narrow: Story = {
 
 export const Dark: Story = { globals: { theme: "dark" } };
 
-/** A GitLab pull request is a merge request, in GitLab's own word. */
 export const OnGitLab: Story = {
 	args: { state: { status: "ready", preview: { ...REQUEST, item: READY.item } } },
 	play: async ({ canvas }) => {

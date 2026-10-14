@@ -31,7 +31,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Every scan status, so the badges and the counts can be compared row by row. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		const rows = canvas.getAllByRole("row").slice(1);
@@ -41,7 +40,6 @@ export const Default: Story = {
 			return;
 		}
 		await expect(within(queued).getByText("Queued")).toBeVisible();
-		// The version is the branch and a short commit.
 		await expect(within(complete).getByText("main")).toBeVisible();
 		await expect(within(complete).getByText("· 4f2a9c1", { exact: false })).toBeVisible();
 		await expect(within(running).getByText("Ada Lovelace")).toBeVisible();

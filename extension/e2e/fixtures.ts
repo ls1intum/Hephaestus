@@ -109,7 +109,6 @@ export const test = base.extend<{ context: BrowserContext; worker: Worker }>({
 
 export const OPTIONS_URL = `chrome-extension://${EXTENSION_ID}/options.html`;
 
-/** Connects the extension to the suite's server and signs in through development sign-in. */
 export async function signIn(
 	context: BrowserContext,
 	username: string,

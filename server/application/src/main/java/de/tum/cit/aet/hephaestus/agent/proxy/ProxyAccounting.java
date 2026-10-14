@@ -81,11 +81,7 @@ public class ProxyAccounting {
         return countedRefusal(budgetGate.isDirectModelCapReached(attempt), routing, "practice_script_attempt");
     }
 
-    /**
-     * Counted by the cap that refused, because different people fix each one: an admin raises a monthly
-     * budget ({@link UsageFundingSource#capTag}), and an operator raises the per-attempt direct model token or
-     * search unit limit ({@code practice_script_attempt}).
-     */
+    // Monthly and per-attempt limits have different owners; count refusal against the cap that blocked it.
     private boolean countedRefusal(boolean refused, ProxyRouting routing, String cap) {
         if (refused) {
             meterRegistry

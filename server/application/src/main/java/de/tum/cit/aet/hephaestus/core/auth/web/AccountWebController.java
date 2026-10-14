@@ -25,10 +25,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * The current-user singleton: identity, linked accounts, and GDPR account deletion. Thin HTTP
- * adapter — all data access lives in {@link AccountService}.
- */
 @ConditionalOnServerRole
 @RestController
 @RequestMapping("/user")

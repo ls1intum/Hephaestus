@@ -30,20 +30,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/**
- * Integration tests for GitLabMilestoneProcessor.
- *
- * <p>Tests the processor independently from the webhook handler to verify:
- *
- * <ul>
- *   <li>Milestone upsert logic (create vs update)
- *   <li>State mapping: GitLab {@code "active"} &rarr; OPEN, {@code "closed"} &rarr; CLOSED
- *   <li>Domain event publishing (MilestoneCreated, MilestoneUpdated, MilestoneDeleted)
- *   <li>Due date parsing (date-only string &rarr; Instant at midnight UTC)
- *   <li>Group milestone deterministic nativeId
- *   <li>htmlUrl construction (GraphQL webPath vs webhook projectWebUrl)
- * </ul>
- */
 @DisplayName("GitLab Milestone Processor")
 class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 

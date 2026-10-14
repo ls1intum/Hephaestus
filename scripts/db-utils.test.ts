@@ -310,15 +310,14 @@ process.on("beforeExit", () => {
 					],
 					{
 						encoding: "utf8",
-						env: {
-							...process.env,
+						env: environmentForGitFixture({
 							CI: String(ci),
 							POSTGRES_HOST: "127.0.0.1",
 							POSTGRES_PORT: "55432",
 							POSTGRES_DB: "external-test",
 							POSTGRES_USER: "external-user",
 							POSTGRES_PASSWORD: "external-password",
-						},
+						}),
 					},
 				);
 				assert.equal(result.status, 0, result.stdout + result.stderr);

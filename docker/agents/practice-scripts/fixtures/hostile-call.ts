@@ -1,5 +1,3 @@
-// A model call that the library never sends: its options have no JSON form. The program then waits
-// for the host to stop it.
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({

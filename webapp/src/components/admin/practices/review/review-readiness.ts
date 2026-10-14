@@ -96,10 +96,6 @@ export function reviewRunningDescription(running: ReviewRunningState): string {
 	return `Practice reviews are on and ${model}. Each developer’s AI choice still decides whether it runs for them. Feedback mode decides separately where results become feedback.`;
 }
 
-/**
- * The strictest ready review binding: it is the one within the most developers' AI choices, so it is
- * the one the banner names. Falls back to any review binding so a blocked state still names one.
- */
 export function availableReviewBinding(bindings: AgentBinding[]): AgentBinding | undefined {
 	const reviews = bindings.filter((binding) => binding.purpose === "PRACTICE_REVIEW");
 	const ready = reviews

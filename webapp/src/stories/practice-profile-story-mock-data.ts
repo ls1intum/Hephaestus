@@ -1,10 +1,3 @@
-/**
- * The developer's practice profile as the wire carries it, for the stories and the tests: the
- * reviewed work every practice-profile fixture names, the workspace's groups, the developer's
- * standing in each and on each practice, and one overview — the events behind the group and practice
- * sentences, the latest-review chip and the practices going well — on the same groups and practices
- * as the feedback card fixtures. The pages read the server.
- */
 import type {
 	GoingWellPractice,
 	GroupRef,
@@ -20,16 +13,9 @@ import { ITEM_KIND } from "@/lib/item-kinds";
 
 import { inStoryYear } from "./story-clock";
 
-/**
- * Items as the wire names them, for every practice-profile fixture. The pull requests and
- * issues are real ones in the development workspace's test repositories, so every link lands on
- * the page it names; the prose around them is the mockup's. A conversation has no page there and
- * stays plain text until the wire contract carries an address for it.
- */
 const PULL_REQUESTS = "https://github.com/HephaestusTest/practice-validation/pull/";
 const ISSUES = "https://github.com/HephaestusTest/MaxTestRepo/issues/";
 
-/** An item with nothing but what every fixture below names; the rest is absent. */
 const item = (fields: Pick<ItemRef, "id" | "kind" | "label"> & Partial<ItemRef>): ItemRef => ({
 	parentId: null,
 	provider: null,
@@ -41,7 +27,6 @@ const item = (fields: Pick<ItemRef, "id" | "kind" | "label"> & Partial<ItemRef>)
 	...fields,
 });
 
-/** A pull request; its workspace item id is its number offset, so ids never collide across kinds. */
 export const pullRequest = (number: number): ItemRef =>
 	item({
 		id: String(1000 + number),
@@ -62,7 +47,6 @@ export const issue = (number: number): ItemRef =>
 		container: "HephaestusTest/MaxTestRepo",
 	});
 
-/** A Slack thread in a channel by name, "#releases"; its id is the channel's place in the list. */
 const CHANNELS = ["#releases", "#incidents", "#backend-review"];
 
 export const conversation = (label: string): ItemRef =>
@@ -73,7 +57,6 @@ export const conversation = (label: string): ItemRef =>
 		label,
 	});
 
-/** An Outline document by title; the title is its label. */
 export const document = (id: number, title: string): ItemRef =>
 	item({
 		id: String(4000 + id),
@@ -156,7 +139,6 @@ export const groupStandings: Record<string, PracticeGroupStanding> = {
 	"testing-discipline": groupStanding("testing-discipline", "NOT_OBSERVED"),
 };
 
-/** A standing with nothing but what a fixture names; no trend, no results and no guidance. */
 export const practiceStandingOf = (
 	fields: Pick<PracticeStanding, "slug" | "name" | "standing"> & Partial<PracticeStanding>,
 ): PracticeStanding => ({
@@ -294,7 +276,6 @@ export const practiceStandings: PracticeStanding[] = Object.values(practicesByGr
 
 const LATEST_REVIEW_AT = inStoryYear("09-09T14:10");
 
-/** The newest review of the reader's work, which the header's chip names. */
 export const LATEST_REVIEW: ProfileReviewRef = {
 	reviewId: "5d1e2a3b-0000-4000-8000-000000000909",
 	at: LATEST_REVIEW_AT,
@@ -457,12 +438,6 @@ const REVIEWING_CHANGES: ProfileChange[] = [
 	),
 ];
 
-/**
- * A review in which three practices of one group made the same move and a fourth made its own: what
- * the "All practice groups" table's group cell has to say in three bullets rather than six. One group moved
- * where a practice under it moved, so it rides on that practice's bullet; the other moved where
- * none of its practices did, so it is a bullet of its own.
- */
 export const SHARED_TRANSITION_OVERVIEW: PracticeProfileOverview = {
 	latestReview: LATEST_REVIEW,
 	goingWell: [],
@@ -555,7 +530,6 @@ export const GOING_WELL: GoingWellPractice[] = [
 	},
 ];
 
-/** One supporting result, recorded by the latest review on `on`. */
 function goingWellEvidence(on: ItemRef): GoingWellPractice["evidence"][number] {
 	return {
 		resultId: `0b9c6f0e-0000-4000-8000-00000000${on.id.padStart(4, "0")}`,
@@ -565,7 +539,6 @@ function goingWellEvidence(on: ItemRef): GoingWellPractice["evidence"][number] {
 	};
 }
 
-/** The overview the stories show: one review, eleven changes, one of them a group moving. */
 export const OVERVIEW_FIXTURE: PracticeProfileOverview = {
 	latestReview: LATEST_REVIEW,
 	goingWell: GOING_WELL,

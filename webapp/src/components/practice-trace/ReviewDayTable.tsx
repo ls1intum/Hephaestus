@@ -14,10 +14,8 @@ import { hasText } from "@/lib/text";
 import { reviewLead, reviewReach, type ReviewSaw } from "./review-saw";
 import { ReviewOrdinalTag } from "./review-tags";
 
-/** A column of a reviews table after Reviewed and Work, which every reviews table has. */
 export type ReviewColumn = RecordTableColumn;
 
-/** The heads every reviews table starts with: the review's time under `timeLabel`, then the work. */
 function leadColumns(timeLabel: string): RecordTableColumn[] {
 	return [{ label: timeLabel, className: "w-24 whitespace-nowrap" }, { label: "Work" }];
 }
@@ -29,24 +27,14 @@ export interface ReviewDayTableProps<TReview> {
 	 * is when the review was asked for, "Reviewed" where it is when it finished.
 	 */
 	timeLabel?: string;
-	/** The heads after Reviewed and Work; each row draws a cell under every one. */
 	columns: readonly ReviewColumn[];
-	/** Newest first, as the wire orders them. */
 	reviews: readonly TReview[];
-	/** The moment a row is listed at, which picks its day. */
 	dateOf: (review: TReview) => Date;
 	reviewKey: (review: TReview) => string;
-	/** One `PracticeTableRow`: `RecordTimeCell`, `ReviewItemCell`, then a cell per column. */
 	renderRow: (review: TReview) => ReactNode;
-	/** What the table says when there are no reviews, inside a cell across every column. */
 	empty: ReactNode;
 }
 
-/**
- * Reviews one body per day under its heading, so a row carries the time alone. The developer's
- * own reviews and the admin's list of every review are drawn in it, so one review reads alike on
- * both.
- */
 export function ReviewDayTable<TReview>({
 	timeLabel = "Reviewed",
 	columns,
@@ -71,7 +59,6 @@ export interface ReviewDayTableSkeletonProps {
 	rows: number;
 }
 
-/** The table's frame and head with placeholder rows, while the first page loads. */
 export function ReviewDayTableSkeleton({
 	timeLabel = "Reviewed",
 	columns,
@@ -82,20 +69,16 @@ export function ReviewDayTableSkeleton({
 
 export interface ReviewItemCellProps {
 	item: ItemRef;
-	/** The review's place among the reviews of its item, which tags a later one "Review 2". */
 	position?: number;
-	/** How many reviews the item has, which makes it "Review 2 of 3". */
 	total?: number;
 	/**
 	 * `false` names the item as plain text, for a list whose row opens one thing: the review's
 	 * level links the item to its provider.
 	 */
 	linked?: boolean;
-	/** Chips beside the item's label, such as the states a list marks a review with. */
 	children?: ReactNode;
 }
 
-/** The item by its provider's icon and label, linked to the provider, with its title under it. */
 export function ReviewItemCell({
 	item,
 	position,
@@ -135,11 +118,9 @@ export function ReviewItemCell({
 
 export interface ReviewSawCellProps {
 	saw: ReviewSaw;
-	/** The feedback it left and the tags it wears, on one wrapping line under the reach. */
 	children?: ReactNode;
 }
 
-/** What the review saw: the practices Not met by name, then how it decided the rest. */
 export function ReviewSawCell({ saw, children }: ReviewSawCellProps) {
 	const reach = reviewReach(saw);
 	return (

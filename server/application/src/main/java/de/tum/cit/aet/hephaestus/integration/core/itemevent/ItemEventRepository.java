@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.itemevent;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +39,7 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
             value =
                     "SELECT * FROM item_event WHERE state IN ('RECORDED','WAITING','BLOCKED') AND (retry_at IS NULL OR retry_at <= :now) ORDER BY occurred_at, id FOR UPDATE SKIP LOCKED LIMIT :limit",
             nativeQuery = true)
+    @WorkspaceAgnostic("Background reaper claims due events across workspaces and preserves each event workspace")
     List<ItemEvent> claimDue(@Param("now") Instant now, @Param("limit") int limit);
 
     @Modifying
@@ -64,6 +66,7 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
     @Modifying
     @Query(
             "UPDATE ItemEvent e SET e.state = de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.EXPIRED, e.reason = 'PENDING_DEADLINE_EXCEEDED', e.decidedAt = :now, e.retryAt = NULL WHERE e.state IN (de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.RECORDED, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.WAITING, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.BLOCKED) AND e.occurredAt < :before")
+    @WorkspaceAgnostic("Background reaper expires pending events across workspaces at the configured deadline")
     int expire(@Param("before") Instant before, @Param("now") Instant now);
 
     @Modifying
@@ -71,5 +74,6 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
             value =
                     "DELETE FROM item_event WHERE id IN (SELECT e.id FROM item_event e WHERE e.state IN ('STARTED','WITHHELD','EXPIRED') AND e.decided_at < :before AND NOT EXISTS (SELECT 1 FROM review r WHERE r.workspace_id=e.workspace_id AND r.event_id=e.id) ORDER BY e.decided_at,e.id LIMIT :limit)",
             nativeQuery = true)
+    @WorkspaceAgnostic("Background reaper removes only retained terminal events without a review reference")
     int deleteUnreferenced(@Param("before") Instant before, @Param("limit") int limit);
 }

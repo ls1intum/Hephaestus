@@ -308,10 +308,6 @@ class ConfigurationReadinessEvaluatorTest extends BaseUnitTest {
         assertStatus(facts, "webhook.shared-secret", ConfigurationStatus.ACTION_REQUIRED);
     }
 
-    /**
-     * The heading anchors the documentation site generates: lower-cased, punctuation dropped,
-     * spaces to hyphens.
-     */
     private static Set<String> guideSections() throws IOException {
         Pattern heading = Pattern.compile("^#{2,6} (.+)$");
         Set<String> anchors = new HashSet<>();

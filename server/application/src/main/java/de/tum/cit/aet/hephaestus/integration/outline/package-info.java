@@ -1,4 +1,3 @@
-/** Outline mirrors workspace documents, records item events, and supplies consent-gated capture. */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Integration · Outline",
         allowedDependencies = {

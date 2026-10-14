@@ -355,10 +355,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("TextEnd");
     }
 
-    /** The result {@code runner_link_result.json} links. */
     private static final UUID FIXTURE_RESULT = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
-    /** The problem {@code runner_link_problem.json} links. */
     private static final UUID FIXTURE_OBSERVATION = UUID.fromString("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
 
     @Test

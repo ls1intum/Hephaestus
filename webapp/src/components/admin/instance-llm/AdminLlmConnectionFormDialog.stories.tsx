@@ -60,7 +60,6 @@ export const AddRerankConnection: Story = {
 		await expect(screen.getByRole("combobox", { name: "API" })).toHaveAccessibleDescription(
 			"Choose a provider that reports token usage, or set No metered API cost.",
 		);
-		// OpenAI serves no rerank API: the preset moves to Other and the admin names the endpoint.
 		const baseUrl = screen.getByLabelText("Base URL");
 		await expect(baseUrl).toHaveValue("");
 		await userEvent.type(baseUrl, "https://rerank.example.test/v1");
@@ -123,7 +122,6 @@ export const EmbeddingsProbeListsNoModels: Story = {
 	},
 };
 
-/** A refused key on an endpoint for practice scripts is a real fault, so it keeps the server's words. */
 export const EmbeddingsProbeRefused: Story = {
 	args: {
 		editing: embeddingsConnection,

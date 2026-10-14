@@ -14,7 +14,6 @@ import {
 	tableFeatures,
 } from "@tanstack/react-table";
 
-/** What a column says about its own header and cells; `DataTableHeader` and the table's body read it. */
 export interface DataTableColumnMeta {
 	/**
 	 * Right-aligned tabular figures, as `TableCell numeric`. The header's sort icon goes before the

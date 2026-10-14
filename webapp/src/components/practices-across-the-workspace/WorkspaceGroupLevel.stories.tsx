@@ -57,11 +57,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The head carries the crumb and the group; each practice shows how many developers have results
- * in it and how they came out. The way to the group in the reader's profile is the level's footer,
- * which the route adds.
- */
 export const Default: Story = {
 	play: async ({ args }) => {
 		const panel = await settledDrawerPanel();
@@ -85,7 +80,6 @@ export const Default: Story = {
 	},
 };
 
-/** No review has produced a result yet: each practice says so, and still opens in the profile. */
 export const NoResultsYet: Story = {
 	args: {
 		state: {

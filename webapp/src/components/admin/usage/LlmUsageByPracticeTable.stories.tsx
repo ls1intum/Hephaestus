@@ -20,7 +20,6 @@ const TABLE_NAME = "Spend on models for practice scripts, by practice";
 
 const priced = withPracticeScriptUsage(withOwnProvider(usageReport()));
 
-/** `find`, not `get`: the preview's router mounts the story after the play function starts. */
 async function tableIn(canvas: StoryContext["canvas"]): Promise<HTMLElement> {
 	return canvas.findByRole("table", { name: TABLE_NAME });
 }
@@ -29,14 +28,12 @@ async function rowNamed(canvas: StoryContext["canvas"], name: RegExp): Promise<H
 	return within(await tableIn(canvas)).getByRole("row", { name });
 }
 
-/** Rendered text, the hidden zeros that line up an average column's decimal points included. */
 function cellTexts(row: HTMLElement): string[] {
 	return within(row)
 		.getAllByRole("cell")
 		.map((cell) => cell.textContent);
 }
 
-/** The practice column top to bottom, between the two header rows and the footer. */
 async function practiceOrder(canvas: StoryContext["canvas"]): Promise<string[]> {
 	return within(await tableIn(canvas))
 		.getAllByRole("row")
@@ -45,15 +42,7 @@ async function practiceOrder(canvas: StoryContext["canvas"]): Promise<string[]> 
 		.map((row) => within(row).getAllByRole("cell")[0]?.textContent ?? "");
 }
 
-/**
- * What the decision, embedding and reranking calls of each practice's script cost, one
- * row per practice. That spend is already inside the run types, so this table is a split of it, never
- * an addition to it. The footer is the server's own total: one review runs several practices, so
- * its reviews do not add up from the rows.
- *
- * Each purse heads its own Spend and Avg per review, so a cell holds one figure and two people's
- * money is never read as one sum.
- */
+/** Per-practice spend is already included in review totals; it must not be added again. */
 const meta = {
 	component: LlmUsageByPracticeTable,
 	parameters: { layout: "padded" },
@@ -64,11 +53,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The purse names group their columns, so only the leaf columns sort and carry `aria-sort`. With
- * every call priced, there is no *Unavailable cost* column. The two purses' Spend buttons are
- * told apart by name.
- */
 export const Priced: Story = {
 	play: async ({ canvas }) => {
 		const table = within(await tableIn(canvas));
@@ -96,8 +80,6 @@ export const Priced: Story = {
 		await expect(table.queryByRole("columnheader", { name: "Unavailable cost" })).toBeNull();
 
 		const row = await rowNamed(canvas, /^Comments explain why/u);
-		// Nothing spent on the own provider still averages: $0.000, not a dash. Each average column
-		// shows three decimals, because *Not attributed* averages half a cent.
 		await expect(cellTexts(row)).toStrictEqual([
 			"Comments explain why",
 			"Decision model",
@@ -117,7 +99,6 @@ export const Priced: Story = {
 	},
 };
 
-/** A single row has no footer: it would restate the line above it. */
 export const OneRow: Story = {
 	args: { report: { ...priced, byPractice: [commentQualityUsage] } },
 	play: async ({ canvas }) => {
@@ -127,10 +108,6 @@ export const OneRow: Story = {
 	},
 };
 
-/**
- * Most shared-model spend first; any leaf column re-sorts, a figure biggest first. *Not attributed*
- * is not a practice, so it stays last in both directions.
- */
 export const Sorted: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await expect(await practiceOrder(canvas)).toStrictEqual([
@@ -165,7 +142,6 @@ export const Sorted: Story = {
 	},
 };
 
-/** Two purses on one practice: each averaged in its own column, never summed. */
 export const SharedAndOwnProvider: Story = {
 	args: { report: { ...priced, byPractice: [expectedBehaviourUsage] } },
 	play: async ({ canvas }) => {
@@ -176,7 +152,6 @@ export const SharedAndOwnProvider: Story = {
 	},
 };
 
-/** A workspace without a provider of its own reads no columns of $0. */
 export const OwnProviderAbsent: Story = {
 	args: {
 		purses: ["SHARED"],
@@ -200,12 +175,7 @@ export const OwnProviderAbsent: Story = {
 	},
 };
 
-/**
- * A reranker that reports no tokens: the reviews that called it are counted under *Unavailable cost*,
- * and the row has no average: its $0.00 is not a known cost.
- * The column is there only while some row has such a review. Its header wraps onto two lines, so at
- * the width of a 1280 px screen the table still shows every column without scrolling.
- */
+/** Missing rerank usage is unknown cost; zero tokens cannot establish a free run. */
 export const UnpricedReviews: Story = {
 	decorators: [
 		(Story) => (
@@ -237,12 +207,10 @@ export const UnpricedReviews: Story = {
 		const cells = cellTexts(await rowNamed(canvas, /small-pull-requests/u));
 		await expect(cells[7]).toBe("2");
 		await expect(cells[3]).toBe("—");
-		// The footer's label is a row header, so its cells start at Models.
 		await expect(cellTexts(await rowNamed(canvas, /^Total/u))[6]).toBe("2");
 	},
 };
 
-/** *No metered API cost*: a confirmed $0.00 with nothing missing, which averages to $0.00. */
 export const NoChargeConfirmed: Story = {
 	args: { report: { ...priced, byPractice: [noChargeUsage] } },
 	play: async ({ canvas }) => {
@@ -272,7 +240,6 @@ export const NotAttributed: Story = {
 	},
 };
 
-/** A practice deleted since its reviews ran keeps its row under its slug, without a link. */
 export const NotACurrentPractice: Story = {
 	args: { report: { ...priced, byPractice: [commentQualityUsage, deletedPracticeUsage] } },
 	play: async ({ canvas }) => {
@@ -282,11 +249,7 @@ export const NotACurrentPractice: Story = {
 	},
 };
 
-/**
- * The footer reads the server's total: 31 reviews, where the rows add up to 41, because a review
- * that ran several scripts counts once. Its averages are the total's own, and its label is a row
- * header.
- */
+/** Use server totals: one review can run several scripts and still counts once. */
 export const Totals: Story = {
 	play: async ({ canvas }) => {
 		const footer = await rowNamed(canvas, /^Total/u);
@@ -305,11 +268,6 @@ export const Totals: Story = {
 	},
 };
 
-/**
- * A cheap embedding model costs a fraction of a cent per review, which is what the average is for.
- * Its column shows the four decimals that model needs on every row and the total, so the decimal
- * points line up; the spend beside it stays in cents.
- */
 export const SubCentAverage: Story = {
 	args: {
 		purses: ["SHARED"],
@@ -353,7 +311,6 @@ export const Loading: Story = {
 	args: { report: undefined },
 	play: async ({ canvas }) => {
 		const table = await tableIn(canvas);
-		// Two header rows over three placeholder rows.
 		await expect(within(table).getAllByRole("row")).toHaveLength(5);
 		await expect(within(table).queryByRole("link")).toBeNull();
 	},
@@ -381,17 +338,13 @@ export const MobileReflow: Story = {
 		scroller.scrollLeft = scroller.scrollWidth;
 		await expect(practice.getBoundingClientRect().left).toBe(before);
 
-		// Nothing that scrolled under the practice column shows through it: a header's sort icon
-		// included. Each cell of the column is on top across its whole width, in every row.
 		const firstCells = [...table.querySelectorAll<HTMLElement>("th, td")].filter(
 			(cell) => getComputedStyle(cell).position === "sticky",
 		);
-		// The header, four practices and the total.
 		await expect(firstCells).toHaveLength(6);
 		const showingThrough = firstCells.flatMap((cell) => {
 			const box = cell.getBoundingClientRect();
 			const points: string[] = [];
-			// Clear of the frame's rounded corner, which clips the corner cells.
 			for (let x = box.left + 4; x < box.right - 1; x += 3) {
 				for (let y = box.top + 4; y < box.bottom - 1; y += 3) {
 					const hit = document.elementFromPoint(x, y);

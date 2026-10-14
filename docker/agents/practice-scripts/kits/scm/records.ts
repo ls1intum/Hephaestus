@@ -24,9 +24,7 @@ export const pullRequestRecordSchema = z.object({
 	provider_id: z.int().positive().optional(),
 	source_branch: z.string(),
 	target_branch: z.string(),
-	/** The reviewed head. */
 	commit_sha: z.string().regex(COMMIT),
-	/** Absent when the job does not carry the text: then it is not known. */
 	title: z.string().optional(),
 	body: z.string().nullable().optional(),
 	state: z.enum(["OPEN", "CLOSED", "MERGED"]).optional(),
@@ -41,7 +39,6 @@ export const pullRequestRecordSchema = z.object({
 	changed_files: z.int(),
 	author: z.string().optional(),
 	author_id: z.int().optional(),
-	/** The provider classified the author as automation. */
 	author_bot: z.literal(true).optional(),
 	merged_by: z.string().optional(),
 	labels: z.array(z.string()),
@@ -51,7 +48,6 @@ export const pullRequestRecordSchema = z.object({
 	merge_state_status: z.string().optional(),
 	/** Only the GraphQL sync fills it. */
 	review_decision: z.string().optional(),
-	/** What the checks or the pipeline said about the reviewed head: `CheckState`. */
 	head_checks: notKnownWhenUnnamed([
 		"SUCCESS",
 		"FAILURE",
@@ -63,7 +59,6 @@ export const pullRequestRecordSchema = z.object({
 	]),
 });
 
-/** `metadata.json` of an issue: `IssueContentSource`. */
 export const issueRecordSchema = z.object({
 	issue_number: z.int(),
 	title: z.string().nullable(),

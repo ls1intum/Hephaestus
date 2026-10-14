@@ -21,14 +21,6 @@ export type DeliveryState = ReviewFeedback["state"];
 
 export type DeliveryFacts = Pick<ReviewFeedback, "destination" | "state" | "stopReason">;
 
-/**
- * **What happened** to a piece of feedback: its delivery. The second delivery axis;
- * `feedback-destination-defs` is the first, and a cell shows one or the other, never a value from
- * each. A partial package is no state of its own: its copy counts say which copies landed.
- *
- * <p>Keyed by the stored state, because that is what the list endpoint filters on. What a *row*
- * renders is {@link deliveryOutcome}, which refines `READY` and `DELIVERED` per destination.
- */
 export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
 	AWAITING_APPROVAL: {
 		label: "Awaiting approval",
@@ -81,13 +73,7 @@ export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
 	},
 };
 
-/**
- * The rows where the stored state under-describes what happened, per destination.
- *
- * <p>Each label **must begin with the label of the state it refines**. The state facet can only
- * offer the stored states, so a badge whose words share no stem with any option leaves a reader
- * unable to find the filter for the row in front of them.
- */
+// Refined delivery labels must begin with the base state label so filters still match what rows say.
 const CONVERSATION_OVERRIDES = {
 	READY: {
 		label: "Ready for conversation",
@@ -109,11 +95,7 @@ const CONVERSATION_OVERRIDES = {
 	},
 } as const satisfies Record<string, StatusDef>;
 
-/**
- * A practice page delivers nothing by itself: the developer opening their own practice pages is
- * the delivery. Saying "waiting for their next chat" about one of these rows would describe an
- * event that will never happen to it.
- */
+// Practice-page feedback is delivered when its developer opens the page; conversation feedback waits for a turn.
 const PRACTICE_PAGE_READY: StatusDef = {
 	label: "Ready for their practice pages",
 	icon: UserRoundIcon,
@@ -129,7 +111,6 @@ const ON_WORK_READY: StatusDef = {
 	description: "It is cleared to send. Provider delivery is in progress and may be retried safely.",
 };
 
-/** What a row should say became of this feedback. */
 export function deliveryOutcome(feedback: DeliveryFacts): StatusDef {
 	const { destination, state, stopReason } = feedback;
 	if (destination === "CONVERSATION") {
@@ -149,7 +130,6 @@ export function deliveryOutcome(feedback: DeliveryFacts): StatusDef {
 	return DELIVERY_STATE_DEFS[state];
 }
 
-/** Still on its way out: cleared to send at a destination that sends by itself. */
 export function isDeliveryInProgress(feedback: DeliveryFacts): boolean {
 	return feedback.state === "READY" && feedback.destination === "ON_WORK";
 }

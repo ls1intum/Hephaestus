@@ -124,6 +124,10 @@ public class ThreadItemSource implements ItemSource, ItemSourceAccess {
     @Override
     @Transactional(readOnly = true)
     public Optional<ItemSnapshot> current(ItemRef item) {
+        return currentSnapshot(item);
+    }
+
+    private Optional<ItemSnapshot> currentSnapshot(ItemRef item) {
         if (!supports(item)) return Optional.empty();
         Long sourceId = item.sourceId();
         if (sourceId == null) return Optional.empty();
@@ -183,8 +187,9 @@ public class ThreadItemSource implements ItemSource, ItemSourceAccess {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ItemSnapshot pin(ItemRef item, @Nullable ItemVersion requested) {
-        ItemSnapshot snapshot = current(item)
+        ItemSnapshot snapshot = currentSnapshot(item)
                 .orElseThrow(
                         () -> new ItemCaptureException(ItemCaptureCode.ITEM_NOT_VISIBLE, "Thread is not available"));
         if (requested != null && !requested.equals(snapshot.version()))

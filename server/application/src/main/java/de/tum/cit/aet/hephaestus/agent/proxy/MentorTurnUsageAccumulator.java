@@ -15,19 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Adds one proxied call's token usage to the mentor turn that made it — the mentor's counterpart to
- * {@link ProxyUsageAccumulator}, writing to the {@code chat_message} row instead of an
- * {@code review_job} one. Runs in its own {@code REQUIRES_NEW} transaction: the proxy servlet thread
- * has no ambient transaction, and the accounting write must commit independently of the passthrough.
- *
- * <p>The row, not the process-local {@link MentorTurnMeter}, is the record: a worker that dies would
- * otherwise take the whole turn's spend with it.
- *
- * <p>A dropped write is money lost, not a no-op — these columns are the only record of a crashed
- * turn's calls, so a non-zero rate on {@code llm.proxy.usage.mentor.superseded} or
- * {@code llm.proxy.usage.mentor.failure} means the ledger is under-billing.
- */
+// Commit accounting independently of passthrough so a worker failure cannot erase measured spend.
 @Service
 @ConditionalOnWorkerRole
 public class MentorTurnUsageAccumulator {

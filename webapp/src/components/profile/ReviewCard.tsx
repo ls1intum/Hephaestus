@@ -16,7 +16,6 @@ import type { FeedbackResponseControls } from "./reviews";
 import { TimelineItem } from "./TimelineItem";
 
 export interface ReviewCardProps {
-	/** One of the reader's own reviews: its item, its results about them and their feedback from it. */
 	review: ProfileReview;
 	/** The reader's response to each piece of feedback; absent leaves no response controls. */
 	responses?: FeedbackResponseControls;
@@ -32,28 +31,12 @@ export interface ReviewCardProps {
 	tailContinues?: boolean;
 }
 
-/** How many results a card shows before "Show more". */
 const COLLAPSED_RESULT_COUNT = 3;
 
-/** Not met first: it is what the reader can act on. The rest keep the server's order. */
 function resultPriority({ outcome }: ResultList): number {
 	return outcome === "NOT_MET" ? 0 : 1;
 }
 
-/**
- * One review as a row of the timeline: the day and time in the date column, a dot on the rail, and
- * the card with the reviewed item at its head, the results as its rows and the reader's feedback
- * from the review under them. The head names the item and nothing else: what the review is worth
- * reading is what it concluded.
- *
- * A review that carries one result has no two things to separate — on a practice's own level a
- * review reaches that practice once, so every card there is that case. It drops the head and
- * merges into one block: the result's summary and verdict are the block's first line, and the item
- * the head would have named is the small line under it.
- *
- * The feedback is the review's, not one result's: a piece can be based on several results, and a
- * result on none, so the card lists each piece once, with its own response.
- */
 export function ReviewCard({
 	review,
 	responses,
@@ -64,7 +47,6 @@ export function ReviewCard({
 	const [showAllResults, setShowAllResults] = useState(false);
 	const { results, feedback } = review;
 	const at = review.review.createdAt;
-	// One result is one block: the row takes the work line and the card grows no head over it.
 	const merged = results.length === 1;
 	const hiddenCount = Math.max(0, results.length - COLLAPSED_RESULT_COUNT);
 	const orderedResults = [...results].sort((a, b) => resultPriority(a) - resultPriority(b));
@@ -126,21 +108,8 @@ export function ReviewCard({
 	);
 }
 
-/**
- * The item a review reviewed, in the two shapes a card needs it.
- *
- * `head` is the head of a card whose results are several: the link the rows below it share,
- * with the repository under it. `line` is the same item under a merged card's summary, on one
- * small line — "#902 · HephaestusTest/practice-validation" — where the summary is the block's
- * anchor and the item it was seen on reads as the note beneath it rather than as a second head.
- *
- * One component, because the two differ in layout and type size only: whether the item is linked,
- * how it is tooltipped and when the repository is printed are the same decisions, and a fix to one
- * copy of them would have missed the other.
- */
 function ReviewedItem({ item, tone }: { item: ItemRef; tone: "head" | "line" }) {
 	const Icon = reviewedWorkIcon(item.kind, item.provider ?? undefined);
-	// The wire names the item: "#902", "#backend-guild", a document's title.
 	const identity = item.label;
 	const isHead = tone === "head";
 	const typography = isHead ? "text-sm font-medium" : "text-xs";

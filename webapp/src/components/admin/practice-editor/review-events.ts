@@ -87,15 +87,9 @@ export function eventDef(name: string): EventDef {
 	return EVENTS[name] ?? UNKNOWN_EVENT;
 }
 
-/** The name of an event the practice still names and this version can no longer offer or describe. */
 export const WITHDRAWN_EVENT_LABEL = "An event this version no longer offers";
 
-/**
- * Events a practice is already bound to that its item kind no longer offers. Drawn rather than
- * dropped — the form refuses to save while one is chosen, and an event nobody can see is an event
- * nobody can untick. A withdrawn event has no label on the wire, so it is named by
- * {@link WITHDRAWN_EVENT_LABEL}, never by its wire id.
- */
+/** Keep unsupported selected events visible so the author can remove them before saving; never expose their wire ids as labels. */
 export function withdrawnEvents(
 	itemType: PracticeItemTypeOption,
 	selected: readonly string[],
@@ -112,7 +106,6 @@ export function withdrawnEvents(
 		}));
 }
 
-/** The label of a chosen event, or {@link WITHDRAWN_EVENT_LABEL} where the item kind lost it. */
 export function eventLabel(name: string, events: readonly ItemEventOption[]): string {
 	return events.find((option) => option.name === name)?.label ?? WITHDRAWN_EVENT_LABEL;
 }
@@ -124,10 +117,6 @@ export interface EventBand {
 
 const PHASE_ORDER: EventPhase[] = ["start", "during", "end"];
 
-/**
- * The item kind's events grouped into bands, keeping the server's order within each. Empty bands
- * are dropped, so one strip serves every item kind without a special case at the call site.
- */
 export function eventBands(events: readonly ItemEventOption[]): EventBand[] {
 	return PHASE_ORDER.map((phase) => ({
 		phase,

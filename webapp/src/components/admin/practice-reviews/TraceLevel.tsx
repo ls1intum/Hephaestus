@@ -25,17 +25,12 @@ import type { TraceFilter } from "./trace-filter";
 import { TRACE_END_TONES, unreviewedVerdict } from "./trace-verdict";
 import { TraceLegend } from "./TraceLegend";
 
-/**
- * What a trace tells: the graph of the record, or, for an item none of whose events started a
- * review, the item and its latest event, which is all there is.
- */
 export type TraceChainState =
 	| PanelState<{ lineage: ReviewLineage }>
 	| {
 			status: "unreviewed";
 			item: ItemRef;
 			event: ItemEvent;
-			/** The event's name, from the practice definition options. */
 			eventLabel: string;
 	  }
 	| { status: "none" };
@@ -56,16 +51,10 @@ export interface TraceLevelProps {
 	onDisplayChange: (display: TraceDisplay) => void;
 	filter: TraceFilter;
 	onFilterChange: (filter: TraceFilter) => void;
-	/**
-	 * The review the trace tells, as its sheet reads it: its times, model, stop reason and runtime
-	 * jobs come from it, so the trace and the review's sheet say the same.
-	 */
 	review?: ReviewDetail;
-	/** How the review came to run, from its row: an event, a request, a schedule or a backfill. */
 	origin?: ReviewOrigin;
 	/** Where the review stands among the reviews of its work, from its row. */
 	position?: { index: number; total: number };
-	/** The item's record, which the latest event of an item without a review opens. */
 	workRecord?: RecordRef;
 	/**
 	 * Whether Practice reviews are on for the workspace now, so the trace of an item without a
@@ -149,11 +138,6 @@ function TraceBody({
 	}
 }
 
-/**
- * An item none of whose events started a review: its latest event, and the end of the path, with
- * whether it still waits or why no review started. The event opens the item's sheet, which has the
- * setting that would let it through.
- */
 function UnreviewedTrace({
 	item,
 	event,

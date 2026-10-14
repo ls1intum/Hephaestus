@@ -59,8 +59,6 @@ async function closeTip() {
 
 export const Default: Story = {
 	play: async ({ canvas, args }) => {
-		// A result is an AI reading of the work, never a grade: the page says so before any count,
-		// in one line, and its (i) says why.
 		await expect(canvas.getByText(/Not a grade\.$/u)).toBeVisible();
 		const about = within(await openTip(canvas, "About this page"));
 		await expect(about.getByText("Not a grade:")).toBeVisible();
@@ -69,7 +67,6 @@ export const Default: Story = {
 		await expect(
 			canvas.getByText("Results for the 28 developers whose work this workspace reviews."),
 		).toBeVisible();
-		// Groups in the order the server sends their practices; a practice in no group is not listed.
 		await expect(
 			groupsTable(canvas)
 				.getAllByRole("row")
@@ -82,7 +79,7 @@ export const Default: Story = {
 			"Testing your changes",
 		]);
 		await expect(canvas.queryByText("Sign your commits")).toBeNull();
-		// A group's results add up its practices' results; developers do not add up, so none is shown.
+		// Result counts add across practices; developer counts can overlap and must not be added.
 		const packaging = groupRow(canvas, "Packaging work for review");
 		await expect(packaging).toHaveTextContent("5 practices");
 		await expect(packaging).toHaveTextContent("Met 43");
@@ -108,7 +105,6 @@ export const GroupOpen: Story = {
 	},
 };
 
-/** Practices set up, but no result yet: every group says so instead of four zeros. */
 export const NoResultsYet: Story = {
 	args: { state: { status: "ready", overview: NO_RESULTS_WORKSPACE } },
 	play: async ({ canvas }) => {
@@ -244,7 +240,6 @@ export const LoadingToLoaded: Story = {
 
 const onRetryOverview = fn();
 
-/** Every region reads the overview, so its failure takes the page. */
 export const LoadError: Story = {
 	args: { state: { status: "error", error: new Error("Network down"), onRetry: onRetryOverview } },
 	play: async ({ canvas }) => {

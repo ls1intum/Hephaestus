@@ -11,12 +11,6 @@ import type { StatusDefs } from "@/components/common/status-def";
 
 export type PurposeStatus = "PARTLY_SET" | "NOT_SET" | "NEEDS_ATTENTION" | "OFF";
 
-/**
- * One purpose on AI models, judged by who it serves today. A purpose that serves every member has
- * no status and draws no badge: the row's tier columns already say who gets which model. `satisfies`
- * keeps each tone's literal, so a note about one status can take that status's tone as an `Alert`
- * variant.
- */
 export const PURPOSE_STATUS_DEFS = {
 	PARTLY_SET: {
 		label: "Not set for some members",
@@ -61,11 +55,6 @@ export interface PurposeStatusInput {
 	used: boolean;
 }
 
-/**
- * Null when there is nothing to flag: every member is served, or a model for practice scripts that no practice
- * uses asks for nothing, whatever it assigns; its cells still show the assignments. An enabled
- * assignment the server cannot run, or an unmet required need, outranks coverage.
- */
 export function purposeStatus({
 	bindings,
 	served,

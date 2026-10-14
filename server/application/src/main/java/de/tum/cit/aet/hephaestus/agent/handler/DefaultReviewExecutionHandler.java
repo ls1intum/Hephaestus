@@ -45,7 +45,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Captures one pinned item through its domain source and stages the same contract for every kind. */
 @Component
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor

@@ -48,7 +48,6 @@ export const Hephaestus: Story = {
 	},
 };
 
-/** People carry the saved reason: it is what a reader is told instead of a result. */
 export const People: Story = {
 	args: {
 		value: {
@@ -89,7 +88,6 @@ export const SwitchingSaysWhatIsCleared: Story = {
 	},
 };
 
-/** The reason survives a detour through another choice, because the draft keeps it. */
 export const TheReasonSurvivesADetour: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("radio", { name: /^People/u }));

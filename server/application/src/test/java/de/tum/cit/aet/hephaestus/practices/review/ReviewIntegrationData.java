@@ -21,9 +21,12 @@ import de.tum.cit.aet.hephaestus.practices.review.model.ReviewPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
 import de.tum.cit.aet.hephaestus.practices.spi.FrozenModel;
 import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.InapplicabilityWarrant;
 import de.tum.cit.aet.hephaestus.practices.spi.IntroducedBasis;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.OpenQuestion;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEvidence;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
@@ -156,9 +159,33 @@ public class ReviewIntegrationData {
                 .captureDecision(json.createObjectNode())
                 .method(new ReviewMethod(1, digest, slots))
                 .build());
-        var evidence = json.readTree("""
+        var baseEvidence = json.convertValue(json.readTree("""
             {"citations":[{"sourceKind":"scm.pull-request.diff","sourcePath":"inputs/sources/scm/diff.patch","path":"src/Main.java","side":"NEW","revision":"commit-1","startLine":1,"endLine":1,"quote":"changed();","verification":{"status":"VERIFIED","itemSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","quoteSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}],"openQuestions":[]}
-            """);
+            """), ResultEvidence.class);
+        var evidence = json.valueToTree(new ResultEvidence(
+                baseEvidence.citations(),
+                null,
+                outcome == ResultOutcome.DOES_NOT_APPLY
+                        ? new InapplicabilityWarrant(
+                                List.of(baseEvidence.citations().getFirst().sourceKind()),
+                                "This practice requires a matching change.",
+                                "The captured work has no matching change.")
+                        : null,
+                outcome == ResultOutcome.COULD_NOT_DETERMINE
+                        ? List.of(new OpenQuestion(
+                                "Does the changed branch cover this case?",
+                                "A focused execution would settle it.",
+                                null))
+                        : List.of()));
+        var member = reviewItems.saveAndFlush(ReviewItem.builder()
+                .workspaceId(s.workspace().getId())
+                .reviewId(review.getId())
+                .practiceId(s.practice().getId())
+                .itemId(s.item().getId())
+                .itemVersion(review.getItemVersion())
+                .state(ReviewItemState.LISTED)
+                .detail(json.createObjectNode().put("developerId", s.account().getId()))
+                .build());
         var result = Result.builder()
                 .id(UUID.randomUUID())
                 .workspaceId(s.workspace().getId())
@@ -176,7 +203,7 @@ public class ReviewIntegrationData {
                 .coverage(json.valueToTree(new HostCoverage(true, List.of(), 1, 0, 0, List.of())))
                 .recordedAt(at)
                 .build();
-        results.save(result);
+        results.saveAndFlush(result);
         if (outcome == ResultOutcome.NOT_MET)
             problems.save(Problem.builder()
                     .id(UUID.randomUUID())
@@ -191,17 +218,10 @@ public class ReviewIntegrationData {
                     .basis(json.valueToTree(new IntroducedBasis(0, "The change introduces this problem.")))
                     .nextStep("Adjust the changed branch.")
                     .build());
-        reviewItems.save(ReviewItem.builder()
-                .workspaceId(s.workspace().getId())
-                .reviewId(review.getId())
-                .practiceId(s.practice().getId())
-                .itemId(s.item().getId())
-                .itemVersion(review.getItemVersion())
-                .state(ReviewItemState.JUDGED)
-                .resultId(result.getId())
-                .attemptedAt(at)
-                .build());
-        results.flush();
+        member.setState(ReviewItemState.JUDGED);
+        member.setResultId(result.getId());
+        member.setAttemptedAt(at);
+        reviewItems.saveAndFlush(member);
         return result;
     }
 
@@ -233,7 +253,9 @@ public class ReviewIntegrationData {
                         "input",
                         json.writeValueAsString(Map.of(
                                 "itemId",
-                                result.getItemId(),
+                                reviews.findByIdAndWorkspaceId(result.getReviewId(), result.getWorkspaceId())
+                                        .orElseThrow()
+                                        .getItemId(),
                                 "assignments",
                                 List.of(new ReviewAssignmentId(
                                         result.getReviewId(), result.getPracticeId(), result.getItemId())))))

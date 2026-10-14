@@ -26,7 +26,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Settles runtime processing independently from product proof and physical-copy delivery. */
 @Component
 @ConditionalOnServerRole
 @ConditionalOnBooleanProperty(name = RuntimeRole.AGENT_ENABLED_PROPERTY)

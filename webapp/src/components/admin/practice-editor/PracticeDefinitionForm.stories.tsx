@@ -16,22 +16,16 @@ type Submit = (value: PracticeDefinitionValue) => void | Promise<void>;
 
 const submit = fn<Submit>();
 
-/** What the last save sent. */
 function lastSaved(): PracticeDefinitionValue | undefined {
 	return submit.mock.lastCall?.[0];
 }
 
-/** The form scrolls its own body, as it does inside a drawer level. */
 const fullHeight: Decorator = (Story) => (
 	<div className="flex h-dvh flex-col">
 		<Story />
 	</div>
 );
 
-/**
- * The shared editor both consoles host. Each console wraps it in its own drawer level, whose stories
- * cover the wrapper; these cover the fields and what a save sends.
- */
 const meta = {
 	component: PracticeDefinitionForm,
 	args: {
@@ -54,16 +48,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The args of an edit of the given practice. */
 function editing(initialData = practiceValueOf()) {
 	return { mode: "edit" as const, initialData };
 }
 
-/** A new practice chooses its kind once; Review on starts at the events the kind recommends. */
 export const Create: Story = {
 	args: { mode: "create" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("radio", { name: /^Pull request\b/u })).toBeChecked();
+		await expect(canvas.getByRole("radio", { name: /^Pull request\b(?! review)/u })).toBeChecked();
 		const strip = within(canvas.getByRole("group", { name: "Review on" }));
 		await expect(strip.getByRole("checkbox", { name: /^Opened/u })).toBeChecked();
 		await expect(strip.getByRole("checkbox", { name: /^Merged/u })).not.toBeChecked();
@@ -71,7 +63,6 @@ export const Create: Story = {
 	},
 };
 
-/** An existing practice keeps its kind, and Review on, When, About and Applies when are its own. */
 export const Edit: Story = {
 	args: editing(),
 	play: async ({ canvas }) => {
@@ -82,7 +73,6 @@ export const Edit: Story = {
 	},
 };
 
-/** Whoever merged the work is a role a pull request offers, so it stays selectable. */
 export const AboutWhoeverMergedIt: Story = {
 	args: editing(),
 	play: async ({ canvas, userEvent }) => {
@@ -96,7 +86,6 @@ export const AboutWhoeverMergedIt: Story = {
 	},
 };
 
-/** People review it: the saved reason is shown, and nothing automated is offered. */
 export const ReviewedByPeople: Story = {
 	args: editing(
 		practiceValueOf({
@@ -121,7 +110,6 @@ export const ReviewedByPeople: Story = {
 	},
 };
 
-/** Choosing Nobody says what the save clears, and the save then clears it. */
 export const ReviewedByNobody: Story = {
 	args: editing(practiceValueOf({ script: "export default 1;", scan: mockScan })),
 	play: async ({ canvas, userEvent }) => {
@@ -140,7 +128,6 @@ export const ReviewedByNobody: Story = {
 	},
 };
 
-/** No script means the built-in review, and the section says so while it is closed. */
 export const BuiltInScript: Story = {
 	args: editing(),
 	play: async ({ canvas }) => {
@@ -220,7 +207,6 @@ export const ScanDisabled: Story = {
 	},
 };
 
-/** A refused pattern is named beside its field and in the summary, and nothing is sent. */
 export const ScanInvalid: Story = {
 	args: editing(practiceValueOf({ scan: mockScan })),
 	play: async ({ canvas, userEvent }) => {
@@ -241,7 +227,6 @@ export const SavePending: Story = {
 	},
 };
 
-/** A refused save keeps the draft, and leaving is a decision again. */
 export const SaveFailure: Story = {
 	args: {
 		...editing(),
@@ -259,12 +244,16 @@ export const SaveFailure: Story = {
 	},
 };
 
-/** A blank create is refused with every reason, in the order the fields appear. */
 export const Refused: Story = {
 	args: { mode: "create" },
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
-		const summary = canvas.getByRole("alert");
+		const summary = canvas
+			.getByRole("heading", { name: /^There are \d+ problems$/u })
+			.closest<HTMLElement>("[role=alert]");
+		if (summary === null) {
+			throw new Error("The error summary must be announced as an alert.");
+		}
 		await expect(
 			within(summary)
 				.getAllByRole("link")

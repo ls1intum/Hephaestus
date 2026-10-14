@@ -1,5 +1,3 @@
-// Finds the issue references of the handoff and counts its checklist. The review judges readiness
-// from the captured handoff.
 import { readCapturedCommits } from "../kits/scm/change.ts";
 import { scm, expectKind } from "../kits/scm/index.ts";
 import { branchIssueReferences, issueNumberReferences } from "../kits/scm/references.ts";
@@ -7,7 +5,6 @@ import { checkableItems } from "../kits/scm/review.ts";
 import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/core/bounded-text.ts";
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 
-/** The characters of a branch name that a direction quotes. */
 const BRANCH_CHARS = 80;
 
 export default definePracticeScript({
@@ -18,7 +15,6 @@ export default definePracticeScript({
 		const description = domain.item.body ?? "";
 		const directions: string[] = [];
 
-		// Traceability: does the handoff reference a motivating issue at all?
 		const commits = await readCapturedCommits(ctx.evidence);
 		const body = `${description}\n${(commits ?? []).map((c) => c.message).join("\n")}`;
 		const branch = domain.item.source_branch;
@@ -45,8 +41,6 @@ export default definePracticeScript({
 			);
 		}
 
-		// Readiness: the checklist as written, counted, so a tick is never guessed at. The counts cannot
-		// say whose lines they are; the review reads that from the description.
 		const items = checkableItems(description);
 		const ticked = items.filter((item) => item.checked).length;
 		const unticked = items.length - ticked;

@@ -1,19 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponse;
 import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponseRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Result;
-import de.tum.cit.aet.hephaestus.practices.result.ResultPresentation;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ResultSourceAuthorization;
-import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
-import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
-import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
@@ -22,12 +13,10 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
-import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +27,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 @Service
 @ConditionalOnCaptureRole
@@ -52,13 +40,8 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
     private final FeedbackVisibilityService visibility;
     private final ResultRepository results;
     private final ResultHistoryQuery history;
-    private final ResultViewQuery views;
-    private final ResultPresentation presentation;
-    private final ReviewRepository reviews;
-    private final ObjectMapper mapper;
     private final FeedbackQueryRepository queries;
-    private final ResultSourceAuthorization sourceAuthorization;
-    private final PracticeRepository practices;
+    private final FeedbackPublicHistory publicHistoryReader;
 
     @Override
     public List<FeedbackHistoryEntry> forDeveloper(
@@ -103,11 +86,11 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
         var support = results.findByWorkspaceIdAndIdIn(workspaceId, ids);
         var authorized = row.getDestination() == FeedbackDestination.ON_WORK
                 ? support.stream()
-                        .flatMap(result -> publicSupport(result, purpose).stream())
+                        .flatMap(result -> publicHistoryReader.authorize(result, purpose).stream())
                         .toList()
                 : ids.stream()
                         .flatMap(id -> history.find(workspaceId, id, viewerAccountId, purpose).stream())
-                        .map(entry -> new AuthorizedSupport(
+                        .map(entry -> new FeedbackPublicHistory.AuthorizedSupport(
                                 entry.resultId(),
                                 entry.practiceSlug(),
                                 new HistoryCustody(
@@ -120,7 +103,7 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
                 && support.size() == ids.size()
                 && authorized.size() == ids.size()
                 && authorized.stream()
-                        .map(AuthorizedSupport::resultId)
+                        .map(FeedbackPublicHistory.AuthorizedSupport::resultId)
                         .collect(Collectors.toSet())
                         .containsAll(ids)
                 && authorized.stream().allMatch(entry -> entry.custody().complete());
@@ -160,7 +143,7 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
                         && complete
                         && row.getDeliveredAt() != null
                         && !confirmed.isEmpty()
-                ? publicHistory(row, support, authorized, confirmed, withdrawn, textAllowed)
+                ? publicHistoryReader.render(row, support, authorized, confirmed, withdrawn, textAllowed)
                 : null;
         return new FeedbackHistoryEntry(
                 row.getId(),
@@ -204,107 +187,4 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
                 complete,
                 publicHistory);
     }
-
-    private record AuthorizedSupport(UUID resultId, String practiceSlug, HistoryCustody custody) {}
-
-    private Optional<AuthorizedSupport> publicSupport(Result result, SourceUsePurpose purpose) {
-        var facts = sourceAuthorization.custody(result);
-        if (!sourceAuthorization.authorized(result, facts, purpose)) return Optional.empty();
-        return practices
-                .findByIdAndWorkspaceId(result.getPracticeId(), result.getWorkspaceId())
-                .map(practice -> new AuthorizedSupport(result.getId(), practice.getSlug(), facts));
-    }
-
-    private JsonNode publicHistory(
-            Feedback row,
-            List<Result> support,
-            List<AuthorizedSupport> authorized,
-            List<FeedbackCopy> confirmed,
-            boolean withdrawn,
-            boolean textAllowed) {
-        var currentness = views.views(row.getWorkspaceId(), support).stream()
-                .map(presentation::currentness)
-                .toList();
-        Currentness freshness = currentness.contains(Currentness.UNVERIFIABLE)
-                ? Currentness.UNVERIFIABLE
-                : currentness.contains(Currentness.STALE) ? Currentness.STALE : Currentness.CURRENT;
-        var byId = authorized.stream().collect(Collectors.toMap(AuthorizedSupport::resultId, entry -> entry));
-        @Nullable
-        String summary =
-                !textAllowed || confirmed.stream().noneMatch(copy -> copy.getKind() == FeedbackCopyKind.SUMMARY)
-                        ? null
-                        : row.getBody();
-        var projection = new PublicEntry(
-                row.getId(),
-                row.getDestination(),
-                row.getState(),
-                Objects.requireNonNull(row.getDeliveredAt()),
-                reviews.findByIdAndWorkspaceId(row.getReviewId(), row.getWorkspaceId())
-                        .orElseThrow()
-                        .getItemVersion(),
-                summary,
-                confirmed.stream().anyMatch(copy -> copy.getKind() == FeedbackCopyKind.SUMMARY)
-                        ? row.getBody() == null
-                        : row.getBody() != null,
-                freshness,
-                withdrawn,
-                support.stream()
-                        .map(result -> new PublicBasis(
-                                result.getId(),
-                                Objects.requireNonNull(byId.get(result.getId())).practiceSlug(),
-                                result.getPracticeVersionId() == null
-                                        ? null
-                                        : result.getPracticeVersionId().toString(),
-                                result.getOutcome()))
-                        .toList(),
-                confirmed.stream()
-                        .map(copy -> new PublicCopy(
-                                copy.getId(),
-                                copy.getKind(),
-                                !textAllowed
-                                        ? null
-                                        : copy.getKind() == FeedbackCopyKind.SUMMARY ? row.getBody() : copy.getBody(),
-                                copy.getPath(),
-                                copy.getStartLine(),
-                                copy.getEndLine(),
-                                copy.getSide(),
-                                copy.getExternalRef(),
-                                copy.getExternalUrl(),
-                                Objects.requireNonNull(copy.getPostedAt()),
-                                copy.getState()))
-                        .toList());
-        return mapper.valueToTree(projection);
-    }
-
-    @JsonInclude(JsonInclude.Include.ALWAYS)
-    private record PublicEntry(
-            UUID id,
-            FeedbackDestination destination,
-            FeedbackState state,
-            Instant deliveredAt,
-            @Nullable String itemVersion,
-            @Nullable String body,
-            boolean bodyUnavailable,
-            Currentness currentness,
-            boolean withdrawn,
-            List<PublicBasis> basedOn,
-            List<PublicCopy> copies) {}
-
-    @JsonInclude(JsonInclude.Include.ALWAYS)
-    private record PublicBasis(
-            UUID resultId, String practiceSlug, @Nullable String practiceVersionId, ResultOutcome outcome) {}
-
-    @JsonInclude(JsonInclude.Include.ALWAYS)
-    private record PublicCopy(
-            UUID id,
-            FeedbackCopyKind kind,
-            @Nullable String body,
-            @Nullable String path,
-            @Nullable Integer startLine,
-            @Nullable Integer endLine,
-            @Nullable CitationSide side,
-            @Nullable String externalRef,
-            @Nullable String externalUrl,
-            Instant postedAt,
-            FeedbackCopyState state) {}
 }

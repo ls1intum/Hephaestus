@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import org.jspecify.annotations.Nullable;
 
-/** Stores and reads the composed headline, guidance and next step. */
 public final class PracticePageFeedbackBody {
 
     static final String HEADLINE_PREFIX = "### ";

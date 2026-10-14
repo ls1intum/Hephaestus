@@ -20,10 +20,6 @@ export interface EvidenceLocation {
 	 */
 	change?: { before: string; after: string };
 }
-/**
- * Citations as the blocks the profile draws: a result's own, one problem's, or an example's. Each
- * list folds on its own, so a quote never joins a block of another problem.
- */
 export function toEvidenceLocations(citations: EvidenceCitation[]): EvidenceLocation[] {
 	return foldObjectSources(foldDiffSides(citations));
 }
@@ -34,13 +30,7 @@ interface DiffBlock {
 	change?: { before: string; after: string };
 }
 
-/**
- * Two sides of one change: the same passage of the same file, quoted from either side of the diff.
- * The wire carries no hunk identity, so every other fact of a citation has to agree before two
- * blocks may become one — the source they were read from, the source kind, the file, and the
- * lines. The commit is deliberately not one of them: on a diff citation it names the commit of
- * the side it was read from, so the two sides of one change carry two different ones.
- */
+// The wire carries no hunk id; pair diff sides only when every other location fact agrees.
 const pairsWith = (kept: DiffBlock, next: EvidenceCitation) =>
 	kept.change === undefined &&
 	kept.citation.side !== null &&
@@ -52,7 +42,6 @@ const pairsWith = (kept: DiffBlock, next: EvidenceCitation) =>
 	kept.citation.startLine === next.startLine &&
 	kept.citation.endLine === next.endLine;
 
-/** Before and after of one change, or nothing at all when either side recorded no quote. */
 function changeBetween(
 	kept: EvidenceCitation,
 	next: EvidenceCitation,
@@ -64,12 +53,7 @@ function changeBetween(
 	return { before, after };
 }
 
-/**
- * The OLD and the NEW quote of one passage folded into one location. A changed line is cited from
- * both sides of the diff, and two blocks over one change read as two pieces of evidence; the pair
- * becomes the one block that says what the lines were and what they became. A side that recorded no
- * quote never folds: its block shows a place its counterpart does not quote.
- */
+// A folded diff pair has no single side or version; keep the before/after quotes instead.
 function foldDiffSides(citations: EvidenceCitation[]): EvidenceLocation[] {
 	const blocks: DiffBlock[] = [];
 	for (const citation of citations) {
@@ -111,11 +95,7 @@ function toLocation({ citation, change }: DiffBlock): EvidenceLocation {
 	};
 }
 
-/**
- * Two quotes of the same object source: not a place the reader could open, so the same registry
- * label over each of them reads as two pieces of evidence instead of one thing quoted twice. Only
- * quotes fold: a citation that recorded no quote keeps its own block.
- */
+// Group only identical object sources; different objects remain separate evidence blocks.
 const quotesTheSameSourceAs = (kept: EvidenceLocation, next: EvidenceLocation) =>
 	kept.sourceKind === next.sourceKind &&
 	evidenceSourceDef(kept.sourceKind).locator === "object" &&
@@ -147,15 +127,6 @@ export interface EvidenceCheck {
 	detail: string;
 }
 
-/**
- * What the review checked, in the warrant it wrote: what it looked for and how far it reached before
- * turning up nothing (a search), or why this practice had nothing to judge here (an inapplicability).
- * A review writes at most one of the two about one result, so the first one present is the whole
- * list. What it could not settle is not a check: the row lists those as open questions.
- *
- * Nothing here is inferred: a pair exists only where the reviewer wrote the sentence behind it,
- * and the sources it consulted are named in the registry's words rather than by their wire kind.
- */
 export function toEvidenceCheck(evidence: ResultEvidence | null): EvidenceCheck[] {
 	const search = evidence?.search;
 	if (search) {
@@ -176,7 +147,6 @@ export function toEvidenceCheck(evidence: ResultEvidence | null): EvidenceCheck[
 	return [];
 }
 
-/** One sentence the reviewer wrote under its term; one it did not write is no pair at all. */
 function writtenCheck(term: string, detail: string | undefined): EvidenceCheck[] {
 	return hasText(detail) ? [{ term, detail }] : [];
 }
@@ -198,7 +168,6 @@ export function splitPath(path: string): { directory: string; fileName: string }
 	}
 	return { directory: path.slice(0, lastSlash + 1), fileName: path.slice(lastSlash + 1) };
 }
-/** "line 4" or "lines 41 to 46"; nothing for a citation that recorded no lines. */
 export function evidenceLineRangeLabel({
 	startLine,
 	endLine,

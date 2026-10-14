@@ -14,11 +14,8 @@ public enum Capability {
     /** OAuth refresh tokens are minted via {@code TokenRefresher}. */
     TOKEN_REFRESH,
 
-    /** Implements {@code SummaryWriter.postSummary}. */
     FEEDBACK_DELIVERY,
-    /** Implements {@code LineNoteWriter.postImmutablePackage}. */
     INLINE_FEEDBACK,
-    /** Implements {@code ApprovalWriter.approve}. */
     APPROVAL_WORKFLOW,
     /** Listener emits {@code onScopeChanged} (channel join/leave, repo add/remove). */
     SCOPE_CHANGES,

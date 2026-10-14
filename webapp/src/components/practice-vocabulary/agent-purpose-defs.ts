@@ -10,17 +10,14 @@ export type AgentPurpose = AgentBinding["purpose"];
 /** A kind's glyph. `size` in pixels, because Heph's mark sizes itself from it, not from a class. */
 type ModelKindIcon = ComponentType<{ size: number; className?: string }>;
 
-/** Heph's mark at rest: a kind mark marks a list row, and a row does not move. */
 function HephKindIcon({ size, className }: { size: number; className?: string }) {
 	return createElement(HephIcon, { size, className, animated: false });
 }
 
 interface AgentPurposeDef {
-	/** The purpose's own name: its row on AI models and the toasts about it. */
 	title: string;
 	/** The name in a list that already says it is about models, such as a *Models* column. */
 	short: string;
-	/** The model as running text names it: "needs a decision model". */
 	noun: string;
 	withArticle: string;
 	description: string;
@@ -30,7 +27,6 @@ interface AgentPurposeDef {
 	 * fact, sent as each model's `purposes`; a connection's API names them in `LLM_API_PROTOCOL_LABELS`.
 	 */
 	practiceScript: boolean;
-	/** The glyph `ModelKindMark` draws on its neutral tile. */
 	icon: ModelKindIcon;
 	/**
 	 * The glyph's colour, as complete class strings. A hue tells the three model kinds for practice scripts apart;
@@ -40,12 +36,7 @@ interface AgentPurposeDef {
 	tone: string;
 }
 
-/**
- * Every purpose a binding serves, in the order AI models shows them. A plain map rather than
- * `StatusDefs`: a purpose is a kind of model, not a state, so it has no badge to draw. It renders
- * through `ModelKindMark`, a tinted glyph on a neutral tile. Its status on AI models is
- * `PURPOSE_STATUS_DEFS`.
- */
+// Agent purposes are model kinds, so their registry has no status tone.
 export const AGENT_PURPOSE_DEFS = {
 	PRACTICE_REVIEW: {
 		title: "Practice reviews",
@@ -101,10 +92,8 @@ export const AGENT_PURPOSE_DEFS = {
 	},
 } satisfies Record<AgentPurpose, AgentPurposeDef>;
 
-/** Every purpose, in page order; also the values `?purpose=` accepts. */
 export const AGENT_PURPOSES = statusValues(AGENT_PURPOSE_DEFS);
 
-/** The purposes under *Models for practice scripts*, in page order. */
 export const PRACTICE_SCRIPT_PURPOSES = AGENT_PURPOSES.filter(isPracticeScriptPurpose);
 
 export function isAgentPurpose(value: string): value is AgentPurpose {
@@ -115,7 +104,6 @@ export function isPracticeScriptPurpose(purpose: AgentPurpose): boolean {
 	return AGENT_PURPOSE_DEFS[purpose].practiceScript;
 }
 
-/** The link text that opens a missing model's purpose on AI models. */
 export function assignModelLabel(purpose: AgentPurpose): string {
 	return `Assign ${AGENT_PURPOSE_DEFS[purpose].withArticle}`;
 }

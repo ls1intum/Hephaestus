@@ -36,7 +36,6 @@ import { ITEM_KIND, itemKindLabel, itemKindNoun } from "@/lib/item-kinds";
 import { formatCostUsd } from "@/lib/money";
 import { hasText } from "@/lib/text";
 
-/** The status changes an admin can ask for. The server owns every other transition. */
 export type ReviewBatchStatusChange = "RUNNING" | "PAUSED" | "CANCELLED";
 
 export interface PracticeReviewBatchProps {
@@ -68,7 +67,6 @@ const WINDOWS = [
 	{ value: "180", label: "The last 180 days" },
 ] as const;
 
-/** Each one names what stopped it and the single thing that restarts it — never just the cause. */
 const PAUSE_EXPLANATIONS: Record<NonNullable<ReviewBatch["pauseReason"]>, string> = {
 	PAUSED_BY_ADMIN:
 		"A workspace admin paused this review. Resume it to continue from where it stopped.",
@@ -82,7 +80,6 @@ const PAUSE_EXPLANATIONS: Record<NonNullable<ReviewBatch["pauseReason"]>, string
 
 const countOf = (count: number, itemKind: string) => `${count} ${itemKindNoun(itemKind, count)}`;
 
-/** Both ends carry the year, because the longest windows offered can cross one. */
 const formatWindow = (batch: ReviewBatch) => {
 	const from = asDate(batch.from);
 	const to = asDate(batch.to);
@@ -92,18 +89,11 @@ const formatWindow = (batch: ReviewBatch) => {
 	return `${format(from, "d MMM yyyy")} – ${format(to, "d MMM yyyy")}`;
 };
 
-/** A missing estimate is not an estimate of zero, and zero is a value this can legitimately carry. */
+// Missing estimates are unknown; a measured zero remains a valid estimate.
 const formatEstimate = (value: string | null) =>
 	value === null ? undefined : formatCostUsd(Number(value));
 
-/**
- * Two steps on purpose: a review of past work can consume a workspace's whole monthly AI budget, so
- * choosing a range only produces an estimate, and the count and the cost are on screen before the
- * second, explicitly worded confirmation starts any spending.
- *
- * <p>Only batches of past work are shown. A schedule opens its own batches, and its controls live
- * with the schedule.
- */
+// Require estimate confirmation before a review can consume the workspace's AI budget.
 export function PracticeReviewBatch({
 	batches,
 	isLoading,

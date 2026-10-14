@@ -85,10 +85,6 @@ import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * The webhook flow from recorded GitLab payloads (gitlab.lrz.de) to the database: MR !3 is opened,
- * closed and reopened, MR !2 updated and merged, MR !4 approved and unapproved.
- */
 @Tag("integration")
 @DisplayName("GitLab Merge Request Message Handler")
 class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTest {
@@ -399,27 +395,17 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     @Nested
     class ReviewerStates {
 
-        /**
-         * The reviewers after their reviews, as {@code merge_request.update.reviewers} lists them.
-         */
         private static final Map<String, RequestedReviewer.ReviewState> REVIEWED = Map.of(
                 "user1", RequestedReviewer.ReviewState.APPROVED,
                 "sjones", RequestedReviewer.ReviewState.REQUESTED_CHANGES,
                 "user2", RequestedReviewer.ReviewState.REVIEWED,
                 "user3", RequestedReviewer.ReviewState.UNREVIEWED);
 
-        /**
-         * The list a sync reads in the snapshot tests: {@code user1} asked again, and no one else.
-         */
         private static final Map<String, RequestedReviewer.ReviewState> SYNCED =
                 Map.of("user1", RequestedReviewer.ReviewState.UNREVIEWED);
 
         private static final Instant STORED_AT = Instant.parse("2026-01-31T18:20:00Z");
 
-        /**
-         * The {@code updated_at} of the merge request {@link #syncedMergeRequest} stores, as a hook
-         * states it.
-         */
         private static final String SYNCED_UPDATED_AT = "2026-01-31 19:10:00 +0100";
 
         /** When the second list was stated, against the stored one's {@link #STORED_AT}. */
@@ -620,11 +606,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             }
         }
 
-        /**
-         * What the one other backend waiting on a lock in this database waits on, once there is
-         * one. Its statement text is cut at {@code track_activity_query_size}, so it cannot show
-         * the locking clause of a long select.
-         */
+        // PostgreSQL truncates statement text at track_activity_query_size; a long query can hide its locking clause.
         private String lockAnotherBackendWaitsOn() throws InterruptedException {
             Instant deadline = Instant.now().plus(Duration.ofSeconds(30));
             while (Instant.now().isBefore(deadline)) {
@@ -662,10 +644,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     ProcessingContext.forSync(null, savedRepo).withObservedAt(fetchedAt));
         }
 
-        /**
-         * A recorded payload at another {@code updated_at}, for a test about the order payloads
-         * arrive in.
-         */
         private GitLabMergeRequestEventDTO at(String filename, String updatedAt) throws IOException {
             ObjectNode payload = (ObjectNode) objectMapper.readTree(
                     new ClassPathResource("gitlab/" + filename + ".json").getContentAsString(StandardCharsets.UTF_8));
@@ -686,11 +664,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    /**
-     * What the merge request's review decision says, from what the sync read about its reviewers.
-     * GitLab's {@code approved} means the approval rules are met, which a project requiring no
-     * approval meets with nobody approving.
-     */
+    // GitLab approved means approval rules are satisfied; zero required approvals need no approving person.
     @Nested
     class ReviewDecisions {
 
@@ -783,11 +757,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(reviewDecision()).isNull();
         }
 
-        /**
-         * GitLab sends {@code approval} and {@code unapproval} where the approval rules are not
-         * met, or stay met: each is one person's act, and the stored decision no longer stands
-         * after it.
-         */
+        // Approval and unapproval hooks report individual actions, independently of approval-rule completion.
         @Test
         void shouldRefreshApprovalMembershipOnlyFromTheNativeSnapshot() throws Exception {
             receive(loadPayload("merge_request.approval"));
@@ -845,10 +815,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    /**
-     * Refresh occasions cannot overwrite newer native snapshots or establish approval membership
-     * themselves.
-     */
     @Nested
     class ApprovalActsOnTheCurrentHead {
 
@@ -1026,16 +992,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    /**
-     * What a read of one merge request after its webhook records ({@link
-     * GitLabMergeRequestProcessor#applyReadiness}), and what it may not.
-     */
     @Nested
     class ReadinessRead {
 
-        /**
-         * A read begun after the hook below was received, so no stored review snapshot is newer.
-         */
         private Instant readAt = Instant.EPOCH;
 
         @BeforeEach
@@ -1333,10 +1292,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(pr.getReviewDecision()).isEqualTo(ReviewDecision.APPROVED);
         }
 
-        /**
-         * A read of the stored head and version that GitLab answered with {@code mergeable} and
-         * {@code status}.
-         */
         private GitLabMergeRequestReadinessReader.Facts mergeability(boolean mergeable, String status) {
             return new GitLabMergeRequestReadinessReader.Facts(
                     savedRepo.getNativeId(),
@@ -1494,10 +1449,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    /**
-     * A sync page that failed to give a merge request's head records nothing that holds for a head:
-     * the upsert keeps the stored head, which is not the one the page read.
-     */
     @Nested
     class SyncedPagesWithoutTheirHead {
 
@@ -1674,8 +1625,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     .isTrue();
             assertThat(mr2().getBaseRefOid()).isEqualTo("b".repeat(40));
 
-            // Asked for now, before the read above was: its pair at the same version does not
-            // replace that read's.
             syncPage(paired(FIRST_HEAD, FIRST_HEAD, "c".repeat(40)), List.of());
             assertThat(mr2().getBaseRefOid()).isEqualTo("b".repeat(40));
 
@@ -1695,10 +1644,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     .isNull();
         }
 
-        /**
-         * MR !2 at the listing's version, with {@code head} and the diffRefs GitLab paired with
-         * {@code pairedHead}.
-         */
         private Map<String, @Nullable Object> paired(@Nullable String head, String pairedHead, String base) {
             Map<String, @Nullable Object> node =
                     page(head, "2026-01-31T18:10:00Z", null, "mergeable", List.of(approverNode()));
@@ -1712,10 +1657,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     ProcessingContext.forSync(null, savedRepo).withObservedAt(fetchedAt));
         }
 
-        /**
-         * Merge request !2 as GitLab's listing gives it; a null head, version or pipeline is sent
-         * as null.
-         */
         private Map<String, @Nullable Object> page(
                 @Nullable String head,
                 @Nullable String updatedAt,
@@ -1763,9 +1704,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    /**
-     * A sync page's head pipeline is dated by when the page was asked for, like the pipeline hook.
-     */
     @Nested
     class SyncedHeadChecks {
 
@@ -1845,10 +1783,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         return user;
     }
 
-    /**
-     * Runs the merge request sync over one page GitLab answered with {@code node} and {@code
-     * errors}.
-     */
     private void syncPage(Map<String, @Nullable Object> node, List<Map<String, ?>> errors) {
         syncPage(node, errors, null);
     }
@@ -1895,10 +1829,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         });
     }
 
-    /**
-     * A recorded hook of MR !4 at GitLab's {@code updatedAt} that names no head: none, or a blank
-     * one.
-     */
     private GitLabMergeRequestEventDTO headless(String filename, String updatedAt, boolean blank) throws IOException {
         return edited(filename, attributes -> {
             if (blank) {
@@ -1910,10 +1840,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         });
     }
 
-    /**
-     * GitLab's own reset of MR !4's approvals after a push, as its unapproval hook with {@code
-     * system}.
-     */
     private GitLabMergeRequestEventDTO systemReset(String head, String updatedAt, String systemAction)
             throws IOException {
         return edited("merge_request.unapproved", attributes -> {
@@ -1941,9 +1867,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         return objectMapper.treeToValue(payload, GitLabMergeRequestEventDTO.class);
     }
 
-    /**
-     * Delivers a hook, then applies the independent native approver snapshot the test specifies.
-     */
     private void receiveWithApprovals(
             GitLabMergeRequestEventDTO event, List<GitLabMergeRequestProcessor.SyncUserData> currentApprovers) {
         receive(event);
@@ -2004,11 +1927,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 .setReviewDecision(decision));
     }
 
-    /**
-     * An update hook names no thread, and GitLab sends one when the last open thread is resolved:
-     * the discussions are read after it and their resolution recorded where the delivery may still
-     * write.
-     */
+    // GitLab sends an update hook when the last thread resolves, but the hook names no thread; read discussions to resolve it.
     @Nested
     class DiscussionResolution {
 
@@ -2069,10 +1988,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(thread.getNodeId()).isNull();
         }
 
-        /**
-         * MR !2's update hook at a later time with no {@code changes}, as GitLab sends it for a
-         * resolution.
-         */
         private GitLabMergeRequestEventDTO unchangedUpdate() throws IOException {
             ObjectNode payload =
                     (ObjectNode) objectMapper.readTree(new ClassPathResource("gitlab/merge_request.update.json")
@@ -2123,10 +2038,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     List.of());
         }
 
-        /**
-         * The merge request handler, reading the discussions GitLab answers with {@code answer} and
-         * nothing else.
-         */
         private GitLabMergeRequestMessageHandler handlerReadingDiscussions(Supplier<ClientGraphQlResponse> answer) {
             GitLabGraphQlClientProvider clients = mock(GitLabGraphQlClientProvider.class);
             when(clients.forScope(any())).thenReturn(ScriptedGraphQlClient.of(request -> Mono.fromSupplier(answer)));

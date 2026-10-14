@@ -85,8 +85,7 @@ export function FeedbackModeLadder({
 						{full && (
 							<span
 								id={addsId}
-								// The chosen rung is tinted `accent`, which muted text falls below 4.5:1 on in the
-								// dark theme (WCAG 2.2 SC 1.4.3).
+								// Selected dark-theme rungs need stronger text contrast (WCAG 1.4.3).
 								className={cn(
 									"ps-6 text-xs",
 									selected ? "text-foreground/80" : "text-muted-foreground",

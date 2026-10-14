@@ -30,12 +30,6 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
-/**
- * Real-Postgres proof of what unit/repository tests cannot give: that login-side and SCM-side
- * resolve the SAME {@code git_provider} row for one person, so the practice-review gate's {@code
- * (User.provider.id, String.valueOf(User.nativeId))} tuple matches the {@code Identity} the login
- * flow stored. Drives the real provisioning path (the inline comments mark each seam).
- */
 class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationTest {
 
     private static final String ROLE = "run_practice_review";
@@ -141,9 +135,6 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
         loginProviderRepository.save(provider);
     }
 
-    /**
-     * Mirror of {@code RegistrationToGitProviderResolver#originOf} for the convergence cross-check.
-     */
     private static String originOf(String baseUrl) {
         URI uri = URI.create(baseUrl);
         String origin = uri.getScheme() + "://" + uri.getHost();

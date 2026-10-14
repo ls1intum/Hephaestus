@@ -19,7 +19,6 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** When a strength reads as held: the standing's own window is the bar, over the trend it was read off. */
 @Tag("unit")
 class PracticeStandingTest {
 
@@ -69,7 +68,6 @@ class PracticeStandingTest {
         return new PracticeStandingSnapshot(dto, List.of(), List.of(), trend, null);
     }
 
-    /** One review per piece of work, oldest first: {@code true} came back clean, {@code false} raised a problem. */
     private static PracticeTrend trendOf(boolean... cleanOldestFirst) {
         List<ResultView> practiceResults = IntStream.range(0, cleanOldestFirst.length)
                 .mapToObj(index -> result(index, cleanOldestFirst[index]))

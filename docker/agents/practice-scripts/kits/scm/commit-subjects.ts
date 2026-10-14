@@ -1,4 +1,4 @@
-/** Commit-subject shapes are leads for the review, not practice verdicts. */
+// Commit-subject patterns identify review candidates; they cannot establish a verdict.
 
 import type { ReviewLead } from "../../lib/core/contract.ts";
 import type { ChangeCommit, ChangedFile } from "./change.ts";
@@ -92,7 +92,7 @@ export function subjectLeads(facts: readonly SubjectFacts[], label: string): Rev
 		}));
 }
 
-/** Shown per commit; the rest are counted, so a long rename cannot push the edited files out of view. */
+// Bound per-commit text so large renames cannot crowd edited files out of the prompt.
 const LISTED_FILES = 8;
 
 /** Renamed with no line changed: a move, which is known only where the record counts the lines. */
@@ -131,7 +131,6 @@ export function commitLeads(facts: readonly SubjectFacts[], label: string): Revi
 					bodyLines: f.bodyLines,
 					files: f.files.length,
 					moved: moved.length,
-					// A fact holds at most 200 characters; an empty one is no fact.
 					...(paths === "" ? {} : { paths: paths.slice(0, 200) }),
 				},
 			};

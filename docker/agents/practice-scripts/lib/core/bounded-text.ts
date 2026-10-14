@@ -1,9 +1,7 @@
-/** Text that a bundled practice script returns, cut to the bounds that `contract.ts` validates. */
 import { FACT_CHARS, type Facts } from "./contract.ts";
 
 export { DIRECTION_CHARS } from "./contract.ts";
 
-/** The text on one line, cut to `max` characters with an ellipsis. */
 export function oneLine(text: string, max: number): string {
 	const flat = text.replaceAll(/\s+/gu, " ").trim();
 	return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;

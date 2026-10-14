@@ -48,13 +48,12 @@ import {
 	scanProblem,
 } from "./scan-settings";
 
-/** The group select's value for a practice in no group: a Base UI `Select` must hold a string. */
+// Base UI Select requires a string value for an unassigned group.
 export const NO_GROUP = "__none__";
 
 export const MAX_SCRIPT_LENGTH = 100_000;
 export const MAX_GUIDANCE_LENGTH = 2000;
 
-/** Everything the form edits, in the shape the controls hold it. */
 export interface PracticeDefinitionDraft {
 	slug: string;
 	kind: string;
@@ -91,10 +90,8 @@ export function kindDraftOf(draft: PracticeDefinitionDraft): KindDraft {
 	};
 }
 
-/** A scan draft for a practice whose kind this instance no longer offers. */
 const NO_SCAN_DRAFT: ScanDraft = { itemKind: "", include: "", exclude: "", context: "", reads: [] };
 
-/** What a kind starts with the first time an author chooses it. */
 export function freshKindDraft(itemType: PracticeItemTypeOption | undefined): KindDraft {
 	return {
 		settings: {
@@ -162,10 +159,7 @@ export function draftOf(
 	};
 }
 
-/**
- * What saving with a choice other than Hephaestus removes from the definition, as phrases. Each
- * stays in the draft, so the author can still choose Hephaestus again before saving.
- */
+/** Draft fields survive reviewer changes; saving decides which fields to keep. */
 export function clearedBySave(draft: PracticeDefinitionDraft): string[] {
 	if (draft.reviewedBy.by === "HEPHAESTUS") {
 		return [];
@@ -183,10 +177,7 @@ function textOrNull(text: string): string | null {
 	return hasText(trimmed) ? trimmed : null;
 }
 
-/**
- * The draft as the one closed definition the server stores. Only an automated review keeps reads,
- * a script or a scan; a blank script is the built-in review.
- */
+/** Only Hephaestus reviews retain reads, scripts, and scans; a blank script selects the built-in review. */
 export function definitionOfDraft(
 	draft: PracticeDefinitionDraft,
 	itemType: PracticeItemTypeOption | undefined,
@@ -208,8 +199,7 @@ export function definitionOfDraft(
 			whyItMatters: textOrNull(draft.whyItMatters),
 			whatGoodLooksLike: textOrNull(draft.whatGoodLooksLike),
 			goingWell: textOrNull(draft.goingWell),
-			// The markup and the Markdown go back as loaded: trimming them would turn an unrelated save
-			// into a change of the visual or the guide.
+			// Preserve loaded markup exactly; trimming would change it during an unrelated save.
 			visual: hasVisual(draft.visual)
 				? { svg: draft.visual.svg, alt: draft.visual.alt.trim() }
 				: null,
@@ -238,7 +228,6 @@ export const FIELD_IDS = {
 } as const;
 
 export interface DraftErrors {
-	/** The message beside each field, keyed by the id of the control it is about. */
 	byField: Partial<Record<string, string>>;
 	reviewedBy?: ReviewedByProblem;
 	settings?: ReviewSettingsProblem;
@@ -251,11 +240,8 @@ export interface DraftErrors {
 }
 
 export interface DraftErrorReveals {
-	/** Opens the collapsed technical settings, which unmount their contents. */
 	revealTechnical: () => void;
-	/** Returns the guide editor to its writing view. */
 	revealGuide: () => void;
-	/** Opens the collapsed script section. */
 	revealScript: () => void;
 }
 
@@ -288,7 +274,6 @@ function guideError(guide: PracticeGuide): string | undefined {
 		: undefined;
 }
 
-/** Every reason the draft cannot be saved, in the order the fields appear. */
 export function draftErrors(
 	draft: PracticeDefinitionDraft,
 	mode: "create" | "edit",
@@ -366,7 +351,6 @@ export function draftErrors(
 			!isValidSlug(draft.slug) && {
 				fieldId: FIELD_IDS.slug,
 				message: "Enter an identifier of 3–64 lowercase letters, numbers and single hyphens.",
-				// Lives inside the collapsed Technical settings panel, which unmounts its contents.
 				reveal: reveals.revealTechnical,
 			},
 	];

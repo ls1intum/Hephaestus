@@ -98,7 +98,6 @@ public final class SandboxLayout {
      */
     public static final String WORK_PREFIX = "work/";
 
-    /** Workspace-relative prefix of the practice programs' region. */
     public static final String PRACTICE_SCRIPT_PREFIX = WORK_PREFIX + "practice-scripts/";
 
     /**
@@ -114,10 +113,11 @@ public final class SandboxLayout {
      */
     public static final String PRACTICE_SCRIPT_LIBRARY_LINK = PRACTICE_SCRIPT_PREFIX + "lib";
 
-    /** Absolute image path of the practice toolkit that {@link #PRACTICE_SCRIPT_LIBRARY_LINK} names. */
     public static final String PRACTICE_SCRIPT_INPUTS_SUFFIX = ".inputs.json";
 
     public static final String PRACTICE_SCRIPT_LIBRARY_TARGET = "/opt/practice-scripts/lib";
+    public static final String PRACTICE_SCRIPT_KITS_LINK = PRACTICE_SCRIPT_PREFIX + "kits";
+    public static final String PRACTICE_SCRIPT_KITS_TARGET = "/opt/practice-scripts/kits";
 
     /** Workspace-relative prefix for analysis markers ({@link #ANALYSIS_PRACTICES_PREFIX} is a child). */
     public static final String ANALYSIS_PREFIX = WORK_PREFIX + "analysis/";
@@ -146,7 +146,6 @@ public final class SandboxLayout {
 
     public static final String NODE_PACKAGE_JSON_FILENAME = "package.json";
 
-    /** Workspace-relative filename of the direct models that the practice programs may call, by slot. */
     public static final String PRACTICE_SCRIPT_MODELS_FILE = "practice-script-models.json";
 
     /** Workspace-relative filename of the shared provider-registration ES module both runners import. */
@@ -195,7 +194,7 @@ public final class SandboxLayout {
     public static final String RUNTIME_CONTRACT_LABEL = "hephaestus.agent.runtime-contract";
 
     /** Runtime contract required by the staged runners. */
-    public static final int RUNTIME_CONTRACT_VERSION = 5;
+    public static final int RUNTIME_CONTRACT_VERSION = 6;
 
     /** Node major required by the staged runners. */
     public static final int NODE_MAJOR = 24;

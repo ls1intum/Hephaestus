@@ -76,7 +76,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Each name leads with its maker's mark, as everywhere else a model is named. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		const rows = canvas.getAllByRole("row").slice(1);
@@ -84,14 +83,12 @@ export const Default: Story = {
 		await expect(tiers).toStrictEqual(["In-house", "Cloud", "Not declared"]);
 		const gpt = canvas.getByRole("cell", { name: "GPT-5 mini" });
 		await expect(gpt.querySelector("img")).not.toBeNull();
-		// A model with no maker declared keeps the tile, with the generic glyph.
 		await expect(
 			canvas.getByRole("cell", { name: "Local Llama" }).querySelector("svg"),
 		).not.toBeNull();
 	},
 };
 
-/** A provider with no model yet keeps its table's header and says so in one row, with no box inside. */
 export const Empty: Story = {
 	args: { models: [] },
 	play: async ({ canvas }) => {
@@ -102,7 +99,6 @@ export const Empty: Story = {
 	},
 };
 
-/** A model turned off wears the registry's badge; a model that can run says so in plain words. */
 export const ModelOff: Story = {
 	args: { models: mockModels.map((model, index) => ({ ...model, enabled: index !== 0 })) },
 	play: async ({ canvas }) => {
@@ -112,7 +108,6 @@ export const ModelOff: Story = {
 	},
 };
 
-/** A turned-off provider stops every model on it, so none of them reads as ready. */
 export const ConnectionOff: Story = {
 	args: { connectionEnabled: false },
 	play: async ({ canvas }) => {

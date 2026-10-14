@@ -10,6 +10,7 @@ import jakarta.persistence.UniqueConstraint;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -37,6 +38,7 @@ public class IdentityRestriction {
     @Column(name = "provider_user_key", nullable = false, length = 255)
     private String providerUserKey;
 
+    @ColumnDefault("''")
     @Column(name = "team_key", nullable = false, length = 255)
     private String teamKey = "";
 

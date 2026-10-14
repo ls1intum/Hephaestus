@@ -1,11 +1,4 @@
-/**
- * Run one bundled practice program in the test process, with the context `child.ts` gives it and a
- * recording fake `review()`: no model, no session. A test gives the record of the work, the inputs record, the
- * change, and the files of the checkout and of the context folder. The harness validates the inputs as
- * the host validates them, answers reads as the host answers them, checks each review input and
- * resolves its leads as the host does, and returns what the program asked the review and what it
- * returned.
- */
+// This harness validates pinned evidence and script input without making model calls.
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -36,10 +29,8 @@ const SCRIPTS_DIR = path.resolve(
 
 const ADMITTED_AT = "2026-01-01T00:00:00Z";
 
-/** A full commit id, for a record or a previous head. */
 export const COMMIT = "a".repeat(40);
 
-/** A pull request record with the fields that every record holds, and `fields` over them. */
 export function pullRequestRecord(fields: Record<string, unknown> = {}): Record<string, unknown> {
 	return {
 		basis: { admission_fields: [], other_fields: "CAPTURE" },
@@ -61,7 +52,6 @@ export function pullRequestRecord(fields: Record<string, unknown> = {}): Record<
 	};
 }
 
-/** An issue record with each field that the provider did not record as null, and `fields` over them. */
 export function issueRecord(fields: Record<string, unknown> = {}): Record<string, unknown> {
 	return {
 		issue_number: 1,
@@ -85,7 +75,6 @@ export function issueRecord(fields: Record<string, unknown> = {}): Record<string
 	};
 }
 
-/** Frozen inputs for an authored script test. */
 export function requested(kind = "scm.pull_request", state: Record<string, string> = {}) {
 	return {
 		contractVersion: 3,
@@ -128,7 +117,6 @@ export function scan(filePath: string) {
 	};
 }
 
-/** The result the fake review returns: an open question about the cited change, with host coverage. */
 export const REVIEWED: Candidate = {
 	outcome: "COULD_NOT_DETERMINE",
 	summary: "The fake review leaves the practice open",
@@ -177,17 +165,14 @@ export interface RunInputs {
 	/** The context folder: a folder, or the files of a new one. The default is no folder. */
 	context?: string | Files;
 	contextReference?: string;
-	/** What the fake review returns. */
 	reviewed?: Candidate;
 }
 
-/** What a run of a bundled program did: the input of each review it asked for, and what it returned or threw. */
 export interface BundledRun {
 	reviews: ReviewOptions[];
 	outcome: { candidate: Candidate } | { error: unknown };
 }
 
-/** The one review a bundled program asks for, and the result it returned. */
 export interface BundledReview {
 	review: ReviewOptions;
 	candidate: Candidate;
@@ -201,7 +186,6 @@ async function writeFiles(dir: string, files: Files): Promise<void> {
 	}
 }
 
-/** The folder that a test gives, or a new folder under `root` that holds its files. */
 async function folder(root: string, name: string, given: string | Files | undefined) {
 	if (typeof given === "string") {
 		return given;
@@ -212,7 +196,6 @@ async function folder(root: string, name: string, given: string | Files | undefi
 	return dir;
 }
 
-/** The record of the work: `work` over the full record of a pull request or an issue. */
 function recordOf(kind: unknown, item: Record<string, unknown> | undefined): unknown {
 	if (kind === "scm.issue") {
 		return issueRecord(item);
@@ -220,7 +203,6 @@ function recordOf(kind: unknown, item: Record<string, unknown> | undefined): unk
 	return kind === "scm.pull_request" ? pullRequestRecord(item) : item;
 }
 
-/** Stage the bundled program beside a `lib` link, as the server stages it, and import it. */
 async function load(slug: string): Promise<{
 	definition: PracticeScriptDefinition<ModelNeeds>;
 	labels: Record<string, string>;
@@ -266,7 +248,6 @@ export async function leadKeys(slug: string): Promise<(label: string) => string>
 	};
 }
 
-/** Assemble the complete pinned fixture, including unchanged hunk context. */
 function fixtureSource(change: DiffFile): string {
 	const captured = new Map(change.addedLines);
 	for (const hunk of change.hunks) {
@@ -381,7 +362,6 @@ export async function runBundled(slug: string, inputs: RunInputs = {}): Promise<
 	return review;
 }
 
-/** {@link runBundled}, with the candidate the program returned. */
 export async function runBundledReview(
 	slug: string,
 	inputs: RunInputs = {},

@@ -26,7 +26,6 @@ const suspended: AdminAccountView = {
 	appRole: "USER",
 	status: "SUSPENDED",
 };
-/** Roster sync created this account; the person has not signed in, so it has no email yet. */
 const unclaimed: AdminAccountView = {
 	id: 4,
 	displayName: "Dana Unclaimed",

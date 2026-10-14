@@ -35,7 +35,6 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Publishes runtime rows and retained ledger spend without reading product persistence. */
 @Component
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor

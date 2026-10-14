@@ -13,7 +13,6 @@ import { problemDetailOf } from "@/lib/problem-detail";
 
 export interface CatalogGroupCreateLevelProps {
 	nested?: boolean;
-	/** Where the level sits, from the host's `levelPathAt`. */
 	path: LevelPath;
 	onDone: () => void;
 }

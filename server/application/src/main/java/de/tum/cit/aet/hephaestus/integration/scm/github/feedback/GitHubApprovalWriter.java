@@ -17,11 +17,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
-/**
- * GitHub adapter for {@link ApprovalWriter}: submits an APPROVE pull-request review via the {@code
- * ApprovePullRequest} mutation ({@code addPullRequestReview} specialised to {@code event:
- * APPROVE}).
- */
 @Component
 @ConditionalOnServerRole
 @OutboundEgressGateway

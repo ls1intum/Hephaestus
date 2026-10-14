@@ -27,12 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * An account whose first-linked actor owns a workspace connected to another provider or another
- * instance of the same provider, where its later-linked actor is the one reviewed. The account
- * reads the workspace as its actor on the connected instance, and keeps what it started through
- * either actor.
- */
 class WorkspaceActorSelectionIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private WorkspaceActorSelector actors;

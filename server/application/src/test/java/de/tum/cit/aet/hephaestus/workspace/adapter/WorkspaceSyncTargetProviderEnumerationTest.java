@@ -36,10 +36,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 
-/**
- * A credential the server cannot decrypt removes its own workspace from the sync enumerations that
- * span every workspace, while a lookup of that one workspace still fails with it.
- */
 class WorkspaceSyncTargetProviderEnumerationTest extends BaseUnitTest {
 
     private static final ConnectionConfig.GitLabConfig GITLAB_CONFIG = new ConnectionConfig.GitLabConfig(
@@ -82,9 +78,6 @@ class WorkspaceSyncTargetProviderEnumerationTest extends BaseUnitTest {
                 .thenReturn(true);
     }
 
-    /**
-     * A workspace that monitors one repository; its sync target id is ten times the workspace id.
-     */
     private static Workspace workspace(long id) {
         Workspace workspace = new Workspace();
         workspace.setId(id);

@@ -22,7 +22,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Current permission uses the actual document connection and every native source contributor. */
 @Component
 @ConditionalOnCaptureRole
 @Transactional(readOnly = true)

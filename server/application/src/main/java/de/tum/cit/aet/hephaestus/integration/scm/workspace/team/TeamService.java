@@ -20,22 +20,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service for managing teams within a workspace.
- *
- * <p>Handles team-related business logic including:
- *
- * <ul>
- *   <li>Retrieving teams for a workspace
- *   <li>Updating team visibility in workspace activity (via workspace-scoped settings)
- *   <li>Updating repository visibility for teams (via workspace-scoped settings)
- * </ul>
- *
- * <p>All visibility settings are stored in workspace-scoped entities to support multi-workspace
- * scenarios with different settings per workspace.
- *
- * @see WorkspaceTeamSettingsService
- */
 @Service
 public class TeamService {
 
@@ -173,15 +157,6 @@ public class TeamService {
                 .orElse(false);
     }
 
-    /**
-     * Converts a Team entity to TeamInfoDTO with workspace-scoped settings applied.
-     *
-     * @param team the team entity
-     * @param hiddenTeamIds set of team IDs that are hidden in this workspace
-     * @param hiddenRepoIds set of repository IDs hidden from contributions in this workspace
-     * @param labelFiltersByTeam pre-fetched label filters for all teams (avoids N+1 queries)
-     * @return the DTO with workspace-scoped hidden/label settings
-     */
     private TeamInfoDTO convertToDTO(
             Team team,
             Set<Long> hiddenTeamIds,

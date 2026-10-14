@@ -5,8 +5,14 @@ import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewEligibility;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRead;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryPolicy;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackHistoryQueryService;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackMarkListener;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPreparationStore;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPublicHistory;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReadService;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendQueue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackStoreService;
@@ -39,12 +45,20 @@ class FeedbackDeliveryRoleContextTest {
             PracticePageSupportReader.class,
             PracticePageFeedbackBasis.class,
             FeedbackLedgerRecorder.class,
+            FeedbackDeliveryPolicy.class,
+            FeedbackPreparationStore.class,
+            FeedbackMarkListener.class,
+            FeedbackPublicHistory.class,
+            FeedbackAnchorEligibility.class,
             FeedbackResponseSuppressionFilter.class,
             RepeatedSummaryCheck.class);
 
+    private static final Set<Class<?>> SERVER_READ_HELPERS = Set.of(FeedbackReadService.class, FeedbackBasisRead.class);
+
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(CAPTURE_HELPERS.toArray(Class<?>[]::new))
-            .withUserConfiguration(ConversationFeedbackTtlPurger.class);
+            .withUserConfiguration(ConversationFeedbackTtlPurger.class)
+            .withUserConfiguration(SERVER_READ_HELPERS.toArray(Class<?>[]::new));
 
     @Test
     void shouldBootWebhookWithoutFeedbackPersistence() {
@@ -56,6 +70,7 @@ class FeedbackDeliveryRoleContextTest {
                     assertThat(context).hasNotFailed().doesNotHaveBean(FeedbackRepository.class);
                     CAPTURE_HELPERS.forEach(type -> assertThat(context).doesNotHaveBean(type));
                     assertThat(context).doesNotHaveBean(ConversationFeedbackTtlPurger.class);
+                    SERVER_READ_HELPERS.forEach(type -> assertThat(context).doesNotHaveBean(type));
                 });
     }
 
@@ -65,8 +80,10 @@ class FeedbackDeliveryRoleContextTest {
             names = {"SERVER", "WORKER"})
     void shouldCreateActualPreparationAndHistoryHelpersOnCaptureRoles(RuntimeRole role) {
         var dependencies = new LinkedHashSet<Class<?>>();
-        CAPTURE_HELPERS.forEach(type -> Arrays.stream(type.getDeclaredConstructors()[0].getParameterTypes())
-                .filter(dependency -> !CAPTURE_HELPERS.contains(dependency))
+        var helpers = new LinkedHashSet<>(CAPTURE_HELPERS);
+        helpers.addAll(SERVER_READ_HELPERS);
+        helpers.forEach(type -> Arrays.stream(type.getDeclaredConstructors()[0].getParameterTypes())
+                .filter(dependency -> !helpers.contains(dependency))
                 .forEach(dependencies::add));
         ApplicationContextRunner configured = runner;
         for (Class<?> dependency : dependencies) configured = withMock(configured, dependency);
@@ -81,6 +98,10 @@ class FeedbackDeliveryRoleContextTest {
                     if (role == RuntimeRole.SERVER)
                         assertThat(context).hasSingleBean(ConversationFeedbackTtlPurger.class);
                     else assertThat(context).doesNotHaveBean(ConversationFeedbackTtlPurger.class);
+                    SERVER_READ_HELPERS.forEach(type -> {
+                        if (role == RuntimeRole.SERVER) assertThat(context).hasSingleBean(type);
+                        else assertThat(context).doesNotHaveBean(type);
+                    });
                 });
     }
 

@@ -21,7 +21,6 @@ function figure(canvas: HTMLElement, label: string) {
 	return within(canvas).getByText(label, { selector: "dt" }).nextElementSibling;
 }
 
-/** Three files against two practices: six pairs, so files and pairs are never one row. */
 export const Default: Story = {
 	play: async ({ canvasElement, canvas }) => {
 		await expect(figure(canvasElement, "Files")).toHaveTextContent("3");
@@ -36,7 +35,6 @@ export const Default: Story = {
 	},
 };
 
-/** Still listing files: the totals are unknown, and no percentage stands in for them. */
 export const TotalsNotKnownYet: Story = {
 	args: { counts: RUNNING_COUNTS, recorded: false },
 	play: async ({ canvasElement, canvas }) => {

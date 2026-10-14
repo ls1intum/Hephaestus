@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import tools.jackson.databind.ObjectMapper;
 
-/** Owns the sole canonical context serializer used for scan file versions. */
 @Component
 public class ScmFileVersions {
     public record Entry(String path, String mode, String objectId) {}

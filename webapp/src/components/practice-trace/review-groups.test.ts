@@ -64,7 +64,6 @@ describe("reviewOrdinalLabel", () => {
 
 	it("counts the item's reviews when it knows them", () => {
 		expect(reviewOrdinalLabel(2, 3)).toBe("Review 2 of 3");
-		// A count that cannot hold the position is not shown.
 		expect(reviewOrdinalLabel(4, 3)).toBe("Review 4");
 	});
 });

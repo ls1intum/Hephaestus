@@ -3,7 +3,6 @@ import test from "node:test";
 
 import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
-/** The commit record where the script reads it, `commits.json`. */
 function commitsRecord(commits: { sha: string; message: string }[]) {
 	return {
 		"commits.json": {
@@ -28,10 +27,8 @@ void test("a testing checklist does not turn a traceable handoff into a test-abs
 	});
 	assert.equal(result.facts?.issueMentionSyntaxCandidateCount, 1);
 	assert.match(result.directions?.[0] ?? "", /#42/u);
-	// The checklist is counted as written, so a tick is a fact rather than a guess.
 	assert.equal(result.facts.checklistTicked, 1);
 	assert.equal(result.facts.checklistUnticked, 0);
-	// The counts claim nothing about whose lines they are; the direction says so.
 	assert.match(
 		(result.directions ?? []).join("\n"),
 		/neither whose lines they are nor what was done/u,

@@ -9,14 +9,10 @@ import type {
 import { itemKindRank } from "@/lib/item-kinds";
 
 export type ReadNeed = PracticeReadSource["need"];
-/** A source's row in the reads editor: one of the three needs, or not read at all. */
 export type ReadChoice = ReadNeed | "NOT_USED";
 export type ReviewedByKind = PracticeDefinition["reviewedBy"]["by"];
 
-/**
- * Review on in the shape the server stores it — events unique and sorted, state dimensions and
- * their values sorted — so an untouched form compares equal to what it loaded.
- */
+/** Canonical order prevents an untouched draft from comparing unequal to the saved definition. */
 export function normalizeReviewOn(reviewOn: ReviewOn): ReviewOn {
 	return {
 		events: [...new Set(reviewOn.events)].sort((left, right) => left.localeCompare(right)),
@@ -28,7 +24,6 @@ export function normalizeReviewOn(reviewOn: ReviewOn): ReviewOn {
 	};
 }
 
-/** The events the item kind recommends, and no state restriction. */
 export function recommendedReviewOn(itemType: PracticeItemTypeOption): ReviewOn {
 	return normalizeReviewOn({
 		events: itemType.events.filter((option) => option.recommended).map((option) => option.name),
@@ -59,7 +54,6 @@ export function itemTypeFor(
 	return definitionOptions.itemTypes.find((option) => option.kind === kind);
 }
 
-/** The item types in the one order every list of kinds keeps; a kind this build does not know last. */
 export function orderedItemTypes(
 	definitionOptions: PracticeDefinitionOptions,
 ): PracticeItemTypeOption[] {

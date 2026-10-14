@@ -51,12 +51,10 @@ describe("ModelPicker", () => {
 			value: { scope: "SHARED", id: 1 },
 			onChange: vi.fn(),
 		});
-		// The model's own name only: the connection is the option's second line.
 		expect(screen.getByRole("combobox").textContent).toMatch(/^GPT-5\W?$/u);
 		fireEvent.click(screen.getByRole("combobox"));
 		screen.getByRole("option", { name: /^GPT-5, Organization endpoint,/u });
 		screen.getByRole("option", { name: /^GPT-5, Workspace endpoint,/u });
-		// Grouped by whose money each model spends, in the usage page's words.
 		screen.getByText("Shared models");
 		screen.getByText("Own provider");
 	});

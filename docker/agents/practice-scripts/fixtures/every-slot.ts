@@ -1,5 +1,3 @@
-// A program that uses every model slot, each optional, to prepare one review. Steps that do not
-// depend on each other start together, so a slow model costs only its own part.
 import {
 	scm,
 	addedComments,
@@ -26,7 +24,6 @@ import {
 	type ReviewLead,
 } from "../lib/core/practice-script.ts";
 
-/** The label of each kind of lead, as the reviewer reads it. */
 export const LABELS = {
 	untrackedTodo: "A TODO without a tracking reference.",
 	commentKind: "An added comment that a model rated as one that may need a second look.",
@@ -34,8 +31,6 @@ export const LABELS = {
 	mostUnfinished: "The added comment that a reranker ranked closest to unfinished work.",
 } as const;
 
-// The comment kinds that deserve a look. Code finds the marked open work, so `untracked-todo` is
-// code's kind here.
 const NEEDS_A_LOOK = new Set([
 	"restates-code",
 	"commented-out-code",
@@ -45,7 +40,6 @@ const NEEDS_A_LOOK = new Set([
 ]);
 
 const OPEN_WORK = /\b(?:TODO|FIXME|HACK|XXX)\b/u;
-/** A tracking reference as `commentKinds` defines one: an issue number, a ticket key or a URL. */
 const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
 
 /** How many pairs of vectors are nearly the same direction. */
@@ -70,10 +64,8 @@ const meta = {
 	},
 } as const;
 
-/** The program reads the change of a pull request. */
 type Context = PracticeScriptContext<typeof meta.models>;
 
-/** What one step of the program prepared for the review. */
 interface Preparation {
 	leads?: ReviewLead[];
 	unrated?: Omission[];

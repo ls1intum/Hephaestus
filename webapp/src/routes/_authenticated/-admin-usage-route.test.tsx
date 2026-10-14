@@ -178,7 +178,6 @@ describe("instance AI usage route", () => {
 	});
 });
 
-/** Thirty workspaces, the most shared-model spend at "Team 30". */
 function mockManyWorkspaces() {
 	const workspaces = Array.from({ length: 30 }, (_, index) => {
 		const number = String(index + 1).padStart(2, "0");
@@ -250,12 +249,10 @@ describe("instance AI usage route, the workspaces table", () => {
 		fireEvent.click(goToPageTwo());
 		await waitFor(() => expect(router.state.location.searchStr).toBe("?page=1"));
 
-		// A new sort starts again on the first page.
 		const workspace = screen.getByRole("columnheader", { name: "Workspace" });
 		fireEvent.click(within(workspace).getByRole("button"));
 		await waitFor(() => expect(router.state.location.searchStr).toBe("?sort=workspace&desc=false"));
 
-		// So does a new search.
 		fireEvent.click(goToPageTwo());
 		await waitFor(() =>
 			expect(router.state.location.searchStr).toBe("?sort=workspace&desc=false&page=1"),
@@ -278,7 +275,6 @@ describe("instance AI usage route, the workspaces table", () => {
 
 		await screen.findByText("Team 05", undefined, ROUTE_RENDER_WAIT);
 		const rows = await workspaceRows();
-		// Most shared spend first, on the last of two pages: 30 workspaces, 25 to a page.
 		expect(rows).toStrictEqual(["Team 05", "Team 04", "Team 03", "Team 02", "Team 01"]);
 		expect(
 			screen.getByRole("columnheader", { name: "Spend (Shared models)" }).getAttribute("aria-sort"),

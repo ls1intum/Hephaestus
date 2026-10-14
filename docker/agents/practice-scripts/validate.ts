@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/** Run a practice script against local pinned captures without model access. */
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -30,13 +29,11 @@ import { stagePracticeScripts } from "./stage.ts";
 const USAGE =
 	"Usage: node validate.ts --script <file.ts> --repo <clone> [--diff <patch>] --inputs <json> [--review <candidate.json>] [--out <dir>]";
 
-/** How long the program may run. */
 const DEADLINE_MS = 600_000;
 /** Where citations name the context folder and the checkout, as the sandbox stages them. */
 const CONTEXT_REFERENCE = "context";
 const TREE_SOURCE_PATH = "repos/reviewed/.git/HEAD";
 
-/** Stop on input that the command cannot use, with one line and exit code 2. */
 function stop(problem: string): never {
 	console.error(problem);
 	process.exit(2);
@@ -53,7 +50,6 @@ async function read(option: string, file: string): Promise<string> {
 	}
 }
 
-/** A JSON file that an option names. */
 async function json(option: string, file: string): Promise<unknown> {
 	const text = await read(option, file);
 	try {
@@ -133,7 +129,6 @@ if (out !== undefined) {
 const jsonPath = path.join(out ?? "", `${slug}.json`);
 const sectionPath = (n: number) => path.join(out ?? "", `${slug}.review-${n}.md`);
 
-/** One review that the program asked for: its input as the host parsed it, and what it gave back. */
 interface AskedReview {
 	/** The input, each lead with the quote that the host resolved. */
 	input: ReviewOptions;

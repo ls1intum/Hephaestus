@@ -18,11 +18,9 @@ import {
 } from "./feedback-check-vocabulary";
 
 export interface FeedbackChecksProps {
-	/** The checks in the order they ran, as the server lists them. */
 	checks: FeedbackCheck[];
 }
 
-/** Each check feedback passed or stopped at on its way to the developer, and the facts it read. */
 export function FeedbackChecks({ checks }: FeedbackChecksProps) {
 	if (checks.length === 0) {
 		return null;
@@ -90,7 +88,6 @@ function CheckFacts({ facts }: { facts: FeedbackCheckFacts }) {
 	);
 }
 
-/** The workspace settings the feedback was admitted under, and the ones it was checked against. */
 function settingsLine(facts: FeedbackCheckFacts): string {
 	return facts.admittedRolloutRevision === facts.evaluatedRolloutRevision
 		? `Workspace settings ${facts.admittedRolloutRevision}`

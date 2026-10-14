@@ -36,10 +36,6 @@ export interface GroupOptions {
 	overridesOnly?: boolean;
 }
 
-/**
- * The groups in their saved order, each with its practices, and one trailing bucket for the practices
- * in no group. Every effective feedback mode comes from the server; this only sorts and counts.
- */
 export function groupPracticesByGroup(
 	groups: readonly PracticeGroup[],
 	practices: readonly Practice[],

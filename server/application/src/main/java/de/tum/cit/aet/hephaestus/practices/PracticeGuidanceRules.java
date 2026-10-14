@@ -35,12 +35,7 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
-/**
- * What a practice visual and a practice guide may contain. The webapp draws an SVG inline, where
- * markup runs with the page's privileges, so this is an allowlist: only shapes and text pass, and
- * anything else is refused with words an admin can act on. A guide is Markdown that shows only its
- * own figures and links only to web pages.
- */
+// Inline SVG runs with page privileges; allow only shapes and text. Guides may link only to web pages.
 public final class PracticeGuidanceRules {
 
     public static final int MAX_SVG_BYTES = 64 * 1024;
@@ -112,11 +107,8 @@ public final class PracticeGuidanceRules {
             "aria-hidden",
             "focusable");
 
-    /**
-     * Numbers, colors, transforms and class names. A browser reads presentation attributes as CSS,
-     * so a backslash escape could spell {@code url(} past the check below; no escape, quote, colon
-     * or semicolon is needed to draw.
-     */
+    // CSS backslash escapes can hide url() from validation; drawing values need no escapes, quotes, colon, or
+    // semicolon.
     private static final Pattern PLAIN_VALUE = Pattern.compile("[\\w\\s#.,%+()/-]*");
 
     private static final Pattern FIGURE_NAME = Pattern.compile("[a-z0-9]+(?:-[a-z0-9]+)*");
@@ -354,12 +346,7 @@ public final class PracticeGuidanceRules {
         }
     }
 
-    /**
-     * Text and comments pass; CDATA and processing instructions do not. An HTML parser ends a
-     * comment that starts with ">" or "->" at once, so markup inside it would become elements once
-     * the picture is drawn inline: a comment passes only without angle brackets, where both parsers
-     * read it the same.
-     */
+    // Reject ambiguous comment markup that XML and HTML parsers could interpret differently.
     private static void checkNonElement(String subject, Node node) {
         boolean plain = node.getNodeType() == Node.TEXT_NODE
                 || (node.getNodeType() == Node.COMMENT_NODE
@@ -385,11 +372,7 @@ public final class PracticeGuidanceRules {
         }
     }
 
-    /**
-     * The OWASP XXE configuration for the JDK parser: no DOCTYPE, so no entity can reach a file or
-     * the network, and no XInclude. Secure processing also caps what a document can make the parser
-     * do.
-     */
+    // Disable DOCTYPE and XInclude so untrusted visuals cannot access files or the network.
     private static DocumentBuilderFactory factory() throws ParserConfigurationException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newDefaultNSInstance();
         factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);

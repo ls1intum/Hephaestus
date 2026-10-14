@@ -14,12 +14,6 @@ import {
 	type TraceDisplay,
 } from "@/components/admin/practice-reviews/trace-display";
 
-/**
- * Every state the story of a review can meet, one small graph per state: how the review ran, what
- * started it, the item reviewed, its results, where its feedback went, what became of it, and many
- * records at once. Each case heads its story with the verdict the graph gives and ends it with
- * where the review's path ended. A story per group, and one with all of them.
- */
 const meta = {
 	parameters: { layout: "fullscreen" },
 	tags: ["autodocs"],
@@ -38,7 +32,6 @@ const GROUPS: readonly LineageStateGroup[] = [
 	"volume",
 ];
 
-/** The groups whose state lives in each piece of feedback read best with everything shown. */
 const DISPLAY: Partial<Record<LineageStateGroup, TraceDisplay>> = {
 	destination: FULL_TRACE_DISPLAY,
 	delivery: FULL_TRACE_DISPLAY,
@@ -96,25 +89,18 @@ function groupStory(group: LineageStateGroup): Story {
 	};
 }
 
-/** Queued, running, complete, failed, timed out, cancelled, a withheld practice, expired runtime, a scan. */
 export const Review = groupStory("review");
 
-/** Started by an event, a request, a schedule and a backfill. */
 export const Origin = groupStory("origin");
 
-/** A pull request, a merge request, a Slack thread, an Outline document and a pull request review. */
 export const Item = groupStory("item");
 
-/** Every outcome by severity, stale, unverifiable, an earlier review's answers, none, and 24. */
 export const Results = groupStory("results");
 
-/** On the work, their practice pages and a conversation. */
 export const Destination = groupStory("destination");
 
-/** Every delivery state, a withdrawal and a replacement. */
 export const Delivery = groupStory("delivery");
 
-/** Many pieces of feedback from a few results. */
 export const Volume = groupStory("volume");
 
 /** Every group on one page. */

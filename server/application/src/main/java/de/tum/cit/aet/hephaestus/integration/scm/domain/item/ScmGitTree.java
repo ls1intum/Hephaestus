@@ -35,7 +35,7 @@ public class ScmGitTree {
                 return id.name();
             }));
         } catch (GitRepositoryManager.GitOperationException e) {
-            throw unavailable("Repository version is unavailable");
+            throw new ItemCaptureException(ItemCaptureCode.VERSION_UNAVAILABLE, "Repository version is unavailable", e);
         }
     }
 
@@ -61,7 +61,8 @@ public class ScmGitTree {
                 return List.copyOf(files);
             }));
         } catch (GitRepositoryManager.GitOperationException e) {
-            throw unavailable("Pinned repository tree is unavailable");
+            throw new ItemCaptureException(
+                    ItemCaptureCode.VERSION_UNAVAILABLE, "Pinned repository tree is unavailable", e);
         }
     }
 
@@ -78,7 +79,8 @@ public class ScmGitTree {
                 return bytes;
             }));
         } catch (GitRepositoryManager.GitOperationException e) {
-            throw unavailable("Pinned file content is unavailable");
+            throw new ItemCaptureException(
+                    ItemCaptureCode.VERSION_UNAVAILABLE, "Pinned file content is unavailable", e);
         }
     }
 

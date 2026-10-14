@@ -39,10 +39,7 @@ export interface SummaryFacts {
 	readOnly?: boolean;
 }
 
-/**
- * When the reader's latest own review finished, if it finished with results: a review that failed or
- * was cancelled recorded none, and one still moving has not finished.
- */
+/** Only completed own reviews with results supply a review date. */
 export function reviewedAt(context: Pick<ReadyContext, "trace">): string | undefined {
 	const review = context.trace?.review;
 	return review !== undefined &&
@@ -54,7 +51,6 @@ export function reviewedAt(context: Pick<ReadyContext, "trace">): string | undef
 
 const COMMIT = /^[0-9a-f]{7,64}$/u;
 
-/** The commit the latest finished own review looked at, shortened, when its version names one. */
 export function reviewedVersion(context: Pick<ReadyContext, "trace">): string | undefined {
 	const version = context.trace?.review.itemVersion ?? undefined;
 	return reviewedAt(context) !== undefined && version !== undefined && COMMIT.test(version)
@@ -62,10 +58,7 @@ export function reviewedVersion(context: Pick<ReadyContext, "trace">): string | 
 		: undefined;
 }
 
-/**
- * What the line says when the latest own review did not finish every practice. The report claims
- * nothing about the practices it could not review.
- */
+/** An incomplete review claims nothing about practices it could not finish. */
 export function unfinishedReview(context: Pick<ReadyContext, "trace">): string | undefined {
 	const status = context.trace?.review.status;
 	return status === "PARTIAL" || status === "FAILED"
@@ -157,7 +150,6 @@ export function summarizeReport({
 	} else if (state.trace === null && activity === undefined) {
 		parts.push("review status unavailable");
 	}
-	// A review that could not finish is said on the line, not only inside.
 	const unfinished = unfinishedReview(state);
 	if (unfinished !== undefined) {
 		parts.push(unfinished);

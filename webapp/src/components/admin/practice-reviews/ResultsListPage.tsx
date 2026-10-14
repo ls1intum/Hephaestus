@@ -22,17 +22,11 @@ import { ReviewTabIntro } from "./ReviewTabIntro";
 export interface ResultsListPageProps {
 	search: ResultsSearch;
 	onSearchChange: (patch: Partial<ResultsSearch>) => void;
-	/** The results the current `search` selects, as far as they are loaded. */
 	results: PagedListState<ReviewResult>;
 	groups: FacetSource;
 	practices: FacetSource;
 	people: ReviewPeople;
-	/** The one record the scope is filtered to, by name, for its pill. */
 	record?: ScopeRecordFilter;
-	/**
-	 * Counts above the list for the one practice it is filtered to (`PracticeResultsSummary`),
-	 * drawn by the route.
-	 */
 	summary?: ReactNode;
 }
 
@@ -59,13 +53,10 @@ export function ResultsListPage({
 	summary,
 }: ResultsListPageProps) {
 	const rows = results.status === "ready" ? results.rows : [];
-	// Guarded on the filter being set, because that is the only condition under which the first row
-	// names the filtered person — unfiltered, row zero is whoever happens to sort first, and the facet
-	// would put a stranger's name on somebody else's id.
+	// Only a developer filter makes the first row's name safe to use for that developer.
 	const filteredDeveloper = search.developerId === undefined ? undefined : rows[0]?.developer;
 	const hasFilter = hasResultFilter(search);
 	const reset = () => onSearchChange(clearedResultFilters());
-	// The server sorts "Most actionable first" by outcome and severity, not by time.
 	const byDay = search.order !== "ACTIONABILITY";
 
 	return (

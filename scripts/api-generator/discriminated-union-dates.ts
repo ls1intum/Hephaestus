@@ -9,8 +9,10 @@ function datePaths(
 	path: string[] = [],
 	seen = new Set<string>(),
 ): string[][] {
-	if (schema.$ref) {
-		if (seen.has(schema.$ref)) return [];
+	if (schema.$ref !== undefined) {
+		if (seen.has(schema.$ref)) {
+			return [];
+		}
 		return datePaths(resolve(schema.$ref), resolve, path, new Set([...seen, schema.$ref]));
 	}
 	if (schema.type === "string" && (schema.format === "date" || schema.format === "date-time")) {
@@ -49,31 +51,43 @@ function literalProperties(
 	resolve: ResolveSchema,
 	seen = new Set<string>(),
 ): Map<string, string> {
-	if (schema.$ref) {
-		if (seen.has(schema.$ref)) return new Map();
+	if (schema.$ref !== undefined) {
+		if (seen.has(schema.$ref)) {
+			return new Map();
+		}
 		return literalProperties(resolve(schema.$ref), resolve, new Set([...seen, schema.$ref]));
 	}
 	const literals = new Map<string, string>();
 	for (const [name, property] of Object.entries(schema.properties ?? {})) {
 		const value =
 			property.const ?? (property.items?.length === 1 ? property.items[0]?.const : undefined);
-		if (typeof value === "string") literals.set(name, value);
+		if (typeof value === "string") {
+			literals.set(name, value);
+		}
 	}
 	if (schema.logicalOperator === "and") {
 		for (const part of schema.items ?? []) {
-			for (const [name, value] of literalProperties(part, resolve, seen)) literals.set(name, value);
+			for (const [name, value] of literalProperties(part, resolve, seen)) {
+				literals.set(name, value);
+			}
 		}
 	}
 	return literals;
 }
 
-/** The generator delegates unresolved OR unions to this public expression hook. */
+// The generator delegates unresolved OR unions to this public expression hook.
 export const discriminatedUnionDates: ExpressionTransformer = ({
 	schema,
 	plugin,
 	dataExpression,
 }) => {
-	if (dataExpression === undefined || !schema.items || schema.logicalOperator === "and") return;
+	if (
+		dataExpression === undefined ||
+		schema.items === undefined ||
+		schema.logicalOperator === "and"
+	) {
+		return;
+	}
 	const resolve: ResolveSchema = (reference) =>
 		plugin.context.resolveIrRef<IR.SchemaObject>(reference);
 	const alternatives = schema.items.map((part) => ({
@@ -88,23 +102,34 @@ export const discriminatedUnionDates: ExpressionTransformer = ({
 			values.every((value) => value !== undefined) && new Set(values).size === alternatives.length
 		);
 	});
-	if (!discriminator) return;
+	if (discriminator === undefined) {
+		return;
+	}
 	const branches = alternatives.flatMap(({ part, literals }) => {
 		const paths = new Map<string, string[]>();
-		for (const path of datePaths(part, resolve)) paths.set(JSON.stringify(path), path);
-		if (paths.size === 0) return [];
+		for (const path of datePaths(part, resolve)) {
+			paths.set(JSON.stringify(path), path);
+		}
+		if (paths.size === 0) {
+			return [];
+		}
 		const literal = literals.get(discriminator);
-		if (literal === undefined)
+		if (literal === undefined) {
 			throw new Error("A union alternative lost its discriminator literal");
+		}
 		return [
 			$.if($.binary($("value").attr(discriminator), "===", $.literal(literal))).do(
 				...[...paths.values()].map((path) => dateAssignment(path, $("value"))),
 			),
 		];
 	});
-	if (branches.length === 0) return;
+	if (branches.length === 0) {
+		return;
+	}
 	const transform = $.func()
-		.param("value", (parameter) => parameter.type("any"))
+		.param("value", (parameter) => {
+			parameter.type("any");
+		})
 		.do(...branches, $.return("value"));
 	const converted = $(transform).call(dataExpression);
 	return typeof dataExpression === "string"

@@ -9,7 +9,7 @@ import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-/** Converts provider actor keys at the activity boundary. Bot activity does not create accounts. */
+// Bot activity must not create accounts.
 @Service
 @RequiredArgsConstructor
 public class ActivityPersonWriteAdmission {

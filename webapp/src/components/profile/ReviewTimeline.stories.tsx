@@ -15,7 +15,6 @@ import { ReviewTimeline } from "./ReviewTimeline";
 
 const THREAD_REVIEW = "00000000-0000-0000-0000-000000000201";
 
-/** Two reviews of different kinds of item, each with a not met result whose problems open. */
 const reviews: ProfileReview[] = [
 	detailReview,
 	{
@@ -44,10 +43,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * A group's feed: every result with problems open on arrival, each row naming its practice, and
- * each closing on its own without disturbing the others.
- */
 export const Default: Story = {
 	play: async ({ canvas, userEvent }) => {
 		const newest = canvas.getByRole("button", { name: /The refactor and the fix/u });
@@ -62,10 +57,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * On a practice's own level no row repeats the practice under its summary, and only the newest
- * review's row arrives open: the rest are the same practice's history, each a press away.
- */
 export const OnThePracticeLevel: Story = {
 	args: { showPracticeName: false, initiallyOpen: "newest" },
 	play: async ({ canvas, userEvent }) => {
@@ -83,7 +74,6 @@ export const OnThePracticeLevel: Story = {
 	},
 };
 
-/** No reviews: an empty rail, which the feed around it replaces with its own empty state. */
 export const Empty: Story = {
 	args: { reviews: [] },
 	play: async ({ canvas }) => {

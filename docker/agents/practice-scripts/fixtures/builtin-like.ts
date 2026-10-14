@@ -1,6 +1,4 @@
 import { scm, addedComments, expectKind, requireChange } from "../kits/scm/index.ts";
-// A custom program that ends as the built-in does, with its review's result, but prepares the
-// review's input in code first: a lead for each added TODO, a fact, a direction and a limitation.
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({

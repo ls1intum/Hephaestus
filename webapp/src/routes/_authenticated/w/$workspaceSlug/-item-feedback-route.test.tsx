@@ -9,13 +9,12 @@ import { detailFeedback, detailReview } from "@/stories/practice-detail-story-mo
 import { daysBefore } from "@/stories/story-clock";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
-// Mounting the real route pulls in the whole app shell and its lazy modules.
+// Route mounting loads the app shell and lazy modules, so the initial render needs a longer test timeout.
 vi.setConfig({ testTimeout: 20_000 });
 
 const REVIEWS_PATH = "*/workspaces/:workspaceSlug/practices/items/:itemId/reviews";
 const RESPONSE_PATH = "*/workspaces/:workspaceSlug/practices/feedback/:feedbackId/response";
 
-/** The linked review, whose feedback the reader already rated helpful on their practice page. */
 const ratedReview: ProfileReview = {
 	...detailReview,
 	feedback: [
@@ -46,7 +45,6 @@ beforeEach(() => {
 	);
 });
 
-/** The page is the address comments on the work link to; its states are stories, its wire is here. */
 describe("the page a comment on the work links to", () => {
 	it("reads the reader's reviews of exactly the linked item", async () => {
 		renderRouteAt("/w/acme/feedback/1902");

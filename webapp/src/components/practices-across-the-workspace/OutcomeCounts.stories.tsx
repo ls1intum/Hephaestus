@@ -15,7 +15,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Every outcome in the registry's order, each with its icon and word. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		const items = canvas.getAllByRole("listitem");
@@ -28,7 +27,6 @@ export const Default: Story = {
 	},
 };
 
-/** A zero stays in its place, muted, so the rows of a table line up. */
 export const SomeZero: Story = {
 	args: { outcomes: outcomes([3, 0, 0, 1]) },
 	play: async ({ canvas }) => {
@@ -36,7 +34,6 @@ export const SomeZero: Story = {
 	},
 };
 
-/** No result at all: one line instead of four zeros. */
 export const Empty: Story = {
 	args: { outcomes: NO_OUTCOMES },
 	play: async ({ canvas }) => {

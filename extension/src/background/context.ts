@@ -39,7 +39,6 @@ export interface ContextApi {
 	trace: (slug: string, itemId: string) => Promise<OwnItemTrace | null>;
 }
 
-/** The reads behind the report on the work's own page: the reader's results and comments. */
 export interface DetailsApi extends ContextApi {
 	ownResults: (slug: string, itemId: string, size: number) => Promise<PageResponseDtoResultList>;
 	workFeedback: (slug: string, workUrl: string) => Promise<DeliveredWorkFeedback>;
@@ -316,7 +315,6 @@ export async function requireReady(
 	return { context, stillShowing: located.stillThere };
 }
 
-/** Whether a record the server returned is about the item the tab resolved to, exactly. */
 export function sameItem(itemId: string | undefined, context: Pick<ReadyContext, "item">): boolean {
 	return itemId === context.item.id;
 }
@@ -329,13 +327,9 @@ function requiredTotal(total: number, returned: number): number {
 	return total;
 }
 
-/** How many results a report lists before it points to the web app for the rest. */
 export const RESULT_PAGE_SIZE = 25;
 
-/**
- * Refuses a list with any row about another item. A server that ignored the item filter would answer
- * with the reader's whole feed; that must never be shown as this work's results.
- */
+// Reject the whole answer if the server returns another item's records.
 function requireOnlyThisItem(
 	itemIds: readonly (string | undefined)[],
 	context: ReadyContext,

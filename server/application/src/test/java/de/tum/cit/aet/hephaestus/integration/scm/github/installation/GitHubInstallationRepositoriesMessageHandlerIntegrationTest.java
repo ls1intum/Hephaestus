@@ -26,11 +26,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Integration tests for GitHubInstallationRepositoriesMessageHandler.
- *
- * <p>Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
- */
 class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

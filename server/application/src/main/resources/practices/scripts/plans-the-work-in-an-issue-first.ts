@@ -1,6 +1,3 @@
-// Finds each issue that the change names as its own, with the time when it was opened, the time when
-// the earliest commit of the change was authored, and the time between them. The review reads the two
-// times beside each other.
 import { readCapturedCommits } from "../kits/scm/change.ts";
 import { scm, expectKind } from "../kits/scm/index.ts";
 import {
@@ -20,7 +17,6 @@ export const LABELS = {
 		"An issue that the change names as its own, with when it was opened and when the earliest commit was authored.",
 };
 
-/** The two moments in one sentence, the way the cell reads them. */
 function relationOf(issueToFirstCommit: number | null): string {
 	if (issueToFirstCommit === null) {
 		return "the captured commits do not establish the earliest authored time; the order is not known from the record";
@@ -30,7 +26,6 @@ function relationOf(issueToFirstCommit: number | null): string {
 		: `the issue was opened ${hours(-issueToFirstCommit)} h after the earliest commit was authored`;
 }
 
-/** Hours with one decimal, signed: positive when `to` is later than `from`. */
 function hours(millis: number): string {
 	return (millis / 3_600_000).toFixed(1);
 }
@@ -103,8 +98,7 @@ export default definePracticeScript({
 			});
 		}
 		const numbers = [...named.keys()].map((n) => `#${String(n)}`);
-		// A named number this repository holds no synchronized issue for may be an issue not yet
-		// synchronized or a reference elsewhere; the record cannot say which.
+		// An unresolved number may be unsynced or external; the record cannot distinguish them.
 		const unresolved = [...named.keys()].filter((n) => capture?.unresolved.includes(n) ?? false);
 		if (!commitsCaptured) {
 			directions.push(

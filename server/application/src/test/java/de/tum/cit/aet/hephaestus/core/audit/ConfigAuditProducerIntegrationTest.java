@@ -25,12 +25,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * One test per config-audit producer. {@code ConfigAuditRecorder} throws outside a writable
- * transaction, so an unexercised producer is a latent 500 rather than merely a missing row — and it
- * drops an UPDATE whose diff is empty, which is silent when a snapshot is built so it never
- * differs.
- */
 class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -151,10 +145,7 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
                 .toList();
     }
 
-    /**
-     * Not {@code findAll()}: the tenancy filter empties an unscoped read when no workspace is
-     * bound.
-     */
+    // Unscoped tenancy reads are empty; bind the workspace before reading audit rows.
     private List<ConfigAuditEvent> rowsFor(Workspace workspace, ConfigAuditEntityType entityType) {
         entityManager.flush();
         var filter = new ConfigAuditFilter(List.of(entityType), null, null, null, null, null, null);

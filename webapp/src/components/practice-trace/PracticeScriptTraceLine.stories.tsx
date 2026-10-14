@@ -12,11 +12,6 @@ import { PracticeScriptTraceLine } from "./PracticeScriptTraceLine";
 const REVIEW = "11111111-1111-1111-1111-111111111111";
 const DETAILS = "Details of the practice script for Thin controllers";
 
-/**
- * How a practice's script ran in one review, as an admin reads it under the practice. The line is
- * muted text and never a badge: it is about the script that reviewed the practice, not about the
- * developer's work, so it must not read as the practice's outcome.
- */
 const meta = {
 	component: PracticeScriptTraceLine,
 	parameters: { layout: "padded" },
@@ -34,7 +29,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** *Details* opens the review's *Practice scripts* section on Practice reviews. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		const details = canvas.getByRole("link", { name: DETAILS });
@@ -43,10 +37,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Inside a drawer stack, the caller opens the review over the stack it already has, so *Details*
- * keeps the reader's place.
- */
 export const DetailsInAStack: Story = {
 	args: {
 		reviewLink: (reviewId, label) => (
@@ -65,7 +55,6 @@ export const DetailsInAStack: Story = {
 	},
 };
 
-/** On the review's own sheet the line sits beside its *Practice scripts* section, so it has no *Details*. */
 export const OnTheReviewSheet: Story = {
 	args: { run: practiceScriptRuns.failed, details: false },
 	play: async ({ canvas }) => {

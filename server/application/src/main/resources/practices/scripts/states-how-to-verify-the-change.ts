@@ -1,6 +1,3 @@
-// Tells what kind of change this is, where text that tells how to verify it can be, and which added
-// lines keep an Xcode placeholder or read a secret. The criteria's applicability gate needs these facts
-// first: a small model often judges a diagram or an introduction as a change without instructions.
 import { scm, expectKind, requireChange, type DiffFile } from "../kits/scm/index.ts";
 import {
 	branchIssueReferences,
@@ -30,20 +27,17 @@ const TEST_PATH =
 	/(?:^|\/)(?:tests?|specs?|__tests__)(?:\/)|[._-](?:test|tests|spec|specs)\.[a-z]+$|Tests?\.[a-z0-9]+$|Spec\.[a-z0-9]+$/iu;
 const CODE = /\.(?:swift|ts|tsx|js|jsx|py|java|kt|go|rb|cs|cpp|cc|cxx|c|m|mm|h|hpp|vue|dart|rs)$/iu;
 const PREVIEW = /^\+.*(?:#Preview\b|PreviewProvider\b|\.stories\.[jt]sx?|storiesOf\()/u;
-// A CommonMark heading may be indented by up to three spaces.
+// CommonMark permits up to three spaces before a heading.
 const TESTING_HEADING =
 	/^ {0,3}#+\s*(?:testing|test(?:ing)? instructions|how to test|verification|steps to (?:test|verify|reproduce))/iu;
 const PLACEHOLDER_TESTING_TEXT = /^(?:n\/?a|none|not applicable|-|—)\.?$/iu;
 const SCREENSHOT = /!\[[^\]]*\]\([^)]*\)/gu;
-// Xcode's library inserts these around a control's defaults until the author replaces them.
 const PLACEHOLDER_TOKEN = /\/\*@(?:START_MENU_TOKEN|PLACEHOLDER=)/u;
-// A key or secret the code reads at runtime: a secret-shaped name beside a runtime lookup.
 const SECRET_NAME =
 	/api[_-]?key|apikey|client[_-]?secret|\bsecrets?\b|secret[A-Z_]|access[_-]?token/iu;
 const RUNTIME_LOOKUP =
 	/Bundle\.main|ProcessInfo|\benvironment\[|\.plist|xcconfig|Keychain|SecItem|UserDefaults|infoDictionary|process\.env|System\.getenv|os\.environ/u;
 
-/** The section under a testing heading, stripped of template comments; empty when it holds nothing. */
 function testingSection(body: string): { heading: string; content: string } | null {
 	const lines = body.split(/\r?\n/u);
 	for (let index = 0; index < lines.length; index += 1) {
@@ -67,10 +61,8 @@ function testingSection(body: string): { heading: string; content: string } | nu
 	return null;
 }
 
-/** The characters of an author's testing heading that a direction quotes. */
 const HEADING_CHARS = 100;
 
-/** A lead for each added line that matches. */
 function addedLinesMatching(
 	change: ReadonlyMap<string, DiffFile>,
 	kind: keyof typeof LABELS,
@@ -83,7 +75,6 @@ function addedLinesMatching(
 	);
 }
 
-/** `opening` and as many of the items as fit in one direction. */
 function listed(opening: string, items: readonly string[], separator = ", "): string {
 	return `${opening}${listWithin(items, DIRECTION_CHARS - opening.length - 1, separator)}.`;
 }
@@ -96,7 +87,6 @@ export default definePracticeScript({
 		const { item: record } = domain;
 		const change = requireChange(domain.files);
 		const paths = [...change.keys()];
-		// A move, a rename or a binary file changes no line; an image among them is still content.
 		const unchanged = [...change.values()]
 			.filter(
 				(file) => file.hunks.length === 0 && file.addedLines.size + file.removedLines.size === 0,
@@ -144,8 +134,6 @@ export default definePracticeScript({
 		const body = record.body ?? "";
 		const testing = testingSection(body);
 		const screenshots = body.match(SCREENSHOT)?.length ?? 0;
-		// Only the author's own words adopt an issue: a closing keyword in their prose, the title, the
-		// branch, or the provider's closing link. A template's example in code or a comment names nothing.
 		const capture = await readLinkedWorkItemCapture(ctx.evidence);
 		const captured = capture?.items.map((item) => item.number) ?? [];
 		const named = namedIssues([
@@ -183,7 +171,6 @@ export default definePracticeScript({
 				),
 			);
 		}
-		// A bare testing section reads as "nothing anywhere" unless the direction says what it settles.
 		const elsewhere =
 			" That settles nothing either way: the entry, action and expected result can be in other sections, an adopted issue, a preview, the documented setup or the author's discussion.";
 		const heading = testing === null ? "" : oneLine(testing.heading, HEADING_CHARS);

@@ -21,10 +21,7 @@ export type ReviewPracticeStatus = ReviewPractice["status"];
 export type ReviewJobStatus = ReviewJob["status"];
 export type ReviewJobProcessingStatus = ReviewJob["processingStatus"];
 
-/**
- * Whether a review *ran*. Nothing here says anything about its results or who heard about them —
- * those are `outcome-defs` and `delivery-state-defs`.
- */
+// Review status describes execution; result outcomes and feedback delivery are separate facts.
 export const REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 	QUEUED: {
 		label: "Queued",
@@ -108,7 +105,6 @@ export const OWN_REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 	},
 };
 
-/** Whether a review is still going: the states a page polls and a Cancel action applies to. */
 export function isActiveReview(status: ReviewStatus): boolean {
 	return status === "QUEUED" || status === "RUNNING";
 }
@@ -181,7 +177,6 @@ export const REVIEW_PRACTICE_STATUS_DEFS: StatusDefs<ReviewPracticeStatus> = {
 	},
 };
 
-/** One runtime job of a review. A scan runs many jobs; a review is not its job. */
 export const REVIEW_JOB_STATUS_DEFS: StatusDefs<ReviewJobStatus> = {
 	QUEUED: {
 		label: "Queued",

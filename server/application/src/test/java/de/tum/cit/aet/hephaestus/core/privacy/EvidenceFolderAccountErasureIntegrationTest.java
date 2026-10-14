@@ -728,7 +728,6 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    /** One incomplete dependency assessment as the catalog logs it: counts only. */
     private static Map<String, Object> assessed(
             String assessment,
             int sourceJobs,
@@ -745,9 +744,6 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
                 "evidence.unvouchedReadyReceipts", unvouchedReadyReceipts);
     }
 
-    /**
-     * The catalog's log events while open. Each must carry its key-value counts and nothing else.
-     */
     private static final class Diagnostics implements AutoCloseable {
         private final Logger logger = (Logger) LoggerFactory.getLogger(EvidenceFolderPersonDataCatalog.class);
         private final @Nullable Level level = logger.getLevel();
@@ -782,7 +778,6 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    /** A capture whose only copied rows came from {@code source}. */
     private ReviewJob captureCopying(
             JobEvidenceFiles files, ExactPersonDataCopyRecorder recorder, Workspace workspace, ReviewJob source)
             throws Exception {
@@ -797,7 +792,6 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         return job;
     }
 
-    /** A receipt row as an earlier capture, attempt or erasure left it. */
     private UUID receipt(ReviewJob job, String state, Map<String, Object> payload) {
         UUID id = UUID.randomUUID();
         jdbc.update(
@@ -822,7 +816,7 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
                 "SELECT payload::text FROM person_evidence_copy WHERE job_id=?", String.class, job.getId())));
     }
 
-    /** The receipt's people as origin#subject; jsonb keeps no key order to compare text against. */
+    // jsonb does not preserve key order; compare identities rather than serialized text.
     private List<String> identities(ReviewJob job) {
         var names = new ArrayList<String>();
         payload(job)
@@ -833,7 +827,6 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         return names;
     }
 
-    /** A receipt written before receipts recorded the jobs whose rows they copied. */
     private ReviewJob legacyCopy(Workspace workspace, PersonCopyIdentity identity) {
         var legacy = jobIn(workspace);
         receipt(legacy, "READY", Map.of("attempt", 0, "identities", List.of(identity), "repositories", List.of()));

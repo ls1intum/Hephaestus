@@ -21,7 +21,6 @@ import { STORY_GROUPS, STORY_PEOPLE, STORY_PRACTICES } from "./story-scope-sourc
 const loadMoreReviews = fn();
 const retryReviews = fn();
 
-/** Request review as the route wires it, for the kinds a person can ask about. */
 function storyRequestActions(): ReviewRequestActions {
 	return {
 		canRequest: (item) => REVIEWABLE_ON_DEMAND.has(item.kind),
@@ -30,17 +29,10 @@ function storyRequestActions(): ReviewRequestActions {
 	};
 }
 
-/** The list's own name, which the table carries while it loads and once it has rows. */
 const LIST = { name: "Practice reviews, newest first" } as const;
 
-/** The heading a day's reviews sit under, as the table names it for the reader's clock. */
 const dayOf = (review: ReviewSummary) => formatWeekdayDay(review.createdAt, new Date(STORY_NOW));
 
-/**
- * The reviews the endpoint would return for a search, computed from the fixture instead of mocked
- * over HTTP, through `reviewsQuery`, the very transformation the route sends, so a story cannot
- * "prove" a filter the screen never asks for.
- */
 function reviewsFor(
 	list: PagedListState<ReviewSummary>,
 	search: ReviewsSearch,
@@ -72,8 +64,6 @@ const meta = {
 		practices: STORY_PRACTICES,
 		people: STORY_PEOPLE,
 	},
-	// The screen is controlled: with a frozen `search` prop every facet reads as dead. The rows
-	// follow the search the same way the route's query would.
 	render: (args) => (
 		<StatefulPatch initial={args.search}>
 			{(search, patch) => (
@@ -94,10 +84,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The reviews as the developer's own list draws them, one body per day under its heading: the time
- * and status, the work, and what started it. A row opens its review over the list.
- */
 export const Default: Story = {
 	parameters: { viewport: { defaultViewport: "desktop" } },
 	play: async ({ canvas }) => {
@@ -109,7 +95,6 @@ export const Default: Story = {
 		}
 		await expect(within(table).getAllByText("Complete").length).toBeGreaterThan(0);
 		await expect(within(table).queryByRole("button", { name: "Complete" })).not.toBeInTheDocument();
-		// One link per row, the review: the work is text, not a link to the provider.
 		await expect(
 			within(table).queryByRole("link", { name: /opens in a new tab/u }),
 		).not.toBeInTheDocument();
@@ -119,7 +104,6 @@ export const Default: Story = {
 	},
 };
 
-/** Choosing a status narrows the list to the reviews in it. */
 export const StatusFilter: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ args, canvas, userEvent }) => {
@@ -137,10 +121,6 @@ export const StatusFilter: Story = {
 	},
 };
 
-/**
- * Request review, a row action: it names the work it would review, and is blocked with the reason
- * while a review of the same work is queued or running.
- */
 export const RequestReviewFromARow: Story = {
 	args: { requestReview: storyRequestActions() },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -163,7 +143,6 @@ export const Mobile: Story = {
 	},
 };
 
-/** The skeleton draws `REVIEW_PAGE_SIZE` rows, so the first page replaces it without a jump. */
 export const Loading: Story = {
 	args: { reviews: { status: "loading" } },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -181,14 +160,12 @@ export const NoReviewsYet: Story = {
 	render: (args) => <ReviewsPage {...args} />,
 	play: async ({ canvas }) => {
 		await canvas.findByText("No reviews yet");
-		// Nothing is filtered, so the empty state must not offer an action that would change nothing.
 		await expect(
 			canvas.queryByRole("button", { name: "Clear all filters" }),
 		).not.toBeInTheDocument();
 	},
 };
 
-/** A filter that matches nothing says so and offers to clear every filter. */
 export const NoReviewsMatch: Story = {
 	args: { reviews: loadedList([]), search: { status: ["CANCELLED"] } },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -199,7 +176,6 @@ export const NoReviewsMatch: Story = {
 	},
 };
 
-/** The status decides the wording and whether Retry is offered; this screen only forwards it. */
 export const LoadFailed: Story = {
 	args: {
 		reviews: {
@@ -217,10 +193,6 @@ export const LoadFailed: Story = {
 	},
 };
 
-/**
- * More reviews than the first page: the next page is asked for when the end of the list scrolls into
- * view, with no press.
- */
 export const LoadsMoreAtTheEnd: Story = {
 	args: { reviews: loadedList(reviews, { hasMore: true, onLoadMore: loadMoreReviews }) },
 	parameters: { chromatic: { viewports: [1440] } },

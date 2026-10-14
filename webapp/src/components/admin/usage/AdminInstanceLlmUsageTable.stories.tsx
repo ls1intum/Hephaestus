@@ -56,7 +56,6 @@ const nearingItsOwnProviderCap: AdminWorkspaceLlmUsage = {
 	events: 74,
 };
 
-/** A capped purse with a call that has no price is paused: a cap that cannot be checked is no cap. */
 const sharedBudgetOnlyUnverifiable: AdminWorkspaceLlmUsage = {
 	workspaceSlug: "launchpad",
 	displayName: "Launchpad",
@@ -84,7 +83,6 @@ const uncapped: AdminWorkspaceLlmUsage = {
 	instancePaused: false,
 };
 
-/** No cap, so calls with no price pause nothing, but $0.00 is still not the whole spend. */
 const uncappedUnpriced: AdminWorkspaceLlmUsage = {
 	...uncapped,
 	workspaceSlug: "workbench",
@@ -117,7 +115,6 @@ const rows: AdminWorkspaceLlmUsage[] = [
 	pausedOnItsOwnProviderCap,
 ];
 
-/** The usage details of one workspace's row: its run types and days add up to the row's figures. */
 function detailReportFor(row: AdminWorkspaceLlmUsage): WorkspaceLlmUsageReport {
 	const { workspaceSlug: _workspaceSlug, displayName: _displayName, events, ...limits } = row;
 	const figures = {
@@ -148,7 +145,6 @@ function detailReportFor(row: AdminWorkspaceLlmUsage): WorkspaceLlmUsageReport {
 
 const detailReport = detailReportFor(pausedOnSharedBudget);
 
-/** Thirty workspaces, the most shared-model spend at "Team 30": more than one page of 25. */
 const thirtyWorkspaces: AdminWorkspaceLlmUsage[] = Array.from({ length: 30 }, (_, index) => {
 	const number = String(index + 1).padStart(2, "0");
 	return {
@@ -160,7 +156,6 @@ const thirtyWorkspaces: AdminWorkspaceLlmUsage[] = Array.from({ length: 30 }, (_
 	};
 });
 
-/** The workspace names in the table, top to bottom. `find`: the preview mounts after the play starts. */
 async function workspaceNames(canvas: StoryContext["canvas"]): Promise<string[]> {
 	const table = await canvas.findByRole("table", { name: /^Per-workspace AI spend/u });
 	return within(table)
@@ -169,11 +164,6 @@ async function workspaceNames(canvas: StoryContext["canvas"]): Promise<string[]>
 		.map((row) => within(row).getAllByRole("cell")[0]?.querySelector("div")?.textContent ?? "");
 }
 
-/**
- * Every workspace's AI spend for one month, against both limits: the shared-model budget the host
- * grants — editable here — and the workspace's own provider cap, read-only because it is their money.
- * The table sorts, filters by name and pages at 25, because an instance can hold many workspaces.
- */
 const meta = {
 	component: AdminInstanceLlmUsageTable,
 	parameters: { layout: "padded" },
@@ -215,7 +205,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The shared-model budget cell of a workspace's row. */
 function sharedBudgetCellOf(canvas: StoryContext["canvas"], displayName: string): HTMLElement {
 	const row = canvas.getByRole("row", { name: new RegExp(`^${displayName}`, "u") });
 	const cell = within(row).getAllByRole("cell")[2];
@@ -225,11 +214,6 @@ function sharedBudgetCellOf(canvas: StoryContext["canvas"], displayName: string)
 	return cell;
 }
 
-/**
- * Each limit cell badges its own state. Launchpad leads with the most shared-model spend; a call with
- * no price pauses its budget. Workbench has no budget, so its calls with no price pause nothing, and
- * the badge says that its $0.00 is not the whole spend.
- */
 export const AllCapCombinationsInUsd: Story = {
 	play: async ({ canvas }) => {
 		await expect(await workspaceNames(canvas)).toStrictEqual([
@@ -251,7 +235,6 @@ export const AllCapCombinationsInUsd: Story = {
 	},
 };
 
-/** The row's button names the budget it edits and whether one is set, and speech control can say it. */
 export const SharedModelBudgetActions: Story = {
 	play: async ({ canvas }) => {
 		await canvas.findByRole("table", { name: /^Per-workspace AI spend/u });
@@ -267,7 +250,6 @@ export const SharedModelBudgetActions: Story = {
 	},
 };
 
-/** The table names its first page of 25 and offers the next. */
 export const FirstPage: Story = {
 	args: { rows: thirtyWorkspaces },
 	play: async ({ canvas, userEvent }) => {
@@ -294,7 +276,6 @@ export const PageTwo: Story = {
 	},
 };
 
-/** The name filter narrows the rows and resets to page one; Reset brings every workspace back. */
 export const FilteredByName: Story = {
 	args: { rows: thirtyWorkspaces },
 	play: async ({ canvas, userEvent }) => {
@@ -307,7 +288,6 @@ export const FilteredByName: Story = {
 	},
 };
 
-/** The field takes no more than the address keeps, so a long search is never cleared by itself. */
 export const LongSearch: Story = {
 	args: { rows: thirtyWorkspaces },
 	play: async ({ canvas, userEvent }) => {
@@ -326,7 +306,6 @@ export const NoNameMatches: Story = {
 	},
 };
 
-/** Only leaf columns sort; the purse names group their columns and carry no `aria-sort`. */
 export const SortByName: Story = {
 	play: async ({ canvas, userEvent }) => {
 		const headers = await canvas.findAllByRole("columnheader");
@@ -342,7 +321,6 @@ export const SortByName: Story = {
 	},
 };
 
-/** No workspace has an own provider, so the table has no columns of $0 for one. */
 export const SharedModelsOnly: Story = {
 	args: { rows: [uncapped, sharedBudgetOnlyUnverifiable] },
 	play: async ({ canvas }) => {
@@ -351,7 +329,6 @@ export const SharedModelsOnly: Story = {
 	},
 };
 
-/** Most workspaces have no practice script calls, and the panel then has no section for them. */
 export const Expanded: Story = {
 	args: {
 		expandedWorkspaceSlug: pausedOnSharedBudget.workspaceSlug,
@@ -360,7 +337,6 @@ export const Expanded: Story = {
 	play: async ({ canvas }) => {
 		const element = await expandedPanelFor(canvas, pausedOnSharedBudget.displayName);
 		const panel = within(element);
-		// No tinted box around the tables: a rule above, the workspace's name, then the sections.
 		await expect(getComputedStyle(element).backgroundColor).toBe("rgba(0, 0, 0, 0)");
 		await expect(
 			panel.getByRole("heading", { level: 2, name: pausedOnSharedBudget.displayName }),
@@ -375,10 +351,6 @@ export const Expanded: Story = {
 	},
 };
 
-/**
- * The same per-practice table as the workspace console, below the two breakdowns. Practice names are
- * plain text here: an instance admin does not have to belong to the workspace.
- */
 export const ExpandedWithPracticeScriptModels: Story = {
 	args: {
 		expandedWorkspaceSlug: pausedOnSharedBudget.workspaceSlug,
@@ -396,7 +368,6 @@ export const ExpandedWithPracticeScriptModels: Story = {
 			},
 		},
 	},
-	// Wide enough for two columns, where the breakdowns would sit side by side if they could.
 	parameters: { viewport: { defaultViewport: "desktop" } },
 	play: async ({ canvas }) => {
 		const panel = within(await expandedPanelFor(canvas, pausedOnSharedBudget.displayName));
@@ -408,7 +379,6 @@ export const ExpandedWithPracticeScriptModels: Story = {
 		await expect(within(table).getByRole("row", { name: /^Total/u }).textContent).toContain(
 			"$0.37",
 		);
-		// Each table gets the panel's width, so no header is cut off at the edge of a scroller.
 		for (const name of [
 			"AI spend by run type",
 			"AI spend by day",
@@ -420,7 +390,6 @@ export const ExpandedWithPracticeScriptModels: Story = {
 	},
 };
 
-/** The details warn about the provider cap that the row shows near its limit, at the row's figures. */
 export const ExpandedNearCap: Story = {
 	args: {
 		expandedWorkspaceSlug: nearingItsOwnProviderCap.workspaceSlug,
@@ -430,7 +399,6 @@ export const ExpandedNearCap: Story = {
 		const panel = within(await expandedPanelFor(canvas, nearingItsOwnProviderCap.displayName));
 		const runTypes = within(panel.getByRole("table", { name: "AI spend by run type" }));
 		const row = runTypes.getByRole("row", { name: /^Pull request review/u });
-		// The details add up to the row above them: $13.48 shared, $21.40 own provider, 74 runs.
 		await expect(within(row).getByText("$13.48")).toBeVisible();
 		await expect(within(row).getByText("$21.40")).toBeVisible();
 		await expect(within(row).getByText("74")).toBeVisible();
@@ -523,7 +491,6 @@ export const NearCap: Story = {
 		],
 	},
 	play: async ({ canvas }) => {
-		// One badge per limit, each beside the meter it reads, so the amber never carries the state alone.
 		await canvas.findByRole("table", { name: /^Per-workspace AI spend/u });
 		for (const [meter, badge] of [
 			["Shared-model budget used by Close Call", "Near the budget"],
@@ -533,7 +500,6 @@ export const NearCap: Story = {
 			await expect(cell).not.toBeNull();
 			const label = within(cell ?? document.body).getByText(badge);
 			await expect(label).toBeVisible();
-			// The whole state, never cut to "Near the bu…".
 			await expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth);
 		}
 	},
@@ -618,7 +584,6 @@ export const PastMonth: Story = {
 	},
 };
 
-/** Every limit state keeps its words and icon on the dark theme, so the tone never carries it alone. */
 export const Dark: Story = {
 	globals: { theme: "dark" },
 	play: async ({ canvas }) => {

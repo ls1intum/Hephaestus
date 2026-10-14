@@ -64,25 +64,19 @@ export type WorkspacePracticeState = PanelState<{
 	groupName?: string;
 }>;
 
-/**
- * What the practice's script needs, from the newest review that ran its current version.
- * Ready without a summary when no review has reported on the script yet.
- */
+/** Needs apply only to the current script version; earlier runs must not describe other code. */
 export type PracticeScriptNeedsState = PanelState<{ summary: PracticeScriptSummary | undefined }>;
 
 export interface WorkspacePracticePanelProps {
 	workspaceSlug: string;
 	state: WorkspacePracticeState;
-	/** Read only when the practice has a practice script. */
 	practiceScript: PracticeScriptNeedsState;
 	nested?: boolean;
 	/** Where the level sits, from the drawer. */
 	path: LevelPath;
-	/** Opens the reset's comparison. Offered only while the catalog has a different version. */
 	onResetToCatalog: () => void;
 }
 
-/** The model a script's slot calls: its chat slot is the review model. */
 const SLOT_PURPOSE = {
 	chat: "PRACTICE_REVIEW",
 	decision: "PRACTICE_DECISION",
@@ -90,14 +84,6 @@ const SLOT_PURPOSE = {
 	reranking: "PRACTICE_RERANKING",
 } as const satisfies Record<PracticeScriptNeed["slot"], AgentPurpose>;
 
-/**
- * A workspace practice, read-only, so that opening one is not the same act as editing it.
- *
- * Renders the same `PracticeDefinitionPreview` the catalog drawer uses, from the practice's current
- * version, so a practice reads identically whether it was met in the catalog or in the workspace's
- * own tree. Editing is a guarded level on top: a form that must ask before discarding work is not a
- * dismissible surface.
- */
 export function WorkspacePracticePanel({
 	workspaceSlug,
 	state,
@@ -194,7 +180,6 @@ export function WorkspacePracticePanel({
 	);
 }
 
-/** The current script's needs, or none while they load, failed, or describe an earlier script. */
 function currentNeeds(state: PracticeScriptNeedsState): PracticeScriptNeed[] {
 	if (state.status !== "ready" || state.summary === undefined) {
 		return [];
@@ -203,10 +188,7 @@ function currentNeeds(state: PracticeScriptNeedsState): PracticeScriptNeed[] {
 	return summary.scriptChanged || summary.asOf === null ? [] : summary.needs;
 }
 
-/**
- * The needs that stop the script for some members: a required model for practice scripts with no assignment
- * for their tier. The review model always runs the review, so the script requiring it stops nothing.
- */
+// Only unserved required direct models block the script; the review model is admitted separately.
 function blockingNeeds(state: PracticeScriptNeedsState): PracticeScriptNeed[] {
 	return currentNeeds(state).filter(
 		(need) =>
@@ -216,20 +198,14 @@ function blockingNeeds(state: PracticeScriptNeedsState): PracticeScriptNeed[] {
 	);
 }
 
-/** "In-house members’ work", or "the work of members who have not chosen". */
 function workOf(tiers: readonly DataHandlingTier[]): string {
 	const members = tierMembersPhrase(tiers);
-	// The phrase ends with the unchosen members whenever it names them, and they take no apostrophe.
 	return tiers.includes("UNDECLARED") ? `the work of ${members}` : `${members}’ work`;
 }
 
-/**
- * On AI models, an unmet required need makes the model's row `NEEDS_ATTENTION`. The alert takes that
- * status's tone and icon, so both surfaces show one state the same way.
- */
 const { badgeVariant: BLOCKING_TONE, icon: BlockingIcon } = PURPOSE_STATUS_DEFS.NEEDS_ATTENTION;
 
-/** Static page content, so no live role: opening the panel must not announce it as news. */
+// Static content must not announce itself as a new alert when the panel opens.
 function BlockingNeedsAlert({
 	workspaceSlug,
 	needs,
@@ -263,11 +239,6 @@ interface PracticeScriptNeedsProps {
 	state: PracticeScriptNeedsState;
 }
 
-/**
- * The models the script calls and the members no model serves, as the newest review that ran this
- * version of the script reported them. Nothing here is a health verdict: a run's own outcome is on
- * that review's trace.
- */
 function PracticeScriptNeeds({ workspaceSlug, state }: PracticeScriptNeedsProps) {
 	if (state.status === "loading") {
 		return (
@@ -293,7 +264,6 @@ function PracticeScriptNeeds({ workspaceSlug, state }: PracticeScriptNeedsProps)
 	if (summary === undefined || summary.asOf === null) {
 		return <NeedsNote>Its models show after its next review.</NeedsNote>;
 	}
-	// The review model always runs the review, so a row for it would have nothing to say.
 	const models = summary.needs.filter((need) => isPracticeScriptPurpose(SLOT_PURPOSE[need.slot]));
 	return (
 		<div className="space-y-2">
@@ -337,14 +307,12 @@ function NeedItem({ workspaceSlug, need }: { workspaceSlug: string; need: Practi
 					{badge && <StatusBadge def={badge} />}
 				</ItemTitle>
 				{unmet && (
-					// Indented past the mark, so the line sits under the name it is about.
 					<ItemDescription className="pl-10">
 						<UnmetTiers tiers={need.unmetTiers} className="text-sm" />
 					</ItemDescription>
 				)}
 			</ItemContent>
 			{unmet && (
-				// Below `sm` under the line it fixes, so the name and the line keep the row's width.
 				<ItemActions className="basis-full pl-10 sm:basis-auto sm:pl-0">
 					<PracticeScriptModelLink workspaceSlug={workspaceSlug} purpose={purpose}>
 						{assignModelLabel(purpose)}

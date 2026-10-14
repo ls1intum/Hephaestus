@@ -11,10 +11,6 @@ import { reviewRangeStart } from "@/components/admin/practice-reviews/review-ran
 import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { server } from "@/mocks/server";
 
-/**
- * The Practice reviews overview past its attention thresholds, for the route tests of its markers:
- * a range with 5 of 85 reviews failed, and a queue whose oldest has waited 42 minutes.
- */
 export const OVERVIEW = "/w/acme/admin/practices/reviews";
 
 /** The range: nothing queued or running, so nothing polls. */

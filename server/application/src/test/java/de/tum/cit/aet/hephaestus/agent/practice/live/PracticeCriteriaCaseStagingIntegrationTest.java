@@ -51,8 +51,16 @@ class PracticeCriteriaCaseStagingIntegrationTest {
                             candidate.path("slug").asString().equals("handles-errors-instead-of-swallowing-them"))
                     .findFirst()
                     .orElseThrow();
-            assertThat(entry.path("exhaustiveSources"))
-                    .extracting(JsonNode::asString)
+            assertThat(StreamSupport.stream(
+                                    entry.path("definition")
+                                            .path("reads")
+                                            .path("sources")
+                                            .spliterator(),
+                                    false)
+                            .filter(source ->
+                                    "COMPLETE".equals(source.path("need").asString()))
+                            .map(source -> source.path("source").asString())
+                            .toList())
                     .containsExactly("scm.pull-request.diff");
             assertThat(entry.path("readsSources"))
                     .extracting(JsonNode::asString)
@@ -61,8 +69,8 @@ class PracticeCriteriaCaseStagingIntegrationTest {
         var index =
                 mapper.readTree(workspace.resolve(SandboxLayout.MANIFEST_PATH).toFile());
         var paths = new HashSet<String>();
-        for (var artifact : index.path("artifacts")) {
-            String path = artifact.path("artifact").path("path").asString();
+        for (var artifact : index.path("files")) {
+            String path = artifact.path("file").path("path").asString();
             assertThat(paths.add(path))
                     .as("unique artifact in %s", scenario.path("id"))
                     .isTrue();
@@ -73,8 +81,8 @@ class PracticeCriteriaCaseStagingIntegrationTest {
         String commentsKind = scenario.path("workType").asString().equals("issue")
                 ? "scm.issue.comments"
                 : "scm.pull-request.comments";
-        for (var artifact : index.path("artifacts")) {
-            String path = artifact.path("artifact").path("path").asString();
+        for (var artifact : index.path("files")) {
+            String path = artifact.path("file").path("path").asString();
             if (path.equals(PracticeCriteriaCaseFixtures.COMMITS)) {
                 assertThat(artifact.path("kind").asString()).isEqualTo("scm.pull-request.core");
             }
@@ -106,9 +114,7 @@ class PracticeCriteriaCaseStagingIntegrationTest {
                                         : "scm.issue.comments"));
         var task = mapper.readTree(
                 workspace.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME).toFile());
-        assertThat(task.path("repositoryRoot").asString())
-                .isEqualTo(SandboxLayout.REPO_MOUNT_RELATIVE.replaceFirst("/$", ""));
-        assertThat(task.path("prompt").asString())
+        assertThat(task.path("task").path("prompt").asString())
                 .doesNotContain(scenario.path("reason").asString());
         var files = mapper.readTree(workspace.resolve("work/change/files.json").toFile())
                 .path("files");

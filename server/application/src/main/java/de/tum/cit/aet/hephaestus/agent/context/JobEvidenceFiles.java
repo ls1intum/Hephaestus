@@ -404,7 +404,6 @@ public class JobEvidenceFiles implements SandboxResultListener {
         }
     }
 
-    /** False when the file is absent; a present file whose bytes differ from {@code sha} throws. */
     private boolean existsWithDigest(ReviewJob job, String filePath, String sha) {
         return inspect(job, filePath, sha, reader -> Boolean.TRUE).isPresent();
     }

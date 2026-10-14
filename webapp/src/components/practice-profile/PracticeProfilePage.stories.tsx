@@ -35,7 +35,6 @@ const meta = {
 		state: { status: "ready" },
 	},
 	argTypes: {
-		// References from the server: nothing in them is a control a reader could set by hand.
 		latestReview: { control: false },
 		goingWell: { control: false },
 	},
@@ -68,8 +67,6 @@ export const Default: Story = {
 			"href",
 			expect.stringContaining("practice-groups:all"),
 		);
-		// What goes well sits between the header and the feedback, in the server's words; no summary
-		// card of the page's own stands there.
 		const goingWell = canvas.getByRole("heading", { level: 2, name: "Going well" });
 		const feedback = canvas.getByRole("heading", { level: 2, name: "Your feedback" });
 		await expect(precedes(goingWell, feedback)).toBe(true);
@@ -132,7 +129,6 @@ export const FeedbackTabs: Story = {
 
 		await userEvent.click(canvas.getByRole("tab", { name: /^All/u }));
 		await expect(articles()).toHaveLength(9);
-		// Newest first across both: the open and the resolved card from the latest review lead.
 		await expect(articles()[0]).toHaveTextContent("Created 9 September, 2:10 pm");
 
 		await userEvent.click(canvas.getByRole("tab", { name: /^Open/u }));
@@ -142,10 +138,6 @@ export const FeedbackTabs: Story = {
 	},
 };
 
-/**
- * No review has reached any practice, so there is no review, no feedback, and the tab says so in the
- * empty block every practice surface uses: the icon, what is missing, and when it will show up.
- */
 export const ColdStart: Story = {
 	args: {
 		latestReview: undefined,

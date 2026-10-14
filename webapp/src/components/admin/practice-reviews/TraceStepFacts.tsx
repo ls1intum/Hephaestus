@@ -32,7 +32,6 @@ export interface TraceStepFactsProps {
 	numbered: readonly NumberedResult[];
 	/** The record the trace was opened for, whose verdict already heads the trace. */
 	here?: TraceNode;
-	/** The review's detail, where the page has it: its runtime jobs and its model. */
 	review?: ReviewDetail;
 	/**
 	 * Whether every step shows its facts, as "Expand all" asks. The results' table then names
@@ -41,13 +40,6 @@ export interface TraceStepFactsProps {
 	everyStep?: boolean;
 }
 
-/**
- * What "Expand all" and the system info add under a step: only what the step's own line does not
- * already say. The count of results and the end say everything on their line, so they
- * add nothing and draw no box. The review adds its times, model and attempts; the item its link; a
- * result what became of it; a piece of feedback where exactly it went, when it was delivered and the
- * practices it was written from.
- */
 export function traceStepFacts(props: TraceStepFactsProps): ReactElement | null {
 	const { node, lineage, numbered, here, review, everyStep = false } = props;
 	const records = lineageRecords(lineage);
@@ -86,10 +78,6 @@ export function traceStepFacts(props: TraceStepFactsProps): ReactElement | null 
 	}
 }
 
-/**
- * A result: what became of it in one sentence, unless the trace stands on it and says so on top,
- * when it was recorded, and whether it is still current.
- */
 function ResultFacts({
 	lineage,
 	entry,
@@ -185,7 +173,6 @@ function ItemFacts({ item }: { item: ItemRef }) {
 	);
 }
 
-/** How far the review got, step by step: recorded, written, reached the developer. */
 function StageLine({ records }: { records: LineageRecords }) {
 	const counts = stageCounts(records);
 	const stages = [

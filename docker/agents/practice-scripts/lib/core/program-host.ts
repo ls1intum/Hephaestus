@@ -31,10 +31,8 @@ import {
 	type SlotReport,
 } from "./script-run.ts";
 
-/** The program of a practice without a custom one: one review of the practice, as it is. */
 export const BUILTIN_SCRIPT = definePracticeScript({ meta: {}, run: async (ctx) => ctx.review() });
 
-/** Which program a practice runs: its staged custom program, or the built-in. */
 export interface PracticeProgram {
 	/** The staged `<slug>.ts`, or null for the built-in. */
 	script: { path: string; source: Buffer } | null;
@@ -55,7 +53,6 @@ export interface ProgramOutcome {
 	durationMs: number | null;
 }
 
-/** The SHA-256 of a staged program's bytes. */
 export const programDigest = (source: Buffer): string =>
 	createHash("sha256").update(source).digest("hex");
 
@@ -85,7 +82,6 @@ function identity(program: PracticeProgram): ProgramOutcome["program"] {
 		: { kind: "custom", digest: programDigest(program.script.source) };
 }
 
-/** Run the built-in program in this process, with the same context and services as a child. */
 async function runBuiltin(job: ProgramJob, services: ProgramServices): Promise<ProgramExecution> {
 	const calls = noCalls();
 	const parsed = parseMeta(BUILTIN_SCRIPT.meta);

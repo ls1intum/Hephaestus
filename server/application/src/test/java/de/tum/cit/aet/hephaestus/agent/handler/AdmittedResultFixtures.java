@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Persisted proof for downstream authorization tests; admission itself must verify real bytes. */
+// These fixtures support downstream authorization tests; admission tests must verify real captured bytes.
 public final class AdmittedResultFixtures {
     private AdmittedResultFixtures() {}
 

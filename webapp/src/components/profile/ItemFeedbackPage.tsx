@@ -6,18 +6,11 @@ import { ReviewFeed } from "./ReviewFeed";
 import type { FeedbackResponseControls, ReviewFeedState } from "./reviews";
 
 export interface ItemFeedbackPageProps {
-	/** The reader's own reviews of the item, newest first. */
 	feed: ReviewFeedState;
 	/** The reader's response to each piece of feedback; absent where they may not respond. */
 	responses?: FeedbackResponseControls;
 }
 
-/**
- * Where a comment Hephaestus posted on a pull request, merge request or issue sends its reader: their
- * own reviews of that item, every practice together, with each piece of their feedback and its
- * response. Somebody the comment was not about finds nothing of theirs, and is told so rather than
- * shown anybody else's.
- */
 export function ItemFeedbackPage({ feed, responses }: ItemFeedbackPageProps) {
 	return (
 		<div className="flex max-w-4xl min-w-0 flex-col gap-6">

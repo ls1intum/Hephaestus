@@ -93,7 +93,6 @@ function renderTable(
 	);
 }
 
-/** The cell that holds a limit's meter: its badges and caption sit beside the bar. */
 function capCellOf(meterName: string): HTMLElement {
 	const cell = screen.getByRole("progressbar", { name: meterName }).closest("td");
 	assert(cell, `No cell holds the meter "${meterName}".`);
@@ -111,7 +110,6 @@ function workspaceNames(): (string | null)[] {
 }
 
 function firstDataRow(): HTMLElement {
-	// Two header rows: the purse names, then the columns under them.
 	const dataRow = screen.getAllByRole("row")[2];
 	assert(dataRow, "The table rendered its two header rows but no workspace row.");
 	return dataRow;
@@ -147,7 +145,6 @@ describe("AdminInstanceLlmUsageTable", () => {
 			{ ...workspace, ownProviderMonthlyBudgetUsd: 10, ownProviderBudgetVerdict: "WITHIN" },
 		]);
 
-		// The host's limit is a budget and the workspace's own is a cap, each named for whose it is.
 		screen.getByRole("columnheader", { name: "Budget (Shared models)" });
 		screen.getByRole("columnheader", { name: "Cap (Own provider)" });
 		const row = within(firstDataRow());
@@ -209,7 +206,6 @@ describe("AdminInstanceLlmUsageTable", () => {
 			},
 		]);
 
-		// Spend, then the budget column: no budget, and the state of the spend beside it.
 		const cells = within(firstDataRow()).getAllByRole("cell");
 		expect(cells[1]?.textContent).toBe("$0.00");
 		expect(cells[2]?.textContent).toBe("—Unavailable cost");

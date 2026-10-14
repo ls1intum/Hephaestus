@@ -79,7 +79,7 @@ export function WorkspaceLlmUsagePage({
 	);
 }
 
-/** The report's shape without its landmarks: a skeleton must not claim the regions the report will own. */
+// Skeletons must not duplicate the report's landmark regions.
 function UsageSkeleton() {
 	return (
 		<div className="space-y-8" aria-busy="true">

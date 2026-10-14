@@ -220,7 +220,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         job.prePersist();
         job.setAvailableAt(availableAt);
         job.setHoldReason(holdReason);
-        return jobRepository.saveAndFlush(job);
+        return jobRepository.saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job));
     }
 
     @Test
@@ -253,6 +253,46 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(event.getFundingSource()).isEqualTo(UsageFundingSource.INSTANCE);
         assertThat(event.getAppliedPriceId()).isEqualTo(42L);
         assertThat(budgetService.headroom(workspace.getId()).instanceSpentUsd()).isEqualByComparingTo("12.00");
+    }
+
+    @Test
+    void shouldPersistReviewIdentitySeparatelyFromTheRuntimeSourceAndPreserveUsageFields() {
+        var workspace = setupWorkspace("ledger-review-identity");
+        var job = queuedJob(workspace, Instant.now(), null);
+        assertThat(job.getReviewId()).isNotEqualTo(job.getId());
+        record(
+                workspace.getId(),
+                new LlmUsageRecorder.LlmUsageSample(
+                        job.getReviewId(),
+                        "PRACTICE_REVIEW",
+                        UsageSourceType.REVIEW_JOB,
+                        job.getId(),
+                        7,
+                        "gpt-ledger",
+                        1234,
+                        3456,
+                        56,
+                        78,
+                        444,
+                        0,
+                        2,
+                        pricedInstance("3.00", "9.00"),
+                        UsageProvenance.PROXY,
+                        MeasurementVerification.VERIFIED,
+                        Instant.now()));
+        var event = eventsOf(workspace).getFirst();
+        assertThat(event.getReviewId()).isEqualTo(job.getReviewId());
+        assertThat(event.getSourceId()).isEqualTo(job.getId());
+        assertThat(event.getSourceAttempt()).isEqualTo(7);
+        assertThat(event.getInputTokens()).isEqualTo(1234);
+        assertThat(event.getOutputTokens()).isEqualTo(3456);
+        assertThat(event.getCacheReadTokens()).isEqualTo(56);
+        assertThat(event.getCacheWriteTokens()).isEqualTo(78);
+        assertThat(event.getReasoningTokens()).isEqualTo(444);
+        assertThat(event.getSearchUnits()).isZero();
+        assertThat(event.getUnreportedCalls()).isZero();
+        assertThat(event.getTotalCalls()).isEqualTo(2);
+        assertThat(event.getUsageProvenance()).isEqualTo(UsageProvenance.PROXY);
     }
 
     @Test

@@ -29,7 +29,6 @@ import type { ScanEntryStatus } from "@/components/practice-vocabulary/scan-entr
 
 import { useInvalidateOnSettle } from "./use-invalidate-on-settle";
 
-/** The report lists' page size: the server's default, named so a test can count on it. */
 export const SCAN_REPORT_PAGE_SIZE = 50;
 
 export interface ScanReportFilters {
@@ -75,7 +74,6 @@ function listState<TPage extends { content: readonly TEntry[]; hasNext: boolean 
 	return { status: "loading" };
 }
 
-/** The file name the server gave the download, or `undefined` when its header names none. */
 export function sarifFilename(disposition: string | null): string | undefined {
 	const match = /filename="?(?<name>[^";]+)"?/iu.exec(disposition ?? "");
 	return match?.groups?.name;
@@ -129,9 +127,7 @@ export function useScanReport(
 		refetchInterval: listsPoll,
 	});
 
-	// The lists stop polling with the report, so the answer that made an active scan terminal is
-	// followed by one more read of each list: without it they would keep the last page from while it
-	// ran.
+	// Read lists once after the report becomes terminal; polling alone can stop before their final rows arrive.
 	useInvalidateOnSettle(scanId, listsPoll !== false, [
 		listScanReportItemsQueryKey({ path }),
 		listScanReportProblemsQueryKey({ path }),

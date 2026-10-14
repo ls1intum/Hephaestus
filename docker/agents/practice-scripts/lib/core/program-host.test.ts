@@ -39,7 +39,6 @@ after(async () =>
 );
 
 const FIXTURES = path.join(import.meta.dirname, "../..", "fixtures");
-/** The reviewed head: `commit_sha` of the record fixture. */
 const HEAD = "0".repeat(40);
 const BASE = "b".repeat(40);
 const CHANGE = parseDiff(
@@ -59,7 +58,6 @@ const CHANGE = parseDiff(
 	].join("\n"),
 );
 
-/** What the fake review returns: an open question, with the host coverage its session measured. */
 const REVIEWED: Candidate = {
 	outcome: "COULD_NOT_DETERMINE",
 	summary: "The review leaves the practice open",
@@ -91,7 +89,6 @@ const REVIEWED: Candidate = {
 
 const fixture = async (name: string) => readFile(path.join(FIXTURES, `${name}.ts`), "utf8");
 
-/** A program staged from its source: `meta` and `run`, with the imports it names. */
 const program = (imports: string, body: string) =>
 	`import {scm} from "../kits/scm/index.ts";
 import { ${imports} } from "../lib/core/practice-script.ts";\nexport default definePracticeScript(${body});\n`;
@@ -103,10 +100,6 @@ interface Workspace {
 	inputs: InputReader;
 }
 
-/**
- * Stage the programs under their slugs (null for the built-in) beside a requested pull request
- * review, with a checkout, the captured record and the captured change.
- */
 async function workspace(scripts: Record<string, string | null>): Promise<Workspace> {
 	const { root, practices } = await stagePracticeScripts(scripts);
 	roots.push(root);
@@ -139,16 +132,13 @@ async function workspace(scripts: Record<string, string | null>): Promise<Worksp
 }
 
 interface RunOptions {
-	/** What the review service does; by default it returns {@link REVIEWED}. */
 	review?: (options: ReviewOptions, signal: AbortSignal) => Promise<Candidate>;
 	models?: Partial<SlotModels>;
 	budget?: ModelBudget;
 	signal?: AbortSignal;
-	/** The practice's time, from now. */
 	deadlineMs?: number;
 }
 
-/** Run one staged practice's program at the host, and return what the review service and the log saw. */
 async function run(ws: Workspace, slug: string, options: RunOptions = {}) {
 	const read = await ws.inputs.read(slug);
 	assert.ok("inputs" in read, "error" in read ? read.error : "");
@@ -189,7 +179,6 @@ async function run(ws: Workspace, slug: string, options: RunOptions = {}) {
 	return { outcome, reviews, logs, staged };
 }
 
-/** The outcome as the execution report holds it: it must parse as a report entry. */
 function reportEntry(slug: string, outcome: ProgramOutcome) {
 	return executionEntrySchema.parse({
 		practiceSlug: slug,
@@ -216,7 +205,6 @@ const calls = (
 	...models,
 });
 
-/** A review service that answers after the given time. */
 const slowReview = (ms: number) => async () => {
 	await sleep(ms);
 	return REVIEWED;
@@ -398,9 +386,7 @@ export default definePracticeScript({
 			assert.ok(logs.includes(line), `${line} in:\n${logs.join("\n")}`);
 		}
 		assert.equal(existsSync(escape), false);
-		// The one read went through the host, which kept its receipt.
 		assert.deepEqual(outcome.coverageReached, { reads: 1, truncatedReads: 0, failedReads: 0 });
-		// It returned host coverage that no review of this practice returned.
 		assert.deepEqual(reviews, []);
 		assert.equal(outcome.status, "failed");
 		assert.equal(outcome.stopReason, "invalid-candidate");
@@ -539,7 +525,6 @@ void describe("the host's bounds on a program's messages", () => {
 	});
 	void test("more requests in flight than the host answers stop the program", async () => {
 		const embedding = new MockEmbeddingModelV4({
-			// It answers only when the host aborts the call.
 			doEmbed: async ({ abortSignal }) => {
 				if (abortSignal !== undefined) {
 					await once(abortSignal, "abort");
@@ -731,7 +716,6 @@ void test("direct model calls share the attempt's budget: a later practice sees 
 	const budget = new ModelBudget(reserve + 100, MODEL_CONCURRENCY);
 	const first = await run(ws, "first", { models: { chat }, budget });
 	assert.equal(first.outcome.status, "ok", first.outcome.error);
-	// The call settled at the 150 tokens it reported.
 	assert.deepEqual(first.reviews[0]?.facts, {
 		before: reserve + 100,
 		after: reserve - 50,

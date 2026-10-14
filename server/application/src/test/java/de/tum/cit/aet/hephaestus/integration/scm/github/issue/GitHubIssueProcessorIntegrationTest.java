@@ -193,10 +193,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 );
     }
 
-    /**
-     * GitHub's issue payload for a pull request carries {@code pull_request}; it is never stored as
-     * an issue.
-     */
     @Nested
     class PullRequestMarkedPayload {
 

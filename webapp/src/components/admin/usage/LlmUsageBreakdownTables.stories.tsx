@@ -59,7 +59,6 @@ const dayRows: LlmUsageByDay[] = [
 	},
 ];
 
-/** The footers read money and runs with no price off the envelope rather than re-adding rows, so the fixture adds up. */
 function report(overrides: Partial<WorkspaceLlmUsageReport> = {}): WorkspaceLlmUsageReport {
 	const byJobType = overrides.byJobType ?? jobTypeRows;
 	const byDay = overrides.byDay ?? dayRows;
@@ -81,14 +80,7 @@ function report(overrides: Partial<WorkspaceLlmUsageReport> = {}): WorkspaceLlmU
 	};
 }
 
-/**
- * Where a month's AI spend went, split by *who pays*: two purses with two separate caps, so a single
- * merged number could not be acted on. By run type, each purse heads its own Spend and Avg per run;
- * by day, each purse has one Spend column. A confirmed $0.00 averages to $0.00; only a row with no
- * runs has no average.
- *
- * Five run types and 31 days at most, so neither table sorts or pages.
- */
+/** Keep spend separate by funding source; each source has its own cap. */
 const meta = {
 	component: LlmUsageByJobTypeTable,
 	parameters: { layout: "padded" },
@@ -99,7 +91,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Heph turns ran with no price set, so the table counts them in their own column. */
 export const ByJobType: Story = {
 	play: async ({ canvas }) => {
 		const table = within(await canvas.findByRole("table", { name: "AI spend by run type" }));
@@ -110,7 +101,6 @@ export const ByJobType: Story = {
 				.map((header) => header.textContent),
 		).toStrictEqual(["Shared models", "Own provider"]);
 		const heph = table.getByRole("row", { name: /^Heph turn/u });
-		// No priced shared spend beside runs with no price: $0.00 is not a known average.
 		await expect(
 			within(heph)
 				.getAllByRole("cell")
@@ -122,7 +112,6 @@ export const ByJobType: Story = {
 	},
 };
 
-/** Every run priced: no column of zeros under *Unavailable cost*. */
 export const AllRunsPriced: Story = {
 	args: { report: report({ byJobType: [pullRequestReviewRow] }) },
 	play: async ({ canvas }) => {
@@ -132,7 +121,6 @@ export const AllRunsPriced: Story = {
 	},
 };
 
-/** A workspace without a provider of its own: one purse, no columns of $0. */
 export const SharedModelsOnly: Story = {
 	args: { purses: ["SHARED"] },
 	play: async ({ canvas }) => {
@@ -142,10 +130,6 @@ export const SharedModelsOnly: Story = {
 	},
 };
 
-/**
- * Runs on a cheap model cost a fraction of a cent each. The average column shows the four decimals
- * that run type needs on every row and the total, so the decimal points line up.
- */
 export const SubCentAveragePerRun: Story = {
 	args: {
 		purses: ["SHARED"],
@@ -194,7 +178,6 @@ export const ByDay: StoryObj = {
 	play: async ({ canvas }) => {
 		const table = within(await canvas.findByRole("table", { name: "AI spend by day" }));
 		const footer = table.getByRole("row", { name: /^Total/u });
-		// The money is the report's month total. The counts add up from the days, as from the run types.
 		await expect(
 			within(footer)
 				.getAllByRole("cell")

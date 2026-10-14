@@ -30,13 +30,6 @@ import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.stereotype.Component;
 
-/**
- * Production success handler for {@code oauth2Login}. Delegates account resolution / JIT / linking
- * to {@link AccountProvisioningService}, then mints a Hephaestus cookie-JWT via {@link
- * HephaestusJwtIssuer} and redirects to the validated {@code returnTo}.
- *
- * <p>Account lookup is always {@code (provider, subject)} — never email (nOAuth defence).
- */
 @ConditionalOnServerRole
 @Component
 public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
@@ -54,12 +47,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
     private final Clock clock;
     private final CsrfAuthenticationStrategy csrfAuthentication;
 
-    /**
-     * SPA origin (no trailing slash) prepended to every post-OAuth redirect, so the browser lands
-     * on the app and not on the API origin. Blank in production (SPA + API share an origin → a
-     * relative path is correct); set to e.g. {@code http://localhost:4200} in local dev where they
-     * differ.
-     */
+    // OAuth redirects target the SPA origin, which can differ from the API origin in development.
     private final String appBaseUrl;
 
     public HephaestusAuthSuccessHandler(
@@ -117,8 +105,6 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             return;
         }
         if (client instanceof ClientCallback.Unregistered) {
-            // The sealed pair is no longer registered: nothing is minted and nothing goes to that
-            // callback.
             log.warn("auth.success: installed-client sign-in whose client is no longer registered");
             redirectToApp(request, response, "/auth/error?code=client_not_registered");
             return;
@@ -256,10 +242,6 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         redirectToApp(request, response, redirectTo);
     }
 
-    /**
-     * Ends the sign-in with {@code code}: at the installed client's registered callback when the
-     * sign-in started there, on the SPA error page otherwise.
-     */
     private void refuse(HttpServletRequest request, HttpServletResponse response, ClientCallback client, String code)
             throws IOException {
         if (client instanceof ClientCallback.Registered registered) {
@@ -276,11 +258,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         redirectToApp(request, response, "/auth/error?code=" + code);
     }
 
-    /**
-     * Redirect to a SPA path, prefixing the app origin when it differs from the API origin (local
-     * dev). {@code path} is always a server-validated, same-origin relative path (leading {@code
-     * /}), so prefixing a trusted, configured origin cannot widen it into an open redirect.
-     */
+    // Only server-validated relative paths may be prefixed with the trusted app origin.
     private void redirectToApp(HttpServletRequest request, HttpServletResponse response, String path)
             throws IOException {
         getRedirectStrategy().sendRedirect(request, response, appBaseUrl + path);

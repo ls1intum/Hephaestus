@@ -12,7 +12,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Reads frozen product facts through the neutral contract before an attempt executes. */
 @Component
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor

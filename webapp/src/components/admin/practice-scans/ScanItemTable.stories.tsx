@@ -40,7 +40,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Reviewed, reused, withheld, not reviewed, and a file the repository no longer has. */
 export const Default: Story = {
 	play: async ({ canvas, userEvent, args }) => {
 		const rows = canvas.getAllByRole("row").slice(1);
@@ -51,7 +50,6 @@ export const Default: Story = {
 		await expect(within(judged).getByText("Not met")).toBeVisible();
 		await expect(within(judged).getByText("2 problems")).toBeVisible();
 		await expect(within(reused).getByText(/Reused from a review on/u)).toBeVisible();
-		// The withheld reason is a sentence, never the recorded code.
 		await expect(
 			within(withheld).getByText("The assigned AI model was unavailable."),
 		).toBeVisible();
@@ -59,7 +57,6 @@ export const Default: Story = {
 		await expect(
 			within(notReviewed).getByText("The scan ended before this file was reviewed."),
 		).toBeVisible();
-		// An earlier result stays visible, labelled as evidence from before this scan.
 		await expect(
 			within(notReviewed).getByText(/Earlier evidence, not from this scan/u),
 		).toBeVisible();
@@ -74,7 +71,6 @@ export const Default: Story = {
 	},
 };
 
-/** A scan that is still running has files it has not reached yet. */
 export const Waiting: Story = {
 	args: { state: ready([LISTED_ENTRY, WITHHELD_ENTRY], true) },
 	play: async ({ canvas }) => {

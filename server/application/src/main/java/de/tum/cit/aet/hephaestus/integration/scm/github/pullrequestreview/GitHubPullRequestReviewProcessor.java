@@ -236,9 +236,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         review.setBody(dto.body());
         PullRequestReview.State newState = mapState(Objects.requireNonNullElse(dto.state(), "COMMENTED"));
         if (newState == PullRequestReview.State.DISMISSED) {
-            // When creating a review that's already dismissed, we don't know the original state.
-            // Set state to DISMISSED and mark as dismissed. This is a best-effort for historical
-            // data.
+            // A dismissed review capture does not reveal its original state.
             review.setState(newState);
             review.setDismissed(true);
         } else {

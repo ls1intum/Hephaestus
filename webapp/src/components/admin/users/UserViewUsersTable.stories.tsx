@@ -25,7 +25,6 @@ function viewable(
 	};
 }
 
-/** One account with a GitHub and a GitLab identity: one row, viewed by its account. */
 const linked = viewable("10", "alex", {
 	displayName: "Alex Rivera",
 	identities: [
@@ -33,7 +32,6 @@ const linked = viewable("10", "alex", {
 		{ provider: "GITLAB", login: "arivera", displayName: null, avatarUrl: null },
 	],
 });
-/** Roster sync created the account; its workspace identity names it. */
 const unclaimed = viewable("11", "sam", {
 	status: "UNCLAIMED",
 	identities: [{ provider: "GITHUB", login: "sam", displayName: "Sam", avatarUrl: null }],

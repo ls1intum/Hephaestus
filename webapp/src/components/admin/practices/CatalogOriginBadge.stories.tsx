@@ -19,12 +19,10 @@ type Story = StoryObj<typeof meta>;
 export const MatchesCatalog: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Same as the catalog")).toBeVisible();
-		// A badge sits inside accordion headers, so it must not be a control of its own.
 		await expect(canvas.queryByRole("button")).not.toBeInTheDocument();
 	},
 };
 
-/** A practice this workspace wrote itself. The only silent state. */
 export const WrittenHere: Story = {
 	args: { origin: OWN_ORIGIN },
 	play: async ({ canvas }) => {
@@ -41,7 +39,6 @@ export const UpdateWaiting: Story = {
 	},
 };
 
-/** Edited here, including after a declined catalog version: there is no separate declined state. */
 export const EditedHere: Story = {
 	args: { origin: catalogOrigin("clear-pr-description", "EDITED_HERE", ["CRITERIA"]) },
 	play: async ({ canvas }) => {
@@ -64,7 +61,6 @@ export const GroupUpdateWaiting: Story = {
 	},
 };
 
-/** The sentence a badge cannot carry, written out where the practice is read, with its action. */
 export const Explained: Story = {
 	args: { origin: catalogOrigin("clear-pr-description", "EDITED_HERE", ["CRITERIA"]) },
 	render: (args) => (

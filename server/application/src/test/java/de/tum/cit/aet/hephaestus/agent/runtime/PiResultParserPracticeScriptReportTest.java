@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -71,14 +72,10 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     }
 
     private static String report(boolean truncated, String... entries) {
-        return "{\"contractVersion\":3,\"truncated\":" + truncated + ",\"practices\":[" + String.join(",", entries)
+        return "{\"schemaVersion\":2,\"truncated\":" + truncated + ",\"practices\":[" + String.join(",", entries)
                 + "]}";
     }
 
-    /**
-     * An entry inside the contract for a practice of {@link #ADMITTED}: its admitted program, no models, no calls and
-     * no reads. A practice that is not admitted gets the built-in program.
-     */
     private static ObjectNode entry(String slug, String status, @Nullable String stopReason) {
         ObjectNode entry = MAPPER.createObjectNode();
         entry.put("practiceSlug", slug);
@@ -120,7 +117,6 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
         return entry(slug, "ok", null).toString();
     }
 
-    /** A failed entry whose error is written with every character outside printable ASCII escaped. */
     private static String failedWithError(String slug, String error) {
         return entry(slug, "failed", "error")
                 .put("error", "@@error@@")
@@ -128,7 +124,6 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
                 .replace(ERROR_PLACEHOLDER, asciiJson(error));
     }
 
-    /** A JSON string with every character outside printable ASCII escaped, so an unpaired surrogate survives. */
     private static String asciiJson(String text) {
         return text.chars()
                 .mapToObj(c ->
@@ -136,7 +131,6 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
                 .collect(Collectors.joining("", "\"", "\""));
     }
 
-    /** The shared fixture that {@code lib/contract.test.ts} reads too: seven admitted practices of every status. */
     @Test
     void shouldReadEveryAdmittedPracticeWhenTheSharedExecutionReportIsParsed() throws IOException {
         byte[] fixture;
@@ -226,8 +220,8 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
                                         true,
                                         // In the declared order of the reasons; a zero count is left out.
                                         List.of(
-                                                new ScriptModelUse.Failure("deadline", 5),
-                                                new ScriptModelUse.Failure("too-large", 2))),
+                                                new ScriptModelUse.Failure("too-large", 2),
+                                                new ScriptModelUse.Failure("deadline", 5))),
                                 new ScriptModelUse(ModelSlot.CHAT, Need.OPTIONAL, true, List.of())),
                         List.of());
         assertThat(runs)
@@ -311,7 +305,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     void shouldKeepHowLongAProgramRanWhenTheRunnerSaysAndLeaveItOutOtherwise() {
         List<PracticeScriptRunReport> runs = parse(report(
                 entry("comment-quality", "ok", null).put("durationMs", 4200).toString(),
-                entry("error-handling", "skipped", "unavailable")
+                entry("error-handling", "withheld", "unavailable")
                         .put("durationMs", -1)
                         .toString()));
 
@@ -326,9 +320,8 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
         assertThat(failures()).isZero();
     }
 
-    /** The error only explains a failure, so a run that did not fail never carries one. */
     @ParameterizedTest
-    @CsvSource({"ok,", "skipped,unavailable", "not-reached,deadline"})
+    @CsvSource({"ok,", "withheld,unavailable", "not-reached,deadline"})
     void shouldLeaveTheErrorOutWhenTheProgramDidNotFail(String status, @Nullable String stopReason) {
         String entry = entry("comment-quality", status, stopReason)
                 .put("error", "Something broke")
@@ -353,7 +346,13 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"ok,,OK", "skipped,unavailable,SKIPPED", "failed,error,FAILED", "not-reached,deadline,NOT_REACHED"})
+    @CsvSource({
+        "ok,,OK",
+        "withheld,unavailable,WITHHELD",
+        "failed,error,FAILED",
+        "not-reached,deadline,NOT_REACHED",
+        "not-finished,cancelled,NOT_FINISHED"
+    })
     void shouldMapEachRunnerStatusWhenTheReportNamesIt(
             String wire, @Nullable String stopReason, ScriptRunStatus status) {
         assertThat(parse(report(entry("comment-quality", wire, stopReason).toString())))
@@ -365,8 +364,16 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     @ParameterizedTest
     @EnumSource(ScriptStopReason.class)
     void shouldMapEachStopReasonWhenAFailedRunNamesIt(ScriptStopReason stopReason) {
-        assertThat(parse(report(
-                        entry("comment-quality", "failed", stopReason.name()).toString())))
+        assertThat(parse(report(entry(
+                                "comment-quality",
+                                "failed",
+                                stopReason == ScriptStopReason.INVALID_SCRIPT
+                                        ? "invalid-program"
+                                        : stopReason
+                                                .name()
+                                                .toLowerCase(Locale.ROOT)
+                                                .replace('_', '-'))
+                        .toString())))
                 .extracting(PracticeScriptRunReport::practiceSlug, PracticeScriptRunReport::stopReason)
                 .contains(tuple("comment-quality", stopReason));
         assertThat(failures()).isZero();
@@ -374,7 +381,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
 
     @Test
     void shouldMapEachModelSlotToThePurposeThatServesItWhenTheProgramDeclaredIt() {
-        ObjectNode entry = entry("comment-quality", "skipped", "unavailable");
+        ObjectNode entry = entry("comment-quality", "withheld", "unavailable");
         entry.set("models", MAPPER.readTree("""
             [{"slot":"embedding","need":"optional","bound":false,"failures":{"unavailable":4}},
              {"slot":"reranking","need":"required","bound":false,"failures":{}}]\
@@ -418,7 +425,6 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
         assertThat(failures()).isZero();
     }
 
-    /** A truncated report left practices out for its size, not because they did not finish. */
     @Test
     void shouldRecordNoRunForAnAdmittedPracticeWhenATruncatedReportDoesNotNameIt() {
         List<PracticeScriptRunReport> runs = parse(report(true, ok("comment-quality")));
@@ -436,11 +442,9 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
         assertThat(failures()).isEqualTo(1d);
     }
 
-    /** Each case puts one entry for {@code comment-quality}, a built-in practice, outside the contract. */
     static Stream<Consumer<ObjectNode>> entriesOutsideTheContract() {
         return Stream.<Consumer<ObjectNode>>of(
                 entry -> entry.put("status", "crashed"),
-                // The program kind the runner ran is not the one the job admitted.
                 entry -> entry.set("program", MAPPER.readTree("{\"kind\":\"custom\",\"digest\":\"" + DIGEST + "\"}")),
                 entry -> entry.set("program", MAPPER.readTree("{\"kind\":\"builtin\",\"digest\":\"" + DIGEST + "\"}")),
                 entry -> entry.set("program", MAPPER.readTree("{\"kind\":\"script\",\"digest\":null}")),
@@ -490,7 +494,6 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
                         "models",
                         MAPPER.readTree("[{\"slot\":\"decision\",\"need\":\"required\",\"bound\":true,\"failures\":{}},"
                                 + "{\"slot\":\"decision\",\"need\":\"optional\",\"bound\":true,\"failures\":{}}]")),
-                // The retired leads report.
                 entry -> entry.put("leads", 2));
     }
 
@@ -529,10 +532,10 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     @ValueSource(
             strings = {
                 "not json",
-                "{\"contractVersion\":3,\"practices\":[],\"truncated\":false} trailing",
-                "{\"contractVersion\":3,\"practices\":{},\"truncated\":false}",
-                "{\"contractVersion\":3,\"practices\":[]}",
-                "{\"contractVersion\":3,\"practices\":[],\"truncated\":\"no\"}",
+                "{\"schemaVersion\":2,\"practices\":[],\"truncated\":false} trailing",
+                "{\"schemaVersion\":2,\"practices\":{},\"truncated\":false}",
+                "{\"schemaVersion\":2,\"practices\":[]}",
+                "{\"schemaVersion\":2,\"practices\":[],\"truncated\":\"no\"}",
                 "{\"practices\":[],\"truncated\":false}",
                 "{\"schemaVersion\":1,\"practices\":[],\"truncated\":false}",
                 "{\"schemaVersion\":\"2\",\"practices\":[],\"truncated\":false}",

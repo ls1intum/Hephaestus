@@ -16,12 +16,10 @@ import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Strict typed binding followed by the outcome rules in the shared contract's refusal order. */
 public final class CandidateParser {
     private static final JsonMapper MAPPER = CandidateWireMapper.create();
     private static final ObjectReader READER = MAPPER.readerFor(CandidateDocument.class);
 
-    /** {@code OMISSION_REASONS} in {@code lib/contract.ts}. */
     public static final List<String> OMISSION_REASONS = List.of(
             "selection",
             "truncated",
@@ -254,7 +252,6 @@ public final class CandidateParser {
         };
     }
 
-    /** {@code readCoverage}: why the coverage's counts and completeness contradict each other, or null. */
     private static @Nullable String coverageProblem(ObjectNode coverage) {
         boolean complete = coverage.path("complete").asBoolean();
         boolean omits = coverage.has("omitted") && !coverage.path("omitted").isEmpty();
@@ -291,7 +288,7 @@ public final class CandidateParser {
         return true;
     }
 
-    /** Overlap established by the submitted coordinates; admission also resolves code source aliases. */
+    // Coordinate overlap is checked here; admission also resolves source aliases.
     private static boolean overlaps(JsonNode a, JsonNode b) {
         return a.path("sourceKind").asString().equals(b.path("sourceKind").asString())
                 && a.path("sourcePath").asString().equals(b.path("sourcePath").asString())
@@ -307,7 +304,6 @@ public final class CandidateParser {
         return side == null ? null : side.asString();
     }
 
-    /** The citation indices a basis names. */
     public static List<Integer> basisIndices(JsonNode basis) {
         return switch (basis.path("type").asString()) {
             case "introduced" -> List.of(basis.path("head").asInt());

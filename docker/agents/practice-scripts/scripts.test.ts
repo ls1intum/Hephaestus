@@ -26,7 +26,6 @@ const SCRIPTS_DIR = path.resolve(
 	"../../../server/application/src/main/resources/practices/scripts",
 );
 
-/** A path the diff touched. The scripts under test read the changed paths, not the hunk bodies. */
 function changedFile(file: string): DiffFile {
 	return { path: file, addedLines: new Map(), removedLines: new Map(), hunks: [] };
 }
@@ -44,7 +43,6 @@ void describe("ships-tests-with-the-change", () => {
 		];
 		const change = new Map(paths.map((file) => [file, changedFile(file)]));
 
-		// No checkout at all: the question is answered from the diff, with no repository census.
 		const result = await runBundled(slug, {
 			repo: path.join(tmpdir(), `missing-checkout-${randomUUID()}`),
 			change,
@@ -216,7 +214,6 @@ void describe("issue classification across practices", () => {
 	}
 
 	const issue = { title: "Course checklist", body: "- [ ] Clarify\n- [ ] Reply\n- [ ] Defer" };
-	// What a count is of is said only for a recorded source; a legacy or unrecognized one claims neither.
 	const provenance = /as the provider reports|stored at capture|whole hierarchy/u;
 	const subIssueCases: [
 		Record<string, number | string | null>,
@@ -463,7 +460,6 @@ void it("the readiness practice script leaves every title to the model and keeps
 	}
 });
 
-/** The smallest valid inputs of each kind: a pull request with a captured empty change, and empty records. */
 const MINIMAL_INPUTS: Record<Kind, RunInputs> = {
 	"scm.pull_request": { inputs: requested("scm.pull_request"), change: new Map() },
 	"scm.issue": { inputs: requested("scm.issue") },
@@ -487,7 +483,6 @@ const MINIMAL_INPUTS: Record<Kind, RunInputs> = {
 	},
 };
 
-/** The kind that a bundled program reads: a program for another kind names its kind when it throws. */
 async function kindOf(slug: string): Promise<Kind> {
 	const { outcome } = await runBundledProgram(slug, MINIMAL_INPUTS["scm.pull_request"]);
 	const message = "error" in outcome && outcome.error instanceof Error ? outcome.error.message : "";
@@ -495,7 +490,6 @@ async function kindOf(slug: string): Promise<Kind> {
 	return KINDS.find((kind) => kind === read) ?? "scm.pull_request";
 }
 
-/** The `meta` of a bundled program, imported from its staged source. */
 async function stagedMeta(slug: string): Promise<unknown> {
 	const source = await readFile(path.join(SCRIPTS_DIR, `${slug}.ts`), "utf8");
 	const { root, practices } = await stagePracticeScripts({ [slug]: source }, {});
@@ -518,7 +512,6 @@ void describe("every bundled practice script", async () => {
 
 	for (const slug of slugs) {
 		void it(`${slug} asks exactly one review on minimal inputs of its kind`, async () => {
-			// runBundledReview fails unless the program asks one review and returns its result unchanged.
 			await runBundledReview(slug, MINIMAL_INPUTS[await kindOf(slug)]);
 		});
 

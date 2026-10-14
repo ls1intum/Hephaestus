@@ -54,7 +54,7 @@ const webappInputsOfTheExtension = [
 	/^webapp\/src\/components\/icons\/brand\.tsx$/u,
 	/^webapp\/src\/components\/practice-vocabulary\//u,
 	/^webapp\/src\/components\/common\/(?:status-def\.ts|FacetMultiSelect\.tsx)$/u,
-	/^webapp\/src\/lib\/(?:artifact-kind-slugs|artifact-kinds|sign-in-providers|text)\.ts$/u,
+	/^webapp\/src\/lib\/(?:item-kind-slugs|item-kinds|sign-in-providers|text)\.ts$/u,
 	/^webapp\/src\/styles\.css$/u,
 ];
 

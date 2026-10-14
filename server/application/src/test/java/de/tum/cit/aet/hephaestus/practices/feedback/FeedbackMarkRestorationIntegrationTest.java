@@ -6,23 +6,30 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.LookupPresence;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDraft;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendAction;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkChanged;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 class FeedbackMarkRestorationIntegrationTest extends AbstractFeedbackDeliveryIntegrationTest {
     @Autowired
+    FeedbackMarkListener feedbackMarks;
+
+    @Autowired
     FeedbackContentDigest digests;
 
-    private UUID mark() {
+    private UUID mark(UUID resultId) {
         UUID id = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO"
@@ -30,28 +37,47 @@ class FeedbackMarkRestorationIntegrationTest extends AbstractFeedbackDeliveryInt
                         + " VALUES (?,?,?,'INCORRECT','Review the basis.',?,now())",
                 id,
                 workspace.getId(),
-                supportingResult.getId(),
+                resultId,
                 developerId);
-        store.marked(new ResultMarkChanged(
-                id, workspace.getId(), supportingResult.getId(), ResultMarkKind.INCORRECT, false, Instant.now()));
+        feedbackMarks.marked(
+                new ResultMarkChanged(id, workspace.getId(), resultId, ResultMarkKind.INCORRECT, false, Instant.now()));
         return id;
     }
 
     private void remove(UUID id) {
+        UUID resultId = Objects.requireNonNull(jdbc.queryForObject(
+                "SELECT result_id FROM result_mark WHERE id=? AND workspace_id=?", UUID.class, id, workspace.getId()));
         jdbc.update(
                 "UPDATE result_mark SET removed_at=now(),removed_by_id=?,removal_reason='The basis"
                         + " is confirmed.' WHERE id=? AND workspace_id=?",
                 developerId,
                 id,
                 workspace.getId());
-        store.marked(new ResultMarkChanged(
-                id, workspace.getId(), supportingResult.getId(), ResultMarkKind.INCORRECT, true, Instant.now()));
+        feedbackMarks.marked(
+                new ResultMarkChanged(id, workspace.getId(), resultId, ResultMarkKind.INCORRECT, true, Instant.now()));
     }
 
     @Test
-    void shouldRestoreOnlyUnsentMarkWithholdingAndKeepAnotherActiveMark() {
-        prepare(false);
-        UUID first = mark(), second = mark();
+    void shouldKeepFeedbackWithheldUntilEveryBasisResultIsUnmarked() {
+        var other = negativeResult();
+        var draft = draft(false);
+        store.prepareAll(
+                workspace.getId(),
+                reviewId,
+                List.of(new FeedbackDraft(
+                        draft.id(),
+                        draft.workspaceId(),
+                        draft.reviewId(),
+                        draft.itemId(),
+                        draft.developerId(),
+                        draft.destination(),
+                        draft.state(),
+                        draft.stopReason(),
+                        draft.body(),
+                        List.of(draft.basis().getFirst(), new FeedbackBasisInput(other.getId(), null, 1)),
+                        draft.copies(),
+                        draft.checks())));
+        UUID first = mark(supportingResult.getId()), second = mark(other.getId());
         assertThat(current().getStopReason()).isEqualTo(FeedbackStopReason.RESULT_MARKED_INCORRECT);
         remove(first);
         assertThat(current().getState()).isEqualTo(FeedbackState.WITHHELD);
@@ -77,7 +103,7 @@ class FeedbackMarkRestorationIntegrationTest extends AbstractFeedbackDeliveryInt
                 null,
                 "Do not send this guidance.",
                 digests.current(workspace.getId(), feedbackId));
-        UUID id = mark();
+        UUID id = mark(supportingResult.getId());
         remove(id);
         assertThat(current().getState()).isEqualTo(FeedbackState.REJECTED);
         sender.send(workspace.getId(), feedbackId);
@@ -89,7 +115,7 @@ class FeedbackMarkRestorationIntegrationTest extends AbstractFeedbackDeliveryInt
         prepare(false);
         sender.send(workspace.getId(), feedbackId);
         var copy = children().getFirst();
-        UUID id = mark();
+        UUID id = mark(supportingResult.getId());
         assertThat(sends.findById(feedbackId).orElseThrow().getAction()).isEqualTo(FeedbackSendAction.RETRACT);
         newSender().send(workspace.getId(), feedbackId);
         assertThat(children().getFirst().getState()).isEqualTo(FeedbackCopyState.RETRACTED);
@@ -106,7 +132,7 @@ class FeedbackMarkRestorationIntegrationTest extends AbstractFeedbackDeliveryInt
         prepare(true);
         sender.send(workspace.getId(), feedbackId);
         var original = children().get(1);
-        UUID id = mark();
+        UUID id = mark(supportingResult.getId());
         newSender().send(workspace.getId(), feedbackId);
         assertThat(children().get(1).getState()).isEqualTo(FeedbackCopyState.RETRACTED);
         remove(id);
@@ -134,7 +160,7 @@ class FeedbackMarkRestorationIntegrationTest extends AbstractFeedbackDeliveryInt
         newSender().send(workspace.getId(), feedbackId);
         assertThat(children().getFirst().getReadback()).isEqualTo(FeedbackCopyReadback.ABSENT);
         store.retry(workspace.getId(), feedbackId, developerId);
-        UUID id = mark();
+        UUID id = mark(supportingResult.getId());
         assertThat(current().getState()).isEqualTo(FeedbackState.WITHHELD);
         remove(id);
         assertThat(current().getState()).isEqualTo(FeedbackState.READY);

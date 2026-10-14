@@ -14,11 +14,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
-/**
- * Cross-language sync test, beside {@code PracticeScriptContractSyncTest}. The practice script runner refuses a call with
- * more items than {@code MODEL_SLOT_CAPS} allows as "too-large" before it reaches the proxy. A runner cap above the
- * proxy's turns that reason into a proxy refusal. A runner cap below it refuses calls that the proxy accepts.
- */
+// Direct-call caps must match across languages so the runner and proxy refuse the same oversized calls.
 class PracticeScriptCapsSyncTest extends BaseUnitTest {
 
     private static final Pattern CAPS = Pattern.compile("MODEL_SLOT_CAPS = \\{([^}]*)}");

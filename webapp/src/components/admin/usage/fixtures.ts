@@ -19,7 +19,6 @@ export function dayOfMonth(month: string, day: number): Date {
 
 type PracticeScriptUsage = Pick<WorkspaceLlmUsageReport, "byPractice" | "practiceScriptTotal">;
 
-/** A month in which no practice script called a decision, embedding or reranking model. */
 export const NO_PRACTICE_SCRIPT_USAGE: PracticeScriptUsage = {
 	byPractice: [],
 	practiceScriptTotal: {
@@ -146,17 +145,12 @@ export function withOwnProvider(report: WorkspaceLlmUsageReport): WorkspaceLlmUs
 	};
 }
 
-/** The month figures that every run type and every day add up to. */
 type MonthTotals = Pick<
 	WorkspaceLlmUsageReport,
 	"instanceTotalCostUsd" | "ownProviderTotalCostUsd" | "unpricedEventCount"
 >;
 
-/**
- * Splits `total` in the proportions of `values`, rounded to `digits` decimals. The largest share
- * takes the rounding remainder, so the shares add up to `total`, and so do their rounded figures.
- * With nothing to split by, the first share takes all of it.
- */
+/** Apply rounding remainder to the largest share so the split still sums to the total. */
 function splitLike(values: readonly number[], total: number, digits: number): number[] {
 	const sum = values.reduce((acc, value) => acc + value, 0);
 	if (sum === 0) {
@@ -182,10 +176,6 @@ function withColumnTotal<Row extends MonthTotals>(
 	return rows.map((row, index) => ({ ...row, [key]: shares[index] ?? row[key] }));
 }
 
-/**
- * The report with other month totals, and its run types and days split in the same proportions, so
- * every table's rows still add up to the month it reports.
- */
 export function withMonthTotals(
 	report: WorkspaceLlmUsageReport,
 	totals: Partial<MonthTotals>,
@@ -212,7 +202,6 @@ export const eurRate: FxRateInfo = {
 	source: "ECB",
 };
 
-/** A practice whose script asked a decision model about each place it found, on shared models. */
 export const commentQualityUsage: LlmUsageByPractice = {
 	practiceSlug: "comment-quality",
 	practiceName: "Comments explain why",
@@ -226,7 +215,6 @@ export const commentQualityUsage: LlmUsageByPractice = {
 	unpricedEventCount: 0,
 };
 
-/** Two models on two purses: the embedding model is shared, the reranker is the workspace's own. */
 export const expectedBehaviourUsage: LlmUsageByPractice = {
 	practiceSlug: "issues-state-expected-behaviour",
 	practiceName: "Issues state the expected behaviour",
@@ -240,7 +228,6 @@ export const expectedBehaviourUsage: LlmUsageByPractice = {
 	unpricedEventCount: 0,
 };
 
-/** A self-hosted embedding model set to *No metered API cost*: a confirmed $0, not a missing price. */
 export const noChargeUsage: LlmUsageByPractice = {
 	practiceSlug: "names-say-what-they-hold",
 	practiceName: "Names say what they hold",
@@ -254,7 +241,6 @@ export const noChargeUsage: LlmUsageByPractice = {
 	unpricedEventCount: 0,
 };
 
-/** Calls from reviews whose split by practice is gone, such as a deleted review's. */
 export const notAttributedUsage: LlmUsageByPractice = {
 	purposes: ["PRACTICE_DECISION"],
 	reviews: 2,
@@ -266,7 +252,6 @@ export const notAttributedUsage: LlmUsageByPractice = {
 	unpricedEventCount: 0,
 };
 
-/** A practice deleted since its reviews ran, on a reranker that reports no tokens and has no price. */
 export const deletedPracticeUsage: LlmUsageByPractice = {
 	practiceSlug: "small-pull-requests",
 	purposes: ["PRACTICE_RERANKING"],
@@ -279,10 +264,7 @@ export const deletedPracticeUsage: LlmUsageByPractice = {
 	unpricedEventCount: 2,
 };
 
-/**
- * The server's own total, not a sum of the rows: one review runs several practices, so it counts
- * 31 reviews where the rows add up to 41.
- */
+// Server review totals count each review once, even when it ran several practices.
 const pricedPracticeScriptTotal: LlmUsagePracticeScriptTotal = {
 	reviews: 31,
 	calls: 662,
@@ -293,10 +275,6 @@ const pricedPracticeScriptTotal: LlmUsagePracticeScriptTotal = {
 	unpricedEventCount: 0,
 };
 
-/**
- * Practice script calls that every model priced, inside the run types of {@link withOwnProvider}: the
- * pull request practices on shared models, the issue practice partly on the workspace's own provider.
- */
 export function withPracticeScriptUsage(report: WorkspaceLlmUsageReport): WorkspaceLlmUsageReport {
 	return {
 		...report,

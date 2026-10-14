@@ -28,10 +28,7 @@ import {
 	type ScanProblem,
 } from "./scan-settings";
 
-/**
- * Whether the practice takes part in scans, and the scan it would run. Turning scans off keeps the
- * draft, so turning them on again before a save restores what was written.
- */
+// Preserve scan drafts across toggles so turning scans on restores unsaved work.
 export interface ScanSettings {
 	enabled: boolean;
 	draft: ScanDraft;
@@ -41,7 +38,6 @@ export interface PracticeScanSettingsEditorProps {
 	itemType: PracticeItemTypeOption;
 	value: ScanSettings;
 	onChange: (value: ScanSettings) => void;
-	/** The sources the scanned kind can read: a pull request practice scans files, which read others. */
 	readSources: readonly ReadSourceOption[];
 	problem?: ScanProblem;
 	disabled?: boolean;
@@ -83,8 +79,7 @@ export function PracticeScanSettingsEditor({
 	disabled = false,
 }: PracticeScanSettingsEditorProps) {
 	if (!itemType.scanSupported) {
-		// A stored scan is kept as it is rather than erased behind the author's back: removing it is a
-		// choice the author makes here.
+		// Only an explicit removal may discard an unsupported saved scan.
 		return value.enabled ? (
 			<div className="space-y-2">
 				<p className="text-sm text-muted-foreground">

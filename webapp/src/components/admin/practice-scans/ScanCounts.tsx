@@ -4,7 +4,6 @@ import { SCAN_ENTRY_DEFS } from "@/components/practice-vocabulary/scan-entry-def
 
 export interface ScanCountsProps {
 	counts: ScanCountsData;
-	/** The counts the scan recorded when it closed, kept as they were after later marks or erasure. */
 	recorded: boolean;
 }
 
@@ -27,11 +26,7 @@ function Figure({ label, value, note }: { label: string; value: string | number;
 	);
 }
 
-/**
- * A scan's counts. Files counts distinct files; everything else counts practice and file pairs, so
- * the two never share a row. A total the scan does not know yet, because it is still listing files,
- * reads as not known rather than as a percentage of a guess.
- */
+// File counts are distinct files; other counts are practice-file pairs. Unknown totals cannot supply percentages.
 export function ScanCounts({ counts, recorded }: ScanCountsProps) {
 	return (
 		<section aria-label="Counts" className="space-y-4 rounded-lg border p-4">

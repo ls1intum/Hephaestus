@@ -9,10 +9,7 @@ import {
 
 import type { StatusDef, StatusDefs } from "@/components/common/status-def";
 
-/**
- * Where one file stands against one practice in a scan’s report. The generated item types are
- * circular, so the values are written out here, as the server’s report item `status` names them.
- */
+// File status describes one practice-file pair in the scan report.
 export type ScanEntryStatus = "JUDGED" | "REUSED" | "WITHHELD" | "LISTED" | "NOT_REVIEWED";
 export const SCAN_ENTRY_STATUSES = [
 	"JUDGED",
@@ -22,10 +19,7 @@ export const SCAN_ENTRY_STATUSES = [
 	"NOT_REVIEWED",
 ] as const satisfies readonly ScanEntryStatus[];
 
-/**
- * Reviewed, reused, withheld and not reviewed are disjoint. Only the first two carry a result:
- * "Not reviewed" never means met, and "Withheld" is a decision with a reason, not a result.
- */
+// Only reviewed and reused pairs carry this scan's result; withheld and not reviewed imply no verdict.
 export const SCAN_ENTRY_DEFS: StatusDefs<ScanEntryStatus> = {
 	JUDGED: {
 		label: "Reviewed",
@@ -60,7 +54,7 @@ export const SCAN_ENTRY_DEFS: StatusDefs<ScanEntryStatus> = {
 	},
 };
 
-/** A file the repository no longer has: report history, never a fixed problem. */
+// Removed files remain report history; removal does not establish a fixed problem.
 export const REMOVED_FILE_DEF: StatusDef = {
 	label: "Removed",
 	icon: FileXIcon,

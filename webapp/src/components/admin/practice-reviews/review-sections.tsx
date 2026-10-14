@@ -17,7 +17,6 @@ import {
 	resultSlots,
 } from "@/components/admin/practice-reviews/review-outcomes";
 
-/** "1 met result, 3 not met results", or `none` when nothing was counted. */
 function slotText(slots: readonly OutcomeSlot[], none: string): string {
 	const counted = slots.filter((slot) => slot.count > 0);
 	return counted.length === 0
@@ -25,7 +24,6 @@ function slotText(slots: readonly OutcomeSlot[], none: string): string {
 		: counted.map((slot) => `${slot.count} ${slot.label}`).join(", ");
 }
 
-/** The review's counts, said once, as the head line of its practices. */
 export function reviewCountsLine(review: Pick<ReviewSummary, "results" | "feedback">): string {
 	return `${slotText(resultSlots(review.results), "No results")} · Feedback: ${slotText(
 		feedbackSlots(review.feedback),
@@ -34,17 +32,10 @@ export function reviewCountsLine(review: Pick<ReviewSummary, "results" | "feedba
 }
 
 interface ReviewPracticesProps {
-	/** Where a practice script line's fix links lead, such as AI models for a missing model. */
 	workspaceSlug: string;
 	review: Pick<ReviewSummary, "id" | "status" | "practices" | "results" | "feedback">;
 }
 
-/**
- * Every practice the review answered, with its status and the reason for it: the one list of what
- * the review judged, including the practices it withheld or could not finish. What it saw and what
- * became of it are other records, so they are its trace; a practice's feedback mode is the
- * practice's. A list rather than a table, so a row reflows at 390px instead of scrolling.
- */
 export function ReviewPractices({ workspaceSlug, review }: ReviewPracticesProps) {
 	const [name, setName] = useState("");
 	const nameId = useId();
@@ -127,10 +118,6 @@ function practiceReason(entry: ReviewPractice): string | undefined {
 		.join(" · ");
 }
 
-/**
- * One practice: its status as a coloured badge, its name, and the reason for its status. How the
- * review answered it, result by result, is its trace's.
- */
 function PracticeRow({
 	workspaceSlug,
 	entry,

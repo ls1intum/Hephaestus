@@ -22,10 +22,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service coordinating workspace lifecycle state transitions and validation. Manages suspend,
- * resume, and purge operations with proper guardrails.
- */
 @Service
 public class WorkspaceLifecycleService {
 
@@ -265,10 +261,6 @@ public class WorkspaceLifecycleService {
 
     // NATS consumer lifecycle helpers
 
-    /**
-     * Stop NATS consumer for a workspace. Applies to all provider types (GitHub App, GitLab PAT,
-     * etc.) when NATS is enabled.
-     */
     private void stopNatsForWorkspace(Workspace workspace) {
         if (shouldUseNats(workspace)) {
             natsConsumerService.ifAvailable(svc -> svc.stopConsumingScope(workspace.getId()));
@@ -281,20 +273,12 @@ public class WorkspaceLifecycleService {
         }
     }
 
-    /**
-     * Start NATS consumer for a workspace. Applies to all provider types (GitHub App, GitLab PAT,
-     * etc.) when NATS is enabled.
-     */
     private void startNatsForWorkspace(Workspace workspace) {
         if (shouldUseNats(workspace)) {
             natsConsumerService.ifAvailable(svc -> svc.startConsumingScope(workspace.getId()));
         }
     }
 
-    /**
-     * Checks if NATS should be used for the given workspace. Must match the logic in {@code
-     * WorkspaceActivationService.shouldUseNats()}.
-     */
     private boolean shouldUseNats(Workspace workspace) {
         return natsProperties.enabled() && workspace != null;
     }

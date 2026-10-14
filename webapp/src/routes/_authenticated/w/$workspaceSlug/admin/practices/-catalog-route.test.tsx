@@ -90,7 +90,6 @@ describe("resetting a group to the catalog", () => {
 		const dialog = await screen.findByRole("alertdialog", {
 			name: "Reset “Review-ready work” to the catalog?",
 		});
-		// The concrete difference, before anything changes: ours beside the catalog's.
 		const description = await within(dialog).findByRole("rowheader", { name: "Description" });
 		expect(description.closest("tr")?.textContent).toBe(
 			"DescriptionOur own words.Make each change easy to review.",
@@ -136,7 +135,6 @@ describe("resetting a group to the catalog", () => {
 		fireEvent.click(await screen.findByRole("menuitem", { name: "Reset to catalog" }));
 		const dialog = await screen.findByRole("alertdialog");
 		await within(dialog).findByText("Our own words.");
-		// Someone else saves after the reader read the comparison and before they confirm.
 		saved = changed;
 		fireEvent.click(within(dialog).getByRole("button", { name: "Reset to catalog" }));
 

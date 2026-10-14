@@ -14,14 +14,6 @@ import {
 } from "./fixtures";
 import { ModelPicker } from "./ModelPicker";
 
-/**
- * A model's declared data handling travels with its name: each option's second line holds its
- * connection and the tier's muted icon and name, as the tables and the assignments draw a tier, so
- * an admin choosing a model for a tier never has to remember what it was declared as. The closed
- * picker shows the model's mark and name only. The groups use the usage page's purse names. The
- * `tier` prop filters rather than disables the other models: a disabled option would still have to
- * be read past, and the assignment already says which tier it holds.
- */
 const meta = {
 	component: ModelPicker,
 	parameters: { layout: "centered" },
@@ -51,7 +43,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** Closed, the picker names the model alone, after its mark: the connection is in the list. */
 export const SharedSelected: Story = {
 	args: { value: { scope: "SHARED", id: 1 } },
 	play: async ({ canvas }) => {
@@ -130,10 +121,6 @@ export const NoModelsForTier: Story = {
 	},
 };
 
-/**
- * A model kind for practice scripts with no model at all names the API that serves only it, and links to the
- * workspace's own providers on the same page.
- */
 export const NoDecisionModelYet: Story = {
 	args: { purpose: "PRACTICE_DECISION", availableModels: [] },
 	play: async ({ canvas }) => {
@@ -149,7 +136,6 @@ export const NoDecisionModelYet: Story = {
 	},
 };
 
-/** An admin who may not add a provider cannot follow the connection step, so the hint names who can. */
 export const NoEmbeddingModelOwnProvidersBlocked: Story = {
 	args: { purpose: "PRACTICE_EMBEDDING", availableModels: [], ownProviderAllowed: false },
 	play: async ({ canvas }) => {
@@ -173,7 +159,6 @@ export const ReasoningDecisionModel: Story = {
 	},
 };
 
-/** The same picker says nothing for a decision model that answers at once. */
 export const DecisionModelAnswersAtOnce: Story = {
 	args: {
 		purpose: "PRACTICE_DECISION",
@@ -204,7 +189,6 @@ export const UnpricedReranker: Story = {
 
 const ownRerankModel: AvailableLlmModel = { ...mockRerankModel, scope: "WORKSPACE", id: 31 };
 
-/** The workspace prices its own model, on the model's row in its providers below. */
 export const UnpricedOwnReranker: Story = {
 	args: {
 		purpose: "PRACTICE_RERANKING",

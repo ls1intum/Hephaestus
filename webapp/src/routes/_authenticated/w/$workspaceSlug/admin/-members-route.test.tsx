@@ -48,7 +48,6 @@ function member(
 	};
 }
 
-/** One account that signed in with GitHub and with GitLab. */
 const ADA = member("7", {
 	displayName: "Ada Lovelace",
 	identities: [
@@ -57,7 +56,6 @@ const ADA = member("7", {
 	],
 });
 
-/** Roster sync created this account; the person has not signed in and has no name of their own. */
 const SAM = member("8", {
 	status: "UNCLAIMED",
 	identities: [{ provider: "GITHUB", login: "sam", displayName: "Sam Unclaimed", avatarUrl: null }],
@@ -79,6 +77,10 @@ function membershipPage(
 		numberOfElements: content.length,
 		empty: content.length === 0,
 	};
+}
+
+function pageMembers(contents: Record<string, Wire<WorkspaceMembership>[]>, page: string | null) {
+	return membershipPage(contents[String(page)] ?? [], Number(page), 101);
 }
 
 function mockMembersRoute(members: Wire<WorkspaceMembership>[] = [ADA, SAM]) {
@@ -125,7 +127,6 @@ describe("workspace members route", () => {
 		ada.getByText("ada-lrz");
 		screen.getByText("Showing 2 of 2 members");
 
-		// The unclaimed account has no name of its own, so its workspace identity names it.
 		const sam = within(rowOf("Sam Unclaimed"));
 		sam.getByText("Unclaimed");
 		expect(sam.queryByText("Active")).toBeNull();
@@ -142,9 +143,7 @@ describe("workspace members route", () => {
 			http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
 				const page = new URL(request.url).searchParams.get("page");
 				pages.push(page);
-				return HttpResponse.json(
-					membershipPage(pageContents[String(page)] ?? [], Number(page), 101),
-				);
+				return HttpResponse.json(pageMembers(pageContents, page));
 			}),
 		);
 		renderRouteAt("/w/acme/admin/members");

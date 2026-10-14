@@ -18,7 +18,6 @@ export const CATALOG_LEVEL_KINDS = [
 
 export type CatalogLevelKind = (typeof CATALOG_LEVEL_KINDS)[number];
 
-/** What each level is called: the last crumb of its path, its title, and its crumb once covered. */
 export const CATALOG_LEVEL_LABELS = {
 	"practice-edit": "Edit practice",
 	"practice-new": "Create practice",
@@ -26,7 +25,6 @@ export const CATALOG_LEVEL_LABELS = {
 	"group-new": "Create group",
 } as const satisfies Record<CatalogLevelKind, string>;
 
-/** Every level here is an editor, so every one holds a draft — see `GUARDED_LEVEL_KINDS`. */
 export const GUARDED_CATALOG_LEVEL_KINDS = CATALOG_LEVEL_KINDS;
 
 /** A stack id is always a slug; a practice or group that does not exist yet has none. */

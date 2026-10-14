@@ -4,13 +4,6 @@ import { hasText } from "@/lib/text";
 
 import type { ReviewScope, ReviewScopeSearch } from "./review-scope";
 
-/**
- * The one record the reader tracks with a row's crosshair, which every tab then narrows to: an
- * item, a review, a result or a piece of feedback with the review that recorded it, or a practice.
- * It lives in the shared scope's URL names plus `selected=true`. The same names without `selected`
- * are a plain filter, as a "See all" link writes them: the lists narrow the same way, and the
- * toolbar shows a filter pill instead of the selection bar.
- */
 export type ReviewSelection =
 	| { kind: "item"; itemId: string }
 	| { kind: "review"; reviewId: string }
@@ -20,11 +13,7 @@ export type ReviewSelection =
 
 export type ReviewSelectionKind = ReviewSelection["kind"];
 
-/**
- * A workspace item or account id: a positive decimal, never a provider's own number. A link written
- * outside the app, such as the browser extension's, carries it bare, which the router reads as a
- * number; either way it reads back as the decimal string.
- */
+/** Accept decimal strings and numbers from external links, then normalize workspace ids to strings. */
 export const positiveIdParam = z
 	.union([z.string(), z.number().int()])
 	.transform(String)
@@ -32,16 +21,9 @@ export const positiveIdParam = z
 	.optional()
 	.catch(undefined);
 
-/**
- * A review, result, problem or feedback id. Shaped as a UUID, as the server parses one: any
- * version, so `z.guid()` rather than the RFC-strict `z.uuid()`.
- */
+// Match the server's UUID parser with z.guid(); z.uuid() enforces a stricter RFC shape.
 export const uuidParam = z.guid().optional().catch(undefined);
 
-/**
- * The selection's part of any route's search, read loosely: a row reads it from whichever route
- * renders it. A malformed id reads as none, so a bad address closes nothing it should not.
- */
 const selectionSearchSchema = z.object({
 	reviewId: uuidParam,
 	resultId: uuidParam,
@@ -66,10 +48,6 @@ export function readSelection(scope: RecordScope): ReviewSelection | undefined {
 	return scope.selected === true ? readScopedRecord(scope) : undefined;
 }
 
-/**
- * The one record the scope narrows to, picked or filtered. A result names its review too, and a
- * review the item it read, so the most specific part is the record.
- */
 export function readScopedRecord(scope: RecordScope): ReviewSelection | undefined {
 	if (hasText(scope.feedbackId)) {
 		return { kind: "feedback", feedbackId: scope.feedbackId, reviewId: scope.reviewId };

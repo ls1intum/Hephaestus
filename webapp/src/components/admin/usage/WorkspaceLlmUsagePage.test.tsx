@@ -86,8 +86,6 @@ describe("WorkspaceLlmUsagePage", () => {
 			expect(within(table).queryByRole("columnheader", { name: "Own provider" })).toBeNull();
 			expect(within(table).queryByRole("columnheader", { name: "Unavailable cost" })).toBeNull();
 		}
-		// The tile stays: it is where a workspace learns it can bring its own provider. While that
-		// provider is not in use, there is no provider cap to set from here.
 		screen.getByText(/^Work on a provider you connect in/u);
 		expect(screen.queryByRole("button", { name: /provider cap/u })).toBeNull();
 	});
@@ -114,7 +112,6 @@ describe("WorkspaceLlmUsagePage", () => {
 		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
 		expect(within(byJobType).getAllByRole("columnheader", { name: "Avg per run" })).toHaveLength(2);
 		const mentorTurns = within(byJobType).getByRole("row", { name: /^Heph turn/u });
-		// $3.84 and $1.92 over 64 turns, each in its own purse's column.
 		expect(
 			within(mentorTurns)
 				.getAllByRole("cell")

@@ -81,18 +81,7 @@ class LlmPriceSnapshotTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * The two amounts a computed cost is moved to when it will not fit, each paired with the
-     * largest value that is NOT moved. The exact-boundary pairs matter more than the extremes: an
-     * off-by-one in either comparison would move real money and leave no trace, since a clamped
-     * amount looks like an ordinary cost once it is in the ledger.
-     *
-     * <p>The upper bound is the WIRE's, not the column's. {@code NUMERIC(18,6)} holds twelve
-     * integer digits, but a cost is served as a JSON number and read into a binary64, which
-     * reproduces fifteen significant digits — at scale 6, everything below $1,000,000,000 ({@link
-     * MoneyWirePrecisionTest}). Clamping at the column's maximum instead would let the ledger hold
-     * amounts the API cannot state without changing them.
-     */
+    // Bound costs by JSON binary64 precision, which is narrower than NUMERIC(18,6) at scale six.
     @Nested
     @DisplayName("clamped amounts")
     class Clamps {

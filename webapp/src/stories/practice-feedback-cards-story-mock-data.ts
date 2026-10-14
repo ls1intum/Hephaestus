@@ -1,8 +1,3 @@
-/**
- * Feedback cards for the stories and the tests, which install no network: what
- * `usePracticePageFeedback` composes from the wire, written out by hand, on the items of
- * `practice-profile-story-mock-data`.
- */
 import { EyeIcon, MessageCircleIcon, MessageSquareReplyIcon, PackageIcon } from "lucide-react";
 
 import { text, work } from "@/components/practice-vocabulary/feedback-text";
@@ -40,14 +35,13 @@ const SCOPE_ONE_CONCERN = {
 	preparedAt: inStoryYear("09-09T14:10"),
 } satisfies Partial<PracticeFeedbackCardEntry>;
 
-/** The page's first card: new, three pieces of work in the strip, nothing clean yet. */
 export const NEW_FEEDBACK_CARD: PracticeFeedbackCardEntry = {
 	feedbackId: "scope-one-concern-new",
 	...SCOPE_ONE_CONCERN,
 	reviewedWork: [
-		{ ref: pullRequest(17), date: inStoryYear("08-28T00:00") },
-		{ ref: pullRequest(19), date: inStoryYear("09-06T00:00") },
-		{ ref: pullRequest(20), date: inStoryYear("09-03T00:00") },
+		{ ref: pullRequest(17), date: inStoryYear("08-28T00:00"), outcome: "NOT_MET" },
+		{ ref: pullRequest(19), date: inStoryYear("09-06T00:00"), outcome: "NOT_MET" },
+		{ ref: pullRequest(20), date: inStoryYear("09-03T00:00"), outcome: "NOT_MET" },
 	],
 	cleanWork: [],
 	state: "new",
@@ -73,9 +67,9 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		timestamp: SCOPE_ONE_CONCERN.timestamp,
 		preparedAt: SCOPE_ONE_CONCERN.timestamp,
 		reviewedWork: [
-			{ ref: pullRequest(17), date: inStoryYear("08-28T00:00") },
-			{ ref: pullRequest(19), date: inStoryYear("09-06T00:00") },
-			{ ref: pullRequest(20), date: inStoryYear("09-03T00:00") },
+			{ ref: pullRequest(17), date: inStoryYear("08-28T00:00"), outcome: "NOT_MET" },
+			{ ref: pullRequest(19), date: inStoryYear("09-06T00:00"), outcome: "NOT_MET" },
+			{ ref: pullRequest(20), date: inStoryYear("09-03T00:00"), outcome: "NOT_MET" },
 		],
 		cleanWork: [clean(21, inStoryYear("09-10T00:00")), clean(22, inStoryYear("09-11T00:00"))],
 		state: "open",
@@ -88,8 +82,8 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		headline: "Descriptions name the files, not the problem",
 		body: "#16 and #18 opened with the list of files touched and no sentence on the problem behind them; on #18 the first review comment asked what the change was for.",
 		reviewedWork: [
-			{ ref: pullRequest(16), date: inStoryYear("08-24T00:00") },
-			{ ref: pullRequest(18), date: inStoryYear("09-01T00:00") },
+			{ ref: pullRequest(16), date: inStoryYear("08-24T00:00"), outcome: "NOT_MET" },
+			{ ref: pullRequest(18), date: inStoryYear("09-01T00:00"), outcome: "NOT_MET" },
 		],
 		cleanWork: [clean(20, inStoryYear("09-10T00:00"))],
 		nextStep:
@@ -108,8 +102,8 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		headline: "Two pull requests grew past what one review can hold",
 		body: "#21 touched 41 files and #22 38; both went through two rounds of review, and the second round of each reopened a file the first had already approved.",
 		reviewedWork: [
-			{ ref: pullRequest(21), date: inStoryYear("09-07T00:00") },
-			{ ref: pullRequest(22), date: inStoryYear("09-09T00:00") },
+			{ ref: pullRequest(21), date: inStoryYear("09-07T00:00"), outcome: "NOT_MET" },
+			{ ref: pullRequest(22), date: inStoryYear("09-09T00:00"), outcome: "NOT_MET" },
 		],
 		cleanWork: [],
 		nextStep:
@@ -135,8 +129,8 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		headline: "Pull requests were merged over open review threads",
 		body: "#17 merged with two threads still open, and on #20 the reviewer's question about the retry limit was never answered; the reviewer had to reopen it in the next review.",
 		reviewedWork: [
-			{ ref: pullRequest(17), date: inStoryYear("08-28T00:00") },
-			{ ref: pullRequest(20), date: inStoryYear("09-03T00:00") },
+			{ ref: pullRequest(17), date: inStoryYear("08-28T00:00"), outcome: "NOT_MET" },
+			{ ref: pullRequest(20), date: inStoryYear("09-03T00:00"), outcome: "NOT_MET" },
 		],
 		cleanWork: [clean(21, inStoryYear("09-07T00:00")), clean(22, inStoryYear("09-09T00:00"))],
 		nextStep:
@@ -155,9 +149,9 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		headline: "Pull requests closed their issue without saying what was met",
 		body: "#16 and #19 each closed an issue with three acceptance criteria and mentioned none of them; #13 was reopened a week later for the criterion the change had skipped.",
 		reviewedWork: [
-			{ ref: pullRequest(16), date: inStoryYear("08-24T00:00") },
-			{ ref: pullRequest(19), date: inStoryYear("09-06T00:00") },
-			{ ref: pullRequest(22), date: inStoryYear("09-09T00:00") },
+			{ ref: pullRequest(16), date: inStoryYear("08-24T00:00"), outcome: "NOT_MET" },
+			{ ref: pullRequest(19), date: inStoryYear("09-06T00:00"), outcome: "NOT_MET" },
+			{ ref: pullRequest(22), date: inStoryYear("09-09T00:00"), outcome: "NOT_MET" },
 		],
 		// Two clean pieces before #22 put the run at two of three; #22 emptied it again, which is
 		// the fall back the overview reports.
@@ -184,7 +178,7 @@ const RESOLVED_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		practiceName: "Describe what changed and why",
 		headline: "Descriptions named the what, rarely the why",
 		body: "#16 and #19 listed the files touched but not the problem behind them; the reviewer on #19 asked in the first comment what the change was for.",
-		reviewedWork: [{ ref: pullRequest(19), date: inStoryYear("09-06T00:00") }],
+		reviewedWork: [{ ref: pullRequest(19), date: inStoryYear("09-06T00:00"), outcome: "NOT_MET" }],
 		cleanWork: [
 			clean(20, inStoryYear("09-07T00:00")),
 			clean(21, inStoryYear("09-08T00:00")),
@@ -217,7 +211,7 @@ const RESOLVED_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		practiceName: "Leave specific, actionable review comments",
 		headline: "Review comments said something was off, not what",
 		body: 'On #2 the comments read "this looks wrong" and "can we do better here?", and the author replied to each one asking what to change.',
-		reviewedWork: [{ ref: pullRequest(2), date: inStoryYear("08-20T00:00") }],
+		reviewedWork: [{ ref: pullRequest(2), date: inStoryYear("08-20T00:00"), outcome: "NOT_MET" }],
 		cleanWork: [
 			clean(1, inStoryYear("08-25T00:00")),
 			clean(4, inStoryYear("08-29T00:00")),
@@ -255,6 +249,7 @@ const RESOLVED_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 			{
 				ref: conversation("#backend-review"),
 				date: inStoryYear("08-12T00:00"),
+				outcome: "NOT_MET",
 			},
 		],
 		// The one the reader resolved, before the work did: the clean work stays where the work

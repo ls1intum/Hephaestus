@@ -31,7 +31,6 @@ import {
 
 const fixtures = path.join(import.meta.dirname, "fixtures");
 const TOKEN = "practice-script-test-token";
-/** The reviewed head: `commit_sha` of the record fixture. */
 const HEAD = "0".repeat(40);
 const BASE = "b".repeat(40);
 
@@ -57,7 +56,6 @@ const CHANGE = parseDiff(
 	].join("\n"),
 );
 
-/** What the fake review returns for every review. */
 const REVIEWED: Candidate = {
 	outcome: "COULD_NOT_DETERMINE",
 	summary: "The review leaves the practice open",
@@ -87,7 +85,6 @@ const REVIEWED: Candidate = {
 	},
 };
 
-/** One review a program asked for: its input, and its leads as the host quotes them. */
 interface Review {
 	options: ReviewOptions;
 	leads: QuotedLead[];
@@ -99,15 +96,11 @@ interface Run {
 }
 
 interface RunOptions {
-	/** The attempt's direct model account, shared by every practice of the run. */
 	budget?: ModelBudget;
-	/** Each practice's time, from its start. */
 	deadlineMs?: number;
-	/** The slugs to run the program under, one practice each. */
 	slugs?: string[];
 }
 
-/** Stage a program, a checkout, the captured record and the captured change. */
 async function stage(slugs: Record<string, string>) {
 	const { root, practices } = await stagePracticeScripts(slugs);
 	roots.push(root);
@@ -142,11 +135,6 @@ async function stage(slugs: Record<string, string>) {
 	};
 }
 
-/**
- * Run a program's source as each of `slugs`, in turn, at the host, with the models bound through
- * the stand-in proxy. The fake review quotes each lead as the host does before a session, and records
- * the input.
- */
 async function runSource(
 	source: string,
 	bound: BoundModels,
@@ -193,7 +181,6 @@ async function runSource(
 	return runs;
 }
 
-/** Run one fixture as one practice under its own name. */
 async function run(
 	fixture: string,
 	bound: BoundModels,
@@ -210,7 +197,6 @@ async function run(
 	return first.value;
 }
 
-/** The one review the run asked for: the program passed, and returned that review's result. */
 function reviewed({ outcome, reviews }: Run): Review {
 	assert.equal(outcome.status, "ok", outcome.error);
 	const { coverage: _coverage, ...result } = REVIEWED;
@@ -220,7 +206,6 @@ function reviewed({ outcome, reviews }: Run): Review {
 	return review;
 }
 
-/** Where a lead points, as `path:line`. */
 function placeOf(at: EvidenceLocation): string {
 	if ("change" in at) {
 		return `${at.change}:${at.line}`;
@@ -228,20 +213,14 @@ function placeOf(at: EvidenceLocation): string {
 	return "file" in at ? `${at.file}:${at.line}` : at.record;
 }
 
-/** Each lead with that label, as `path:line quote`. */
 function leadsLabelled(review: Review, label: string): string[] {
 	return review.leads
 		.filter((lead) => lead.label === label)
 		.map((lead) => `${placeOf(lead.at)} ${lead.quote}`);
 }
 
-/** A lead at `at`. */
 const leadAt = (at: EvidenceLocation) => ({ at, label: "A lead." });
 
-/**
- * Answers a packed classify call: a comment that starts "// increment" restates the code, and one that
- * starts "// TODO" is untracked work.
- */
 function decisions(request: { body: Record<string, unknown> }) {
 	const { questions, input } = request.body;
 	assert.ok(typeof input === "string" && Array.isArray(questions), "an OpenAI Decisions request");
@@ -280,7 +259,6 @@ function decisions(request: { body: Record<string, unknown> }) {
 	};
 }
 
-/** Every request that reached the stand-in names the practice whose program made it. */
 function assertAttributed(standIn: StandIn, practice: string) {
 	assert.ok(standIn.requests.length > 0, "a model was called");
 	for (const request of standIn.requests) {
@@ -358,7 +336,6 @@ void describe("practice programs and their direct models at the host", () => {
 				assert.deepEqual(leadsLabelled(review, LABELS.commentKind), [
 					"src/cart.ts:2   // increment the item count by one",
 				]);
-				// Code found the TODO, so the model never rates it, and it has one lead.
 				assert.deepEqual(
 					review.leads
 						.filter((lead) => "change" in lead.at && lead.at.line === 6)
@@ -374,7 +351,6 @@ void describe("practice programs and their direct models at the host", () => {
 			async (request) => {
 				assert.equal(request.body.logprobs, true);
 				const prompt = JSON.stringify(request.body.messages);
-				// One answer line per question, each letter with its distribution.
 				const ids = [...prompt.matchAll(/\[(?<id>q\d+)\] Item \[i\d+\]/gu)].map(
 					(m) => m.groups?.id ?? "",
 				);
@@ -401,7 +377,6 @@ void describe("practice programs and their direct models at the host", () => {
 				assert.equal(standIn.requests[0]?.operation, "chat/completions");
 				assert.equal(standIn.requests[0].slot, "decision");
 				assertAttributed(standIn, "every-slot");
-				// Letter E is the fifth kind, restates-code, for both comments without a TODO marker.
 				assert.equal(leadsLabelled(reviewed(result), LABELS.commentKind).length, 2);
 			},
 		);
@@ -418,7 +393,6 @@ void describe("practice programs and their direct models at the host", () => {
 				if (turn === 1) {
 					return chatToolCall("grep", { pattern: "export function parseDiff" });
 				}
-				// The tool's result came back through the host: the second turn sees it.
 				assert.match(
 					JSON.stringify(request.body.messages),
 					/lib\/diff-parser\.ts:2: export function parseDiff/u,
@@ -433,7 +407,6 @@ void describe("practice programs and their direct models at the host", () => {
 				);
 				assert.ok(standIn.requests.every((r) => r.slot === "chat"));
 				assertAttributed(standIn, "every-slot");
-				// The agent's grep is a read of the head tree, with its receipt.
 				assert.equal(result.outcome.coverageReached.reads, 1);
 				const review = reviewed(result);
 				assert.deepEqual(leadsLabelled(review, LABELS.declaration), [
@@ -534,7 +507,6 @@ void describe("the attempt's direct model budget", () => {
 				);
 				assert.deepEqual(review.options.facts, { answered: 2, refused: 2 });
 				assert.equal(standIn.requests.length, 2);
-				// Each call that ran settled at the 15 tokens it reported.
 				assert.equal(budget.left, 2300 - 2 * 15);
 			},
 		);
@@ -680,7 +652,6 @@ return ctx.review();
 						{ slot: "reranking", failures: { "too-large": 1 } },
 					],
 				);
-				// Only the rerank at the cap and the two calls that `embedMany` split its values into.
 				assert.deepEqual(
 					standIn.requests
 						.map((r) => {
@@ -835,7 +806,6 @@ void describe("a program the host refuses", () => {
 				return true;
 			});
 		}
-		// The review that the lead was for fails, and with it the program.
 		const runs = await runSource(
 			`import {definePracticeScript,generateText} from "../lib/core/practice-script.ts";
 export default definePracticeScript({

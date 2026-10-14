@@ -4,7 +4,6 @@ export function practiceCatalogStructureScope(workspaceSlug: string) {
 	return { id: `practice-catalog:${workspaceSlug}:structure` };
 }
 
-/** Catalog order: position first, then name, so equal positions still read the same every time. */
 export function byPosition<T extends { position: number; name: string }>(a: T, b: T) {
 	return a.position - b.position || a.name.localeCompare(b.name);
 }
@@ -26,7 +25,6 @@ export function upsertGroup(groups: PracticeGroup[], updated: PracticeGroup): Pr
 		: [...groups, updated];
 }
 
-/** A group with the details an update replaces, as the server will return it. */
 export function withGroupDetails(
 	groups: PracticeGroup[],
 	slug: string,

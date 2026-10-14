@@ -16,11 +16,7 @@ const julyFifth: LlmUsageByDay = {
 	events: 10,
 };
 
-/**
- * Deliberately inconsistent with its own rows, which is the only way to see which number a footer is
- * made of: the rows come to $9.00 and $3.00, while the report's month totals say $4.25 and $1.75. The
- * rows have 3 runs with no price, while the month has 2: one run can have usage on two days.
- */
+// Deliberately inconsistent totals distinguish server envelope values from sums of displayed rows.
 const report: WorkspaceLlmUsageReport = {
 	month: "2026-07",
 	instanceTotalCostUsd: 4.25,
@@ -106,7 +102,6 @@ describe("usage breakdown totals", () => {
 
 		const footer = totalsRowOf("AI spend by run type");
 		within(footer).getByRole("rowheader", { name: "Total" });
-		// $4.25 and $1.75 over 30 runs: never one average of the two purses summed.
 		expect(cellTexts(footer)).toStrictEqual([
 			"$4.25",
 			"$0.14",

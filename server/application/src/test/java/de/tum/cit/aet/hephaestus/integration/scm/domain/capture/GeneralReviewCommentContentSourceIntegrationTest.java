@@ -35,15 +35,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * The general discussion the reviewer-craft practices read, against a real schema.
- *
- * <p>{@code GeneralReviewCommentContentSourceTest} mocks the repository, so it can only prove the
- * in-memory pass against rows it was handed. This covers what only Postgres can prove: the query
- * itself excludes Hephaestus-authored comments, the {@code LEFT JOIN FETCH} initialises the lazy
- * author before the session closes, and the {@code issue.id} filter does not leak a neighbouring
- * artifact's thread.
- */
 class GeneralReviewCommentContentSourceIntegrationTest extends BaseIntegrationTest {
 
     private static final String FILE_KEY = "context/general_comments.json";

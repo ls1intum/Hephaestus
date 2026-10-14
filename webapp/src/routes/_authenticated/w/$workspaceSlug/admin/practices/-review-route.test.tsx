@@ -46,7 +46,6 @@ const membership = (overrides: Partial<WorkspaceMembership>): WorkspaceMembershi
 	...overrides,
 });
 
-/** An account nobody has signed in to yet, known only by its GitLab identity. */
 const unclaimed = membership({
 	role: "MEMBER",
 	account: {
@@ -112,7 +111,6 @@ function stubWorkspace(extra: Parameters<typeof server.use>) {
 	);
 }
 
-/** Serves `initial` and records every settings write with the If-Match it carried. */
 function stubSettings(initial: PracticeReviewSettings) {
 	let settings = initial;
 	const previews: WorkspaceReviewScope[] = [];
@@ -150,7 +148,6 @@ function stubSettings(initial: PracticeReviewSettings) {
 	return { previews, patches, handlers };
 }
 
-/** Opens the Hygiene group unless it is already open, then finds the practice's row in it. */
 async function openPractice(name: string): Promise<HTMLElement> {
 	const group = await screen.findByRole("button", { name: /^Hygiene/u }, ROUTE_RENDER_WAIT);
 	if (group.getAttribute("aria-expanded") !== "true") {
@@ -177,12 +174,7 @@ describe("review route", () => {
 		expect(screen.queryByText("States the motivation")).toBeNull();
 	});
 
-	/**
-	 * The whole reason the page hands its section bodies down as elements instead of composing them:
-	 * an element that is never mounted runs no hooks, so a reader who opens one tab pays for one
-	 * tab's data. Asserted at the network, because the DOM cannot tell a section that rendered nothing
-	 * from one that never ran.
-	 */
+// Unmounted section elements run no hooks; a closed section must not fetch its data.
 	it("asks for a section's data only once its tab is opened", async () => {
 		const requested: string[] = [];
 		const recorded = (path: string, body: Parameters<typeof HttpResponse.json>[0]) =>
@@ -221,10 +213,7 @@ describe("review route", () => {
 		expect(screen.queryByRole("tabpanel", { name: "Feedback mode" })).toBeNull();
 	});
 
-	/**
-	 * Null is the inherit instruction; Off is a choice like any other. Sending Off to mean "inherit",
-	 * or omitting the field, would turn a reset into a silent stop of every destination.
-	 */
+// Null restores inheritance; Off is an explicit choice and cannot serve as reset.
 	it("overrides a practice's feedback mode and makes it inherit again with an explicit null", async () => {
 		const bodies: SetFeedbackModeRequest[] = [];
 		stubWorkspace([
@@ -242,8 +231,7 @@ describe("review route", () => {
 
 		renderRouteAt("/w/acme/admin/practices/review");
 
-		// `hidden: true`: jsdom runs no layout, so Base UI leaves the opened accordion panel carrying
-		// the attribute it strips once the panel has a height.
+		// jsdom has no layout; Base UI can retain aria-hidden until the panel receives a height.
 		const inherited = await openPractice("States the motivation");
 		await userEvent.click(within(inherited).getByRole("radio", { name: "Off", hidden: true }));
 		await waitFor(() => expect(bodies).toStrictEqual([{ feedbackMode: "OFF" }]));
@@ -262,7 +250,6 @@ describe("review route", () => {
 		const bodies: SetFeedbackModeRequest[] = [];
 		const [hygiene] = fixture.groups;
 		assert(hygiene);
-		/** What the server answers after each write, in order: Off chosen here, then inherited again. */
 		const answers: PracticeGroup[] = [
 			{ ...hygiene, feedbackMode: { effective: "OFF", override: "OFF", source: "GROUP" } },
 			hygiene,
@@ -342,7 +329,6 @@ describe("review route", () => {
 
 		renderRouteAt("/w/acme/admin/practices/review?section=automated-review");
 
-		// An unclaimed account is a member like any other, named by its workspace identity.
 		await screen.findByRole(
 			"button",
 			{ name: "Remove grace from the review scope" },

@@ -51,7 +51,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The purse's tile, found by its name, once the preview has mounted the report. */
 async function tileOf(
 	canvas: StoryContext["canvas"],
 	purse: "Shared models" | "Own provider",
@@ -65,10 +64,6 @@ async function tileOf(
 	return tile;
 }
 
-/**
- * Two equal tiles, one per purse, each against its own limit. The cap editor belongs to the section,
- * so neither tile is taller for holding it; with room left on both limits, no state is badged.
- */
 export const BothCapsHealthy: Story = {
 	play: async ({ canvas }) => {
 		await canvas.findByRole("region", { name: "Spend this month" });
@@ -76,8 +71,6 @@ export const BothCapsHealthy: Story = {
 		await expect(canvas.queryByText(FX_DISCLOSURE)).toBeNull();
 		await expect(canvas.queryAllByLabelText(ESTIMATE_LABEL)).toHaveLength(0);
 		const spend = within(canvas.getByRole("region", { name: "Spend this month" }));
-		// The section's one action names the purse it changes: only the own provider's cap is the
-		// workspace's to set.
 		spend.getByRole("button", { name: "Change provider cap" });
 
 		const shared = within(await tileOf(canvas, "Shared models"));
@@ -99,7 +92,6 @@ export const BothCapsHealthy: Story = {
 
 const PRACTICE_SCRIPT_CARD = "Models for practice scripts, by practice";
 
-/** Below *By run type*, because its spend is a split of the review run types, not an addition. */
 export const PracticeScriptModelsByPractice: Story = {
 	args: { report: withPracticeScriptUsage(capped) },
 	play: async ({ canvas }) => {
@@ -114,7 +106,6 @@ export const PracticeScriptModelsByPractice: Story = {
 	},
 };
 
-/** A month in which no script called a model has no card, not an empty one. */
 export const NoPracticeScriptCalls: Story = {
 	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("By run type")).toBeVisible();
@@ -122,10 +113,6 @@ export const NoPracticeScriptCalls: Story = {
 	},
 };
 
-/**
- * The workspace has no provider of its own in use: its tile says where one is connected, no table
- * has its columns, and no cap is offered for a purse that is not in use.
- */
 export const NoProviderConnected: Story = {
 	args: { report: baseReport },
 	play: async ({ canvas }) => {
@@ -150,10 +137,6 @@ export const ProviderUncapped: Story = {
 	},
 };
 
-/**
- * A provider connected with a model turned on, before its first call: the purse is in use, so its
- * columns read $0.00 and its cap can be set before any spend.
- */
 export const ConnectedBeforeFirstSpend: Story = {
 	args: { report: { ...baseReport, ownProviderInUse: true } },
 	play: async ({ canvas }) => {
@@ -180,7 +163,6 @@ export const NoSharedBudget: Story = {
 	},
 };
 
-/** Each tile badges its own limit in its own word; the pace alerts above say when each is reached. */
 export const ApproachingBothCaps: Story = {
 	args: {
 		report: withMonthTotals(capped, { instanceTotalCostUsd: 22, ownProviderTotalCostUsd: 8.4 }),
@@ -297,10 +279,6 @@ export const ZeroProviderCap: Story = {
 	},
 };
 
-/**
- * A $0 cap on a provider that is not in use holds nothing back, so the page names no cap state. It
- * only says where a provider is connected.
- */
 export const ZeroProviderCapNotInUse: Story = {
 	args: {
 		report: {
@@ -425,10 +403,6 @@ export const Empty: Story = {
 	},
 };
 
-/**
- * The limit states, meters and muted headers keep their meaning on the dark theme: the shared-model
- * budget is reached, and the provider cap is paused because some calls have no price.
- */
 export const Dark: Story = {
 	args: {
 		report: {

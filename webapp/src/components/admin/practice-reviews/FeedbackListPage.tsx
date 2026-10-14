@@ -20,7 +20,6 @@ import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { ReviewTabIntro } from "./ReviewTabIntro";
 
 export interface FeedbackListPageProps {
-	/** Only the developer summary needs it: its counts link to the list narrowed to them. */
 	workspaceSlug: string;
 	search: FeedbackSearch;
 	onSearchChange: (patch: Partial<FeedbackSearch>) => void;
@@ -29,10 +28,6 @@ export interface FeedbackListPageProps {
 	groups: FacetSource;
 	practices: FacetSource;
 	people: ReviewPeople;
-	/**
-	 * Everything for the developer `search.developerId` names, by location, whatever else the list is
-	 * filtered to. Read only while that filter is set.
-	 */
 	developerCounts: PanelState<{ counts: ReasonCount[] }>;
 	/** The one record the scope is filtered to, by name, for its pill. */
 	record?: ScopeRecordFilter;

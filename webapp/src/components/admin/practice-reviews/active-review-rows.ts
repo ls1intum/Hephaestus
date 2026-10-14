@@ -4,7 +4,6 @@ import { isActiveReview as isActiveStatus } from "@/components/practice-vocabula
 /** The statuses a review still moves through, and the only ones the list re-reads on a timer. */
 export const ACTIVE_REVIEW_STATUSES = ["QUEUED", "RUNNING"] as const;
 
-/** Whether a review row is still active, so the list keeps polling it. */
 export const isActiveReview = (review: Pick<ReviewSummary, "status">) =>
 	isActiveStatus(review.status);
 
@@ -31,7 +30,6 @@ export function reconcileActiveRows(
 	loaded: readonly ReviewSummary[],
 	active: readonly ReviewSummary[],
 	activeComplete: boolean,
-	// The rows the poll follows: the active reviews.
 	follows: (review: ReviewSummary) => boolean = isActiveReview,
 ): ActiveRowsReconciliation {
 	const loadedById = new Map(loaded.map((review) => [review.id, review]));

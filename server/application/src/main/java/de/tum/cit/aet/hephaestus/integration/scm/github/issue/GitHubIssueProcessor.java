@@ -387,21 +387,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return issue;
     }
 
-    /**
-     * Process a {@code transferred} event: the issue has moved to another repository and no longer
-     * exists in this one.
-     *
-     * <p>GitHub delivers {@code transferred} to the SOURCE repository, and the payload's issue is
-     * the source-side issue. Routing it to {@link #process} would re-upsert the issue into the
-     * repository it had just left, creating a permanent phantom instead of removing one. A transfer
-     * is not a delete event, but from this repository's perspective the outcome is identical: the
-     * issue is gone.
-     *
-     * <p>Tombstoned rather than deleted, matching the {@code RECONCILIATION} sweep: the issue's
-     * feedback/result rows reference it by bare id with no FK, so removing the row would orphan
-     * them. The sweep would eventually catch this anyway (a transferred issue vanishes from the
-     * source repository's upstream listing); handling the event makes it immediate.
-     */
+    // GitHub sends transfers to the source repository; upserting that payload would recreate an issue that left.
+    // Tombstones retain source ids referenced by items, feedback, and activity.
     @Transactional
     public void processTransferred(GitHubIssueDTO issueDto, ProcessingContext context) {
         if (namesPullRequest(issueDto, context)) return;

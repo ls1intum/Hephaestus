@@ -1,8 +1,3 @@
-// Finds each ask that a reviewer made, one lead each, with what the record shows beside it: if the
-// change touches the file of the ask, if the author replied and if the reply names an issue, if the
-// reviewer had a later word on it or approved after it, and if the thread was marked resolved. The
-// review decides for each ask if it was addressed, deferred into tracked work, waived or merged past.
-// The RESOLVED mark of a thread tells who clicked it, not what happened to the ask.
 import { scm, expectKind, requireChange, type DiffFile } from "../kits/scm/index.ts";
 import { issueNumberReferences } from "../kits/scm/references.ts";
 import {
@@ -24,15 +19,12 @@ export const LABELS = {
 	"conversation-ask": "A comment by someone other than the author in the conversation.",
 };
 
-/** Words a reply uses to put an ask off rather than answer it. */
 const DEFERRAL =
 	/\b(?:later|next (?:mr|pr|merge request|pull request|sprint|iteration)|follow[- ]?up|will (?:do|add|fix|revisit|look)|todo|not (?:in|for) this (?:mr|pr)|separate (?:mr|pr|issue)|future)\b/iu;
 
-/** Words a reviewer uses to drop an ask rather than keep it. */
 const WAIVER =
 	/\b(?:fine to skip|not needed|no need|never mind|nevermind|ignore|optional|nit|non[- ]blocking|up to you|can be skipped)\b/iu;
 
-/** One ask, with the facts that the record shows beside it. */
 interface Ask {
 	lead: ReviewLead;
 	authorReplied: boolean;
@@ -44,8 +36,6 @@ export default definePracticeScript({
 	async run(ctx) {
 		const domain = scm(ctx);
 		expectKind(domain, "scm.pull_request");
-		// The practice reviews the asks that the work merged with, so a requested review of unmerged
-		// work has none to decide yet.
 		if (ctx.review.origin === "REQUEST" && !domain.item.is_merged) {
 			return ctx.review({
 				leads: [],
@@ -67,9 +57,6 @@ export default definePracticeScript({
 			decisions.some(
 				(d) => d.state === "APPROVED" && d.dismissed !== true && later(d.submittedAt, at),
 			);
-		// An inline ask: the first comment in a thread by someone other than the author. The author's
-		// later comments in the thread are its answers; the others' later comments there are the
-		// reviewer's last word on it, not new asks.
 		const inlineAsks = reviewerCommentRows(inline ?? [], record?.threads ?? [], author).filter(
 			(r) => r.opensThread,
 		);
@@ -81,8 +68,6 @@ export default definePracticeScript({
 				}),
 			);
 		}
-		// A conversation ask: a general comment by someone other than the author; the author's later
-		// general comments are the candidate answers, the others' later ones the follow-ups.
 		const conversationAsks = (general ?? []).filter(byOthers);
 		for (const ask of conversationAsks) {
 			const afterAsk = (c: GeneralComment) => later(c.createdAt, ask.createdAt);
@@ -131,7 +116,6 @@ export default definePracticeScript({
 	},
 });
 
-/** An inline ask cites its body in `comments.json`, and a conversation ask in `general_comments.json`. */
 function askOf(
 	ask: ReviewComment | GeneralComment,
 	replies: readonly { body: string }[],

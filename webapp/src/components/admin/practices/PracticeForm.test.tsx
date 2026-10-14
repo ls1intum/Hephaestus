@@ -38,7 +38,6 @@ describe("editing a workspace practice", () => {
 		});
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-		// The group is where the practice sits, not definition: it travels beside the request, never inside it.
 		await waitFor(() =>
 			expect(onSubmit).toHaveBeenCalledExactlyOnceWith(
 				{

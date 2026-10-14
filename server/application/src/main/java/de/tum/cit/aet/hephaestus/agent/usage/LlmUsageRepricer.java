@@ -60,7 +60,6 @@ public class LlmUsageRepricer {
     public enum ResultOutcome {
         /** A rate was found and applied; the row now counts toward its purse's total. */
         REPRICED,
-        /** The row lacks complete usage or a usable rate, or another pass already priced it. Nothing was written. */
         STILL_UNPRICEABLE,
         /** The row named no model, or named one this instance can no longer identify. Nothing was written. */
         UNIDENTIFIABLE,

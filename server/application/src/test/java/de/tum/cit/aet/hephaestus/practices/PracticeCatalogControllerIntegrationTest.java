@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogCustomizationService;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogEntryType;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
@@ -40,6 +41,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Autowired
     CatalogService catalog;
+
+    @Autowired
+    CatalogCustomizationService customization;
 
     @Test
     @WithAdminUser
@@ -372,9 +376,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         var owner = persistUser("admin");
         var workspace = createWorkspace("catalog-comparison", "Comparison", "comparison-org", AccountType.ORG, owner);
         String slug = "comparison-" + UUID.randomUUID();
-        var entry = catalog.createPractice(
+        var entry = customization.createPractice(
                 new CatalogPracticeInputDTO(slug, "scm.pull_request", null, DefinitionTestFixtures.definition(), null));
-        catalog.setExcluded(
+        customization.setExcluded(
                 CatalogEntryType.PRACTICE,
                 slug,
                 true,

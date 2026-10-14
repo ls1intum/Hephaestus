@@ -169,7 +169,6 @@ class IssueContentSourceTest extends BaseUnitTest {
         return deliveries;
     }
 
-    /** A source whose delivery record names {@code delivered} as Hephaestus's own GitLab notes. */
     private IssueContentSource excludingDelivered(StoredComment... delivered) {
         return new IssueContentSource(objectMapper, issueRepository, issueCommentRepository, versions(delivered));
     }
@@ -284,10 +283,6 @@ class IssueContentSourceTest extends BaseUnitTest {
         };
     }
 
-    /**
-     * The stored comments as the projection returns them, oldest first, and that many mirrored in
-     * all.
-     */
     private void stubComments(List<StoredComment> chronological) {
         when(issueCommentRepository.countByIssueId(ISSUE_ID)).thenReturn((long) chronological.size());
         when(issueCommentRepository.findStoredByIssueId(ISSUE_ID)).thenReturn(chronological);

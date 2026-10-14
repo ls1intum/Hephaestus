@@ -6,10 +6,6 @@ import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-orig
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { StatusLabel } from "@/components/practice-vocabulary/StatusTooltip";
 
-/**
- * The outcome in the words a result's head line uses — "Not met · 3 problems" where its problems are
- * known — with the registry's icon and colour, so the count travels with the outcome it qualifies.
- */
 export function resultOutcomeDef(
 	outcome: ReviewResult["outcome"],
 	problems: number | undefined,
@@ -23,10 +19,6 @@ export interface ResultOutcomeProps {
 	problems?: number;
 }
 
-/**
- * The outcome and, for a not met result, its severity, as words beside their icons. A verdict is not an
- * exception, so neither is a badge: the badges on a level are kept for what went wrong.
- */
 export function ResultOutcome({ result, problems }: ResultOutcomeProps) {
 	const severity = resultSeverity(result);
 	return (
@@ -37,7 +29,6 @@ export function ResultOutcome({ result, problems }: ResultOutcomeProps) {
 	);
 }
 
-/** The states a badge is kept for: what failed, was withheld, was marked incorrect or needs a look. */
 export function isExceptionStatus(def: StatusDef): boolean {
 	return def.badgeVariant === "destructive" || def.badgeVariant === "warning";
 }
@@ -50,10 +41,7 @@ export function ReviewStatusMark({ def }: { def: StatusDef }) {
 	return isExceptionStatus(def) ? <StatusBadge def={def} /> : <StatusLabel def={def} />;
 }
 
-/**
- * Severity is only ever read alongside a not met result — a "Minor" beside a met result would
- * be a cost for something that cost nothing.
- */
+// Severity describes the cost of Not met problems; it must not label Met results.
 export function resultSeverity(
 	result: Pick<ReviewResult, "outcome" | "severity">,
 ): StatusDef | undefined {
@@ -62,11 +50,6 @@ export function resultSeverity(
 		: undefined;
 }
 
-/**
- * EVENT renders nothing: naming the ordinary case buries the others. The others are plain words, not
- * a badge: an origin is a fact about the record, not something that went wrong. The words are the
- * registry's, so the operator's console and the developer's own surface name an origin alike.
- */
 export function ResultOriginNote({ origin }: { origin: ReviewResult["origin"] }) {
 	if (origin === "EVENT") {
 		return null;

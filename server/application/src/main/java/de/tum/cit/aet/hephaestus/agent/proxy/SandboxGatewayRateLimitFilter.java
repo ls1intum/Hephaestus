@@ -17,19 +17,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Caps how fast one authenticated sandbox may call the gateway. The bucket is keyed by the principal
- * {@link JobTokenAuthenticationFilter} resolved — one agent job or one mentor session — so no
- * sandbox can drain another's budget, and no workspace's mentor traffic can throttle another's.
- *
- * <p>Runs after the chain's authorization rules, so a call that its scope refuses spends nothing
- * from the bucket of the principal that its path routes to. A request that carries no
- * {@link ProxyIdentity} principal is passed on unchanged.
- *
- * <p>A bucket store it cannot reach fails open. The caller is already job-token-authenticated and its
- * spend still has to pass the budget gate. The limiter records an unavailable bucket store and
- * permits the authenticated call.
- */
+// Authorize before consuming rate limits, and key buckets by principal to isolate sandboxes.
+// An unavailable bucket store permits the call; authentication and budget checks still apply.
 public final class SandboxGatewayRateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxGatewayRateLimitFilter.class);

@@ -39,7 +39,6 @@ export const REPLY_WITH_FEEDBACK: ChatMessage = {
 				text: "The commit `Fix stuff` does not say what it changes.",
 			},
 		},
-		// Stored before links carried their feedback, so it shows nothing.
 		{
 			type: "data-result",
 			id: "link-3",

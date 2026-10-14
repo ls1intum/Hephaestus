@@ -32,10 +32,6 @@ public class AccountHardDeleteSweeper {
 
     private static final Logger log = LoggerFactory.getLogger(AccountHardDeleteSweeper.class);
 
-    /**
-     * Page size for the erasure backlog — one bounded transaction set per account, not one giant
-     * one.
-     */
     private static final int PAGE_SIZE = 100;
 
     private final AccountRepository accountRepository;

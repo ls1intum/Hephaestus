@@ -7,10 +7,7 @@ export function workspaceBase(webAppOrigin: string, workspaceSlug: string): stri
 	return `${webAppOrigin}/w/${encodeURIComponent(workspaceSlug)}`;
 }
 
-/**
- * The reader's feedback page for the item, and for an admin the reviews of this item with its detail
- * open. The item id is the server's; it is never built from a provider's own number.
- */
+/** Web app links use server item ids; provider issue numbers cannot identify items. */
 export function workLinks(
 	webAppOrigin: string,
 	workspaceSlug: string,

@@ -2,23 +2,28 @@
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://hephaestus.aet.cit.tum.de/schemas/practices/default-catalog.schema.json",
 	"title": "Bundled practice catalog",
+	"description": "Practice groups and practice definitions offered by the shipped catalog.",
 	"type": "object",
 	"additionalProperties": false,
 	"required": ["$schema", "version", "criteriaPreambles", "groups"],
 	"properties": {
 		"$schema": {
+			"description": "Schema used to validate this catalog.",
 			"const": "./default-catalog.schema.json"
 		},
 		"version": {
+			"description": "Version of the bundled practice catalog format.",
 			"const": "2.0.0"
 		},
 		"criteriaPreambles": {
+			"description": "Named text that the catalog loader adds before practice criteria.",
 			"type": "object",
 			"additionalProperties": {
 				"type": "string"
 			}
 		},
 		"groups": {
+			"description": "Practice groups and their bundled practices, in catalog order.",
 			"type": "array",
 			"minItems": 1,
 			"items": {

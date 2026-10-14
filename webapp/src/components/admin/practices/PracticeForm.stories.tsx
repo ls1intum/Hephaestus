@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
@@ -20,12 +20,6 @@ import { PracticeFormLevel } from "./PracticeFormLevel";
 const createSubmit = fn();
 const editSubmit = fn();
 
-/**
- * The editor is a level of the practice-setup drawer stack, so the tree a practice belongs to stays
- * on screen while it is written — and so these stories exercise the surface people actually get.
- * The fields are the shared editor's, whose own stories cover them; these cover what the workspace
- * wraps around it and what it sends.
- */
 const meta = {
 	component: PracticeForm,
 	parameters: {
@@ -103,7 +97,6 @@ export const EscapeLeavesACleanEditor: Story = {
 	},
 };
 
-/** An edit says what the save creates, and leads to the results that stay with the practice. */
 export const Edit: Story = {
 	args: { mode: "edit", initialData: mockScriptedPractice, onSubmit: editSubmit },
 	play: async () => {
@@ -119,7 +112,6 @@ export const Edit: Story = {
 	},
 };
 
-/** A save refused because someone saved first: the host's notice sits above the kept draft. */
 export const EditConflict: Story = {
 	args: {
 		mode: "edit",
@@ -170,7 +162,6 @@ export const Submitting: Story = {
 	},
 };
 
-/** A new practice sends its kind and its definition, with no position: the server appends it. */
 export const CreateSends: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
@@ -181,6 +172,12 @@ export const CreateSends: Story = {
 			screen.getByRole("textbox", { name: /What to look for/u }),
 			"Check whether the reviewed work explains its purpose.",
 		);
+		await userEvent.click(screen.getByRole("button", { name: "Choose sources" }));
+		await userEvent.click(
+			within(
+				screen.getByRole("radiogroup", { name: "How Pull request details is read" }),
+			).getByRole("radio", { name: "Required" }),
+		);
 		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		await expect(createSubmit).toHaveBeenCalledOnce();
 		await expect(createSubmit.mock.lastCall?.[0]).toMatchObject({
@@ -190,6 +187,10 @@ export const CreateSends: Story = {
 			definition: {
 				name: "Clear review context",
 				criteria: "Check whether the reviewed work explains its purpose.",
+				reads: {
+					contract: "2.0.0",
+					sources: [{ source: "scm.pull-request.core", need: "REQUIRED" }],
+				},
 			},
 		});
 	},

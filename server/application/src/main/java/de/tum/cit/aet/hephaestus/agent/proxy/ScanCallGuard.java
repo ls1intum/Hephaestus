@@ -29,7 +29,6 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Serializes scan calls on their owning gateway until usage commits, including parallel program calls. */
 @Component
 @ConditionalOnWorkerRole
 @RequiredArgsConstructor
@@ -70,7 +69,10 @@ public class ScanCallGuard {
             try {
                 inFlight = budget.inFlight(job, snapshot);
             } catch (ScanModelUnavailableException unavailable) {
-                throw refused();
+                throw new ResponseStatusException(
+                        HttpStatus.PAYMENT_REQUIRED,
+                        "The scan budget or its frozen execution bounds do not permit this call.",
+                        unavailable);
             }
             String slot = route.practiceScriptSlot() == null
                     ? "review"

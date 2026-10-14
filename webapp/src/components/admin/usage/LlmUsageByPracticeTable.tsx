@@ -59,11 +59,7 @@ const columnHelper = createColumnHelper<DataTableFeatures, LlmUsageByPractice>()
 const NUMERIC = { numeric: true };
 const NUMERIC_WIDE_ONLY = { numeric: true, className: WIDE_ONLY };
 
-/**
- * Decision, embedding and reranking calls of practice scripts, one row per practice, most shared
- * spend first. The footer is the server's `practiceScriptTotal`: one review runs several practices, so its
- * reviews, with or without a price, do not add up from the rows, and money is never re-added here.
- */
+// Per-practice spend is part of review spend; use server totals to avoid counting shared reviews twice.
 export function LlmUsageByPracticeTable({
 	report,
 	purses,
@@ -74,9 +70,7 @@ export function LlmUsageByPracticeTable({
 	const hasUnpriced = rows?.some((row) => row.unpricedEventCount > 0) === true;
 	const [sorting, setSorting] = useState<SortingState>([{ id: "SHARED-spend", desc: true }]);
 
-	// TanStack Table caches its column model, and every row model derived from it, against this
-	// array's identity. Its inputs are the report's own arrays, the page's purses and two flags, never
-	// a fresh array per render.
+	// TanStack Table caches the column model by identity; memoize every input that defines it.
 	const columns = useMemo(
 		() =>
 			columnHelper.columns([
@@ -93,7 +87,6 @@ export function LlmUsageByPracticeTable({
 					cell: ({ row }) => <ModelKinds row={row.original} />,
 				}),
 				...purses.map((purse) => {
-					// One precision for the whole column, its total included, so the decimal points line up.
 					const digits = averageFractionDigits([
 						...(rows ?? []).map((row) => averageOf(row, purse)),
 						total == null ? null : averageOf(total, purse),
@@ -113,7 +106,6 @@ export function LlmUsageByPracticeTable({
 								sortDescFirst: true,
 								meta: NUMERIC,
 							}),
-							// A row with nothing to average sorts below every row that has an average.
 							columnHelper.accessor((row) => averageOf(row, purse) ?? -1, {
 								id: `${purse}-average`,
 								header: () => <PurseLeaf purse={purse}>Avg per review</PurseLeaf>,
@@ -173,7 +165,6 @@ export function LlmUsageByPracticeTable({
 		[rows, total, hasUnpriced, purses, workspaceSlug],
 	);
 
-	// The table's `data`, keyed the same way `columns` is.
 	const data = useMemo(() => rows ?? [], [rows]);
 
 	const table = useTable({
@@ -184,8 +175,7 @@ export function LlmUsageByPracticeTable({
 		state: { sorting },
 	});
 	const [leafFooters] = table.getFooterGroups();
-	// The sorted model, not `getRowModel()`: the feature set pages by default, and this table never
-	// pages. *Not attributed* is not a practice, so it stays last, above the total, whatever the sort.
+	// The default row model pages; use the sorted model for this unpaged table.
 	const sortedRows = table.getSortedRowModel().rows;
 	const orderedRows = [
 		...sortedRows.filter((row) => row.original.practiceSlug !== undefined),

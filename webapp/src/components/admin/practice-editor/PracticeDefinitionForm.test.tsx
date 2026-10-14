@@ -61,7 +61,6 @@ async function openTechnicalSettings() {
 	return screen.findByRole("textbox", { name: "Identifier" });
 }
 
-/** A create draft the server would accept: a name, criteria, and one source the review must read. */
 async function fillValidDraft() {
 	fireEvent.change(nameField(), { target: { value: "Explain what changed and why" } });
 	fireEvent.change(screen.getByRole("textbox", { name: /What to look for/u }), {

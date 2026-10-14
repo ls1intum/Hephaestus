@@ -1,4 +1,3 @@
-/** The practice and result domain types other modules read. */
 @NamedInterface("model")
 @NullMarked
 package de.tum.cit.aet.hephaestus.practices.model;

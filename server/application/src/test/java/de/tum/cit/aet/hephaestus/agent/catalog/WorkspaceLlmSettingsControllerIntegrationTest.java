@@ -13,11 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * The endpoint answers with an instance-wide fact and never reads its
- * {@link WorkspaceContext}, so the body is identical
- * whoever asks: only the status code can tell you the membership gate ran.
- */
+// The response body is instance-wide; only the HTTP status proves that the workspace membership gate ran.
 class WorkspaceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired

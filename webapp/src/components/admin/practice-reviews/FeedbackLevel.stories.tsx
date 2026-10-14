@@ -37,17 +37,6 @@ const ready = (feedback: ReviewFeedbackDetail) => ({ status: "ready" as const, f
 /** A card shown on the developer's practice pages; its text is theirs alone. */
 const practicePageCard = feedbackDetail("44444444-5555-5555-5555-555555555555");
 
-/**
- * One piece of feedback's sheet, over the list it was opened from or over a trace, in the order
- * every record sheet has: a status line, What it is, State and history (composed, each decision,
- * withheld with its precise reason, each copy posted with its permalink or failed with its error,
- * each send, the developer's response), what it says and its checks, Technical and the actions. It
- * is titled by its first line, as its row is. It links to no other record: the results it was
- * written from are its trace.
- *
- * Feedback awaiting approval is the same level: the package is expanded, because approving it
- * unread is the failure to design out, and the decision is the footer like every sheet's actions.
- */
 const meta = {
 	component: FeedbackLevel,
 	parameters: { layout: "fullscreen" },
@@ -86,7 +75,6 @@ function history(panel: HTMLElement) {
 	return within(within(panel).getByRole("list", { name: "History" }));
 }
 
-/** Found while reviewing past work, so it was measured and never sent. */
 export const Withheld: Story = {
 	play: async () => {
 		const panelElement = await settledDrawerPanel();
@@ -103,21 +91,18 @@ export const Withheld: Story = {
 			"Checks",
 			SHEET_SECTIONS.technical,
 		];
-		// In the order every sheet has; the checks' own rows are headings of their own.
 		await expect(
 			panel
 				.getAllByRole("heading", { level: 3 })
 				.map((heading) => heading.textContent)
 				.filter((text) => sections.includes(text)),
 		).toStrictEqual(sections);
-		// The sheet is the feedback alone: no link to another record or list.
 		for (const link of panel.queryAllByRole("link")) {
 			await expect(String(link.getAttribute("href"))).not.toMatch(/detail=|\/reviews\//u);
 		}
 		history(panelElement).getByText(
 			"Found while reviewing past work, which is measured but never sent.",
 		);
-		// A record, not a proposal: nothing is left to decide, and nothing was shown to withdraw.
 		await expect(
 			panel.queryByRole("button", { name: "Approve for delivery" }),
 		).not.toBeInTheDocument();
@@ -127,10 +112,6 @@ export const Withheld: Story = {
 	},
 };
 
-/**
- * Approved, then posted on the pull request: the decision with who took it, the summary's receipt
- * with its permalink, and the developer's answer in their own words.
- */
 export const Delivered: Story = {
 	args: { feedback: ready(approvedFeedbackDetail) },
 	play: async () => {
@@ -145,7 +126,6 @@ export const Delivered: Story = {
 			"href",
 			expect.stringContaining("#issuecomment-"),
 		);
-		// A send that finished is said by the receipt, not a second time.
 		await expect(events.queryByText("Done")).toBeNull();
 		events.getByText("Answered");
 		events.getByText("Helpful");
@@ -161,7 +141,13 @@ export const Delivered: Story = {
  * it on GitHub, without the hidden marker and with the footer as small print.
  */
 export const DeliveredSummaryComment: Story = {
-	args: { feedback: ready({ ...approvedFeedbackDetail, body: POSTED_SUMMARY_COMMENT }) },
+	args: {
+		feedback: ready({
+			...approvedFeedbackDetail,
+			destination: "ON_WORK",
+			body: POSTED_SUMMARY_COMMENT,
+		}),
+	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		const rendered = panel.getByRole("tabpanel", { name: "Rendered" });
@@ -173,10 +159,6 @@ export const DeliveredSummaryComment: Story = {
 	},
 };
 
-/**
- * The summary went up and both line notes failed: the status line counts the copies, each copy has
- * its receipt or its error, and the send says when it tries the failed ones again.
- */
 export const PartialPackage: Story = {
 	args: { feedback: ready(partialPackageFeedbackDetail) },
 	play: async () => {
@@ -196,12 +178,8 @@ export const PartialPackage: Story = {
 	},
 };
 
-/**
- * The developer disagreed: the flag says so, and their reason is in the history as theirs, never as
- * an admin's mark.
- */
 export const Disagreed: Story = {
-	args: { feedback: ready(longFeedbackDetail) },
+	args: { feedback: ready({ ...longFeedbackDetail, destination: "ON_WORK" }) },
 	play: async () => {
 		const panelElement = await settledDrawerPanel();
 		await expectHeaderChip(panelElement, "Disagreed");
@@ -213,7 +191,6 @@ export const Disagreed: Story = {
 	},
 };
 
-/** A response the developer cleared leaves no answer behind, and no disagreement. */
 export const ClearedResponse: Story = {
 	args: {
 		feedback: ready({
@@ -249,10 +226,6 @@ export const UncertainWrite: Story = {
 	},
 };
 
-/**
- * A send that gave up says how often it was tried and what the provider last answered, under the
- * outcome rather than as a second outcome.
- */
 export const DeliveryFailed: Story = {
 	args: { feedback: ready(failedFeedbackDetail) },
 	play: async () => {
@@ -263,12 +236,10 @@ export const DeliveryFailed: Story = {
 		events.getByText("Summary failed");
 		events.getByText("Post the copies · 5 attempts");
 		await expect(events.getAllByText(/Resource not accessible by integration/u).length).toBe(2);
-		// Nothing is tried again, so no next attempt.
 		await expect(events.queryByText(/Next attempt/u)).toBeNull();
 	},
 };
 
-/** Withheld because a workspace admin marked the only result behind it incorrect. */
 export const WithheldResultMarkedIncorrect: Story = {
 	args: { feedback: ready(markedIncorrectFeedbackDetail) },
 	play: async () => {
@@ -280,7 +251,6 @@ export const WithheldResultMarkedIncorrect: Story = {
 	},
 };
 
-/** The work changed before the copies went up, so they stayed back. */
 export const WithheldAfterTheWorkChanged: Story = {
 	args: {
 		feedback: ready({
@@ -302,7 +272,6 @@ export const WithheldAfterTheWorkChanged: Story = {
 	},
 	play: async () => {
 		const events = history(await settledDrawerPanel());
-		// Said once: the copy's reason is the feedback's own.
 		await expect(
 			events.getAllByText("The work changed before this feedback could be posted."),
 		).toHaveLength(1);
@@ -325,13 +294,11 @@ export const Rejected: Story = {
 		const events = history(panelElement);
 		events.getByText("Rejected");
 		events.getByText("by Grace Hopper");
-		// The category is the registry's words, not the stored value.
 		await expect(events.getByText(/Not useful to the developer/u)).toBeVisible();
 		events.getByText(/The long comment already covers the test names/u);
 	},
 };
 
-/** A decision whose account was erased names the account as gone, not as blank. */
 export const DecidedByAnErasedAccount: Story = {
 	args: {
 		feedback: ready({
@@ -349,7 +316,6 @@ export const DecidedByAnErasedAccount: Story = {
 	},
 };
 
-/** Withdrawn from the practice pages: the level offers the restore, and says what withdrawal did. */
 export const Withdrawn: Story = {
 	args: { feedback: ready(withdrawnFeedbackDetail) },
 	play: async () => {
@@ -365,7 +331,6 @@ export const Withdrawn: Story = {
 	},
 };
 
-/** Withdrawn, then restored: both decisions stay listed, and it can be withdrawn again. */
 export const Restored: Story = {
 	args: { feedback: ready(restoredFeedbackDetail) },
 	play: async () => {
@@ -458,10 +423,6 @@ export const ReadyForConversation: Story = {
 	},
 };
 
-/**
- * A practice pages card not opened yet. Nothing is retried at this destination, so the sheet says
- * the developer opening it is the delivery, never that copies are tried again.
- */
 export const ReadyForPracticePages: Story = {
 	args: {
 		feedback: ready({ ...practicePageCard, state: "READY", deliveredAt: null }),
@@ -481,7 +442,7 @@ export const ReadyForPracticePages: Story = {
  * receipt.
  */
 export const Reflow: Story = {
-	args: { feedback: ready(longFeedbackDetail) },
+	args: { feedback: ready({ ...longFeedbackDetail, destination: "ON_WORK" }) },
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
 		await expectNoPanelOverflow(await settledDrawerPanel());
@@ -490,7 +451,7 @@ export const Reflow: Story = {
 
 /** Long feedback reads whole, Rendered or as its Source. */
 export const LongFeedback: Story = {
-	args: { feedback: ready(longFeedbackDetail) },
+	args: { feedback: ready({ ...longFeedbackDetail, destination: "ON_WORK" }) },
 	play: async ({ userEvent }) => {
 		const panel = within(await settledDrawerPanel());
 		const rendered = panel.getByRole("tabpanel", { name: "Rendered" });
@@ -500,10 +461,6 @@ export const LongFeedback: Story = {
 	},
 };
 
-/**
- * Awaiting approval, the level leads with what approval authorizes and ends in the decision. What
- * will be sent is expanded — the summary and every note — rather than behind a disclosure.
- */
 export const AwaitingApproval: Story = {
 	args: { feedback: ready(awaitingApprovalFeedbackDetail) },
 	play: async ({ args, userEvent }) => {

@@ -14,7 +14,6 @@ import {
 	repositoryRecordSchema,
 } from "./scm/records.ts";
 
-/** The server's item contracts, which the kits read the captured records by. */
 const CONTRACTS = path.join(
 	import.meta.dirname,
 	"../../../../server/application/src/main/resources/contracts/items",

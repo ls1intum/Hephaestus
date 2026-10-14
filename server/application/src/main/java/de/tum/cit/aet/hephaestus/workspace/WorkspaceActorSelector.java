@@ -13,10 +13,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/**
- * Chooses the actor an account speaks through in one workspace, as {@code workspace-context.mdx}
- * describes.
- */
 @Component
 public class WorkspaceActorSelector {
 

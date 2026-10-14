@@ -28,24 +28,17 @@ const longContent = {
 	},
 } satisfies ReviewResult;
 
-/** The fixture's results spread over a week, about three a day. */
 const overAWeek: ReviewResult[] = reviewResults.map((result, index) => ({
 	...result,
 	recordedAt: index < 3 ? hoursBefore(index + 1) : daysBefore(Math.floor(index / 3)),
 }));
 
-/** Storybook resets a spy that appears in `args` between runs, so one instance is enough. */
+// Storybook resets args spies between runs; one shared instance is sufficient.
 const clearFilters = fn();
 const retry = fn();
 
 const TABLE = { name: "Results" } as const;
 
-/**
- * The Results stream, drawn as the Reviews table: one body per day under its heading, the time and
- * the outcome as an icon, named with the problems a not met result counts, the result with its
- * practice, the item and the developer. The whole row opens the result's sheet;
- * Track and Trace end it.
- */
 const meta = {
 	component: ResultRows,
 	parameters: {
@@ -61,7 +54,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The mixed result list from the review fixtures. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		const table = canvas.getByRole("table", TABLE);
@@ -70,21 +62,16 @@ export const Default: Story = {
 				.getAllByRole("columnheader")
 				.map((head) => head.textContent),
 		).toEqual(["Recorded", "Result", "Work", "Developer", "Actions", "Open"]);
-		// The outcome is each row's leading icon, named for a screen reader with the problems a not
-		// met result counts, and no button.
-		await expect(canvas.getAllByText("Not met · 1 problem")).toHaveLength(3);
+		await expect(canvas.getAllByText("Not met · 1 problem")).toHaveLength(4);
 		await expect(canvas.getAllByText("Not met · 2 problems")).toHaveLength(3);
 		await expect(canvas.getAllByText("Not met · 3 problems")).toHaveLength(1);
 		await expect(canvas.queryByRole("button", { name: /^Not met/u })).not.toBeInTheDocument();
-		// The count also shows beside the practice, so a sighted reader sees it without the icon.
 		await expect(canvas.getAllByText("2 problems")).toHaveLength(3);
 		canvas.getByText("Does not apply");
-		// Severity is named only where it costs something: critical or major.
 		canvas.getByText("Critical");
 		await expect(canvas.queryByText("Minor")).not.toBeInTheDocument();
 		await expect(canvas.queryByText("Trivial")).not.toBeInTheDocument();
 		await expect(canvas.getAllByText("Backfilled")).toHaveLength(2);
-		// A row opens its result over the list, so the list stays where the reader left it.
 		const open = canvas
 			.getAllByRole("link", { name: /^Open result /u })
 			.find(
@@ -99,7 +86,6 @@ export const Default: Story = {
 	},
 };
 
-/** A week of results: one heading per day, newest first, and each row carries only its time. */
 export const ManyDays: Story = {
 	args: { state: { status: "ready", results: overAWeek } },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -127,7 +113,6 @@ export const CouldNotDetermine: Story = {
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("Could not determine");
-		// The row's own controls are its Track and Trace, nothing else.
 		await expect(canvas.getAllByRole("button").map((button) => button.title)).toEqual([
 			"",
 			"Track",
@@ -136,10 +121,6 @@ export const CouldNotDetermine: Story = {
 	},
 };
 
-/**
- * A row shows the result, not what became of it: feedback counts are the trace's to tell, so
- * none appear here even when the result led to feedback.
- */
 export const NoFeedbackCounts: Story = {
 	args: {
 		state: {
@@ -153,10 +134,6 @@ export const NoFeedbackCounts: Story = {
 	},
 };
 
-/**
- * A row opens one thing, its result's sheet. The practice and the item are plain text; Track
- * and Trace end the row.
- */
 export const OneLinkPerRow: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
@@ -183,7 +160,6 @@ export const OneLinkPerRow: Story = {
 	},
 };
 
-/** On a phone the table scrolls sideways in its frame; the page does not. */
 export const Narrow: Story = {
 	parameters: {
 		chromatic: { viewports: [320] },
@@ -206,7 +182,6 @@ export const LongContent: Story = {
 	},
 };
 
-/** The head stands and the rows wait in their shape, so nothing jumps when they arrive. */
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -250,7 +225,6 @@ export const LoadFailed: Story = {
 	},
 };
 
-/** The outcome icons, the day headings and the exception badges keep their contrast on dark. */
 export const Dark: Story = {
 	globals: { theme: "dark" },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -259,10 +233,6 @@ export const Dark: Story = {
 	},
 };
 
-/**
- * Tracking one result: its row is tinted and its Track pressed, read from the address, as on
- * the list every table narrows to it.
- */
 export const Tracked: Story = {
 	parameters: {
 		router: {

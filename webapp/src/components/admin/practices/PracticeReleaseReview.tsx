@@ -34,7 +34,6 @@ import {
 type Source = Choice["source"];
 
 export interface PracticeReleaseReviewProps {
-	/** The instance catalog's proposal; a workspace proposal adds only the version it applies to. */
 	proposal: CatalogPracticeReleaseProposal;
 	pending: "accept" | "decline" | null;
 	onAccept: (choices: Choice[]) => void;
@@ -48,8 +47,7 @@ export function PracticeReleaseReview({
 	onDecline,
 }: PracticeReleaseReviewProps) {
 	const id = useId();
-	// Without the version this workspace adopted, a local edit is indistinguishable from a catalog
-	// change, so nothing is chosen for the reader.
+	// Without the adopted version, local edits cannot be distinguished from catalog changes.
 	const base: PracticeDefinition | null = proposal.base;
 	const baseKnown = base !== null;
 	const [choices, setChoices] = useState(

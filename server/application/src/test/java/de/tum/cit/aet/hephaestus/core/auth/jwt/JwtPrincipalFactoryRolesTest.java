@@ -12,11 +12,6 @@ import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins the instance-admin authority string emitted into the JWT. It MUST be the namespaced {@code
- * app_admin} (matching the {@code /.well-known} discovery doc and the {@code @PreAuthorize}
- * checks), not the bare {@code admin}, which collides with the per-workspace "admin" role.
- */
 class JwtPrincipalFactoryRolesTest extends BaseUnitTest {
 
     private final AccountFeatureRepository featureRepository = mock(AccountFeatureRepository.class);

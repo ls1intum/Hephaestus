@@ -54,7 +54,6 @@ public class WorkerJwtIssuer {
         return issueForJobUntil(jobId, workspaceId, attempt, Instant.now().plus(ttl));
     }
 
-    /** The job's one credential, scoped {@link #LLM_PROXY_SCOPE}. */
     public String issueForJobUntil(UUID jobId, Long workspaceId, int attempt, Instant expiresAt) {
         WorkerSigningKey active = keyRing.active();
         Instant now = Instant.now();

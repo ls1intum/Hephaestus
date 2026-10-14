@@ -82,7 +82,6 @@ export interface OutcomeMixProps {
 	 * never added to the total. No threshold colours them: they are a correction, not an outcome.
 	 */
 	flags?: { label: string; slots: readonly OutcomeSlot[] };
-	/** The total's noun for its count: "results", "pieces of feedback". */
 	noun: (total: number) => string;
 	/** The legend's accessible name. */
 	label: string;

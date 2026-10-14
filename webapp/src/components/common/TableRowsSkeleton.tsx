@@ -9,7 +9,6 @@ export interface TableSkeletonColumn {
 	width: string | null;
 	/** The column's own classes, so a cell that the header hides below `lg` is hidden here too. */
 	className?: string;
-	/** Right-aligned, where the figures will be. */
 	numeric?: boolean;
 }
 

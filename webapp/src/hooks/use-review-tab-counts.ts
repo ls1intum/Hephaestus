@@ -32,13 +32,6 @@ const COUNT_READ = {
 	refetchInterval: () => (sessionRetriesQueries() ? COUNT_REFRESH_MS : false),
 } as const;
 
-/**
- * How many reviews, results, problems and pieces of feedback each tab lists under the shared scope (the
- * developer, groups, practices, dates and the tracked record), read as the total of a one-row page of
- * the tab's own endpoint. Each read is the query the tab's list sends for that scope, so a count is
- * what the table shows before its own facets narrow it. A count shows nothing until it is known for
- * this scope (`COUNT_READ`).
- */
 export function useReviewTabCounts(workspaceSlug: string, scope: ReviewScopeSearch) {
 	const path = { workspaceSlug };
 	const reviews = useQuery({

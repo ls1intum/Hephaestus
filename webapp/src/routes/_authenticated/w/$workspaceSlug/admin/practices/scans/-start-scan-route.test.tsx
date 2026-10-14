@@ -21,7 +21,7 @@ import {
 	wireScan,
 } from "./-scan-wire";
 
-// Mounting the real route pulls in the whole admin layout and its lazy modules.
+// Route mounting loads the admin layout and lazy modules; allow time for the first render.
 vi.setConfig({ testTimeout: 20_000 });
 
 const FORM_URL = "/w/acme/admin/practices/scans?detail=scan-new:draft";
@@ -30,7 +30,6 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const ELIGIBLE: Wire<Practice>[] = [
 	wirePractice("error-handling", "Errors are handled where they occur"),
 	wirePractice("comment-quality", "Comments explain why"),
-	// Neither of these can be scanned: one is not included in scans, people review the other.
 	wirePractice("pr-description", "Pull requests say why", { scanned: false }),
 	wirePractice("design-review", "Designs are reviewed", { by: "PEOPLE" }),
 ];
@@ -119,7 +118,6 @@ describe("start scan route", () => {
 		expect(within(drawer).queryByText("Designs are reviewed")).toBeNull();
 		within(drawer).getByText(/2 of 2 selected/u);
 
-		// An empty selection is refused on the form, and nothing is sent.
 		for (const box of practiceBoxes) {
 			await user.click(box);
 		}
@@ -190,7 +188,6 @@ describe("start scan route", () => {
 
 		await user.click(within(drawer).getByRole("button", { name: "Start scan" }));
 		await within(drawer).findByText("We could not start the scan");
-		// The draft stays as it was.
 		expect(within(drawer).getByRole("textbox", { name: "Budget (US dollars)" })).toHaveProperty(
 			"value",
 			"10",
@@ -244,7 +241,6 @@ describe("start scan route", () => {
 		await within(drawer).findByText("The repository changed");
 		within(drawer).getByText(/moved to version 9e8d7c6/u);
 		await waitFor(() => expect(repositoryReads.length).toBeGreaterThan(readsBefore));
-		// Nothing is started on the reader's behalf.
 		expect(starts).toHaveLength(1);
 		expect(router.state.location.pathname).toBe("/w/acme/admin/practices/scans");
 

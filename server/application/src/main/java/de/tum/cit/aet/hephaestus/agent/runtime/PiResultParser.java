@@ -284,13 +284,11 @@ public class PiResultParser {
         }
     }
 
-    /** The version of {@link SandboxLayout#PRACTICE_SCRIPT_REPORT_FILE} this parser reads. */
-    static final int PRACTICE_SCRIPT_REPORT_VERSION = 3;
+    static final int PRACTICE_SCRIPT_REPORT_VERSION = 2;
 
     static final int PRACTICE_SCRIPT_REPORT_MAX_BYTES = 64 * 1024;
     static final int PRACTICE_SCRIPT_REPORT_MAX_ENTRIES = 256;
 
-    /** The longest error line that a practice program run keeps, in characters, as {@code practice-scripts.json} bounds it. */
     public static final int PRACTICE_SCRIPT_ERROR_MAX_LENGTH = 500;
 
     private static final Pattern CONTROL = Pattern.compile("\\p{Cc}");
@@ -301,7 +299,8 @@ public class PiResultParser {
 
     private static final Map<String, ScriptRunStatus> PRACTICE_SCRIPT_STATUSES = Map.of(
             "ok", ScriptRunStatus.OK,
-            "skipped", ScriptRunStatus.WITHHELD,
+            "withheld", ScriptRunStatus.WITHHELD,
+            "not-finished", ScriptRunStatus.NOT_FINISHED,
             "failed", ScriptRunStatus.FAILED,
             "not-reached", ScriptRunStatus.NOT_REACHED);
 
@@ -310,10 +309,15 @@ public class PiResultParser {
 
     private static final Map<String, ScriptStopReason> STOP_REASONS = Arrays.stream(ScriptStopReason.values())
             .collect(Collectors.toUnmodifiableMap(
-                    reason -> reason.name().toLowerCase(Locale.ROOT).replace('_', '-'), reason -> reason));
+                    reason -> reason == ScriptStopReason.INVALID_SCRIPT
+                            ? "invalid-program"
+                            : reason.name().toLowerCase(Locale.ROOT).replace('_', '-'),
+                    reason -> reason));
 
-    /** The call counts of an entry, in their report order. */
     public static final List<String> CALL_KINDS = List.of("review", "chat", "decision", "embedding", "reranking");
+
+    private static final Set<String> MODEL_FAILURE_REASONS =
+            Set.of("unavailable", "budget", "deadline", "too-large", "off-format", "refused", "error");
 
     private static final List<String> COVERAGE_COUNTS = List.of("reads", "truncatedReads", "failedReads");
 
@@ -331,10 +335,6 @@ public class PiResultParser {
     private static final Map<String, Need> PRACTICE_SCRIPT_NEEDS =
             Map.of("required", Need.REQUIRED, "optional", Need.OPTIONAL);
 
-    /**
-     * Each purpose by the slot of its agent purpose's model kind. Built from the mirror, so an agent purpose that
-     * the mirror lacks leaves its slot unknown here instead of failing to load; a sync test names that drift.
-     */
     private static final Map<String, ModelSlot> PURPOSES_BY_SLOT =
             Arrays.stream(ModelSlot.values()).collect(Collectors.toUnmodifiableMap(ModelSlot::wireValue, slot -> slot));
 
@@ -371,7 +371,7 @@ public class PiResultParser {
         }
         JsonNode entries = root != null && root.isObject() ? root.get("practices") : null;
         JsonNode truncated = root != null && root.isObject() ? root.get("truncated") : null;
-        JsonNode version = root != null && root.isObject() ? root.get("contractVersion") : null;
+        JsonNode version = root != null && root.isObject() ? root.get("schemaVersion") : null;
         if (version == null
                 || !version.isIntegralNumber()
                 || version.asInt() != PRACTICE_SCRIPT_REPORT_VERSION
@@ -382,7 +382,8 @@ public class PiResultParser {
                 || !truncated.isBoolean()) {
             recordFailure(
                     "practice_script_report",
-                    new IllegalArgumentException("no contract version 3, bounded practices array or truncation flag"));
+                    new IllegalArgumentException(
+                            "no report schema version 2, bounded practices array or truncation flag"));
             return List.of();
         }
         Set<String> named = new HashSet<>();
@@ -454,7 +455,6 @@ public class PiResultParser {
                 slug, status, kind, digest, stopReason, models, calls, coverage, error, durationMs);
     }
 
-    /** Each named count, as a non-negative int; null when one is missing or malformed, or another key is present. */
     private static @Nullable Map<String, Integer> counts(JsonNode node, List<String> names) {
         if (!node.isObject() || node.size() != names.size()) return null;
         Map<String, Integer> counts = new LinkedHashMap<>();
@@ -466,14 +466,7 @@ public class PiResultParser {
         return counts;
     }
 
-    /**
-     * The line of a failed script's error that the run keeps, by the rule of {@code errorLine} in
-     * {@code pi-practice-scripts-report.ts}: the first line after blanks, cut to {@link #PRACTICE_SCRIPT_ERROR_MAX_LENGTH} code
-     * points, with each control character as a space and no blanks at the end. A line that is still not
-     * {@link StorableText} is left out: the run is written in the attempt's terminal transaction, which a refused
-     * value would fail. The error only explains the failure, so a missing or malformed one leaves the run without it
-     * instead of dropping the run. {@code practice-script-error-lines.json} holds the cases that both sides agree on.
-     */
+    // Share error-line bounds with the runner; malformed optional errors must not invalidate the run's terminal write.
     private static @Nullable String errorLine(JsonNode error) {
         if (!error.isString()) return null;
         String text = BLANK_START.matcher(error.asString()).replaceFirst("");
@@ -502,7 +495,7 @@ public class PiResultParser {
             if (!counts.isObject()) return null;
             for (var entry : counts.properties()) {
                 Integer amount = count(entry.getValue());
-                if (amount == null || !entry.getKey().matches("[a-z][a-z0-9-]{0,63}")) return null;
+                if (amount == null || !MODEL_FAILURE_REASONS.contains(entry.getKey())) return null;
                 if (amount > 0) failures.add(new ScriptModelUse.Failure(entry.getKey(), amount));
             }
             uses.add(new ScriptModelUse(slot, need, model.path("bound").asBoolean(), failures));
@@ -510,7 +503,6 @@ public class PiResultParser {
         return List.copyOf(uses);
     }
 
-    /** A non-negative int, or null for anything else. */
     private static @Nullable Integer count(JsonNode value) {
         return value.isIntegralNumber() && value.canConvertToInt() && value.asInt() >= 0 ? value.asInt() : null;
     }

@@ -9,16 +9,11 @@ import { OVERVIEW, rangeOverview, serveAttention } from "./-overview-attention-s
 
 vi.setConfig({ testTimeout: 30_000 });
 
-// jsdom has no IntersectionObserver, and the lists load their next page as their end scrolls into view.
+// jsdom needs an IntersectionObserver stub for paged lists.
 beforeEach(() => {
 	vi.stubGlobal("IntersectionObserver", ObserverStub);
 });
 
-/**
- * The overview's failure rates follow the range on screen, each where it happened: failed reviews
- * on the Reviews tile, failed deliveries under Delivery. No fixed week is
- * read any more, so a week with many more failures changes none of them.
- */
 describe("the overview's failure rates", () => {
 	/** The week alone fails far more: were any figure to read it, it would show. */
 	const busyWeek = {
@@ -31,8 +26,6 @@ describe("the overview's failure rates", () => {
 		const { overviewReads } = serveAttention(busyWeek);
 		renderRouteAtWithRouter(`${OVERVIEW}?range=30d`);
 
-		// 5 of the range's 85 finished reviews failed: above 5 %, and still plain, since only what is
-		// broken and fixable now is coloured, and that is red.
 		const link = await screen.findByRole(
 			"link",
 			{ name: "6 % failed, 5 of 85 finished reviews" },

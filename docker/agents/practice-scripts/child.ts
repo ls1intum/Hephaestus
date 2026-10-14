@@ -1,7 +1,4 @@
-/**
- * One custom practice program in its own process. The process may not start a program, reads nothing
- * but its own code, and holds no credential, so its reads, model calls and reviews go to the host.
- */
+// Custom scripts run without credentials and request evidence and model calls through the host.
 import { once } from "node:events";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -32,20 +29,18 @@ if (send === undefined) {
 }
 const post = (message: ChildMessage) => send(JSON.stringify(message));
 
-/** Send the last message. A disconnect before a large message has left this process drops it. */
+// Keep IPC connected until the final message finishes sending.
 const postLast = promisify((message: ChildMessage, sent: (error: Error | null) => void) => {
 	send(JSON.stringify(message), undefined, undefined, sent);
 });
 
-/** Replies the host owes this child, by request id. A reply with another id is not this child's. */
 const pending = new Map<number, (message: HostMessage) => void>();
 let nextId = 0;
 const metaReply = Promise.withResolvers<Extract<HostMessage, { kind: "meta-accepted" }>>();
 let tokensLeft = 0;
-/** Aborts when the host stops this program. */
 const stopped = new AbortController();
 
-/** The host's own messages are trusted, so only the field that routes them is checked. */
+// Host messages are trusted; only the routing field needs validation.
 function isHostMessage(value: unknown): value is HostMessage {
 	return isJsonObject(value) && typeof value.kind === "string";
 }

@@ -220,10 +220,6 @@ class GitHubWorkspaceDataSyncTriggerTest extends BaseUnitTest {
         return provider;
     }
 
-    /**
-     * A provider whose value a test may not need, for example when the step that uses it is
-     * skipped.
-     */
     private static <T> ObjectProvider<T> lazyProvider(T value) {
         @SuppressWarnings("unchecked")
         ObjectProvider<T> provider = mock(ObjectProvider.class);

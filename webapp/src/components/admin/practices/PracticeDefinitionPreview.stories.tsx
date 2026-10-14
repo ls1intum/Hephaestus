@@ -40,7 +40,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Review on, About, Reviewed by, Script, Scan support and Version, in that order. */
 export const Complete: Story = {
 	args: { kind: "scm.pull_request", definition, version: 4 },
 	play: async ({ canvas }) => {
@@ -62,7 +61,6 @@ export const Complete: Story = {
 	},
 };
 
-/** No script is the built-in review, said in words. */
 export const BuiltInScript: Story = {
 	args: { kind: "scm.pull_request", definition: { ...definition, script: null } },
 	play: async ({ canvas }) => {
@@ -79,7 +77,6 @@ export const IncludedInScans: Story = {
 	},
 };
 
-/** A kind that scans cannot review says so, rather than offering a setting it cannot have. */
 export const ScansUnsupported: Story = {
 	args: { kind: "scm.issue", definition: definitionOf({ reviewOn: { events: [], state: {} } }) },
 	play: async ({ canvas }) => {
@@ -122,7 +119,6 @@ export const ReviewedByNobody: Story = {
 	},
 };
 
-/** About a merger and only for Swift changes: both settings read in words. */
 export const ScopedMerger: Story = {
 	args: {
 		kind: "scm.pull_request",
@@ -141,7 +137,6 @@ export const ScopedMerger: Story = {
 	},
 };
 
-/** A practice about the work itself has no role, and says so. */
 export const AboutTheWork: Story = {
 	args: { kind: "scm.pull_request", definition: definitionOf({ about: null }) },
 	play: async ({ canvas }) => {
@@ -215,7 +210,6 @@ export const RationaleLeadsTheRuleFollows: Story = {
 	},
 };
 
-/** A practice may carry only one of the guidance fields; nothing above may collapse without it. */
 export const RationaleOnly: Story = {
 	args: {
 		definition: {
@@ -231,7 +225,6 @@ export const RationaleOnly: Story = {
 	},
 };
 
-/** A kind the options do not describe still renders its settings, with the raw names. */
 export const UnknownItemKind: Story = {
 	args: { options: { ...mockDefinitionOptions, itemTypes: [] } },
 	play: async ({ canvas }) => {
@@ -273,7 +266,6 @@ export const WithVisualAndGuide: Story = {
 		await expect(
 			within(guide).getByRole("heading", { level: 4, name: "How to do it" }),
 		).toBeVisible();
-		// The guide comes before the review settings.
 		await expect(precedes(guide, canvas.getByRole("region", { name: "Review settings" }))).toBe(
 			true,
 		);

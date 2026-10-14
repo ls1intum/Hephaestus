@@ -16,7 +16,6 @@ const DESCRIPTIONS: Record<CatalogLevelKind, string> = {
 export interface CatalogFormLevelProps {
 	kind: CatalogLevelKind;
 	nested?: boolean;
-	/** Where the level sits, from the host's `levelPathAt`. */
 	path: LevelPath;
 	children: ReactNode;
 }

@@ -15,7 +15,6 @@ import org.jspecify.annotations.Nullable;
  * @see WorkspaceTeamScopeResolver
  */
 public record WorkspaceTeamScope(String accountLogin, Long providerId) {
-    /** Whether {@code team} belongs to this workspace. */
     public boolean contains(@Nullable Team team) {
         return (team != null
                 && team.getOrganization() != null

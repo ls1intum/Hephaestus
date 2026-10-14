@@ -74,12 +74,6 @@ import { minutesAfter, minutesBefore, STORY_NOW } from "@/stories/story-clock";
 import type { OutcomeScope } from "./review-outcomes";
 import type { OverviewRegionState } from "./review-states";
 
-// The only thing written by hand is REVIEW_FIXTURE: reviews, their results and the feedback
-// those drove. Every count, preview, copy, send, check and summary is computed from it below, so a
-// fixture whose tallies contradict the records they count is not something you can write.
-// Real `Date`s throughout: these go straight to props, and `HttpResponse.json` serialises them to
-// the ISO strings the wire carries when a story or route test serves them through MSW.
-
 // ---------------------------------------------------------------------------------------------
 // People
 // ---------------------------------------------------------------------------------------------
@@ -106,10 +100,6 @@ function account(
 	};
 }
 
-/**
- * The workspace's accounts. Ada has a GitHub and a GitLab identity on one account; Margaret has not
- * signed in yet, so her account is unclaimed.
- */
 export const reviewAccounts = {
 	ada: account("7", "Ada Lovelace", [
 		["GITHUB", "ada"],
@@ -163,7 +153,6 @@ export const workspaceMembers: WorkspaceMembership[] = Object.entries(reviewAcco
 // The work under review
 // ---------------------------------------------------------------------------------------------
 
-/** An item ref with every nullable fact absent unless the fixture states it. */
 export function itemRef(
 	fields: Pick<ItemRef, "id" | "kind" | "label"> & Partial<ItemRef>,
 ): ItemRef {
@@ -182,7 +171,6 @@ export function itemRef(
 // Every list row and every detail header draws its glyph from the provider and its words from the
 // kind, so a fixture on a single provider would let a wrong mark or a missing label ship.
 
-/** A GitHub pull request: the item most stories open. */
 export const reviewItem = itemRef({
 	id: "42",
 	kind: ITEM_KIND.pullRequest,
@@ -212,7 +200,6 @@ export const slackConversation = itemRef({
 	url: "https://example.slack.com/archives/C01/p1721400000",
 });
 
-/** A document's title is its label, so it carries no separate title. */
 export const outlineDocument = itemRef({
 	id: "96",
 	kind: ITEM_KIND.document,
@@ -235,7 +222,6 @@ export const trackerIssue = itemRef({
 	url: "https://github.com/ls1intum/Hephaestus/issues/204",
 });
 
-/** Grace's review of the pull request: its own item, whose parent is the pull request. */
 export const pullRequestReviewItem = itemRef({
 	id: "47",
 	kind: ITEM_KIND.pullRequestReview,
@@ -246,7 +232,6 @@ export const pullRequestReviewItem = itemRef({
 	url: "https://github.com/ls1intum/Hephaestus/pull/1423#pullrequestreview-2481001",
 });
 
-/** The repository a scan reviewed, and two of the files in it. */
 export const scannedRepository = itemRef({
 	id: "300",
 	kind: ITEM_KIND.repository,
@@ -307,10 +292,6 @@ const invoiceBackfillMergeRequest = itemRef({
 	container: "platform/billing-service",
 	url: "https://gitlab.example.com/platform/billing-service/-/merge_requests/91",
 });
-
-// ---------------------------------------------------------------------------------------------
-// The catalog
-// ---------------------------------------------------------------------------------------------
 
 const groupNames = {
 	"code-quality": "Code quality",
@@ -468,7 +449,6 @@ const PRACTICE_SPECS: PracticeSpec[] = [
 		whyItMatters:
 			"A comment that only says what to change starts an argument; one that says why lets the author agree or push back on the reason.",
 		whatGoodLooksLike: "Every requested change names the risk it removes.",
-		// Turned off, so the reviews list's "Show feedback turned off" has a practice to hide.
 		feedbackMode: "OFF",
 	},
 ];
@@ -483,7 +463,6 @@ function practiceOf(slug: string): Practice {
 	return practice;
 }
 
-/** A practice's name, as every review DTO repeats it. */
 export function practiceNameOf(slug: string): string {
 	const { currentVersion } = practiceOf(slug);
 	return currentVersion.name ?? currentVersion.definition?.name ?? slug;
@@ -508,7 +487,6 @@ type Severity = Problem["severity"];
 interface CopySpec {
 	kind: FeedbackCopy["kind"];
 	state: FeedbackCopy["state"];
-	/** A note's own text. A summary uses the feedback's body, never a second copy of it. */
 	body?: string;
 	at?: { path: string; startLine: number; endLine: number };
 	lastError?: string;
@@ -531,10 +509,8 @@ interface ResponseSpec {
 
 interface FeedbackSpec {
 	id: string;
-	/** The composed body exactly as the server stores it: Markdown, headings and all. */
 	body?: string;
 	destination: ReviewFeedback["destination"];
-	/** Where a conversation raised it; absent, delivered conversation feedback reads as Heph's. */
 	conversation?: "HEPH" | "SLACK";
 	state: FeedbackState;
 	stopReason?: StopReason;
@@ -542,20 +518,15 @@ interface FeedbackSpec {
 	deliveredAt?: string;
 	/** The feedback this one took the place of. */
 	replaces?: string;
-	/** Where a line note landed. Absent, feedback on the work is one summary. */
 	anchoredAt?: { path: string; startLine: number; endLine: number };
-	/** Results it draws on, in render order; the first leads it. */
 	from: string[];
-	/** The problem a basis entry names, by result id, where it rests on one problem only. */
 	fromProblem?: Partial<Record<string, number>>;
-	/** The package written by hand, where the state alone does not say what each copy did. */
 	copies?: CopySpec[];
 	decisions?: DecisionSpec[];
 	response?: ResponseSpec;
 	withdrawn?: boolean;
 }
 
-/** One located problem under a Not met result. */
 interface ProblemSpec {
 	severity: Severity;
 	summary: string;
@@ -576,23 +547,17 @@ interface MarkSpec {
 interface ResultSpec {
 	id: string;
 	outcome: ReviewResult["outcome"];
-	/** Null for a Met result the server wrote no summary for; the practice name stands in. */
 	summary: string | null;
 	explanation: string;
 	practiceSlug: string;
 	currentness?: ReviewResult["currentness"];
 	recordedAt: string;
-	/** The item a scan's result is about, a file under the scanned repository. */
 	item?: ItemRef;
-	/** A result about the work itself, with no developer: "About the work". */
 	aboutTheWork?: true;
-	/** Consent withholds citations, quotes and explanations from admins; the problems still count. */
+	/** Denied evidence hides text and citations without changing problem counts. */
 	evidenceHidden?: true;
-	/** Recorded before the proof was kept: the evidence version is 0, which means unknown. */
 	unknownProof?: true;
-	/** The result's own citations; each problem carries its own. */
 	evidence?: EvidenceCitation[];
-	/** A Not met result's problems, in display order. Its severity is the worst of them. */
 	problems?: ProblemSpec[];
 	openQuestions?: OpenQuestion[];
 	example?: ResultExample;
@@ -608,20 +573,14 @@ interface ReviewSpec {
 	status: ReviewSummary["status"];
 	stopReason?: NonNullable<ReviewSummary["stopReason"]>;
 	startedAt: string;
-	/** Whose work this review was about; every result and every piece of feedback inherits it. */
 	developer: ReviewDeveloper | null;
 	origin?: ReviewSummary["origin"];
-	/** The event that started it, by name. Absent for a requested, scheduled or batch review. */
 	event?: string;
 	requestedBy?: AccountRef;
 	batchId?: string;
-	/** Practices the review covers that have no result yet, or never will. */
 	pending?: string[];
-	/** Practices the review withheld, with the reason it recorded; they have no result. */
 	withheld?: { practiceSlug: string; reason: string }[];
-	/** How many runtime jobs carried it. A scan fans out. */
 	jobs?: number;
-	/** Its runtime records expired, so the detail has none. */
 	runtimeExpired?: true;
 	results: ResultSpec[];
 	feedback: FeedbackSpec[];
@@ -662,11 +621,6 @@ const cited = (sourceKind: string, path: string, quote: string, line = 1): Evide
 	verification: null,
 });
 
-/**
- * A summary comment exactly as Hephaestus posts it on a pull request: the hidden marker, the
- * composer's text, a rule, and the `<sub>` footer with its two links. The stored body is this text,
- * so every page that shows it must render the HTML the way GitHub does.
- */
 export const POSTED_SUMMARY_COMMENT = [
 	"<!-- hephaestus:practice-review:774b9e9b-2c40-4d6b-9e76-7094dda3a7a2 -->",
 	"The description needs its purpose and coverage. Use the description to name the need behind this change and identify which of the linked item's Done-when points it covers or defers.",
@@ -679,7 +633,6 @@ export const POSTED_SUMMARY_COMMENT = [
 	"",
 ].join("\n");
 
-/** Composer formatting, with the preview cut inside the first code fence. */
 const LONG_BODY = [
 	"2 issues to tighten in this change, plus one thing worth keeping.",
 	"",
@@ -720,17 +673,12 @@ const LONG_BODY = [
 	"without HTTP.",
 ].join("\n");
 
-/** The card on a developer's own practice pages, whose text the fixture writes and no surface may show. */
+// Include private practice-page text to prove admin surfaces withhold it.
 export const PRIVATE_FEEDBACK_TEXT =
 	"Private to Barbara: the runbook's first step is the one a tired reader most needs.";
 
 const DISAGREEMENT = "The two cases share a cause, so one status is right here.";
 
-/**
- * Spans every outcome a review can reach and every state a piece of feedback can be in, with a
- * withheld piece under each family an admin can filter by. Deliberately ordinary otherwise: a set
- * that is mostly failures and empties teaches a reader that the product mostly does not work.
- */
 export const REVIEW_FIXTURE: ReviewSpec[] = [
 	{
 		id: "11111111-1111-1111-1111-111111111111",
@@ -876,8 +824,6 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 					total: 3,
 					omitted: [{ reason: "budget", what: "test files", count: 1 }],
 				},
-				// Marked incorrect, then the mark removed, then marked accepted: the history the
-				// result's sheet lists in order.
 				marks: [
 					{
 						kind: "INCORRECT",
@@ -976,7 +922,6 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 				response: { resolution: null, usefulness: "HELPFUL", at: "2026-07-28T15:20:00Z" },
 			},
 			{
-				// A partial package: the summary went up and both line notes failed.
 				id: "44444444-4444-4444-4444-444444444444",
 				body: LONG_BODY,
 				destination: "ON_WORK",
@@ -1102,7 +1047,6 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 		status: "COMPLETE",
 		startedAt: "2026-07-27T09:10:00Z",
 		developer: alan,
-		// A confirmed batch over work that already existed, so nothing from it is sent.
 		origin: "BACKFILL",
 		batchId: "0b0b0b0b-1111-4111-8111-111111111111",
 		results: [
@@ -1227,7 +1171,6 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 			},
 			{
 				id: "ffffffff-3333-3333-3333-333333333333",
-				// A Met result without a summary of its own: the practice name stands in.
 				summary: null,
 				explanation:
 					"Every message names the customer-visible effect — prices reverting, invoices reissuing — rather than the tables involved. Somebody paged at two in the morning could act on this thread without opening the schema.",
@@ -1264,7 +1207,6 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 				from: ["ffffffff-3333-3333-3333-333333333333"],
 			},
 			{
-				// The conversation linked it, but whether it appeared was never recorded.
 				id: "33333333-4444-4444-4444-444444444444",
 				body: "The thread reads like the incident it is about, which makes it easy to follow.",
 				destination: "CONVERSATION",
@@ -1291,7 +1233,6 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 				practiceSlug: "the-change-explains-itself",
 				outcome: "MET",
 				recordedAt: "2026-07-25T11:30:00Z",
-				// Recorded before proof was kept, so whether its citation was verified is unknown.
 				unknownProof: true,
 				evidence: [
 					cited(
@@ -1339,8 +1280,7 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 				from: ["11111111-5555-5555-5555-555555555555"],
 			},
 			{
-				// A card on the developer's own practice pages. The server never sends its text to an
-				// admin; it is written here so a story can prove no surface shows it.
+				// Supply private text deliberately; the story must prove it stays hidden.
 				id: "44444444-5555-5555-5555-555555555555",
 				body: PRIVATE_FEEDBACK_TEXT,
 				destination: "PRACTICE_PAGE",
@@ -1430,7 +1370,6 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 				practiceSlug: "product-language",
 				outcome: "NOT_MET",
 				recordedAt: "2026-07-29T08:10:00Z",
-				// Katherine did not allow her evidence to be shown to admins.
 				evidenceHidden: true,
 				problems: [
 					{
@@ -1486,7 +1425,6 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 				fromProblem: { "66666666-7777-7777-7777-777777777777": 0 },
 			},
 			{
-				// Planned and held for an admin: the package an approval reads and signs.
 				id: "aaaaaaaa-6666-6666-6666-666666666666",
 				body: "The four retry tests are named for the rules they pin down. Keep that shape for the next ones.",
 				destination: "ON_WORK",
@@ -1519,7 +1457,6 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 				],
 			},
 			{
-				// The write started and nobody knows whether the provider took it.
 				id: "bbbbbbbb-6666-6666-6666-666666666666",
 				body: "The outbox naming split also shows up in the metric tags.",
 				destination: "ON_WORK",
@@ -1592,7 +1529,6 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 		],
 	},
 	{
-		// A scan of a repository: many runtime jobs, one review, results about files with no developer.
 		id: "dddddddd-9999-9999-9999-999999999999",
 		item: scannedRepository,
 		kind: "SCAN",
@@ -1645,17 +1581,11 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 	},
 ];
 
-// ---------------------------------------------------------------------------------------------
-// Derivations
-// ---------------------------------------------------------------------------------------------
-
-/** The cut the server applies to `bodyPreview`, mirrored here so `bodyTruncated` cannot claim
- * something the preview beside it contradicts. */
+// Preview bounds must match the server so bodyTruncated agrees with bodyPreview.
 const BODY_PREVIEW_LENGTH = 320;
 
 const MINUTE = 60_000;
 
-/** The text the server lets an admin read: none for a private destination. */
 function adminBody(spec: FeedbackSpec): string | null {
 	return ADMIN_WITHHELD_TEXT[spec.destination] === undefined ? (spec.body ?? null) : null;
 }
@@ -1702,21 +1632,18 @@ function feedbackSpec(feedbackId: string) {
 	return found;
 }
 
-/** The feedback drawing on one result, newest first, as the detail surfaces list it. */
 function feedbackFor(resultId: string) {
 	return allFeedbackSpecs
 		.filter(({ item }) => item.from.includes(resultId))
 		.sort((a, b) => b.item.composedAt.localeCompare(a.item.composedAt));
 }
 
-/** The ids of the feedback written from one result, as the feedback list filters by it. */
 export function feedbackIdsFrom(resultId: string): ReadonlySet<string> {
 	return new Set(feedbackFor(resultId).map(({ item }) => item.id));
 }
 
 const SEVERITY_RANK: Record<Severity, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, TRIVIAL: 3 };
 
-/** The worst of a result's problems, as the server caches it on the result. */
 function severityOf(spec: ResultSpec): Severity | null {
 	const [worst] = (spec.problems ?? [])
 		.map((problem) => problem.severity)
@@ -1724,12 +1651,10 @@ function severityOf(spec: ResultSpec): Severity | null {
 	return worst ?? null;
 }
 
-/** A child id that is still a UUID: the result's id with its last two digits replaced. */
 export function problemIdOf(resultId: string, position: number): string {
 	return `${resultId.slice(0, -2)}${String(position).padStart(2, "0")}`;
 }
 
-/** One count per delivery state, as the server reports a review's or a result's feedback. */
 const COUNT_OF: Record<FeedbackState, keyof ReviewFeedbackCounts> = {
 	AWAITING_APPROVAL: "awaitingApproval",
 	READY: "ready",
@@ -1769,7 +1694,6 @@ export function resultCounts(outcomes: readonly ReviewResult["outcome"][]): Revi
 	};
 }
 
-/** What the counts by reason return for these rows: the rows with a stop reason, by it. */
 export function reasonCounts(rows: readonly ReviewFeedback[]): ReasonCount[] {
 	const counts = new Map<StopReason, number>();
 	for (const row of rows) {
@@ -1794,7 +1718,6 @@ const LOCATION_ORDER: ReviewFeedback["location"][] = [
 	"PRACTICE_PAGES",
 ];
 
-/** What the counts by location return for these rows, in the order the server sorts them. */
 export function locationCounts(rows: readonly ReviewFeedback[]): ReasonCount[] {
 	return LOCATION_ORDER.flatMap((location) => {
 		const count = rows.filter((row) => row.location === location).length;
@@ -1803,8 +1726,6 @@ export function locationCounts(rows: readonly ReviewFeedback[]): ReasonCount[] {
 			: [{ reason: location, description: FEEDBACK_LOCATION_DEFS[location].label, count }];
 	});
 }
-
-// --- Marks and disagreements -----------------------------------------------------------------
 
 function markId(resultId: string, index: number): string {
 	return `${resultId.slice(0, -3)}a${String(index).padStart(2, "0")}`;
@@ -1824,7 +1745,6 @@ function marksOf(resultId: string, spec: ResultSpec): ResultMark[] {
 	}));
 }
 
-/** The full mark history of one result, oldest first, as `listResultMarks` returns it. */
 export function resultMarks(resultId: string): ResultMark[] {
 	return marksOf(resultId, resultSpec(resultId).result);
 }
@@ -1851,7 +1771,6 @@ function disagreementsOf(resultId: string): FeedbackDisagreement[] {
 	);
 }
 
-/** The results a developer disagreed with through their feedback, for the `disagreed` filter. */
 export function disagreedResultIds(): ReadonlySet<string> {
 	return new Set(
 		allResultSpecs
@@ -1863,8 +1782,6 @@ export function disagreedResultIds(): ReadonlySet<string> {
 function disagreedAt(resultId: string): Date | null {
 	return disagreementsOf(resultId)[0]?.respondedAt ?? null;
 }
-
-// --- Results and problems --------------------------------------------------------------------
 
 function itemOf(review: ReviewSpec, spec: ResultSpec): ItemRef {
 	return spec.item ?? review.item;
@@ -1901,7 +1818,6 @@ function toResult(review: ReviewSpec, spec: ResultSpec): ReviewResult {
 	};
 }
 
-/** A result, or a result's detail, as another record names it. */
 export function boundResultOf(result: ReviewBoundResult): ReviewBoundResult {
 	return {
 		id: result.id,
@@ -1970,14 +1886,10 @@ export const reviewResults: ReviewResult[] = allResultSpecs
 	.map(({ review, result }) => toResult(review, result))
 	.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
 
-/** The problems of the Not met results, newest first, each placed at its first citation. */
 export const reviewProblems: ReviewProblem[] = allResultSpecs
 	.flatMap(({ review, result }) => toProblemRows(review, result))
 	.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
 
-// --- Feedback --------------------------------------------------------------------------------
-
-/** Where the server says feedback appeared: the destination, split by provider or conversation. */
 function locationOf(review: ReviewSpec, spec: FeedbackSpec): ReviewFeedback["location"] {
 	switch (spec.destination) {
 		case "PRACTICE_PAGE": {
@@ -2006,7 +1918,6 @@ const COPY_STATE_OF: Record<FeedbackState, FeedbackCopy["state"]> = {
 	FAILED: "FAILED",
 };
 
-/** The package a piece of feedback went out as, where the fixture does not write it by hand. */
 function copySpecsOf(spec: FeedbackSpec): CopySpec[] {
 	if (spec.copies) {
 		return spec.copies;
@@ -2086,11 +1997,6 @@ function copyCountsOf(copies: readonly FeedbackCopy[]): FeedbackCopyCounts {
 	};
 }
 
-/**
- * The send behind a package on the work: done, retrying the copies that failed, given up, unsure
- * whether the provider took a write, or taking a withdrawn package back down. Feedback elsewhere,
- * or held, has none.
- */
 function sendsOf(spec: FeedbackSpec, copies: readonly FeedbackCopy[]): FeedbackSend[] {
 	if (spec.destination !== "ON_WORK") {
 		return [];
@@ -2176,7 +2082,6 @@ function decisionsOf(spec: FeedbackSpec): FeedbackDecision[] {
 	}));
 }
 
-/** Every decision on one piece of feedback, oldest first, as `listFeedbackDecisions` returns them. */
 export function feedbackDecisions(feedbackId: string): FeedbackDecision[] {
 	return decisionsOf(feedbackSpec(feedbackId).item);
 }
@@ -2194,7 +2099,6 @@ const ALLOWED_FACTS: FeedbackCheckFacts = {
 	writeStarted: false,
 };
 
-/** The checks a piece of feedback passed, in order, and the one that stopped it. */
 function checksOf(spec: FeedbackSpec): FeedbackCheck[] {
 	const composed = new Date(spec.composedAt);
 	const check = (
@@ -2277,13 +2181,11 @@ export const reviewFeedback: ReviewFeedback[] = allFeedbackSpecs
 	.map(({ review, item }) => toFeedback(review, item))
 	.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-/** The practice slugs a piece of feedback draws on, for the practice and group filters. */
 export function feedbackPracticeSlugs(feedbackId: string): string[] {
 	const found = allFeedbackSpecs.find(({ item }) => item.id === feedbackId);
 	return (found?.item.from ?? []).map((resultId) => resultSpec(resultId).result.practiceSlug);
 }
 
-/** The group a practice sits in, which the group filters read. */
 export function practiceGroupSlug(practiceSlug: string): string | null {
 	return practiceOf(practiceSlug).groupSlug;
 }
@@ -2314,70 +2216,55 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 	};
 }
 
-/** Withheld from a batch review: the detail stories open it by default. */
 export const reviewFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"dddddddd-2222-2222-2222-222222222222",
 );
 
-/** The long comment, drawn from two results: a partial package the developer disagreed with. */
 export const longFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"44444444-4444-4444-4444-444444444444",
 );
 
-/** One summary posted and two line notes failed, with the send retrying them. */
 export const partialPackageFeedbackDetail: ReviewFeedbackDetail = longFeedbackDetail;
 
-/** A planned package awaiting an admin's approval: summary, line note and file note. */
 export const awaitingApprovalFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"aaaaaaaa-6666-6666-6666-666666666666",
 );
 
-/** A summary whose write started and was never confirmed: the send is uncertain. */
 export const uncertainWriteFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"bbbbbbbb-6666-6666-6666-666666666666",
 );
 
-/** Posted on the work after an admin approved it; the developer found it helpful. */
 export const approvedFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"33333333-3333-3333-3333-333333333333",
 );
 
-/** Rejected by an admin before anything was written. */
 export const rejectedFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"dddddddd-3333-3333-3333-333333333333",
 );
 
-/** Shown on the developer's practice pages, then withdrawn by an admin. */
 export const withdrawnFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"bbbbbbbb-3333-3333-3333-333333333333",
 );
 
-/** Withdrawn, then restored by an admin. */
 export const restoredFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"cccccccc-3333-3333-3333-333333333333",
 );
 
-/** Replaced by a later comment on the same work. */
 export const replacedFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"99999999-3333-3333-3333-333333333333",
 );
 
-/** Every attempt to post it failed. */
 export const failedFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"33333333-5555-5555-5555-555555555555",
 );
 
-/** Linked by a conversation whose appearance was never recorded. */
 export const unconfirmedFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"33333333-4444-4444-4444-444444444444",
 );
 
-/** Withheld because its only result was marked incorrect. */
 export const markedIncorrectFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"eeeeeeee-3333-3333-3333-333333333333",
 );
-
-// --- Result and problem detail ---------------------------------------------------------------
 
 function boundFeedbackOf(feedback: ReviewFeedback): ReviewBoundFeedback {
 	return {
@@ -2391,7 +2278,6 @@ function boundFeedbackOf(feedback: ReviewFeedback): ReviewBoundFeedback {
 
 export function resultDetail(resultId: string): ReviewResultDetail {
 	const { review, result: spec } = resultSpec(resultId);
-	// The detail replaces the tallies with the records they were counting.
 	const {
 		feedback: _tally,
 		problemCount: _count,
@@ -2429,11 +2315,6 @@ export function resultDetail(resultId: string): ReviewResultDetail {
 	};
 }
 
-/**
- * A Not met result with three problems of mixed severity across a diff and a repository file, its
- * own citation from a human review thread, complete coverage, an example, and a disagreement from
- * the developer.
- */
 export const reviewResultDetail: ReviewResultDetail = resultDetail(
 	"66666666-6666-6666-6666-666666666666",
 );
@@ -2449,17 +2330,13 @@ export function problemDetail(problemId: string): ReviewProblemDetail {
 	throw new Error(`No problem ${problemId} in the fixture`);
 }
 
-/** The first problem of the default result: two citations, a basis and a next step. */
 export const reviewProblemDetail: ReviewProblemDetail = problemDetail(
 	problemIdOf("66666666-6666-6666-6666-666666666666", 1),
 );
 
-/** A problem whose evidence consent withholds from admins. */
 export const evidenceHiddenProblemDetail: ReviewProblemDetail = problemDetail(
 	problemIdOf("66666666-7777-7777-7777-777777777777", 0),
 );
-
-// --- Reviews ---------------------------------------------------------------------------------
 
 const MODEL = "openai/gpt-oss-120b";
 
@@ -2478,7 +2355,6 @@ const PRACTICE_STATUS_OF: Record<ReviewSummary["status"], ReviewPractice["status
 	CANCELLED: "FAILED",
 };
 
-/** One entry per practice the review covered: what it recorded, withheld, or did not reach. */
 function practicesOf(review: ReviewSpec): ReviewPractice[] {
 	const slugs = [
 		...new Set([...review.results.map((result) => result.practiceSlug), ...(review.pending ?? [])]),
@@ -2519,7 +2395,6 @@ function practicesOf(review: ReviewSpec): ReviewPractice[] {
 	return [...reviewed, ...withheld];
 }
 
-/** The event that started a review, recorded on the item a moment before the review was ordered. */
 function startedByOf(review: ReviewSpec): ItemEvent | null {
 	if (!hasText(review.event)) {
 		return null;
@@ -2569,12 +2444,10 @@ export const reviews: ReviewSummary[] = allReviews
 	.map(toReview)
 	.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-/** Whose work a review was about, which the reviews list's developer filter reads. */
 export function reviewDeveloperOf(reviewId: string): ReviewDeveloper | null {
 	return allReviews.find((entry) => entry.id === reviewId)?.developer ?? null;
 }
 
-/** A review as a trace or a lineage names it. */
 export function reviewRefOf(review: ReviewSummary): ReviewRef {
 	return {
 		id: review.id,
@@ -2615,8 +2488,6 @@ function jobsOf(summary: ReviewSummary, count: number): ReviewJob[] {
 	const started = summary.createdAt.getTime();
 	const status = JOB_STATUS_OF[summary.status];
 	return Array.from({ length: count }, (_, index) => {
-		// Forty seconds preparing, the rest of the five minutes with the model; a scan's jobs run
-		// one after another, and the last of them did not finish within the budget.
 		const startedAt = new Date(started + 40_000 + index * 70_000);
 		const last = index === count - 1;
 		const jobStatus = summary.status === "PARTIAL" && last ? "CANCELLED" : status;
@@ -2682,38 +2553,28 @@ function detailOf(summary: ReviewSummary, jobs: ReviewJob[] | null): ReviewDetai
 	};
 }
 
-/**
- * The detail behind one review, derived from the same spec as its rows. A review page takes its
- * heading from the review and its rows from the list endpoints, so a detail served from an
- * unrelated fixture makes the header name one pull request and every row underneath another.
- */
 export function reviewDetail(reviewId: string): ReviewDetail {
 	const spec = reviewSpec(reviewId);
 	const summary = toReview(spec);
 	return detailOf(summary, spec.runtimeExpired === true ? null : jobsOf(summary, spec.jobs ?? 1));
 }
 
-/** The pull request's completed review: four results, a withheld practice, eight pieces of feedback. */
 export const reviewDetailCompleted: ReviewDetail = reviewDetail(
 	"11111111-1111-1111-1111-111111111111",
 );
 
-/** Running, nothing recorded yet. */
 export const reviewDetailRunning: ReviewDetail = reviewDetail(
 	"aaaaaaaa-8888-8888-8888-888888888888",
 );
 
-/** A scan of a repository that fanned out into four runtime jobs and stopped on its budget. */
 export const reviewDetailScanManyJobs: ReviewDetail = reviewDetail(
 	"dddddddd-9999-9999-9999-999999999999",
 );
 
-/** Failed long enough ago that its runtime records expired: no jobs, the facts remain. */
 export const reviewDetailExpiredRuntime: ReviewDetail = reviewDetail(
 	"bbbbbbbb-8888-8888-8888-888888888888",
 );
 
-/** A review some stories need that no list row reaches, built on the completed review. */
 function standaloneReview(
 	id: string,
 	overrides: Partial<ReviewSummary>,
@@ -2731,7 +2592,6 @@ function standaloneReview(
 	return { ...detailOf(summary, runtime), jobCount: runtime.length };
 }
 
-/** Waiting in the queue. */
 export const reviewDetailQueued: ReviewDetail = standaloneReview(
 	"0a0a0a0a-1111-4111-8111-000000000001",
 	{
@@ -2744,7 +2604,6 @@ export const reviewDetailQueued: ReviewDetail = standaloneReview(
 	(summary) => jobsOf(summary, 1),
 );
 
-/** A first attempt that ran out of memory and a retry waiting for its turn. */
 export const reviewDetailBackingOff: ReviewDetail = standaloneReview(
 	"0a0a0a0a-1111-4111-8111-000000000002",
 	{
@@ -2767,7 +2626,6 @@ export const reviewDetailBackingOff: ReviewDetail = standaloneReview(
 	},
 );
 
-/** Stopped after twenty minutes. */
 export const reviewDetailTimedOut: ReviewDetail = standaloneReview(
 	"0a0a0a0a-1111-4111-8111-000000000003",
 	{ status: "FAILED", stopReason: "TIMED_OUT" },
@@ -2780,7 +2638,6 @@ export const reviewDetailTimedOut: ReviewDetail = standaloneReview(
 		})),
 );
 
-/** The model finished, and the server could not process what it returned. */
 export const reviewDetailProcessingFailed: ReviewDetail = standaloneReview(
 	"0a0a0a0a-1111-4111-8111-000000000004",
 	{ status: "FAILED", stopReason: "PROCESSING_FAILED" },
@@ -2792,14 +2649,12 @@ export const reviewDetailProcessingFailed: ReviewDetail = standaloneReview(
 		})),
 );
 
-/** Stopped before it started, because the AI budget was used up. */
 export const reviewDetailCancelledOnBudget: ReviewDetail = standaloneReview(
 	"0a0a0a0a-1111-4111-8111-000000000005",
 	{ status: "CANCELLED", stopReason: "BUDGET" },
 	(summary) => jobsOf(summary, 1).map((job) => ({ ...job, startedAt: null, exitCode: null })),
 );
 
-/** What a review spent on the model: a first attempt that failed and the retry that finished. */
 export const reviewUsageTwoAttempts: ReviewUsage = {
 	attempts: [
 		{
@@ -2834,7 +2689,6 @@ export const reviewUsageTwoAttempts: ReviewUsage = {
 	priced: true,
 };
 
-/** One attempt on a model the workspace set up without a price. */
 export const reviewUsageUnpriced: ReviewUsage = {
 	attempts: [
 		{
@@ -2869,16 +2723,10 @@ function cycled<T>(specs: readonly T[], index: number): T {
 	return spec;
 }
 
-/** A different id in the same shape, so a restated row is still a valid UUID. */
 function cycledId(id: string, cycle: number): string {
 	return `${id.slice(0, -2)}${(10 + cycle).toString(16).padStart(2, "0")}`;
 }
 
-/**
- * The fixture's results restated across as many days as it takes to fill `count` rows. Cycling the
- * real specs keeps every row a record the server could have produced, unlike a generated
- * `Result #17`.
- */
 export function manyResults(count: number): ReviewResult[] {
 	const base = reviewResults;
 	const rows = Array.from({ length: count }, (_, index) => {
@@ -2983,12 +2831,6 @@ const countsOf = (
 	resultsMarkedIncorrect,
 });
 
-/**
- * Skewed the way a real workspace is: one practice carries most of the volume and most of the
- * strengths, one is mostly problems, one records twice and says nothing useful, and "Decisions are
- * written down" is not reviewed at all — so the busiest-first ranking and the not-reviewed level
- * both have something to show.
- */
 export const practiceCounts: ReviewPracticeCounts[] = [
 	countsOf(
 		"thin-controllers",
@@ -3048,7 +2890,6 @@ export const practiceReviewOverview: ReviewOverview = {
 	bucket: "DAY",
 	buckets: overviewBuckets(PER_DAY),
 	reviews: { complete: 31, partial: 1, failed: 3, cancelled: 1, running: 1, queued: 2 },
-	// Every result is of one practice, so the practices' counts add up to these.
 	results: outcomeCounts(35, 27, 10, 6),
 	resultsMarkedIncorrect: 3,
 	// One piece of feedback citing two practices counts for each, so these are not the practices' sum.
@@ -3066,10 +2907,6 @@ export const practiceReviewOverview: ReviewOverview = {
 	practices: practiceCounts,
 };
 
-/**
- * The overview's 14 delivered pieces by location, as the counts by location return them for the
- * delivered state: on GitHub, on the developers' practice pages, and with Heph in Slack.
- */
 export const deliveredByLocationCounts: ReasonCount[] = [
 	{ reason: "GITHUB", description: FEEDBACK_LOCATION_DEFS.GITHUB.label, count: 8 },
 	{ reason: "SLACK", description: FEEDBACK_LOCATION_DEFS.SLACK.label, count: 2 },
@@ -3114,11 +2951,6 @@ export const reviewOverviewScope: OutcomeScope = {
 // Where the time of the overview's reviews went
 // ---------------------------------------------------------------------------------------------
 
-/**
- * The thirty days' reviews: a typical review took 14 min 38 s from the request to its comment,
- * almost all of it with the model, and the slowest 1 in 10 took 25 min or longer. Nine reviews
- * started before the merge and finished after it.
- */
 export const practiceReviewTiming: ReviewTiming = {
 	from: OVERVIEW_FROM,
 	to: new Date(STORY_NOW),
@@ -3127,7 +2959,6 @@ export const practiceReviewTiming: ReviewTiming = {
 	preparation: { count: 51, medianSeconds: 20, p90Seconds: 40 },
 	model: { count: 51, medianSeconds: 700, p90Seconds: 1080 },
 	posted: { count: 14, medianSeconds: 12, p90Seconds: 30 },
-	// Until asked 2 min, queue 26 s, preparing 20 s, model 11 min 40 s, posting 12 s: the median.
 	total: { count: 14, medianSeconds: 878, p90Seconds: 1500 },
 	totalShares: {
 		asked: 120 / 878,
@@ -3180,7 +3011,6 @@ export const reviewQueueHead = {
 	waitingLong: queueItem(3, "waiting", webhookRetryPullRequest, alan, 4),
 	waitingShort: queueItem(4, "waiting", leagueColumnsPullRequest, katherine, 2),
 	waitingNew: queueItem(5, "waiting", invoiceBackfillMergeRequest, barbara, 1),
-	// One job of a scan: the scan is one review, however many of its jobs wait.
 	scanJob: queueItem(6, "held", scannedRepository, null, 1),
 };
 
@@ -3198,7 +3028,6 @@ export const idleReviewQueue: ReviewQueue = {
 	finishedPerHourLastDay: 4,
 };
 
-/** Two running on two workers, four waiting and one held, the oldest for four minutes: busy, not stuck. */
 export const busyReviewQueue: ReviewQueue = {
 	...idleReviewQueue,
 	running: 2,
@@ -3228,15 +3057,6 @@ export const awaitingApprovalFeedback: ReviewFeedback[] = reviewFeedback
 		withdrawn: false,
 	}));
 
-// ---------------------------------------------------------------------------------------------
-// The item a review looked at: its events, trace and facts
-// ---------------------------------------------------------------------------------------------
-
-/**
- * The events recorded on a review's item, oldest first, told so they agree with that review: the
- * one that started it a moment before it was ordered, one withheld during the cooldown before it,
- * and one blocked after it because the model was unavailable.
- */
 export function itemEventsOf(review: ReviewSummary): ItemEvent[] {
 	const asked = review.createdAt.getTime();
 	const event = (
@@ -3267,11 +3087,6 @@ export function itemEventsOf(review: ReviewSummary): ItemEvent[] {
 	];
 }
 
-/**
- * The trace of the item a review fixture looked at, told so it agrees with that review: its own
- * events, the review itself, and the practices it answered naming it. A trace taken from another
- * review would put the event that started this one after it finished.
- */
 export function itemTraceOf(review: ReviewSummary): ItemTrace {
 	const ref = reviewRefOf(review);
 	return {
@@ -3285,10 +3100,6 @@ export function itemTraceOf(review: ReviewSummary): ItemTrace {
 	};
 }
 
-/**
- * The feedback checks a review ran: those of its own feedback, and one that stopped feedback as
- * the work had changed.
- */
 export function reviewFeedbackChecksOf(review: ReviewSummary): FeedbackCheck[] {
 	const own = allFeedbackSpecs
 		.filter(({ review: owner }) => owner.id === review.id)
@@ -3297,7 +3108,6 @@ export function reviewFeedbackChecksOf(review: ReviewSummary): FeedbackCheck[] {
 	return [...own, { ...deniedFeedbackCheck, checkedAt: new Date(end.getTime() + 30_000) }];
 }
 
-/** A merged pull request whose head failed its checks, as its adapter reports it. */
 export const mergedPullRequestFacts: ItemFacts = {
 	item: reviewItem,
 	facts: [
@@ -3322,11 +3132,6 @@ export const openIssueFacts: ItemFacts = {
 	],
 };
 
-// ---------------------------------------------------------------------------------------------
-// A practice's versions, and how each practice's script ran in one review
-// ---------------------------------------------------------------------------------------------
-
-/** Three versions of a practice, newest first: the first, a wording change, and a change to what it reviews. */
 export const practiceVersions: PracticeVersion[] = [
 	practiceVersion(definitionOf({ name: "Thin controllers" }), {
 		id: "303",
@@ -3381,7 +3186,6 @@ const decisionModel = (calls: number, tier: "IN_HOUSE" | "CLOUD") => ({
 	cacheWriteTokens: 0,
 });
 
-/** How each practice's script ran in one review: one entry per way the section words it. */
 export const reviewPracticeScripts = {
 	fromCode: scriptRun("thin-controllers", {
 		scriptKind: "CUSTOM",
@@ -3406,7 +3210,6 @@ export const reviewPracticeScripts = {
 			},
 		],
 	}),
-	// A practice without a script of its own gets the built-in review.
 	builtIn: scriptRun("the-change-explains-itself", {
 		scriptKind: "BUILTIN",
 		status: "OK",
@@ -3431,19 +3234,16 @@ export const reviewPracticeScripts = {
 		stopReason: "DEADLINE",
 		durationMs: 15_000,
 	}),
-	// The script stopped before it reported, so it names no models.
 	notFinished: scriptRun("decisions-are-written-down", {
 		scriptKind: "CUSTOM",
 		status: "NOT_FINISHED",
 		durationMs: null,
 	}),
-	// The review ended before this script's turn came, so it asked nothing and took no time.
 	notReached: scriptRun("decisions-are-written-down", {
 		scriptKind: "CUSTOM",
 		status: "NOT_REACHED",
 		durationMs: null,
 	}),
-	// A practice removed since the review: no workspace practice has its id.
 	removedPractice: scriptRun("retired-practice", {
 		scriptKind: "CUSTOM",
 		status: "FAILED",

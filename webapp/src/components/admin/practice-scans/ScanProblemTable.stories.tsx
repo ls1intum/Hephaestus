@@ -46,7 +46,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** New, unchanged, updated, absent, and an absence proved to be a fix. */
 export const Default: Story = {
 	play: async ({ canvas, userEvent, args }) => {
 		const table = canvas.getByRole("table", { name: "Problems in this scan" });
@@ -54,7 +53,6 @@ export const Default: Story = {
 		await expect(within(table).getByText("Unchanged")).toBeVisible();
 		await expect(within(table).getByText("Updated")).toBeVisible();
 		await expect(within(table).getByText("Absent")).toBeVisible();
-		// Only the absence the file's new review proved reads as a fix.
 		await expect(within(table).getAllByText("Now met")).toHaveLength(1);
 		await expect(within(table).getByText(/That alone does not prove a fix\./u)).toBeVisible();
 		await expect(within(table).getAllByText("server/src/ScanService.java:42–48")[0]).toBeVisible();
@@ -92,7 +90,6 @@ export const NoProblemsWithWithholding: Story = {
 	},
 };
 
-/** Nothing could be compared, so no row claims a comparison. */
 export const NotCompared: Story = {
 	args: {
 		state: ready(PROBLEM_ENTRIES.slice(0, 2).map((entry) => ({ ...entry, baselineState: null }))),

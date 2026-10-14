@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 export interface UserViewBannerProps {
 	name: string;
 	workspace: string;
-	/** The person has not signed in yet, so the view shows no choice of theirs. */
 	unclaimed: boolean;
 	onExit: () => void;
 }

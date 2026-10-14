@@ -43,11 +43,7 @@ export interface ScanItemTableProps {
 
 const SKELETON_COLUMNS = ["w-56", "w-40", "w-20", "w-64"] as const;
 
-/**
- * Every file the scan listed, against each practice. Only reviewed and reused rows carry this scan's
- * result. A not-reviewed row may show an earlier result of the same file, labelled as earlier
- * evidence, which is never this scan's verdict.
- */
+// Earlier evidence on a not-reviewed row is not this scan's verdict.
 export function ScanItemTable({ state, filter, onFilterChange }: ScanItemTableProps) {
 	return (
 		<section aria-label="Files" className="space-y-4">
@@ -82,7 +78,7 @@ function ScanItemResults({
 		return (
 			<EmptyState
 				icon={<FileSearchIcon />}
-				headingLevel={3}
+				headingLevel={2}
 				title={filtered ? "No files match this filter." : "No files listed yet."}
 			/>
 		);

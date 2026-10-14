@@ -12,10 +12,7 @@ import type {
 import { aboutLabel } from "@/components/practice-vocabulary/about-role-labels";
 import { hasText } from "@/lib/text";
 
-/**
- * A practice's current definition. Only a historical version can lack one, so a current version
- * without it is a broken server contract, not a state to render.
- */
+/** A current version must contain its definition; absence is a server contract error. */
 export function currentDefinition(practice: {
 	slug: string;
 	currentVersion: Pick<PracticeVersion, "definition">;
@@ -30,10 +27,6 @@ export function currentDefinition(practice: {
 /** A part of a practice's definition that can change on its own. */
 export type PracticeDefinitionField = PracticeReleaseField["field"];
 
-/**
- * The name of each part of a practice's definition, and where it sits on the definition: one list
- * for a catalog release's review, a reset's comparison, and a practice's version history.
- */
 export const PRACTICE_DEFINITION_FIELDS = {
 	NAME: { label: "Name", key: "name" },
 	REVIEW_ON: { label: "Review on", key: "reviewOn" },
@@ -62,7 +55,6 @@ const FIELD_ORDER = [
 	"GUIDANCE",
 ] as const satisfies readonly PracticeDefinitionField[];
 
-/** The fields where `current` and `offered` differ, in definition order. */
 export function definitionDifferences(
 	current: PracticeDefinition,
 	offered: PracticeDefinition,
@@ -73,14 +65,12 @@ export function definitionDifferences(
 	});
 }
 
-/** Who reviews the work, in the words the definition editor uses. */
 export const REVIEWED_BY_LABELS: Record<ReviewedBy["by"], string> = {
 	HEPHAESTUS: "Heph",
 	PEOPLE: "People",
 	NOBODY: "Nobody",
 };
 
-/** How much of a source a review needs, as a short phrase after the source's name. */
 export const READ_NEED_LABELS: Record<PracticeReadSource["need"], string> = {
 	REQUIRED: "required",
 	COMPLETE: "required in full",
@@ -89,7 +79,6 @@ export const READ_NEED_LABELS: Record<PracticeReadSource["need"], string> = {
 
 const NOBODY_SENTENCE = "This practice offers guidance without automated review.";
 
-/** Who reviews the work and why, as the lines an admin reads. */
 export function reviewedByLines(reviewedBy: ReviewedBy): string[] {
 	const reason = reviewedBy.humanReason;
 	return [
@@ -100,7 +89,6 @@ export function reviewedByLines(reviewedBy: ReviewedBy): string[] {
 	];
 }
 
-/** The conditions under which a practice applies, or that it always does. */
 export function appliesWhenLines(appliesWhen: AppliesWhen | null): string[] {
 	if (appliesWhen === null) {
 		return ["Always"];
@@ -115,7 +103,6 @@ export function appliesWhenLines(appliesWhen: AppliesWhen | null): string[] {
 	];
 }
 
-/** Which files a scan reviews, or that the practice is not part of scans. */
 export function scanLines(scan: ScanDefinition | null): string[] {
 	if (scan === null) {
 		return ["Not included in scans"];
@@ -127,10 +114,6 @@ export function scanLines(scan: ScanDefinition | null): string[] {
 	];
 }
 
-/**
- * One field of a definition as plain text, for comparing two versions side by side. The visual and
- * the guide are pictures and Markdown, so `PracticeDefinitionFieldValue` draws those itself.
- */
 export function definitionFieldText(
 	definition: PracticeDefinition,
 	field: PracticeDefinitionField,

@@ -11,11 +11,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins the contract reviewers care about: every {@link MentorChatMetrics.ResultOutcome} ends up on a
- * pre-registered Counter (no per-call builder allocation), the duration timer brackets correctly,
- * and the cost summary swallows negative / non-finite inputs instead of polluting dashboards.
- */
 class MentorChatMetricsTest extends BaseUnitTest {
 
     private MeterRegistry registry;

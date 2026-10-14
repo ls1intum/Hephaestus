@@ -127,6 +127,8 @@ class JobEvidenceFilesTest extends BaseUnitTest {
             files.discardAdmittedAttempt(identity);
             assertThat(read(files, job, "context/quote", sha)).contains(bytes);
 
+            job.setAdmissionAttempt(job.getAttempt());
+            job.setAdmissionDigest("a".repeat(64));
             files.discardAdmittedAttempt(new AdmissionIdentity(job.getId(), 1L, 1, "worker"));
             assertThat(read(files, job, "context/quote", sha)).contains(bytes);
             files.discardAdmittedAttempt(identity);
@@ -321,6 +323,8 @@ class JobEvidenceFilesTest extends BaseUnitTest {
     void shouldDeleteAdmittedFinalEvidenceImmediatelyWithoutDeletingAReplacementHandle() {
         var files = new JobEvidenceFiles(new FabricLayout(root.toString()), jobs, clock, personCopies());
         var job = job();
+        job.setAdmissionAttempt(job.getAttempt());
+        job.setAdmissionDigest("a".repeat(64));
         job.setStatus(ReviewJobStatus.COMPLETED);
 
         when(jobs.findByIdAndWorkspaceId(job.getId(), 1L)).thenReturn(Optional.of(job));
@@ -596,6 +600,8 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         var layout = new FabricLayout(root.toString());
         var files = new JobEvidenceFiles(layout, jobs, clock, personCopies());
         var job = job();
+        job.setAdmissionAttempt(job.getAttempt());
+        job.setAdmissionDigest("a".repeat(64));
         job.setStatus(ReviewJobStatus.RUNNING);
         when(jobs.findByIdAndWorkspaceId(job.getId(), 1L)).thenReturn(Optional.of(job));
         byte[] bytes = "verified quote".getBytes(StandardCharsets.UTF_8);
@@ -635,6 +641,8 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         var layout = new FabricLayout(root.toString());
         var files = new JobEvidenceFiles(layout, jobs, clock, personCopies());
         var job = job();
+        job.setAdmissionAttempt(job.getAttempt());
+        job.setAdmissionDigest("a".repeat(64));
         job.setStatus(ReviewJobStatus.RUNNING);
         byte[] bytes = "verified quote".getBytes(StandardCharsets.UTF_8);
         String sha = ProvenanceDigest.sha256Hex(bytes);

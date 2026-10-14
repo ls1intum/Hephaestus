@@ -91,24 +91,12 @@ export interface FeedbackRowProps {
 	feedback: ReviewFeedback;
 }
 
-/**
- * What tells one row from the next without its text: who it was for, on which work, and where it
- * went, after the word "feedback": "for Ada Lovelace on #1423, on GitHub".
- */
 export function feedbackRowName(feedback: ReviewFeedback): string {
 	const location = FEEDBACK_LOCATION_DEFS[feedback.location].label.toLowerCase();
 	const on = feedback.item === null ? "" : ` on ${feedback.item.label}`;
 	return `for ${developerLabel(feedback.developer)}${on}, ${location}`;
 }
 
-/**
- * One piece of feedback, drawn as a review row is: the time, where it went, the work, who it was
- * for, and what became of it. Its text is on its sheet: a row is told apart by its time,
- * destination, work, developer and delivery, which its accessible names say too. The delivery is
- * its icon and label, and a withheld row adds why, in the words the "Why withheld" filter offers, with the precise reason on
- * hover. The whole row opens the feedback's sheet, and that is its one link; Track and Trace stand
- * in the actions column.
- */
 export function FeedbackRow({ feedback }: FeedbackRowProps) {
 	const today = new Date(useNow());
 	const tracked = useTracked({ kind: "feedback", id: feedback.id });

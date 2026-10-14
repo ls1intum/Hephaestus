@@ -851,8 +851,6 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                         "credential-canary",
                         "Practice guidance for developer",
                         "context/conversation.json");
-        // The frozen selection names workspaces, so a journal written after the preview is cleared
-        // too.
         UUID laterThread = seedJournal(
                         workspaces.findById(affected.getFirst().workspaceId()).orElseThrow(), other)
                 .getId();

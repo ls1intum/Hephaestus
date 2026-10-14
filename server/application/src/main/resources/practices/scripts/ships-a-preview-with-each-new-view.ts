@@ -1,5 +1,3 @@
-// Finds the view types that the change declares and the previews that it adds, in each Swift file.
-// The review pairs them, and reads if the data of each preview is representative.
 import { isCommentLine } from "../kits/scm/declarations.ts";
 import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
 import { isTestPath, languageOf } from "../kits/scm/languages.ts";

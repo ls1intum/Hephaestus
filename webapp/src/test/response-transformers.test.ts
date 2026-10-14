@@ -40,14 +40,12 @@ describe("generated SDK response transformers", () => {
 
 	it("leaves a null date null rather than the epoch", async () => {
 		server.use(
-			// `finishedAt` is null: a batch still running has not finished.
 			http.get("*/workspaces/:slug/practices/review-batches", () => batchesResponse("RUNNING")),
 		);
 
 		const { data } = await listReviewBatches({ path: { workspaceSlug: "acme" } });
 
-		// `new Date(null)` is 1 January 1970, which renders as a real instant instead of the em dash a
-		// screen shows for "not yet". The transformer must skip the field.
+		// new Date(null) creates a real epoch date; missing timestamps must remain absent.
 		expect(data?.content[0]?.finishedAt).toBeNull();
 	});
 

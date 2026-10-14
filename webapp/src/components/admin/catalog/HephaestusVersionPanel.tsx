@@ -17,7 +17,6 @@ import type { VersionField } from "./hephaestus-version-fields";
 export interface HephaestusVersionPanelProps {
 	status: CatalogEntryStatus;
 	kind: "practice" | "group";
-	/** The Hephaestus version field by field, or none when Hephaestus ships no default. */
 	shipped?: readonly VersionField[];
 	isResetPending: boolean;
 	isKeepPending?: boolean;

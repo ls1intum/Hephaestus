@@ -15,7 +15,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Coordinates external effects while the connection service owns local lifecycle writes. */
 final class ConnectionLifecycleEffects {
     private static final Logger log = LoggerFactory.getLogger(ConnectionLifecycleEffects.class);
     private final ApplicationEventPublisher eventPublisher;

@@ -22,7 +22,7 @@ import {
 	wireScan,
 } from "./-scan-wire";
 
-// Mounting the real route pulls in the whole admin layout and its lazy modules.
+// Route mounting loads the admin layout and lazy modules; allow time for the first render.
 vi.setConfig({ testTimeout: 15_000 });
 
 const LIST = "/w/acme/admin/practices/scans";
@@ -46,7 +46,6 @@ describe("scans list route", () => {
 			ROUTE_RENDER_WAIT,
 		);
 		expect(table.getAttribute("aria-busy")).toBe("true");
-		// The skeleton promises the real columns, and no figure a scan has not reported.
 		expect(within(table).queryByRole("link")).toBeNull();
 		expect(within(table).queryByText("0")).toBeNull();
 
@@ -98,11 +97,9 @@ describe("scans list route", () => {
 			"Ada Lovelace",
 			"Running",
 			"2",
-			// No total yet: the scan is still listing files, so no "of" and no percentage.
 			"1",
 			"0",
 		]);
-		// Nobody asked for the cancelled scan: what started it is said instead.
 		within(cancelledRow).getByText("Scheduled");
 		within(cancelledRow).getByText("Cancelled");
 		within(cancelledRow).getByText("4 of 6");
@@ -119,7 +116,6 @@ describe("scans list route", () => {
 		renderRouteAtWithRouter(LIST);
 
 		await screen.findByText("We could not load scans", undefined, ROUTE_RENDER_WAIT);
-		// No table of zeros under an error: nothing is known about any scan.
 		expect(screen.queryByRole("table")).toBeNull();
 		expect(screen.queryByText("No scans yet")).toBeNull();
 

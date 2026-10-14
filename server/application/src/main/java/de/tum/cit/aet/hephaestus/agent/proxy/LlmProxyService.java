@@ -38,11 +38,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Credential-injecting proxy for the model calls of agent sandboxes and their practice scripts.
- * The authenticated token chooses a catalog model; callers cannot choose an upstream host, path,
- * protocol, credential header, or model id.
- */
+// The authenticated token chooses the model and upstream; callers cannot supply hosts, paths, or credentials.
 @Service
 @ConditionalOnWorkerRole
 class LlmProxyService {
@@ -159,7 +155,6 @@ class LlmProxyService {
     static final int MAX_EMBEDDING_INPUTS = 64;
     static final int MAX_RERANK_DOCUMENTS = 256;
 
-    /** @return why the call holds more entries than one call to its model may send, or {@code null} */
     private static @Nullable String tooManyEntries(JsonNode call, LlmApiProtocol protocol) {
         return switch (protocol) {
             case OPENAI_DECISIONS -> tooManyEntries(call, "questions", MAX_DECISION_QUESTIONS);
@@ -169,7 +164,6 @@ class LlmProxyService {
         };
     }
 
-    /** Only an array can hold too many entries. Any other shape is left for the provider to refuse. */
     private static @Nullable String tooManyEntries(JsonNode call, String field, int max) {
         JsonNode entries = call.get(field);
         if (entries == null || !entries.isArray() || entries.size() <= max) return null;
@@ -540,11 +534,7 @@ class LlmProxyService {
                 : "Shared-model budget reached. Paused until an admin raises the budget or the month rolls over.";
     }
 
-    /**
-     * The OTel GenAI usage attributes. The input count is the prompt total, cache reads and writes included, as the
-     * convention defines it. GenAI has no attribute for search units, so a call that billed search units and reported
-     * no tokens carries only {@code hephaestus.usage.search_units}, not a token count of 0.
-     */
+    // OTel GenAI input includes cache tokens; search units have no standard token attribute.
     private static void tagUsage(Span span, @Nullable ProxyTokenUsage usage) {
         if (usage == null) return;
         if (usage.searchUnits() > 0) {

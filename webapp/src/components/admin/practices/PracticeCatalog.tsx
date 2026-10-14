@@ -67,7 +67,6 @@ import { CatalogOriginBadge, canResetToCatalog } from "./CatalogOriginBadge";
 
 export type FocusFilter = "ALL" | KnownItemKind;
 
-/** A practice as the tree sorts and labels it: its name lives on its current version. */
 interface PracticeRow {
 	slug: string;
 	groupSlug: string | null;
@@ -104,7 +103,6 @@ export interface PracticeCatalogProps {
 	onUpdateGroup: (slug: string, details: GroupDetails) => Promise<boolean>;
 	onSetGroupShownToDevelopers: (slug: string, shownToDevelopers: boolean) => void;
 	onDeleteGroup: (slug: string) => void;
-	/** Opens the comparison for resetting a group's details to the catalog's. */
 	onResetGroup: (slug: string) => void;
 	onReorderGroups: (orderedSlugs: string[]) => void;
 	onSetGroupVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
@@ -606,7 +604,6 @@ function PracticeRowDetails({
 							key="source"
 							source={feedbackModeSourceOf(practice.feedbackMode, "PRACTICE", inheritedFrom)}
 						/>,
-						// Heph is the default reviewer; a practice people or nobody review says so.
 						...(by === "HEPHAESTUS"
 							? []
 							: [

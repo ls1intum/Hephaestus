@@ -40,7 +40,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Verifies one candidate per pinned assignment before the attempt's transactional admission. */
 @Service
 @ConditionalOnCaptureRole
 public class ReviewOutputService {

@@ -199,22 +199,7 @@ public class ReviewThreadContentSource {
                 ScmCitableTexts.files(files, this::sourceKindFor, objectMapper));
     }
 
-    /**
-     * Marker embedded in every Hephaestus practice-review note ({@code <!-- hephaestus-diff-note
-     * -->}, {@code <!-- hephaestus:practice-review:… -->}, {@code <!--
-     * hephaestus-approved-package:… -->}). A human reviewer never writes it, so a note that carries
-     * it is the tool's own posted feedback, never reviewer input. Every source that stages review
-     * discussion filters by this one prefix: a diff note whose line falls outside the hunk is
-     * posted as a conversation comment and still carries the diff-note form. The {@code
-     * rootComment} FK is not populated by the sync, so we scan the thread's comment set for the
-     * marker.
-     *
-     * <p>The marker is the ONLY signal used: the mirror's Hephaestus identity is an opaque {@code
-     * group_*_bot_*} access-token login indistinguishable from a human's by login alone, so a login
-     * substring match would silently drop a genuine reviewer thread from anyone whose login happens
-     * to contain "hephaestus" (e.g. a fork named {@code hephaestus-fan}) — masking a real review
-     * signal.
-     */
+    // Filter posted feedback by its marker; bot logins cannot reliably distinguish it from human review.
     private static boolean isHephaestusThread(PullRequestReviewThread t) {
         var comments = t.getComments();
         if (comments == null || comments.isEmpty()) {

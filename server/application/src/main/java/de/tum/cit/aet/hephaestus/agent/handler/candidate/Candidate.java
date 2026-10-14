@@ -23,7 +23,6 @@ public sealed interface Candidate
     /** The result's own citations; empty only on {@link NotMetCandidate}, whose problems carry theirs. */
     List<ObjectNode> citations();
 
-    /** {@code {source: "host" | "claimed", …, complete, omitted?}}. */
     ObjectNode coverage();
 
     default List<CandidateProblem> problems() {
@@ -42,7 +41,6 @@ public sealed interface Candidate
         return null;
     }
 
-    /** The located open questions, {@code {openQuestion, wouldSettleIt, citation?}}. */
     default List<ObjectNode> openQuestions() {
         return List.of();
     }

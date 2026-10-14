@@ -11,14 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { hasText } from "@/lib/text";
 
 export interface DateRangeFacetProps {
-	/**
-	 * Which date this filters, in the words the rows use: "Recorded", "Composed", "Changed".
-	 *
-	 * Required, and deliberately not defaulted to "Date": several screens filter different timestamps
-	 * through this control, and "Date" names the category rather than the value. A filter's name has to
-	 * be "concrete and predictable" (NN/g, "Filter Categories and Values"), and a default would let the
-	 * next screen ship unlabelled.
-	 */
+	/** Name the filtered date explicitly; Recorded and Composed select different facts. */
 	title: string;
 	value: DateRange | undefined;
 	onChange: (range: DateRange | undefined) => void;

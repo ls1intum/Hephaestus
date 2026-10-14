@@ -42,29 +42,8 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * <b>Fixture Values (pull_request.opened.json - PR #26):</b>
- *
- * <ul>
- *   <li>ID: 2969820636
- *   <li>Number: 26
- *   <li>Title: "Fixture: pull request events"
- *   <li>Body: "Testing webhook payloads for pull_request actions."
- *   <li>State: open, Draft: false, Merged: false
- *   <li>HTML URL: "https://github.com/HephaestusTest/TestRepository/pull/26"
- *   <li>Created/Updated: 2025-11-01T23:07:44Z
- *   <li>Head ref: fixtures/pr-events, SHA: 3d1674023df8f9ef83febb8fb8d9ffa3a8119d6a
- *   <li>Base ref: main, SHA: a76020c0f7e2afac4475770bb83cf4fe06ab5da1
- *   <li>Commits: 1, Additions: 1, Deletions: 0, Changed files: 1
- *   <li>Author: FelixTJDietrich (ID: 5898705)
- * </ul>
- *
- * <p>Note: This test class does NOT use @Transactional because the pull request processing chain
- * calls GitHubUserProcessor.findOrCreate() which uses REQUIRES_NEW propagation.
- * Having @Transactional here would cause connection pool deadlocks as the test transaction holds a
- * connection while REQUIRES_NEW needs an additional one. We use TransactionTemplate for
- * lazy-loading assertions.
- */
+// REQUIRES_NEW user writes need a free connection; an outer test transaction can deadlock the pool.
+// Use TransactionTemplate only for the lazy-loading assertions.
 class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures

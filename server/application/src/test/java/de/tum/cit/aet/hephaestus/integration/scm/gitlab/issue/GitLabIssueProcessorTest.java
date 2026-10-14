@@ -162,9 +162,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         @Test
         void purgeConfidentialTombstonesStoredSnapshot() {
-            // Public → confidential flip: the previously-mirrored public row must be tombstoned so
-            // it
-            // drops out of every live query.
             GitLabIssueEventDTO event = createEvent("update", "opened", true);
             when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any()))
                     .thenReturn(1);
@@ -1148,11 +1145,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldHumaniseMultiWordTypeNameBeforeLookup() {
-            // The lookup depends on humaniseTypeName: TEST_CASE must become "Test Case" (not
-            // "TEST_CASE"
-            // or "test case") before the case-insensitive query — the single-word "TASK" case can't
-            // catch
-            // a regression in the multi-word/lowercasing path.
+            // Multiword issue types exercise underscore-to-space conversion before case-insensitive lookup.
             var organization = new Organization();
             organization.setId(42L);
             testRepo.setOrganization(organization);
@@ -1237,9 +1230,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldResolveNullIssueTypeWhenOrganizationMissing() {
-            // No organization on the repository → early return null; the issue_type FK passed to
-            // upsert is
-            // null and the COALESCE on the DB side preserves any previously set value.
             testRepo.setOrganization(null);
 
             processor.processFromSync(syncDataWithType("TASK"), testRepo, 1L);
@@ -1270,9 +1260,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                             any());
         }
 
-        /**
-         * A minimal sync payload carrying the given GraphQL issue-type enum (e.g. {@code TASK}).
-         */
         private GitLabIssueProcessor.SyncIssueData syncDataWithType(String typeName) {
             return new GitLabIssueProcessor.SyncIssueData(
                     "gid://gitlab/Issue/422296",
@@ -1353,9 +1340,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null);
     }
 
-    /**
-     * An {@code action=update} event carrying the given {@code changes} diff and no label delta.
-     */
     private GitLabIssueEventDTO createUpdateEventWithChanges(GitLabIssueEventDTO.Changes changes) {
         return withChanges(null, changes);
     }

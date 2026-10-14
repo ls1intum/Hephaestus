@@ -16,7 +16,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Definition and catalog proof uses released SQL rows, independent of the current Java model. */
 @Tag("database")
 class PracticeV1DefinitionMigrationTest {
     @ParameterizedTest
@@ -79,8 +78,8 @@ class PracticeV1DefinitionMigrationTest {
                 assertThat(PracticeV1CutoverMigrationTest.column(
                                 database,
                                 "SELECT encode(sha256(convert_to(v.definition->>'script','UTF8')),'hex') || '|' ||"
-                                        + " v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id"
-                                        + " WHERE p.id="
+                                    + " v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id"
+                                    + " WHERE p.id="
                                         + (1000000L + index)))
                         .containsExactly(program.path("targetSha256").asString() + "|2");
                 index++;
@@ -212,8 +211,8 @@ class PracticeV1DefinitionMigrationTest {
                 .containsExactly("APPROVE_FIRST");
         assertThat(PracticeV1CutoverMigrationTest.column(
                         database,
-                        "SELECT kind || '|' || (definition->>'criteria') || '|' || version FROM catalog_entry"
-                                + " WHERE entry_type='PRACTICE' AND slug='local-offer'"))
+                        "SELECT kind || '|' || (definition->'definition'->>'criteria') || '|' || version FROM"
+                                + " catalog_entry WHERE entry_type='PRACTICE' AND slug='local-offer'"))
                 .containsExactly("scm.pull_request|Local offer standard.|7");
         assertThat(PracticeV1CutoverMigrationTest.column(
                         database,
@@ -237,6 +236,45 @@ class PracticeV1DefinitionMigrationTest {
                                 + " history\"'::jsonb) WHERE id=992131"))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("immutable");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldAttachAuthoredProvenanceWithoutRestoringTheClearedBundledGroup(String context) throws Exception {
+        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
+        PracticeV1CutoverMigrationTest.execute(database, """
+            INSERT INTO practice_revision(id,practice_id,revision_number,slug,name,applies_to,subject,
+                signals,evidence_requirements,review_when,criteria,automated_review_policy,delivery_behavior,created_at)
+            SELECT 992132,id,2,'keeps-functions-small-and-single-purpose',name,applies_to,subject,
+                signals,evidence_requirements,review_when,criteria,automated_review_policy,delivery_behavior,'2026-01-02'
+            FROM practice WHERE id=992121;
+            UPDATE practice SET slug='keeps-functions-small-and-single-purpose',current_revision_id=992132 WHERE id=992121;
+            INSERT INTO curated_practice_override(slug,name,applies_to,criteria,subject,signals,
+                evidence_requirements,review_when,automated_review_policy,delivery_behavior,group_slug,
+                based_on_digest,position,version,created_at,updated_at)
+            SELECT slug,name,applies_to,criteria,subject,signals,evidence_requirements,review_when,
+                automated_review_policy,delivery_behavior,NULL,
+                'practice:v3:cab2c04eb3617978148320711a11951f6fd19a1f348d19f032cf1d8a49a080f3',0,1,'2026-01-01','2026-01-02'
+            FROM practice WHERE id=992121;
+            INSERT INTO practice_catalog_installation(workspace_id,installed_at,provenance_linked_at)
+            VALUES(992101,'2026-01-01',NULL);
+            """);
+        PracticeV1CutoverMigrationTest.upgrade(database, context);
+        assertThat(PracticeV1CutoverMigrationTest.column(database, """
+            SELECT catalog_slug || '|' || (catalog_base->'groupSlug'='null'::jsonb)::text || '|' ||
+                (catalog_base->'definition'->>'criteria') || '|' ||
+                (catalog_base->'definition'->'reads'->>'contract') FROM practice WHERE id=992121
+            """))
+                .containsExactly(
+                        "keeps-functions-small-and-single-purpose|true|Explain the purpose of the change.|2.0.0");
+        assertThat(PracticeV1CutoverMigrationTest.column(database, """
+            SELECT (definition->'groupSlug'='null'::jsonb)::text || '|' ||
+                (definition->'definition'->'reads'->>'contract') FROM catalog_entry
+                WHERE entry_type='PRACTICE' AND slug='keeps-functions-small-and-single-purpose'
+            """)).containsExactly("true|2.0.0");
+        assertThat(PracticeV1CutoverMigrationTest.column(
+                        database, "SELECT definition->>'criteria' FROM practice_version WHERE id=992131"))
+                .containsExactly("Explain the purpose of the change.");
     }
 
     @ParameterizedTest

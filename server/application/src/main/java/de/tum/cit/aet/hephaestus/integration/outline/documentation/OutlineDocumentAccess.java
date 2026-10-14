@@ -5,7 +5,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/** Source identity facts used for permission checks without loading document content. */
 public record OutlineDocumentAccess(
         long workspaceId,
         long id,

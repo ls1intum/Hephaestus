@@ -132,7 +132,6 @@ public class SlackConversationProjector implements ConversationThreadProjection 
         return root;
     }
 
-    /** Complete ordered turns for one thread, with distinct native authors and no per-person verdict cloning. */
     @Override
     public ObjectNode threadPayload(long workspaceId, String channelId, String threadTs) {
         ObjectNode root = objectMapper.createObjectNode();
@@ -188,15 +187,6 @@ public class SlackConversationProjector implements ConversationThreadProjection 
         return keys;
     }
 
-    /**
-     * Non-tombstoned messages of one thread (root {@code slack_ts = thread_ts} + replies
-     * {@code slack_thread_ts = thread_ts}), oldest first. Workspace-pinned and gated on the channel's consent
-     * being {@code ACTIVE}, via {@link de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository#findThreadMessages}. The consent predicate lives on
-     * the message read itself (not only on the thread scan) so the review path — which enters via
-     * {@link #threadPayload} without a prior consent-filtered thread scan — cannot leak messages from a
-     * channel paused or revoked between enqueue and execution: a non-ACTIVE channel yields zero messages,
-     * atomically with the read.
-     */
     private void recordNative(@Nullable String subject, String teamId) {
         if (subject != null && !subject.isBlank())
             personCopies.recordIdentity(new PersonCopyIdentity("SLACK", "https://slack.com", subject, teamId));

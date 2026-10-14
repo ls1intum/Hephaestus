@@ -16,24 +16,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Short-lived signed cookie that carries the user's pre-OAuth intent across the IdP round-trip:
- * which workspace to land back in, where to redirect after success, and whether this is a fresh
- * login or a link-mode flow.
- *
- * <p>Distinct from {@link CookieOAuth2AuthorizationRequestRepository}'s cookie (which holds
- * Spring's serialised {@code OAuth2AuthorizationRequest}). Separate concerns, separate AADs,
- * separate cookies.
- *
- * <h2>Cookie</h2>
- *
- * Name {@value #COOKIE_NAME}; {@code HttpOnly}, {@code Secure}, {@code SameSite=Lax}, {@code
- * Path=/}, 10-minute TTL.
- *
- * <h2>Encryption</h2>
- *
- * AES-256-GCM, AAD = {@code "auth-intent"} (distinct from {@code "oauth2-state"}).
- */
+/** Auth intent and {@link CookieOAuth2AuthorizationRequestRepository} use separate cookies and encryption AADs. */
 public class AuthIntentCookie {
 
     public static final String COOKIE_NAME = "__Host-AUTH_INTENT";

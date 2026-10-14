@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
-/** Evidence counts and time span used to compute a trend direction. */
 public record TrendSupport(
         int currentOpportunities,
         int previousOpportunities,

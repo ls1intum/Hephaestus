@@ -29,7 +29,6 @@ public interface ConversationThreadProjection {
 
     enum ThreadReadability {
         READABLE,
-        /** Consent is not ACTIVE; messages must not be read. */
         CONSENT_NOT_ACTIVE,
         NOT_FOUND,
     }

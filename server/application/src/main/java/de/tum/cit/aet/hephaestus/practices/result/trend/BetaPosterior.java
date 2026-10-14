@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices.result.trend;
 
 import java.util.Arrays;
 
-/** Deterministic beta-posterior approximation for opportunity-indexed trends. */
 final class BetaPosterior {
 
     static final int GRID_SIZE = 256;
@@ -63,16 +62,8 @@ final class BetaPosterior {
         return variance;
     }
 
-    /**
-     * The density on a midpoint grid, normalised to sum to one.
-     *
-     * <p>Only the unnormalised kernel is evaluated. The beta normaliser {@code B(α, β)} is one constant
-     * subtracted from every grid point, and both the max-shift below and the final division by the total
-     * remove any constant, so computing it (a log-gamma approximation) could not change a single output.
-     *
-     * <p>Midpoints, not cell edges: with the Jeffreys prior {@code α} and {@code β} can be below one, so
-     * the density diverges at 0 and 1. A grid that evaluated the edges would produce infinities.
-     */
+    // Jeffreys priors can diverge at grid edges; evaluate midpoints.
+    // The beta normalizer cancels during normalization and cannot change the output.
     private double[] gridMass(int gridSize) {
         double[] logs = new double[gridSize];
         double max = Double.NEGATIVE_INFINITY;
@@ -102,15 +93,8 @@ final class BetaPosterior {
             return probabilityWhere(boundary, false);
         }
 
-        /**
-         * The mass of the product grid on one side of {@code boundary}, in one pass instead of the full
-         * {@code gridSize²} product.
-         *
-         * <p>For a fixed current point the condition is an interval on the previous point, so its mass is a
-         * prefix sum. The interval's edge moves monotonically with the current point, which lets a single
-         * forward pointer find it, so each grid point is visited once per axis rather than once per pair.
-         * The comparisons are the same ones the pairwise form made, so cells on the edge fall the same way.
-         */
+        // The boundary moves monotonically, so prefix sums replace the quadratic product without changing edge
+        // comparisons.
         private double probabilityWhere(double boundary, boolean above) {
             double[] previousPrefix = new double[gridSize + 1];
             for (int previous = 0; previous < gridSize; previous++) {

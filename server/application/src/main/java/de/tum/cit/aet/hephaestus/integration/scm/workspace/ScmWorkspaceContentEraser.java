@@ -44,7 +44,7 @@ public class ScmWorkspaceContentEraser {
     private final OrganizationMembershipRepository organizationMembershipRepository;
     private final NatsConnectionProperties natsProperties;
 
-    /** Absent under the webhook runtime role. */
+    // The webhook runtime does not provide a NATS consumer.
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
 
     private final ApplicationEventPublisher eventPublisher;
@@ -121,7 +121,6 @@ public class ScmWorkspaceContentEraser {
                 teamsErased);
     }
 
-    /** Erases org-tier mirrors only after the workspace releases its organization binding. */
     private int eraseOrgTierIfLastWorkspace(Workspace workspace) {
         Organization organization = organizations.find(workspace).orElse(null);
         if (organization == null || StringUtils.isBlank(organization.getLogin())) {

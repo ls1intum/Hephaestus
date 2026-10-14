@@ -23,12 +23,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-/**
- * Read-only REST API for practice results.
- *
- * <p>All endpoints require workspace membership (enforced by {@link WorkspaceScopedController}).
- * Every endpoint is scoped to the authenticated developer's own results.
- */
+// Membership alone is insufficient; every endpoint must restrict reads to the authenticated developer.
 @ConditionalOnServerRole
 @WorkspaceScopedController
 @RequestMapping("/practices/results")

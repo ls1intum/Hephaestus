@@ -16,10 +16,6 @@ import java.util.Map;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import reactor.core.publisher.Mono;
 
-/**
- * The real {@link GitLabSummaryWriter} over a GitLab whose issue and merge request notes the test
- * controls.
- */
 public final class ScriptedGitLabNotes {
 
     private static final String BOT = "gid://gitlab/User/1";
@@ -66,10 +62,6 @@ public final class ScriptedGitLabNotes {
         };
     }
 
-    /**
-     * Every scripted note was written through the channel, so the identity it authenticates as
-     * wrote it.
-     */
     private Mono<ClientGraphQlResponse> notes(String path, String noteable) {
         return threads.read(
                 noteable,

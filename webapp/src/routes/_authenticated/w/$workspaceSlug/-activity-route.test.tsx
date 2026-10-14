@@ -146,7 +146,6 @@ function pagedWork(record: (request: Request) => void) {
 	});
 }
 
-/** Ada's membership; the workspace's GitHub instance knows her as `ada-lrz`. */
 function adaMembership(
 	role: WorkspaceMembership["role"],
 	identities: WorkspaceMembership["account"]["identities"] = [
@@ -1514,7 +1513,7 @@ describe("Workspace activity", () => {
 			expect(router.state.location.search.detail).toBe("person:bob");
 			await act(async () => {
 				membership.resolve(
-					HttpResponse.json({ role: "ADMIN", userId: 7, userLogin: "ada-lrz", userName: "Ada" }),
+					HttpResponse.json(ownMembership("ADMIN", { account: { id: "7", status: "ACTIVE", displayName: "Ada", avatarUrl: null, identities: [{ provider: "GITLAB", login: "ada-lrz", displayName: "Ada", avatarUrl: null }] } })),
 				);
 				await navigation;
 			});
@@ -1524,7 +1523,7 @@ describe("Workspace activity", () => {
 			await act(async () => {
 				response.resolve(new HttpResponse(null, { status: 204 }));
 				membership.resolve(
-					HttpResponse.json({ role: "ADMIN", userId: 7, userLogin: "ada-lrz", userName: "Ada" }),
+					HttpResponse.json(ownMembership("ADMIN", { account: { id: "7", status: "ACTIVE", displayName: "Ada", avatarUrl: null, identities: [{ provider: "GITLAB", login: "ada-lrz", displayName: "Ada", avatarUrl: null }] } })),
 				);
 				await navigation;
 			});

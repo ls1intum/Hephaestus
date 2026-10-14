@@ -9,23 +9,21 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Names only native rows reachable through this workspace's authoritative item index. */
 @Component
 @RequiredArgsConstructor
 public class ScmItemLabelQuery {
+    private static final ScmItemQueryRepository.KindNames KINDS = new ScmItemQueryRepository.KindNames(
+            ScmItemEvents.REPOSITORY.value(),
+            ScmItemEvents.FILE.value(),
+            ScmItemEvents.PULL_REQUEST_REVIEW.value(),
+            ScmItemEvents.PULL_REQUEST.value(),
+            ScmItemEvents.ISSUE.value());
     private final ScmItemQueryRepository queries;
 
     public Map<Long, ItemLabel> labels(long workspaceId, Collection<Long> ids) {
         if (ids.isEmpty()) return Map.of();
         Map<Long, ItemLabel> labels = new HashMap<>();
-        for (var row : queries.labels(
-                workspaceId,
-                List.copyOf(ids),
-                ScmItemEvents.REPOSITORY.value(),
-                ScmItemEvents.FILE.value(),
-                ScmItemEvents.PULL_REQUEST_REVIEW.value(),
-                ScmItemEvents.PULL_REQUEST.value(),
-                ScmItemEvents.ISSUE.value())) {
+        for (var row : queries.labels(workspaceId, List.copyOf(ids), KINDS)) {
             labels.put(
                     row.getId(),
                     new ItemLabel(

@@ -7,25 +7,14 @@ import { eventBands, eventDef, PHASE_LABEL, withdrawnEvents } from "./review-eve
 import { normalizeReviewOn, REVIEW_ON_ID_PREFIX, reviewOnFieldId } from "./review-settings";
 
 export interface ReviewOnEditorProps {
-	/** The whole item type: its events draw the strip and its state dimensions ask When. */
 	itemType: PracticeItemTypeOption;
 	reviewOn: ReviewOn;
 	onChange: (reviewOn: ReviewOn) => void;
-	/**
-	 * The id of the message describing what is wrong, passed only while the events are what fails
-	 * validation; its presence is also what draws them in the invalid state. One field rather than an
-	 * `invalid` flag beside an id, so neither can be set without the other.
-	 */
 	eventsErrorId?: string;
 	stateErrorId?: string;
 	disabled?: boolean;
 }
 
-/**
- * Review on, drawn as the life of the item rather than as a list of checkboxes, and the states the
- * item has to be in. Bands come from the events the item type offers, so every kind renders from
- * the same code.
- */
 export function ReviewOnEditor({
 	itemType,
 	reviewOn,
@@ -85,8 +74,6 @@ export function ReviewOnEditor({
 									))}
 								</div>
 							);
-							// A single band has nothing to tell apart, so no heading — and so nothing to name a
-							// group by.
 							if (bands.length === 1) {
 								return <div key={band.phase}>{rail}</div>;
 							}
@@ -126,7 +113,6 @@ export function ReviewOnEditor({
 						Review only items in these states. A requested review ignores them.
 					</FieldDescription>
 					{itemType.reviewOnStateDimensions.map((dimension) => {
-						// A state with no value cannot be chosen; one with no label shows its value.
 						const options = dimension.values.flatMap(({ value, label }) =>
 							value === undefined ? [] : [{ value, label: label ?? value }],
 						);
@@ -144,7 +130,6 @@ export function ReviewOnEditor({
 											<Checkbox
 												id={controlId}
 												checked={selectedValues.includes(option.value)}
-												// The last state cannot be cleared: no state at all would review nothing.
 												disabled={
 													disabled ||
 													(selectedValues.length === 1 && selectedValues.includes(option.value))
@@ -179,7 +164,6 @@ export function ReviewOnEditor({
 
 interface EventNodeProps {
 	option: ItemEventOption;
-	/** Draw the hairline reaching back to the event before it, where the band is a progression. */
 	railed: boolean;
 	chosen: boolean;
 	controlId: string;
@@ -188,11 +172,6 @@ interface EventNodeProps {
 	onToggle: (chosen: boolean) => void;
 }
 
-/**
- * One point on the strip: a real checkbox with a label, drawn as a node on a rail. Nothing here
- * reimplements checkbox behaviour — `htmlFor` leaves the click, the Space press and the accessible
- * name to the platform, and only the focus ring is moved onto the node a reader actually sees.
- */
 function EventNode({
 	option,
 	railed,

@@ -405,7 +405,6 @@ function resultResponse(
 	};
 }
 
-/** Two merge requests: MR1 is item 101, MR2 is item 102. */
 function detailsEnvironment() {
 	let url = MR1;
 	const byPage: Record<string, ReviewContextDTO> = {
@@ -675,7 +674,6 @@ describe("the reader's own feedback on the item", () => {
 					deliveredAt: "2026-09-26T09:00:00Z",
 					practices: [{ slug: "small-changes", name: "Small, focused changes" }],
 					copies: [
-						// The same summary, edited in place later by another piece of feedback.
 						summary({
 							id: "6d2a8b01-2c3d-4e5f-9a01-b2c3d4e5f607",
 							externalUrl: null,
@@ -702,13 +700,11 @@ describe("the reader's own feedback on the item", () => {
 							side: "NEW",
 							postedAt: "2026-09-26T09:00:00Z",
 						}),
-						// A conversation turn and a copy with no handle are no comment the reader can go to.
 						summary({ kind: "CHAT_TURN", externalRef: "turn-1" }),
 						summary({ externalRef: " " }),
 						summary({ externalRef: null }),
 					],
 				}),
-				// Feedback with no recorded copy adds no comment.
 				delivered({ id: "c", copies: [] }),
 			],
 		});

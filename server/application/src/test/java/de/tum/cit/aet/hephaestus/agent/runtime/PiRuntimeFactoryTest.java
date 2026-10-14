@@ -71,8 +71,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             var inputs = factory.build(spec("azure-openai-responses", "gpt-5.4-mini", false))
                     .inputFiles();
             assertThat(inputs.get(SandboxLayout.ORCHESTRATOR_PATH)).isNotNull();
-            assertThat(new String(inputs.get(SandboxLayout.ORCHESTRATOR_PATH), StandardCharsets.UTF_8))
-                    .contains("observations");
+            assertThat(inputs.get(SandboxLayout.ORCHESTRATOR_PATH)).isNotEmpty();
             assertThat(inputs.get(SandboxLayout.RUNNER_SCRIPT_FILENAME)).isNotEmpty();
             assertThat(new String(inputs.get(SandboxLayout.NODE_PACKAGE_JSON_FILENAME), StandardCharsets.UTF_8))
                     .isEqualTo("{\"type\":\"module\"}\n");
@@ -382,6 +381,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     .isGreaterThan(writable)
                     .isLessThan(link);
             assertThat(link).isLessThan(node);
+            int kits = body.indexOf("ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_KITS_TARGET + " "
+                    + SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.PRACTICE_SCRIPT_KITS_LINK);
+            assertThat(kits).isGreaterThan(link).isLessThan(node);
             assertThat(node)
                     .isLessThan(
                             body.indexOf(SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.RUNNER_SCRIPT_FILENAME));

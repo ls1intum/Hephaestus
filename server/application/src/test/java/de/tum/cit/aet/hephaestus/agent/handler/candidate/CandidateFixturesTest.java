@@ -22,10 +22,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * The Java and TypeScript parsers share these fixtures: both sides admit
- * the same candidates and refuse the same values with the same code.
- */
 class CandidateFixturesTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

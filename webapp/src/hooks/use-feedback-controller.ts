@@ -19,10 +19,6 @@ import { awaitingApprovalOptions } from "./use-feedback-awaiting-approval";
 /** How often feedback still on its way out is re-read, until it lands or stops. */
 const DELIVERY_POLL_MS = 2000;
 
-/**
- * Every read a decision moves: the admin's, and the developer's own reads that show a
- * practice-page card or count it.
- */
 const READS_OF_FEEDBACK_DECISION: ReadonlySet<string> = new Set([
 	...PRACTICE_REVIEW_READS,
 	"getOwnPracticeProfileOverview",
@@ -48,7 +44,6 @@ interface FeedbackControllerOptions {
 	onDecided?: () => void;
 }
 
-/** One piece of feedback as its level reads it, and the decisions an admin can record on it. */
 export function useFeedbackController(
 	workspaceSlug: string,
 	feedbackId: string,
@@ -62,8 +57,7 @@ export function useFeedbackController(
 		refetchInterval: ({ state: { data } }) =>
 			data !== undefined && isDeliveryInProgress(data) ? DELIVERY_POLL_MS : false,
 	});
-	// Approval and rejection name the copies the admin read: a package composed again since then
-	// is refused, and the re-read below shows the new one.
+	// Approvals bind the reviewed copy digest; a changed package requires a fresh read.
 	const contentDigest = feedbackQuery.data?.contentDigest ?? undefined;
 	const approval = useMutation({
 		...createFeedbackDecisionMutation(),

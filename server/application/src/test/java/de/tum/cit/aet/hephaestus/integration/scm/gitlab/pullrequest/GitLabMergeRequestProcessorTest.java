@@ -495,10 +495,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             assertThat(hasPullRequestMerged).isFalse();
         }
 
-        /**
-         * The stored merge request at the hook's head, with its author resolvable and a decision on
-         * record.
-         */
         private PullRequest storedForApprovalHook() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -798,8 +794,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             when(pullRequestRepository.findForUpdateByRepositoryIdAndNumber(REPO_ID, MR_IID))
                     .thenReturn(Optional.of(pr));
 
-            // Create an event with older updatedAt ("2024-01-15T10:00:00Z") than the existing
-            // entity
             GitLabMergeRequestEventDTO event = createEvent("update", "opened", false);
             PullRequest result = processor.process(event, createContext());
 

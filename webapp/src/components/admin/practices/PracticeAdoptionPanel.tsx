@@ -236,8 +236,6 @@ function GroupOutcome({ preview }: { preview: PracticeAdoptionPreview }) {
 
 function FeedbackModeOutcome({ preview }: { preview: PracticeAdoptionPreview }) {
 	return (
-		// No bare icon beside the badge: the badge already renders the registry's icon, and the
-		// same mark twice in one row reads as two facts.
 		<Item variant="muted" size="sm" role="listitem">
 			<ItemContent>
 				<ItemTitle>

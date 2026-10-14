@@ -18,7 +18,6 @@ const OUTCOME_WORDS: Record<Outcome, string> = {
 	COULD_NOT_DETERMINE: "not decided",
 };
 
-/** What a screen reader hears for evidence whose outcome the record does not carry. */
 const EVIDENCE_WORDS = "evidence for this feedback";
 
 /**

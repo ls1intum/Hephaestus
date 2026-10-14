@@ -108,10 +108,7 @@ function Activity() {
 	);
 }
 
-/**
- * The login the workspace's provider knows the account by — in a user view, the viewed member's.
- * Never the sign-in name, which may be another linked identity's.
- */
+// Activity uses this workspace provider's identity, including in user view; the sign-in identity can differ.
 function providerLogin(
 	membership: WorkspaceMembership,
 	providerType: ProviderType,

@@ -33,7 +33,6 @@ export interface ProgramJob {
 	deadline: number;
 }
 
-/** The child's job: what it runs, and the practice's data. */
 export interface ChildJob extends ProgramJob {
 	modulePath: string;
 }
@@ -67,7 +66,6 @@ export type ReadRequest =
 	  }
 	| { op: "cite"; source: "record"; name: string; startLine: number; endLine?: number };
 
-/** What each read answers. */
 export interface ReadValues {
 	read:
 		| { status: "FOUND"; text: string; truncated: boolean }
@@ -83,10 +81,8 @@ export type ReadValue = ReadValues[keyof ReadValues];
 /** Why the host stopped the program: its deadline, the attempt's budget, or a cancellation. */
 export type AbortReason = "deadline" | "budget" | "cancelled";
 
-/** Messages the host sends to a child. */
 export type HostMessage =
 	| { kind: "job"; job: ChildJob }
-	/** The direct models this program may call: the slots it declared that have a bound model. */
 	| { kind: "meta-accepted"; models: Partial<Record<ModelSlot, string>>; tokens: number }
 	| { kind: "model"; id: number; answer: SlotAnswer; tokensLeft: number }
 	| { kind: "model-failed"; id: number; reason: UnratedReason; message: string; tokensLeft: number }
@@ -99,7 +95,6 @@ export type HostMessage =
 /** The longest log line and call label a child may send. */
 export const MAX_LOG_CHARS = 2000;
 export const MAX_LABEL_CHARS = 200;
-/** The largest message a child may send, as JSON. */
 export const MAX_IPC_MESSAGE_BYTES = 524_288;
 
 const callId = z.int().nonnegative().max(Number.MAX_SAFE_INTEGER);

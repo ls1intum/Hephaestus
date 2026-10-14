@@ -9,12 +9,6 @@ import { FeedbackModeLadder } from "./FeedbackModeLadder";
 
 const LAYOUT_SLACK_PX = 1;
 
-/**
- * The complaint this component was rebuilt for was "the parts are not connecting", so the regression
- * test is adjacency rather than any class name: three rungs that read as one control have to share
- * edges, along whichever axis the group is laid out on at this width. A rung that rounds its own
- * corners or holds a gap fails this at one of the two widths, which is exactly how the old build broke.
- */
 async function expectRungsConnected(rungs: HTMLElement[]) {
 	await expect(rungs.length).toBeGreaterThan(1);
 	const [firstBox, ...laterBoxes] = rungs.map((rung) => rung.getBoundingClientRect());
@@ -51,9 +45,6 @@ const meta = {
 	component: FeedbackModeLadder,
 	parameters: {
 		layout: "padded",
-		// The width this control is actually used at. The narrow branch is a story of its own below:
-		// defaulting the whole file to 320px meant every reviewer, and every docs page, opened the
-		// stacked layout and never saw the one the workspace settings screen renders.
 		viewport: { defaultViewport: "desktop" },
 	},
 	args: {
@@ -69,7 +60,6 @@ const meta = {
 		),
 	],
 	tags: ["autodocs"],
-	/** Held in state, so the ladder can be moved; `fn()` alone pins every rung to `args.value`. */
 	render: (args) => (
 		<Stateful initial={args.value}>
 			{(value, setValue) => (
@@ -93,12 +83,8 @@ export const Full: Story = {
 	args: { variant: "full" },
 	play: async ({ canvas }) => {
 		const radios = canvas.getAllByRole("radio");
-		// Radios, not pressed buttons: the rungs are three states of one setting, and a screen reader
-		// should say "Automatic, selected, 3 of 3" rather than "Off, not pressed" twice over.
 		await expect(radios).toHaveLength(3);
 		await expect(canvas.getByRole("radiogroup")).toHaveAccessibleName("Workspace feedback mode");
-		// The chosen rung is announced, not merely tinted (WCAG 2.2 SC 1.4.1), and it is announced under
-		// the word the reader can see (SC 2.5.3) with the sentence beside it as its description.
 		const automatic = canvas.getByRole("radio", { name: "Automatic" });
 		await expect(automatic).toBeChecked();
 		await expect(automatic).toHaveAccessibleDescription(FEEDBACK_MODE_DESCRIPTIONS.AUTOMATIC);
@@ -108,16 +94,11 @@ export const Full: Story = {
 	},
 };
 
-/** The chosen rung's tint and the muted sentence on it are the dark theme's weakest pair. */
 export const FullInDarkMode: Story = {
 	args: { variant: "full" },
 	globals: { theme: "dark" },
 };
 
-/**
- * The width the owner was shown by the old default. The ladder turns its axis and nothing else: one
- * border, one radius, the same lines between the rungs.
- */
 export const Narrow: Story = {
 	args: { variant: "full" },
 	parameters: {
@@ -144,7 +125,6 @@ export const Compact: Story = {
 	play: async ({ canvas }) => {
 		const radios = canvas.getAllByRole("radio");
 		await expect(canvas.getByRole("radio", { name: "Approve first" })).toBeChecked();
-		// No sentences at this size, so nothing describes the rungs — the word has to be the whole name.
 		await expect(
 			canvas.getByRole("radio", { name: "Approve first" }),
 		).not.toHaveAccessibleDescription();
@@ -178,7 +158,6 @@ export const Choosing: Story = {
 	},
 };
 
-/** The whole rung is the target, not the 16px circle: the label wraps the control. */
 export const ChoosingByTheWholeRung: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	args: { variant: "full", value: "OFF" },
@@ -189,7 +168,6 @@ export const ChoosingByTheWholeRung: Story = {
 	},
 };
 
-/** Arrow keys move along the ladder — the only way a keyboard reaches the rungs, since one tab stop covers the group. */
 export const ChoosingByKeyboard: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	args: { variant: "full", value: "OFF" },

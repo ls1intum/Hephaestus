@@ -12,7 +12,6 @@ import { ReviewOnEditor } from "./ReviewOnEditor";
 /** Also the `aria-describedby` target: focus lands on the control, not on the rendered message. */
 const REVIEW_SETTINGS_ERROR_ID = "practice-review-settings-error";
 
-/** When a practice is reviewed and what that review reads. */
 export interface ReviewSettings {
 	reviewOn: ReviewOn;
 	reads: PracticeReadSource[];
@@ -22,7 +21,6 @@ export interface PracticeReviewSettingsEditorProps {
 	itemType: PracticeItemTypeOption;
 	value: ReviewSettings;
 	onChange: (value: ReviewSettings) => void;
-	/** Who reviews the practice: only an automated review reads anything. */
 	reviewedBy: ReviewedByKind;
 	error?: string;
 	/** The control the error points at, so the field it names is the one that opens. */
@@ -30,10 +28,6 @@ export interface PracticeReviewSettingsEditorProps {
 	disabled?: boolean;
 }
 
-/**
- * Review on, When, and what the review reads. Deliberately not a card — it is the body of the
- * form's own section, and a border around it would say there is a second one of these somewhere.
- */
 export function PracticeReviewSettingsEditor({
 	itemType,
 	value,

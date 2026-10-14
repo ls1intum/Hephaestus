@@ -15,17 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Adds one proxied call's token usage to the owning {@code review_job} row, or one practice script call to its
- * {@code review_job_script_usage} row, so a job that crashes mid-run still has the calls it made on
- * record and can be billed for them instead of recording zero.
- * Runs in its own {@code REQUIRES_NEW} transaction — the proxy servlet thread has no ambient
- * transaction, and the accounting write must commit independently of the passthrough.
- *
- * <p>A failed write is money lost, not a no-op: these running totals are what a run without a
- * {@code usage.json} is billed on, so a non-zero rate on {@code llm.proxy.usage.accumulate.failure}
- * means the ledger is under-billing.
- */
+// Commit accounting independently of passthrough so a crashed job retains measured spend.
 @Service
 @ConditionalOnWorkerRole
 public class ProxyUsageAccumulator {
@@ -84,7 +74,6 @@ public class ProxyUsageAccumulator {
                 () -> agentJobRepository.accumulatePracticeScriptUsage(attempt.sourceId(), attempt.number(), counted));
     }
 
-    /** @param write returns the rows the attempt fence let through */
     private void fenced(BilledAttempt attempt, IntSupplier write) {
         try {
             if (write.getAsInt() == 0) {

@@ -18,18 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Materialises {@code inputs/context/recent_authored_work.json} for a {@link MentorContextRequest}.
- *
- * <p><b>Why this exists (the mentor must know the work, not just results about it).</b> The other mentor
- * contexts describe the work only indirectly (results, delivered feedback, counts), so a reference like "my
- * camera change" has no concrete anchor. This context supplies the inventory: the developer's own authored PRs
- * and issues — number, title, URL, state, size — drawn from the same tables practice reviews use, so the
- * mentor can name and link the real work and recognise what the conversation is about.
- *
- * <p>The work itself only (no diffs — those are fetched on demand for a specific artifact, not pre-mounted
- * for every PR). Best-effort like its sibling contexts. Personal context is read for each turn, not cached.
- */
+// Read personal context for each turn; fetch work details on demand rather than mounting every diff.
 @Component
 @RequiredArgsConstructor
 public class RecentAuthoredWorkContentSource implements ContentSource {

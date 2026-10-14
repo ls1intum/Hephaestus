@@ -150,11 +150,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * GitLab webhook events from a real JetStream stream reach the database while the workspace's full
- * sync is held open, and a new group's webhook opens only once its scope consumer is ready. Each
- * test drives one lifecycle; only the GitLab API is stubbed.
- */
 class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
 
     private static final String STREAM = "gitlab";
@@ -718,13 +713,6 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         assertMoveOutStopsOnlyThisWorkspacesMonitor(false);
     }
 
-    /**
-     * The project leaves the connected group for another workspace's group. That workspace handling
-     * the move first is simulated by storing what its admission stores: the shared row at the new
-     * path; this workspace's monitor then has only its native id to be found by. Handled first
-     * here, the monitor has no native id, as one created before ids were recorded, and is found
-     * through the stored row of the same project.
-     */
     private void assertMoveOutStopsOnlyThisWorkspacesMonitor(boolean destinationFirst) throws Exception {
         createStream();
         Workspace connected = connectGroup();
@@ -967,8 +955,6 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         assertThat(repositoryMonitors.monitorAllowed(loaded, List.of(samePathElsewhere, outsideGroup)))
                 .isZero();
 
-        // The selection stored when the lock is held decides, not a Workspace the transaction
-        // loaded before.
         Repository project = foreignRepository(NESTED_PROJECT, NESTED_PROJECT_ID);
         ExecutorService committer = Executors.newSingleThreadExecutor();
         try {
@@ -1255,12 +1241,6 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 .isZero();
     }
 
-    /**
-     * Delivers an update of merge request !2 through the connection's hook, with issue #5 stored
-     * and GitLab reporting the merge request mergeable and closing #5, and runs {@code duringRead}
-     * while GitLab is read after the update is stored. Returns the merge request as stored once the
-     * delivery is acknowledged.
-     */
     private PullRequest deliverMergeRequestUpdateWhileGitLabIsRead(Consumer<Workspace> duringRead) throws Exception {
         createStream();
         Workspace connected = connectGroup();
@@ -1338,10 +1318,6 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         assertKeptOnlyWhatTheHookSaid(merged);
     }
 
-    /**
-     * The merge the hook stored before GitLab was read stays; nothing the read named is recorded or
-     * offered.
-     */
     private void assertKeptOnlyWhatTheHookSaid(PullRequest merged) {
         assertThat(merged.getState()).isEqualTo(Issue.State.MERGED);
         assertThat(merged.getMergeCommitSha()).isEqualTo(HOOK_MERGE_COMMIT);
@@ -1353,12 +1329,6 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         assertThat(mergesOffered(merged)).isZero();
     }
 
-    /**
-     * Delivers merge request !2 opened and then merged through the connection's hook, whose merge
-     * names no merger or merge time, with GitLab then reporting that its author merged it, and runs
-     * {@code duringRead} while GitLab is read after the merge is stored. Returns the merge request
-     * as stored once the merge is acknowledged.
-     */
     private PullRequest deliverMergeWhileGitLabIsRead(Consumer<Workspace> duringRead) throws Exception {
         createStream();
         Workspace connected = connectGroup();
@@ -1447,10 +1417,6 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(HttpStatus.ACCEPTED);
     }
 
-    /**
-     * Posts {@code body} to the connection endpoint {@code route}, the {@code keyId/routeId} of a
-     * hook URL.
-     */
     private HttpStatusCode ingest(
             long connectionId, String route, String token, String instance, String deliveryKey, byte[] body)
             throws Exception {
@@ -1728,10 +1694,6 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 .count();
     }
 
-    /**
-     * What the durable of an earlier release subscribed: the monitored repository and the group
-     * tier.
-     */
     private static Set<String> legacyFilter() {
         return Set.of(
                 ConsumerSubjectMath.repositoryFilter(STREAM, REPOSITORY),

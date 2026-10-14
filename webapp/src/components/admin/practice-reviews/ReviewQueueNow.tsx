@@ -66,17 +66,6 @@ const QUEUE_ITEM_DEFS: Record<QueueItemState, StatusDef & { short: string }> = {
 	},
 };
 
-/**
- * The left part of the Queue card: under "Now", what the queue holds right now, whatever the range.
- * How many reviews wait, run and are held for budget, and the oldest wait while something waits, in
- * one line. Running links to the reviews it counts and the oldest wait to its review; waiting and on
- * hold stay plain, since the review list filters by review status and both are queued. Then the
- * first few in line as a small table of work, developer, state and how long, each work opening its
- * review. What each figure counts is in the (i) beside "Now".
- * Only a problem stands out: a hold for budget, in red, since nothing runs until an admin acts, and
- * a wait of half an hour or more, marked in words only. Everything else is quiet, and an empty
- * queue says so in a line.
- */
 export function ReviewQueueNow({ workspaceSlug, state }: ReviewQueueNowProps) {
 	let body: ReactNode;
 	if (state.status === "error") {
@@ -239,7 +228,6 @@ function QueueCount({
 	workspaceSlug: string;
 	count: number;
 	status: ReviewStatus;
-	/** "running". */
 	noun: string;
 	children: ReactNode;
 }) {

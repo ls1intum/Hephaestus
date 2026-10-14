@@ -48,7 +48,6 @@ export type ScanReportState =
 	| { status: "error"; error: unknown; onRetry: () => void }
 	| { status: "ready"; scan: ScanDetail; report: ScanReport };
 
-/** A report action the reader can start: Cancel scan, Export SARIF. Its failure is shown beside it. */
 export interface ScanAction {
 	pending: boolean;
 	error?: unknown;
@@ -80,11 +79,6 @@ const TAB_LABELS: Record<ScanReportTab, string> = {
 	practices: "Practices",
 };
 
-/**
- * One scan’s report: a page, not a drawer level, because it carries several independent actions —
- * reading three lists, cancelling, exporting. The route polls an active scan; a refetch keeps the
- * loaded report on screen, so this page shows the skeleton only before the first answer.
- */
 export function ScanReportPage(props: ScanReportPageProps) {
 	const { state, workspaceSlug } = props;
 	if (state.status === "loading") {
@@ -269,10 +263,6 @@ function progressSentence(scan: ScanDetail): string {
 	return `${finished} ${activeJobs} running, ${queuedJobs} waiting.`;
 }
 
-/**
- * What the reader must know before trusting a count: whether the scan finished, whether it can be
- * compared with the one before, whether files were recorded as removed, and why pairs have no result.
- */
 function ReportNotes({
 	scan,
 	report,

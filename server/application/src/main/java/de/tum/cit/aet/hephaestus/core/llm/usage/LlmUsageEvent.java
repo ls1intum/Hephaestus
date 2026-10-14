@@ -42,10 +42,14 @@ import org.jspecify.annotations.Nullable;
             // leading column is absent from that predicate.
             @Index(name = "idx_llm_usage_occurred_at", columnList = "occurred_at")
         },
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "ux_llm_usage_event_source_attempt",
-                        columnNames = {"source_type", "source_id", "source_attempt"}))
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "ux_llm_usage_event_source_attempt",
+                    columnNames = {"source_type", "source_id", "source_attempt"}),
+            @UniqueConstraint(
+                    name = "uk_llm_usage_event_workspace",
+                    columnNames = {"id", "workspace_id"})
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -109,15 +113,11 @@ public class LlmUsageEvent {
     @Column(name = "total_calls", nullable = false)
     private int totalCalls = 1;
 
-    /**
-     * USD cost of this unit of work. Null when the model's price is unknown — the sums exclude such
-     * a row rather than counting it as $0. Clamped into range by the frozen applied rates.
-     */
+    // Unknown prices remain null and are excluded from sums; they are not zero-cost usage.
     @Nullable
     @Column(name = "cost_usd", precision = 18, scale = 6)
     private BigDecimal costUsd;
 
-    /** When the work finished — the rollup and month-window time axis. */
     @NonNull
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
@@ -138,20 +138,15 @@ public class LlmUsageEvent {
     @Column(name = "funding_source", nullable = false, length = 16)
     private UsageFundingSource fundingSource = UsageFundingSource.INSTANCE;
 
-    /** Provenance: the {@code llm_model_price} row applied to this event. Soft ref (no FK). */
     @Nullable
     @Column(name = "applied_price_id")
     private Long appliedPriceId;
 
-    /** Provenance: the {@code workspace_llm_model} row applied to this event. Soft ref (no FK). */
     @Nullable
     @Column(name = "applied_workspace_model_id")
     private Long appliedWorkspaceModelId;
 
-    /**
-     * The rates actually applied, frozen. The two provenance ids above are live refs — repricing or
-     * deleting the row they point at must not change what a historical event was charged.
-     */
+    // Freeze applied rates so edits or deletion of price records cannot change historical charges.
     @Nullable
     @Column(name = "applied_per_1m_input_usd", precision = 18, scale = 8)
     private BigDecimal appliedPer1mInputUsd;
@@ -168,26 +163,17 @@ public class LlmUsageEvent {
     @Column(name = "applied_per_1m_cache_write_usd", precision = 18, scale = 8)
     private BigDecimal appliedPer1mCacheWriteUsd;
 
-    /**
-     * Which of the two independent spend records these token counts came from — see {@link
-     * UsageProvenance}. Nullable only because rows written before this column existed have no
-     * honest answer; every row this application writes carries one.
-     */
+    // Null provenance records no source-selection decision; it must not imply verified measurement.
     @Nullable
     @Enumerated(EnumType.STRING)
     @Column(name = "usage_provenance", length = 16)
     private UsageProvenance usageProvenance;
 
-    /**
-     * What Cohere reranking calls billed instead of tokens. No price has a rate for them, so a
-     * PRICED row never holds any: a row with search units is UNPRICED unless its model declares no
-     * metered cost.
-     */
+    // Rerank search units remain unpriced without a rate, unless the model declares no metered cost.
     @ColumnDefault("0")
     @Column(name = "search_units", nullable = false)
     private long searchUnits;
 
-    /** Calls with no usage receipt, retained after the source job and its counters are deleted. */
     @ColumnDefault("0")
     @Column(name = "unreported_calls", nullable = false, updatable = false)
     private int unreportedCalls;

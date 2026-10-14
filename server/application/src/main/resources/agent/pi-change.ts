@@ -1,8 +1,4 @@
-// Derive work/change/ from the captured repository and pinned inputs/context/change.json range. The
-// practice runner calls writeChangeView at its start, before any practice program runs.
-// The server stages commits separately in inputs/context/commits.json for verifiable citations.
-// Hunk lines in diff.patch carry [L<n>]: NEW coordinates for additions/context, OLD for deletions.
-// description.authored.md keeps original description.md line numbers after template removal.
+// Build the change view from the captured checkout and pinned range before any script reads it.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";

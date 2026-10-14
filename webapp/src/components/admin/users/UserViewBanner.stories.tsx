@@ -24,7 +24,6 @@ export const Default: Story = {
 	},
 };
 
-/** Roster sync created the account; the person has not signed in, and the banner says so. */
 export const UnclaimedAccount: Story = {
 	args: { unclaimed: true },
 	play: async ({ canvas }) => {

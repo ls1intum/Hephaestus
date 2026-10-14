@@ -12,17 +12,8 @@ import {
 	type MorePages,
 } from "@/runtime/tanstack-query/infinite-list";
 
-/**
- * A feed of the reader's own reviews, newest first, with its paging while earlier ones exist: a
- * practice level's reviews on one group, the reviews of one item, or every review of the reader's
- * work.
- */
 export type ReviewFeedState = PanelState<{ reviews: ProfileReview[] } & MorePages>;
 
-/**
- * A level with no reviews of its own: ready, empty, and with nothing more to load — `hasMore:
- * false` keeps the paging button off screen, so the callback is never reached.
- */
 export const EMPTY_REVIEW_FEED = {
 	status: "ready",
 	reviews: [],
@@ -31,7 +22,6 @@ export const EMPTY_REVIEW_FEED = {
 	onLoadMore: () => undefined,
 } satisfies ReviewFeedState;
 
-/** One infinite query as the feed's state: failed, loading, or the loaded pages as one list. */
 export function reviewFeedState(
 	query: InfiniteQueryLike<{ content?: ProfileReview[] }>,
 ): ReviewFeedState {
@@ -57,9 +47,7 @@ export interface FeedbackResponseControls {
 		recorded: FeedbackResponse | null,
 		change: FeedbackResponseRequest,
 	) => void;
-	/** "Clear response": back to no response at all. */
 	clear: (feedbackId: string) => void;
-	/** The response that stands: the one being written, else the recorded one. */
 	responseOf: (feedbackId: string, recorded: FeedbackResponse | null) => FeedbackResponseRequest;
 	/**
 	 * The response being written to each piece of feedback, from whichever surface; a clear is the
@@ -77,7 +65,6 @@ export function isEmptyFeedbackResponse(response: FeedbackResponseRequest): bool
 	);
 }
 
-/** A recorded response as the request that would write it again; a cleared one is empty. */
 export function responseRequestOf(
 	response: FeedbackResponse | null | undefined,
 ): FeedbackResponseRequest {
@@ -88,10 +75,6 @@ export function responseRequestOf(
 	};
 }
 
-/**
- * What a result's head line says: its summary, or the practice's name when it has none, as a met
- * result may not.
- */
 export function resultSummary({
 	summary,
 	practiceName,

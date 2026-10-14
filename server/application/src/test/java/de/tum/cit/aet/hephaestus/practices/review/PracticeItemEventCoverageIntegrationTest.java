@@ -13,16 +13,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/**
- * The check that "an authorable event no shipped integration raises" cannot ship — run over the real
- * wiring, which is the only place it means anything.
- *
- * <p>The unit test beside this one supplies a {@link ItemEventCoverage} it constructs itself, which proves
- * the method's <em>logic</em> but nothing about the <em>fact</em> — a fake derived from the options can
- * only ever agree with them. Here both sides come from the container: the offered vocabulary from every
- * registered {@code ItemDescriptor} bean, the compiled coverage from what the shipped manifests
- * actually declare.
- */
 class PracticeItemEventCoverageIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

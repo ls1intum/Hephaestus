@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
+import { expectSettledVisible } from "@/stories/overlay";
+
 import { definitionOf } from "@/components/admin/practice-editor/fixtures";
 
 import { ResetToCatalogDialog } from "./ResetToCatalogDialog";
@@ -25,12 +27,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Each field the reset replaces, this workspace's beside the catalog's, and nothing else. */
 export const PracticeDifferences: Story = {
 	play: async ({ args }) => {
 		const dialog = await screen.findByRole("alertdialog", {
 			name: "Reset “Explain the change” to the catalog?",
 		});
+		await expectSettledVisible(dialog);
 		const table = within(dialog).getByRole("table", { name: "What the reset changes" });
 		await expect(within(table).getByRole("rowheader", { name: "Review criteria" })).toBeVisible();
 		await expect(within(table).getByText("Our criteria")).toBeVisible();
@@ -62,6 +64,7 @@ export const GroupDifferences: Story = {
 	},
 	play: async () => {
 		const dialog = await screen.findByRole("alertdialog");
+		await expectSettledVisible(dialog);
 		await expect(within(dialog).getByRole("rowheader", { name: "Description" })).toBeVisible();
 		await expect(within(dialog).getByText("Make each change easy to review.")).toBeVisible();
 		await expect(within(dialog).getByText(/practices stay where they are/u)).toBeVisible();
@@ -74,6 +77,7 @@ export const NoDifferences: Story = {
 	},
 	play: async () => {
 		const dialog = await screen.findByRole("alertdialog");
+		await expectSettledVisible(dialog);
 		await expect(within(dialog).getByText("Nothing differs from the catalog.")).toBeVisible();
 		await expect(within(dialog).getByRole("button", { name: "Reset to catalog" })).toBeDisabled();
 	},
@@ -83,6 +87,7 @@ export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async () => {
 		const dialog = await screen.findByRole("alertdialog");
+		await expectSettledVisible(dialog);
 		await expect(within(dialog).queryByRole("table")).toBeNull();
 		await expect(within(dialog).getByRole("button", { name: "Reset to catalog" })).toBeDisabled();
 	},
@@ -92,6 +97,7 @@ export const LoadError: Story = {
 	args: { state: { status: "error", error: new Error("down"), onRetry: fn() } },
 	play: async () => {
 		const dialog = await screen.findByRole("alertdialog");
+		await expectSettledVisible(dialog);
 		await expect(within(dialog).getByText("We could not load the catalog’s version")).toBeVisible();
 		await expect(within(dialog).getByRole("button", { name: "Reset to catalog" })).toBeDisabled();
 	},
@@ -101,16 +107,17 @@ export const Resetting: Story = {
 	args: { pending: true },
 	play: async () => {
 		const dialog = await screen.findByRole("alertdialog");
+		await expectSettledVisible(dialog);
 		await expect(within(dialog).getByRole("button", { name: "Resetting…" })).toBeDisabled();
 		await expect(within(dialog).getByRole("button", { name: "Keep yours" })).toBeDisabled();
 	},
 };
 
-/** A refused reset shows what changed instead of trying again on its own. */
 export const ChangedWhileOpen: Story = {
 	args: { stale: true },
 	play: async () => {
 		const dialog = await screen.findByRole("alertdialog");
+		await expectSettledVisible(dialog);
 		await expect(within(dialog).getByRole("alert")).toHaveTextContent(/Nothing was reset/u);
 	},
 };

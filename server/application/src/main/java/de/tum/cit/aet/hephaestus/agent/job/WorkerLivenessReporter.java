@@ -67,7 +67,7 @@ public class WorkerLivenessReporter {
                 .register(meterRegistry);
     }
 
-    /** Must stay ordered ahead of {@code ReviewJobExecutor.start()}, or its first claim looks orphaned. */
+    // Publish liveness before the first claim, or the sweeper can mistake it for an orphan.
     @EventListener(ApplicationReadyEvent.class)
     @Order(1)
     public void start() {

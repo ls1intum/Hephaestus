@@ -50,17 +50,8 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub adapter for {@link LineNoteWriter}. Posts the new threads of a package as one {@code
- * addPullRequestReview} mutation: one notification per review, all-or-nothing for the batch.
- *
- * <p>Each thread's first comment carries the copy marker and a hidden correlation tag with its
- * delivery key. Before any create, the pull request's review threads are read completely and the
- * copies of the package are indexed by key; an item with a copy is never posted again, and no copy
- * is ever minimized or recreated, outdated or resolved alike. The whole batch is fenced before the
- * one request, so a lost response leaves every thread in it unconfirmed rather than absent.
- *
- * <p>The review is anchored to {@link FeedbackTarget#version}, and a copy is verified at its
- * original commit and lines, so an outdated or resolved thread still counts as the copy it is.
+ * One review mutation posts all threads atomically. A lost response leaves every thread unconfirmed.
+ * Verify copies at {@link FeedbackTarget#version}; resolved or outdated threads still count.
  */
 @Component
 @ConditionalOnServerRole
@@ -69,12 +60,8 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubLineNoteWriter.class);
 
-    /**
-     * GitHub caps {@code reviewThreads(first:)} at 100; we page through with the connection cursor.
-     */
     private static final int THREADS_PAGE_SIZE = 100;
 
-    /** Hard cap on pagination; a scan that reaches it with more pages proves nothing. */
     private static final int MAX_THREAD_PAGES = 20;
 
     private final GitHubGraphQlClientProvider gitHubProvider;
@@ -322,11 +309,7 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         }
     }
 
-    /**
-     * The one review mutation for every candidate. Only a returned comment id acknowledges a
-     * thread; any other outcome — no response, errors, an exception or a missing id — may still
-     * have created it.
-     */
+    // Only a returned comment id acknowledges creation; errors or missing ids can follow a provider write.
     private List<CopyReceipt> postBatch(
             long scopeId, String prNodeId, @Nullable String commitOid, List<LineNote> candidates) {
         List<Map<String, Object>> threads = new ArrayList<>(candidates.size());
@@ -374,11 +357,7 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         }
     }
 
-    /**
-     * Matches returned comment ids back to their feedback by the exact correlation tag in each
-     * body: two pieces of feedback can anchor to one line, so coordinates alone cannot bind a
-     * comment to its feedback.
-     */
+    // Match receipts by correlation tag; multiple feedback copies can share coordinates.
     private static List<CopyReceipt> postedReceipts(
             @Nullable List<Map<String, Object>> comments, List<LineNote> candidates) {
         Map<String, SummaryHandle> commentByCk = new HashMap<>();
@@ -409,11 +388,7 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         return receipts;
     }
 
-    /**
-     * The package's copies on the pull request, by delivery key, from a complete scan: a page
-     * budget, a lost cursor, a missing connection or an unanswered {@code hasNextPage} fails the
-     * scan instead of passing for absence. A key whose copies do not verify is kept as a conflict.
-     */
+    // Partial pagination cannot prove absence; retain mismatched copies as conflicts.
     private Map<String, Copy> indexCopies(
             long scopeId, PrCoordinates pr, List<LineNote> items, @Nullable String commitOid) {
         Map<String, LineNote> expected = new HashMap<>();
@@ -472,10 +447,6 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         }
     }
 
-    /**
-     * Indexes one review thread under the correlation key of its first comment, if it is a package
-     * copy.
-     */
     private static void indexThread(
             @Nullable Object node,
             Map<String, LineNote> expected,
@@ -510,10 +481,6 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         }
     }
 
-    /**
-     * The viewer's own comment, with the exact body this writer posts, at the item's original
-     * lines and commit.
-     */
     private static boolean sameCopy(
             Map<?, ?> thread, Map<?, ?> comment, String body, LineNote item, @Nullable String commitOid) {
         FeedbackAnchor diff = item.anchor();
@@ -538,10 +505,6 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         return value instanceof Number number ? number.intValue() : null;
     }
 
-    /**
-     * The commit the reviewed work was captured at; blank means none, since an empty GitObjectID
-     * fails the batch.
-     */
     private static @Nullable String commitOid(FeedbackTarget target) {
         try {
             return ScmVersion.reviewedHead(target.version());
@@ -567,9 +530,6 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         return body + "\n" + ScmFeedbackFormatter.deliveryTag(item.writeKey());
     }
 
-    /**
-     * A copy of a package item; {@code verified} false when it carries the key but not the item.
-     */
     private record Copy(
             boolean verified,
             String threadId,
@@ -581,7 +541,6 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         }
     }
 
-    /** Builds a GitHub review-thread payload from a {@link FeedbackAnchor}. */
     private static Map<String, Object> buildThread(FeedbackAnchor diff, String body) {
         Map<String, Object> thread = new HashMap<>();
         thread.put("path", diff.path());

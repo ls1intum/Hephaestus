@@ -75,10 +75,6 @@ export interface Work {
 	outputTokens: number;
 }
 
-/**
- * A turn's budget: one piece per practice it carries, and never less than three feedback, since a turn
- * of one practice still reads before it records.
- */
 export function turnBudget(practices: number, perPractice: Work): Work {
 	if (!Number.isInteger(practices) || practices < 1) {
 		throw new Error(`practices must be a positive integer, got: ${practices}`);
@@ -111,7 +107,6 @@ export function spent(work: Work, budget: Work): boolean {
 	return work.modelCalls >= budget.modelCalls || work.outputTokens >= budget.outputTokens;
 }
 
-/** The practices with no recorded problem, in the order the review asked about them. */
 export function missingSlugs(all: readonly string[], observed: readonly string[]): string[] {
 	const seen = new Set(observed);
 	return all.filter((slug) => !seen.has(slug));

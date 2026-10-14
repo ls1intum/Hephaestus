@@ -26,15 +26,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Outline's implementation of the agent {@link DocumentProjection} SPI — the sole agent-facing reader of the
- * mirror; the agent consumes the projected payload, never the schema.
- *
- * <p>A document removed upstream or size-cap evicted projects as a marker rather than being dropped, so a link to
- * a vanished document still resolves to a placeholder. Reads are pure — the {@code readOnly} transaction enforces
- * that this projector never stamps {@code last_materialized_at}.
- *
- * <p>Authorship projects as-is; the account id resolves lazily per connection and batch (memoised per subject) through
- * {@link OutlineIdentityResolver}. An unlinked author degrades to name-only — no account id is ever stamped on the row.
+ * Missing or evicted documents project as absence markers; reads must not alter materialization state.
+ * Resolve authors through {@link OutlineIdentityResolver}; unlinked authors retain names without account ids.
  */
 @Component
 @ConditionalOnCaptureRole
@@ -190,7 +183,6 @@ public class OutlineDocumentProjector implements DocumentProjection {
                 doc.getDocumentId());
     }
 
-    /** Collection labels use both the connection and native collection id. */
     private Map<CollectionKey, String> collectionNames(long workspaceId) {
         Map<CollectionKey, String> names = new HashMap<>();
         for (OutlineCollection collection : collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(workspaceId)) {
@@ -230,7 +222,7 @@ public class OutlineDocumentProjector implements DocumentProjection {
         return List.copyOf(result);
     }
 
-    /** Each connection has its own native author namespace and per-batch resolution cache. */
+    // Cache author resolution per connection because native identities are tenant-specific.
     private AuthorContext authorContext(OutlineDocument document, Map<Long, AuthorContext> contexts) {
         return contexts.computeIfAbsent(document.getConnectionId(), ignored -> {
             var connection = connectionService.findInWorkspace(document.getWorkspaceId(), document.getConnectionId());

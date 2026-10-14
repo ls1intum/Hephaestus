@@ -29,15 +29,8 @@ import {
 import type { TraceStage } from "./lineage-story";
 import type { TraceNode } from "./review-trace";
 
-/**
- * The stretches of time a review's timing names, on the overview and on a trace: how long the
- * review waited to be asked for after the event, how long it waited in the queue, how long it
- * prepared and executed, and how long until its feedback reached the developer. The overview splits
- * the run into Preparation and Execution; one review records only its whole Run.
- */
 export type TraceSpanKind = "asked" | "queue" | "preparation" | "execution" | "run" | "delivery";
 
-/** Each span's word, which the overview's review time and a review's trace use for the same stretch. */
 export const TRACE_SPAN_LABELS: Record<TraceSpanKind, string> = {
 	asked: "Until asked",
 	queue: "Queue",
@@ -47,7 +40,6 @@ export const TRACE_SPAN_LABELS: Record<TraceSpanKind, string> = {
 	delivery: "To developer",
 };
 
-/** The spans one review's record can measure. */
 export type MeasuredSpanKind = Extract<TraceSpanKind, "asked" | "queue" | "run" | "delivery">;
 
 export interface TraceSpan {
@@ -114,10 +106,6 @@ function span(
 	};
 }
 
-/**
- * The review a trace stands on: the one whose detail the page read, else the review of the graph's
- * root result, else the graph's first review.
- */
 export function traceReview(
 	records: LineageRecords,
 	detail: ReviewDetail | undefined,
@@ -129,7 +117,6 @@ export function traceReview(
 	return records.reviews.find((review) => review.id === rootReviewId) ?? records.reviews[0];
 }
 
-/** The feedback written from the review's own results. */
 function reviewFeedback(records: LineageRecords, review: ReviewRef | undefined): LineageFeedback[] {
 	if (review === undefined) {
 		return records.feedback;
@@ -140,7 +127,6 @@ function reviewFeedback(records: LineageRecords, review: ReviewRef | undefined):
 	return records.feedback.filter((entry) => entry.basis.some((id) => own.has(id)));
 }
 
-/** The feedback the trace stands on: the piece itself, a result's pieces, or the review's own. */
 function feedbackOnPath(
 	records: LineageRecords,
 	review: ReviewRef | undefined,
@@ -155,7 +141,6 @@ function feedbackOnPath(
 	return reviewFeedback(records, review);
 }
 
-/** When the first runtime job of the review was picked up by a worker. */
 function pickedUpAt(detail: ReviewDetail | undefined): Date | undefined {
 	const starts = (detail?.runtime?.jobs ?? [])
 		.map((job) => job.startedAt)
@@ -164,11 +149,6 @@ function pickedUpAt(detail: ReviewDetail | undefined): Date | undefined {
 	return starts[0];
 }
 
-/**
- * Where the time of the path went, stage by stage: asked for after the event, the queue, the run,
- * until the feedback on the path first reached the developer. A span the record cannot tell is left
- * out, never guessed: the queue and the run need the review's runtime jobs, which expire.
- */
 export function traceSpans(
 	lineage: ReviewLineage,
 	here: TraceNode | undefined,
@@ -216,25 +196,16 @@ export interface FeedbackLoss {
 	title: string;
 	text: string;
 	short: string;
-	/**
-	 * How much the loss asks of an admin: red where sending failed, amber where it was withheld, and
-	 * neutral where an admin decided or newer feedback took its place.
-	 */
 	tone: LossTone;
 }
 
 type LossTone = "destructive" | "warning" | "secondary";
 
-/**
- * Why a piece of feedback did not reach the developer or no longer stands; undefined while it
- * stands or waits. The graph records no stop reason, so a withheld piece says only that it was
- * withheld.
- */
+// The graph supplies no stop reason; withheld feedback cannot be given an invented explanation.
 export function feedbackLoss(feedback: ReviewBoundFeedback): FeedbackLoss | undefined {
 	if (feedback.withdrawn) {
 		return {
 			title: "Withdrawn",
-			// A ready piece can be withdrawn too: only a recorded delivery says it was delivered.
 			text: reachedDeveloper(feedback)
 				? "An admin withdrew it after it was delivered."
 				: "An admin withdrew it before it reached the developer.",
@@ -291,7 +262,6 @@ export function feedbackLoss(feedback: ReviewBoundFeedback): FeedbackLoss | unde
 	}
 }
 
-/** "withheld (2), rejected (1)": the reasons of several lost pieces, most first. */
 function lossesByReason(losses: readonly { short: string }[]): string {
 	const counts = new Map<string, number>();
 	for (const loss of losses) {
@@ -303,10 +273,6 @@ function lossesByReason(losses: readonly { short: string }[]): string {
 		.join(", ");
 }
 
-/**
- * Lost feedback in the tone of what it asks of an admin, the strongest of its pieces: a delivery
- * failure is red, a withheld piece amber, and a piece an admin held back is neutral.
- */
 function lost(losses: readonly FeedbackLoss[]): { tone: LossTone; icon: LucideIcon } {
 	let tone: LossTone = "secondary";
 	for (const loss of losses) {
@@ -317,10 +283,9 @@ function lost(losses: readonly FeedbackLoss[]): { tone: LossTone; icon: LucideIc
 	return { tone, icon: EyeOffIcon };
 }
 
-/** A not-met result the review told nobody about: worth a look, never a failure. */
+// Missing feedback for a Not met result warrants attention; it does not prove a delivery failure.
 const NOT_TOLD = { tone: "warning", icon: EyeOffIcon } as const;
 
-/** The error the review's last failed runtime job recorded, and how many attempts it took. */
 function runtimeFailure(detail: ReviewDetail | undefined): { error?: string; attempts: number } {
 	const jobs = detail?.runtime?.jobs ?? [];
 	const failed = [...jobs].reverse().find((job) => hasText(job.errorMessage));
@@ -333,7 +298,6 @@ function runtimeFailure(detail: ReviewDetail | undefined): { error?: string; att
 	};
 }
 
-/** A review that stopped or still runs is its own bottleneck; a complete one is not. */
 function reviewBottleneck(
 	review: ReviewRef,
 	detail: ReviewDetail | undefined,
@@ -404,7 +368,6 @@ function reviewBottleneck(
 	}
 }
 
-/** The not-met results on the path that led to no feedback at all. */
 function silentOnPath(records: LineageRecords, review: ReviewRef, here: TraceNode | undefined) {
 	if (here?.kind === "feedback") {
 		return [];
@@ -466,10 +429,6 @@ function lossBottleneck(
 	};
 }
 
-/**
- * What a path still on its way waits on: an admin's approval, a conversation that has not come, a
- * send in progress, or a conversation that did not record showing it.
- */
 function waitBottleneck(
 	records: LineageRecords,
 	review: ReviewRef,
@@ -534,7 +493,6 @@ function spanLength(entry: TraceSpan): number {
 	return entry.to.getTime() - entry.from.getTime();
 }
 
-/** The longest wait of half an hour or more. */
 function timeBottleneck(
 	lineage: ReviewLineage,
 	records: LineageRecords,
@@ -568,12 +526,6 @@ function timeBottleneck(
 	};
 }
 
-/**
- * The bottleneck of the path the trace stands on, read from the graph and, where the page has it,
- * the review's detail: its stop reason, its runtime jobs and the event that started it. It names
- * the first thing that stopped the path: the review itself, then lost feedback; where nothing
- * stopped it, what it still waits on, else the longest wait.
- */
 export function traceBottleneck(
 	lineage: ReviewLineage,
 	here: TraceNode | undefined,

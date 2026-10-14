@@ -243,7 +243,7 @@ public class ScanReportTestData {
         var member = members.findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(
                         review.getWorkspaceId(), review.getId(), result.getPracticeId(), result.getItemId())
                 .orElseThrow();
-        var job = UUID.randomUUID();
+        var job = data.job(result);
         member.setState(ReviewItemState.JUDGED);
         member.setResultId(result.getId());
         member.setJobId(job);

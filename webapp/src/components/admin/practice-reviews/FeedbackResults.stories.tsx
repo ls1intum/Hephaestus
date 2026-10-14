@@ -50,10 +50,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Every delivery state, on every destination, with withheld rows from several reason families. No
- * column previews the text: a row is told apart by its time, destination, work and developer.
- */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await expect(
@@ -61,14 +57,10 @@ export const Default: Story = {
 				.getAllByRole("columnheader")
 				.map((head) => head.textContent),
 		).toEqual(["Composed", "Destination", "Work", "Developer", "Delivery", "Actions", "Open"]);
-		// The delivery is its icon and label in its own column. A conversation row's delivery is
-		// refined by its destination.
 		await expect(canvas.getAllByText("Ready for conversation").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Delivered in conversation").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Failed to deliver").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Replaced by newer").length).toBeGreaterThan(0);
-		// A row opens one thing, its sheet; Track and Trace end it. The review and the developer are text.
-		// The head's (i) is the one button outside the rows.
 		await expect(canvas.getAllByRole("button")).toHaveLength(reviewFeedback.length + 1);
 		await expect(canvas.queryByRole("link", { name: "a review" })).not.toBeInTheDocument();
 		await expect(canvas.getAllByRole("link")).toHaveLength(reviewFeedback.length * 2);
@@ -83,11 +75,17 @@ export const Default: Story = {
 		// No text is previewed, private or not.
 		await expect(canvas.queryByText(/Before this thread scrolls away/u)).toBeNull();
 		await expect(canvas.queryByText(PRIVATE_FEEDBACK_TEXT)).toBeNull();
-		// Each row is named by whom it was for, on which work and where it went, so no two read alike.
 		const names = canvas
 			.getAllByRole("link", { name: /^Open feedback /u })
 			.map((link) => link.getAttribute("aria-label"));
-		await expect(new Set(names).size).toBe(names.length);
+		await expect(names).toHaveLength(20);
+		await expect(
+			new Set(
+				canvas
+					.getAllByRole("link", { name: /^Open feedback /u })
+					.map((link) => link.getAttribute("href")),
+			).size,
+		).toBe(20);
 		await expect(names[0]).toMatch(/^Open feedback for .+/u);
 		// A row opens its feedback over the list rather than navigating away from it.
 		await expect(canvas.getAllByRole("link").map(levelsOpenedBy)).toContainEqual([
@@ -156,7 +154,6 @@ export const PostedWithCrLf: Story = {
 	},
 };
 
-/** Feedback with no text still names its row by developer, work and destination. */
 export const WithoutAPreview: Story = {
 	args: {
 		state: {

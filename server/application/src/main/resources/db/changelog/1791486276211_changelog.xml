@@ -913,7 +913,7 @@ CREATE TABLE review_batch (
     (kind<>'scm.repository' AND from_at IS NOT NULL AND to_at IS NOT NULL AND from_at<to_at)),
   CONSTRAINT ck_review_batch_status CHECK (status IN ('AWAITING_CONFIRMATION','RUNNING','PAUSED','COMPLETED','CANCELLED')),
   CONSTRAINT ck_review_batch_pause CHECK ((status = 'PAUSED') = (pause_reason IS NOT NULL)),
-  CONSTRAINT ck_review_batch_pause_reason CHECK (pause_reason IS NULL OR pause_reason IN ('BUDGET_EXHAUSTED','REVIEW_MODEL_UNBOUND','WORKSPACE_UNAVAILABLE')),
+  CONSTRAINT ck_review_batch_pause_reason CHECK (pause_reason IS NULL OR pause_reason IN ('BUDGET_EXHAUSTED','REVIEW_MODEL_UNBOUND','WORKSPACE_UNAVAILABLE','PAUSED_BY_ADMIN')),
   CONSTRAINT ck_review_batch_counts CHECK (estimated_items >= 0 AND submitted_count >= 0 AND skipped_count >= 0 AND failed_count >= 0),
   CONSTRAINT ck_review_batch_cost CHECK (estimated_cost_usd IS NULL OR estimated_cost_usd >= 0),
   CONSTRAINT ck_review_batch_version CHECK (version >= 0)
@@ -977,7 +977,7 @@ CREATE TABLE review (
   CONSTRAINT ck_review_inventory CHECK(inventory_receipt IS NULL OR (kind='SCAN' AND jsonb_typeof(inventory_receipt)='object')),
   CONSTRAINT ck_review_checks CHECK(jsonb_typeof(checks)='object'),
   CONSTRAINT ck_review_report CHECK(report IS NULL OR (kind='SCAN' AND jsonb_typeof(report)='object')),
- CONSTRAINT ck_review_stop_reason CHECK(stop_reason IS NULL OR stop_reason IN ('TIMED_OUT','EXECUTION_FAILED','PREPARATION_FAILED','PROCESSING_FAILED','PERSON_DATA_ERASED','STALE_ROLLOUT_REVISION','CANCELLED_BY_ADMIN','REPLACED','LEGACY_FAILURE','BUDGET_EXHAUSTED','DEADLINE_EXCEEDED','CANCELLED_BY_REQUESTER','EXECUTION_INCOMPLETE','RESULT_WITHHELD','READINESS_REFUSED','SUSPECT_LISTING','INVENTORY_INCOMPLETE','BUDGET','DEADLINE','CANCELLED','ENUMERATION_FAILED','ENUMERATION_LIMIT','NO_SCAN_PRACTICES','MODEL_CHANGED','MODEL_UNAVAILABLE','SOURCE_UNAVAILABLE','ERROR','LEGACY_SCOPE_UNKNOWN','CONTRACT_CHANGED'))
+ CONSTRAINT ck_review_stop_reason CHECK(stop_reason IS NULL OR stop_reason IN ('TIMED_OUT','EXECUTION_FAILED','PREPARATION_FAILED','PROCESSING_FAILED','PERSON_DATA_ERASED','STALE_ROLLOUT_REVISION','CANCELLED_BY_ADMIN','REPLACED','LEGACY_FAILURE','EXECUTION_INCOMPLETE','RESULT_WITHHELD','READINESS_REFUSED','SUSPECT_LISTING','BUDGET','DEADLINE','CANCELLED','ENUMERATION_FAILED','ENUMERATION_LIMIT','NO_SCAN_PRACTICES','MODEL_CHANGED','MODEL_UNAVAILABLE','ERROR','LEGACY_SCOPE_UNKNOWN','CONTRACT_CHANGED'))
 );
 
 
@@ -1328,7 +1328,7 @@ CREATE TABLE feedback_copy (
   path text,
   start_line integer, end_line integer,
   side varchar(3),
-  stop_reason varchar(48), last_error varchar(512),
+  stop_reason varchar(48), readback varchar(16), last_error varchar(512),
   state varchar(16) NOT NULL DEFAULT 'PLANNED',
   write_started_at timestamptz,
   write_key text, write_marker text,
@@ -1344,6 +1344,7 @@ CREATE TABLE feedback_copy (
     REFERENCES feedback(id, workspace_id) ON DELETE CASCADE,
   CONSTRAINT sfk_feedback_copy_chat FOREIGN KEY (chat_message_id, workspace_id)
     REFERENCES chat_message(id, workspace_id) ON DELETE SET NULL (chat_message_id),
+  CONSTRAINT ck_feedback_copy_readback CHECK(readback IS NULL OR readback IN ('ABSENT','TRANSIENT','UNKNOWN')),
   CONSTRAINT ck_feedback_copy_kind CHECK (kind IN ('SUMMARY','LINE_NOTE','FILE_NOTE','CHAT_TURN')),
   CONSTRAINT ck_feedback_copy_side CHECK(side IS NULL OR side IN ('OLD','NEW')),
   CONSTRAINT ck_feedback_copy_side_scope CHECK(kind IN ('LINE_NOTE','FILE_NOTE') OR side IS NULL),
@@ -1798,9 +1799,12 @@ END $$;
 
 CREATE TEMP TABLE _cutover_offer ON COMMIT DROP AS
  SELECT b.entry_type,b.slug,COALESCE(e.kind,CASE WHEN b.old_definition->>'subject'='REVIEWER' THEN 'scm.pull_request_review' ELSE pg_temp.cutover_kind(b.kind) END) AS kind,
- COALESCE(e.base->>'groupSlug',b.old_definition->>'groupSlug') AS group_slug,COALESCE(e.definition,b.definition) AS definition
+ CASE WHEN b.entry_type='PRACTICE' THEN CASE WHEN e.definition IS NOT NULL THEN e.definition->>'groupSlug' ELSE b.old_definition->>'groupSlug' END END AS group_slug,
+ CASE WHEN b.entry_type='PRACTICE' AND e.definition IS NOT NULL THEN e.definition->'definition' ELSE COALESCE(e.definition,b.definition) END AS definition
  FROM _cutover_bundle b LEFT JOIN catalog_entry e ON e.entry_type=b.entry_type AND e.slug=b.slug WHERE e.excluded_at IS NULL
- UNION ALL SELECT e.entry_type,e.slug,e.kind,e.base->>'groupSlug',e.definition FROM catalog_entry e WHERE e.definition IS NOT NULL AND e.excluded_at IS NULL AND NOT EXISTS(SELECT 1 FROM _cutover_bundle b WHERE b.entry_type=e.entry_type AND b.slug=e.slug);
+ UNION ALL SELECT e.entry_type,e.slug,e.kind,CASE WHEN e.entry_type='PRACTICE' THEN e.definition->>'groupSlug' END,
+ CASE WHEN e.entry_type='PRACTICE' THEN e.definition->'definition' ELSE e.definition END
+ FROM catalog_entry e WHERE e.definition IS NOT NULL AND e.excluded_at IS NULL AND NOT EXISTS(SELECT 1 FROM _cutover_bundle b WHERE b.entry_type=e.entry_type AND b.slug=e.slug);
 UPDATE practice p SET catalog_slug=o.slug,catalog_base=jsonb_build_object('kind',o.kind,'groupSlug',o.group_slug,'definition',o.definition)
  FROM _cutover_old_practice source JOIN _cutover_old_practice_catalog_installation i ON i.workspace_id=source.workspace_id AND i.provenance_linked_at IS NULL
  LEFT JOIN _cutover_old_practice_group g ON g.id=source.practice_group_id JOIN _cutover_offer o ON o.entry_type='PRACTICE' AND o.slug=source.slug AND g.slug IS NOT DISTINCT FROM o.group_slug
@@ -3005,7 +3009,7 @@ WITH inserted AS(INSERT INTO practice_version(workspace_id,practice_id,number,de
  WHERE u.definition IS DISTINCT FROM (SELECT definition FROM practice_version WHERE id=u.previous_version_id) RETURNING id,practice_id)
 UPDATE practice p SET current_version_id=i.id,updated_at=transaction_timestamp() FROM inserted i WHERE p.id=i.practice_id;
 UPDATE practice SET catalog_base=jsonb_set(catalog_base,'{definition}',pg_temp.cutover_executable_definition(catalog_base->'definition','practice '||id::text||' catalog base',catalog_slug)) WHERE catalog_base IS NOT NULL;
-UPDATE catalog_entry SET definition=pg_temp.cutover_executable_definition(definition,'catalog '||slug,slug),
+UPDATE catalog_entry SET definition=jsonb_set(definition,'{definition}',pg_temp.cutover_executable_definition(definition->'definition','catalog '||slug,slug)),
  base=CASE WHEN base IS NOT NULL THEN jsonb_set(base,'{definition}',pg_temp.cutover_executable_definition(base->'definition','catalog '||slug||' base',slug)) END
  WHERE entry_type='PRACTICE' AND definition IS NOT NULL;
 CREATE INDEX idx_identity_account ON identity(account_id);

@@ -11,7 +11,7 @@ public enum UsageProvenance {
      */
     PROXY,
 
-    /** Rows recorded before one source was selected whole: a per-bucket maximum of both. No longer written. */
+    /** Per-bucket maxima from both usage sources, without whole-vector provenance. */
     MERGED,
 
     /** Neither source had tokens. The row is UNPRICED: this is an admission, not a $0. */

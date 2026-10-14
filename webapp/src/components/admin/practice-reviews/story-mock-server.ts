@@ -52,11 +52,6 @@ import {
 } from "./fixtures";
 import { type LineageKind, reviewLineage } from "./lineage-fixtures";
 
-// These handlers filter, sort and paginate the fixture the way the server does. A mock that answers
-// every URL with the same array leaves a story that clicks a facet testing nothing. MSW matches the
-// first handler that fits, and `:reviewId` fits any segment, so every fixed path under
-// `/practices/reviews/` comes before the review's own.
-
 const PAGE_SIZE = 25;
 
 /**
@@ -84,7 +79,6 @@ function matchesAny(selected: string[], actual: readonly (string | null)[]): boo
 	);
 }
 
-/** A boolean filter: unset selects every row, `true`/`false` the rows that are or are not. */
 function flag(url: URL, name: string, actual: boolean): boolean {
 	const asked = single(url, name);
 	return asked === undefined || asked === String(actual);
@@ -95,7 +89,6 @@ function equals(url: URL, name: string, actual: string | null | undefined): bool
 	return !hasText(asked) || asked === actual;
 }
 
-/** The scope every list shares: one review, one item, one kind of item. */
 function withinScope(url: URL, row: { reviewId: string; item: ItemRef | null }) {
 	return (
 		equals(url, "reviewId", row.reviewId) &&
@@ -129,8 +122,6 @@ function pageOf<T>(rows: readonly T[], url: URL) {
 	};
 }
 
-/** A `PagedModel` page: the rows, and the page facts under `page`. */
-/** A Spring `Page`, as every list returns it: the page facts beside the rows. */
 function springPage(rows: readonly unknown[], url: URL) {
 	const page = pageOf(rows, url);
 	return HttpResponse.json({
@@ -206,8 +197,6 @@ function filterFeedback(rows: readonly ReviewFeedback[], url: URL) {
 function filterReviews(rows: readonly ReviewSummary[], url: URL) {
 	return rows.filter(
 		(row) =>
-			// Every filter, intersected, exactly as the endpoint applies them. Honouring only
-			// `status` here would let a story "prove" a date range that the screen never sent.
 			withinScope(url, { reviewId: row.id, item: row.item }) &&
 			matches(values(url, "status"), row.status) &&
 			equals(url, "kind", row.kind) &&
@@ -254,7 +243,6 @@ function sortResults(rows: readonly ReviewResult[], url: URL) {
 	);
 }
 
-/** The items the fixture's reviews looked at, each once, as `listReviewItems` pages them. */
 function reviewedItems(): ItemRef[] {
 	const byId = new Map<string, ItemRef>();
 	for (const review of reviews) {
@@ -267,7 +255,6 @@ function itemNamed(itemId: string): ItemRef {
 	return reviewedItems().find((item) => item.id === itemId) ?? { ...itemTrace.item, id: itemId };
 }
 
-/** The review whose item is this one, so an item's trace and events agree with a real review. */
 function reviewOfItem(itemId: string): ReviewSummary | undefined {
 	return reviews.find((review) => review.item.id === itemId);
 }
@@ -312,7 +299,6 @@ const createDecisionSchema = z.object({
 	contentDigest: z.string().optional(),
 });
 
-/** The practices' outcome and operational counts, as `getReviewEvidenceOutcomes` returns them. */
 const evidenceOutcomes: ReviewEvidenceOutcome[] = practiceCounts.map((counts) => ({
 	practiceSlug: counts.practiceSlug,
 	practiceName: counts.practiceName,
@@ -324,20 +310,11 @@ const evidenceOutcomes: ReviewEvidenceOutcome[] = practiceCounts.map((counts) =>
 export interface ReviewMockOptions {
 	results?: ReviewResult[];
 	feedback?: ReviewFeedback[];
-	/**
-	 * Answer a result query with a 400 unless it asks for this ordering. A screen that shows only
-	 * the results most worth acting on has to request that ordering, and a mock that ignores
-	 * `sort` answers a screen that forgot to ask exactly as it answers one that remembered.
-	 */
 	requireResultSort?: string;
-	/** The role `members/me` answers with; an admin by default, as these screens need one. */
 	role?: Parameters<typeof ownMembership>[0];
 }
 
-/**
- * Spread into a story's or a route test's handlers with the handlers it overrides placed *before*
- * these: MSW matches the first handler that fits.
- */
+/** Place overrides before these handlers; MSW uses the first match. */
 export function reviewHandlers({
 	results,
 	feedback,
@@ -523,7 +500,6 @@ export function feedbackCountHandlers(rows: readonly ReviewFeedback[] = reviewFe
 	];
 }
 
-/** The reviews list and one review's detail, usage, scripts, checks and cancellation. */
 function reviewDetailHandlers() {
 	return [
 		http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
@@ -544,7 +520,6 @@ function reviewDetailHandlers() {
 			({ params }) =>
 				HttpResponse.json(reviewFeedbackChecksOf(reviewDetail(String(params.reviewId)))),
 		),
-		// Already ended answers 200 with the review as it is; asking jobs to stop answers 202.
 		http.post("*/workspaces/:workspaceSlug/practices/reviews/:reviewId/cancel", ({ params }) => {
 			const review = reviewDetail(String(params.reviewId));
 			const active = review.status === "QUEUED" || review.status === "RUNNING";
@@ -561,7 +536,6 @@ function reviewDetailHandlers() {
 	];
 }
 
-/** The items reviewed, and one item's trace, provider facts and events. */
 function itemHandlers() {
 	return [
 		http.get("*/workspaces/:workspaceSlug/practices/items", ({ request }) => {
@@ -575,7 +549,6 @@ function itemHandlers() {
 		http.get("*/workspaces/:workspaceSlug/practices/items/:itemId", ({ params }) =>
 			HttpResponse.json(itemNamed(String(params.itemId))),
 		),
-		// Whichever item is asked for is named as asked, so a level reads as that item's own trace.
 		http.get("*/workspaces/:workspaceSlug/practices/items/:itemId/trace", ({ params }) => {
 			const itemId = String(params.itemId);
 			const review = reviewOfItem(itemId);
@@ -583,7 +556,6 @@ function itemHandlers() {
 				review === undefined ? { ...itemTrace, item: itemNamed(itemId) } : itemTraceOf(review),
 			);
 		}),
-		// A pull request reads as merged and an issue as open; other work reports no facts.
 		http.get("*/workspaces/:workspaceSlug/practices/items/:itemId/facts", ({ params }) => {
 			const item = itemNamed(String(params.itemId));
 			if (item.kind === "scm.pull_request") {
@@ -604,7 +576,6 @@ function itemHandlers() {
 	];
 }
 
-/** The catalog every review surface names practices and groups from. */
 function catalogHandlers() {
 	return [
 		http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>

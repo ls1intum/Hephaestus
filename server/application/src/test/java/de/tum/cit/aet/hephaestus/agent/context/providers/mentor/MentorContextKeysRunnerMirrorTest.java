@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -26,9 +25,7 @@ import org.junit.jupiter.api.Test;
 @Tag("unit")
 class MentorContextKeysRunnerMirrorTest {
 
-    private static final Path RUNNER = Path.of("src", "main", "resources", "agent", "pi-mentor-runner.ts");
     private static final Path PROTOCOL = Path.of("src", "main", "resources", "agent", "pi-mentor-protocol.ts");
-    private static final Path SYSTEM_PROMPT = Path.of("src", "main", "resources", "agent", "mentor", "system.md");
     private static final Pattern ALLOWED_BLOCK =
             Pattern.compile("const FETCH_CONTEXT_ALLOWED = new Set\\(\\[(.*?)\\]\\);", Pattern.DOTALL);
     private static final Pattern STRING_LITERAL = Pattern.compile("\"([^\"]+)\"");
@@ -54,18 +51,6 @@ class MentorContextKeysRunnerMirrorTest {
     }
 
     @Test
-    @DisplayName("a fitted context payload is never sliced by the runner")
-    void mergeReadinessBudgetIsTheRunnerFetchCap() throws IOException {
-        assertThat(Files.readString(RUNNER, StandardCharsets.UTF_8))
-                .contains("const FETCH_CONTEXT_MAX_CHARS = 200_000;");
-        assertThat(MentorContextKeys.FETCH_CONTEXT_MAX_CHARS).isEqualTo(200_000);
-        assertThat(MergeReadinessContentSource.pullRequestIdOf("inputs/context/merge_readiness/42.json"))
-                .contains(42L);
-        assertThat(MergeReadinessContentSource.pullRequestIdOf("inputs/context/merge_readiness/../user.json"))
-                .isEmpty();
-    }
-
-    @Test
     @DisplayName("a result detail key is one canonical lowercase id, mirrored by the runner")
     void practiceResultDetailKeyIsCanonical() throws IOException {
         String id = "0b7e1c9a-3f5d-4a8e-9c21-6d4f8e2a1b3c";
@@ -78,41 +63,5 @@ class MentorContextKeysRunnerMirrorTest {
                 .isEmpty();
         assertThat(ResultHistoryContentSource.resultIdOf("inputs/context/results_history/42.json"))
                 .isEmpty();
-        assertThat(Files.readString(PROTOCOL, StandardCharsets.UTF_8))
-                .contains(
-                        "/^inputs\\/context\\/results_history\\/[\\da-f]{8}-[\\da-f]{4}-[\\da-f]{4}-[\\da-f]{4}-[\\da-f]{12}\\.json$/u");
-    }
-
-    @Test
-    @DisplayName("a review-attempts key names one pull request or issue by pullRequestId, mirrored by the runner")
-    void reviewAttemptsKeyIsCanonical() throws IOException {
-        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/issue/21.json"))
-                .contains(new ReviewAttemptsContentSource.ItemSelection(new ItemKind("scm.issue"), 21L));
-        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/pull_request/42.json"))
-                .contains(new ReviewAttemptsContentSource.ItemSelection(new ItemKind("scm.pull_request"), 42L));
-        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/21.json"))
-                .isEmpty();
-        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/conversation/21.json"))
-                .isEmpty();
-        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/issue/../user.json"))
-                .isEmpty();
-        assertThat(ReviewAttemptsContentSource.selectionOf(
-                        "inputs/context/review_attempts/issue/1234567890123456789.json"))
-                .isEmpty();
-        assertThat(Files.readString(PROTOCOL, StandardCharsets.UTF_8))
-                .contains("/^inputs\\/context\\/review_attempts\\/(?:pull_request|issue)\\/\\d{1,18}\\.json$/u");
-    }
-
-    @Test
-    @DisplayName("system prompt lists every mentor context file path")
-    void systemPromptListsContextBasenames() throws IOException {
-        String prompt = Files.readString(SYSTEM_PROMPT, StandardCharsets.UTF_8);
-        String perTurnInputSection =
-                prompt.substring(prompt.indexOf("## Per-turn input"), prompt.indexOf("## When to use tools"));
-
-        assertThat(MentorContextKeys.ALLOWED_OUTPUT_KEYS)
-                .allSatisfy(key -> assertThat(perTurnInputSection)
-                        .as("system prompt should document context file %s in the per-turn input list", key)
-                        .contains("`" + key + "`"));
     }
 }

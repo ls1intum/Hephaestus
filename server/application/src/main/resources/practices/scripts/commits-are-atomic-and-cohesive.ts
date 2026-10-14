@@ -1,6 +1,3 @@
-// Finds each authored commit in the commit record: its subject, if the subject joins clauses, and the
-// files that the commit touched with their line counts and moves. The criteria tell what one logical
-// change is, and the review judges the partition. A fact is a place to look, never a verdict.
 import { readCapturedCommits } from "../kits/scm/change.ts";
 import { commitLeads, describeCommitCount, subjectFacts } from "../kits/scm/commit-subjects.ts";
 import { scm, expectKind } from "../kits/scm/index.ts";

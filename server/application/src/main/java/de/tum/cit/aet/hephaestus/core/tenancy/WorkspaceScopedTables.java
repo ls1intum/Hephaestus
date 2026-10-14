@@ -21,23 +21,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Single source of truth for workspace-scoped vs. global SQL tables.
- *
- * <p>At {@link ApplicationReadyEvent}, walks Hibernate's mapping metamodel for the physical table
- * name of every {@code @Entity} AND every many-to-many {@code @JoinTable} collection. Any table not
- * in {@link #GLOBAL_TABLES} is treated as workspace-scoped.
- *
- * <p>Join tables are critical: they have no {@code workspace_id} column of their own but still need
- * a predicate — they share the parent entity's tenancy boundary. A bare {@code SELECT * FROM
- * issue_label} without a join to the scoped parent leaks across workspaces, so the inspector must
- * treat join tables as scoped.
- *
- * <p>Using the physical metamodel (rather than reflecting on {@code @Table.name()}) avoids the
- * silent landmine of entities without explicit {@code @Table.name} — Hibernate emits snake_case
- * while {@code entity.getName()} returns CamelCase.
- *
- * <p>Adding to {@link #GLOBAL_TABLES} is a security decision: each entry carries a one-line
- * rationale and must be reviewed.
+ * Use physical Hibernate table names, including join tables: joins share their parent tenancy boundary.
+ * Adding a table to {@link #GLOBAL_TABLES} is a security decision.
  */
 @Component
 public class WorkspaceScopedTables {

@@ -9,17 +9,11 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
-/**
- * The citations of a practice result. A result's stored {@code evidence.citations} lists every place it rests on: its
- * own citations, then each of its problems' that is not already among them. A reader that shows the result beside its
- * problems takes its own: the stored list without the problems'. A reader that authorizes or attributes sources takes
- * every place, the example's and the open questions' included.
- */
+/** Stored citations include problem citations; authorization must also include example and open-question sources. */
 public final class ResultCitations {
 
     private ResultCitations() {}
 
-    /** The result's own citations: the stored list without any citation one of its problems carries. */
     public static List<JsonNode> own(@Nullable JsonNode evidence, List<Problem> problems) {
         Set<JsonNode> problemPlaces = new HashSet<>();
         problems.forEach(problem -> problem.getCitations().forEach(problemPlaces::add));
@@ -32,7 +26,6 @@ public final class ResultCitations {
         return List.copyOf(own);
     }
 
-    /** Every place the result cites: the stored list, the example's citation and each open question's. */
     public static List<JsonNode> all(Result result) {
         return all(result.getEvidence(), result.getExample());
     }

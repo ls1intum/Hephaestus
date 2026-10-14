@@ -40,7 +40,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/** Workspace-scoped Slack source and product review fixtures. */
 public final class SlackConversationTestSupport {
 
     public static long accountWithIdentity(

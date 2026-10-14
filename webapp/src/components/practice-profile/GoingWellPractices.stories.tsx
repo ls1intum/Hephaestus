@@ -17,7 +17,6 @@ if (!proofOf) {
 	throw new globalThis.Error("The first practice going well carries a result that shows it");
 }
 
-/** The `detail` stack a link opens, read off its address. */
 const detailOf = (link: HTMLElement) =>
 	new URL(String(link.getAttribute("href")), window.location.origin).searchParams.getAll("detail");
 
@@ -34,11 +33,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Two practices, each named by a link to its own level, with the results that show them. The
- * workspace's sentence is shown as written; the practice it left without one shows only its name
- * and its proof.
- */
 export const TwoLinkedPractices: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("heading", { level: 2, name: "Going well" })).toBeVisible();
@@ -49,18 +43,18 @@ export const TwoLinkedPractices: Story = {
 			canvas.getByText("Your pull requests say when they are ready and name the issue they close."),
 		).toBeVisible();
 
-		// Each result opens its own review at that result, and names the item in the provider's own
-		// noun.
 		const proof = within(
 			canvas.getByRole("list", { name: `Work that shows ${linked.practiceName}` }),
 		).getByRole("link", { name: "Pull request #22" });
 		await expect(detailOf(proof)).toStrictEqual([`review:${proofOf.reviewId}`]);
 		await expect(searchOf(proof, "reviewResult")).toBe(proofOf.resultId);
 
-		// Activating it lands there: the link is the current address.
 		await userEvent.click(proof);
 		await waitFor(async () => {
-			await expect(proof).toHaveAttribute("aria-current", "page");
+			await expect(canvas.getByRole("link", { name: "Pull request #22" })).toHaveAttribute(
+				"aria-current",
+				"page",
+			);
 		});
 	},
 };
@@ -94,7 +88,6 @@ export const NoSupport: Story = {
 	},
 };
 
-/** The server sends five results at most; "More" opens the practice on its results. */
 export const FiveLinksAndMore: Story = {
 	args: {
 		practices: [
@@ -123,12 +116,13 @@ export const FiveLinksAndMore: Story = {
 		await expect(searchOf(more, "practiceTab")).toBe("results");
 		await userEvent.click(more);
 		await waitFor(async () => {
-			await expect(more).toHaveAttribute("aria-current", "page");
+			await expect(
+				canvas.getByRole("link", { name: `More results for ${linked.practiceName}` }),
+			).toHaveAttribute("aria-current", "page");
 		});
 	},
 };
 
-/** Long document titles wrap inside the column on a phone instead of widening the page. */
 export const LongProviderLabels: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },

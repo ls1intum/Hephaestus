@@ -10,7 +10,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** A sign-in creates or claims the exact roster identity in its provisioning transaction. */
 @ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("JIT account creation is user-scoped, keyed by (provider, subject)")

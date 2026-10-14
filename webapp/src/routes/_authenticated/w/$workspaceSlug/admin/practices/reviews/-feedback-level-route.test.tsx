@@ -37,18 +37,18 @@ const FEEDBACK_LEVEL = `/w/acme/admin/practices/reviews/feedback?detail=feedback
 
 type ProposalState = Extract<ReviewFeedback["state"], "AWAITING_APPROVAL" | "READY">;
 
-/** A proposal with its planned copies, or the same feedback once approved and ready to send. */
 function proposalWire(state: ProposalState, id = FEEDBACK_ID) {
 	return {
 		...awaitingApprovalFeedbackDetail,
 		id,
 		state,
+		destination: "ON_WORK" as const,
 		stopReason: state === "AWAITING_APPROVAL" ? "PRACTICE_REQUIRES_APPROVAL" : null,
 		body: "Please keep the cache scoped to one workspace so membership changes cannot leak.",
+		copies: awaitingApprovalFeedbackDetail.copies.map((copy) => ({ ...copy, body: "Please keep the cache scoped to one workspace so membership changes cannot leak." })),
 	};
 }
 
-/** The decision the server records, as `createFeedbackDecision` answers. */
 function decisionWire(feedbackId: string, action: FeedbackDecision["action"]) {
 	return {
 		id: `${feedbackId.slice(0, -3)}d99`,
@@ -131,15 +131,10 @@ describe("feedback approval level", () => {
 
 		await userEvent.click(screen.getByRole("button", { name: "Approve for delivery" }));
 		await screen.findByText("Feedback approved. Delivery is being checked.");
-		// Approval names the copies the admin read, so a package composed again since is refused.
 		expect(requestBody).toStrictEqual({ action: "APPROVE", contentDigest: CONTENT_DIGEST });
-		// The level reads the decision back rather than assuming it: once ready, there is nothing
-		// left to approve.
 		await waitFor(() =>
 			expect(screen.queryByRole("button", { name: "Approve for delivery" })).toBeNull(),
 		);
-		// Every count of it moved: the overview's "awaiting approval", a review's tally, an
-		// result's feedback — in this workspace only.
 		const invalidated = (keys: typeof ours) =>
 			keys.map((key) => queryClient.getQueryState(key)?.isInvalidated);
 		expect(invalidated(ours)).toStrictEqual([true, true, true]);
@@ -475,7 +470,6 @@ describe("feedback approval level", () => {
 
 			await queueSteps("1 of 3");
 			await userEvent.click(screen.getByRole("button", { name: "Approve and open next" }));
-			// A sheet links to no other record: the reader opens the result from its address.
 			const opened = [`result:${source.resultId}`];
 			await router.navigate({
 				to: ".",
@@ -488,8 +482,6 @@ describe("feedback approval level", () => {
 			decision.resolve();
 
 			await screen.findByText("Feedback approved. Delivery is being checked.");
-			// Once decided, the level reads it back as ready and drops its footer; the move on would
-			// run right after.
 			await waitFor(() =>
 				expect(
 					screen.queryByRole("button", { name: "Approve and open next", hidden: true }),
@@ -545,7 +537,10 @@ describe("feedback approval level", () => {
 					return HttpResponse.json({
 						content: waiting,
 						// One more waits beyond this page.
-						page: { number: 0, size: 100, totalElements: waiting.length + 1, totalPages: 2 },
+						number: 0,
+						size: 100,
+						totalElements: waiting.length + 1,
+						totalPages: 2,
 					});
 				}),
 			);

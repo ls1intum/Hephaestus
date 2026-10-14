@@ -26,7 +26,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A chat API serves practice reviews and Heph: two marks, one phrase. */
 export const ChatApi: Story = {
 	play: async ({ canvas, canvasElement }) => {
 		await expect(canvas.getByText("Responses API")).toBeVisible();
@@ -35,7 +34,6 @@ export const ChatApi: Story = {
 	},
 };
 
-/** An API for practice scripts serves one kind of model: one mark. */
 export const PracticeScriptApi: Story = {
 	args: { connection: { apiProtocol: "openai-embeddings", purposes: ["PRACTICE_EMBEDDING"] } },
 	play: async ({ canvas, canvasElement }) => {
@@ -45,7 +43,6 @@ export const PracticeScriptApi: Story = {
 	},
 };
 
-/** The longest API name stays on one line inside a 320 px viewport. */
 export const LongNameReflow: Story = {
 	args: { connection: { apiProtocol: "cohere-rerank", purposes: ["PRACTICE_RERANKING"] } },
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },

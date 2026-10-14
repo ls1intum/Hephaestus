@@ -2,11 +2,9 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecisionRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.dto.FeedbackDecisionDTO;
-import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackBasisDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackCheckDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackCopyCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackCopyDTO;
@@ -15,13 +13,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackSendDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.ReviewFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.ReviewFeedbackDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponseRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Result;
-import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
-import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewResultQueryService;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReasonCountDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackLocation;
@@ -49,7 +42,7 @@ import tools.jackson.databind.ObjectMapper;
 public class FeedbackReadService {
     private static final int PREVIEW_LENGTH = 240;
     private final FeedbackRepository feedback;
-    private final FeedbackBasisRepository basis;
+    private final FeedbackBasisRead basisRead;
     private final FeedbackCopyRepository copies;
     private final FeedbackSendRepository sends;
     private final FeedbackDecisionRepository decisions;
@@ -57,10 +50,6 @@ public class FeedbackReadService {
     private final FeedbackVisibilityService visibility;
     private final FeedbackContentDigest digests;
     private final ProductReferenceQuery references;
-    private final ResultRepository results;
-    private final ResultViewQuery views;
-    private final ResultVisibilityPolicy evidence;
-    private final ReviewResultQueryService resultPresentation;
     private final ReviewRepository reviews;
     private final FeedbackQueryRepository queries;
     private final ObjectMapper mapper;
@@ -106,29 +95,9 @@ public class FeedbackReadService {
         var row = required(workspaceId, id);
         var summary = summary(
                 row, queries.locations(workspaceId, List.of(id)).getFirst().getLocation());
-        var edges = basis.findByWorkspaceIdAndFeedbackIdOrderByOrdinalAscIdAsc(workspaceId, id);
-        var support = results.findByWorkspaceIdAndIdIn(
-                workspaceId,
-                edges.stream().map(FeedbackBasis::getResultId).distinct().toList());
-        var permitted = evidence.permitsHistory(workspaceId, support, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-        var resultViews = views.views(workspaceId, support).stream()
-                .collect(Collectors.toMap(view -> view.result().getId(), view -> view));
-        var bound = edges.stream()
-                .map(edge -> new FeedbackBasisDTO(
-                        edge.getResultId(),
-                        edge.getProblemId(),
-                        edge.getOrdinal(),
-                        resultPresentation.bound(
-                                Objects.requireNonNull(resultViews.get(edge.getResultId())),
-                                permitted.contains(edge.getResultId()))))
-                .toList();
-        boolean readable = !edges.isEmpty()
-                && support.size()
-                        == edges.stream()
-                                .map(FeedbackBasis::getResultId)
-                                .distinct()
-                                .count()
-                && permitted.containsAll(support.stream().map(Result::getId).toList());
+        var selected = basisRead.read(workspaceId, id);
+        var bound = basisRead.bound(workspaceId, selected);
+        boolean readable = selected.readable();
         var actualCopies = copies.findByWorkspaceIdAndFeedbackIdOrderByPositionAsc(workspaceId, id).stream()
                 .map(copy -> redactedCopy(copy, readable))
                 .toList();
@@ -213,16 +182,12 @@ public class FeedbackReadService {
         var children = copies.findByWorkspaceIdAndFeedbackIdOrderByPositionAsc(workspaceId, id);
         var copyCounts = new EnumMap<FeedbackCopyState, Integer>(FeedbackCopyState.class);
         children.forEach(copy -> copyCounts.merge(copy.getState(), 1, Integer::sum));
-        var edgeIds = basis.findByWorkspaceIdAndFeedbackIdOrderByOrdinalAscIdAsc(workspaceId, id).stream()
+        var selected = basisRead.read(workspaceId, id);
+        int resultCount = (int) selected.edges().stream()
                 .map(FeedbackBasis::getResultId)
                 .distinct()
-                .toList();
-        var support = results.findByWorkspaceIdAndIdIn(workspaceId, edgeIds);
-        boolean allowed = !support.isEmpty()
-                && support.size() == edgeIds.size()
-                && evidence.permitsHistory(workspaceId, support, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
-                                .size()
-                        == support.size();
+                .count();
+        boolean allowed = selected.readable();
         String body = allowed ? row.getBody() : null;
         var answer = responses.findCurrent(workspaceId, id);
         Instant disagreedAt = answer.filter(response -> response.getResolution() == FeedbackResolution.DISAGREE)
@@ -242,7 +207,7 @@ public class FeedbackReadService {
                 row.getDeliveredAt(),
                 body == null ? null : body.substring(0, Math.min(body.length(), PREVIEW_LENGTH)),
                 body != null && body.length() > PREVIEW_LENGTH,
-                edgeIds.size(),
+                resultCount,
                 new FeedbackCopyCountsDTO(
                         copyCounts.getOrDefault(FeedbackCopyState.PLANNED, 0),
                         copyCounts.getOrDefault(FeedbackCopyState.WRITE_STARTED, 0),

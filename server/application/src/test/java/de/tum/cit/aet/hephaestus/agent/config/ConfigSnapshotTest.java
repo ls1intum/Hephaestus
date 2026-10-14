@@ -21,6 +21,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import tools.jackson.databind.exc.InvalidFormatException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -74,7 +75,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
     void rejectsUnknownProtocolAtTheJsonBoundary() {
         var json = (ObjectNode) snapshot(600).toJson(mapper);
         ((ObjectNode) json.path("model")).put("apiProtocol", "unknown");
-        assertThatThrownBy(() -> ConfigSnapshot.fromJson(json, mapper)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ConfigSnapshot.fromJson(json, mapper)).isInstanceOf(InvalidFormatException.class);
     }
 
     @Test

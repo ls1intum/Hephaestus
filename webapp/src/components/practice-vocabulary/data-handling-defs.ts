@@ -70,7 +70,6 @@ export const DATA_HANDLING_TIERS = statusValues(DATA_HANDLING_DEFS);
 /** The members an `UNDECLARED` model serves. The tier's own label names the model, not them. */
 export const UNCHOSEN_MEMBERS = "members who have not chosen";
 
-/** "In-house and Cloud members and members who have not chosen", in tier order. */
 export function tierMembersPhrase(tiers: readonly DataHandlingTier[]): string {
 	const ordered = DATA_HANDLING_TIERS.filter((tier) => tiers.includes(tier));
 	const named = ordered
@@ -83,7 +82,6 @@ export function tierMembersPhrase(tiers: readonly DataHandlingTier[]): string {
 	return andList.format(groups);
 }
 
-/** The members a model misses, as one phrase: "Not set for In-house members". */
 export function notSetForPhrase(tiers: readonly DataHandlingTier[]): string {
 	return `Not set for ${tierMembersPhrase(tiers)}`;
 }

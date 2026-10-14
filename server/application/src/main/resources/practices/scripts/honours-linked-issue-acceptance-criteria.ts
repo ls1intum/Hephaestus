@@ -1,5 +1,3 @@
-// Finds the issue references in the title, the body and the branch of a pull request, and the
-// acceptance-criteria blocks of the linked issues. It gives facts, never a verdict of compliance.
 import { scm, expectKind } from "../kits/scm/index.ts";
 import { OUTCOME_HEADING } from "../kits/scm/references.ts";
 import { checkableItems, readLinkedWorkItems } from "../kits/scm/review.ts";
@@ -7,16 +5,11 @@ import { DIRECTION_CHARS, oneLine } from "../lib/core/bounded-text.ts";
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 const CLOSE_KEYWORD = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b/giu;
-// "closes #12", "fixes GH-12", "resolves group/proj#12" — capture the trailing issue number.
 const CLOSE_REF =
 	/\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+(?:[\w./~-]*[#!]|GH-)(?<number>\d+)/giu;
-// Full issue/MR URLs on either host: .../issues/12, .../-/issues/12.
 const ISSUE_URL = /https?:\/\/[^\s)]+?\/(?:-\/)?issues\/(?<number>\d+)/giu;
-// Issue number embedded in a branch name: feature/123-foo, issue-123, 123-fix-thing, bugfix/GH-123.
 const BRANCH_REF = /(?:^|[/_-])(?:issue[-_]?|gh[-_]?|#)?(?<number>\d{1,6})(?:[-_/]|$)/giu;
 
-// Every pattern below is global and captures the issue number in group 1; matchAll iterates a clone,
-// so the shared module-level regexes keep a lastIndex of 0 between calls.
 function collect(re: RegExp, text: string, into: Set<string>): void {
 	if (!text) {
 		return;
@@ -27,7 +20,6 @@ function collect(re: RegExp, text: string, into: Set<string>): void {
 	}
 }
 
-// A checkable acceptance-criteria section: an outcome heading or a task list in the issue body.
 function acFacts(body: string): { heading: boolean; boxes: number } {
 	return { heading: OUTCOME_HEADING.test(body), boxes: checkableItems(body).length };
 }
@@ -41,8 +33,7 @@ export default definePracticeScript({
 		const body = domain.item.body ?? "";
 		const branch = domain.item.source_branch;
 
-		// Syntax matches are candidates, including examples and code spans. They establish neither a
-		// provider-reported relationship nor adoption of another issue's criteria by the author.
+		// Syntax matches include examples and code; they establish no provider relationship or adoption.
 		const refs = new Set<string>();
 		collect(CLOSE_REF, `${title}\n${body}`, refs);
 		collect(ISSUE_URL, `${title}\n${body}`, refs);

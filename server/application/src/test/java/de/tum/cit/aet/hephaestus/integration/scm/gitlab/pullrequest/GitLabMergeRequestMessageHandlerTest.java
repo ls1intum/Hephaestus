@@ -175,8 +175,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
 
             handler.onMessage(mockMessage(event));
 
-            // The change is published under the delivery the read completes, never as a new
-            // occurrence.
             var context = ArgumentCaptor.forClass(ProcessingContext.class);
             verify(mergeRequestProcessor)
                     .replaceClosingIssues(any(), eq(5), eq(List.of(41, 42)), any(), context.capture());

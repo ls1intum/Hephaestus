@@ -21,16 +21,11 @@ import {
 	stagePractices,
 } from "./program-host-runner.ts";
 
-// Every direct model call of one attempt draws on one account of PI_DIRECT_MODEL_TOKENS, whichever practice makes
-// it; the native review sessions are bounded by the proxy, not by that account. The runner runs against a stand-in
-// for the proxy's direct routes, which accepts only the job token.
 
 const JOB_TOKEN = "job-token";
-/** The tokens every answered call reports: 1500 in, 500 out. */
 const CALL_TOKENS = 2000;
 const ACCOUNT = 5000;
 
-/** One chat call of the given output ceiling, with what it left the program noted. */
 const call = (maxOutputTokens: number) => `
 		const answer = await step("one call", () =>
 			generateText({ model: ctx.models.chat, prompt: "Say yes.", maxOutputTokens: ${maxOutputTokens} }),
@@ -51,7 +46,6 @@ after(async () => {
 stagePractices(cwd, [
 	{ slug: "a-spends", program: directProgram(call(100)) },
 	{ slug: "b-native" },
-	// Above what remains: the most output a chat call may ask for exceeds the 3000 tokens left.
 	{ slug: "c-refused", program: directProgram(`${atStart}${call(4096)}`) },
 	{ slug: "d-small", program: directProgram(`${atStart}${call(100)}`) },
 ]);
@@ -66,12 +60,10 @@ const exit = await runRunner(
 		LLM_PROXY_URL: standIn.url,
 		LLM_PROXY_TOKEN: JOB_TOKEN,
 		PI_DIRECT_MODEL_TOKENS: String(ACCOUNT),
-		// Calls use only the job credential.
 		PRACTICE_SCRIPT_PROXY_TOKEN: "practice-script-token",
 	},
 );
 
-/** The summary of each admitted result, by practice: the programs note what the account showed them there. */
 function summaries(): Map<unknown, unknown> {
 	const results: unknown = field(readJsonFile(cwd, "out/result.json"), "results");
 	assert.ok(Array.isArray(results));
@@ -101,7 +93,6 @@ void test("a practice's direct call spends the shared account, and the next prac
 });
 
 void test("a native review session's calls are not charged to the direct account", () => {
-	// b-native's session reported 1100 tokens between a-spends and c-refused; c-refused starts where a-spends left it.
 	assert.equal(capturedLines(cwd, "prompts").length, 1);
 	assert.match(
 		String(summaries().get("c-refused")),

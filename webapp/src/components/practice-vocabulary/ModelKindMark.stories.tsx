@@ -4,15 +4,6 @@ import { expect } from "storybook/test";
 import { AGENT_PURPOSES } from "./agent-purpose-defs";
 import { ModelKindMark } from "./ModelKindMark";
 
-/**
- * Which kind of model a row, cell or need is about. The glyph carries the kind's hue and the tile
- * stays neutral: a tinted ground is a practice group's pill, and a tinted badge is a status, so
- * neither may stand for a kind.
- *
- * The three model kinds for practice scripts take violet, cyan and fuchsia, each at least 30° (OKLCH) from the
- * status tones and the mentor accent. Practice reviews and Heph stay neutral, because this mark
- * does not introduce Heph.
- */
 const meta = {
 	component: ModelKindMark,
 	parameters: { layout: "centered" },
@@ -32,7 +23,6 @@ export const Default: Story = {
 	},
 };
 
-/** Every kind at both sizes: inline beside text, and leading a list row. */
 export const EveryKind: Story = {
 	render: (args) => (
 		<div className="grid gap-6 sm:grid-cols-2">
@@ -57,11 +47,9 @@ export const EveryKind: Story = {
 	},
 };
 
-/** In a cell or beside a heading that already names the kind, the name is for a screen reader. */
 export const NameForScreenReaders: Story = {
 	args: { purpose: "PRACTICE_EMBEDDING", label: "sr-only" },
 	play: async ({ canvas }) => {
-		// Present in the accessibility tree, but drawn in a 1px clip: only the tile shows.
 		const name = canvas.getByText("Embedding model");
 		await expect(name.getBoundingClientRect().width).toBeLessThanOrEqual(1);
 		await expect(canvas.getByText("Embedding model").closest("[aria-hidden]")).toBeNull();

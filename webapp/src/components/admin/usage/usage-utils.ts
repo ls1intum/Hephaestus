@@ -12,7 +12,6 @@ export const JOB_TYPE_LABELS: Record<LlmJobType, string> = {
 	MENTOR_TURN: "Heph turn",
 };
 
-/** The two spend fields every usage row and total carries, one per purse. */
 export interface PurseSpend {
 	instanceTotalCostUsd: number;
 	ownProviderTotalCostUsd: number;
@@ -22,7 +21,6 @@ export function spendOf(row: PurseSpend, purse: Purse): number {
 	return purse === "SHARED" ? row.instanceTotalCostUsd : row.ownProviderTotalCostUsd;
 }
 
-/** The cap fields a workspace's usage report and an instance usage row both carry. */
 export type PurseCaps = Pick<
 	WorkspaceLlmUsageReport,
 	| "instanceTotalCostUsd"
@@ -36,7 +34,6 @@ export type PurseCaps = Pick<
 	| "ownProviderInUse"
 >;
 
-/** One purse's spend against its own cap. */
 export interface PurseCap {
 	spendUsd: number;
 	capUsd: number | undefined;
@@ -44,11 +41,7 @@ export interface PurseCap {
 	verdict: WorkspaceLlmUsageReport["instanceBudgetVerdict"];
 }
 
-/**
- * One purse's cap as every surface shows it. A cap on an own provider that is not in use holds
- * nothing back. The server still reports a $0 cap as reached, so without this gate the screen would
- * say "cap reached" beside "connect a provider".
- */
+// A cap cannot block a provider that is not in use.
 export function purseCap(usage: PurseCaps, purse: Purse): PurseCap {
 	if (purse === "SHARED") {
 		return {
@@ -76,22 +69,14 @@ export function purseCap(usage: PurseCaps, purse: Purse): PurseCap {
 
 const SHARED_ONLY: readonly Purse[] = ["SHARED"];
 
-/**
- * The purses a workspace's usage shows: shared models always, its own provider when the server says
- * that purse is in use. The spend and cap fields cannot tell a month of $0.00 calls, or a provider
- * connected before its first call, from no provider at all. One array per answer, so a table can key
- * its column model on it.
- */
+/** Provider use is server-owned; neither spend nor a cap can establish it. */
 export function pursesOf(
 	usage: Pick<WorkspaceLlmUsageReport, "ownProviderInUse">,
 ): readonly Purse[] {
 	return usage.ownProviderInUse ? PURSES : SHARED_ONLY;
 }
 
-/**
- * A purse's spend over a count of runs or reviews. `null` where there is nothing to average: no runs,
- * or no priced spend beside calls with no price, whose $0.00 would claim a cost nobody knows.
- */
+/** Unknown cost and absent runs cannot establish an average; a measured zero can. */
 export function averageSpend(
 	totalUsd: number,
 	count: number,
@@ -103,7 +88,6 @@ export function averageSpend(
 	return totalUsd / count;
 }
 
-/** The note under *Models for practice scripts, by practice*, on both consoles. */
 export function practiceScriptByPracticeDescription(isCurrentMonth: boolean): string {
 	return `Decision, embedding and reranking calls from finished reviews${isCurrentMonth ? ", to date" : ""}. Chat calls from scripts are in each review’s cost. A review that ran several scripts counts once in the total.`;
 }
@@ -239,34 +223,15 @@ export function formatTokens(value: number | undefined): string {
 	return value.toLocaleString();
 }
 
-/**
- * The first column of a usage table stays in view while the figures scroll sideways under it. Its
- * rows are `static`: a hover tint would stop at this cell's opaque ground.
- *
- * The cell stacks above the scrolled cells, so a positioned sort icon does not paint over it. A rule
- * on its right edge marks where the figures go under it, so a cut figure does not read as a whole one.
- * The rule is a pseudo-element: in a collapsed table, a cell's own border stays behind when the cell
- * sticks.
- */
 export const FIRST_COLUMN =
 	"sticky left-0 z-1 bg-card after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border";
 
-/**
- * Every cell of a total row. The row's sticky label needs an opaque ground, and the footer's own
- * `bg-muted/50` is translucent, so each cell paints the same opaque ground.
- */
+// Sticky total labels need an opaque background; translucent footer paint would let scrolled cells show through.
 export const TOTAL_CELL = "bg-muted";
 
-/**
- * The column that counts runs with no price, or reviews with no price in the table by practice: the
- * runs or reviews with at least one usage row that has no price. It wraps onto two lines where the
- * table is short of room, instead of widening it. Its minimum width keeps it at two lines, not one
- * word per line, and the two lines are balanced.
- */
 export const UNPRICED_RUNS = {
 	label: "Unavailable cost",
 	className: "min-w-24 whitespace-normal text-balance",
 };
 
-/** Token and call counts: below `lg` they give way to the money, which is what the page is for. */
 export const WIDE_ONLY = "hidden lg:table-cell";

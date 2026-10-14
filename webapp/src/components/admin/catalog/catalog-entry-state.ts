@@ -1,6 +1,5 @@
 import type { CatalogGroup, CatalogPractice } from "@/api/types.gen";
 
-/** What a practice and a group share about their place in the instance catalog. */
 export type CatalogEntryStatus = Pick<
 	CatalogPractice | CatalogGroup,
 	"state" | "changeKind" | "excluded"
@@ -69,8 +68,7 @@ export function catalogEntryCopy(
 					: `This ${kind} is no longer a Hephaestus default. Keep it as a custom ${kind}, or exclude it from new workspaces.`,
 			};
 		}
-		// Named rather than defaulted: a state added by the API later must become a type error, not
-		// silently render the most reassuring answer.
+		// Enumerate states so new API values fail type checking rather than imply success.
 		case "FROM_HEPHAESTUS": {
 			return {
 				label: "Uses Hephaestus default",
@@ -95,12 +93,10 @@ export function isOrdinary(status: CatalogEntryStatus): boolean {
 	return status.state === "FROM_HEPHAESTUS" && !status.excluded;
 }
 
-/** The Hephaestus changes an instance admin still has to decide on, by what each would change. */
 export interface CatalogChangeCounts {
 	reviewRules: number;
 	wording: number;
 	groupAppearance: number;
-	/** Removed defaults that still reach workspaces; an excluded one needs no decision. */
 	removedDefaults: number;
 }
 
@@ -122,7 +118,6 @@ export function catalogChangeCounts({
 	};
 }
 
-/** Whether an entry belongs in the focused review of pending Hephaestus changes. */
 export function needsReview(entry: CatalogPractice | CatalogGroup): boolean {
 	return entry.state === "UPDATE_WAITING" || (entry.state === "NO_LONGER_SHIPPED" && entry.offered);
 }

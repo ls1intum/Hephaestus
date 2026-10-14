@@ -27,6 +27,9 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
     CatalogService catalog;
 
     @Autowired
+    CatalogCustomizationService customization;
+
+    @Autowired
     PracticeVersionService versions;
 
     @Autowired
@@ -86,7 +89,7 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
         var allowCommit = new CountDownLatch(1);
         var installerStarted = new CountDownLatch(1);
         var writer = CompletableFuture.runAsync(() -> transactions.executeWithoutResult(ignored -> {
-            catalog.updatePractice(
+            customization.updatePractice(
                     current.slug(),
                     new CatalogPracticeInputDTO(
                             current.slug(),

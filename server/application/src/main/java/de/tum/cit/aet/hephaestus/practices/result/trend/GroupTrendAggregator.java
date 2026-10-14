@@ -9,13 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Combines a practice group's per-practice trends into one direction.
- *
- * <p>A group combines already-computed practice differences using inverse-variance weights. Because practices
- * can share reviewed work, the pooled variance uses the conservative perfect-correlation bound rather than
- * pretending the estimates are independent.
- */
+// Shared reviewed work can correlate practice estimates, so use the conservative perfect-correlation variance bound.
 final class GroupTrendAggregator {
 
     private GroupTrendAggregator() {}
@@ -104,7 +98,7 @@ final class GroupTrendAggregator {
         return TrendDirection.UNCERTAIN;
     }
 
-    /** Abramowitz-Stegun 7.1.26: absolute error below 1.5e-7, far under what a 0.90 threshold can notice. */
+    // Abramowitz-Stegun 7.1.26 bounds absolute error below 1.5e-7.
     private static double normalCdf(double value) {
         double sign = value < 0 ? -1.0 : 1.0;
         double x = Math.abs(value) / Math.sqrt(2.0);
@@ -115,13 +109,6 @@ final class GroupTrendAggregator {
         return 0.5 * (1.0 + erf);
     }
 
-    /**
-     * One entry per item the group saw, whichever of its practices saw it.
-     *
-     * <p>Two practices reviewing the same pull request is one piece of reviewed work to a reader, so their outcomes are
-     * summed into a single point rather than drawn twice. The merged point takes the stronger bundle of the
-     * two: an item that is current evidence for any practice is current evidence for the group.
-     */
     private static List<EvidenceOpportunity> mergedTrail(Collection<PracticeTrend> trends, int bundleSize) {
         Map<Long, EvidenceOpportunity> combined = new LinkedHashMap<>();
         for (PracticeTrend trend : trends) {
@@ -150,13 +137,7 @@ final class GroupTrendAggregator {
         return TrendBundle.OLDER;
     }
 
-    /**
-     * The pieces of reviewed work the comparison rests on, counted once each.
-     *
-     * <p>Not the sum of the two bundle counts: a practice group's bundles are built per practice, so one pull
-     * request can be current evidence for one practice and previous evidence for another. Adding the counts
-     * would report it twice and tell the reader the group saw more work than it did.
-     */
+    // An item can appear in different practice bundles; count it once across the group.
     private static int distinctComparedOpportunities(Collection<PracticeTrend> trends) {
         return (int) trends.stream()
                 .flatMap(trend -> trend.opportunities().stream())
@@ -167,7 +148,6 @@ final class GroupTrendAggregator {
                 .count();
     }
 
-    /** Every piece of work any of the practices reached a verdict on, once however many practices did. */
     private static Map<Long, ItemKind> reviewedWork(Collection<PracticeTrend> trends) {
         Map<Long, ItemKind> work = new LinkedHashMap<>();
         trends.forEach(trend -> work.putAll(trend.reviewedWork()));

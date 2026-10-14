@@ -39,15 +39,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/**
- * Real-Postgres proof of the thread-grain Slack retention sweep. Once a thread goes cold (its {@code last_ts} is
- * older than the retention window), the sweep erases the derived {@code chat.thread} results/feedback
- * (through the practices erasure port) <b>and</b> drops the {@code slack_thread} aggregate (which holds the
- * {@code participant_account_ids} PII) — while a still-active thread's derived rows and an unrelated PR result
- * are left intact. The assertions fail if the retention erasure path is removed (the aged derived rows would
- * survive) and fail if it over-reaches (the fresh thread or the PR result would vanish). Also proves the
- * {@code participant_account_ids} {@code array_remove} prune is workspace-scoped.
- */
 class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

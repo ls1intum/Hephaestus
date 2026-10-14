@@ -12,7 +12,6 @@ import {
 
 export interface PracticeScriptFixLinkProps {
 	workspaceSlug: string;
-	/** The practice whose script the editor opens. */
 	practiceSlug: string;
 	/**
 	 * The practice's name, for a screen reader, where one list repeats the same link for several
@@ -22,18 +21,13 @@ export interface PracticeScriptFixLinkProps {
 	fix: PracticeScriptFix;
 }
 
-/**
- * The way to what would help a practice script next time: the script itself, or
- * the guide when nothing in the workspace fixes it. An arrow, like the trace's other ways onward,
- * tells it from the result beside it; the guide wears the outbound icon instead.
- */
 export function PracticeScriptFixLink({
 	workspaceSlug,
 	practiceSlug,
 	practiceName,
 	fix,
 }: PracticeScriptFixLinkProps) {
-	// After the visible words, so speech control still matches them (WCAG SC 2.5.3).
+		// Place context after the visible label so speech control can match it (WCAG 2.5.3).
 	const context =
 		practiceName === undefined ? null : (
 			<>

@@ -19,8 +19,6 @@ import {
 } from "./models-host.ts";
 
 void test("the models file in the shape the server writes gives every slot a model", async () => {
-	// PracticeScriptContractSyncTest proves that the server writes this file for the same four
-	// models.
 	const file = new URL("../../test/practice-script-models.json", import.meta.url);
 	const bound = boundModelsSchema.parse(JSON.parse(await readFile(file, "utf8")));
 	const models = hostModels(bound, "http://proxy.test/internal/llm", "token", "comment-quality");
@@ -46,7 +44,6 @@ void describe("the attempt's direct model account", () => {
 
 	void test("every practice's direct calls spend one account, so a call that it cannot afford does not run", async () => {
 		const budget = new ModelBudget(200, 2);
-		// Two practices, one account: the first practice's call leaves too little for the second's.
 		assert.ok(
 			"value" in (await budget.run(150, never, async () => ({ value: "first", tokens: 150 }))),
 		);
@@ -106,7 +103,6 @@ void describe("the attempt's direct model account", () => {
 		busy.resolve({ value: "first", tokens: 10 });
 		assert.deepEqual(await first, { value: "first", tokens: 10 });
 		assert.equal(ran, false);
-		// The turn that the abandoned call gave up goes to the next call.
 		assert.ok(
 			"value" in (await budget.run(10, never, async () => ({ value: "next", tokens: 10 }))),
 		);

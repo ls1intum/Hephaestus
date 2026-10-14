@@ -20,13 +20,9 @@ public final class PracticeTrend {
     private final TrendSupport support;
     private final List<EvidenceOpportunity> opportunities;
 
-    /**
-     * Every piece of work in the look-back with a decided opportunity, uncapped: {@link #opportunities} is cut to
-     * what a chart draws, and a group's count of reviewed work must still reach past that cut.
-     */
+    // Group counts need every decided opportunity, including work outside the chart's display cap.
     private final Map<Long, ItemKind> reviewedWork;
 
-    /** Absent for INSUFFICIENT_EVIDENCE, and for a group result, which aggregates rather than diffs. */
     private final BetaPosterior.@Nullable Difference difference;
 
     PracticeTrend(
@@ -83,7 +79,6 @@ public final class PracticeTrend {
         return recentMetShare(opportunities, window, decay);
     }
 
-    /** {@link #recentMetShare(int, double)} over any opportunities, oldest first. */
     static OptionalDouble recentMetShare(List<EvidenceOpportunity> opportunities, int window, double decay) {
         List<EvidenceOpportunity> decided =
                 opportunities.stream().filter(EvidenceOpportunity::decided).toList();
@@ -147,7 +142,6 @@ public final class PracticeTrend {
             @Nullable ItemKind kind,
             @Nullable Instant since,
             List<UUID> reviewIds) {
-        /** The value most of the clean work shares, the newest piece's on a tie; null with no values. */
         public static <T> @Nullable T mostOf(Stream<T> newestFirst) {
             return newestFirst
                     .collect(Collectors.groupingBy(value -> value, LinkedHashMap::new, Collectors.counting()))

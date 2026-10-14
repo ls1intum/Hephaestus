@@ -37,7 +37,6 @@ export interface PracticeReviewOverviewPageProps {
 	previous: PreviousReviewPeriodState;
 	/** The decisions an admin owes, whenever the feedback was composed. */
 	attention: ReviewAttentionReads;
-	/** The range's feedback by location and by reason, beside the Feedback tile. */
 	delivery: DeliveryBreakdownReads;
 	/** How long the range's reviews took, read apart from the overview. */
 	timing: ReviewTimingState;

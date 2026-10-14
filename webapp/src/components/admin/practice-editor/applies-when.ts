@@ -40,7 +40,6 @@ function clauseKind(item: AppliesWhenClause): ApplicabilityClause {
 	return item.diffContains === undefined ? "HAS_ITEMS" : "DIFF_CONTAINS";
 }
 
-/** The conditions as the author edits them: the JSON list of clauses, or blank for none. */
 export function appliesWhenText(appliesWhen: AppliesWhen | null): string {
 	return appliesWhen === null ? "" : JSON.stringify(appliesWhen.anyOf, null, 2);
 }
@@ -101,7 +100,6 @@ export function parseAppliesWhen(
 	return { value: { anyOf: parsed, otherwise } };
 }
 
-/** What the conditions field offers for this item type, and an example where it has one. */
 export function appliesWhenPresentation(itemType: PracticeItemTypeOption | undefined) {
 	const kinds = itemType?.applicabilityClauses ?? [];
 	return {

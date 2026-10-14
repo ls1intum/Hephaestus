@@ -35,20 +35,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * <b>Fixture Values (label.created.json):</b>
- *
- * <ul>
- *   <li>Label ID: 8747399111
- *   <li>Label name: "documentation"
- *   <li>Label color: "0075ca"
- *   <li>Label description: "Improvements or additions to documentation"
- * </ul>
- *
- * <p>Note: This test class does NOT use @Transactional because the GitHubLabelProcessor uses
- * REQUIRES_NEW propagation. Having @Transactional here would cause deadlocks as the test
- * transaction would hold locks needed by the processor's new transaction.
- */
+// REQUIRES_NEW processor writes cannot share an outer test transaction that holds their required locks.
 class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -241,7 +228,6 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         return objectMapper.readValue(json, GitHubLabelEventDTO.class);
     }
 
-    /** Creates a test repository reference DTO matching the fixture data. */
     private GitHubRepositoryRefDTO createTestRepoRef() {
         return new GitHubRepositoryRefDTO(
                 FIXTURE_REPO_ID,
@@ -408,12 +394,6 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // Label-Issue Association Tests
 
-    /**
-     * Tests that verify label-issue relationships.
-     *
-     * <p>Note: This class does NOT use @Transactional because the handler uses REQUIRES_NEW. We use
-     * TransactionTemplate for lazy loading assertions to avoid connection leaks.
-     */
     @Nested
     class LabelIssueRelationship {
 

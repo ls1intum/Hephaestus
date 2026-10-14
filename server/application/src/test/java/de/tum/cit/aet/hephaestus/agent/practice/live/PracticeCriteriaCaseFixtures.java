@@ -30,7 +30,6 @@ final class PracticeCriteriaCaseFixtures {
 
     static final String COMMITS = "context/commits.json";
 
-    /** The title of the work in a case that does not state one. */
     static final String DEFAULT_TITLE = "Add the change shown in the captured files";
 
     static final String COMMENTS = "context/comments.json";
@@ -134,7 +133,6 @@ final class PracticeCriteriaCaseFixtures {
         Files.write(
                 workspace.resolve("context/change.json"),
                 MAPPER.writeValueAsBytes(Map.of("base_sha", base, "head_sha", head)));
-        // The content source's own record of the work; a case states only the fields it is about.
         String description = Files.readString(workspace.resolve("context/description.md"));
         ObjectNode metadata = issue
                 ? LiveWorkRecords.issue(DEFAULT_TITLE, description)

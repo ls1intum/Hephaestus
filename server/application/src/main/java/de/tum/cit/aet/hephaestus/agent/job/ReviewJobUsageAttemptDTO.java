@@ -9,7 +9,6 @@ import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** What one attempt of a job spent, as the usage ledger recorded it. */
 @Schema(description = "The model usage and cost of one attempt of a job")
 public record ReviewJobUsageAttemptDTO(
         @Schema(

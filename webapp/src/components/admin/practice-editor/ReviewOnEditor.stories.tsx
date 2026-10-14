@@ -5,6 +5,7 @@ import type { PracticeItemTypeOption, ReviewOn } from "@/api/types.gen";
 import { expectNoOverflowingElement } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 
+import { expectUnavailable } from "@/test/controls";
 import {
 	definitionOf,
 	mockDocumentItemType,
@@ -14,6 +15,7 @@ import {
 	mockPullRequestReviewItemType,
 	mockThreadItemType,
 } from "./fixtures";
+
 import { ReviewOnEditor } from "./ReviewOnEditor";
 
 const meta = {
@@ -25,8 +27,6 @@ const meta = {
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
-	// The editor is controlled, so a story has to hold its state — but the handler it holds calls the
-	// spy from `args` before it stores anything, so the Actions panel still shows what was reported.
 	render: (args) => (
 		<Stateful initial={args.reviewOn}>
 			{(reviewOn, setReviewOn) => (
@@ -55,7 +55,6 @@ export const PullRequest: Story = {
 	},
 };
 
-/** A reviewer is reviewed on their own submitted review, not on an event of the parent pull request. */
 export const PullRequestReview: Story = {
 	args: {
 		itemType: mockPullRequestReviewItemType,
@@ -78,7 +77,6 @@ export const Conversation: Story = {
 	},
 };
 
-/** No event is a valid choice: such a practice runs only when someone requests a review. */
 export const NoEventChosen: Story = {
 	args: { reviewOn: { events: [], state: {} } },
 	play: async ({ canvas }) => {
@@ -90,7 +88,6 @@ export const NoEventChosen: Story = {
 	},
 };
 
-/** A file is never reviewed on an event: scans review it. */
 export const AnItemWithoutEvents: Story = {
 	args: { itemType: mockFileItemType, reviewOn: { events: [], state: {} } },
 	play: async ({ canvas }) => {
@@ -109,7 +106,6 @@ const ALL_ITEM_TYPES: { itemType: PracticeItemTypeOption; reviewOn: ReviewOn }[]
 	{ itemType: mockThreadItemType, reviewOn: { events: ["chat.thread.settled"], state: {} } },
 ];
 
-/** Side by side, which is the only way to judge whether one visual language holds across them. */
 export const EveryItemType: Story = {
 	render: (args) => (
 		<div className="space-y-8">
@@ -149,7 +145,6 @@ export const AnEventTheItemTypeNoLongerOffers: Story = {
 	},
 };
 
-/** The fault is drawn on the strip, not only in the message. */
 export const Invalid: Story = {
 	args: {
 		reviewOn: { events: ["scm.pull_request.reviewed"], state: {} },
@@ -166,7 +161,7 @@ export const Invalid: Story = {
 export const Disabled: Story = {
 	args: { disabled: true },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("checkbox", { name: /^Opened/u })).toBeDisabled();
+		await expectUnavailable(canvas.getByRole("checkbox", { name: /^Opened/u }));
 	},
 };
 
@@ -190,7 +185,6 @@ export const TogglingEventsAndStates: Story = {
 
 		await userEvent.click(canvas.getByRole("checkbox", { name: "Draft" }));
 		await expect(canvas.getByRole("checkbox", { name: "Draft" })).toBeChecked();
-		// Every state chosen is no restriction at all, so the dimension leaves the definition.
 		await expect(args.onChange).toHaveBeenLastCalledWith(expect.objectContaining({ state: {} }));
 	},
 };

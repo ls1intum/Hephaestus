@@ -52,7 +52,6 @@ interface CapturedCommit {
 	files?: { status: string; path: string }[];
 }
 
-/** The commit record, `commits.json`, with `commits` authored and committed by ada. */
 function commitsRecord(commits: CapturedCommit[]) {
 	return {
 		commits: commits.map((c) => ({
@@ -66,10 +65,6 @@ function commitsRecord(commits: CapturedCommit[]) {
 	};
 }
 
-/**
- * The records that the server stages beside the given ones and that the leads cite: the record of the
- * item, its description, and one file for each linked item item.
- */
 function stagedRecords(itemRecord: Record<string, unknown>, given: Files): Files {
 	const linked = given["linked_work_items.json"];
 	const items: unknown[] =
@@ -86,7 +81,6 @@ function stagedRecords(itemRecord: Record<string, unknown>, given: Files): Files
 	return files;
 }
 
-/** A run of `slug` with the context folder at the reference that the server gives it. */
 async function review(slug: string, inputs: RunInputs) {
 	const given = inputs.context ?? {};
 	const result = await runBundled(slug, {
@@ -98,13 +92,10 @@ async function review(slug: string, inputs: RunInputs) {
 	return { ...result, leads: result.leads ?? [] };
 }
 
-/** A review at the merge, the only moment of the merge practices. */
 const atMerge = event("scm.pull_request.merged");
 
-/** A review that a person requested, of an open pull request. */
 const requestedOpen = requested("scm.pull_request", { state: "OPEN" });
 
-/** A review that a person requested, of a merged pull request. */
 const requestedMerged = requested("scm.pull_request", { state: "MERGED" });
 
 void test("malformed review comments stop the bundled program before it can claim no asks", async () => {
@@ -373,7 +364,6 @@ void test("plans-first keeps missing commit capture separate from unknown author
 	}
 });
 
-/** GitLab's partial workflow: the issue is named only by `Related to` in the description. */
 const partial = {
 	...unmerged,
 	source_branch: "tutor-question-draft",
@@ -381,7 +371,6 @@ const partial = {
 	created_at: "2026-09-27T02:19:18Z",
 };
 
-/** The commit record of the partial workflow: one commit, authored before the pull request. */
 const partialCommits = commitsRecord([
 	{ sha: "b08d591eaaaa", message: "Save the draft", authoredAt: "2026-09-27T02:18:53Z" },
 ]);
@@ -567,8 +556,6 @@ void test("deferred asks are one lead each, with the record's facts and none of 
 	assert.equal(result.facts.conversationAsks, 1);
 	const [stock, capitalisation, emptyState] = result.leads;
 	assert.ok(stock && capitalisation && emptyState);
-	// The stock ask: the file is in the change but nothing near line 55 changed, no reply,
-	// resolved — and the reviewer's own later word on the thread drops it.
 	assert.equal(keyOf(stock.label), "inline-ask");
 	assert.deepEqual(stock.at, { record: "comments.json", line: 0 });
 	assert.equal(stock.facts?.path, "App/AddIngredientView.swift");
@@ -580,13 +567,10 @@ void test("deferred asks are one lead each, with the record's facts and none of 
 	assert.equal(stock.facts.reviewerFollowedUp, true);
 	assert.equal(stock.facts.waiverWordsInFollowUp, true);
 	assert.equal(stock.facts.approvedAfterAsk, true);
-	// The capitalisation ask: changed beside it, and the author answered; nobody else did.
 	assert.equal(capitalisation.facts?.changeNearLine, true);
 	assert.equal(capitalisation.facts.authorReplied, true);
 	assert.equal(capitalisation.facts.reviewerFollowedUp, false);
 	assert.equal(capitalisation.facts.waiverWordsInFollowUp, false);
-	// The conversation ask: the reply names an issue and defers in words, and the approval
-	// followed it — a fact the review weighs, not a waiver by itself.
 	assert.equal(keyOf(emptyState.label), "conversation-ask");
 	assert.deepEqual(emptyState.at, { record: "general_comments.json", line: 0 });
 	assert.equal(emptyState.facts?.issueNamedInReply, true);
@@ -606,7 +590,6 @@ void test("an ask cites the line of its body in the record that the server write
 		inputs: atMerge,
 		context: {
 			"general_comments.json": { comments: [] },
-			// The server writes each key of a comment on its own line.
 			"comments.json": JSON.stringify(comments, null, 2),
 		},
 	});
@@ -746,7 +729,6 @@ void test("every captured linked issue is a row, and those with a checkable outc
 			unrecognized,
 	);
 	assert.deepEqual(story.at, { record: "linked_work_items/18.md" });
-	// An unreported rollup is unknown: neither a checkable outcome nor proof there is none.
 	assert.equal(keyOf(story.label), "no-task-list-or-outcome-heading");
 	assert.equal(Object.hasOwn(story.facts ?? {}, "subIssuesTotal"), false);
 	assert.equal(story.facts?.how, "named with a closing keyword in the body");
@@ -760,13 +742,11 @@ void test("every captured linked issue is a row, and those with a checkable outc
 	assert.equal(Object.hasOwn(totalOnly.facts ?? {}, "subIssuesCompleted"), false);
 	assert.equal(keyOf(none.label), "no-checkable-outcome");
 	assert.equal(none.facts?.subIssuesTotal, 0);
-	// A capture that recorded no source claims neither.
 	for (const incomplete of [story, subIssues, totalOnly, none, unrecognized]) {
 		assert.equal(Object.hasOwn(incomplete.facts ?? {}, "subIssuesSource"), false);
 	}
 	assert.equal(unrecognized.facts?.subIssuesCompleted, 2);
 	assert.equal(provider.facts?.subIssuesSource, "provider");
-	// Stored children are the mirror at capture, which may omit others.
 	for (const stored of [someOpen, allClosed, emptyMirror]) {
 		assert.equal(stored.facts?.subIssuesSource, "children");
 	}
@@ -777,12 +757,10 @@ void test("every captured linked issue is a row, and those with a checkable outc
 	const said = (result.directions ?? []).join("\n");
 	assert.match(result.directions?.[0] ?? "", /Each is a candidate: the criteria decide which/u);
 	assert.doesNotMatch(said, /every one is an applicability/u);
-	// All of them closed establishes only that mirror, not the whole hierarchy.
 	assert.match(
 		said,
 		/may omit other children, so all of them closed does not show that the whole hierarchy is complete/u,
 	);
-	// A review that a person requested of an open pull request has no merge to review.
 	const open = await review("merge-confirms-the-linked-issue-outcome", {
 		item: { ...unmerged, state: "OPEN" },
 		inputs: requestedOpen,
@@ -815,7 +793,6 @@ void test("every captured linked issue is a row, and those with a checkable outc
 	}
 });
 
-/** An open merge request whose description says `Closes #1`; the provider records #1 as a closing candidate. */
 const closingLink = {
 	"linked_work_items.json": {
 		workItems: [
@@ -861,7 +838,6 @@ void test("an open issue that an open merge request may close stays open, its cl
 		...(result.directions ?? []),
 	].join("\n");
 	assert.doesNotMatch(evidence, /\bclosed\b/u);
-	// The merge practice has no merge to review before the merge.
 	const unmergedOutcome = await review("merge-confirms-the-linked-issue-outcome", {
 		item: openMergeRequest,
 		inputs: requestedOpen,
@@ -888,7 +864,6 @@ void test("a merge request stored closed by its merge is merged, while its linke
 		result.directions?.[0] ?? "",
 		/1 captured linked issue\(s\) state a checkable outcome/u,
 	);
-	// A person who asks for a review of the merged item gets the same leads as the merge.
 	assert.deepEqual(
 		await review("merge-confirms-the-linked-issue-outcome", {
 			item: mergedRequest,
@@ -936,7 +911,6 @@ void test("every authored commit is one lead, however many there are", async () 
 		const [first] = result.leads;
 		const bare = result.leads[3];
 		assert.ok(first && bare);
-		// The server writes the commit record on one line, so a lead cites it whole and names its sha.
 		assert.deepEqual(first.at, { record: "commits.json" });
 		assert.equal(keyOf(first.label), "commit");
 		assert.deepEqual(
@@ -959,7 +933,6 @@ void test("every authored commit is one lead, however many there are", async () 
 	}
 });
 
-/** The captured identity of an inventory row's repository: a full name and the ids that settle it. */
 const teamProject = { repository: "team/project", repository_id: 1, provider_id: 1 };
 const teamOther = { repository: "team/other", repository_id: 2, provider_id: 1 };
 const gitlab = (repository: string, repositoryId: number) => ({
@@ -996,7 +969,6 @@ void test("an issue reference is resolved against the inventory and the linked i
 			},
 		},
 	});
-	// The first lead for a number is the title's; the same number in the body and branch follows.
 	const byNumber = new Map(
 		result.leads.toReversed().map((lead) => [lead.facts?.number, lead.facts]),
 	);
@@ -1012,13 +984,11 @@ void test("an issue reference is resolved against the inventory and the linked i
 	assert.equal(byNumber.get(21)?.inLinkedItems, false);
 	assert.equal(byNumber.get(99)?.inInventory, false);
 	assert.equal(byNumber.get(99)?.title, undefined);
-	// The provider's enum casing is the one the inventory holds.
 	assert.equal(result.facts?.inventoryOpenIssues, 1);
 	assert.equal(result.facts.referencesInInventory, 2);
 	assert.equal(result.facts.linkedWorkItems, 1);
 });
 
-/** Run links-the-change-to-its-issue on one inventory and one description; the leads keyed by reference. */
 async function linksAgainst(
 	inventory: unknown,
 	reviewed: {
@@ -1054,7 +1024,6 @@ void test("a plain #number is the reviewed repository's issue, whichever permitt
 				{ ...teamProject, number: 7, title: "Show the map", state: "OPEN" },
 				{ ...teamOther, number: 7, title: "Rename the app", body: "", state: "CLOSED" },
 				{ ...teamOther, number: 8, title: "Fix the icon", state: "OPEN" },
-				// The same full name on another provider is another repository.
 				{
 					repository: "team/project",
 					repository_id: 3,
@@ -1072,7 +1041,6 @@ void test("a plain #number is the reviewed repository's issue, whichever permitt
 	assert.equal(seven.facts?.title, "Show the map");
 	assert.equal(seven.facts.state, "OPEN");
 	assert.equal(seven.facts.inInventory, true);
-	// The counts are the reviewed repository's, not the workspace's.
 	assert.equal(result.facts?.inventoryIssues, 1);
 	assert.equal(result.facts.inventoryOpenIssues, 1);
 });
@@ -1100,7 +1068,6 @@ void test("a qualified reference stays an issue of the repository it names, on G
 				{ ...gitlab("group/sub/project", 10), number: 7, title: "Show the map", state: "OPENED" },
 				{ ...gitlab("group/sub/other", 11), number: 8, title: "Share the map", state: "OPENED" },
 				{ ...gitlab("owner/repo", 12), number: 9, title: "Export the map", state: "OPENED" },
-				// The same path on another provider is another repository and never answers for this one.
 				{
 					repository: "group/sub/other",
 					repository_id: 13,
@@ -1125,7 +1092,6 @@ void test("a qualified reference stays an issue of the repository it names, on G
 	assert.equal(keyOf(other.label), "qualified-issue-reference");
 	assert.equal(other.facts?.title, "Share the map");
 	assert.equal(other.facts.inInventory, true);
-	// owner/repo has no #7, and the reviewed repository's #7 is not it.
 	const elsewhere = result.rows.get("owner/repo#7");
 	assert.ok(elsewhere);
 	assert.equal(elsewhere.facts?.inInventory, false);
@@ -1140,7 +1106,6 @@ void test("a qualified reference stays an issue of the repository it names, on G
 void test("an inventory that does not say whose issues it holds leaves the reviewed repository's rows unknown", async () => {
 	for (const inventory of [
 		{ issues: [{ number: 7, title: "Show the map", state: "OPEN" }] },
-		// A capture of one other repository says nothing about the reviewed one.
 		{
 			repository: "team/other",
 			issues: [{ number: 7, title: "Rename the app", body: "", state: "OPEN" }],
@@ -1168,7 +1133,6 @@ void test("an inventory that does not say whose issues it holds leaves the revie
 	assert.equal(unbound.facts?.inventoryIssues, -1);
 	assert.equal(unbound.rows.get("#7")?.facts?.title, undefined);
 	for (const [inventory, reviewed] of [
-		// Identified rows, but no admitted repository id: the full name alone settles nothing.
 		[
 			{ issues: [{ ...teamProject, number: 7, title: "Show the map", state: "OPEN" }] },
 			{
@@ -1178,7 +1142,6 @@ void test("an inventory that does not say whose issues it holds leaves the revie
 				body: "Refs #7 and team/project#7",
 			},
 		],
-		// One repository id under two names is a capture that identifies nothing.
 		[
 			{
 				issues: [
@@ -1206,7 +1169,6 @@ void test("unsafe captured repository identities cannot answer a plain or qualif
 		assert.equal(result.rows.get("#7")?.facts?.inInventory, "unknown");
 		assert.equal(result.rows.get("team/project#7")?.facts?.inInventory, "unknown");
 		assert.equal(result.facts?.inventoryIssues, -1);
-		// The record of the item refuses an identity that the server never writes.
 		await assert.rejects(
 			linksAgainst(
 				{ issues: [{ ...teamProject, number: 7, title: "Show the map" }] },
@@ -1420,7 +1382,6 @@ void test("every reviewer comment is one lead with the reply, the thread and the
 	assert.ok(stock && rename);
 	assert.equal(keyOf(stock.label), "reviewer-comment");
 	assert.deepEqual(stock.at, { record: "comments.json", line: 0 });
-	// An empty text is no fact: no later note by the reviewer, no approval after it.
 	assert.deepEqual(stock.facts, {
 		by: "jennifer",
 		bot: false,
@@ -1507,13 +1468,11 @@ void test("a conversation note is a lead, with the reviewer's approval, their se
 	const keyOf = await leadKeys("engaging-with-inline-review-comments");
 	const [nitpick, advice, thanks, afterMerge] = result.leads;
 	assert.ok(nitpick && advice && thanks && afterMerge);
-	// The reviewer's own next note stands beside the resolution of the inline nitpick.
 	assert.match(String(nitpick.facts?.reviewerLaterNote), /^Approved, it works\./u);
 	assert.equal(
 		nitpick.facts?.reviewerApprovedAfter,
 		"3600s later; 1 commit(s) and 0 author note(s) between",
 	);
-	// Advice posted with the reviewer's own approval, nothing between them.
 	assert.equal(keyOf(advice.label), "conversation-comment");
 	assert.deepEqual(advice.at, { record: "general_comments.json", line: 0 });
 	assert.equal(
@@ -1522,7 +1481,6 @@ void test("a conversation note is a lead, with the reviewer's approval, their se
 	);
 	assert.equal(advice.facts.afterHandOff, false);
 	assert.equal(advice.facts.authorNotesAfter, 0);
-	// A note posted after the merge is marked as such.
 	assert.equal(afterMerge.facts?.by, "peer");
 	assert.equal(afterMerge.facts.afterHandOff, true);
 	assert.equal("reviewerApprovedAfter" in afterMerge.facts, false);
@@ -1626,7 +1584,6 @@ void test("a resolution the record does not date by the merge, or a merge it doe
 				},
 				{ id: 22, state: "RESOLVED", createdAt: "2026-04-13T14:00:00Z" },
 				{ id: 23, state: "RESOLVED", createdAt: "2026-04-13T14:00:00Z", resolvedAt: "yesterday" },
-				// Opened after the 15:06 merge: whenever it was resolved, it was not open at the merge.
 				{ id: 24, state: "RESOLVED", createdAt: "2026-04-13T16:00:00Z" },
 			],
 			reviewDecisions: [],
@@ -1657,7 +1614,6 @@ void test("a resolution the record does not date by the merge, or a merge it doe
 	assert.equal(result.facts.resolutionTimeUnknown, 2);
 	assert.equal(result.facts.resolvedBeforeMerge, 1);
 
-	// Merged without a merge time, or with one that does not parse; and a pull request still open.
 	const [missing, invalid, open] = await Promise.all([
 		review("merged-past-unresolved-review-threads", {
 			item: unmerged,
@@ -1716,7 +1672,6 @@ void test("the merge practices read the threads and decisions as rows against th
 					outdated: true,
 					createdAt: "2026-04-13T14:19:00Z",
 				},
-				// Resolved, but after the merge: open at the merge, which is what the practice asks.
 				{
 					id: 12,
 					path: "App/Late.swift",
@@ -1736,7 +1691,6 @@ void test("the merge practices read the threads and decisions as rows against th
 				},
 				{ state: "APPROVED", author: "ada", submittedAt: "2026-04-13T14:30:00Z" },
 				{ state: "APPROVED", author: "jennifer", submittedAt: "2026-04-13T15:00:00Z" },
-				// A bot whose login looks like anyone's: its approval is recorded but is nobody's review.
 				{
 					state: "APPROVED",
 					author: "heph_introcourse_tutor_e2e",
@@ -1791,8 +1745,6 @@ void test("the merge practices read the threads and decisions as rows against th
 	});
 	const decisionKey = await leadKeys("merges-only-after-approval");
 	assert.equal(decisions.facts?.decisions, 5);
-	// Jennifer's approval at 15:00 is before the 15:06 merge and by someone else; Ada's is the author's, the bot's is
-	// no person's, Tom's is after.
 	assert.equal(decisions.facts.approvalsBeforeMergeByOthers, 1);
 	const rows = decisions.leads.filter((lead) => decisionKey(lead.label) === "review-decision");
 	assert.deepEqual(
@@ -1956,7 +1908,6 @@ void test("review engagement distinguishes unavailable commit evidence from a ca
 		const said = (result.directions ?? []).join(" ");
 		assert.equal(result.facts?.commitsFileAbsent, captured ? 0 : 1);
 		assert.equal(note.facts?.commitsAfterTouchingFile, captured ? 0 : "unknown");
-		// The sum over notes is as unknown as each note's count; a captured empty range measures 0.
 		assert.equal(result.facts.withLaterCommitOnFile, captured ? 0 : undefined);
 		assert.match(
 			said,

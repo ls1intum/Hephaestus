@@ -87,10 +87,6 @@ const practiceRows = () =>
 			document.body,
 	).getAllByRole("row");
 
-/**
- * The group the overview knows, in one column: the practices with a sentence under each practice
- * the overview mentions. No summary card and no "Where you stand" section stand over them.
- */
 export const Default: Story = {
 	play: async ({ args }) => {
 		const table = await screen.findByRole("table", { name: "Practices in this group" });

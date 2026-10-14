@@ -32,9 +32,7 @@ const recorded = (response: Partial<FeedbackResponse>): FeedbackResponse => ({
 	...response,
 });
 
-/** The hook against the real client, recording what each write puts on the wire. */
 function renderWrite(
-	/** Holds every PUT's answer until it settles. */
 	held?: Promise<void>,
 ) {
 	const written: { method: string; feedbackId: string; body: unknown }[] = [];

@@ -6,10 +6,6 @@ import java.nio.charset.StandardCharsets;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Centralized service for deserializing NATS messages. This avoids injecting ObjectMapper into
- * every message handler.
- */
 @Component
 public class NatsMessageDeserializer {
 

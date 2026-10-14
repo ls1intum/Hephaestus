@@ -26,14 +26,8 @@ import { hiddenByFilter, type TraceFilter } from "./trace-filter";
 import { type RailStepProps, StoryNode, offPath, useStory } from "./TraceStoryNode";
 import { CellLabel, TRACE_ROW_CELLS, TRACE_ROW_MAIN, TraceTable, traceRowGrid } from "./TraceTable";
 
-/** Past this many, the table lists the first results and folds the rest behind one line. */
 const RESULTS_OPEN = 12;
 
-/**
- * The results the review stage's table lists: every one where the table is open, otherwise
- * only the path's own, with the record the reader started from among them. The rest stay dots
- * under the count, each of which opens itself.
- */
 export function resultRows(
 	numbered: NumberedResult[],
 	path: NumberedResult[] | undefined,
@@ -49,11 +43,6 @@ export function resultRows(
 	return self === undefined ? [] : [self];
 }
 
-/**
- * The review's results: the count by verdict, then a table with one row per result the
- * reader sees in full, and a numbered dot for each of the rest. The table opens and folds on its own
- * button, whatever else the trace shows; "Expand all" opens it too.
- */
 export function ResultsStep({
 	lineage,
 	full,
@@ -78,7 +67,6 @@ export function ResultsStep({
 	const total = records.results.length;
 	const earlier = numbered.filter(({ result }) => answeredEarlier(result, review));
 	const empty = total === 0;
-	// The detail the page read speaks for this review only.
 	const nothing =
 		review === undefined
 			? undefined
@@ -191,10 +179,6 @@ export function ResultsStep({
 	);
 }
 
-/**
- * What the result step says: what the review recorded, from the whole chain, so a filter
- * never makes it say the review recorded less; how much of it the filter shows; or why there is none.
- */
 function ResultsHead({
 	full,
 	filter,
@@ -245,7 +229,6 @@ function worstTone(results: readonly LineageResult[]): BadgeVariant {
 	return "outline";
 }
 
-/** One result as its dot, which brings it into view and opens its sheet. */
 function ResultDot({ result, number }: { result: LineageResult; number: number }) {
 	const context = useStory();
 	const node: TraceNode = { kind: "result", id: result.id };
@@ -258,7 +241,7 @@ function ResultDot({ result, number }: { result: LineageResult; number: number }
 		/>
 	);
 	const { open } = context;
-	// The outcome in words too, so a dot is never told by its colour alone.
+	// Dots need outcome words so color is not their only distinction.
 	const facts = [
 		OUTCOME_DEFS[result.outcome].label,
 		result.severity === null ? undefined : SEVERITY_DEFS[result.severity].label.toLowerCase(),
@@ -272,7 +255,7 @@ function ResultDot({ result, number }: { result: LineageResult; number: number }
 		);
 	}
 	return (
-		// 24 px, the smallest target a pointer should have to hit (WCAG 2.5.8), around the smaller chip.
+		// Keep the pointer target at least 24 px (WCAG 2.5.8), even when the chip is smaller.
 		<button
 			type="button"
 			title={title}
@@ -286,7 +269,6 @@ function ResultDot({ result, number }: { result: LineageResult; number: number }
 	);
 }
 
-/** The letters of the pieces of feedback written from a result, in letter order. */
 function fedLetters(
 	resultId: string,
 	records: LineageRecords,
@@ -298,11 +280,6 @@ function fedLetters(
 		.sort((a, b) => a.length - b.length || a.localeCompare(b));
 }
 
-/**
- * One result as a row of the review stage's table: its number in its verdict's colour, its
- * practice and summary, the outcome, the severity, the pieces of feedback written from it by letter,
- * and when it was recorded. An earlier review's answer stands under the summary.
- */
 function ResultRow({
 	entry,
 	records,
@@ -312,7 +289,6 @@ function ResultRow({
 }: {
 	entry: NumberedResult;
 	records: LineageRecords;
-	/** The id of the trace's review, which says whether an earlier review answered the result. */
 	review: string | undefined;
 	letters: ReadonlyMap<string, string>;
 	muted: boolean;

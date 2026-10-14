@@ -1,5 +1,3 @@
-// Calls that hold more items than one call to their model may: the host refuses them before the
-// proxy. A rerank at the cap reaches the proxy, and `embedMany` splits its values into calls that fit.
 import { MODEL_SLOT_CAPS } from "../lib/core/contract.ts";
 import {
 	definePracticeScript,

@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
+import { parseSearch } from "@/lib/router-search";
+
 import type { ReviewFeedback } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
@@ -73,6 +75,7 @@ function feedbackPage(
 			(!query.from || row.createdAt >= new Date(query.from)) &&
 			(!query.to || row.createdAt < new Date(query.to)) &&
 			selects(query.state, row.state) &&
+			selects(query.destination, row.destination) &&
 			(query.location === undefined || row.location === query.location) &&
 			selects(query.stopReason, row.stopReason) &&
 			(query.developerId === undefined || row.developer.accountId === query.developerId),
@@ -101,7 +104,6 @@ const meta = {
 		groups: STORY_GROUPS,
 		practices: PRACTICES,
 		people: PEOPLE,
-		// Recomputed in `render` from the pool and the developer filtered to, as the route's query is.
 		developerCounts: { status: "ready", counts: [] },
 	},
 	// The screen is controlled: with a frozen `search` prop every facet reads as dead. The rows are
@@ -151,7 +153,7 @@ function comboboxes(group: HTMLElement) {
  */
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		// The same order as on every tab: the scope, which applies to every tab, then this list's own
 		// facets and its sort, all in one row.
 		const scope = canvas.getByRole("group", { name: "Applies to every tab" });
@@ -189,23 +191,18 @@ export const LongFeedbackReadsAsProse: Story = {
 export const FilterToOneDeveloper: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		await userEvent.click(canvas.getByRole("combobox", { name: "Developer" }));
 		const listbox = await screen.findByRole("listbox");
 		await userEvent.click(
 			await within(listbox).findByRole("option", { name: /Katherine Johnson/u }),
 		);
 		await canvas.findByRole("combobox", { name: "Developer: Katherine Johnson" });
-		await canvas.findByText("3 pieces of feedback match your filters.");
-		// The developer filtered to leads the list with all their feedback.
+		await canvas.findByText("5 pieces of feedback match your filters.");
 		await canvas.findByRole("heading", { name: "Feedback for Katherine Johnson" });
 	},
 };
 
-/**
- * A developer in a row opens the list filtered to them, which leads with their summary: all their
- * feedback by location, each count a link to exactly those rows.
- */
 export const DeveloperSummary: Story = {
 	args: {
 		search: {
@@ -226,9 +223,10 @@ export const DeveloperSummary: Story = {
 		}
 		await expect(within(table).getByRole("cell", { name: "With Heph in Slack" })).toBeVisible();
 		await expect(within(table).getByRole("cell", { name: "In conversation" })).toBeVisible();
-		// The counts open the rows they count.
 		const [count] = within(table).getAllByRole("link");
-		await expect(count).toHaveAttribute("href", expect.stringContaining(`developerId=${GRACE_ID}`));
+		await expect(
+			parseSearch(new URL(String(count?.getAttribute("href")), window.location.origin).search),
+		).toMatchObject({ developerId: "9", location: "HEPH" });
 	},
 };
 
@@ -258,7 +256,7 @@ export const DeveloperSummaryFailed: Story = {
 export const EveryRowNamesItsLocation: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		const table = within(canvas.getByRole("table", { name: "Feedback" }));
 		await expect(table.getAllByText("On GitHub").length).toBeGreaterThan(0);
 		await expect(table.getAllByText("On GitLab").length).toBeGreaterThan(0);
@@ -267,11 +265,10 @@ export const EveryRowNamesItsLocation: Story = {
 	},
 };
 
-/** The destination facet offers the three destinations, and filters to exactly the one chosen. */
 export const FilterToOneDestination: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		const trigger = canvas.getByRole("combobox", { name: "Destination" });
 		await userEvent.click(trigger);
 		const listbox = await screen.findByRole("listbox", { name: "Destination options" });
@@ -280,7 +277,7 @@ export const FilterToOneDestination: Story = {
 		}
 		await userEvent.click(within(listbox).getByRole("option", { name: /In conversation/u }));
 		await userEvent.click(trigger);
-		await canvas.findByText(/matches? your filters\./u);
+		await canvas.findByText(/match(?:es)? your filters\./u);
 		const table = within(canvas.getByRole("table", { name: "Feedback" }));
 		await expect(table.queryByText("On GitHub")).not.toBeInTheDocument();
 		await expect(table.getAllByText("In conversation").length).toBeGreaterThan(0);
@@ -305,7 +302,7 @@ export const WhyWithheldFacetOpen: Story = {
 export const FilterToOneWithholdingFamily: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		const trigger = canvas.getByRole("combobox", { name: "Why withheld" });
 		await userEvent.click(trigger);
 		const listbox = await screen.findByRole("listbox", { name: "Why withheld options" });
@@ -313,18 +310,18 @@ export const FilterToOneWithholdingFamily: Story = {
 		// Closed again: these facets are multi-select and stay open after a choice, so the next facet
 		// would otherwise put a second listbox on screen.
 		await userEvent.click(trigger);
-		await canvas.findByText("1 piece of feedback matches your filters.");
+		await canvas.findByText("2 pieces of feedback match your filters.");
 		canvas.getByTitle("It said nothing the developer was not already told.");
 
-		// A destination nothing under that family went to, so the two filters intersect to nothing.
 		await userEvent.click(canvas.getByRole("combobox", { name: "Destination" }));
 		const destinations = await screen.findByRole("listbox", { name: "Destination options" });
 		await userEvent.click(
 			await within(destinations).findByRole("option", { name: /In conversation/u }),
 		);
+		await userEvent.keyboard("{Escape}");
 		await canvas.findByText("No feedback matches these filters");
 		await userEvent.click(canvas.getByRole("button", { name: "Clear all filters" }));
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 	},
 };
 
@@ -335,7 +332,7 @@ export const FilterToOneWithholdingFamily: Story = {
 export const SortOldestFirst: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ args, canvas, userEvent }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		await userEvent.click(canvas.getByRole("combobox", { name: /Sort/u }));
 		await userEvent.click(await screen.findByRole("option", { name: "Oldest first" }));
 		await expect(args.onSearchChange).toHaveBeenLastCalledWith(
@@ -365,7 +362,7 @@ export const Mobile: Story = {
 		viewport: { defaultViewport: "reflow" },
 	},
 	play: async ({ canvas }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		await expectNoPageOverflow();
 	},
 };

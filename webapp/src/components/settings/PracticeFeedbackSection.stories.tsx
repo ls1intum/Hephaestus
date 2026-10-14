@@ -17,7 +17,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The choice belongs to the account, so turning it off in one workspace turns it off in all. */
 export const Enabled: Story = {
 	args: {
 		practiceFeedbackDeliveryEnabled: true,

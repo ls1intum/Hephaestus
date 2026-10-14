@@ -7,7 +7,6 @@ import static de.tum.cit.aet.hephaestus.architecture.HephaestusArchitectureTest.
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** Product reviews consume neutral ports. Domain and provider code own source-specific work. */
 @Tag("architecture")
 class PracticeReviewModuleBoundaryTest {
     @Test

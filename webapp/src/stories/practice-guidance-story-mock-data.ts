@@ -9,10 +9,6 @@ import bundledCatalog from "@bundled-practices";
 
 const GUIDED_SLUG = "scope-one-reviewable-change";
 
-/**
- * A catalog practice as the webapp reads it: its definition's name and words, and the resources its
- * picture and guide are read from, either of which it may leave out.
- */
 interface BundledPractice {
 	slug: string;
 	definition: {

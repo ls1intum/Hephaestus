@@ -23,25 +23,9 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Immutable event payload DTOs for SCM domain events. These records are safe for async handling —
- * they capture entity state at publish time, so subscribers never trigger {@code
- * LazyInitializationException}.
- *
- * <p>Imports are restricted to the vendor-neutral SCM domain layer ({@code
- * integration.scm.domain.*}) by {@link
- * de.tum.cit.aet.hephaestus.architecture.IntegrationCoreVendorNeutralityTest}. Vendor-specific
- * payloads (e.g. GitHub Projects V2 — no GitLab equivalent) live in vendor packages: see {@code
- * integration.scm.github.events.GitHubProjectEventPayload}.
- */
+/** Capture state at publication so asynchronous subscribers cannot encounter lazy entity associations. */
 public final class ScmEventPayload {
 
-    /**
-     * Diagnostic only — fires from the {@link ReviewData#from} / {@link ReviewThreadData#from}
-     * factories when an entity references a null {@code PullRequest} (the FK is nullable on the
-     * join column). Callers use {@code Optional.empty()} as the contract; this log exists so
-     * operators can investigate which DB rows triggered the empty path.
-     */
     private static final Logger log = LoggerFactory.getLogger(ScmEventPayload.class);
 
     private ScmEventPayload() {}

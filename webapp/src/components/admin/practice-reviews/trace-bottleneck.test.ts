@@ -18,7 +18,6 @@ function bottleneckOf(key: string, node: TraceNode = REVIEW) {
 	return traceBottleneck(lineage, node, review, NOW);
 }
 
-/** The case's graph with one piece of feedback changed. */
 function withFeedback(
 	lineage: ReviewLineage,
 	feedbackId: string,
@@ -34,7 +33,6 @@ function withFeedback(
 	};
 }
 
-/** The one piece of feedback of a case. */
 function onlyPiece(key: string): ReviewBoundFeedback {
 	const piece = lineageStateCase(key).lineage.nodes.find(
 		(node) => node.feedback !== null,
@@ -70,7 +68,6 @@ function job(fields: Partial<ReviewJob>): ReviewJob {
 	};
 }
 
-/** The detail of the case's review: asked for at 13:35, started by an event ten seconds before. */
 function detailOf(key: string, overrides: Partial<ReviewDetail> = {}): ReviewDetail {
 	const ref = lineageStateCase(key).lineage.nodes.find((node) => node.review !== null)?.review;
 	if (ref == null) {

@@ -1,5 +1,3 @@
-// A model call that never answers, next to a line that plain code found. The call ends unrated when
-// the host stops the program, and the program still has the time it takes to return its own result.
 import { setTimeout as sleep } from "node:timers/promises";
 import { scm } from "../kits/scm/index.ts";
 

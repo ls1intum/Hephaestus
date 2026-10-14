@@ -43,7 +43,6 @@ export function ReviewTimeline({
 	);
 }
 
-/** Every card open, or only the newest card's first result. */
 function cardInitiallyOpen(
 	initiallyOpen: "all" | "newest",
 	index: number,
