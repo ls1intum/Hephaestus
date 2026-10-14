@@ -30,6 +30,7 @@ import { problemStatusOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
 import { QUERY_RETRIES, sessionRetriesQueries } from "@/runtime/tanstack-query/query-defaults";
 import { slicePageParams } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 interface ProfileReviewRunsRequest {
 	workspaceSlug: string;
@@ -55,20 +56,22 @@ export function usePracticeProfileReviewRuns({
 	since,
 }: ProfileReviewRunsRequest) {
 	const now = useNow();
+	const runsOptions = listPracticeProfileReviewRunsInfiniteOptions({
+		path: { workspaceSlug },
+		query: {
+			size: PROFILE_REVIEWS_PAGE_SIZE,
+			kind,
+			since: since === undefined ? undefined : reviewRangeStart(now, since),
+		},
+	});
 	const runsQuery = useInfiniteQuery({
-		...listPracticeProfileReviewRunsInfiniteOptions({
-			path: { workspaceSlug },
-			query: {
-				size: PROFILE_REVIEWS_PAGE_SIZE,
-				kind,
-				since: since === undefined ? undefined : reviewRangeStart(now, since),
-			},
-		}),
+		...runsOptions,
 		...slicePageParams,
 		enabled: listOpen,
 		// A review is listed once it records something about the reader, which no ask here announces.
 		refetchInterval: PRACTICE_PROFILE_POLL_MS,
 	});
+	useQueryReadRefusal(runsOptions.queryKey, runsQuery.isError, runsQuery.error);
 	const runOptions = getPracticeProfileReviewRunOptions({
 		path: { workspaceSlug, reviewId: reviewId ?? "" },
 	});

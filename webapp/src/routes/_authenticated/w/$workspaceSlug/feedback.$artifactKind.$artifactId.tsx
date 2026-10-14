@@ -9,6 +9,7 @@ import { REVIEW_RUN_PAGE_SIZE } from "@/hooks/use-practice-group-detail";
 import { pageHead } from "@/lib/page-title";
 import { useAuth } from "@/runtime/auth/AuthContext";
 import { slicePageParams } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 /**
  * The address every comment Hephaestus posts on reviewed work ends with, so it is a contract with
@@ -34,13 +35,12 @@ function ReviewedWorkFeedbackRoute() {
 	const readOnly = useAuth().userView !== undefined;
 	const { workspaceSlug, artifactKind } = Route.useParams();
 	const { artifactId } = Route.useLoaderData();
-	const runs = useInfiniteQuery({
-		...listReviewedWorkReviewRunsInfiniteOptions({
-			path: { workspaceSlug, artifactKind, artifactId },
-			query: { size: REVIEW_RUN_PAGE_SIZE },
-		}),
-		...slicePageParams,
+	const runsOptions = listReviewedWorkReviewRunsInfiniteOptions({
+		path: { workspaceSlug, artifactKind, artifactId },
+		query: { size: REVIEW_RUN_PAGE_SIZE },
 	});
+	const runs = useInfiniteQuery({ ...runsOptions, ...slicePageParams });
+	useQueryReadRefusal(runsOptions.queryKey, runs.isError, runs.error);
 	const { respond, pendingResponses } = useFeedbackResponseWrite(workspaceSlug, () => undefined);
 	return (
 		<ReviewedWorkFeedbackPage
