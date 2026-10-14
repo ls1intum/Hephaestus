@@ -25,19 +25,23 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
+import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
@@ -70,6 +74,9 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Autowired
     private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -108,7 +115,12 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .put("coveringJobId", covering.toString())
                 .put("rawOutput", "{\"observations\":[]}");
         output.set("runnerDebug", OBJECT_MAPPER.readTree("""
-            {"turns":[{"label":"private-feedback","stored":2}]}
+            {"publicHistory":{"secret":"PRIVATE-HISTORY"},"turns":[
+              {"phase":"private-feedback","label":"PRIVATE-LABEL","calls":2,"durationMs":12,
+               "modelFailures":{"HTTP_ERROR":1,"PRIVATE-KEY":99},
+               "modelCallTiming":{"timedCalls":1,"respondedCalls":0,"elapsedMs":4,"failedElapsedMs":4,"maxElapsedMs":4,"responseMs":0},
+               "finalModelFailure":{"kind":"HTTP_ERROR","source":"ADAPTER","phase":"request","status":503,"at":1760000000000,"reason":"PRIVATE-REASON"},
+               "toolCalls":{"PRIVATE-TOOL":1},"toolArgs":"PRIVATE-ARGS","refusalReasons":["PRIVATE-REFUSAL"]}]}
             """));
         output.set("feedback", OBJECT_MAPPER.readTree("""
             {"review":{"summary":{"body":"PUBLIC-COMPOSITION"}},
@@ -134,8 +146,40 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             assertThat(response)
                     .isNotNull()
                     .doesNotContain("PRIVATE-APP-BODY", "PRIVATE-CHAT-NOTES", "PRIVATE-PROPOSAL", "PUBLIC-COMPOSITION")
-                    .doesNotContain("rawOutput", "runnerDebug", "private-feedback")
+                    .doesNotContain(
+                            "rawOutput",
+                            "runnerDebug",
+                            "private-feedback",
+                            "PRIVATE-HISTORY",
+                            "PRIVATE-LABEL",
+                            "PRIVATE-KEY",
+                            "PRIVATE-REASON",
+                            "PRIVATE-TOOL",
+                            "PRIVATE-ARGS",
+                            "PRIVATE-REFUSAL")
                     .contains("SUPERSEDED", covering.toString(), "\"llmTotalCalls\":5");
+            var body = OBJECT_MAPPER.readTree(Objects.requireNonNull(response));
+            if (suffix.isEmpty()) {
+                body.path("content").forEach(row -> {
+                    assertThat(row.path("output").isNull() || row.path("output").isMissingNode())
+                            .isTrue();
+                    assertThat(row.path("reviewDiagnostics").isMissingNode()).isTrue();
+                });
+            } else {
+                assertThat(body.path("output").isNull() || body.path("output").isMissingNode())
+                        .isTrue();
+                var phase = body.path("reviewDiagnostics").path("phases").path(2);
+                assertThat(phase.path("phase").asString()).isEqualTo("PRIVATE_FEEDBACK");
+                assertThat(phase.path("recordedTurns").asInt()).isEqualTo(1);
+                assertThat(phase.path("assistantCalls").asLong()).isEqualTo(2);
+                assertThat(phase.path("elapsedMs").asLong()).isEqualTo(12);
+                assertThat(phase.path("modelCallTiming").path("timedCalls").asLong())
+                        .isEqualTo(1);
+                assertThat(phase.path("modelCallTiming").path("responseMs").isMissingNode())
+                        .isTrue();
+                assertThat(phase.path("finalModelFailure").path("status").asInt())
+                        .isEqualTo(503);
+            }
         }
         assertThat(agentJobRepository.findById(job.getId()).orElseThrow().getOutput())
                 .isEqualTo(output);
@@ -380,6 +424,8 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(result.status()).isEqualTo(AgentJobStatus.COMPLETED);
         assertThat(result.jobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
         assertThat(result.model()).isEqualTo("gpt-5.4-mini");
+        assertThat(result.reviewDiagnostics()).isNull();
+        assertThat(result.output()).isNull();
     }
 
     /** The run recorded the title the pull request had then; the mirror holds the one it has now. */
@@ -490,6 +536,9 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         ensureAdminMembership(workspaceB);
 
         AgentJob jobInA = createJob(workspaceA, AgentJobStatus.COMPLETED);
+        jobInA.setOutput(OBJECT_MAPPER.readTree(
+                "{\"runnerDebug\":{\"turns\":[{\"phase\":\"practice\",\"calls\":1,\"durationMs\":0}]}}"));
+        agentJobRepository.saveAndFlush(jobInA);
 
         webTestClient
                 .get()
@@ -499,6 +548,84 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectStatus()
                 .isNotFound()
                 .expectBody(Void.class);
+    }
+
+    @Test
+    @WithMentorUser
+    void shouldDenyRetainedDiagnosticsWhenAWorkspaceMemberReadsJobDetailOrList() {
+        Workspace workspace = setupWorkspace();
+        User member = persistUser("mentor");
+        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+        AgentJob job = createJob(workspace, AgentJobStatus.FAILED);
+        job.setOutput(OBJECT_MAPPER.readTree(
+                "{\"runnerDebug\":{\"turns\":[{\"phase\":\"practice\",\"calls\":1,\"durationMs\":0}]}}"));
+        agentJobRepository.saveAndFlush(job);
+        for (String suffix : List.of("/" + job.getId(), "")) {
+            webTestClient
+                    .get()
+                    .uri("/workspaces/{slug}/agents/jobs" + suffix, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden()
+                    .expectBody(Void.class);
+        }
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldKeepDiagnosticsAbsentWhenCancelledOrCrashedOutputIsUnavailable() {
+        Workspace workspace = setupWorkspace();
+        for (var status : List.of(AgentJobStatus.CANCELLED, AgentJobStatus.FAILED, AgentJobStatus.TIMED_OUT)) {
+            AgentJob job = createJob(workspace, status);
+            webTestClient
+                    .get()
+                    .uri("/workspaces/{slug}/agents/jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.reviewDiagnostics")
+                    .doesNotExist()
+                    .jsonPath("$.output")
+                    .doesNotExist();
+        }
+        AgentJob job = createJob(workspace, AgentJobStatus.COMPLETED);
+        job.setOutput(OBJECT_MAPPER.readTree(
+                "{\"runnerDebug\":{\"turns\":[{\"calls\":0,\"durationMs\":0,\"label\":\"practice\"}]}}"));
+        agentJobRepository.saveAndFlush(job);
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/agents/jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.reviewDiagnostics.phases[0].recordedTurns")
+                .isEqualTo(0)
+                .jsonPath("$.reviewDiagnostics.phases[3].phase")
+                .isEqualTo("UNKNOWN")
+                .jsonPath("$.reviewDiagnostics.phases[3].recordedTurns")
+                .isEqualTo(1)
+                .jsonPath("$.reviewDiagnostics.phases[3].modelCallTiming")
+                .doesNotExist();
+        assertThat(jdbc.update(
+                        "UPDATE agent_job SET output = NULL WHERE id = ? AND workspace_id = ?",
+                        job.getId(),
+                        workspace.getId()))
+                .isEqualTo(1);
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/agents/jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.reviewDiagnostics")
+                .doesNotExist();
     }
 
     @Test

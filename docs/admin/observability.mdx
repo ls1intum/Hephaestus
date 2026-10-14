@@ -378,6 +378,14 @@ they ended. It is not a record of what a review read or said.
 
 Durable review records retain admitted observations and their citation verdicts, not raw inputs,
 model requests or session transcripts. `AGENT_PAYLOAD_RETENTION` strips diagnostic job output.
+
+Workspace admins can read phase diagnostics on terminal job detail while that output remains available.
+These facts describe retained closed turns, not a complete or live review.
+Legacy turns without an explicit phase stay unassigned.
+Missing or invalid facts stay unknown, and durations use milliseconds.
+Model durations cover only recorded adapter spans, including failed calls, and an observed zero remains valid.
+Retention and erasure remove these diagnostics with the job output.
+
 The worker can separately retain bounded debug session transcripts. The
 [retention decision](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0041-compose-1x-kubernetes-2.md#update--2026-10-09-debug-transcripts)
 defines their ownership checks, metadata fallback, erasure and expiry.

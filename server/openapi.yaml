@@ -12042,6 +12042,11 @@ components:
           type: integer
           format: int32
           description: Number of retry attempts
+        reviewDiagnostics:
+          $ref: "#/components/schemas/ReviewDiagnostics"
+          description: "Safe observed closed-turn diagnostics from retained output;\
+            \ available only on terminal job detail, absent when retained turns cannot\
+            \ be safely read"
         reviewOutcome:
           type: string
           description: "Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE\
@@ -16074,6 +16079,65 @@ components:
           - CLOUD
       required:
       - choice
+    ModelCallTiming:
+      type: object
+      properties:
+        elapsedMs:
+          type: integer
+          format: int64
+          description: Sum of adapter spans in milliseconds; absent when no span was
+            recorded
+        failedElapsedMs:
+          type: integer
+          format: int64
+          description: Sum of failed or aborted adapter spans in milliseconds; absent
+            when no span was recorded
+        maxElapsedMs:
+          type: integer
+          format: int64
+          description: Largest recorded adapter span in milliseconds; absent when
+            no span was recorded
+        respondedCalls:
+          type: integer
+          format: int64
+          description: Timed calls with a recorded valid SDK response time
+        responseMs:
+          type: integer
+          format: int64
+          description: Sum of request-to-SDK-response times in milliseconds; absent
+            when no response time was recorded
+        timedCalls:
+          type: integer
+          format: int64
+          description: Calls with a recorded valid adapter span; does not imply all
+            calls were timed
+      required:
+      - respondedCalls
+      - timedCalls
+    ModelFailureCount:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: Observed failed or aborted calls; absent if a supplied count
+            is invalid or its sum overflows
+        kind:
+          type: string
+          enum:
+          - HTTP_ERROR
+          - CONNECTION_TIMEOUT
+          - CONNECTION_ERROR
+          - STREAM_INCOMPLETE
+          - FINISH_REASON_ERROR
+          - STREAM_ERROR_EVENT
+          - RESPONSE_FAILED
+          - RESPONSE_STATUS_ERROR
+          - TOOL_CALL_INCOMPLETE
+          - ABORTED
+          - UNKNOWN
+      required:
+      - kind
     NotificationPreferences:
       type: object
       properties:
@@ -19947,6 +20011,17 @@ components:
       - canInspectReviewDetails
       - canRequestReview
       - work
+    ReviewDiagnostics:
+      type: object
+      description: "Observed closed turns from retained runner output, not live or\
+        \ complete execution telemetry"
+      properties:
+        phases:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewPhaseDiagnostics"
+      required:
+      - phases
     ReviewFeedback:
       type: object
       properties:
@@ -21063,6 +21138,49 @@ components:
       - practiceName
       - practiceSlug
       - reviewedWork
+    ReviewPhaseDiagnostics:
+      type: object
+      description: One fixed review phase; UNKNOWN includes legacy turns without an
+        explicit recognized phase
+      properties:
+        assistantCalls:
+          type: integer
+          format: int64
+          description: Observed assistant/model calls; absent if any count is unknown
+            or the sum exceeds the bound
+        elapsedMs:
+          type: integer
+          format: int64
+          description: Sum of observed closed turn durations in milliseconds; absent
+            if any duration is unknown or the sum overflows
+        finalModelFailure:
+          $ref: "#/components/schemas/TerminalModelFailure"
+          description: Safe failure of the last model call in the latest closed turn
+            of this phase; absent after recovery or when unknown
+        modelCallTiming:
+          $ref: "#/components/schemas/ModelCallTiming"
+          description: "Adapter span totals; absent if any turn has absent, partial\
+            \ or invalid span totals"
+        modelFailures:
+          type: array
+          description: "Closed failure kinds recorded across these turns; empty means\
+            \ none recorded, absent means a turn has no readable counts"
+          items:
+            $ref: "#/components/schemas/ModelFailureCount"
+        phase:
+          type: string
+          enum:
+          - PRACTICE
+          - PUBLIC_REVIEW
+          - PRIVATE_FEEDBACK
+          - UNKNOWN
+        recordedTurns:
+          type: integer
+          format: int32
+          description: Number of retained closed turn records
+      required:
+      - phase
+      - recordedTurns
     ReviewPlacement:
       type: object
       description: A recorded message placement
@@ -22490,6 +22608,48 @@ components:
       - hidden
       - id
       - name
+    TerminalModelFailure:
+      type: object
+      properties:
+        at:
+          type: integer
+          format: int64
+          description: Adapter failure time in epoch milliseconds; absent if unknown
+        kind:
+          type: string
+          enum:
+          - HTTP_ERROR
+          - CONNECTION_TIMEOUT
+          - CONNECTION_ERROR
+          - STREAM_INCOMPLETE
+          - FINISH_REASON_ERROR
+          - STREAM_ERROR_EVENT
+          - RESPONSE_FAILED
+          - RESPONSE_STATUS_ERROR
+          - TOOL_CALL_INCOMPLETE
+          - ABORTED
+          - UNKNOWN
+        phase:
+          type: string
+          enum:
+          - REQUEST
+          - RESPONSE_BODY
+        retryEndedUnsuccessfully:
+          type: boolean
+          description: Whether the native retry ended unsuccessfully; absent if no
+            valid flag was recorded
+        source:
+          type: string
+          enum:
+          - ADAPTER
+          - MISSING
+          - INVALID
+        status:
+          type: integer
+          format: int32
+          description: "HTTP status from 400 through 599, for HTTP_ERROR only"
+      required:
+      - kind
     TimeBucketSize:
       type: string
       description: "How long each bucket of a range is: a day for ranges up to 31\

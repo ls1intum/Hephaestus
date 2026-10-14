@@ -1,5 +1,5 @@
 import { CopyIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 
 import { cn } from "cn";
 
@@ -234,6 +234,7 @@ export function ReviewLevel({
 					{usage?.status === "ready" && usage.usage.attempts.length > 1 && (
 						<UsageAttempts attempts={usage.usage.attempts} />
 					)}
+					{!cancellable && <ModelActivity diagnostics={job.reviewDiagnostics} />}
 					<GeneratedPaths job={job} />
 				</SheetTechnical>
 			</DrawerBody>
@@ -535,6 +536,141 @@ function UsageAttempts({ attempts }: { attempts: AgentJobUsageAttempt[] }) {
 					</li>
 				))}
 			</ol>
+		</Section>
+	);
+}
+
+type ReviewDiagnostics = NonNullable<AgentJob["reviewDiagnostics"]>;
+type PhaseDiagnostics = ReviewDiagnostics["phases"][number];
+type ModelFailure = NonNullable<PhaseDiagnostics["finalModelFailure"]>;
+
+const MODEL_PHASE_LABELS: Record<PhaseDiagnostics["phase"], string> = {
+	PRACTICE: "Practice checks",
+	PUBLIC_REVIEW: "Review on the work",
+	PRIVATE_FEEDBACK: "Private feedback",
+	UNKNOWN: "Not assigned to a phase",
+};
+
+const MODEL_FAILURE_LABELS: Record<ModelFailure["kind"], string> = {
+	HTTP_ERROR: "HTTP error",
+	CONNECTION_TIMEOUT: "Connection timed out",
+	CONNECTION_ERROR: "Connection failed",
+	STREAM_INCOMPLETE: "Response ended early",
+	FINISH_REASON_ERROR: "Model stopped with an error",
+	STREAM_ERROR_EVENT: "Error in the response stream",
+	RESPONSE_FAILED: "Response failed",
+	RESPONSE_STATUS_ERROR: "Response reported an error",
+	TOOL_CALL_INCOMPLETE: "Tool call left incomplete",
+	ABORTED: "Aborted",
+	UNKNOWN: "Unknown failure",
+};
+
+const MODEL_FAILURE_STEP_LABELS: Record<NonNullable<ModelFailure["phase"]>, string> = {
+	REQUEST: "while sending the request",
+	RESPONSE_BODY: "while reading the response",
+};
+
+const NOT_RECORDED = "Not recorded";
+
+function msText(ms: number): string {
+	return ms > 0 && ms < 1000 ? "under 1 s" : durationText(ms / 1000);
+}
+
+function callCount(count: number): string {
+	return count === 1 ? "1 call" : `${count} calls`;
+}
+
+/** The summed model spans, with how many calls they cover: a span is only kept for a timed call. */
+function modelTimeText({ assistantCalls, modelCallTiming: timing }: PhaseDiagnostics): string {
+	if (timing == null || timing.elapsedMs == null) {
+		return NOT_RECORDED;
+	}
+	const coverage =
+		assistantCalls == null
+			? `${callCount(timing.timedCalls)} timed`
+			: `${timing.timedCalls} of ${callCount(assistantCalls)} timed`;
+	const longest = timing.maxElapsedMs == null ? "" : `, longest ${msText(timing.maxElapsedMs)}`;
+	return `${msText(timing.elapsedMs)} over ${coverage}${longest}`;
+}
+
+/** Each kind of failed call and how many; an empty list is none recorded, an absent one unknown. */
+function failedCallsText({ modelFailures }: PhaseDiagnostics): string {
+	if (modelFailures == null) {
+		return NOT_RECORDED;
+	}
+	if (modelFailures.length === 0) {
+		return "None recorded";
+	}
+	return modelFailures
+		.map(({ kind, count }) => `${MODEL_FAILURE_LABELS[kind]}: ${count ?? "number not recorded"}`)
+		.join(" · ");
+}
+
+function lastCallFailureText(failure: ModelFailure): string {
+	const parts = [
+		failure.status == null
+			? MODEL_FAILURE_LABELS[failure.kind]
+			: `${MODEL_FAILURE_LABELS[failure.kind]} ${failure.status}`,
+	];
+	if (failure.phase != null) {
+		parts.push(MODEL_FAILURE_STEP_LABELS[failure.phase]);
+	}
+	if (failure.retryEndedUnsuccessfully === true) {
+		parts.push("after retries ended unsuccessfully");
+	}
+	return `Failed: ${parts.join(", ")}`;
+}
+
+function PhaseActivity({ phase }: { phase: PhaseDiagnostics }) {
+	const labelId = useId();
+	const timing = phase.modelCallTiming;
+	const turns = phase.recordedTurns === 1 ? "1 turn" : `${phase.recordedTurns} turns`;
+	return (
+		<div role="group" aria-labelledby={labelId} className="space-y-2">
+			<p id={labelId} className="font-medium">
+				{MODEL_PHASE_LABELS[phase.phase]}
+			</p>
+			<ReviewFactGrid>
+				<ReviewFact label="Closed turns">
+					{turns}, {phase.elapsedMs == null ? "time not recorded" : msText(phase.elapsedMs)}
+				</ReviewFact>
+				<ReviewFact label="Calls recorded">{phase.assistantCalls ?? NOT_RECORDED}</ReviewFact>
+				<ReviewFact label="Model time">{modelTimeText(phase)}</ReviewFact>
+				{timing?.responseMs != null && (
+					<ReviewFact label="Request to SDK response">
+						{msText(timing.responseMs)} over {callCount(timing.respondedCalls)}
+					</ReviewFact>
+				)}
+				<ReviewFact label="Failed calls">{failedCallsText(phase)}</ReviewFact>
+				{phase.finalModelFailure != null && (
+					<ReviewFact label="Latest turn’s last call">
+						{lastCallFailureText(phase.finalModelFailure)}
+					</ReviewFact>
+				)}
+			</ReviewFactGrid>
+		</div>
+	);
+}
+
+function ModelActivity({ diagnostics }: { diagnostics: ReviewDiagnostics | undefined }) {
+	const phases = diagnostics?.phases.filter((phase) => phase.recordedTurns > 0);
+	let body: ReactNode;
+	if (phases == null) {
+		body = <p className="text-muted-foreground">Not available.</p>;
+	} else if (phases.length === 0) {
+		body = <p className="text-muted-foreground">No closed turns were kept.</p>;
+	} else {
+		body = phases.map((phase) => <PhaseActivity key={phase.phase} phase={phase} />);
+	}
+	return (
+		<Section
+			level={4}
+			size="sm"
+			title="Model activity"
+			description="From the closed turns kept in the review’s output, not a live or complete record of every call. A turn’s time includes tools and local work. Model spans are not a partition of execution. Failed calls may have recovered later."
+			className="space-y-4 text-sm"
+		>
+			{body}
 		</Section>
 	);
 }

@@ -32,6 +32,12 @@ public record AgentJobDTO(
         @Nullable
         Object output,
 
+        @Schema(
+                description =
+                        "Safe observed closed-turn diagnostics from retained output; available only on terminal job detail, absent when retained turns cannot be safely read")
+        @Nullable
+        ReviewDiagnosticsDTO reviewDiagnostics,
+
         @NonNull
         @Schema(
                 description =
@@ -204,6 +210,7 @@ public record AgentJobDTO(
                 ReviewRunTargetDTO.from(target),
                 job.getMetadata(),
                 null,
+                ReviewDiagnosticsProjector.from(job),
                 ReviewRunOutcome.fromJobOutput(job.getOutput()),
                 ReviewRunOutcome.coveringJobId(job.getOutput()),
                 redactInstanceBaseUrl(snapshot),
@@ -250,6 +257,7 @@ public record AgentJobDTO(
                 row.getStatus(),
                 ReviewRunTargetDTO.from(target),
                 row.getMetadata(),
+                null,
                 null,
                 ReviewRunOutcome.fromJobOutput(row.getOutput()),
                 ReviewRunOutcome.coveringJobId(row.getOutput()),
