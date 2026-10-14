@@ -570,8 +570,7 @@ public class GitHubDataSyncService {
      * repos-done/repos-total progress is reported after each repository.
      *
      * @param scopeId the scope ID
-     * @param handle  the live job handle, or {@code null} for the untracked scheduled/lifecycle paths
-     *                (unchanged behavior — no cancellation checks, no progress reporting)
+     * @param handle  the tracked sync job's cancellation/progress handle, or {@code null} for untracked callers
      */
     public void syncAllRepositories(Long scopeId, @Nullable SyncExecutionHandle handle) {
         // Fail fast for a suspended installation so no threads are spawned for it at all.
@@ -623,14 +622,14 @@ public class GitHubDataSyncService {
 
             int reposProcessed = 0;
             for (SyncTarget target : syncTargets) {
-                // Cooperative cancel for the manual "reconcile now" sync-job path — best-effort,
-                // checked between repositories only (see class-level SyncExecutionHandle javadoc).
+                // Cooperative cancellation is best-effort, checked between repositories.
                 if (handle != null && handle.isCancellationRequested()) {
                     log.info(
                             "Aborting remaining syncs: reason=cancellationRequested, scopeId={}, reposProcessed={}, reposRemaining={}",
                             scopeId,
                             reposProcessed,
                             syncTargets.size() - reposProcessed);
+                    handle.reportCancelled();
                     break;
                 }
                 // Check if installation became suspended mid-sync - abort remaining syncs
@@ -668,6 +667,7 @@ public class GitHubDataSyncService {
                                 scopeId,
                                 reposProcessed,
                                 syncTargets.size() - reposProcessed);
+                        handle.reportCancelled();
                         break;
                     }
                 }
