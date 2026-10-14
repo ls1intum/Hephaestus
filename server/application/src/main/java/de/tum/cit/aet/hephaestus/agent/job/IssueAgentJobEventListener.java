@@ -27,6 +27,7 @@ import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.util.Collections;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -138,8 +139,8 @@ public class IssueAgentJobEventListener {
     }
 
     void recordUpdate(ScmDomainEvent.IssueUpdated event, SignalRevision revision) {
-        for (Workspace workspace : workspaceResolver.resolveAllForRepository(
-                event.issue().repository().nameWithOwner())) {
+        for (Workspace workspace : workspaceResolver.resolveAllForRepositoryId(
+                event.issue().repository().id())) {
             SignalKey key = new SignalKey(workspace.getId(), event.issue().id(), ScmSignals.ISSUE_UPDATED, revision);
             if (event.context().isSync()) {
                 signalRecorder.record(key, event.context().occurredAt(), DiscoveredVia.SYNC);
@@ -173,16 +174,16 @@ public class IssueAgentJobEventListener {
     }
 
     /**
-     * Records the observation, then decides whether it warrants a review — the same split as the PR
+     * Records the occurrence, then decides whether it warrants a review — the same split as the PR
      * listener, and for the same reason: what we saw is a fact, whether to coach on it is a policy.
      */
     private void dispatchIssueEvent(
             ScmEventPayload.IssueData issueData, EventContext context, String triggerEventName) {
-        for (Workspace workspace :
-                workspaceResolver.resolveAllForRepository(issueData.repository().nameWithOwner())) {
+        for (Workspace workspace : workspaceResolver.resolveAllForRepositoryId(
+                issueData.repository().id())) {
             try {
-                workspaceTransaction.executeWithoutResult(
-                        status -> dispatchIssueEventInWorkspace(issueData, context, triggerEventName, workspace));
+                workspaceTransaction.executeWithoutResult(status ->
+                        dispatchIssueEventInWorkspace(issueData, context, triggerEventName, workspace.getId()));
             } catch (Exception e) {
                 log.error(
                         "Failed to handle issue event: issueId={}, event={}, workspaceId={}",
@@ -195,7 +196,19 @@ public class IssueAgentJobEventListener {
     }
 
     private void dispatchIssueEventInWorkspace(
-            ScmEventPayload.IssueData issueData, EventContext context, String triggerEventName, Workspace workspace) {
+            ScmEventPayload.IssueData issueData, EventContext context, String triggerEventName, long workspaceId) {
+        Issue issue = issueRepository
+                .findByIdWithRepositoryAndAssignees(issueData.id())
+                .orElse(null);
+        Long repositoryId = issue == null
+                ? issueData.repository().id()
+                : issue.getRepository() == null ? null : issue.getRepository().getId();
+        // Discovery is not admission: monitoring and settings can change between workspace transactions.
+        Workspace workspace = workspaceResolver.resolveAllForRepositoryId(repositoryId).stream()
+                .filter(candidate -> Objects.equals(candidate.getId(), workspaceId))
+                .findFirst()
+                .orElse(null);
+        if (workspace == null) return;
         SignalKey key = signalKeyFor(issueData, triggerEventName, workspace.getId());
         if (key == null) {
             return;
@@ -216,9 +229,6 @@ public class IssueAgentJobEventListener {
             return;
         }
 
-        Issue issue = issueRepository
-                .findByIdWithRepositoryAndAssignees(issueData.id())
-                .orElse(null);
         if (issue == null || issue.getRepository() == null) {
             log.warn(
                     "Cannot submit issue agent job: issue not found or missing repository, issueId={}", issueData.id());

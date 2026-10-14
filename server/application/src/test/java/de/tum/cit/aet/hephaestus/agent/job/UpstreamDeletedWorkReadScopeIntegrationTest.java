@@ -345,6 +345,7 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
                 workspaceResolver,
                 signalRecorder,
                 manifests,
+                Objects.requireNonNull(transactionTemplate.getTransactionManager()),
                 repositoryPreparer);
         tombstonePullRequest();
 

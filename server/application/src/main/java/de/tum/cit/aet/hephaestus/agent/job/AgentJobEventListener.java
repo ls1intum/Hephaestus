@@ -27,6 +27,7 @@ import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -34,14 +35,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Listens for PR and review domain events, records what was observed, and submits practice-aware
- * agent jobs for the observations that warrant one.
+ * Listens for PR and review domain events, records their occurrences, and submits practice-aware
+ * agent jobs for the occurrences that warrant one.
  *
  * <p>Uses {@code @Async @TransactionalEventListener(AFTER_COMMIT)} to avoid blocking the webhook
  * processing thread and to ensure entities are committed before we read them.
@@ -66,6 +68,7 @@ public class AgentJobEventListener {
     private final SignalRecorder signalRecorder;
     private final IntegrationManifestRegistry manifests;
     private final LinkedIssueOccasions linkedIssueOccasions;
+    private final TransactionTemplate workspaceTransaction;
 
     public AgentJobEventListener(
             AgentJobService agentJobService,
@@ -74,6 +77,7 @@ public class AgentJobEventListener {
             WorkspaceResolver workspaceResolver,
             SignalRecorder signalRecorder,
             IntegrationManifestRegistry manifests,
+            PlatformTransactionManager transactionManager,
             ReviewRepositoryPreparer repositoryPreparer) {
         this.agentJobService = agentJobService;
         this.pullRequestRepository = pullRequestRepository;
@@ -83,17 +87,17 @@ public class AgentJobEventListener {
         this.manifests = manifests;
         this.linkedIssueOccasions =
                 new LinkedIssueOccasions(pullRequestRepository, workspaceResolver, signalRecorder, repositoryPreparer);
+        this.workspaceTransaction = new TransactionTemplate(transactionManager);
+        this.workspaceTransaction.setPropagationBehavior(Propagation.REQUIRES_NEW.value());
     }
 
     @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestCreated(ScmDomainEvent.PullRequestCreated event) {
         handlePullRequestEvent(event.pullRequest(), event.context(), TriggerEventNames.PULL_REQUEST_CREATED);
     }
 
     @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestReady(ScmDomainEvent.PullRequestReady event) {
         handlePullRequestEvent(event.pullRequest(), event.context(), TriggerEventNames.PULL_REQUEST_READY);
@@ -118,14 +122,14 @@ public class AgentJobEventListener {
         if (event.context().isSync() || isClosedOrMerged(prData.state(), prData.isMerged())) {
             return;
         }
-        SignalKey key = signalKeyFor(prData, TriggerEventNames.PULL_REQUEST_SYNCHRONIZED, null);
-        if (key != null) {
-            signalRecorder.defer(key, event.context().occurredAt());
+        for (Workspace workspace :
+                workspaceResolver.resolveAllForRepositoryId(prData.repository().id())) {
+            SignalKey key = signalKeyFor(prData, TriggerEventNames.PULL_REQUEST_SYNCHRONIZED, null, workspace.getId());
+            if (key != null) signalRecorder.defer(key, event.context().occurredAt());
         }
     }
 
     @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestSynchronizedBySync(ScmDomainEvent.PullRequestSynchronized event) {
         if (event.context().isSync()) {
@@ -153,27 +157,26 @@ public class AgentJobEventListener {
                 || isClosedOrMerged(prData.state(), prData.isMerged())) {
             return;
         }
-        SignalKey key = signalKeyFor(prData, TriggerEventNames.PULL_REQUEST_UPDATED, null);
-        if (key == null) {
-            return;
-        }
-        if (event.context().isSync()) {
-            signalRecorder.record(key, event.context().occurredAt(), DiscoveredVia.SYNC);
-        } else {
-            signalRecorder.defer(
-                    key, event.context().occurredAt(), event.context().actorUserId());
+        for (Workspace workspace :
+                workspaceResolver.resolveAllForRepositoryId(prData.repository().id())) {
+            SignalKey key = signalKeyFor(prData, TriggerEventNames.PULL_REQUEST_UPDATED, null, workspace.getId());
+            if (key == null) continue;
+            if (event.context().isSync()) {
+                signalRecorder.record(key, event.context().occurredAt(), DiscoveredVia.SYNC);
+            } else {
+                signalRecorder.defer(
+                        key, event.context().occurredAt(), event.context().actorUserId());
+            }
         }
     }
 
     @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewSubmitted(ScmDomainEvent.ReviewSubmitted event) {
         handleReviewEvent(event.review(), event.context());
     }
 
     @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestMerged(ScmDomainEvent.PullRequestMerged event) {
         // Deliberately without the closed/merged short-circuit: here the terminal state IS the
@@ -187,7 +190,6 @@ public class AgentJobEventListener {
      * {@link #onPullRequestMerged}.
      */
     @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestClosed(ScmDomainEvent.PullRequestClosed event) {
         if (event.wasMerged()) {
@@ -205,7 +207,7 @@ public class AgentJobEventListener {
     }
 
     /**
-     * Records the observation, then decides whether it warrants a review.
+     * Records the occurrence, then decides whether it warrants a review.
      *
      * <p>The ledger settles the first question for everyone: whichever observer of an occurrence gets
      * there first is told to act, and the rest stop here. That is what makes deduplication outlast the
@@ -217,7 +219,51 @@ public class AgentJobEventListener {
             String triggerEventName,
             ScmEventPayload.@Nullable ReviewData reviewData) {
         try {
-            SignalKey key = signalKeyFor(prData, triggerEventName, reviewData);
+            PullRequest current =
+                    pullRequestRepository.findByIdWithAllForGate(prData.id()).orElse(null);
+            for (Workspace workspace : workspaceResolver.resolveAllForRepositoryId(repositoryIdFor(current, prData))) {
+                try {
+                    workspaceTransaction.executeWithoutResult(status ->
+                            dispatchInWorkspace(prData, context, triggerEventName, reviewData, workspace.getId()));
+                } catch (Exception e) {
+                    log.error(
+                            "Failed to process PR event in workspace: prId={}, workspaceId={}, event={}",
+                            prData.id(),
+                            workspace.getId(),
+                            triggerEventName,
+                            e);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to resolve PR event source: prId={}, event={}", prData.id(), triggerEventName, e);
+        }
+    }
+
+    private static @Nullable Long repositoryIdFor(
+            @Nullable PullRequest current, ScmEventPayload.PullRequestData event) {
+        return current == null
+                ? event.repository().id()
+                : current.getRepository() == null
+                        ? null
+                        : current.getRepository().getId();
+    }
+
+    private void dispatchInWorkspace(
+            ScmEventPayload.PullRequestData prData,
+            EventContext context,
+            String triggerEventName,
+            ScmEventPayload.@Nullable ReviewData reviewData,
+            long workspaceId) {
+        try {
+            PullRequest pr =
+                    pullRequestRepository.findByIdWithAllForGate(prData.id()).orElse(null);
+            // Discovery is not admission: a monitor or workspace setting can change between transactions.
+            Workspace workspace = workspaceResolver.resolveAllForRepositoryId(repositoryIdFor(pr, prData)).stream()
+                    .filter(candidate -> Objects.equals(candidate.getId(), workspaceId))
+                    .findFirst()
+                    .orElse(null);
+            if (workspace == null) return;
+            SignalKey key = signalKeyFor(prData, triggerEventName, reviewData, workspaceId);
             if (key == null) {
                 return;
             }
@@ -238,8 +284,6 @@ public class AgentJobEventListener {
                 return;
             }
 
-            PullRequest pr =
-                    pullRequestRepository.findByIdWithAllForGate(prData.id()).orElse(null);
             if (pr == null) {
                 log.warn("Cannot submit agent job: PR not found, prId={}", prData.id());
                 signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_GONE);
@@ -262,9 +306,10 @@ public class AgentJobEventListener {
             }
 
             GateDecision decision = reviewData == null
-                    ? reviewGate.evaluate(pr, key.signalName(), TriggerMode.AUTO)
-                    : reviewGate.evaluate(
+                    ? reviewGate.evaluatePullRequest(pr, workspace, key.signalName(), TriggerMode.AUTO)
+                    : reviewGate.evaluatePullRequest(
                             pr,
+                            workspace,
                             key.signalName(),
                             TriggerMode.AUTO,
                             ReviewSubject.reviewer(reviewData.authorId(), reviewData.humanAuthor()));
@@ -344,16 +389,8 @@ public class AgentJobEventListener {
     private @Nullable SignalKey signalKeyFor(
             ScmEventPayload.PullRequestData prData,
             String triggerEventName,
-            ScmEventPayload.@Nullable ReviewData reviewData) {
-        // The mirror can hold a pull request whose repository row is gone; that reads as "not ours"
-        // rather than as an error, matching the gate.
-        String repositoryName = repositoryNameOf(prData);
-        Workspace workspace =
-                workspaceResolver.resolveForRepository(repositoryName).orElse(null);
-        if (workspace == null) {
-            log.debug("No workspace owns this repository, nothing to record: repoName={}", repositoryName);
-            return null;
-        }
+            ScmEventPayload.@Nullable ReviewData reviewData,
+            long workspaceId) {
         SignalName signal = ScmSignals.forTriggerEvent(triggerEventName).orElse(null);
         if (signal == null) {
             log.debug("No signal declared for trigger event, nothing to record: event={}", triggerEventName);
@@ -362,10 +399,10 @@ public class AgentJobEventListener {
         if (signal.equals(ScmSignals.PULL_REQUEST_REVIEWED)) {
             return reviewData == null
                     ? null
-                    : ScmSignals.pullRequestReviewKey(workspace.getId(), prData.id(), reviewData.id());
+                    : ScmSignals.pullRequestReviewKey(workspaceId, prData.id(), reviewData.id());
         }
         return ScmSignals.pullRequestKey(
-                        workspace.getId(),
+                        workspaceId,
                         prData.id(),
                         signal,
                         pullRequestRepository.findHeadRefOidById(prData.id()).orElse(null),

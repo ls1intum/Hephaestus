@@ -122,6 +122,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         // repository, and is this observation ours to act on. Lenient because the paths that
         // short-circuit before dispatch never ask them.
         lenient().when(workspaceResolver.resolveAllForRepository(any())).thenReturn(List.of(owningWorkspace));
+        lenient().when(workspaceResolver.resolveAllForRepositoryId(any())).thenReturn(List.of(owningWorkspace));
         lenient().when(signalRecorder.record(any(), any(), any())).thenReturn(true);
     }
 
@@ -233,7 +234,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             listener.onIssueCreated(event);
 
             verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SYNC));
-            verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
             verify(reviewGate, never()).evaluateIssue(any(), any(Workspace.class), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
         }
@@ -474,7 +474,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             listener.onIssueClosed(new ScmDomainEvent.IssueClosed(issueData, "completed", syncContext()));
 
             verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SYNC));
-            verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
             verify(reviewGate, never()).evaluateIssue(any(), any(Workspace.class), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
         }
@@ -487,7 +486,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         void shouldDeferTheSameUpdateForEveryMonitoringWorkspace() {
             Workspace second = new Workspace();
             second.setId(8L);
-            when(workspaceResolver.resolveAllForRepository(any())).thenReturn(List.of(owningWorkspace, second));
+            when(workspaceResolver.resolveAllForRepositoryId(any())).thenReturn(List.of(owningWorkspace, second));
             var issueData = createIssueData(Issue.State.OPEN);
             var context = webhookContext(1L);
 
