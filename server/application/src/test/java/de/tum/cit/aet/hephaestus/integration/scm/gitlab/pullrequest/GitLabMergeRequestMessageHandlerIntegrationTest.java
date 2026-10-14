@@ -21,6 +21,9 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobEventListener;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
 import de.tum.cit.aet.hephaestus.agent.job.LinkedRepairFollowups;
 import de.tum.cit.aet.hephaestus.agent.job.PullRequestSignalResubmitter;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -34,6 +37,8 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalState;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -76,6 +81,8 @@ import de.tum.cit.aet.hephaestus.testconfig.GraphQlResponses;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.testconfig.ScriptedGraphQlClient;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
@@ -237,6 +244,12 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     private Repository savedRepo;
     private IdentityProvider savedProvider;
     private Workspace savedWorkspace;
+
+    @Autowired
+    private ConnectionRepository eventConnections;
+
+    @Autowired
+    private RepositoryToMonitorRepository eventMonitors;
 
     @BeforeEach
     void setUp() {
@@ -2304,6 +2317,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         /** Settles the occasion as the real submission does, so a redelivery meets a decided signal. */
         @BeforeEach
         void submissionSettlesTheOccasion() {
+            prepareListenerAuthority();
             when(jobs.submit(any(), any(), any(), any(), any())).thenAnswer(invocation -> {
                 signalRecorder.markTriggered(invocation.getArgument(3), UUID.randomUUID());
                 return Optional.empty();
@@ -2779,7 +2793,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
         private void gateRuns(Practice practice) {
             var decision = new GateDecision.Run(savedWorkspace, List.of(practice), 1, TriggerMode.AUTO);
-            when(gate.evaluate(any(), eq(ScmSignals.PULL_REQUEST_MERGED), eq(TriggerMode.AUTO)))
+            when(gate.evaluatePullRequest(
+                            any(), any(Workspace.class), eq(ScmSignals.PULL_REQUEST_MERGED), eq(TriggerMode.AUTO)))
                     .thenReturn(decision);
             when(gate.evaluateQueued(
                             any(), eq(savedWorkspace.getId()), eq(ScmSignals.PULL_REQUEST_MERGED), any(), anyBoolean()))
@@ -2794,6 +2809,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     workspaceResolver,
                     signalRecorder,
                     manifests,
+                    Objects.requireNonNull(transactionTemplate.getTransactionManager()),
                     repositoryPreparer);
         }
 
@@ -2851,6 +2867,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
          */
         @Test
         void tombstonedMergeRequestHoldsItsOccasionUntilAFurtherDeliveryRestoresIt() throws Exception {
+            prepareListenerAuthority();
             receive(loadPayload("merge_request.open"));
             ScmDomainEvent.PullRequestCreated created = eventListener
                     .ofType(ScmDomainEvent.PullRequestCreated.class)
@@ -2872,6 +2889,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     workspaceResolver,
                     signalRecorder,
                     manifests,
+                    Objects.requireNonNull(transactionTemplate.getTransactionManager()),
                     repositoryPreparer);
             transactionTemplate.executeWithoutResult(status -> listener.onPullRequestCreated(created));
 
@@ -3035,6 +3053,27 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         ClassPathResource resource = new ClassPathResource("gitlab/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitLabMergeRequestEventDTO.class);
+    }
+
+    private void prepareListenerAuthority() {
+        var source = new Connection(
+                savedWorkspace,
+                IntegrationKind.GITLAB,
+                "listener-fixture",
+                new ConnectionConfig.GitLabConfig(
+                        savedProvider.getServerUrl(),
+                        null,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of(),
+                        null));
+        source.setState(IntegrationState.ACTIVE);
+        eventConnections.saveAndFlush(source);
+        var monitor = new RepositoryToMonitor();
+        monitor.setWorkspace(savedWorkspace);
+        monitor.setNameWithOwner(savedRepo.getNameWithOwner());
+        monitor.setNativeId(savedRepo.getNativeId());
+        eventMonitors.saveAndFlush(monitor);
     }
 
     private void setupTestData() {

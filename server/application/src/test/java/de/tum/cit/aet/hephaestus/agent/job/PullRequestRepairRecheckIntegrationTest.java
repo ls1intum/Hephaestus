@@ -373,6 +373,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                 workspaceResolver,
                 recorder,
                 manifests,
+                transactionManager,
                 repositoryPreparer);
         resubmitter = new PullRequestSignalResubmitter(
                 agentJobService, pullRequestRepository, gate, recorder, reviewRepository, manifests, followups);
@@ -1391,6 +1392,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
      */
     @Test
     void shouldHoldAnOlderPushForAnEditThatCommitsWhileTheGroupIsDrained() throws Exception {
+        ensureEventSource();
         Practice describe = practice("describe-what-and-why", ScmSignals.PULL_REQUEST_OPENED);
         PullRequest pr = pullRequest(false, HEAD, "Adds the thing");
         AgentJob opened = capturedReview(workspace, pr.getNumber(), pr.getId(), NOW);
@@ -2630,7 +2632,28 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         return pullRequestRepository.findByIdWithAllForGate(pr.getId()).orElseThrow();
     }
 
+    private void ensureEventSource() {
+        if (connections.findByWorkspaceId(workspace.getId()).stream()
+                .noneMatch(connection -> (connection.getKind() == IntegrationKind.GITHUB
+                                || connection.getKind() == IntegrationKind.GITLAB)
+                        && (connection.getState() == IntegrationState.ACTIVE
+                                || connection.getState() == IntegrationState.SUSPENDED))) {
+            connectActivitySource(
+                    workspace,
+                    gitProviderRepository
+                            .findById(Objects.requireNonNull(
+                                    repository.getProvider().getId()))
+                            .orElseThrow());
+        }
+        if (!monitors.existsByWorkspaceIdAndNameWithOwner(workspace.getId(), REPO)) {
+            var monitor = WorkspaceTestFixtures.repositoryMonitor(workspace, REPO);
+            monitor.setNativeId(repository.getNativeId());
+            monitors.saveAndFlush(monitor);
+        }
+    }
+
     private void edit(String body, Set<String> changedFields) {
+        ensureEventSource();
         upsert(false, Objects.requireNonNull(reload().getHeadRefOid()), body);
         var event = new ScmDomainEvent.PullRequestUpdated(
                 ScmEventPayload.PullRequestData.from(reload()), changedFields, liveContext());
@@ -2638,6 +2661,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
     }
 
     private void push(String head) {
+        ensureEventSource();
         upsert(false, head, Objects.requireNonNull(reload().getBody()));
         var event = new ScmDomainEvent.PullRequestSynchronized(
                 ScmEventPayload.PullRequestData.from(reload()), liveContext());
@@ -2645,6 +2669,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
     }
 
     private void draftPush(String head) {
+        ensureEventSource();
         upsert(true, head, Objects.requireNonNull(reload().getBody()));
         var event = new ScmDomainEvent.PullRequestSynchronized(
                 ScmEventPayload.PullRequestData.from(reload()), liveContext());
@@ -2653,6 +2678,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
 
     /** Marks the draft Ready and returns the review that occasion submitted. */
     private AgentJob markReady(PullRequest pr) {
+        ensureEventSource();
         PullRequest draft = reload();
         upsert(false, Objects.requireNonNull(draft.getHeadRefOid()), Objects.requireNonNull(draft.getBody()));
         var event = new ScmDomainEvent.PullRequestReady(ScmEventPayload.PullRequestData.from(reload()), liveContext());

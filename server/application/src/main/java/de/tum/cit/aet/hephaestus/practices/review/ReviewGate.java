@@ -128,15 +128,18 @@ public class ReviewGate {
             @NonNull Workspace workspace,
             @NonNull SignalName signal,
             @NonNull TriggerMode triggerMode) {
+        return evaluatePullRequest(pullRequest, workspace, signal, triggerMode, pullRequest.reviewSubject());
+    }
+
+    /** A submitted review retains its reviewer subject within the workspace that observed it. */
+    public GateDecision evaluatePullRequest(
+            @NonNull PullRequest pullRequest,
+            @NonNull Workspace workspace,
+            @NonNull SignalName signal,
+            @NonNull TriggerMode triggerMode,
+            @NonNull ReviewSubject subject) {
         return evaluateReviewableInWorkspace(
-                pullRequest,
-                workspace,
-                pullRequest.reviewState(),
-                signal,
-                triggerMode,
-                false,
-                pullRequest.reviewSubject(),
-                false);
+                pullRequest, workspace, pullRequest.reviewState(), signal, triggerMode, false, subject, false);
     }
 
     public GateDecision evaluatePullRequest(

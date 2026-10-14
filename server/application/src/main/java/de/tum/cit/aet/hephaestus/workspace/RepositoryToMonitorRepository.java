@@ -78,6 +78,13 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
             "SELECT m FROM RepositoryToMonitor m JOIN FETCH m.workspace WHERE m.nameWithOwner = :nameWithOwner ORDER BY m.workspace.id")
     List<RepositoryToMonitor> findAllWithWorkspaceByNameWithOwner(@Param("nameWithOwner") String nameWithOwner);
 
+    /** Qualified monitors of one mirrored repository, with current workspace settings initialized. */
+    @Query("SELECT m FROM RepositoryToMonitor m JOIN FETCH m.workspace "
+            + "JOIN Repository r ON r.nameWithOwner = m.nameWithOwner WHERE r.id = :repositoryId AND "
+            + MonitoredRepositoryScope.FUNCTION
+            + "(m.workspace.id, m.nativeId, r.nativeId, r.provider.id) = true ORDER BY m.workspace.id")
+    List<RepositoryToMonitor> findAllWithWorkspaceByRepositoryId(@Param("repositoryId") Long repositoryId);
+
     /**
      * Finds every monitor tracking the repository with the given provider-stable id on {@code providerId} — across
      * all workspaces whose SCM connection is registered under that provider, because a repository can be monitored by

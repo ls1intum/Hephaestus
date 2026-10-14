@@ -31,6 +31,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -102,9 +103,11 @@ class BotPracticeReviewIntegrationTest extends AbstractWorkspaceIntegrationTest 
         repository.setHtmlUrl((gitLab ? "https://gitlab.com/" : "https://github.com/") + "owner/repo");
         repository.setDefaultBranch("main");
         repository = repositories.saveAndFlush(repository);
+        connectActivitySource(workspace, provider);
         var monitor = new RepositoryToMonitor();
         monitor.setWorkspace(workspace);
         monitor.setNameWithOwner("owner/repo");
+        monitor.setNativeId(repository.getNativeId());
         monitors.saveAndFlush(monitor);
         PullRequest pr = new PullRequest();
         pr.setProvider(provider);
@@ -136,8 +139,15 @@ class BotPracticeReviewIntegrationTest extends AbstractWorkspaceIntegrationTest 
         review = reviews.saveAndFlush(review);
         var payload = ScmEventPayload.ReviewData.from(review).orElseThrow();
         assertThat(payload.humanAuthor()).isFalse();
-        var listener =
-                new AgentJobEventListener(jobs, pullRequests, gate, resolver, recorder, manifests, repositoryPreparer);
+        var listener = new AgentJobEventListener(
+                jobs,
+                pullRequests,
+                gate,
+                resolver,
+                recorder,
+                manifests,
+                Objects.requireNonNull(transactions.getTransactionManager()),
+                repositoryPreparer);
         var context = new EventContext(
                 UUID.randomUUID(),
                 Instant.now(),

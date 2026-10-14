@@ -86,8 +86,7 @@ class DeferredIssueEventIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         workspace = workspaces.save(WorkspaceTestFixtures.activeWorkspace("deferred-event-" + UUID.randomUUID()));
-        when(fixture.resolver().resolveAllForRepository("owner/repo")).thenReturn(List.of(workspace));
-        when(fixture.resolver().resolveForRepository("owner/repo")).thenReturn(Optional.of(workspace));
+        when(fixture.resolver().resolveAllForRepositoryId(1L)).thenReturn(List.of(workspace));
         when(fixture.pullRequests().findHeadRefOidById(PULL_REQUEST_ID)).thenReturn(Optional.of("head-2"));
     }
 
@@ -138,7 +137,7 @@ class DeferredIssueEventIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldCommitOtherWorkspaceWhenOneDatabaseWriteFails() {
         Workspace other = workspaces.save(WorkspaceTestFixtures.activeWorkspace("other-event-" + UUID.randomUUID()));
-        when(fixture.resolver().resolveAllForRepository("owner/repo")).thenReturn(List.of(workspace, other));
+        when(fixture.resolver().resolveAllForRepositoryId(1L)).thenReturn(List.of(workspace, other));
         var attempts = new AtomicInteger();
         when(fixture.issueRepository().findByIdWithRepositoryAndAssignees(anyLong()))
                 .thenAnswer(invocation -> {
@@ -246,6 +245,7 @@ class DeferredIssueEventIntegrationTest extends BaseIntegrationTest {
                 Fixture fixture,
                 SignalRecorder recorder,
                 IntegrationManifestRegistry manifests,
+                PlatformTransactionManager transactionManager,
                 ReviewRepositoryPreparer repositoryPreparer) {
             return new AgentJobEventListener(
                     mock(AgentJobService.class),
@@ -254,6 +254,7 @@ class DeferredIssueEventIntegrationTest extends BaseIntegrationTest {
                     fixture.resolver(),
                     recorder,
                     manifests,
+                    transactionManager,
                     repositoryPreparer);
         }
 
